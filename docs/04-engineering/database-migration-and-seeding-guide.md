@@ -186,7 +186,7 @@ async function main() {
       phone: '9876543210',
       email: 'admin@kumaranfinance.com',
       passwordHash,
-      role: Role.SUPER_ADMIN,
+      roles: [Role.SUPER_ADMIN],
       isActive: true,
     },
   });

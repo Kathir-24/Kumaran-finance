@@ -36,7 +36,7 @@ flowchart LR
 - [ ] Monetary columns use 64-bit integer Rupees (**`BigInt`**); zero floating-point numbers and zero paise (`CONFIRMED-BY-DEVELOPER`).
 
 ### Gate 4: Security & Authorization (RBAC)
-- [ ] Endpoint is protected with JWT Auth Guard and Role Decorators (`@Roles(Role.BRANCH_MANAGER)`).
+- [ ] Endpoint is protected with JWT Auth Guard and Role Decorators (e.g., `@Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)`).
 - [ ] Branch scoping enforced: Users cannot read or mutate data outside their assigned branch unless granted global scope.
 - [ ] Sensitive operations (payment reversals, auction finalization, prize payouts) require Maker-Checker dual approval with **`maker_user_id != checker_user_id`** strictly enforced (`CONFIRMED-BY-DEVELOPER`).
 

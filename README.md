@@ -8,8 +8,8 @@
 
 1. **Company & Tenancy**: Built specifically for **Kumaran Finance** operating as a strict single-company database (zero redundant `company_id` columns).
 2. **Whole Rupee Arithmetic**: All financial amounts (installments, dividends, foreman commissions, prize payouts) are stored and calculated strictly as **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations.
-3. **Commission & Dividends**: Foreman commission defaults to **4.00%** and is frozen per chit group upon activation. Dividends are shared **only among non-prized (remaining non-winning) members** and deducted directly from the monthly installment payable ($I_{net} = I_{base} - Div$).
-4. **Auctions & Tie-Breaks**: Auctions are conducted offline at the branch. The software records and validates bids against dynamic ceilings. Tied ceiling bids are resolved via **Option A (Physical Paper Token Draw)** at the branch.
+3. **Commission & Dividends**: Foreman commission defaults to **4.00%** and is frozen per chit group upon activation. Dividends are shared **equally across ALL members in that chit group, INCLUDING the auction winner and past prized winners** (`CONFIRMED-BY-DEVELOPER`), and deducted directly from the monthly installment payable next month ($I_{net} = I_{base} - Div$).
+4. **Auctions & Tie-Breaks**: Auctions are conducted offline at the branch. The software records and validates bids against a fixed **one-fourth (1/4 or 25%) discount ceiling** ($D \le \frac{V}{4}$). Tied ceiling bids are resolved via **Option A (Physical Paper Token Draw)** at the branch.
 5. **Operating Structure & Dual Controls**: Supports Kumaran Finance's structure (**4 equal partners**, **2–3 field collection agents**, **1 physical branch office**). High-risk financial actions strictly enforce **Maker-Checker separation of duties** (`maker_user_id != checker_user_id`).
 6. **Data Scope**: Handles fresh new chits as well as mid-cycle onboarding from physical paper notebooks and physical receipts.
 
