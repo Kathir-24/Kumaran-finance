@@ -65,7 +65,7 @@
 | `GET` | `/branches` | List all active company branches | Authenticated Staff |
 | `POST` | `/branches` | Create new branch office | `SUPER_ADMIN` |
 | `GET` | `/users` | List staff users (scoped to branch) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/users` | Create staff user and assign role | `SUPER_ADMIN` |
+| `POST` | `/users` | Create staff user and assign roles (supports multi-role array, e.g. `[COLLECTION_AGENT, ACCOUNTANT]`) | `SUPER_ADMIN` |
 | `PATCH` | `/users/:id/status` | Activate or deactivate staff user | `SUPER_ADMIN` |
 
 ### 2.3 Customers & KYC (`/customers`)
@@ -90,39 +90,40 @@
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/chits/:id/auctions` | View auction schedule and past results | All |
-| `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket and bid discount | `BRANCH_MANAGER`, `SUPER_ADMIN` |
-| `POST` | `/auctions/:id/tie-break-record` | **Option A (Physical Draw)**: Record physically drawn paper token winner for ceiling tie | `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket and bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/tie-break-record` | **Option A (Physical Draw)**: Record physically drawn paper token winner for ceiling tie | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/finalize` | **Checker**: Commit official auction result & update dues (`maker != checker`) | `SUPER_ADMIN` |
 | `GET` | `/auctions/:id/minutes/pdf` | Download signed statutory Auction Minutes PDF | Staff, Auditor |
 
-### 2.6 Installment Dues & Passbook (`/installments`)
+### 2.6 Installment Dues, Passbook & Ticket Management (`/installments`, `/tickets`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/tickets/:ticketId/dues` | View full schedule of past and upcoming dues | Staff, Member |
 | `GET` | `/tickets/:ticketId/passbook` | Detailed statement (Dues, Dividends, Payments) | Staff, Member |
+| `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute company removal rights after 3 consecutive missed installments (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
 
 ### 2.7 Field Collections & Cash Handover (`/collections`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/collections/agent-dues` | List dues assigned to field agent | `COLLECTION_AGENT` |
-| `POST` | `/collections/record` | Agent records collection (Supports Idempotency) | `COLLECTION_AGENT`, `ACCOUNTANT` |
-| `GET` | `/collections/daily-summary` | Summary of today's field collections | `COLLECTION_AGENT`, `BRANCH_MANAGER` |
+| `POST` | `/collections/record` | Agent records collection (Requires exact $I_{net}$; throws 400 on partial or duplicate) | `COLLECTION_AGENT`, `ACCOUNTANT` |
+| `GET` | `/collections/daily-summary` | Summary of today's field collections | `COLLECTION_AGENT`, `SUPER_ADMIN` |
 | `POST` | `/collections/cash-handover/submit` | Agent submits cash handover request | `COLLECTION_AGENT` |
-| `POST` | `/collections/cash-handover/acknowledge` | Cashier confirms cash receipt at branch | `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/collections/cash-handover/acknowledge` | Partner acknowledges cash into vault (**Enforces** `collector_user_id != acknowledger_user_id`) | `SUPER_ADMIN`, `ACCOUNTANT` |
 
 ### 2.8 Payments, Bilingual Receipts, & Reversals (`/payments`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `POST` | `/payments` | Record payment (Cash, UPI, Cheque) | Staff |
+| `POST` | `/payments` | Record discrete payment (Requires exact $I_{net}$; throws 400 on partial or duplicate) | Staff |
 | `GET` | `/payments/:id/receipt` | Generate bilingual PDF receipt (English + Tamil) | Staff, Member |
-| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with reason | `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with reason | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 
 ### 2.9 Prize Disbursements & Safety Proof Checklist (`/disbursements`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/auctions/:id/winner` | View auction winner details & disbursement status | Staff, Member |
-| `POST` | `/auctions/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, promissory notes, scans) | `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/auctions/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, promissory notes, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/auctions/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
 
