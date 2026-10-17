@@ -49,4 +49,4 @@
 - **Field Agent Offline Drafts**:
   - The Android app must allow field collection agents (supporting dynamic $N$ agents) to record cash collections even when cellular network connectivity is lost in rural areas.
   - Collections are cached securely in local SQLite/Encrypted SharedPreferences with timestamps and synchronized via idempotent retry queues upon network reconnection.
-- **Offline Conflict Handling**: If duplicate online and offline payments occur, the excess cash is automatically credited as **Advance Balance** on the subscriber's ticket toward next month's installment (`CONFIRMED-BY-DEVELOPER`).
+- **Single Discrete Payment Enforcement**: Each installment month accepts strictly one payment matching the net installment due. Once marked paid, duplicate payment attempts are rejected by the backend idempotency engine; zero double payments and zero advance balances exist (`CONFIRMED-BY-DEVELOPER`).

@@ -67,50 +67,48 @@ it('should guarantee: Total Collected + Distributed Dividends + Undistributed Re
 
 ---
 
-## 2. Dynamic Discount Ceiling Boundary Tests
+## 2. Fixed 1/4 (25%) Discount Ceiling Boundary Tests
 
 | Test Case ID | Description | Input Discount | Expected Outcome |
 |---|---|---|---|
-| `TC-CEIL-01` | Exceeds Active Scheme Ceiling | $D = 36\%$ (Ceiling is 35%) | **REJECT**: Exceeds active scheme discount ceiling for that month |
-| `TC-CEIL-02` | Within Month Ceiling | $D = 30\%$ (Ceiling is 35%) | **ACCEPT**: Valid winning bid recorded |
-| `TC-CEIL-03` | Exactly at Ceiling | $D = 35\%$ (Ceiling is 35%) | **ACCEPT**: Recorded as ceiling bid |
-| `TC-CEIL-04` | Multiple Ceiling Bids | 3 members bid $D = 35\%$ | **TRIGGER TIE-BREAKER**: Staff records tied bidders; physical paper token drawn at branch; staff enters drawn winner into software (`CONFIRMED-BY-DEVELOPER`) |
+| `TC-CEIL-01` | Exceeds 1/4 (25%) Ceiling | $D = 26\%$ ($D > \frac{V}{4}$) | **REJECT**: Exceeds maximum 1/4 (25.00%) ceiling of chit value ($D \le \frac{V}{4}$) |
+| `TC-CEIL-02` | Within Permitted Range | $D = 20\%$ | **ACCEPT**: Valid winning bid recorded |
+| `TC-CEIL-03` | Exactly at 1/4 Ceiling | $D = 25\%$ ($D = \frac{V}{4}$) | **ACCEPT**: Recorded as ceiling bid |
+| `TC-CEIL-04` | Multiple Ceiling Bids | 3 members bid $D = 25\%$ | **TRIGGER TIE-BREAKER**: Staff records tied bidders; physical paper token drawn at branch; staff enters drawn winner into software (`CONFIRMED-BY-DEVELOPER`) |
 | `TC-CEIL-05` | Below Floor (Less than 4%) | $D = 3.5\%$ (Less than commission) | **REJECT**: Cannot be less than 4.00% Foreman Commission ($D \ge C_f$) |
 
 ---
 
-## 3. Offline Cash Collection Conflict & Advance Balance Test
+## 3. Single Payment Rule & Duplicate Payment Rejection Test
 
 ```typescript
-it('should credit duplicate offline cash collection as Advance Balance when online payment already posted', async () => {
+it('should reject duplicate payment attempt for an already paid installment (no advance balance allowed)', async () => {
   const ticketId = 'ticket-07';
   const installmentDueMonth = 4;
   const netDueAmount = 3750n;
 
-  // 1. Customer pays online via UPI
+  // 1. Customer pays installment due
   await recordPayment({
     ticketId,
     month: installmentDueMonth,
     amount: netDueAmount,
-    method: 'UPI',
-    reference: 'UPI-TXN-12345'
-  });
-
-  const dueAfterOnline = await getInstallmentDue(ticketId, installmentDueMonth);
-  expect(dueAfterOnline.status).toBe('PAID');
-
-  // 2. Field agent collects offline cash for the same installment
-  const conflictCashPayment = await recordPayment({
-    ticketId,
-    month: installmentDueMonth,
-    amount: netDueAmount,
     method: 'CASH',
-    reference: 'AGENT-CASH-9988'
+    reference: 'REC-PRD-00412'
   });
 
-  // Verify conflict resolution: Extra payment credited as Advance Balance
-  const ticket = await getSubscriberTicket(ticketId);
-  expect(ticket.advanceBalance).toBe(netDueAmount); // 3750n credited toward Month 5
+  const dueAfterPayment = await getInstallmentDue(ticketId, installmentDueMonth);
+  expect(dueAfterPayment.status).toBe('PAID');
+
+  // 2. Attempting a duplicate payment for the same already-paid month must be strictly rejected
+  await expect(
+    recordPayment({
+      ticketId,
+      month: installmentDueMonth,
+      amount: netDueAmount,
+      method: 'CASH',
+      reference: 'AGENT-CASH-9988'
+    })
+  ).rejects.toThrow('INSTALLMENT_ALREADY_PAID');
 });
 ```
 

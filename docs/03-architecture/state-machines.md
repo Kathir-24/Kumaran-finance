@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ### Transition Guards:
 - **`IN_PROGRESS` $\to$ `BID_RECORDED`**:
-  - Guard 1: Winning discount $D \le \text{Max Ceiling}$ for that month (validates against dynamic ceiling rule).
+  - Guard 1: Winning discount $D \le \frac{V}{4}$ (validates against fixed 1/4 ceiling of total chit value).
   - Guard 2: Winning discount $D \ge \text{Foreman Commission}$ ($4.00\%$).
   - Guard 3: Winner ticket must be active and non-prized.
   - Guard 4: **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: The bidding ticket must have paid its installment due for the current month (`due.status == PAID`). Unpaid subscribers are strictly blocked from participating or bidding in that month's auction.
@@ -63,24 +63,26 @@ stateDiagram-v2
 
 ---
 
-## 3. Prize Disbursement & Surety Checklist State Machine (`CONFIRMED-BY-DEVELOPER`)
+## 3. Prize Disbursement & Safety Proof Checklist State Machine (`CONFIRMED-BY-DEVELOPER`)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING_SURETY : Auction Finalized / Winner Determined
-    PENDING_SURETY --> VERIFIED_BY_MAKER : Staff Verifies Physical Checklist & Scans
+    [*] --> PENDING_VERIFICATION : Auction Finalized / Winner Determined
+    PENDING_VERIFICATION --> VERIFIED_BY_MAKER : Staff Verifies Safety Proof Checklist & Scans
     VERIFIED_BY_MAKER --> AUTHORIZED_BY_CHECKER : Partner Approves Payout Voucher (Maker != Checker)
     AUTHORIZED_BY_CHECKER --> DISBURSED : Payment Released (Cheque / NEFT / Cash)
     DISBURSED --> [*]
 ```
 
 ### Transition Guards:
-- **`PENDING_SURETY` $\to$ `VERIFIED_BY_MAKER`**:
-  - Branch Manager or Accountant verifies physical paperwork and records checklist in software:
-    1. Property documents submitted? [Yes / No]
+- **`PENDING_VERIFICATION` $\to$ `VERIFIED_BY_MAKER`**:
+  - Property documents are completely eliminated. Collateral/surety is **not mandatory** across the board; requested only if required by Kumaran Finance for company safety on a case-by-case basis.
+  - Branch Manager or Accountant verifies paperwork and records checklist in software:
+    1. Safety proof required for this winner? [Yes / No]
     2. Winner agreement signed? [Yes / No]
     3. Nominee signed? [Yes / No]
-    4. Scanned copies uploaded to secure storage.
+    4. Signed blank cheque(s) with details submitted? [Yes / No]
+    5. Scanned copies uploaded to secure storage.
 - **`VERIFIED_BY_MAKER` $\to$ `AUTHORIZED_BY_CHECKER`**:
   - Super Admin (Partner) authorizes the payout voucher.
   - Enforces `maker_user_id != checker_user_id`.
@@ -107,7 +109,7 @@ stateDiagram-v2
 - **`INITIATED` $\to$ `SUCCESS`**:
   - Issues sequential bilingual receipt (English + Tamil) in whole integer Rupees.
   - Allocates funds to oldest unpaid installment dues.
-  - **Conflict Handling Rule**: If online payment and offline field collection occur for the same month, extra cash is credited as **Advance Balance** toward next month's installment (`CONFIRMED-BY-DEVELOPER`).
+  - **Single Discrete Payment Rule**: Each installment month accepts strictly one payment matching the net installment due. Zero double payments and zero advance balances exist in the system (`CONFIRMED-BY-DEVELOPER`).
 - **`SUCCESS` $\to$ `REVERSED`**:
   - Never deletes the original payment record.
   - Reverses allocations on installment dues and cancels receipt.

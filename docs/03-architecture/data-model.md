@@ -7,8 +7,9 @@
 > 2. **Dynamic Personas ($N$ Users per Role)**: The system supports an arbitrary, dynamic number of users per persona; headcounts are never static.
 > 3. **Ticket Limit Constraint**: Database-level unique constraint prevents any single customer from holding 2 or more tickets in the same chit group (`@@unique([chitGroupId, customerId])`).
 > 4. **Commission Snapshotting**: 4.00% default with immutable group-level and auction-level freezes.
-> 5. **Surety Checklist Recordkeeping**: Checklist fields for property documents, signed agreements, and nominee signatures on prize winners.
-> 6. **Dynamic Ceilings & Physical Tie-Breaks**: Dynamic ceiling rules with support for physical paper token tie-breaks.
+> 5. **Company Safety Proof Recordkeeping**: Flexible security checklist (signed agreements, nominee signatures, blank cheques, promissory notes) on prize winners. Property documents eliminated; collateral is non-mandatory.
+> 6. **Fixed 1/4 Discount Ceiling & Physical Tie-Breaks**: Maximum auction discount fixed at strictly 1/4 (25%) of total chit value with support for in-branch physical paper token tie-breaks.
+> 7. **Single Discrete Payments & Zero Advance Balance**: Each installment month accepts strictly one payment; zero double payments and zero advance balance concept.
 
 ---
 
@@ -24,7 +25,6 @@ erDiagram
     CUSTOMER ||--o{ CUSTOMER_DOCUMENT : uploads
     CUSTOMER ||--o{ SUBSCRIBER_TICKET : owns
 
-    CHIT_GROUP ||--o{ CHIT_DISCOUNT_RULE : defines_ceilings
     CHIT_GROUP ||--o{ SUBSCRIBER_TICKET : contains
     CHIT_GROUP ||--o{ AUCTION : conducts
     CHIT_GROUP ||--o{ INSTALLMENT_DUE : schedules
@@ -158,7 +158,7 @@ model CustomerDocument {
 }
 
 // -------------------------------------------------------------
-// 3. Chit Groups, Mid-Cycle Onboarding & Dynamic Ceiling Engine
+// 3. Chit Groups, Mid-Cycle Onboarding & Fixed 1/4 Ceiling
 // -------------------------------------------------------------
 
 enum ChitStatus {
@@ -172,12 +172,6 @@ enum ChitStatus {
 enum InitializationMode {
   NEW_GROUP      // Starts from Month 1
   ONGOING_GROUP  // Mid-cycle onboarding from physical paper notebooks (e.g. at Month 7)
-}
-
-enum DiscountCeilingStrategy {
-  FLAT_CEILING    // Constant % across all months (e.g. 30.00%)
-  MONTH_TIERED    // Tapering ceiling (e.g. early months high, late months low)
-  CUSTOM_SCHEDULE // Explicit per-month limits defined in ChitDiscountRule
 }
 
 model ChitGroup {
@@ -195,9 +189,8 @@ model ChitGroup {
   // Commission Snapshot Pattern: 4.00% default, frozen per group
   foremanCommissionRate  Decimal                 @default(4.00) @db.Decimal(5, 2)
   
-  // Ceiling Strategy Pattern
-  ceilingStrategy        DiscountCeilingStrategy @default(FLAT_CEILING)
-  defaultMaxDiscountRate Decimal                 @default(30.00) @db.Decimal(5, 2) // Global scheme ceiling
+  // Fixed 1/4 (25%) Discount Ceiling: chitValue / 4
+  maxDiscountCeiling     BigInt                  // Whole integer Rupees: chitValue / 4 (e.g., 25000)
   
   // Mid-cycle onboarding support
   initMode               InitializationMode      @default(NEW_GROUP)
@@ -211,35 +204,21 @@ model ChitGroup {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
-  discountRules          ChitDiscountRule[]
   tickets                SubscriberTicket[]
   auctions               Auction[]
   dues                   InstallmentDue[]
 }
 
-model ChitDiscountRule {
-  id               String    @id @default(uuid())
-  chitGroupId      String
-  chitGroup        ChitGroup @relation(fields: [chitGroupId], references: [id], onDelete: Cascade)
-  fromMonth        Int       // e.g., 2
-  toMonth          Int       // e.g., 6
-  maxDiscountRate  Decimal   @db.Decimal(5, 2) // e.g., 35.00%
-  description      String?   // "Early months auction ceiling"
-
-  @@unique([chitGroupId, fromMonth, toMonth])
-}
-
 model SubscriberTicket {
-  id               String           @id @default(uuid())
-  chitGroupId      String
-  chitGroup        ChitGroup        @relation(fields: [chitGroupId], references: [id])
-  customerId       String
-  customer         Customer         @relation(fields: [customerId], references: [id])
-  ticketNumber     Int              // 1 to 20
+  id                      String           @id @default(uuid())
+  chitGroupId             String
+  chitGroup               ChitGroup        @relation(fields: [chitGroupId], references: [id])
+  customerId              String
+  customer                Customer         @relation(fields: [customerId], references: [id])
+  ticketNumber            Int              // 1 to 20
   isPrized                Boolean          @default(false)
   prizedAuctionId         String?
   openingBalance          BigInt           @default(0) // Whole integer Rupees for mid-cycle onboarding
-  advanceBalance          BigInt           @default(0) // Advance credit from overpayments / conflicts
   consecutiveUnpaidMonths Int              @default(0) // Tracks continuous unpaid months (triggers removal rights at 3)
   joiningDate             DateTime         @default(now())
   status                  String           @default("ACTIVE") // ACTIVE, DEFAULT_3_MONTHS, REMOVED_DEF_3M, SURRENDERED
@@ -311,14 +290,16 @@ model AuctionWinner {
   ticket                 SubscriberTicket  @relation(fields: [ticketId], references: [id])
   wasTieBreakWinner      Boolean           @default(false)
   
-  // Surety & Verification Checklist (Recordkeeper pattern)
-  propertyDocsSubmitted  Boolean           @default(false)
-  agreementSigned        Boolean           @default(false)
-  nomineeSigned          Boolean           @default(false)
-  suretyDocS3Key         String?           // Scanned paper documents
+  // Company Safety Proof Checklist (Recordkeeper pattern)
+  isSecurityRequired     Boolean           @default(false) // Evaluated case-by-case (not mandatory)
+  securityType           String?           // "BLANK_CHEQUE", "SIGNED_AGREEMENT", "PROMISSORY_NOTE", "OTHER"
+  blankChequeDetails     String?           // Bank name, cheque numbers, account holder name
+  agreementSigned        Boolean           @default(false) // Winner agreement signature
+  nomineeSigned          Boolean           @default(false) // Nominee signature
+  securityDocS3Key       String?           // Scanned papers, signed cheques, agreements
   verifiedByUserId       String?           // Staff / Branch Manager (Maker)
   
-  disbursementStatus     String            @default("PENDING_SURETY") // PENDING_SURETY, APPROVED, DISBURSED
+  disbursementStatus     String            @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, APPROVED, DISBURSED
   disbursementMode       DisbursementMode? // Cheque, NEFT/RTGS/IMPS, Cash
   disbursedAmount        BigInt?           // Whole integer Rupees
   authorizedByUserId     String?           // Super Admin / Partner (Checker)
@@ -431,7 +412,7 @@ model Receipt {
   branch             Branch   @relation(fields: [branchId], references: [id])
   paymentId          String   @unique
   payment            Payment  @relation(fields: [paymentId], references: [id])
-  receiptNumber      String   @unique // e.g., "KC-REC-VNR-2026-00045"
+  receiptNumber      String   @unique // e.g., "KC-REC-PRD-2026-00045"
   issuedAt           DateTime @default(now())
   isBilingual        Boolean  @default(true) // Generates English + Tamil receipt
   pdfS3Key           String?

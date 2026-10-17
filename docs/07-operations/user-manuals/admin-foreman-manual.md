@@ -69,14 +69,15 @@
 
 ---
 
-## 4. Prize Money Disbursement & Surety Checklist (`CONFIRMED-BY-DEVELOPER`)
+## 4. Prize Money Disbursement & Safety Proof Checklist (`CONFIRMED-BY-DEVELOPER`)
 
-1. When a winning subscriber claims their prize money, navigate to **Disbursements $\to$ Pending Sureties**.
-2. Fill in the **Surety Checklist** (**Maker**):
-   - **Property documents submitted?** [Yes / No] (Note: Evaluated on a case-by-case basis by company decision; **not mandatory** across the board).
+1. When a winning subscriber claims their prize money, navigate to **Disbursements $\to$ Pending Verification**.
+2. Fill in the **Company Safety Proof Checklist** (**Maker**):
+   - **Safety proof required for this winner?** [Yes / No] (Note: Evaluated on a case-by-case basis by company decision; **not mandatory** across the board).
    - **Winner agreement signed?** [Yes / No]
    - **Nominee signed?** [Yes / No]
-   - Upload scanned copies of the signed papers to secure storage.
+   - **Signed blank cheque(s) with details submitted?** [Yes / No, enter bank & cheque numbers]
+   - Upload scanned copies of the signed papers / cheques to secure storage.
 3. Prepare the Payout Voucher:
    - Select payment mode: **Account Payee Cheque**, **Bank Transfer (NEFT/RTGS/IMPS)**, or **Cash**.
    - Enter cheque number or bank reference details.

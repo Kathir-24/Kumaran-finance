@@ -12,7 +12,7 @@
 ```mermaid
 flowchart TD
     Step1["Step 1: Gather Physical Notebooks\nVerify Chit Group Name, Sanction Order, Total Tickets"] --> Step2["Step 2: Enter Group Master Terms\nChit Value, Duration, 4% Commission, Initialization Month"]
-    Step2 --> Step3["Step 3: Transcribe Past Auctions (Months 1 to K-1)\nRecord Winning Ticket, Winning Discount, Surety Checklist & Payout"]
+    Step2 --> Step3["Step 3: Transcribe Past Auctions (Months 1 to K-1)\nRecord Winning Ticket, Winning Discount, Safety Proof & Payout"]
     Step3 --> Step4["Step 4: Transcribe Month-by-Month Member Dues\nEnter payments month-by-month directly from physical ledger"]
     Step4 --> Step5{"Step 5: Pre-Activation Balancing Guard\nDoes System Total == Physical Notebook Total?"}
     Step5 -- Discrepancy Found --> Fix["Highlight Cell in Red & Correct Transcription Error"]
@@ -54,14 +54,15 @@ For each completed month from Month 1 up to Month 6, transcribe:
   - **NO auction** was conducted in Month 1; dividend is **₹0**.
 - **Months 2 through $K-1$ (Months 2 to 6) (`CONFIRMED-BY-DEVELOPER`)**:
   - Winning Ticket Number (e.g., Ticket #4)
-  - Winning Bid Discount (e.g., `₹28,000`)
+  - Winning Bid Discount (e.g., `₹24,000`, strictly $\le$ 1/4 ceiling of `₹25,000`)
   - Prize Money Status:
     - `DISBURSED`: With physical cheque number, bank UTR, or cash voucher reference number and date.
-    - `PENDING_SURETY`: If winning subscriber has not yet completed surety checklist.
-  - **Surety Checklist Verification (`CONFIRMED-BY-DEVELOPER`)**:
-    - Property documents submitted? [Yes / No]
+    - `PENDING_VERIFICATION`: If winning subscriber has not yet completed safety proof checklist.
+  - **Company Safety Proof Checklist Verification (`CONFIRMED-BY-DEVELOPER`)**:
+    - Safety proof required for this winner? [Yes / No]
     - Winner agreement signed? [Yes / No]
     - Nominee signed? [Yes / No]
+    - Signed blank cheque(s) with details submitted? [Yes / No]
     - Scanned copy uploaded to secure storage.
 - **Automatic Calculation**: The software instantly calculates the historical Foreman Commission (4%) and the member dividend allocated to non-prized members, verifying that it matches the dividend written in the physical ledger.
 
@@ -70,14 +71,14 @@ For each completed month from Month 1 up to Month 6, transcribe:
 ### Step 4: Transcribe Month-by-Month Member Payments
 Because Kumaran Finance's physical ledgers record collections **month-by-month**, the software presents an interactive digital grid mirroring the physical notebook page:
 
-| Ticket # | Subscriber Name | Month 1 (₹5,000) | Month 2 (₹3,700) | Month 3 (₹3,700) | Month 4 (₹3,800) | Month 5 (₹3,850) | Month 6 (₹3,900) | Advance Credit | Net Overdue |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | M. Kathirvel | Paid (REC-012) | Paid (REC-098) | Paid (REC-145) | Paid (REC-210) | Paid (REC-280) | Paid (REC-340) | ₹0 | ₹0 |
-| **2** | S. Sundaram | Paid (REC-014) | Paid (REC-101) | Paid (REC-148) | Paid (REC-212) | **UNPAID** | **UNPAID** | ₹0 | ₹7,750 |
-| **3** | P. Meenakshi | Paid (REC-015) | Paid (REC-102) | Paid (REC-150) | Paid (REC-215) | Paid (REC-282) | Paid (REC-345) | ₹4,000 | ₹0 |
+| Ticket # | Subscriber Name | Month 1 (₹5,000) | Month 2 (₹3,700) | Month 3 (₹3,700) | Month 4 (₹3,800) | Month 5 (₹3,850) | Month 6 (₹3,900) | Net Overdue |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | M. Kathirvel | Paid (REC-012) | Paid (REC-098) | Paid (REC-145) | Paid (REC-210) | Paid (REC-280) | Paid (REC-340) | ₹0 |
+| **2** | S. Sundaram | Paid (REC-014) | Paid (REC-101) | Paid (REC-148) | Paid (REC-212) | **UNPAID** | **UNPAID** | ₹7,750 |
+| **3** | P. Meenakshi | Paid (REC-015) | Paid (REC-102) | Paid (REC-150) | Paid (REC-215) | Paid (REC-282) | Paid (REC-345) | ₹0 |
 
 1. Check off paid installments or enter the physical paper receipt book number for cross-auditing.
-2. If a customer paid in advance (e.g., Ticket #3 paid an extra ₹4,000), enter the amount in the **Advance Credit** field.
+2. Each month has strictly a single discrete payment; zero double payments and zero advance balances exist.
 3. If a customer has unpaid past months (e.g., Ticket #2 unpaid for Months 5 & 6), the system calculates the exact overdue arrears in whole integer Rupees.
 
 ---
@@ -100,5 +101,5 @@ $$\sum \text{Total Historical Collections (System)} \quad \text{vs.} \quad \sum 
    - The chit is now officially `ACTIVE`.
    - Installments for Month 7 to Month 20 will be managed digitally.
    - Field collection agents can collect Month 7 dues on the mobile app.
-   - All past subscriber payment histories, receipts, and surety documents remain fully searchable.
+   - All past subscriber payment histories, receipts, and safety proof documents remain fully searchable.
    - In Month 20 (Final Month $N$), there will be **no auction**; the company will take 4% commission and the last month's payable installment, and settle the remaining prize money to the final subscriber with a receipt (`CONFIRMED-BY-DEVELOPER`).

@@ -95,8 +95,10 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 ### Module 7: Field Collections & Cash Handover (`CONFIRMED-BY-DEVELOPER`)
 - Mobile-first interface for field collection agents (supporting dynamic $N$ agents) showing assigned customer dues.
 - Offline-resilient collection recording with timestamp and receipt generation.
-- **Conflict Handling Rule (`CONFIRMED-BY-DEVELOPER`)**:
-  - If a subscriber pays online while an agent collects cash offline for the same installment, the extra cash is credited as **Advance Balance** toward the subscriber's next month's installment.
+- **Single Discrete Payment Rule (`CONFIRMED-BY-DEVELOPER`)**:
+  - Each installment month accepts strictly one payment matching the net installment due.
+  - Double payments for the same month will never happen in business operations.
+  - The concept of "Advance Balance" is completely eliminated from the product.
 - **End-of-Day Cash Handover**:
   - Agent records physical cash collected during field rounds.
   - Branch Cashier / Accountant / Partner verifies physical cash and acknowledges handover in the software before transactions are closed.
@@ -105,12 +107,12 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **Payment Modes**: Cash, UPI, Bank Transfer (NEFT/RTGS/IMPS), and Cheque.
 - **Bilingual Receipts (V1 Scope)**:
   - Formatted in both English and Tamil.
-  - Sequential branch-scoped numbering (e.g., `KC-REC-2026-00045`).
+  - Sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
   - Available as physical printed slips and downloadable digital PDFs.
 - **Prize Payout Vouchers (V1 Scope)**:
   - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`).
-  - Requires physical surety checklist verification (property docs [Yes/No], signed agreement [Yes/No], nominee signed [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).
-  - Property submission decision is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
+  - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).
+  - Property documents are completely eliminated; security proof is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
 - **Payment Reversals**:
   - Never delete a posted payment.
   - Requires Maker entry with documented reason and Checker approval by Super Admin (`maker_user_id != checker_user_id`).
@@ -121,10 +123,10 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Software does not conduct auctions autonomously; it validates and records results entered by staff.
 - **Validation Rules & Pre-Conditions**:
   1. Bid discount $\ge$ Foreman commission (4.00%).
-  2. Bid discount $\le$ Scheme's active ceiling for that month.
+  2. Bid discount $\le$ Fixed 1/4 (25.00%) ceiling of the total chit value ($D \le \frac{V}{4}$).
   3. **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: Any subscriber who has not paid their installment due for that specific month is **strictly ineligible to participate or bid** in that month's auction. The system verifies payment status and blocks entering an unpaid subscriber as an active bidder or winner.
 - **Tie-Breaker Protocol (`CONFIRMED-BY-DEVELOPER`)**:
-  - **Option A (Physical Paper Token Draw)**: When multiple members bid the ceiling discount, the Foreman draws paper tokens physically at the branch in front of members.
+  - **Option A (Physical Paper Token Draw)**: When multiple members bid the maximum 1/4 ceiling discount, the Foreman draws paper tokens physically at the branch in front of members.
   - Staff enters the winning ticket number into the software. (No autonomous digital lottery draws).
 - **Financial Commitment**:
   - Automatically calculates Prize Money ($P = V - D$), Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend for non-prized members.

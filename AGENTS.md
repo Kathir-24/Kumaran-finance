@@ -50,10 +50,10 @@ flowchart TD
     G2 --- G3["3. Commission Freeze\n4.00% locked per group"]
     G3 --- G4["4. Non-Prized Dividends\nInet = Ibase - Div (Non-prized only)"]
     G4 --- G5["5. Month 1 & N Rules\nNo auctions in Month 1 & N"]
-    G5 --- G6["6. Physical Tie-Breaks\nPhysical paper token draw at branch"]
+    G5 --- G6["6. Fixed 1/4 Ceiling & Tie-Break\nMax discount = V/4; paper token draw"]
     G6 --- G7["7. Ticket Limit\nMax 1 ticket per customer in same group"]
-    G7 --- G8["8. Defaulter Rules\nUnpaid = no auction; 3M = removal rights"]
-    G8 --- G9["9. Surety Checklist\nRecordkeeper; property not mandatory"]
+    G7 --- G8["8. Defaulter & Payment Rules\nUnpaid = no bid; zero double payment/advance"]
+    G8 --- G9["9. Company Safety Proof\nCheques/Agreements; property eliminated"]
     G9 --- G10["10. Maker != Checker\nStrict dual control on reversals/payouts"]
 ```
 
@@ -62,10 +62,10 @@ flowchart TD
 3. **Commission Freeze (ADR-04)**: Foreman commission defaults to **4.00%**, copied and permanently frozen per chit group upon activation.
 4. **Non-Prized Dividend Deduction**: Dividend is allocated **strictly to non-prized members** and deducted directly from the payable installment ($I_{net} = I_{base} - Div_{ticket}$). Prized past winners pay the full base installment ($I_{base}$) with no dividend deduction.
 5. **Month 1 & Month $N$ Rules**: Month 1 full pool is taken by the company customer ticket (**no auction**, ₹0 dividend). Month $N$ is settled directly to the final subscriber with a 4% commission and receipt (**no auction**). Auctions occur exclusively in Months 2 through $N-1$.
-6. **Physical Tie-Break Protocol (Option A)**: In-office auctions are recorded by branch staff. If multiple members bid the ceiling discount, the Foreman draws paper tokens physically at the branch in front of members; staff enters the drawn winning ticket into the system. **No autonomous software lottery draws**.
+6. **Fixed 1/4 Ceiling & Physical Tie-Break Protocol (ADR-06 & Option A)**: Auction discount ceiling is fixed strictly at **one-fourth (1/4 or 25%) of total chit value** ($D \le \frac{V}{4}$). If multiple members bid the ceiling, the Foreman draws paper tokens physically at the branch in front of members; staff enters the drawn winning ticket into the system. **No autonomous software lottery draws**.
 7. **Ticket Limit Constraint (ADR-13)**: A customer can join multiple chit groups, but **cannot hold 2 or more tickets in the same chit group** (Database enforced: `@@unique([chitGroupId, customerId])`).
-8. **Defaulter & Removal Rules**: Any subscriber who has not paid their installment due for that month is **strictly ineligible to participate or bid** in that month's auction. Failing to pay for **3 continuous (consecutive) months** grants the company the full right to remove the customer from the chit group.
-9. **Surety Checklist & Property Policy (ADR-15)**: The software acts as a checklist & recordkeeper (property docs [Yes/No], signed agreement [Yes/No], nominee signed [Yes/No], scanned uploads). Property submission is **not mandatory** across the board and is evaluated case-by-case by the company.
+8. **Defaulter & Single Payment Rules (ADR-07)**: Any subscriber who has not paid their installment due for that month is **strictly ineligible to participate or bid** in that month's auction. 3 consecutive unpaid months grants the company removal rights. Each month has strictly a single discrete payment; **zero double payments** and **zero advance balances** exist.
+9. **Company Safety Proof Checklist (ADR-15)**: Property documents are completely eliminated. Collateral/surety is **not mandatory** across the board and requested only on-demand for company safety. Software acts as a flexible checklist and attachment recordkeeper (signed agreement with winner & nominee, signed blank cheques, promissory notes, and scanned uploads).
 10. **Maker-Checker Separation of Duties**: Critical actions (payment reversals, auction finalization, prize disbursements) strictly enforce **`maker_user_id != checker_user_id`** at application and database levels.
 
 ---

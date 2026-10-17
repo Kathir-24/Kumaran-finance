@@ -36,7 +36,7 @@
   "timestamp": "2026-10-17T10:30:00.000Z",
   "error": {
     "code": "INVALID_BID_DISCOUNT",
-    "message": "Bid discount ₹42,000 exceeds maximum allowable ceiling of 40% (₹40,000)",
+    "message": "Bid discount ₹28,000 exceeds maximum allowable 1/4 ceiling of 25% (₹25,000)",
     "details": []
   }
 }
@@ -118,11 +118,11 @@
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with reason | `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 
-### 2.9 Prize Disbursements & Surety Checklist (`/disbursements`)
+### 2.9 Prize Disbursements & Safety Proof Checklist (`/disbursements`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/auctions/:id/winner` | View auction winner details & disbursement status | Staff, Member |
-| `POST` | `/auctions/:id/verify-surety` | **Maker**: Verify surety checklist (property docs, agreement, nominee, scans) | `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/auctions/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, promissory notes, scans) | `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/auctions/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/auctions/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
 

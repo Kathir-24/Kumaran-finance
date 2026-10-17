@@ -32,7 +32,7 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | **Password / Login** | Reset Staff Credentials | Yes | No | No | No | Self (OTP/MPIN)| No | `CONFIRMED-BY-DEVELOPER` |
 | **Customer Management**| View Customers | All | Branch scope | All | Assigned only | Own profile only| Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Create / Edit Customer Profile | Yes | Yes (Branch) | Limited intake| Lead intake only| Update request | No | `CONFIRMED-BY-DEVELOPER` |
-| | View KYC / Surety Documents | All | Branch scope | Verification | No | Own docs only | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | View KYC / Safety Proof Documents | All | Branch scope | Verification | No | Own docs only | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Verify Customer KYC Documents | Yes | Yes (Branch) | Yes | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Chit Schemes** | Create Scheme Draft / Template | Yes | Review only | Review only | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Activate Chit Scheme | Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
@@ -44,7 +44,7 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | | Approve Payment Reversal (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Offline Auctions** | Record Auction Result (Maker) | No | Yes (Branch) | No | No | View result | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Finalize Auction Result (Checker)| Yes | Authorized checker | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Prize Disbursement** | Verify Surety Checklist & Voucher (Maker)| No | Yes (Branch) | Yes (Voucher prep)| No | View status | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Prize Disbursement** | Verify Safety Proof Checklist & Voucher (Maker)| No | Yes (Branch) | Yes (Voucher prep)| No | View status | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Authorize Prize Payout (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Reports & Auditing** | View Financial Reports & Day Books| Global | Branch scope | Global | No | Own passbook | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Export Reports / Ledgers | Yes | Branch scope | Global | No | Own statement | Read-only | `CONFIRMED-BY-DEVELOPER` |
@@ -71,7 +71,7 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 - **Rule**: `Maker != Checker`.
 
 ### 3. Prize Money Disbursement:
-- **Maker (Verify & Submit)**: Branch Manager or Accountant verifies the physical surety checklist (property docs [Yes/No], winner agreement [Yes/No], nominee signed [Yes/No], scanned uploads) and prepares the payout voucher.
+- **Maker (Verify & Submit)**: Branch Manager or Accountant verifies the physical safety proof checklist (winner agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads) and prepares the payout voucher.
 - **Checker (Authorize Payout)**: Super Admin (Partner) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash.
 - **Rule**: `Maker != Checker`.
 

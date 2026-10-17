@@ -47,14 +47,14 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
 - **Installment Collection**: All 20 tickets pay the full base installment: **₹5,000 each**.
 - **Dividend in Month 1**: **₹0** (no dividend distributed in the first month).
 
-### Month 2: Sample Auction with ₹30,000 Winning Discount
-- Winning bid discount: **$D = ₹30,000$**
+### Month 2: Sample Auction with 1/4 Ceiling Discount (₹25,000)
+- Winning bid discount at maximum ceiling (1/4 of ₹1,00,000): **$D = ₹25,000$**
 - **Prize Money**:
-  $$P = V - D = ₹1,00,000 - ₹30,000 = ₹70,000$$
+  $$P = V - D = ₹1,00,000 - ₹25,000 = ₹75,000$$
 - **Foreman Commission Retained**:
   $$C_f = 4\% \times ₹1,00,000 = ₹4,000$$
 - **Total Member Dividend Calculated**:
-  $$Div_{total} = D - C_f = ₹30,000 - ₹4,000 = ₹26,000$$
+  $$Div_{total} = D - C_f = ₹25,000 - ₹4,000 = ₹21,000$$
 
 ### Installment Calculation Applied to All Schemes (`CONFIRMED-BY-DEVELOPER`):
 - **Dividend Eligibility (`CONFIRMED-BY-DEVELOPER`)**: Dividend is shared **only among non-prized (remaining non-winning) members**. Once a subscriber wins the prize money, they do not receive dividends in subsequent months.
@@ -110,13 +110,15 @@ The dividend settlement policy is confirmed as follows:
 - Staff conduct auctions offline at the branch office with participating members.
 - The software does not conduct auctions autonomously; it only **records, validates, and stores** the entered results submitted by staff.
 
-### 6.2 Discount Ceilings (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)
-- **Dynamic Ceilings (`CONFIRMED-BY-DEVELOPER`)**: Discount ceiling limits are **not constant**; they change dynamically depending on the scheme, duration, month, or company risk parameters.
-- **Statutory Maximum Cap (`UNVERIFIED-LEGAL`)**: A flat statutory 40% cap cited in generic chit literature is `UNVERIFIED-LEGAL` until verified with Tamil Nadu regulatory authorities.
-- **Minimum Floor (`CONFIRMED-BY-DEVELOPER`)**: The minimum bid discount cannot be lower than the foreman commission ($D \ge C_f$) to prevent negative dividends.
+### 6.2 Fixed 1/4 (25%) Discount Ceiling (`CONFIRMED-BY-DEVELOPER`)
+- **Fixed One-Fourth Ceiling ($D_{max} = \frac{V}{4}$)**: The auction discount ceiling is strictly fixed at **one-fourth (1/4 or 25.00%) of the total chit value ($V$)** across all auction months (`CONFIRMED-BY-DEVELOPER`). There is no dynamic ceiling.
+- **Enforced Range**: In every auction (Months 2 to $N-1$), the winning bid discount ($D$) must satisfy:
+  $$C_f \le D \le \frac{V}{4}$$
+  For example, in a ₹1,00,000 scheme ($V = \text{₹}1,00,000$), the winning discount can never exceed ₹25,000 ($D \le \text{₹}25,000$).
+- **Minimum Floor**: The minimum bid discount cannot be lower than the foreman commission ($D \ge C_f$) to prevent negative dividends.
 
 ### 6.3 Tie-Break Protocol (`CONFIRMED-BY-DEVELOPER`)
-- **Option A — Physical Token Draw (`CONFIRMED-BY-DEVELOPER`)**: When multiple bidders bid the maximum discount ceiling:
+- **Option A — Physical Token Draw (`CONFIRMED-BY-DEVELOPER`)**: When multiple bidders bid the maximum 1/4 discount ceiling:
   - The Foreman draws paper tokens/lots physically at the branch office in the presence of participating members.
   - Branch staff simply enters the winning ticket number drawn into the software.
   - The software records the result without running an autonomous digital RNG draw.
@@ -128,14 +130,19 @@ The dividend settlement policy is confirmed as follows:
 Kumaran Finance currently tracks active chits in physical notebooks and paper receipts (`CONFIRMED-BY-DEVELOPER`).
 - **Initial Month Offset (`CONFIRMED-BY-DEVELOPER`)**: The software records the active running month (e.g., Month 7) and sets past months (1 to 6) as completed historical records based on paper notebook entries.
 - **Historical Past Winners (`CONFIRMED-BY-DEVELOPER`)**: Recorded with winner ticket, winning discount, and prize payout status from ledger entries.
-- **Surety and Documentation Checklist (`CONFIRMED-BY-DEVELOPER`)**:
-  - The software acts strictly as a checklist and recordkeeper:
-    - Has the winner submitted property documents? [Yes / No]
-    - Has the agreement been signed by the winner? [Yes / No]
-    - Has the nominee signed? [Yes / No]
-    - Upload scanned copies of the signed papers to private storage.
-  - The software does not validate legal title or evaluate legal enforceability (`CONFIRMED-BY-DEVELOPER`).
-  - The property submission decision for each auction winner is evaluated on a case-by-case basis by the company and is **not mandatory** (`CONFIRMED-BY-DEVELOPER`).
+- **Single Discrete Payment & Zero Advance Balance (`CONFIRMED-BY-DEVELOPER`)**:
+  - Each installment month accepts strictly one payment matching the net installment amount.
+  - **Double payments for the same specified month will never happen** in business operations.
+  - The concept of "Advance Balance" is completely eliminated. No advance ledger or carry-forward balance exists.
+- **Flexible Company Safety Proof & Collateral Checklist (`CONFIRMED-BY-DEVELOPER`)**:
+  - Property documents and property deeds are completely eliminated from the workflow.
+  - Collateral / security proof is **not mandatory** across the board; it is requested strictly if required by Kumaran Finance for company safety on a case-by-case basis.
+  - The software functions as a flexible safety checklist & recordkeeper:
+    - Is safety proof required for this winner? [Yes / No]
+    - Agreement signed with auction winner & nominee signatures? [Yes / No]
+    - Signed blank cheque(s) with signatures submitted? [Yes / No, with cheque details]
+    - Promissory note / personal guarantee submitted? [Yes / No]
+    - Upload scanned copies of submitted papers / cheques to secure private storage.
 - **Receipts & Notifications (`CONFIRMED-BY-DEVELOPER`)**:
   - Generation of bilingual (English + Tamil) receipts (physical and digital PDF) is in V1 scope (`CONFIRMED-BY-DEVELOPER`).
   - SMS & WhatsApp payment notifications are in V1 scope (`CONFIRMED-BY-DEVELOPER`).
