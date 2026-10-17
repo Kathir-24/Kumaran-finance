@@ -57,7 +57,7 @@ stateDiagram-v2
   - Branch staff enters the physically drawn winning ticket number into the software.
   - Software logs all tied bidders and records the physical draw outcome without running an electronic random lottery.
 - **`BID_RECORDED` $\to$ `FINALIZED`**:
-  - Requires **Maker-Checker dual approval**: The staff member who entered the auction result cannot finalize it (`maker_user_id != checker_user_id`).
+  - Requires **Partner-to-Partner Maker-Checker dual approval**: The partner or staff member who conducted the auction and entered the result cannot finalize it (`maker_user_id != checker_user_id`). Partner A records $\to$ Partner B, C, or D reviews and commits.
   - Automatically calculates Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members (including auction winners).
   - Generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$) uniformly for all members.
 
@@ -77,15 +77,16 @@ stateDiagram-v2
 ### Transition Guards:
 - **`PENDING_VERIFICATION` $\to$ `VERIFIED_BY_MAKER`**:
   - Property documents are completely eliminated. Collateral/surety is **not mandatory** across the board; requested only if required by Kumaran Finance for company safety on a case-by-case basis.
-  - Branch Manager or Accountant verifies paperwork and records checklist in software:
+  - Accountant or Partner A (acting as Maker) verifies paperwork and records checklist in software:
     1. Safety proof required for this winner? [Yes / No]
     2. Winner agreement signed? [Yes / No]
     3. Nominee signed? [Yes / No]
     4. Signed blank cheque(s) with details submitted? [Yes / No]
-    5. Scanned copies uploaded to secure storage.
+    5. Promissory note / personal guarantee submitted? [Yes / No]
+    6. Scanned copies uploaded to secure storage.
 - **`VERIFIED_BY_MAKER` $\to$ `AUTHORIZED_BY_CHECKER`**:
-  - Super Admin (Partner) authorizes the payout voucher.
-  - Enforces `maker_user_id != checker_user_id`.
+  - Super Admin / Partner B authorizes the payout voucher.
+  - Enforces `maker_user_id != checker_user_id` (Partner A cannot self-approve; Partner B, C, or D must authorize).
 - **`AUTHORIZED_BY_CHECKER` $\to$ `DISBURSED`**:
   - Funds released via selected mode: Cheque, Bank Transfer (NEFT/RTGS/IMPS), or Cash.
   - Voucher number and payment reference recorded.
@@ -98,7 +99,7 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> INITIATED : Agent/Cashier Records Payment
     INITIATED --> PENDING_HANDOVER : Cash Payment Recorded in Field
-    PENDING_HANDOVER --> SUCCESS : Cashier Acknowledges Cash at Branch
+    PENDING_HANDOVER --> SUCCESS : Partner Acknowledges Cash at Branch (Collector != Acknowledger)
     INITIATED --> SUCCESS : Online UPI / Bank Cleared
     SUCCESS --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
     REVERSAL_REQUESTED --> REVERSED : Partner Approves Reversal (Checker, Maker != Checker)
@@ -106,18 +107,53 @@ stateDiagram-v2
 ```
 
 ### Transition Guards:
+- **`INITIATED` $\to$ `PENDING_HANDOVER` $\to$ `SUCCESS` (Field Cash Handover Guard)**:
+  - Agent records physical cash collected in the field, creating a payment batch in `PENDING_HANDOVER`.
+  - At end-of-day, the agent submits cash to the branch.
+  - **Dual-Role Cash Handover Guard**: Since field agents also perform desk accounting duties, the software strictly enforces:
+    $$\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$$
+    An agent who collected the cash can **never** acknowledge their own handover. An independent Partner (Super Admin) must physically verify and sign off the cash into the branch vault.
 - **`INITIATED` $\to$ `SUCCESS`**:
   - Issues sequential bilingual receipt (English + Tamil) in whole integer Rupees.
-  - Allocates funds to oldest unpaid installment dues.
-  - **Single Discrete Payment Rule**: Each installment month accepts strictly one payment matching the net installment due. Zero double payments and zero advance balances exist in the system (`CONFIRMED-BY-DEVELOPER`).
+  - **Single Discrete Payment & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)**:
+    - Each payment is strictly for **one discrete month's net installment ($I_{net}$)** in full.
+    - Partial payments and overpayments are strictly prohibited; floating allocations across multiple dues do not exist.
+    - Zero double payments and zero advance balances exist in the system.
+    - Marks that specific month's `InstallmentDue` status as `PAID`.
 - **`SUCCESS` $\to$ `REVERSED`**:
   - Never deletes the original payment record.
-  - Reverses allocations on installment dues and cancels receipt.
+  - Reverses the payment, restores the corresponding `InstallmentDue` strictly to `UNPAID`, and marks receipt as `VOID / CANCELED`.
   - Requires maker justification and checker authorization by Super Admin (`maker_user_id != checker_user_id`).
 
 ---
 
-## 5. Subscriber Ticket & 3-Month Arrears State Machine (`CONFIRMED-BY-DEVELOPER`)
+## 5. Installment Due Lifecycle State Machine (`CONFIRMED-BY-DEVELOPER`)
+
+```mermaid
+stateDiagram-v2
+    [*] --> UNPAID : Generated at Chit Launch / After Auction
+    UNPAID --> OVERDUE : Due Date Passes Without Payment
+    UNPAID --> PAID : Single Discrete Payment of I_net
+    OVERDUE --> PAID : Single Discrete Payment of I_net
+    PAID --> UNPAID : Payment Reversal Approved (Maker != Checker)
+```
+
+### Transition Guards:
+- **`[*] ` $\to$ `UNPAID`**:
+  - Generated automatically for each subscriber ticket upon chit group registration (Month 1) or immediately following auction finalization (Months 2 to $N$).
+  - Net amount calculated as $I_{net} = I_{base} - Div_{ticket}$ in whole integer Rupees.
+- **`UNPAID` $\to$ `OVERDUE`**:
+  - Automatically triggered when the monthly due date passes without full payment.
+  - **Auction Ineligibility**: Subscriber is strictly blocked from bidding in that month's auction until paid.
+- **`UNPAID` / `OVERDUE` $\to$ `PAID`**:
+  - Triggered exclusively by a single discrete payment of the exact net amount ($I_{net}$).
+  - **Zero Partial Payments**: `DueStatus` has strictly 3 states (`UNPAID`, `PAID`, `OVERDUE`).
+- **`PAID` $\to$ `UNPAID`**:
+  - Triggered when a payment reversal is approved under Maker-Checker dual control. Restores the due back to `UNPAID` with zero mathematical discrepancy.
+
+---
+
+## 6. Subscriber Ticket & 3-Month Arrears State Machine (`CONFIRMED-BY-DEVELOPER`)
 
 ```mermaid
 stateDiagram-v2
@@ -128,8 +164,8 @@ stateDiagram-v2
     ARREARS_2_MONTHS --> ACTIVE : Arrears Paid Up-to-Date
     ARREARS_2_MONTHS --> DEFAULT_3_MONTHS : 3rd Consecutive Installment Missed
     DEFAULT_3_MONTHS --> ACTIVE : Full Arrears Paid Up-to-Date
-    DEFAULT_3_MONTHS --> REMOVED_BY_COMPANY : Company Executes Removal Rights (Partner / Admin)
-    REMOVED_BY_COMPANY --> [*]
+    DEFAULT_3_MONTHS --> REMOVED_DEF_3M : Company Executes Removal Rights (Partner / Admin)
+    REMOVED_DEF_3M --> [*]
 ```
 
 ### Transition Guards:
@@ -138,7 +174,7 @@ stateDiagram-v2
   - Ineligibility: Subscribers in arrears are **strictly ineligible to bid in that month's auction** (`CONFIRMED-BY-DEVELOPER`).
 - **`ARREARS_2_MONTHS` $\to$ `DEFAULT_3_MONTHS`**:
   - Triggered when `consecutiveUnpaidMonths == 3`. Ticket is flagged for default removal.
-- **`DEFAULT_3_MONTHS` $\to$ `REMOVED_BY_COMPANY`**:
+- **`DEFAULT_3_MONTHS` $\to$ `REMOVED_DEF_3M`**:
   - Requires **Company Management / Partner Authorization**: Company exercises its confirmed right to remove the customer from the chit group.
   - Generates an immutable audit event with `removedByUserId` and timestamp.
   - Ticket is freed for substitution / re-assignment or account settlement according to company terms.
