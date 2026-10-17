@@ -33,15 +33,16 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **Dynamic Capacity ($N$ Persons Per Persona)**:
   - The software supports an arbitrary, dynamic number ($N$) of users assigned to any persona.
   - Headcounts are **never static or hardcoded**. The system accommodates any number of partners, managers, accountants, collection agents, customers, and auditors at present and in the future.
-- **The 6 Standardized Personas**:
-  1. `SUPER_ADMIN`: Company partners / proprietors with full administrative, configuration, and final approval (Checker) authority.
-  2. `BRANCH_MANAGER`: Operational branch head; manages member intake, ticket assignment, and offline auction recording (Maker).
-  3. `ACCOUNTANT`: Manages collections verification, bank reconciliation, day books, cash handovers, and voucher prep. (Simple "Accountant"; no "Head Office Accountant").
-  4. `COLLECTION_AGENT`: Field staff using mobile app for doorstep collections, offline recording, and cash handover.
+- **The Standardized Personas & Operating Reality**:
+  1. `SUPER_ADMIN`: Company partners / proprietors with full administrative, configuration, and final approval (Checker) authority. The **4 partners directly run branch operations**; no external Branch Manager is hired.
+  2. `BRANCH_MANAGER`: Operational branch head persona (optional/future expansion). Currently fulfilled directly by the 4 partners.
+  3. `ACCOUNTANT`: Manages collections verification, bank reconciliation, day books, cash handovers, and voucher prep. **Can be assigned to field collection agents performing dual office accounting roles**.
+  4. `COLLECTION_AGENT`: Field staff using mobile app for doorstep collections, offline recording, and cash handover submission.
   5. `CUSTOMER`: Subscribers viewing digital passbooks, dividend savings, upcoming dues, and making online payments.
   6. `AUDITOR`: Independent auditor with read-only access to ledgers, auction records, and reports.
 - **Enforced Maker-Checker Dual Controls**:
   - High-risk operations (payment reversals, auction finalization, prize disbursements) strictly enforce `maker_user_id != checker_user_id` at application and database levels (`CONFIRMED-BY-DEVELOPER`).
+  - Partner-to-Partner workflow: One partner initiates an entry (Maker) $\to$ Another partner reviews and finalizes (Checker).
 
 ### Module 3: Customer Management & KYC (`CONFIRMED-BY-DEVELOPER`)
 - **Unique Customer Code**: System-generated identifier (e.g., `KC-CUST-00101`).
@@ -54,11 +55,10 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 ### Module 4: Chit Scheme Management (New & Ongoing) (`CONFIRMED-BY-DEVELOPER`)
 - **Scheme Parameters**: Chit Value ($V$), Duration Months ($N$), Total Tickets ($M = N$), Base Monthly Installment ($I_{base} = V / N$). All values in whole integer Rupees (₹).
 - **Foreman Commission**: Configurable default of **4.00%**, copied and frozen onto the chit group record upon activation (`CONFIRMED-BY-DEVELOPER`).
-- **Dynamic Auction Discount Ceilings (`CONFIRMED-BY-DEVELOPER`)**:
-  - Discount ceilings are dynamic and vary per scheme/month (`FLAT_CEILING`, `MONTH_TIERED`, or `CUSTOM_SCHEDULE`).
-  - System rejects any entered bid discount exceeding the scheme's active ceiling.
-  - Minimum floor: Bid discount cannot be lower than foreman commission ($D \ge C_f$).
-  - 40% statutory cap retained as `UNVERIFIED-LEGAL` pending primary regulatory confirmation.
+- **Fixed 1/4 (25%) Auction Discount Ceiling (`CONFIRMED-BY-DEVELOPER`)**:
+  - Discount ceiling is fixed strictly at **one-fourth (1/4 or 25.00%) of total chit value** ($D_{max} = \frac{V}{4} = 0.25 \times V$).
+  - System rejects any entered bid discount exceeding 1/4 of total chit value ($D \le \frac{V}{4}$).
+  - Minimum floor: Bid discount cannot be lower than foreman commission ($D \ge C_f = 0.04 \times V$).
 - **Month 1 Rule (`CONFIRMED-BY-DEVELOPER`)**:
   - One company representative acts as a customer (holds 1 ticket).
   - Full first-month pool is collected and taken by the company.
@@ -96,9 +96,10 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Each installment month accepts strictly one payment matching the net installment due.
   - Double payments for the same month will never happen in business operations.
   - The concept of "Advance Balance" is completely eliminated from the product.
-- **End-of-Day Cash Handover**:
-  - Agent records physical cash collected during field rounds.
-  - Branch Cashier / Accountant / Partner verifies physical cash and acknowledges handover in the software before transactions are closed.
+- **End-of-Day Cash Handover & Dual Agent/Accountant Guard (`CONFIRMED-BY-DEVELOPER`)**:
+  - Agent records physical cash collected during field rounds and submits handover batch.
+  - Branch Cashier / Partner verifies physical cash and acknowledges handover in the software before transactions are closed.
+  - **Hard Guard**: `collector_user_id != acknowledger_user_id`. An agent who also performs accounting tasks can never acknowledge their own collected cash.
 
 ### Module 8: Payments, Reversals, & Bilingual Receipts (`CONFIRMED-BY-DEVELOPER`)
 - **Payment Modes**: Cash, UPI, Bank Transfer (NEFT/RTGS/IMPS), and Cheque.
