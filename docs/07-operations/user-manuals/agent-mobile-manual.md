@@ -40,10 +40,11 @@ flowchart TD
 1. Tap on the customer’s name or search by **Customer Code** / **Chit Ticket Number**.
 2. Tap **"Record Collection"**.
 3. Select Payment Method: **`CASH`** (or `UPI` if customer transfers directly to company QR).
-4. Enter the amount collected (e.g., `₹3,700`).
+4. Enter the exact net installment amount due (e.g., `₹3,700`).  
+   *(Strict Rule: The system enforces single discrete payments of full $I_{net}$; partial payments and advance balances are rejected).*
 5. Tap **"Confirm & Issue Receipt"**:
    - The app instantly displays the **Bilingual Digital Receipt (English + Tamil)**:
-     - *"ரசீது எண் / Receipt No: KC-REC-VNR-2026-00124"*
+     - *"ரசீது எண் / Receipt No: KC-REC-PRD-2026-00124"*
      - *"சந்தாதாரர் பெயர் / Subscriber Name: S. Sundaram"*
      - *"செலுத்திய தொகை / Amount Paid: ₹3,700"*
    - Tap **"Share via WhatsApp / SMS"** to immediately send a receipt link to the customer.
@@ -57,10 +58,11 @@ flowchart TD
 
 ## 3. End-of-Day Cash Handover Procedure
 
-1. Return to the branch office before closing time.
+1. Return to the Perundurai branch office before closing time.
 2. Tap **"Daily Summary & Cash Handover"** in the app menu.
 3. The app displays your exact physical cash tally (e.g., `Total Cash Collected: ₹42,500`).
-4. Hand the physical currency notes to the Branch Cashier.
-5. The cashier counts the money and confirms the handover on their computer.
+4. Hand the physical currency notes to an authorized **Partner (Super Admin)** at the branch office.
+5. The Partner physically counts the money and officially acknowledges receipt on the web portal.  
+   *(Dual-Role Guard: If you also hold accountant permissions, the system enforces `collector_user_id != acknowledger_user_id`; you can never acknowledge your own cash handover).*
 6. Your app will update to **"Cash Handover Cleared — Status: CONFIRMED"**.
 7. **Strict Rule**: Never take company cash home overnight.
