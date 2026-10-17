@@ -1,7 +1,7 @@
 # Kumaran Chits — Physical Ledger to Digital Onboarding SOP
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Target Audience**: Branch Managers, Accountants, Partners, and System Administrators  
+> **Target Audience**: Desk Accountants, Partners, and System Administrators (Operating from Perundurai Head Office)  
 > **Context**: Kumaran Finance holds existing running chit records **exclusively in physical hand-written notebooks, paper ledgers, and physical receipts** (no soft copies/Excel in current business; `CONFIRMED-BY-DEVELOPER`). This SOP governs how active running chits are accurately transcribed into the software without human arithmetic errors.  
 > **Integrity Standard**: Strictly enforced **Whole Integer Rupee arithmetic** (no paise) and **Maker-Checker dual authorization** (`CONFIRMED-BY-DEVELOPER`).
 
@@ -17,7 +17,7 @@ flowchart TD
     Step4 --> Step5{"Step 5: Pre-Activation Balancing Guard\nDoes System Total == Physical Notebook Total?"}
     Step5 -- Discrepancy Found --> Fix["Highlight Cell in Red & Correct Transcription Error"]
     Fix --> Step5
-    Step5 -- Exact Match --> Signoff["Step 6: Dual Sign-Off (Maker != Checker)\nStaff/Manager enters + Partner/Accountant activates"]
+    Step5 -- Exact Match --> Signoff["Step 6: Dual Sign-Off (Maker != Checker)\nAccountant/Partner A enters + Partner B activates"]
 ```
 
 ---
@@ -78,7 +78,10 @@ Because Kumaran Finance's physical ledgers record collections **month-by-month**
 | **3** | P. Meenakshi | Paid (REC-015) | Paid (REC-102) | Paid (REC-150) | Paid (REC-215) | Paid (REC-282) | Paid (REC-345) | ₹0 |
 
 1. Check off paid installments or enter the physical paper receipt book number for cross-auditing.
-2. Each month has strictly a single discrete payment; zero double payments and zero advance balances exist.
+2. **Binary Payments & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)**:
+   - Each historical month is strictly either **PAID in full** (with paper receipt number) or **UNPAID**.
+   - Partial payment amounts do not exist in Kumaran Finance records.
+   - Zero double payments and zero advance balances exist.
 3. If a customer has unpaid past months (e.g., Ticket #2 unpaid for Months 5 & 6), the system calculates the exact overdue arrears in whole integer Rupees.
 
 ---
@@ -94,9 +97,9 @@ $$\sum \text{Total Historical Collections (System)} \quad \text{vs.} \quad \sum 
 ---
 
 ### Step 6: Dual Sign-Off & Forward Activation (`CONFIRMED-BY-DEVELOPER`)
-1. **Maker (Branch Manager / Staff)**: Enters the digitized historical data from the physical notebooks and submits for review.
-2. **Checker (Partner / Accountant)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"**.
-   - Strict constraint enforced: `maker_user_id != checker_user_id`. The user who transcribed the data cannot self-activate the chit group.
+1. **Maker (Desk Accountant / Partner A)**: Enters the digitized historical data from the physical notebooks and submits for review.
+2. **Checker (Partner B / Super Admin)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"**.
+   - Strict constraint enforced: `maker_user_id != checker_user_id`. The user who transcribed the data cannot self-activate the chit group; another partner must independently review and sign off.
 3. **Forward Engine Activated**:
    - The chit is now officially `ACTIVE`.
    - Installments for Month 7 to Month 20 will be managed digitally.

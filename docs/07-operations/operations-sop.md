@@ -12,37 +12,43 @@ sequenceDiagram
     autonumber
     actor Customer as Subscriber
     actor Agent as Field Collection Agent
-    actor Cashier as Branch Cashier / Accountant
+    actor Partner as Partner (Super Admin)
     participant App as Android Mobile App
     participant Server as NestJS Backend
 
-    Customer->>Agent: Pays Cash Installment (e.g., ₹3,700)
-    Agent->>App: Records Collection (Ticket #, Amount, Method: CASH)
+    Customer->>Agent: Pays Single Discrete Installment in Full (e.g., ₹3,700)
+    Agent->>App: Records Collection (Ticket #, Exact Amount, Method: CASH)
     App->>Server: POST /collections/record (with Idempotency-Key)
     Server-->>App: Issues Digital Bilingual Receipt (English + Tamil)
     App-->>Customer: Displays Receipt & sends SMS/WhatsApp link
 
-    Note over Agent,Cashier: End of Day: Field Agent returns to Branch Office
+    Note over Agent,Partner: End of Day: Field Agent returns to Perundurai Branch Office
 
-    Agent->>Cashier: Submits physical cash + opens "Cash Handover" on App
-    Cashier->>Cashier: Physically counts currency notes against App total
-    alt Cash Matches Exactly
-        Cashier->>Server: POST /collections/cash-handover/acknowledge
-        Server-->>Cashier: Generates Daily Cash Settlement Voucher
+    Agent->>Partner: Submits physical cash + opens "Cash Handover" on App
+    Partner->>Partner: Physically counts currency notes against App total
+    alt Cash Matches Exactly & Collector != Acknowledger
+        Partner->>Server: POST /collections/cash-handover/acknowledge (Enforces Collector != Acknowledger)
+        Server-->>Partner: Generates Daily Cash Settlement Voucher
         Server-->>Agent: Handover Cleared & Receipt Status: CONFIRMED
     else Cash Shortage Detected
-        Cashier->>Server: Records Discrepancy (Cash Shortage Voucher)
+        Partner->>Server: Records Discrepancy (Cash Shortage Voucher)
         Server-->>Agent: Flags Agent Balance Owed (Audit Event)
     end
 ```
 
 ### 1.1 Field Collection Rules
-1. **Instant Receipt Issuance**: The collection agent must generate a digital bilingual receipt on the spot. No paper slips without software entry are permitted.
-2. **Zero Cash Retention**: Agents are strictly prohibited from holding physical cash overnight. All collected cash must be surrendered to the branch cashier before the branch closes for the day.
-3. **Cash Handover Acknowledgement**:
-   - The cashier physically counts the currency notes against the app's summary.
-   - The cashier enters their MPIN or password on their terminal to officially acknowledge receipt.
-   - Until acknowledged, the payment status remains `PENDING_HANDOVER`. Once acknowledged, it updates to `CONFIRMED`.
+1. **Single Discrete Payment & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)**:
+   - The customer must pay the exact net installment due ($I_{net}$) in full.
+   - Partial payments are strictly prohibited in the product.
+   - The concept of "Advance Balance" is completely eliminated; each payment satisfies exactly one discrete monthly due.
+2. **Instant Receipt Issuance**: The collection agent must generate a digital bilingual receipt on the spot. No paper slips without software entry are permitted.
+3. **Zero Cash Retention**: Agents are strictly prohibited from holding physical cash overnight. All collected cash must be surrendered to an authorized Partner at the branch office before closing for the day.
+4. **Cash Handover Dual-Role Guard (`CONFIRMED-BY-DEVELOPER`)**:
+   - Because field collection agents also perform desk **Accountant** duties, the system strictly enforces:
+     $$\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$$
+   - An agent who collected the cash can **never** acknowledge their own handover.
+   - An independent **Partner (Super Admin)** must physically count the currency notes, enter their credentials, and officially acknowledge the cash deposit into the branch vault.
+   - Until acknowledged, payment status remains `PENDING_HANDOVER`. Once acknowledged, it updates to `CONFIRMED`.
 
 ---
 
@@ -56,16 +62,17 @@ Financial transactions can never be deleted from the database. If a staff member
 - Duplicate entry created due to network timeout.
 
 ### 2.2 Reversal Workflow:
-1. **Maker (Branch Manager / Accountant)**:
+1. **Maker (Desk Accountant / Partner A)**:
    - Navigates to the payment record in the Web Dashboard.
    - Clicks **"Request Payment Reversal"**.
    - Selects mandatory reason code and uploads supporting proof (e.g., bank bounce slip or customer note).
-2. **Checker (Super Admin / Proprietor)**:
+2. **Checker (Partner B / Super Admin)**:
    - Receives high-priority reversal request in the Admin Dashboard.
    - Verifies the reason and clicks **"Approve Reversal"**.
+   - **Hard Rule**: `maker_user_id != checker_user_id` (Partner A cannot approve their own reversal request; Partner B, C, or D must verify).
 3. **Automated Ledger Effect**:
    - The original payment is flagged as `REVERSED`.
-   - The corresponding `InstallmentDue` is restored to `UNPAID` with zero mathematical discrepancy.
+   - The corresponding `InstallmentDue` is restored strictly to `UNPAID` with zero mathematical discrepancy.
    - The original receipt is marked `VOID / CANCELED`.
    - An immutable audit log records the Maker ID, Checker ID, timestamp, and justification.
 
@@ -93,7 +100,9 @@ flowchart LR
    - Company Management / Partners can formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M`.
    - The company may then substitute a new subscriber or settle past contributions according to company terms.
 
-### 3.2 Prized Subscriber Default (`UNVERIFIED-LEGAL`)
+### 3.2 Prized Subscriber Default (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)
 Because a prized subscriber has already received the pool amount:
-1. **Surety Demand**: Demand notice is served on the subscriber and nominee/guarantors based on the surety documents collected during prize disbursement.
-2. **Statutory Recovery (`UNVERIFIED-LEGAL`)**: Formal arbitration or legal petition before the Registrar of Chits for recovery of remaining installments. Legal citations are retained as `UNVERIFIED-LEGAL` pending inspection of primary Tamil Nadu regulatory orders.
+1. **Safety Proof Demand (`CONFIRMED-BY-DEVELOPER`)**:
+   - Demand notice is served on the subscriber and nominee based on the physical documents recorded in the **Company Safety Proof Checklist** during prize disbursement (signed agreement with winner & nominee signatures, signed blank cheques, promissory notes).
+2. **Statutory Recovery (`UNVERIFIED-LEGAL`)**:
+   - Formal arbitration or legal petition before the Registrar of Chits for recovery of remaining installments. Legal citations are retained as `UNVERIFIED-LEGAL` pending inspection of primary Tamil Nadu regulatory orders.
