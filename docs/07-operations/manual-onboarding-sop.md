@@ -37,7 +37,7 @@ flowchart TD
 ### Step 2: Open Digital Onboarding Wizard
 Navigate to **Admin Web Portal $\to$ Chit Schemes $\to$ "Onboard Ongoing Physical Chit"**.
 1. Enter Scheme Master Info:
-   - Select Branch (e.g., Virudhunagar Branch)
+   - Select Branch (e.g., Perundurai Head Office)
    - Chit Value: `₹1,00,000` (Whole integer Rupees)
    - Total Months: `20`
    - Foreman Commission: `4.00%` (Fixed default, frozen per chit)

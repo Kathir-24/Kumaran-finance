@@ -158,15 +158,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting Kumaran Chits database seed...');
 
-  // 1. Seed Single Physical Branch (Head Office - Virudhunagar)
+  // 1. Seed Single Physical Branch (Head Office - Perundurai, Erode)
   const branch = await prisma.branch.upsert({
-    where: { code: 'VNR' },
+    where: { code: 'PRD' },
     update: {},
     create: {
-      code: 'VNR',
-      name: 'Head Office - Virudhunagar',
-      nameTamil: 'தலைமை கிளை - விருதுநகர்',
-      address: 'Main Road, Virudhunagar, Tamil Nadu',
+      code: 'PRD',
+      name: 'Head Office - Perundurai',
+      nameTamil: 'தலைமை கிளை - பெருந்துறை',
+      address: 'Main Road, Perundurai, Erode, Tamil Nadu',
       phone: '+91 98765 43210',
       isActive: true,
     },

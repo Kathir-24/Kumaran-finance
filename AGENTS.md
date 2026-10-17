@@ -11,7 +11,7 @@
 
 - **Platform**: **Kumaran Chits** — official chit-fund operations software built exclusively for **Kumaran Finance**.
 - **Operating Reality**: 
-  - Operating from **1 physical branch office** (Head Office - Virudhunagar).
+  - Operating from **1 physical branch office** (Head Office - Perundurai, Erode, Tamil Nadu).
   - Managed by **4 equal partners** and **2 to 3 field collection agents**.
   - Current business records exist **exclusively in physical hand-written paper notebooks and physical receipts** (no soft copies/Excel in current business).
   - Software supports fresh new chits as well as mid-cycle onboarding from physical notebooks.

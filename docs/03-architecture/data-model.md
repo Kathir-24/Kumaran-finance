@@ -64,9 +64,9 @@ generator client {
 
 model Branch {
   id          String   @id @default(uuid())
-  code        String   @unique // e.g., "HO", "MDU", "VNR"
-  name        String   // "Head Office - Virudhunagar"
-  nameTamil   String?  // "தலைமை கிளை - விருதுநகர்"
+  code        String   @unique // e.g., "HO", "PRD"
+  name        String   // "Head Office - Perundurai"
+  nameTamil   String?  // "தலைமை கிளை - பெருந்துறை"
   address     String
   phone       String
   isActive    Boolean  @default(true)

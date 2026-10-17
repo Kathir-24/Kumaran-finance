@@ -13,7 +13,7 @@
 2. Enter your registered Email / Phone and Password.
 3. When prompted, open your **Microsoft Authenticator** app on your phone.
 4. Enter the current 6-digit rotating TOTP code.
-5. Select your active Branch Office (e.g., *Head Office - Virudhunagar*).
+5. Select your active Branch Office (e.g., *Head Office - Perundurai*).
 
 ---
 
