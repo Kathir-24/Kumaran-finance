@@ -13,10 +13,10 @@
 it('should guarantee: Foreman Commission + Total Member Dividends == Winning Discount', () => {
   const chitValue = 100000n; // ₹1,00,000 whole rupees
   const commissionRate = 4n; // 4%
-  const bidDiscount = 30000n; // ₹30,000 winning bid
+  const bidDiscount = 20000n; // ₹20,000 winning bid (within <= 1/4 ceiling of ₹25,000)
 
   const foremanCommission = (chitValue * commissionRate) / 100n; // ₹4,000
-  const totalDividend = bidDiscount - foremanCommission; // ₹26,000
+  const totalDividend = bidDiscount - foremanCommission; // ₹16,000
 
   expect(foremanCommission + totalDividend).toBe(bidDiscount);
 });
@@ -26,9 +26,9 @@ it('should guarantee: Foreman Commission + Total Member Dividends == Winning Dis
 ```typescript
 it('should guarantee: Prize Money Paid + Bid Discount == Chit Gross Value', () => {
   const chitValue = 100000n;
-  const bidDiscount = 28500n;
+  const bidDiscount = 25000n; // Exactly at 1/4 ceiling (25%)
 
-  const prizeMoney = chitValue - bidDiscount; // ₹71,500
+  const prizeMoney = chitValue - bidDiscount; // ₹75,000
 
   expect(prizeMoney + bidDiscount).toBe(chitValue);
 });
@@ -84,7 +84,7 @@ it('should verify user-confirmed scenario: Base 10,000, Dividend 2,100 -> All me
 
 ---
 
-## 3. Single Payment Rule & Duplicate Payment Rejection Test
+## 3. Single Payment, Zero Partial Payments & Duplicate Rejection Tests
 
 ```typescript
 it('should reject duplicate payment attempt for an already paid installment (no advance balance allowed)', async () => {
@@ -92,7 +92,7 @@ it('should reject duplicate payment attempt for an already paid installment (no 
   const installmentDueMonth = 4;
   const netDueAmount = 3750n;
 
-  // 1. Customer pays installment due
+  // 1. Customer pays installment due in full
   await recordPayment({
     ticketId,
     month: installmentDueMonth,
@@ -115,6 +115,22 @@ it('should reject duplicate payment attempt for an already paid installment (no 
     })
   ).rejects.toThrow('INSTALLMENT_ALREADY_PAID');
 });
+
+it('should strictly reject partial payment attempt (exact net due must be paid in full)', async () => {
+  const ticketId = 'ticket-08';
+  const installmentDueMonth = 4;
+  const netDueAmount = 3750n;
+  const partialAmount = 2000n; // Incomplete payment attempt
+
+  await expect(
+    recordPayment({
+      ticketId,
+      month: installmentDueMonth,
+      amount: partialAmount,
+      method: 'CASH'
+    })
+  ).rejects.toThrow('PARTIAL_PAYMENTS_NOT_ALLOWED');
+});
 ```
 
 ---
@@ -135,17 +151,17 @@ it('should restore original installment due amount with zero penny difference up
   expect(paidDue.paidAmount).toBe(3750n);
   expect(paidDue.status).toBe('PAID');
 
-  // Maker initiates reversal request
+  // Maker initiates reversal request (Accountant or Partner 1)
   const reversalRequest = await requestPaymentReversal({
     paymentId: payment.id,
     reason: 'Wrong customer ticket entered',
-    makerUserId: 'manager-selvam'
+    makerUserId: 'accountant-anand'
   });
 
   // Enforce Maker != Checker: Reversal cannot be approved by same user
   await expect(approvePaymentReversal({
     reversalId: reversalRequest.id,
-    checkerUserId: 'manager-selvam'
+    checkerUserId: 'accountant-anand'
   })).rejects.toThrow('Maker and Checker must be different users');
 
   // Partner / Super Admin (Checker) approves reversal
@@ -158,5 +174,37 @@ it('should restore original installment due amount with zero penny difference up
   const revertedDue = await getInstallmentDue(ticketId, 5);
   expect(revertedDue.paidAmount).toBe(0n);
   expect(revertedDue.status).toBe('UNPAID');
+});
+```
+
+---
+
+## 5. Cash Handover Dual-Role Guard Test (Collector != Acknowledger)
+
+```typescript
+it('should strictly reject cash handover acknowledgment if collector_user_id == acknowledger_user_id', async () => {
+  const dualRoleAgentId = 'agent-muniyasamy'; // Field agent who also holds Accountant permissions
+
+  await expect(
+    acknowledgeCashHandover({
+      handoverBatchId: 'batch-2026-10-18-01',
+      collectedByUserId: dualRoleAgentId,
+      acknowledgedByUserId: dualRoleAgentId
+    })
+  ).rejects.toThrow('COLLECTOR_CANNOT_ACKNOWLEDGE_OWN_CASH');
+});
+
+it('should accept cash handover acknowledgment when confirmed by an independent Partner', async () => {
+  const collectorAgentId = 'agent-muniyasamy';
+  const partnerApproverId = 'partner-kumaran'; // Partner (Super Admin)
+
+  const handover = await acknowledgeCashHandover({
+    handoverBatchId: 'batch-2026-10-18-01',
+    collectedByUserId: collectorAgentId,
+    acknowledgedByUserId: partnerApproverId
+  });
+
+  expect(handover.status).toBe('ACKNOWLEDGED');
+  expect(handover.acknowledgedByUserId).toBe(partnerApproverId);
 });
 ```
