@@ -97,7 +97,7 @@ model User {
   phone        String    @unique
   email        String?   @unique
   passwordHash String
-  role         Role
+  roles        Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
@@ -386,9 +386,11 @@ model Payment {
   paymentStatus      PaymentStatus       @default(INITIATED)
   idempotencyKey     String?             @unique
   transactionRef     String?             // UPI Ref, Cheque number, Bank UTR
-  chequeStatus       String?             // PENDING, CLEARED, BOUNCED
-  cashHandoverStatus String?             // PENDING_HANDOVER, ACKNOWLEDGED
-  createdAt          DateTime            @default(now())
+  chequeStatus                     String?             // PENDING, CLEARED, BOUNCED
+  cashHandoverStatus               String?             // PENDING_HANDOVER, ACKNOWLEDGED
+  cashHandoverAcknowledgedByUserId String?             // Partner / Cashier who counted and verified physical cash
+  cashHandoverAcknowledgedAt       DateTime?
+  createdAt                        DateTime            @default(now())
 
   allocations        PaymentAllocation[]
   receipt            Receipt?
