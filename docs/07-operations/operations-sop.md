@@ -65,7 +65,7 @@ Financial transactions can never be deleted from the database. If a staff member
    - Verifies the reason and clicks **"Approve Reversal"**.
 3. **Automated Ledger Effect**:
    - The original payment is flagged as `REVERSED`.
-   - The corresponding `InstallmentDue` is restored to `UNPAID` or `PARTIALLY_PAID` with zero mathematical discrepancy.
+   - The corresponding `InstallmentDue` is restored to `UNPAID` with zero mathematical discrepancy.
    - The original receipt is marked `VOID / CANCELED`.
    - An immutable audit log records the Maker ID, Checker ID, timestamp, and justification.
 

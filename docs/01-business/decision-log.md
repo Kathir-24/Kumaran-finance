@@ -62,8 +62,9 @@
 
 ---
 
-### ADR-07: Field Agent Collection, Sync & Single Payment Rule (`CONFIRMED-BY-DEVELOPER`)
+### ADR-07: Field Agent Collection, Sync, Single Payment & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)
 - **Single Discrete Payment per Month**: Each installment month accepts strictly a single payment matching the net installment amount. **Double payments for the same specified month will never happen** in business operations.
+- **Zero Partial Payments**: Installments must be paid in full for the exact net amount due ($I_{net}$). Partial payments are strictly prohibited in the product. The `DueStatus` enum is strictly `UNPAID`, `PAID`, `OVERDUE`.
 - **Zero Advance Balance**: The concept of "Advance Balance" is completely eliminated from the architecture and data models. No advance ledger or carry-forward balance exists.
 - **Offline Sync & Reconciliation**: When agents collect offline, entries are recorded as `PENDING_SYNC` with device timestamp. Upon syncing with the server, the payment marks that specific month's installment as `PAID`. End-of-day cash handover reconciles physical cash against recorded receipts.
 

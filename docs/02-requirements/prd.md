@@ -86,7 +86,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - For All Subscribers (Including Auction Winners & Past Prized Winners):
     $$I_{net} = I_{base} - Div_{ticket}$$
     (e.g., if base is ₹10,000 and dividend is ₹2,100, every subscriber including the auction winner pays ₹7,900 next month; applies uniformly across all schemes; `CONFIRMED-BY-DEVELOPER`).
-- **Statuses**: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `OVERDUE`.
+- **Statuses**: `UNPAID`, `PAID`, `OVERDUE`. Partial payments are strictly prohibited under the single discrete payment rule (`CONFIRMED-BY-DEVELOPER`).
 - All installment and dividend values calculated in clean **whole integer Rupees**.
 
 ### Module 7: Field Collections & Cash Handover (`CONFIRMED-BY-DEVELOPER`)

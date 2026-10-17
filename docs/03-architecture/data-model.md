@@ -335,7 +335,6 @@ model AuctionMinutes {
 
 enum DueStatus {
   UNPAID
-  PARTIALLY_PAID
   PAID
   OVERDUE
 }
