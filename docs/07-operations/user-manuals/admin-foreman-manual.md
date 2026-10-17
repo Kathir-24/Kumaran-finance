@@ -63,8 +63,8 @@
      - In the software, click **"Record Tie-Breaker Draw"** and enter the physically drawn winning ticket number into the system (Option A). (No autonomous computer lottery).
 6. Click **"Submit Auction Results"** (Maker).
 7. A different Partner / Super Admin reviews and clicks **"Finalize Auction & Commit Results"** (Checker; `maker != checker`):
-   - The system calculates the 4% Foreman Commission (`₹4,000`) and allocates member dividends strictly to non-prized members.
-   - Automatically generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$).
+   - The system calculates the 4% Foreman Commission (`₹4,000`) and allocates member dividends equally across all members (including the auction winner).
+   - Automatically generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$) uniformly for all members.
    - Generates the statutory **Auction Minutes** for physical signing and filing with the Chit Registrar.
 
 ---

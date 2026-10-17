@@ -29,7 +29,7 @@
 
 | # | Topic | Question / Resolved Decision | Source Document | Status |
 |---|---|---|---|---|
-| **A-01** | **Dividend Distribution Eligibility** | Dividend is shared ONLY among NON-PRIZED (remaining non-winning) members. Once a subscriber wins, they do NOT receive dividends in subsequent months; they pay full base installment. | `financial-rules.md` | `CONFIRMED-BY-DEVELOPER` |
+| **A-01** | **Dividend Distribution Eligibility** | Dividend is shared equally among ALL members in that chit group, INCLUDING the auction winner and past prized winners. Everyone pays the discounted net installment ($I_{net} = I_{base} - Div$) next month. | `financial-rules.md` | `CONFIRMED-BY-DEVELOPER` |
 | **A-02** | **Rounding and Remainder Handling** | All financial values (installments, dividends, prizes, commissions) are **always whole numbers (Rupees only; paise never comes in)**. Kumaran Finance maintains a standard dividend amount so clean whole numbers are maintained without fractional remainder issues. | `financial-rules.md` | `CONFIRMED-BY-DEVELOPER` |
 | **A-03** | **Statutory Registers Format** | What are the exact ledger column layouts currently used by Kumaran Finance for the Subscribers' Ledger (Form XXI) and Day Book/Cash Book (Form XXII)? *(Obtain physical sample sheets).* | `compliance-checklist.md` | `UNVERIFIED-LEGAL` |
 | **A-04** | **Income Tax Cash Payout Limits** | What are the current Income Tax limits (e.g., Section 269ST) for cash prize payouts, and should the software enforce a hard block on cash disbursements exceeding statutory limits? | `decision-log.md` (ADR-14) | `UNVERIFIED-LEGAL` |

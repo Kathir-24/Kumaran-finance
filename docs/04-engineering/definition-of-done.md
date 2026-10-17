@@ -44,7 +44,7 @@ flowchart LR
 - [ ] Unit tests for services and calculation logic pass with 100% success rate.
 - [ ] Integration tests verify database transactions and pessimistic row locking (`SELECT FOR UPDATE`).
 - [ ] Mathematical invariant tests verify zero rupee leaks:
-  $$\text{Foreman Commission } (4\%) + \text{Dividends (Non-Prized)} = \text{Discount}$$
+  $$\text{Foreman Commission } (4\%) + \text{Total Member Dividends} = \text{Discount}$$
 - [ ] Negative tests verify that unauthorized requests, self-approvals (`maker == checker`), and illegal discount bids are cleanly rejected.
 
 ### Gate 6: Idempotency & Concurrency

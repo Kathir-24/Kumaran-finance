@@ -58,8 +58,8 @@ stateDiagram-v2
   - Software logs all tied bidders and records the physical draw outcome without running an electronic random lottery.
 - **`BID_RECORDED` $\to$ `FINALIZED`**:
   - Requires **Maker-Checker dual approval**: The staff member who entered the auction result cannot finalize it (`maker_user_id != checker_user_id`).
-  - Automatically calculates Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated to non-prized members.
-  - Generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$).
+  - Automatically calculates Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members (including auction winners).
+  - Generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$) uniformly for all members.
 
 ---
 

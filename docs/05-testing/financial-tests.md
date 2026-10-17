@@ -34,34 +34,39 @@ it('should guarantee: Prize Money Paid + Bid Discount == Chit Gross Value', () =
 });
 ```
 
-### Invariant Test 3: Non-Prized Dividend Distribution & Pool Conservation
+### Invariant Test 3: Universal Equal Dividend Distribution & Pool Conservation
 ```typescript
-it('should guarantee: Total Collected + Distributed Dividends + Undistributed Remainder == Chit Value', () => {
-  const totalTickets = 20;
+it('should guarantee: Total Collections (All 20 Members) + Total Dividends == Chit Value', () => {
+  const totalTickets = 20n;
   const chitValue = 100000n;
   const baseInstallment = 5000n; // chitValue / 20
-  const totalDividend = 26000n; // ₹30,000 bid discount - ₹4,000 commission
+  const bidDiscount = 25000n; // Exactly at 1/4 ceiling (25%)
+  const commission = 4000n; // 4% of 100,000
+  const totalDividend = bidDiscount - commission; // 21,000n
 
-  // Month 2: 1 prized ticket (Month 1 company pool), 19 non-prized tickets
-  const prizedTicketsCount = 1n;
-  const nonPrizedTicketsCount = 19n;
+  // Dividend allocated EQUALLY across ALL 20 members (including auction winner)
+  const dividendPerTicket = totalDividend / totalTickets; // 21,000 / 20 = 1,050n
+  const totalDistributedDividend = dividendPerTicket * totalTickets; // 1,050 * 20 = 21,000n
 
-  // Dividend allocated ONLY to non-prized members using integer division
-  const dividendPerTicket = totalDividend / nonPrizedTicketsCount; // 26000 / 19 = 1368n
-  const totalDistributedDividend = dividendPerTicket * nonPrizedTicketsCount; // 1368 * 19 = 25992n
-  const undistributedRemainder = totalDividend - totalDistributedDividend; // 8n
+  // Every member (including the auction winner) pays the net installment next month
+  const netInstallment = baseInstallment - dividendPerTicket; // 5,000 - 1,050 = 3,950n
+  const totalInstallmentsCollected = netInstallment * totalTickets; // 3,950 * 20 = 79,000n
 
-  // Prized members pay full base installment; non-prized pay net installment
-  const prizedInstallment = baseInstallment; // 5000n
-  const netInstallmentPerNonPrized = baseInstallment - dividendPerTicket; // 5000 - 1368 = 3632n
-
-  const totalCollectedFromPrized = prizedInstallment * prizedTicketsCount; // 5000n
-  const totalCollectedFromNonPrized = netInstallmentPerNonPrized * nonPrizedTicketsCount; // 3632 * 19 = 69008n
-  const totalInstallmentsCollected = totalCollectedFromPrized + totalCollectedFromNonPrized; // 74008n
-
-  // Invariant verification: Collections (74008) + Distributed (25992) == Chit Value (100000)
+  // Invariant 1: Collections (79,000) + Distributed Dividend (21,000) == Chit Value (100,000)
   expect(totalInstallmentsCollected + totalDistributedDividend).toBe(chitValue);
-  expect(undistributedRemainder).toBe(8n);
+
+  // Invariant 2: Prize Money (75,000) + Commission (4,000) == Total Collections (79,000)
+  const prizeMoney = chitValue - bidDiscount; // 100,000 - 25,000 = 75,000n
+  expect(prizeMoney + commission).toBe(totalInstallmentsCollected);
+});
+
+it('should verify user-confirmed scenario: Base 10,000, Dividend 2,100 -> All members pay 7,900', () => {
+  const baseInstallment = 10000n;
+  const dividend = 2100n;
+  const netPayable = baseInstallment - dividend; // 7,900n
+
+  // Both non-prized members and the auction winner pay exactly 7,900 next month
+  expect(netPayable).toBe(7900n);
 });
 ```
 

@@ -48,7 +48,7 @@ These 10 rules are mathematically and architecturally non-negotiable. Never viol
 flowchart TD
     G1["1. Single Company\nZero company_id columns"] --- G2["2. Whole Rupee Math\nBigInt only; zero paise/floats"]
     G2 --- G3["3. Commission Freeze\n4.00% locked per group"]
-    G3 --- G4["4. Non-Prized Dividends\nInet = Ibase - Div (Non-prized only)"]
+    G3 --- G4["4. Universal Dividends\nInet = Ibase - Div (All members)"]
     G4 --- G5["5. Month 1 & N Rules\nNo auctions in Month 1 & N"]
     G5 --- G6["6. Fixed 1/4 Ceiling & Tie-Break\nMax discount = V/4; paper token draw"]
     G6 --- G7["7. Ticket Limit\nMax 1 ticket per customer in same group"]
@@ -60,7 +60,7 @@ flowchart TD
 1. **Single-Company Tenancy (ADR-01)**: Built solely for Kumaran Finance. Zero `company_id` columns exist in any table.
 2. **Pure Whole Rupee Math**: All monetary values are 64-bit integer Rupees (**`BigInt`** in Prisma, native **`bigint`** in TypeScript). Paise, decimal fractions (`.00`), and IEEE 754 floating-point numbers (`float`, `number`) are strictly prohibited in financial code.
 3. **Commission Freeze (ADR-04)**: Foreman commission defaults to **4.00%**, copied and permanently frozen per chit group upon activation.
-4. **Non-Prized Dividend Deduction**: Dividend is allocated **strictly to non-prized members** and deducted directly from the payable installment ($I_{net} = I_{base} - Div_{ticket}$). Prized past winners pay the full base installment ($I_{base}$) with no dividend deduction.
+4. **Universal Equal Dividend Deduction**: Dividend is allocated **equally across ALL members in that chit group, INCLUDING the auction winner and past prized winners**. Every customer in the group pays the discounted net installment ($I_{net} = I_{base} - Div_{ticket}$) next month.
 5. **Month 1 & Month $N$ Rules**: Month 1 full pool is taken by the company customer ticket (**no auction**, ₹0 dividend). Month $N$ is settled directly to the final subscriber with a 4% commission and receipt (**no auction**). Auctions occur exclusively in Months 2 through $N-1$.
 6. **Fixed 1/4 Ceiling & Physical Tie-Break Protocol (ADR-06 & Option A)**: Auction discount ceiling is fixed strictly at **one-fourth (1/4 or 25%) of total chit value** ($D \le \frac{V}{4}$). If multiple members bid the ceiling, the Foreman draws paper tokens physically at the branch in front of members; staff enters the drawn winning ticket into the system. **No autonomous software lottery draws**.
 7. **Ticket Limit Constraint (ADR-13)**: A customer can join multiple chit groups, but **cannot hold 2 or more tickets in the same chit group** (Database enforced: `@@unique([chitGroupId, customerId])`).

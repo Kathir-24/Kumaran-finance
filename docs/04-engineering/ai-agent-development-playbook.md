@@ -26,7 +26,7 @@ Every AI coding assistant working in this repository must strictly adhere to the
 | **1** | **Single Company** | Built exclusively for Kumaran Finance. | No `company_id` columns or multi-tenant abstractions. |
 | **2** | **Pure Whole Rupee Math** | Stored as `BigInt` / `bigint`. | Zero paise, zero decimals (`.00`), zero JavaScript `number` or `float` for currency. |
 | **3** | **Commission Freeze** | 4.00% default, frozen per chit group. | Rate locked upon chit activation; never recalculated retroactively. |
-| **4** | **Non-Prized Dividends** | Deducted from non-prized members only: $I_{net} = I_{base} - Div$. | Prized past winners pay full base installment ($I_{base}$) with no dividend deduction. |
+| **4** | **Universal Dividends** | Deducted from all members equally: $I_{net} = I_{base} - Div$. | All members (including the auction winner) pay the same discounted net installment next month. |
 | **5** | **Month 1 & Month $N$** | Month 1 pool goes to company ticket (no auction); Month $N$ settled directly to final subscriber (no auction). | Auctions run exclusively in Months 2 through $N-1$. |
 | **6** | **Fixed 1/4 Ceiling & Physical Tie-Breaks** | Max discount = 1/4 of chit value ($D \le \frac{V}{4}$). Offline physical paper token draw at branch (Option A). | No dynamic ceiling; no autonomous software lottery draws or electronic RNG algorithms. |
 | **7** | **Ticket Limit** | Maximum 1 ticket per customer in the same chit group. | Enforce database constraint: `@@unique([chitGroupId, customerId])`. |

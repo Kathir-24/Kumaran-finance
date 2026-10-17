@@ -64,7 +64,7 @@ For each completed month from Month 1 up to Month 6, transcribe:
     - Nominee signed? [Yes / No]
     - Signed blank cheque(s) with details submitted? [Yes / No]
     - Scanned copy uploaded to secure storage.
-- **Automatic Calculation**: The software instantly calculates the historical Foreman Commission (4%) and the member dividend allocated to non-prized members, verifying that it matches the dividend written in the physical ledger.
+- **Automatic Calculation**: The software instantly calculates the historical Foreman Commission (4%) and the member dividend allocated equally to all members, verifying that it matches the dividend written in the physical ledger.
 
 ---
 

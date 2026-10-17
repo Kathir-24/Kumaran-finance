@@ -259,7 +259,7 @@ model Auction {
   foremanCommissionRate  Decimal?         @db.Decimal(5, 2) // Rate frozen at auction time (4.00%)
   foremanCommissionAmount BigInt?         // Exact whole ₹ amount
   totalDividend          BigInt?          // Whole Rupees: bidDiscount - commission
-  dividendPerTicket      BigInt?          // Whole Rupees: integer division across non-prized tickets
+  dividendPerTicket      BigInt?          // Whole Rupees: divided equally across all tickets in group (including winner)
   prizeMoney             BigInt?          // Whole Rupees: chitValue - bidDiscount
   
   conductedByUserId      String?          // Staff/Manager who entered the result (Maker)

@@ -83,12 +83,9 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 
 ### Module 6: Installments & Due Schedules (`CONFIRMED-BY-DEVELOPER`)
 - **Net Installment Calculation**:
-  - For Non-Prized Subscribers:
+  - For All Subscribers (Including Auction Winners & Past Prized Winners):
     $$I_{net} = I_{base} - Div_{ticket}$$
-    (e.g., if base is ₹10,000 and dividend is ₹1,000, subscriber pays ₹9,000; applies to all schemes; `CONFIRMED-BY-DEVELOPER`).
-  - For Prized Subscribers:
-    $$I_{prized} = I_{base}$$
-    Past winners pay full base installment with no dividend deduction.
+    (e.g., if base is ₹10,000 and dividend is ₹2,100, every subscriber including the auction winner pays ₹7,900 next month; applies uniformly across all schemes; `CONFIRMED-BY-DEVELOPER`).
 - **Statuses**: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `OVERDUE`.
 - All installment and dividend values calculated in clean **whole integer Rupees**.
 
@@ -129,7 +126,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - **Option A (Physical Paper Token Draw)**: When multiple members bid the maximum 1/4 ceiling discount, the Foreman draws paper tokens physically at the branch in front of members.
   - Staff enters the winning ticket number into the software. (No autonomous digital lottery draws).
 - **Financial Commitment**:
-  - Automatically calculates Prize Money ($P = V - D$), Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend for non-prized members.
+  - Automatically calculates Prize Money ($P = V - D$), Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members.
   - Month 1 and Month $N$ have **NO auctions** (`CONFIRMED-BY-DEVELOPER`).
 
 ### Module 10: Dashboards & Reports (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)

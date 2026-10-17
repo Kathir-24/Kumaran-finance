@@ -19,16 +19,14 @@
 |---|---|---|---|
 | **Chit Value (Gross Pool)** | $V$ | Total pool amount for the chit group (e.g., ₹1,00,000). Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
 | **Duration (Months)** | $N$ | Total number of installments / months (e.g., 20 months). | `CONFIRMED-BY-DEVELOPER` |
-| **Total Tickets / Members** | $M$ | Total number of tickets participating ($M = N$). A single customer can join multiple chits, but cannot hold 2 or more tickets in the same chit group (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` |
-| **Base Monthly Installment** | $I_{base}$ | Base gross installment per ticket before dividend deduction: $I_{base} = \frac{V}{N}$ (e.g., ₹5,000). Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
+| **Total Tickets / Members** | $M$ | Total number of tickets participating ($M = N$). Dividend is shared equally across **all $M$ tickets**, including the auction winner and past prized winners (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` |
+| **Base Monthly Installment** | $I_{base}$ | Base gross installment per ticket before dividend deduction: $I_{base} = \frac{V}{N}$ (e.g., ₹5,000 or ₹10,000). Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
 | **Foreman Commission Rate** | $r_f$ | Configurable default rate of **4.00%** ($0.04$). Copied from settings when a chit is created; frozen per chit once active. May be changed for future chits. | `CONFIRMED-BY-DEVELOPER` |
 | **Foreman Commission Amount** | $C_f$ | Commission retained by company: $C_f = V \times r_f = V \times 0.04$. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
-| **Auction Bid Discount** | $D$ | Amount forgone by winning bidder to claim prize money early. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
+| **Auction Bid Discount** | $D$ | Amount forgone by winning bidder to claim prize money early ($C_f \le D \le \frac{V}{4}$). Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
 | **Total Member Dividend** | $Div_{total}$ | Net discount available after commission: $Div_{total} = D - C_f$. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
-| **Eligible Non-Prized Tickets** | $M_{non-prized}$ | Number of non-winning tickets eligible to receive dividend in that month. | `CONFIRMED-BY-DEVELOPER` |
-| **Dividend Per Non-Prized Ticket** | $Div_{ticket}$ | Dividend allocated per eligible non-prized ticket: $Div_{ticket} = \lfloor \frac{Div_{total}}{M_{non-prized}} \rfloor$. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
-| **Net Installment Payable** | $I_{net}$ | Actual amount payable by a non-prized subscriber in that month: $I_{net} = I_{base} - Div_{ticket}$ (e.g., if base is ₹10,000 and dividend is ₹1,000, subscriber pays ₹9,000). Applies across all schemes. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
-| **Prized Subscriber Installment** | $I_{prized}$ | Subscribers who have already won previous auctions pay the **full base installment** ($I_{base}$) with no dividend deduction. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
+| **Dividend Per Ticket** | $Div_{ticket}$ | Dividend allocated equally per ticket across all $M$ members: $Div_{ticket} = \frac{Div_{total}}{M}$. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
+| **Net Installment Payable** | $I_{net}$ | Actual amount payable by **all subscribers (including the auction winner)** next month: $I_{net} = I_{base} - Div_{ticket}$ (e.g., base ₹10,000 - dividend ₹2,100 = ₹7,900). Applies uniformly to everyone in the group. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
 | **Prize Money** | $P$ | Amount payable to winning subscriber before deductions: $P = V - D$. Always whole rupees. | `CONFIRMED-BY-DEVELOPER` |
 
 ---
@@ -37,7 +35,7 @@
 
 The numbers below illustrate arithmetic relationships based on confirmed rules:
 - **Chit Value ($V$)**: ₹1,00,000
-- **Duration ($N$)**: 20 months
+- **Duration ($N$) & Tickets ($M$)**: 20 months / 20 tickets
 - **Base Monthly Installment ($I_{base}$)**: $\frac{₹1,00,000}{20} = ₹5,000$ per ticket
 - **Foreman Commission ($C_f$)**: $4\% \times ₹1,00,000 = ₹4,000$
 
@@ -55,14 +53,21 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
   $$C_f = 4\% \times ₹1,00,000 = ₹4,000$$
 - **Total Member Dividend Calculated**:
   $$Div_{total} = D - C_f = ₹25,000 - ₹4,000 = ₹21,000$$
+- **Dividend Per Ticket (Divided by all 20 members)**:
+  $$Div_{ticket} = \frac{₹21,000}{20} = ₹1,050$$
 
 ### Installment Calculation Applied to All Schemes (`CONFIRMED-BY-DEVELOPER`):
-- **Dividend Eligibility (`CONFIRMED-BY-DEVELOPER`)**: Dividend is shared **only among non-prized (remaining non-winning) members**. Once a subscriber wins the prize money, they do not receive dividends in subsequent months.
+- **Universal Dividend Eligibility (`CONFIRMED-BY-DEVELOPER`)**:
+  - Dividend is shared **equally among ALL members in that chit group, INCLUDING the auction winner and past prized winners**.
 - **Monthly Payable Rule (`CONFIRMED-BY-DEVELOPER`)**:
-  - If a customer’s base installment is ₹10,000 per month and their allocated dividend is ₹1,000, **they pay ₹9,000 on that month**.
-  - In this 20-month example:
-    - Non-prized members pay: $I_{net} = I_{base} - Div_{ticket}$.
-    - Prized past winners pay the full base installment: $I_{base} = ₹5,000$.
+  - **Everyone (including the auction winner) pays the net installment next month**:
+    $$I_{net} = I_{base} - Div_{ticket}$$
+  - **Confirmed Example**:
+    - If base installment is ₹10,000 per month and allocated dividend is ₹2,100, **every customer in that group (including the auction winner) pays ₹7,900 next month**.
+  - In this 20-month (₹1 Lakh) walkthrough:
+    - Base installment: $I_{base} = ₹5,000$.
+    - Dividend: $Div_{ticket} = ₹1,050$.
+    - **All 20 tickets (including the winner) pay**: $I_{net} = ₹5,000 - ₹1,050 = ₹3,950$.
 
 ### Final Month (Month $N$): Settlement (`CONFIRMED-BY-DEVELOPER`)
 - **No Auction**: There is **NO bidding auction** in the final month.
@@ -78,13 +83,13 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
 The dividend settlement policy is confirmed as follows:
 
 1. **Who Receives Dividend? (`CONFIRMED-BY-DEVELOPER`)**:
-   - Dividend is shared **ONLY among NON-PRIZED (remaining non-winning) members**.
-   - Once a subscriber wins an auction and claims the prize money, they become "prized" and **do not receive dividends in subsequent months**.
+   - Dividend is shared **equally among ALL members of the chit group, INCLUDING the auction winner and past prized subscribers**.
+   - No subscriber is excluded from receiving dividends after winning.
 2. **How is Dividend Settled? (`CONFIRMED-BY-DEVELOPER`)**:
-   - The dividend is **deducted directly from that month’s payable installment**:
+   - The dividend is **deducted directly from the next month’s payable installment**:
      $$I_{net} = I_{base} - Div_{ticket}$$
-   - This monthly deduction rule **applies across all schemes** (`CONFIRMED-BY-DEVELOPER`).
-   - Prized members pay the full base installment amount ($I_{base}$) with no dividend deduction.
+   - This monthly deduction rule **applies uniformly to every member in the group across all schemes** (`CONFIRMED-BY-DEVELOPER`).
+   - Every subscriber (both prized winners and non-prized subscribers) pays the exact same net installment $I_{net}$ for that month.
 
 ---
 
