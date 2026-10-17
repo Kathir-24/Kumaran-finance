@@ -14,10 +14,10 @@ The software implements a standardized, industry-standard set of personas. Kumar
 
 | Role | Scope | Description | Status |
 |---|---|---|---|
-| **Super Admin / Owner** | Global (Company-wide) | Partners / Proprietor. Full administrative, financial configuration, and final approval (Checker) authority. | `CONFIRMED-BY-DEVELOPER` |
-| **Branch Manager** | Assigned Branch | Operational branch head. Manages member intake, ticket assignment, offline auction recording (Maker), and agent supervision. (1 branch operates today; schema supports multi-branch). | `CONFIRMED-BY-DEVELOPER` |
-| **Accountant** | Company-wide | Financial recordkeeper. Verifies collections, bank reconciliations, day books, cash handovers, and prepares payment vouchers. (Simply "Accountant"; no "Head Office Accountant"). | `CONFIRMED-BY-DEVELOPER` |
-| **Collection Agent** | Assigned Customers | Field staff (2–3 agents today) using mobile app for daily/monthly doorstep collections and issuing bilingual receipts. | `CONFIRMED-BY-DEVELOPER` |
+| **Super Admin / Owner** | Global (Company-wide) | **The 4 Equal Partners**. Can act as operational Maker (entering auction results, safety proof, reversals) and final Checker. Full administrative and financial authority. | `CONFIRMED-BY-DEVELOPER` |
+| **Branch Manager** | Assigned Branch | Optional role. In current operations, the **4 partners fulfill all branch manager duties directly**; no external manager is hired. | `CONFIRMED-BY-DEVELOPER` |
+| **Accountant** | Company-wide | Financial recordkeeper for day books, voucher preparation, and reconciliations. **Can be held by a field collection agent wearing the accountant hat**. | `CONFIRMED-BY-DEVELOPER` |
+| **Collection Agent** | Assigned Customers | Field staff (2–3 agents today) using mobile app for daily/monthly doorstep collections; **also handles office accounting tasks**. | `CONFIRMED-BY-DEVELOPER` |
 | **Customer / Member** | Self Only | Subscribers viewing their personal digital passbook, dividends, upcoming dues, and making online UPI/card payments. | `CONFIRMED-BY-DEVELOPER` |
 | **Auditor** | Read-Only (Global) | Independent chartered accountant / auditor viewing ledgers, auction minutes, and compliance reports without edit permissions. | `CONFIRMED-BY-DEVELOPER` |
 
@@ -38,16 +38,16 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | | Activate Chit Scheme | Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Enrollment & Tickets**| Assign Ticket to Subscriber | Yes | Yes (Branch) | No | No | Request only | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Collections** | Record Field Cash Collection | Yes | Yes (Branch) | Yes | Assigned only | Online payment | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| | Submit Cash Handover | No | No | No | Yes (Assigned) | No | No | `CONFIRMED-BY-DEVELOPER` |
+| | Submit Cash Handover | Yes (Agent role)| No | No | Yes (Assigned) | No | No | `CONFIRMED-BY-DEVELOPER` |
 | | Acknowledge Cash Handover | Yes | Yes (Branch) | Yes | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Payment Adjustments**| Request Payment Reversal (Maker)| No | Yes (Branch) | Yes | No | No | No | `CONFIRMED-BY-DEVELOPER` |
+| **Payment Adjustments**| Request Payment Reversal (Maker)| Yes | Yes (Branch) | Yes | No | No | No | `CONFIRMED-BY-DEVELOPER` |
 | | Approve Payment Reversal (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Offline Auctions** | Record Auction Result (Maker) | No | Yes (Branch) | No | No | View result | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Offline Auctions** | Record Auction Result (Maker) | Yes | Yes (Branch) | No | No | View result | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Finalize Auction Result (Checker)| Yes | Authorized checker | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Prize Disbursement** | Verify Safety Proof Checklist & Voucher (Maker)| No | Yes (Branch) | Yes (Voucher prep)| No | View status | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Prize Disbursement** | Verify Safety Proof Checklist & Voucher (Maker)| Yes | Yes (Branch) | Yes (Voucher prep)| No | View status | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Authorize Prize Payout (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Reports & Auditing** | View Financial Reports & Day Books| Global | Branch scope | Global | No | Own passbook | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| | Export Reports / Ledgers | Yes | Branch scope | Global | No | Own statement | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Reports & Auditing** | View Financial Reports & Day Books| Global | Branch scope | Global | Dual role only | Own passbook | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Export Reports / Ledgers | Yes | Branch scope | Global | Dual role only | Own statement | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | View Immutable Audit Logs | Global | Branch scope | Read-only | No | Own history | Read-only | `CONFIRMED-BY-DEVELOPER` |
 
 ---
@@ -61,21 +61,26 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 > Under no circumstances may the user who initiates or records an action approve or finalize it. The application and database strictly reject any transaction where `maker_user_id == checker_user_id`, regardless of the user's role or partner status.
 
 ### 1. Payment Reversals & Adjustments:
-- **Maker**: Branch Manager or Accountant initiates a reversal request with a mandatory documented justification.
-- **Checker**: Super Admin (Partner) verifies the justification and approves the ledger adjustment.
-- **Rule**: `Maker != Checker`.
+- **Maker**: Super Admin (Partner A) or Accountant initiates a reversal request with a mandatory documented justification.
+- **Checker**: Super Admin (Partner B) verifies the justification and approves the ledger adjustment.
+- **Hard Guard**: `maker_user_id != checker_user_id` (Partner A cannot approve their own reversal request; Partner B, C, or D must verify).
 
 ### 2. Offline Auction Recording vs. Finalization:
-- **Maker (Record Result)**: Staff member or Branch Manager who attended the physical auction enters the winning ticket, bid discount, and attendee list.
-- **Checker (Finalize Result)**: Super Admin / designated approver reviews the entered bid against ceiling rules and commits the auction outcome.
-- **Rule**: `Maker != Checker`.
+- **Maker (Record Result)**: Super Admin (Partner A who conducted/attended physical auction) enters winning ticket, bid discount, and attendee list.
+- **Checker (Finalize Result)**: Super Admin (Partner B) reviews the entered bid against ceiling rules ($D \le V/4$) and commits the auction outcome.
+- **Hard Guard**: `maker_user_id != checker_user_id`.
 
 ### 3. Prize Money Disbursement:
-- **Maker (Verify & Submit)**: Branch Manager or Accountant verifies the physical safety proof checklist (winner agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads) and prepares the payout voucher.
-- **Checker (Authorize Payout)**: Super Admin (Partner) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash.
-- **Rule**: `Maker != Checker`.
+- **Maker (Verify & Submit)**: Accountant or Super Admin (Partner A) verifies the physical safety proof checklist (winner agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads) and prepares the payout voucher.
+- **Checker (Authorize Payout)**: Super Admin (Partner B) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash.
+- **Hard Guard**: `maker_user_id != checker_user_id`.
 
-### 4. Audit Log Integrity:
+### 4. Field Cash Handover & Vault Deposit (Dual Agent/Accountant Guard):
+- **Collector (Submit Handover)**: Field Collection Agent (or staff in field collector role) collects cash from customers and submits daily handover batch.
+- **Acknowledger (Accept Handover)**: Partner (Super Admin) physically counts cash and signs off / acknowledges handover into branch vault.
+- **Hard Guard**: `collector_user_id != acknowledger_user_id`. Even though a collection agent also performs accountant desk duties, **they can NEVER acknowledge or sign off on their own collected cash**. An independent Partner must accept and verify the physical cash.
+
+### 5. Audit Log Integrity:
 - Every high-risk modification, reversal, auction finalization, and payout approval is recorded in an **append-only, immutable audit log** (`CONFIRMED-BY-DEVELOPER`).
 
 ---
@@ -83,15 +88,19 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 ## 4. Operating Reality & Persona Mapping (`CONFIRMED-BY-DEVELOPER`)
 
 1. **Current Team Structure**:
-   - Kumaran Finance operates with **4 equal partners** and **2 to 3 field collection agents**.
-   - Current business operations run from **1 physical branch office**.
-2. **Persona Mapping Policy**:
-   - The software maintains clean, separate personas (`Super Admin`, `Branch Manager`, `Accountant`, `Collection Agent`, `Customer`, `Auditor`).
-   - The 4 partners decide which personas they each assume in the system.
-   - For example:
-     - All 4 partners may have Super Admin accounts for business oversight.
-     - Specific partners can hold operational Branch Manager or Accountant permissions when entering daily records.
-3. **Automated Enforcement**:
-   - Even if multiple partners hold Super Admin privileges, the **Maker $\ne$ Checker** software constraint prevents any partner who enters an auction result or payout voucher from self-approving their own entry. Another partner must perform the checker approval.
-4. **Role Naming**:
-   - The role is confirmed as simply **"Accountant"**. The legacy term "Head Office Accountant" is completely retired.
+   - Kumaran Finance operates from **1 physical branch office** (Head Office - Perundurai, Erode, Tamil Nadu).
+   - Managed by **4 equal partners** and **2 to 3 field collection agents**.
+2. **Direct Partner Management (No External Branch Manager Hired)**:
+   - Kumaran Finance does **not** hire an external Branch Manager.
+   - The **4 partners directly run branch operations**, oversee auctions, supervise field agents, manage customer onboarding, and authorize all payouts and reversals.
+   - In the database and API, partners hold the **Super Admin** role.
+3. **Dual Role: Field Collection Agent + Desk Accountant**:
+   - The field collection agents also perform desk **Accountant** duties (maintaining day books, preparing payment vouchers, and reconciling physical receipts).
+   - The system allows assigning both the Collection Agent and Accountant roles to the same user account.
+   - To maintain financial safety, the system enforces **`collector_user_id != acknowledger_user_id`**: when wearing their collection hat, they submit handovers; a Partner must count and acknowledge the cash.
+4. **Partner-to-Partner Maker-Checker Dual Control**:
+   - All 4 partners have administrative authority, but the **`maker_user_id != checker_user_id`** constraint prevents any single partner from initiating and completing high-risk financial transactions unilaterally.
+   - Example: Partner 1 conducts the auction and enters the winning bid $\to$ Partner 2, 3, or 4 reviews and finalizes the auction in the system.
+5. **Role Naming**:
+   - Confirmed standard roles: **Super Admin** (Partners), **Accountant** (Desk accounts/Agent dual role), **Collection Agent** (Field mobile app), **Customer** (Subscribers), and **Auditor** (Read-only CA).
+   - The legacy term "Head Office Accountant" is completely retired.
