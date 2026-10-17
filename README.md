@@ -39,6 +39,8 @@ u:\Kumaran-finance\docs\
 ├── 04-engineering/
 │   ├── setup-and-contributing.md             # Local environment & Docker guide
 │   ├── ai-coding-guidelines.md               # Prompt templates & AI guardrails
+│   ├── ai-agent-development-playbook.md      # Guided coding playbook & task-to-doc map
+│   ├── database-migration-and-seeding-guide.md # Docker, Prisma migrations & BigInt seeding
 │   └── definition-of-done.md                 # 10-gate quality checklist per module
 ├── 05-testing/
 │   ├── financial-tests.md                    # Math invariant & concurrency tests
