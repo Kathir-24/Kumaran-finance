@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:17
+    container_name: chitflow-db
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - chitflow_pgdata:/var/lib/postgresql/data
+
+volumes:
+  chitflow_pgdata:
