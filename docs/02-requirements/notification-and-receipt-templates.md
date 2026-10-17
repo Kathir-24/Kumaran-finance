@@ -36,7 +36,6 @@
 
 கட்டண முறை / Payment Mode              : ரொக்கம் / CASH
 வசூலித்தவர் / Collected By             : முகவர் முனியசாமி (AG-04)
-முன்பண இருப்பு / Advance Credit Balance  : ₹ 0
 --------------------------------------------------------------------------------
   * கணினி மூலம் உருவாக்கப்பட்ட ரசீது. கையொப்பம் தேவையில்லை.
   * This is a computer-generated digital receipt.
@@ -82,7 +81,6 @@ Your chit subscription payment has been received successfully.
 • கட்டண முறை / Mode: *{{payment_mode}}*
 • ரசீது எண் / Receipt No: *{{receipt_number}}*
 • தேதி & நேரம் / Date: *{{transaction_timestamp}}*
-• முன்பண இருப்பு / Advance Credit: *₹{{advance_balance}}*
 
 📥 *டிஜிட்டல் ரசீதை பதிவிறக்க / Download Receipt PDF:*
 {{receipt_download_url}}
