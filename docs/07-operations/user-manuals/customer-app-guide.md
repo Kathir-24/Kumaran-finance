@@ -32,7 +32,6 @@ flowchart TD
 - View your active chit groups, ticket numbers, and current status:
   - **Due Amount**: Exact amount payable for the upcoming month (with dividend deduction already applied).
   - **Due Date**: Payment cutoff date.
-  - **Advance Credit (முன்பணம்)**: Any excess funds available in your account.
 - Tap any completed month to view and download your **Bilingual PDF Receipt (English + Tamil)**.
 
 ### 2.2 Paying Online via UPI (GPay / PhonePe / Paytm)
@@ -40,21 +39,22 @@ flowchart TD
 2. Review the breakdown:
    - Base Installment: ₹5,000
    - Minus Dividend: -₹1,300
-   - **Net Payable: ₹3,700**
+   - **Net Payable: ₹3,700** (Single discrete monthly installment; partial payments and advance balances are not permitted).
 3. Tap **"Pay with UPI"**.
 4. Select your preferred payment app (Google Pay, PhonePe, Paytm, or BHIM).
 5. Authorize the payment in your UPI app.
 6. Return to Kumaran Chits — your payment is instantly confirmed, and a digital receipt is issued immediately.
 
 ### 2.3 Auction Schedule & Results
-- Check when the next in-office auction will be held at your branch.
+- Check when the next in-office auction will be held at the Perundurai branch.
+- **Auction Eligibility**: If you have an unpaid installment due for the current month, you cannot participate or bid in that month's auction.
 - View past auction results:
   - Winning ticket number and winner's name.
   - Winning bid discount.
-  - Dividend credited to your ticket.
+  - Dividend credited to your ticket (**Universal Dividend**: shared equally among all members, including the auction winner).
 
 ---
 
 ## 3. Help & Support
-- Tap **"Contact Branch / கிளை தொடர்பு"** to call your assigned branch manager or WhatsApp the office directly.
+- Tap **"Contact Branch / கிளை தொடர்பு"** to call the Kumaran Finance Head Office (Perundurai) or WhatsApp the partners directly.
 - View branch address and working hours.
