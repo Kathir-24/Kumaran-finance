@@ -167,9 +167,53 @@
 > [!NOTE]
 > All statutory register outputs (`form-xvii`, `form-xxi`, `form-xxii`) transparently include `statutoryStatus: 'UNVERIFIED-LEGAL'` per `compliance-checklist.md` §3 until physical specimens from the Registrar of Chits (Erode/Perundurai) are officially inspected.
 
+## 11. Component 1: Encrypted Storage Service (`apps/api/src/storage/`)
+
+### 11.1 Overview & Architecture
+- **Dual-Driver Pattern**:
+  - `LocalStorageDriver`: Default for local development. Automatically writes files to `./storage/uploads/` and resolves absolute paths with path-traversal safeguards.
+  - `AwsS3StorageDriver`: Production driver using AWS SDK v3 (`@aws-sdk/client-s3`) with `ServerSideEncryption: 'AES256'` and `@aws-sdk/s3-request-presigner`.
+- **15-Minute Presigned Lifespan**: All presigned download URLs strictly expire in **900 seconds (15 minutes)** per `AGENTS.md` §1 and `prd.md` §3.
+- **Path Traversal Protection**: `StorageKeyHelper.sanitizeKey()` rejects any `..` or double slashes with `BadRequestException`.
+- **Deterministic Key Taxonomy**:
+  - Customer KYC: `kyc/{customerId}/{docType}-{uuid}.{ext}`
+  - Bilingual Receipts: `receipts/{branchCode}/{year}/{receiptNumber}.pdf`
+  - Prize Vouchers: `vouchers/{branchCode}/{year}/{voucherNumber}.pdf`
+  - Safety Proof Scans: `safety-proof/{auctionId}/{uuid}-{filename}`
+  - Form XVII Minutes: `minutes/{chitGroupId}/month-{installmentMonth}.pdf`
+
+### 11.2 Endpoint Catalog
+| Method | Endpoint | Description | Allowed Roles |
+|---|---|---|:---:|
+| `GET` | `/storage/file/:key(*)` | Authenticated stream of stored files (Local driver fallback) | Staff, Customer, Auditor |
+
 ---
 
-## 11. Summary of Completion Deliverables
+## 12. Component 2: Bilingual PDF Canvas Engine (`apps/api/src/pdf/`)
+
+### 12.1 Overview & Architecture
+- **Self-Contained Tamil Fonts**: Bundles `NotoSansTamil-Regular.ttf` and `NotoSansTamil-Bold.ttf` directly in `apps/api/src/assets/fonts/` (automatically copied to `dist/` on build) ensuring 100% OS font independence across Windows, Linux, and Docker Alpine.
+- **Rupee Words Converter (`RupeeWordsHelper`)**: Mathematically converts whole rupees (`BigInt`) into legal words in both English and Tamil:
+  - English: e.g. `3750n` $\to$ `"Three Thousand Seven Hundred Fifty Rupees Only"`
+  - Tamil: e.g. `3750n` $\to$ `"ரூபாய் மூன்றாயிரத்து எழுநூற்று ஐம்பது மட்டும்"`
+- **Canvas Templates**:
+  - `ThermalReceiptTemplate`: 80mm ESC/POS thermal printer layout (width: 226.77 pt) per `notification-and-receipt-templates.md` §1.
+  - `PayoutVoucherTemplate`: A5 landscape prize payout voucher with safety proof checklist stamps and Maker-Checker signature lines.
+  - `FormXviiMinutesTemplate`: A4 statutory auction minutes with financial breakdown, tie-breaker paper token lot draw table, and Foreman declaration.
+  - `FormXxiPassbookTemplate`: A4 landscape 20-month continuous schedule showing monthly base dues, dividend credits, payments, and arrears.
+- **Storage Integration**: Seamlessly saves generated PDF buffers via `StorageService`, updates database keys (`Receipt.pdfS3Key`), and returns 15-minute presigned URLs.
+
+### 12.2 Endpoint Catalog
+| Method | Endpoint | Description | Allowed Roles |
+|---|---|---|:---:|
+| `GET` | `/pdf/receipt/:paymentId` | Stream or download bilingual 80mm subscription receipt PDF | Staff, Customer, Auditor |
+| `GET` | `/pdf/voucher/:auctionId` | Stream or download bilingual prize payout voucher PDF | Staff, Customer, Auditor |
+| `GET` | `/pdf/minutes/:auctionId` | Stream or download Form XVII statutory auction minutes PDF | Staff, Auditor |
+| `GET` | `/pdf/passbook/:ticketId` | Stream or download Form XXI 20-month passbook statement PDF | Staff, Customer, Auditor |
+
+---
+
+## 13. Summary of Completion Deliverables
 
 - **Single Tenancy**: Zero `company_id` columns exist across all tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
@@ -184,4 +228,7 @@
 - **Physical Safe Cash Reconciliation Invariant**:
   $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Cash Inflows} - \text{Cash Outflows}$$
   Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
-- **Total Production Endpoints**: **61 fully implemented and tested endpoints** spanning Modules 1 through 9.
+- **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
+- **Bilingual PDF Canvas Engine**: 80mm thermal receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
+- **Total Production Endpoints**: **66 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes).
+- **Automated Test Coverage**: **158 / 158 tests passing across 14 test suites (100% pass rate)**.
