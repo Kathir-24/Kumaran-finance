@@ -81,6 +81,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Architectural Decisions (ADR 01-15)** | [`docs/01-business/decision-log.md`](docs/01-business/decision-log.md) |
 | **Personas, Roles & RBAC Matrix** | [`docs/01-business/permissions-matrix.md`](docs/01-business/permissions-matrix.md) |
 | **Functional Requirements (10 Modules)** | [`docs/02-requirements/prd.md`](docs/02-requirements/prd.md) |
+| **User Stories & 6-Persona Journey Maps** | [`docs/02-requirements/user-stories-and-journeys.md`](docs/02-requirements/user-stories-and-journeys.md) |
 | **API Endpoints, DTOs & HTTP Methods** | [`docs/03-architecture/api-spec.md`](docs/03-architecture/api-spec.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |
 | **Non-Functional Standards (NFR)** | [`docs/02-requirements/non-functional-requirements.md`](docs/02-requirements/non-functional-requirements.md) |

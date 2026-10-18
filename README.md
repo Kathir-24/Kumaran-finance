@@ -29,6 +29,7 @@ u:\Kumaran-finance\docs\
 │   └── open-questions.md                     # Centralized log of open questions and unverified legal claims
 ├── 02-requirements/
 │   ├── prd.md                                # 10 core modules acceptance criteria
+│   ├── user-stories-and-journeys.md          # 6 personas, 28 features, user stories & journey maps
 │   ├── non-functional-requirements.md        # Security, latency, precision standards
 │   └── notification-and-receipt-templates.md # Bilingual Tamil+English SMS, WhatsApp, & PDF receipts
 ├── 03-architecture/
