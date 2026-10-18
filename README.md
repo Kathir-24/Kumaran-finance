@@ -69,27 +69,29 @@ Follow these 4 steps to get a fully working local development environment:
 cd infra\docker
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 docker compose up -d
-docker compose ps
+cd ..\..
 ```
 The database will be available on `127.0.0.1:5433` (`chitflow_dev`).
 
-### Step 2: Configure Backend Environment & Install Dependencies
+### Step 2: Configure Environment & Install All Dependencies
 ```powershell
-cd ..\..\apps\api
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
+# Copy backend environment template
+if (!(Test-Path apps\api\.env)) { Copy-Item apps\api\.env.example apps\api\.env }
+
+# Install dependencies across all monorepo workspaces
 npm install
 ```
 
-### Step 3: Apply Migrations & Seed Foundational Data
+### Step 3: Apply Migrations & Seed Foundational Data (Run from root)
 ```powershell
-# Apply database schema to PostgreSQL
-npx prisma migrate dev
+# Apply Prisma schema migrations to PostgreSQL
+npm run prisma:migrate
 
-# Seed Head Office (PRD) and Partner Super Admin
-npx prisma db seed
+# Seed Head Office (PRD) and initial Super Admin partner
+npm run prisma:seed
 ```
 
-### Step 4: Run Tests & Start Backend API
+### Step 4: Run Tests & Launch Development Server
 ```powershell
 # Run unit & financial invariant tests (22/22 must pass)
 npm test
@@ -97,6 +99,9 @@ npm test
 # Start the NestJS backend in development watch mode
 npm run start:dev
 ```
-- API Base URL: `http://localhost:3000`
-- Health Check: `http://localhost:3000/health` (returns `{"status":"ok","service":"chitflow-api"}`)
-- Prisma Studio (DB Inspector): `npx prisma studio` (available on `http://localhost:5555`)
+
+### Live Endpoints & Tools:
+- **API Base URL**: `http://localhost:3000`
+- **Health Check**: `http://localhost:3000/health` (returns `{"status":"ok","service":"chitflow-api"}`)
+- **Swagger / OpenAPI Documentation**: `http://localhost:3000/api/docs` *(interactive API explorer)*
+- **Prisma Studio (Visual Database GUI)**: `npm run prisma:studio` (opens `http://localhost:5555`)

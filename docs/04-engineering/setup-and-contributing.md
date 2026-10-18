@@ -20,8 +20,13 @@ Kumaran-finance/
 │   ├── mobile/              # Flutter Android-first application (To be initialized)
 │   └── web/                 # React / Next.js Admin Dashboard (To be initialized)
 ├── infra/
-│   └── docker/              # Docker Compose (PostgreSQL 17)
+│   ├── docker/              # Docker Compose (PostgreSQL 17)
+│   └── scripts/             # Database backup & restore automation scripts
 ├── docs/                    # Complete Project Documentation Suite
+├── .github/workflows/       # CI/CD pipelines (ephemeral Postgres, lint, test, build)
+├── package.json             # Root monorepo workspace orchestration
+├── .editorconfig            # Monorepo code style formatting rules
+├── .prettierrc              # Monorepo Prettier configuration
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -44,6 +49,9 @@ docker compose up -d
 
 # Verify container is running
 docker compose ps
+
+# Return to repository root
+cd ..\..
 ```
 The database will be available at:
 - **Host**: `127.0.0.1`
@@ -55,25 +63,25 @@ The database will be available at:
 ---
 
 ### Step 2: Configure Backend Environment & Install Dependencies
+From the repository root:
 ```powershell
-cd apps\api
-
 # Copy environment template if not present
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
+if (!(Test-Path apps\api\.env)) { Copy-Item apps\api\.env.example apps\api\.env }
 
-# Install Node.js dependencies
+# Install Node.js dependencies across all workspaces
 npm install
 ```
 
 ---
 
 ### Step 3: Run Database Migrations & Seed Foundational Data
+Run directly from repository root:
 ```powershell
 # Apply Prisma migrations to PostgreSQL
-npx prisma migrate dev
+npm run prisma:migrate
 
 # Seed Head Office (PRD) and initial Super Admin partner
-npx prisma db seed
+npm run prisma:seed
 ```
 
 ---
@@ -89,9 +97,12 @@ npm test
 # Run NestJS in development watch mode
 npm run start:dev
 ```
-- API Base URL: `http://localhost:3000`
-- Health check endpoint: `http://localhost:3000/health`
-- Database visual inspector (Prisma Studio): `npx prisma studio` (opens `http://localhost:5555`)
+- **API Base URL**: `http://localhost:3000`
+- **Health check endpoint**: `http://localhost:3000/health`
+- **Interactive Swagger / OpenAPI Explorer**: `http://localhost:3000/api/docs`
+- **Database visual inspector (Prisma Studio)**: `npm run prisma:studio` (opens `http://localhost:5555`)
+- **Automated Database Backup**: `npm run backup`
+- **Automated Database Restore**: `npm run restore`
 
 ---
 
