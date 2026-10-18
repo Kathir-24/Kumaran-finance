@@ -201,15 +201,19 @@
   - `PayoutVoucherTemplate`: A5 landscape prize payout voucher with safety proof checklist stamps and Maker-Checker signature lines.
   - `FormXviiMinutesTemplate`: A4 statutory auction minutes with financial breakdown, tie-breaker paper token lot draw table, and Foreman declaration.
   - `FormXxiPassbookTemplate`: A4 landscape 20-month continuous schedule showing monthly base dues, dividend credits, payments, and arrears.
-- **Storage Integration**: Seamlessly saves generated PDF buffers via `StorageService`, updates database keys (`Receipt.pdfS3Key`), and returns 15-minute presigned URLs.
+- **Storage Integration & 6-Persona Access Guardians**: Seamlessly saves generated PDF buffers via `StorageService`, updates database keys (`Receipt.pdfS3Key`), and returns 15-minute presigned URLs. Guarded at Layer 2 (Ownership/ABAC) via `DocumentAccessHelper` to eliminate OWASP BOLA/IDOR vulnerabilities:
+  - `CUSTOMER`: strictly restricted to own receipts, own payout vouchers, and own passbooks; barred from internal minutes and other customers' files.
+  - `BRANCH_MANAGER`: restricted strictly to own branch data; barred from accessing other branches' documents.
+  - `COLLECTION_AGENT`: can only download receipts for payments they personally collected; strictly barred from prize vouchers, passbooks, and statutory minutes.
+  - `SUPER_ADMIN`, `ACCOUNTANT`, and `AUDITOR`: full oversight per permissions matrix.
 
 ### 12.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|:---:|
-| `GET` | `/pdf/receipt/:paymentId` | Stream or download bilingual 80mm subscription receipt PDF | Staff, Customer, Auditor |
-| `GET` | `/pdf/voucher/:auctionId` | Stream or download bilingual prize payout voucher PDF | Staff, Customer, Auditor |
-| `GET` | `/pdf/minutes/:auctionId` | Stream or download Form XVII statutory auction minutes PDF | Staff, Auditor |
-| `GET` | `/pdf/passbook/:ticketId` | Stream or download Form XXI 20-month passbook statement PDF | Staff, Customer, Auditor |
+| `GET` | `/pdf/receipt/:paymentId` | Stream or download bilingual 80mm subscription receipt PDF (Ownership-guarded) | Staff, Customer, Auditor |
+| `GET` | `/pdf/voucher/:auctionId` | Stream or download bilingual prize payout voucher PDF (Ownership-guarded) | Staff, Customer, Auditor |
+| `GET` | `/pdf/minutes/:auctionId` | Stream or download Form XVII statutory auction minutes PDF (Branch-guarded) | Staff, Auditor |
+| `GET` | `/pdf/passbook/:ticketId` | Stream or download Form XXI 20-month passbook statement PDF (Ownership-guarded) | Staff, Customer, Auditor |
 
 ---
 
@@ -230,5 +234,7 @@
   Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
 - **Bilingual PDF Canvas Engine**: 80mm thermal receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
+- **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **Total Production Endpoints**: **66 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes).
-- **Automated Test Coverage**: **158 / 158 tests passing across 14 test suites (100% pass rate)**.
+- **Automated Test Coverage**: **177 / 177 tests passing across 14 test suites (100% pass rate)**.
+
