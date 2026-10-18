@@ -23,3 +23,8 @@ Thumbs.db
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Database backups & dumps
+infra/backups/
+*.dump
+*.sql.gz
