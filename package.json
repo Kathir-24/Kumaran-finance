@@ -1,0 +1,27 @@
+{
+  "name": "kumaran-finance-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for Kumaran Chits operations platform (Kumaran Finance, Perundurai)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "start:dev": "npm --workspace=apps/api run start:dev",
+    "build": "npm --workspace=apps/api run build",
+    "test": "npm --workspace=apps/api test",
+    "lint": "npm --workspace=apps/api run lint",
+    "prisma:generate": "npm --workspace=apps/api run prisma:generate",
+    "prisma:migrate": "npm --workspace=apps/api run prisma:migrate",
+    "prisma:seed": "npm --workspace=apps/api run prisma:seed",
+    "prisma:studio": "npm --workspace=apps/api run prisma:studio"
+  },
+  "keywords": [
+    "chit-fund",
+    "fintech",
+    "kumaran-finance",
+    "tamil-nadu"
+  ],
+  "author": "Kumaran Finance",
+  "license": "UNLICENSED"
+}
