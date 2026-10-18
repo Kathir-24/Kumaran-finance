@@ -60,27 +60,32 @@ jobs:
           cache-dependency-path: apps/api/package-lock.json
 
       - name: Install Dependencies
-        run: |
-          cd apps/api
-          npm ci
+        working-directory: apps/api
+        run: npm ci
 
       - name: Run Oxlint (Fast Type-Aware Linter)
-        run: |
-          cd apps/api
-          npm run lint
+        working-directory: apps/api
+        run: npm run lint
 
       - name: Validate Prisma Schema & Generate Client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
         run: |
-          cd apps/api
           npx prisma validate
           npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
 
       - name: Run Unit & Financial Invariant Tests
+        working-directory: apps/api
         env:
-          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db
-        run: |
-          cd apps/api
-          npm test
+          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
+        run: npm test
+
+      - name: Compile NestJS Application
+        working-directory: apps/api
+        run: npm run build
 
   build-and-deploy:
     name: Build Docker Container & Deploy to AWS

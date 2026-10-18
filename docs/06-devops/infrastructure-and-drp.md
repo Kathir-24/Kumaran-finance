@@ -88,3 +88,21 @@ Once every 90 days, the developer and Kumaran Finance administrator execute this
 4. Verify that:
    $$\sum \text{Member Installment Dues} = \sum \text{Past Collections} + \text{Current Outstanding}$$
 5. Confirm pass rate and terminate temporary staging resources.
+
+### 3.4 Local & Branch Database Backup / Restore Runbook
+For on-premise branch operations and local developer testing, automated PowerShell scripts in `infra/scripts/` provide immediate snapshot capabilities:
+
+1. **Creating a Compressed Backup**:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File infra\scripts\backup-db.ps1
+   ```
+   - Connects to the running `chitflow-db` container.
+   - Executes `pg_dump -F c` creating a compressed binary archive in `infra/backups/`.
+   - Guarantees whole-rupee `BigInt` precision and index integrity.
+
+2. **Restoring from a Backup**:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File infra\scripts\restore-db.ps1 -BackupFilePath "infra\backups\kumaran_chits_backup_YYYYMMDD_HHMMSS.dump"
+   ```
+   - Performs a clean, transactional restore using `pg_restore --clean`.
+
