@@ -61,11 +61,12 @@ export class CustomerController {
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
+    Role.AUDITOR,
   )
   @ApiOperation({
     summary: 'Search & list customers with pagination',
     description:
-      'Returns paginated customer list with keyword search (name, phone, code) and optional KYC status filter. Allowed: Staff.',
+      'Returns paginated customer list with keyword search (name, phone, code) and optional KYC status filter. Allowed: Staff, Auditor.',
   })
   @ApiResponse({ status: 200, description: 'Customer list retrieved' })
   async findAll(@Query() query: QueryCustomerDto) {
@@ -79,6 +80,7 @@ export class CustomerController {
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
     Role.CUSTOMER,
+    Role.AUDITOR,
   )
   @ApiOperation({
     summary: 'Get customer profile by ID',

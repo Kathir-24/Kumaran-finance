@@ -36,11 +36,11 @@ export class ChitController {
 
   @Post('new')
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Create a fresh chit scheme (Starts Month 1)',
     description:
-      'Initializes a new chit group in DRAFT status with automatic whole-rupee math, 4.00% commission lock, and fixed 1/4 ceiling. Allowed: Super Admin, Branch Manager.',
+      'Initializes a new chit group in DRAFT status with automatic whole-rupee math, 4.00% commission lock, and fixed 1/4 ceiling. Allowed strictly: Super Admin.',
   })
   @ApiResponse({ status: 201, description: 'Chit group created successfully' })
   @ApiResponse({ status: 409, description: 'Group code already exists' })
@@ -69,9 +69,17 @@ export class ChitController {
   }
 
   @Get()
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
   @ApiOperation({
     summary: 'List chit schemes with status & keyword filter',
-    description: 'Returns paginated chit schemes. Allowed: Authenticated users.',
+    description: 'Returns paginated chit schemes. Allowed: All authenticated personas.',
   })
   @ApiResponse({ status: 200, description: 'Chit schemes list retrieved' })
   async findAll(@Query() query: QueryChitDto) {
@@ -79,10 +87,18 @@ export class ChitController {
   }
 
   @Get(':id')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
   @ApiOperation({
     summary: 'Get chit scheme details',
     description:
-      'Returns scheme parameters, financial rules, assigned tickets, and past auction progress. Allowed: Authenticated users.',
+      'Returns scheme parameters, financial rules, assigned tickets, and past auction progress. Allowed: All authenticated personas.',
   })
   @ApiResponse({ status: 200, description: 'Chit scheme found' })
   @ApiResponse({ status: 404, description: 'Chit scheme not found' })
@@ -108,9 +124,17 @@ export class ChitController {
   }
 
   @Get(':id/tickets')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
   @ApiOperation({
     summary: 'View all tickets in a chit group',
-    description: 'Lists all assigned tickets (1..N) with customer names and prized status.',
+    description: 'Lists all assigned tickets (1..N) with customer names and prized status. Allowed: All authenticated personas.',
   })
   @ApiResponse({ status: 200, description: 'Tickets list retrieved' })
   async getTickets(@Param('id') chitGroupId: string) {

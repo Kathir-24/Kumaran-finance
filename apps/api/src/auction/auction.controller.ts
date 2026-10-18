@@ -34,10 +34,18 @@ export class AuctionController {
   constructor(private readonly auctionService: AuctionService) {}
 
   @Get('group/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
   @ApiOperation({
     summary: 'List all auctions and tie-break results for a chit scheme',
     description:
-      'Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: Authenticated users.',
+      'Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: All authenticated personas.',
   })
   @ApiResponse({ status: 200, description: 'Auctions retrieved successfully' })
   async getGroupAuctions(@Param('chitGroupId') chitGroupId: string) {
@@ -45,10 +53,18 @@ export class AuctionController {
   }
 
   @Get(':id')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
   @ApiOperation({
     summary: 'Get details of a specific auction',
     description:
-      'Returns auction status, winning ticket, tied bidders, and statutory minutes. Allowed: Authenticated users.',
+      'Returns auction status, winning ticket, tied bidders, and statutory minutes. Allowed: All authenticated personas.',
   })
   @ApiResponse({ status: 200, description: 'Auction retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
