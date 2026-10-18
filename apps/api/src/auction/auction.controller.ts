@@ -160,11 +160,11 @@ export class AuctionController {
 
   @Post(':id/finalize')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Checker: Finalize auction and commit results (Maker != Checker)',
     description:
-      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Throws 403 Forbidden if finalized by the same user who recorded bids. Allowed: Super Admin.',
+      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.',
   })
   @ApiResponse({ status: 200, description: 'Auction successfully finalized' })
   @ApiResponse({
