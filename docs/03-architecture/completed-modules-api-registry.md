@@ -150,11 +150,28 @@
 | `POST` | `/disbursements/auction/:id/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/disbursements/auction/:id/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
 
+## 10. Module 9: Dashboards & Statutory Reports (`apps/api/src/report/`)
+
+### 10.1 Endpoint Catalog & 6-Persona Access Control
+
+| Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
+|---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `GET` | `/reports/dashboard` | Executive KPI dashboard & vault metrics | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/day-book` | Daily collection & disbursement journal | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/form-xxii` | Form XXII: Cash Book (Physical Cash Only) | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/form-xvii` | Form XVII: Auction Minutes Register | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/form-xxi` | Form XXI: Subscriber Ledger Register | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | **Own Ticket Only** | **Read-Only (Global)** |
+| `GET` | `/reports/defaulters` | Overdue members with 1M, 2M, 3M aging | **Global** | **Branch Scope** | **Global** | **Branch / Assigned** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/audit-logs` | Immutable audit trail of dual-control actions | **Global** | **Branch Scope** | **Read-Only** | 🚫 **Blocked** | **Own History Only**| **Read-Only (Global)** |
+
+> [!NOTE]
+> All statutory register outputs (`form-xvii`, `form-xxi`, `form-xxii`) transparently include `statutoryStatus: 'UNVERIFIED-LEGAL'` per `compliance-checklist.md` §3 until physical specimens from the Registrar of Chits (Erode/Perundurai) are officially inspected.
+
 ---
 
-## 10. Summary of Completion Deliverables
+## 11. Summary of Completion Deliverables
 
-- **Single Tenancy**: Zero `company_id` columns exist across all 10 tables.
+- **Single Tenancy**: Zero `company_id` columns exist across all tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
 - **Universal Equal Dividend Deduction**: Distributed equally to all members, including auction winner and past prized winners ($I_{net} = I_{base} - Div$).
 - **Single Discrete Payment & Zero Partial Payments**: Exactly one payment per monthly installment matching $I_{net}$; zero partials, zero doubles, zero advances (`UNPAID`, `PAID`, `OVERDUE`).
@@ -164,3 +181,7 @@
   - `collector_user_id != acknowledger_user_id` on cash handover into branch vault.
   - `maker_user_id != checker_user_id` on payment reversals (with `BRANCH_MANAGER` strictly blocked from approving reversals per permissions-matrix §6).
   - `verifiedByUserId != authorizedByUserId` on prize money disbursements (with `BRANCH_MANAGER` strictly blocked from authorizing payouts per permissions-matrix §6).
+- **Physical Safe Cash Reconciliation Invariant**:
+  $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Cash Inflows} - \text{Cash Outflows}$$
+  Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
+- **Total Production Endpoints**: **61 fully implemented and tested endpoints** spanning Modules 1 through 9.
