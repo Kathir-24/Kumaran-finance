@@ -128,9 +128,13 @@
 | `POST` | `/auctions/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
 
 ### 2.10 Statutory Reports (`/reports`)
+
+> **Note on Statutory Form Labels (`UNVERIFIED-LEGAL`)**: Form numbers XVII, XXI, and XXII are working references from generic chit-fund literature. Do not treat these as confirmed Tamil Nadu statutory layouts until physical specimen forms from the Registrar of Chits are verified. See `compliance-checklist.md` §3.
+
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET` | `/reports/day-book` | Daily collection and disbursement journal | `ACCOUNTANT`, `SUPER_ADMIN` |
-| `GET` | `/reports/form-xxi` | Form XXI: Subscriber Ledger for Registrar | `AUDITOR`, `SUPER_ADMIN` |
-| `GET` | `/reports/form-xxii` | Form XXII: Minutes of Auction Register | `AUDITOR`, `SUPER_ADMIN` |
+| `GET` | `/reports/form-xxi` | Form XXI: Subscriber Ledger for Registrar (`UNVERIFIED-LEGAL`) | `AUDITOR`, `SUPER_ADMIN` |
+| `GET` | `/reports/form-xvii` | Form XVII: Auction Minutes Consolidated Register (`UNVERIFIED-LEGAL`) — lists all auction results, winning discounts, tied bidders, and physical draw outcomes across all months | `AUDITOR`, `SUPER_ADMIN` |
+| `GET` | `/reports/form-xxii` | Form XXII: Cash Book / Day Book Register (`UNVERIFIED-LEGAL`) — daily register of all collections, agent cash handovers, and prize disbursements | `AUDITOR`, `SUPER_ADMIN` |
 | `GET` | `/reports/defaulters` | List overdue members with aging buckets | Staff |

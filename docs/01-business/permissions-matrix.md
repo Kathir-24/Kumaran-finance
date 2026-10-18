@@ -85,6 +85,23 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 
 ---
 
+### 6. Branch Manager Checker Scope — Explicit Boundary Rule (`CONFIRMED-BY-DEVELOPER`):
+
+> **Today's Reality**: Kumaran Finance does **not** hire an external Branch Manager. All 4 Partners (Super Admin) directly handle both Maker and Checker duties across all high-risk actions under the `maker_user_id != checker_user_id` constraint.
+>
+> **Future / Latent Role**: The `BRANCH_MANAGER` role is kept in the system architecture as a future-ready latent role. If a Branch Manager is ever hired, the following Checker scope boundaries apply — and must be enforced strictly by the application:
+
+| High-Risk Action | Branch Manager as Checker? | Reason |
+|---|:---:|---|
+| **Finalize In-Office Auction Result** | ✅ **ALLOWED** | Operational task — verifying the bid entered matches the physical auction outcome at the branch |
+| **Approve Payment Reversal** | 🚫 **STRICTLY BLOCKED** | Ledger change — financial authority reserved exclusively for Super Admin / Partners |
+| **Authorize Prize Payout** | 🚫 **STRICTLY BLOCKED** | Financial outflow — money leaving the company; reserved exclusively for Super Admin / Partners |
+
+- **The Governing Principle**: Branch Manager is an **operational role**. Any action that involves **money leaving the company** or **correcting the financial ledger** is strictly reserved for **Super Admin (Partners)** as the final financial authority — regardless of whether a Branch Manager is ever hired in the future.
+- **Hard Guard**: Backend must reject any `checker_user_id` with `BRANCH_MANAGER`-only role attempting to approve a payment reversal or authorize a prize payout, even if that user's role array does not include `SUPER_ADMIN`.
+
+---
+
 ## 4. Operating Reality & Persona Mapping (`CONFIRMED-BY-DEVELOPER`)
 
 1. **Current Team Structure**:
