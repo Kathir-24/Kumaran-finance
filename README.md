@@ -62,15 +62,41 @@ u:\Kumaran-finance\docs\
 
 ## Local Development Quickstart
 
-1. **Start PostgreSQL 17 Database**:
-   ```powershell
-   cd infra\docker
-   docker compose up -d
-   ```
-2. **Start Backend API**:
-   ```powershell
-   cd apps\api
-   npm install
-   npm run start:dev
-   ```
-   API runs on `http://localhost:3000`. Health check: `http://localhost:3000/health`.
+Follow these 4 steps to get a fully working local development environment:
+
+### Step 1: Start PostgreSQL 17 Database
+```powershell
+cd infra\docker
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+docker compose up -d
+docker compose ps
+```
+The database will be available on `127.0.0.1:5433` (`chitflow_dev`).
+
+### Step 2: Configure Backend Environment & Install Dependencies
+```powershell
+cd ..\..\apps\api
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+npm install
+```
+
+### Step 3: Apply Migrations & Seed Foundational Data
+```powershell
+# Apply database schema to PostgreSQL
+npx prisma migrate dev
+
+# Seed Head Office (PRD) and Partner Super Admin
+npx prisma db seed
+```
+
+### Step 4: Run Tests & Start Backend API
+```powershell
+# Run unit & financial invariant tests (22/22 must pass)
+npm test
+
+# Start the NestJS backend in development watch mode
+npm run start:dev
+```
+- API Base URL: `http://localhost:3000`
+- Health Check: `http://localhost:3000/health` (returns `{"status":"ok","service":"chitflow-api"}`)
+- Prisma Studio (DB Inspector): `npx prisma studio` (available on `http://localhost:5555`)

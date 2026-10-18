@@ -83,6 +83,11 @@ npx prisma studio
 ```
 Opens in your browser at `http://localhost:5555`.
 
+### 3.4 Applied Migrations & Verification Log
+| Migration Name | Applied At | Description | Verification Status |
+|---|---|---|:---:|
+| `20261018110459_init_kumaran_schema` | 2026-10-18 | Initial schema creation: 10 models, 8 enums, `roles Role[]`, `BigInt` currency fields, `@@unique([chitGroupId, customerId])` ticket limit. | **Applied & Verified** (`22/22` automated tests passing) |
+
 ---
 
 ## 4. The BigInt JSON Serialization Pattern (`BigIntInterceptor`)

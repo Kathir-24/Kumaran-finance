@@ -54,24 +54,44 @@ The database will be available at:
 
 ---
 
-### Step 2: Configure & Run NestJS API
+### Step 2: Configure Backend Environment & Install Dependencies
 ```powershell
 cd apps\api
 
-# Install dependencies (if not already installed)
-npm install
+# Copy environment template if not present
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 
-# Run Oxlint type-aware linter
+# Install Node.js dependencies
+npm install
+```
+
+---
+
+### Step 3: Run Database Migrations & Seed Foundational Data
+```powershell
+# Apply Prisma migrations to PostgreSQL
+npx prisma migrate dev
+
+# Seed Head Office (PRD) and initial Super Admin partner
+npx prisma db seed
+```
+
+---
+
+### Step 4: Verify Quality Gates & Start Development Server
+```powershell
+# Run Oxlint type-aware linter (0 errors, 0 warnings expected)
 npm run lint
 
-# Run unit tests
+# Run automated unit and financial invariant tests (100% pass expected)
 npm test
 
-# Run in watch mode for development
+# Run NestJS in development watch mode
 npm run start:dev
 ```
-The API starts on `http://localhost:3000`.  
-Health check endpoint: `http://localhost:3000/health`.
+- API Base URL: `http://localhost:3000`
+- Health check endpoint: `http://localhost:3000/health`
+- Database visual inspector (Prisma Studio): `npx prisma studio` (opens `http://localhost:5555`)
 
 ---
 
