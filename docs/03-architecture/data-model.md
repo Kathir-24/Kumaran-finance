@@ -90,21 +90,25 @@ enum Role {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  branchId     String?
-  branch       Branch?   @relation(fields: [branchId], references: [id])
-  name         String
-  phone        String    @unique
-  email        String?   @unique
-  passwordHash String
-  roles        Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  branchId         String?
+  branch           Branch?   @relation(fields: [branchId], references: [id])
+  name             String
+  phone            String    @unique
+  email            String?   @unique
+  passwordHash     String
+  roles            Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
+  isActive         Boolean   @default(true)
+  totpSecret       String?   // RFC 6238 TOTP secret for Microsoft Authenticator 2FA
+  isTotpEnabled    Boolean   @default(false)
+  mpinHash         String?   // 6-digit MPIN bcrypt hash for mobile quick unlock
+  refreshTokenHash String?   // Hashed refresh token for active session revocation
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  collections  Payment[] @relation("AgentPayments")
-  auditLogs    AuditLog[]
+  collections      Payment[] @relation("AgentPayments")
+  auditLogs        AuditLog[]
 }
 
 // -------------------------------------------------------------
