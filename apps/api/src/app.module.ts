@@ -14,6 +14,7 @@ import { PaymentModule } from './payment/payment.module';
 import { DisbursementModule } from './disbursement/disbursement.module';
 import { ReportModule } from './report/report.module';
 import { StorageModule } from './storage/storage.module';
+import { PdfModule } from './pdf/pdf.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -33,6 +34,7 @@ import { validateEnv } from './config/env.validation';
     DisbursementModule,
     ReportModule,
     StorageModule,
+    PdfModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
