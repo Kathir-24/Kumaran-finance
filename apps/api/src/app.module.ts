@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CustomerModule } from './customer/customer.module';
 import { ChitModule } from './chit/chit.module';
 import { AuctionModule } from './auction/auction.module';
+import { InstallmentModule } from './installment/installment.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -21,6 +22,7 @@ import { validateEnv } from './config/env.validation';
     CustomerModule,
     ChitModule,
     AuctionModule,
+    InstallmentModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
