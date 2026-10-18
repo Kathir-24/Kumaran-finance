@@ -1,9 +1,9 @@
 # Kumaran Chits — Completed Modules API & 6-Persona RBAC Registry
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Current Status**: **Modules 1, 2, 3, 4, 5, 6, and 7 Complete**  
+> **Current Status**: **Modules 1, 2, 3, 4, 5, 6, 7, and 8 Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**109 / 109 passing tests**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**120 / 120 passing tests**).
 
 ---
 
@@ -19,8 +19,9 @@
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
 | **Module 6: Collections & Handover** | `/collections` | 5 | Exact $I_{net}$ matching, sequential bilingual receipt, dual control (`collector != acknowledger`) | 11 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
+| **Module 8: Prize Disbursements** | `/disbursements` | 6 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout | 11 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 13 passing |
-| **TOTAL VERIFIED SCOPE** | — | **48** | **All Invariants 100% Satisfied** | **109 / 109 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **54** | **All Invariants 100% Satisfied** | **120 / 120 PASSING** |
 
 ---
 
@@ -136,13 +137,30 @@
 
 ---
 
-## 9. Summary of Completion Deliverables
+## 9. Module 8: Prize Disbursements & Company Safety Proof Checklist (`apps/api/src/disbursement/`)
+
+### 9.1 Endpoint Catalog & 6-Persona Access Control
+
+| Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
+|---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `GET` | `/disbursements` | List disbursements across chit schemes | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/disbursements/auction/:id` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Winner Only** | **Read-Only (Global)** |
+| `POST` | `/disbursements/auction/:id/verify-safety-proof` | **Maker**: Verify safety checklist & scans | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/auction/:id/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/disbursements/auction/:id/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
+
+---
+
+## 10. Summary of Completion Deliverables
 
 - **Single Tenancy**: Zero `company_id` columns exist across all 10 tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
 - **Universal Equal Dividend Deduction**: Distributed equally to all members, including auction winner and past prized winners ($I_{net} = I_{base} - Div$).
 - **Single Discrete Payment & Zero Partial Payments**: Exactly one payment per monthly installment matching $I_{net}$; zero partials, zero doubles, zero advances (`UNPAID`, `PAID`, `OVERDUE`).
+- **Flexible Company Safety Proof Checklist (ADR-15)**: Property documents eliminated; non-mandatory, on-demand safety proof checklist (signed agreement, nominee signature, signed blank cheques, promissory notes).
 - **Maker-Checker Dual Control Hard Guards**:
   - `conductedByUserId != finalizedByUserId` on offline auctions.
   - `collector_user_id != acknowledger_user_id` on cash handover into branch vault.
   - `maker_user_id != checker_user_id` on payment reversals (with `BRANCH_MANAGER` strictly blocked from approving reversals per permissions-matrix §6).
+  - `verifiedByUserId != authorizedByUserId` on prize money disbursements (with `BRANCH_MANAGER` strictly blocked from authorizing payouts per permissions-matrix §6).
