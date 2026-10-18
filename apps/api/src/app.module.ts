@@ -10,6 +10,7 @@ import { ChitModule } from './chit/chit.module';
 import { AuctionModule } from './auction/auction.module';
 import { InstallmentModule } from './installment/installment.module';
 import { CollectionModule } from './collection/collection.module';
+import { PaymentModule } from './payment/payment.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -25,6 +26,7 @@ import { validateEnv } from './config/env.validation';
     AuctionModule,
     InstallmentModule,
     CollectionModule,
+    PaymentModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

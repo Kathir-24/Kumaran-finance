@@ -1,9 +1,9 @@
 # Kumaran Chits — Completed Modules API & 6-Persona RBAC Registry
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Current Status**: **Modules 1, 2, 3, 4, 5, and 6 Complete**  
+> **Current Status**: **Modules 1, 2, 3, 4, 5, 6, and 7 Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**93 / 93 passing tests**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**109 / 109 passing tests**).
 
 ---
 
@@ -18,8 +18,9 @@
 | **Module 4: In-Office Auctions** | `/auctions` | 7 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker | 16 passing |
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
 | **Module 6: Collections & Handover** | `/collections` | 5 | Exact $I_{net}$ matching, sequential bilingual receipt, dual control (`collector != acknowledger`) | 11 passing |
+| **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 13 passing |
-| **TOTAL VERIFIED SCOPE** | — | **41** | **All Invariants 100% Satisfied** | **93 / 93 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **48** | **All Invariants 100% Satisfied** | **109 / 109 PASSING** |
 
 ---
 
@@ -119,7 +120,23 @@
 
 ---
 
-## 8. Summary of Completion Deliverables
+## 8. Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals (`apps/api/src/payment/`)
+
+### 8.1 Endpoint Catalog & 6-Persona Access Control
+
+| Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
+|---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `POST` | `/payments` | Record discrete payment (Exact $I_{net}$) | **Allowed** | **Branch Scope** | **Company-wide** | **Allowed (Office/Field)** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/payments` | Query & filter payments list | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payments Only** | **Read-Only (Global)** |
+| `GET` | `/payments/:id` | Get single payment details & history | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payment Only** | **Read-Only (Global)** |
+| `GET` | `/payments/:id/receipt` | Generate bilingual receipt (EN + தமிழ்) | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Receipt Only** | **Read-Only (Global)** |
+| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/payments/:id/approve-reversal` | **Checker**: Commit reversal (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+
+---
+
+## 9. Summary of Completion Deliverables
 
 - **Single Tenancy**: Zero `company_id` columns exist across all 10 tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
@@ -128,4 +145,4 @@
 - **Maker-Checker Dual Control Hard Guards**:
   - `conductedByUserId != finalizedByUserId` on offline auctions.
   - `collector_user_id != acknowledger_user_id` on cash handover into branch vault.
-  - `maker_user_id != checker_user_id` on payment reversals.
+  - `maker_user_id != checker_user_id` on payment reversals (with `BRANCH_MANAGER` strictly blocked from approving reversals per permissions-matrix §6).
