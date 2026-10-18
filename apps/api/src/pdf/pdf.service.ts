@@ -3,7 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
 import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
 import { StorageService } from '../storage/storage.service';
 import { FormXviiMinutesTemplate } from './templates/form-xvii-minutes.template';
@@ -27,7 +29,10 @@ export class PdfService {
   /**
    * Generates a bilingual 80mm subscription receipt PDF, uploads to storage, and updates receipt.
    */
-  async generateReceiptPdf(paymentId: string): Promise<GeneratedPdfResult> {
+  async generateReceiptPdf(
+    paymentId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
@@ -54,6 +59,9 @@ export class PdfService {
     if (!payment || !payment.receipt) {
       throw new NotFoundException('Payment or receipt not found');
     }
+
+    // Enforce 6-persona ownership & data scoping
+    DocumentAccessHelper.assertReceiptAccess(payment, requestingUser);
 
     const firstAlloc = payment.allocations[0];
     if (!firstAlloc) {
@@ -107,7 +115,10 @@ export class PdfService {
   /**
    * Generates a bilingual prize payout voucher PDF, uploads to storage, and returns presigned URL.
    */
-  async generatePayoutVoucherPdf(auctionId: string): Promise<GeneratedPdfResult> {
+  async generatePayoutVoucherPdf(
+    auctionId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
     const winner = await this.prisma.auctionWinner.findUnique({
       where: { auctionId },
       include: {
@@ -127,6 +138,9 @@ export class PdfService {
     if (!winner || winner.disbursementStatus !== 'DISBURSED') {
       throw new NotFoundException('Prize winner not found or prize payout not yet released');
     }
+
+    // Enforce 6-persona ownership & data scoping
+    DocumentAccessHelper.assertVoucherAccess(winner, requestingUser);
 
     const auction = winner.auction;
     const chit = auction.chitGroup;
@@ -183,7 +197,10 @@ export class PdfService {
   /**
    * Generates Form XVII statutory auction minutes PDF and saves to storage.
    */
-  async generateAuctionMinutesPdf(auctionId: string): Promise<GeneratedPdfResult> {
+  async generateAuctionMinutesPdf(
+    auctionId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
@@ -202,6 +219,9 @@ export class PdfService {
     if (!auction || !auction.winner) {
       throw new NotFoundException('Finalized auction or winner not found');
     }
+
+    // Enforce 6-persona ownership & data scoping
+    DocumentAccessHelper.assertMinutesAccess(auction, requestingUser);
 
     const chit = auction.chitGroup;
     const winnerTicket = auction.winner.ticket;
@@ -249,7 +269,10 @@ export class PdfService {
   /**
    * Generates Form XXI subscriber passbook ledger PDF and saves to storage.
    */
-  async generatePassbookPdf(ticketId: string): Promise<GeneratedPdfResult> {
+  async generatePassbookPdf(
+    ticketId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
       include: {
@@ -273,6 +296,9 @@ export class PdfService {
     if (!ticket) {
       throw new NotFoundException('Subscriber ticket not found');
     }
+
+    // Enforce 6-persona ownership & data scoping
+    DocumentAccessHelper.assertPassbookAccess(ticket, requestingUser);
 
     let totalGrossDue = 0n;
     let totalDividendCredit = 0n;

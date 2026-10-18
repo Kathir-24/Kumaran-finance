@@ -15,9 +15,11 @@ import {
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PdfService } from './pdf.service';
 
 @ApiTags('Bilingual PDF Documents')
@@ -43,12 +45,14 @@ export class PdfController {
   })
   @ApiQuery({ name: 'download', required: false, type: Boolean, description: 'Return presigned URL JSON instead of streaming PDF' })
   @ApiResponse({ status: 200, description: 'PDF stream or presigned URL returned' })
+  @ApiResponse({ status: 403, description: 'Forbidden access to receipt' })
   async getReceiptPdf(
     @Param('paymentId') paymentId: string,
     @Query('download') download: boolean,
+    @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
-    const result = await this.pdfService.generateReceiptPdf(paymentId);
+    const result = await this.pdfService.generateReceiptPdf(paymentId, currentUser);
 
     if (String(download) === 'true') {
       return res.json({
@@ -82,12 +86,14 @@ export class PdfController {
   })
   @ApiQuery({ name: 'download', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Voucher PDF stream or presigned URL returned' })
+  @ApiResponse({ status: 403, description: 'Forbidden access to voucher' })
   async getVoucherPdf(
     @Param('auctionId') auctionId: string,
     @Query('download') download: boolean,
+    @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
-    const result = await this.pdfService.generatePayoutVoucherPdf(auctionId);
+    const result = await this.pdfService.generatePayoutVoucherPdf(auctionId, currentUser);
 
     if (String(download) === 'true') {
       return res.json({
@@ -120,12 +126,14 @@ export class PdfController {
   })
   @ApiQuery({ name: 'download', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Auction minutes PDF returned' })
+  @ApiResponse({ status: 403, description: 'Forbidden access to auction minutes' })
   async getMinutesPdf(
     @Param('auctionId') auctionId: string,
     @Query('download') download: boolean,
+    @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
-    const result = await this.pdfService.generateAuctionMinutesPdf(auctionId);
+    const result = await this.pdfService.generateAuctionMinutesPdf(auctionId, currentUser);
 
     if (String(download) === 'true') {
       return res.json({
@@ -159,12 +167,14 @@ export class PdfController {
   })
   @ApiQuery({ name: 'download', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Passbook PDF returned' })
+  @ApiResponse({ status: 403, description: 'Forbidden access to passbook' })
   async getPassbookPdf(
     @Param('ticketId') ticketId: string,
     @Query('download') download: boolean,
+    @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
-    const result = await this.pdfService.generatePassbookPdf(ticketId);
+    const result = await this.pdfService.generatePassbookPdf(ticketId, currentUser);
 
     if (String(download) === 'true') {
       return res.json({
@@ -183,3 +193,4 @@ export class PdfController {
     res.end(result.buffer);
   }
 }
+
