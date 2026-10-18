@@ -13,6 +13,7 @@ import { CollectionModule } from './collection/collection.module';
 import { PaymentModule } from './payment/payment.module';
 import { DisbursementModule } from './disbursement/disbursement.module';
 import { ReportModule } from './report/report.module';
+import { StorageModule } from './storage/storage.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -31,6 +32,7 @@ import { validateEnv } from './config/env.validation';
     PaymentModule,
     DisbursementModule,
     ReportModule,
+    StorageModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

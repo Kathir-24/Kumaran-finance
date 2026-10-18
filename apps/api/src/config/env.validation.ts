@@ -14,6 +14,12 @@ export interface EnvironmentVariables {
   REFRESH_TOKEN_EXPIRES_IN: string;
   DEFAULT_FOREMAN_COMMISSION_PERCENT: number;
   PRIMARY_BRANCH_CODE: string;
+  STORAGE_DRIVER: 'local' | 's3';
+  LOCAL_STORAGE_PATH: string;
+  AWS_REGION: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_S3_BUCKET?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -37,6 +43,20 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     errors.push(`Invalid NODE_ENV: ${nodeEnv}. Must be one of: ${validEnvironments.join(', ')}`);
   }
 
+  const storageDriver = (config.STORAGE_DRIVER as string) ?? 'local';
+  if (storageDriver !== 'local' && storageDriver !== 's3') {
+    errors.push(`Invalid STORAGE_DRIVER: ${storageDriver}. Must be 'local' or 's3'`);
+  }
+
+  if (storageDriver === 's3') {
+    const s3Required = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_S3_BUCKET'];
+    for (const v of s3Required) {
+      if (!config[v] || typeof config[v] !== 'string') {
+        errors.push(`Missing mandatory AWS S3 variable when STORAGE_DRIVER is 's3': ${v}`);
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `\n❌ ENVIRONMENT CONFIGURATION ERROR:\n` +
@@ -55,5 +75,11 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     REFRESH_TOKEN_EXPIRES_IN: (config.REFRESH_TOKEN_EXPIRES_IN as string) ?? '7d',
     DEFAULT_FOREMAN_COMMISSION_PERCENT: Number(config.DEFAULT_FOREMAN_COMMISSION_PERCENT ?? 4.0),
     PRIMARY_BRANCH_CODE: (config.PRIMARY_BRANCH_CODE as string) ?? 'PRD',
+    STORAGE_DRIVER: storageDriver as 'local' | 's3',
+    LOCAL_STORAGE_PATH: (config.LOCAL_STORAGE_PATH as string) ?? './storage/uploads',
+    AWS_REGION: (config.AWS_REGION as string) ?? 'ap-south-1',
+    AWS_ACCESS_KEY_ID: config.AWS_ACCESS_KEY_ID as string | undefined,
+    AWS_SECRET_ACCESS_KEY: config.AWS_SECRET_ACCESS_KEY as string | undefined,
+    AWS_S3_BUCKET: config.AWS_S3_BUCKET as string | undefined,
   };
 }
