@@ -1,0 +1,206 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuctionService } from './auction.service';
+import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
+import { RecordBidDto } from './dto/record-bid.dto';
+import { RecordTieBreakDto } from './dto/record-tie-break.dto';
+
+@ApiTags('Auctions')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('auctions')
+export class AuctionController {
+  constructor(private readonly auctionService: AuctionService) {}
+
+  @Get('group/:chitGroupId')
+  @ApiOperation({
+    summary: 'List all auctions and tie-break results for a chit scheme',
+    description:
+      'Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: Authenticated users.',
+  })
+  @ApiResponse({ status: 200, description: 'Auctions retrieved successfully' })
+  async getGroupAuctions(@Param('chitGroupId') chitGroupId: string) {
+    return this.auctionService.getGroupAuctions(chitGroupId);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get details of a specific auction',
+    description:
+      'Returns auction status, winning ticket, tied bidders, and statutory minutes. Allowed: Authenticated users.',
+  })
+  @ApiResponse({ status: 200, description: 'Auction retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Auction not found' })
+  async findOne(@Param('id') id: string) {
+    return this.auctionService.findOne(id);
+  }
+
+  @Get(':id/eligible-bidders')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Pre-Auction Defaulter Guard: List eligible non-prized subscribers',
+    description:
+      'ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.',
+  })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: Number,
+    description: 'Installment month (required if ID is ChitGroup UUID)',
+  })
+  @ApiResponse({ status: 200, description: 'Eligible bidders list retrieved' })
+  async getEligibleBidders(
+    @Param('id') id: string,
+    @Query('month') month?: string,
+  ) {
+    const monthNum = month ? parseInt(month, 10) : undefined;
+    return this.auctionService.getEligibleBiddersForIdentifier(id, monthNum);
+  }
+
+  @Post(':id/record-bid')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Maker: Record winning auction bid and whole-rupee discount',
+    description:
+      'Records the in-office winning bid discount (Floor >= 4% Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.',
+  })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: Number,
+    description: 'Installment month (required if ID is ChitGroup UUID)',
+  })
+  @ApiResponse({ status: 200, description: 'Bid recorded successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Ceiling exceeded or defaulter violation',
+  })
+  async recordBid(
+    @Param('id') id: string,
+    @Body() dto: RecordBidDto,
+    @CurrentUser('sub') makerUserId: string,
+    @Query('month') month?: string,
+  ) {
+    const monthNum = month ? parseInt(month, 10) : undefined;
+    return this.auctionService.recordBidForIdentifier(
+      id,
+      dto,
+      makerUserId,
+      monthNum,
+    );
+  }
+
+  @Post(':id/tie-break')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary:
+      'Option A (Physical Paper Token Draw): Record ceiling tie-break winner',
+    description:
+      'Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Super Admin, Branch Manager.',
+  })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: Number,
+    description: 'Installment month (required if ID is ChitGroup UUID)',
+  })
+  @ApiResponse({ status: 200, description: 'Tie-break recorded successfully' })
+  async recordTieBreak(
+    @Param('id') id: string,
+    @Body() dto: RecordTieBreakDto,
+    @CurrentUser('sub') makerUserId: string,
+    @Query('month') month?: string,
+  ) {
+    const monthNum = month ? parseInt(month, 10) : undefined;
+    return this.auctionService.recordTieBreakForIdentifier(
+      id,
+      dto,
+      makerUserId,
+      monthNum,
+    );
+  }
+
+  @Post(':id/tie-break-record')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Alias for Option A Tie-Break (as in API Specification)',
+  })
+  async recordTieBreakAlias(
+    @Param('id') id: string,
+    @Body() dto: RecordTieBreakDto,
+    @CurrentUser('sub') makerUserId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.recordTieBreak(id, dto, makerUserId, month);
+  }
+
+  @Post(':id/finalize')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Checker: Finalize auction and commit results (Maker != Checker)',
+    description:
+      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Throws 403 Forbidden if finalized by the same user who recorded bids. Allowed: Super Admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Auction successfully finalized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Maker-Checker separation violated',
+  })
+  async finalize(
+    @Param('id') auctionId: string,
+    @CurrentUser('sub') checkerUserId: string,
+    @Body() dto?: FinalizeAuctionDto,
+  ) {
+    return this.auctionService.finalizeAuction(auctionId, checkerUserId, dto);
+  }
+
+  @Get(':id/minutes')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'Get statutory Auction Minutes proceedings text',
+    description:
+      'Retrieves Form XVII statutory auction proceedings record with attendee count, discount, dividend, and Foreman signature flag. Allowed: Staff and Auditor.',
+  })
+  @ApiResponse({ status: 200, description: 'Auction minutes retrieved' })
+  @ApiResponse({ status: 404, description: 'Minutes not found' })
+  async getMinutes(@Param('id') auctionId: string) {
+    return this.auctionService.getAuctionMinutes(auctionId);
+  }
+
+  @Get(':id/minutes/pdf')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'Get statutory Auction Minutes layout for printing / PDF',
+    description:
+      'Returns formatted statutory auction minutes for printable dispatch and audit recordkeeping.',
+  })
+  @ApiResponse({ status: 200, description: 'Minutes text layout retrieved' })
+  async getMinutesPdf(@Param('id') auctionId: string) {
+    return this.auctionService.getAuctionMinutes(auctionId);
+  }
+}

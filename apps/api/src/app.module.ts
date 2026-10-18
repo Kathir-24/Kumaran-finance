@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomerModule } from './customer/customer.module';
 import { ChitModule } from './chit/chit.module';
+import { AuctionModule } from './auction/auction.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -19,6 +20,7 @@ import { validateEnv } from './config/env.validation';
     AuthModule,
     CustomerModule,
     ChitModule,
+    AuctionModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
