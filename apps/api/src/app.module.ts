@@ -9,6 +9,7 @@ import { CustomerModule } from './customer/customer.module';
 import { ChitModule } from './chit/chit.module';
 import { AuctionModule } from './auction/auction.module';
 import { InstallmentModule } from './installment/installment.module';
+import { CollectionModule } from './collection/collection.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -23,6 +24,7 @@ import { validateEnv } from './config/env.validation';
     ChitModule,
     AuctionModule,
     InstallmentModule,
+    CollectionModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
