@@ -106,3 +106,35 @@ For on-premise branch operations and local developer testing, automated PowerShe
    ```
    - Performs a clean, transactional restore using `pg_restore --clean`.
 
+---
+
+## 4. Production Go-Live Deployment Checklist (Local vs Live AWS)
+
+Before launching the platform into live customer and partner operations in Perundurai, the DevOps engineer must verify all 5 infrastructure transitions from local development defaults to hardened AWS production configurations:
+
+| Security Area | Local / Staging Default | Required in Live Production (AWS) | Implementation Verification |
+|---|---|---|---|
+| **HTTPS / TLS** | Local HTTP (`http://localhost:3000`) | Enforce HTTPS-only via **AWS CloudFront / Application Load Balancer (ALB)** with an auto-renewing **AWS Certificate Manager (ACM)** SSL/TLS certificate. | Port 80 traffic automatically redirects (HTTP 301) to HTTPS port 443. Plaintext HTTP is rejected at the load balancer. |
+| **Secrets Storage** | Plain text `.env` file on local disk | Store sensitive credentials (`DATABASE_URL`, `JWT_SECRET`) in **AWS Secrets Manager** or **AWS SSM Parameter Store** (`SecureString`). | Zero production passwords or JWT keys committed to git, Docker images, or unencrypted disk storage. |
+| **Database Subnet Isolation** | Docker container port `5433` exposed on `127.0.0.1` | Deploy **AWS RDS PostgreSQL 17** in a **Private VPC Subnet** with **zero public IP address** (`PubliclyAccessible: No`). | Security group `DB-SG` allows inbound port 5432 exclusively from the Application Security Group (`App-SG`). Zero direct internet access. |
+| **S3 Bucket Encryption & Access** | Local filesystem (`./storage/uploads`) | Enable **AWS SSE-KMS** encryption and turn on **Block All Public Access** on S3 bucket. | S3 bucket blocks all public ACLs and bucket policies. Documents are strictly accessible via 15-minute temporary presigned URLs. |
+| **Automated Database Backups** | Local PowerShell scripts (`infra/scripts/backup-db.ps1`) | Enable **AWS RDS Automated Backups** with **7-day Continuous Point-in-Time Recovery (PITR)** and daily snapshots retained for **30 days**. | Nightly automated snapshot scheduled at 02:00 AM IST. RPO $\le 15$ min, RTO $\le 2$ hours verified via quarterly recovery drill. |
+
+### 4.1 Production Secrets Injection Architecture
+In production container environments (AWS ECS Fargate or Docker):
+- The NestJS API container does **not** mount a physical `.env` file.
+- Instead, the ECS Task Definition directly references secrets by ARN from **AWS Secrets Manager**:
+  ```json
+  "secrets": [
+    {
+      "name": "DATABASE_URL",
+      "valueFrom": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:kumaran/production/db-url"
+    },
+    {
+      "name": "JWT_SECRET",
+      "valueFrom": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:kumaran/production/jwt-secret"
+    }
+  ]
+  ```
+- AWS ECS injects the decrypted values directly into process environment variables in memory at container boot time, preventing disk exposure.
+
