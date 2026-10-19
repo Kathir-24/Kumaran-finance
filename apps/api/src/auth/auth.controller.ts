@@ -8,6 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import {
+  THROTTLE_AUTH_LIMIT,
+  THROTTLE_AUTH_TTL_MS,
+  THROTTLE_OTP_LIMIT,
+  THROTTLE_OTP_TTL_MS,
+} from '../common/constants';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { DisableTotpDto } from './dto/disable-totp.dto';
@@ -26,6 +33,7 @@ export class AuthController {
 
   @Post('web/login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: THROTTLE_AUTH_LIMIT, ttl: THROTTLE_AUTH_TTL_MS } })
   @ApiOperation({
     summary: 'Office staff credentials login',
     description:
@@ -33,18 +41,21 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Login successful or 2FA challenge issued' })
   @ApiResponse({ status: 401, description: 'Invalid credentials or inactive account' })
+  @ApiResponse({ status: 429, description: 'Too many login attempts. Account locked for 15 minutes.' })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Post('web/verify-totp')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: THROTTLE_OTP_LIMIT, ttl: THROTTLE_OTP_TTL_MS } })
   @ApiOperation({
     summary: 'Verify Microsoft Authenticator TOTP code',
     description: 'Validates 6-digit code against RFC 6238 TOTP secret and issues full JWT tokens.',
   })
   @ApiResponse({ status: 200, description: 'TOTP verified, JWT tokens issued' })
   @ApiResponse({ status: 401, description: 'Invalid or expired code or session' })
+  @ApiResponse({ status: 429, description: 'Too many verification attempts' })
   async verifyTotp(@Body() dto: TotpVerifyDto) {
     return this.authService.verifyTotp(dto);
   }
@@ -101,12 +112,14 @@ export class AuthController {
   @Post('totp/enable')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
+  @Throttle({ default: { limit: THROTTLE_OTP_LIMIT, ttl: THROTTLE_OTP_TTL_MS } })
   @ApiOperation({
     summary: 'Confirm and enable Microsoft Authenticator 2FA',
     description: 'Verifies the 6-digit code with the generated secret and permanently locks 2FA.',
   })
   @ApiResponse({ status: 200, description: '2FA enabled' })
   @ApiResponse({ status: 400, description: 'Invalid verification code' })
+  @ApiResponse({ status: 429, description: 'Too many verification attempts' })
   async enableTotp(@CurrentUser('sub') userId: string, @Body() dto: TotpEnableDto) {
     return this.authService.enableTotp(userId, dto);
   }
@@ -126,12 +139,14 @@ export class AuthController {
 
   @Post('mobile/login-mpin')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: THROTTLE_AUTH_LIMIT, ttl: THROTTLE_AUTH_TTL_MS } })
   @ApiOperation({
     summary: 'Mobile quick unlock with 6-digit MPIN',
     description: 'Quick biometric/MPIN login for field collection agents on mobile.',
   })
   @ApiResponse({ status: 200, description: 'MPIN verified, tokens issued' })
   @ApiResponse({ status: 401, description: 'Invalid phone or MPIN' })
+  @ApiResponse({ status: 429, description: 'Too many MPIN attempts. Account locked for 15 minutes.' })
   async loginMpin(@Body() dto: MpinLoginDto) {
     return this.authService.loginMpin(dto);
   }
