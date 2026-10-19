@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: apps/api
-        run: npm ci
+        run: npm install
 
       - name: Run Oxlint (Code Quality & Style)
         working-directory: apps/api

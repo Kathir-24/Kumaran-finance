@@ -61,7 +61,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: apps/api
-        run: npm ci
+        run: npm install
 
       - name: Run Oxlint (Fast Type-Aware Linter)
         working-directory: apps/api
