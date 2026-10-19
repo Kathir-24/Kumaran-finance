@@ -217,7 +217,38 @@
 
 ---
 
-## 13. Summary of Completion Deliverables
+## 13. Component 3: BullMQ Background Queue & Daily Cron Worker (`apps/api/src/jobs/`)
+
+### 13.1 Overview & Architecture
+- **Dual Conveyor Architecture**: BullMQ running on Redis 7 (`127.0.0.1:6379`) with resilient direct-execution fallback mode when Redis is offline during local test suites.
+- **Daily Midnight Arrears Cron (`DailyArrearsService`)**:
+  - Automatically transitions all `UNPAID` dues with past due dates (`dueDate < now`) strictly to `OVERDUE`.
+  - Recalculates consecutive unpaid months for each subscriber ticket.
+  - Automatically tags tickets with 3+ consecutive unpaid months as `DEFAULT_3_MONTHS` per ADR-07 and emits statutory warning notices.
+  - Automatically restores tickets from `DEFAULT_3_MONTHS` back to `ACTIVE` when delinquent dues are cleared.
+- **Bilingual Notification Dispatcher (`NotificationService`)**:
+  - **Indian Telecom DLT SMS**: Pre-registered header `KMRCHT` / Template ID `1407169823412093847` with whole-rupee amounts (`Rs.{amount}`) and passbook URLs.
+  - **Bilingual WhatsApp Business API**: Rich Tamil & English message templates for payment receipt confirmations, auction reminders, and 3-month default warning notices.
+  - **In-Memory Audit Registry**: Preserves full notification payloads for review and automated test assertions.
+- **Payment Settlement Reconciliation (`ReconciliationService`)**:
+  - Runs daily at 06:00 AM IST to compare payment gateway settlement records against internal database entries.
+  - Auto-resolves ghost drops (updates internal `INITIATED` payment to `SUCCESS` and issues receipts).
+  - Flags amount and status discrepancies as exceptions for Accountant review.
+
+### 13.2 Endpoint Catalog
+| Method | Endpoint | Description | Allowed Roles |
+|---|---|---|:---:|
+| `POST` | `/jobs/run-daily-arrears` | Manually trigger daily midnight arrears recalculation & default tagging | Super Admin, Branch Manager |
+| `POST` | `/jobs/enqueue-daily-arrears` | Enqueue daily arrears check job onto BullMQ conveyor belt | Super Admin |
+| `POST` | `/jobs/run-reconciliation` | Manually trigger payment settlement reconciliation | Super Admin, Accountant |
+| `POST` | `/jobs/enqueue-reconciliation` | Enqueue payment reconciliation job onto BullMQ queue | Super Admin, Accountant |
+| `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | Super Admin, Branch Manager |
+| `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin, Branch Manager, Auditor |
+| `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched DLT SMS and WhatsApp messages | Super Admin, Auditor |
+
+---
+
+## 14. Summary of Completion Deliverables
 
 - **Single Tenancy**: Zero `company_id` columns exist across all tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
@@ -235,6 +266,8 @@
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
 - **Bilingual PDF Canvas Engine**: 80mm thermal receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
-- **Total Production Endpoints**: **66 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes).
-- **Automated Test Coverage**: **177 / 177 tests passing across 14 test suites (100% pass rate)**.
+- **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Indian DLT SMS & WhatsApp bilingual dispatchers, and 06:00 AM settlement reconciliation.
+- **Total Production Endpoints**: **73 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 7 background jobs routes).
+- **Automated Test Coverage**: **188 / 188 tests passing across 15 test suites (100% pass rate)**.
+
 
