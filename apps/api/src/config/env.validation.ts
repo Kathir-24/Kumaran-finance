@@ -20,6 +20,8 @@ export interface EnvironmentVariables {
   AWS_ACCESS_KEY_ID?: string;
   AWS_SECRET_ACCESS_KEY?: string;
   AWS_S3_BUCKET?: string;
+  REDIS_HOST: string;
+  REDIS_PORT: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -81,5 +83,7 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     AWS_ACCESS_KEY_ID: config.AWS_ACCESS_KEY_ID as string | undefined,
     AWS_SECRET_ACCESS_KEY: config.AWS_SECRET_ACCESS_KEY as string | undefined,
     AWS_S3_BUCKET: config.AWS_S3_BUCKET as string | undefined,
+    REDIS_HOST: (config.REDIS_HOST as string) ?? '127.0.0.1',
+    REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
   };
 }
