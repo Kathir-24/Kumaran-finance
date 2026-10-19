@@ -80,29 +80,32 @@ The database will be available on `127.0.0.1:5433` (`chitflow_dev`).
 if (!(Test-Path apps\api\.env)) { Copy-Item apps\api\.env.example apps\api\.env }
 
 # Install dependencies across all monorepo workspaces
-npm install
+pnpm install
 ```
 
 ### Step 3: Apply Migrations & Seed Foundational Data (Run from root)
 ```powershell
 # Apply Prisma schema migrations to PostgreSQL
-npm run prisma:migrate
+pnpm run prisma:migrate
 
 # Seed Head Office (PRD) and initial Super Admin partner
-npm run prisma:seed
+pnpm run prisma:seed
 ```
 
 ### Step 4: Run Tests & Launch Development Server
 ```powershell
-# Run unit & financial invariant tests (22/22 must pass)
-npm test
+# Run unit & financial invariant tests (100% pass)
+pnpm test
+
+# Run end-to-end tests
+pnpm run test:e2e
 
 # Start the NestJS backend in development watch mode
-npm run start:dev
+pnpm run start:dev
 ```
 
 ### Live Endpoints & Tools:
 - **API Base URL**: `http://localhost:3000`
 - **Health Check**: `http://localhost:3000/health` (returns `{"status":"ok","service":"chitflow-api"}`)
 - **Swagger / OpenAPI Documentation**: `http://localhost:3000/api/docs` *(interactive API explorer)*
-- **Prisma Studio (Visual Database GUI)**: `npm run prisma:studio` (opens `http://localhost:5555`)
+- **Prisma Studio (Visual Database GUI)**: `pnpm run prisma:studio` (opens `http://localhost:5555`)

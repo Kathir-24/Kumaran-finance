@@ -219,7 +219,7 @@ Add the `prisma.seed` configuration to `apps/api/package.json`:
 ### 5.3 Executing the Seed
 ```powershell
 cd apps\api
-npx prisma db seed
+pnpm exec prisma db seed
 ```
 
 ---
@@ -231,5 +231,5 @@ If the local database gets out of sync or test data needs to be wiped:
 cd apps\api
 
 # WARNING: Drops the local database, re-applies all migrations, and runs seed.ts
-npx prisma migrate reset
+pnpm exec prisma migrate reset
 ```
