@@ -107,7 +107,15 @@ async function bootstrap() {
     .addTag('Customers', 'Customer intake, KYC, and Nominees')
     .addTag('Chits', 'Chit schemes, tickets, and mid-cycle onboarding')
     .addTag('Auctions', 'In-office auctions, bidding, and tie-breakers')
-    .addTag('Payments', 'Collections, dues, and bilingual receipts')
+    .addTag('Installment Dues', 'Monthly installment schedules and arrears')
+    .addTag('Subscriber Tickets & Passbook', 'Digital passbook and ticket ledger')
+    .addTag('Collections & Cash Handover', 'Doorstep field collections and end-of-day branch handover')
+    .addTag('Payments, Receipts & Reversals', 'Office counter payments, bilingual receipts, and dual-control reversals')
+    .addTag('Prize Disbursements & Safety Proof', 'Prize settlement, safety proof checklist, and bilingual payout vouchers')
+    .addTag('Dashboards & Statutory Reports', 'Form XXII, Form XVII, Form XXI, and executive dashboards')
+    .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
+    .addTag('Bilingual PDF Documents', 'On-demand 80mm receipts, A5 vouchers, minutes, and passbooks')
+    .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

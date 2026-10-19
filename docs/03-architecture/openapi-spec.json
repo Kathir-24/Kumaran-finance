@@ -1,0 +1,4228 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/auth/web/login": {
+      "post": {
+        "description": "Authenticates staff via phone/email and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.",
+        "operationId": "AuthController_login_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful or 2FA challenge issued"
+          },
+          "401": {
+            "description": "Invalid credentials or inactive account"
+          },
+          "429": {
+            "description": "Too many login attempts. Account locked for 15 minutes."
+          }
+        },
+        "summary": "Office staff credentials login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/web/verify-totp": {
+      "post": {
+        "description": "Validates 6-digit code against RFC 6238 TOTP secret and issues full JWT tokens.",
+        "operationId": "AuthController_verifyTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP verified, JWT tokens issued"
+          },
+          "401": {
+            "description": "Invalid or expired code or session"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "summary": "Verify Microsoft Authenticator TOTP code",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh-token": {
+      "post": {
+        "description": "Rotates 15-minute access token and 7-day refresh token.",
+        "operationId": "AuthController_refreshToken_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens rotated successfully"
+          },
+          "401": {
+            "description": "Invalid or revoked refresh token"
+          }
+        },
+        "summary": "Refresh access token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Clears the refresh token hash in database, invalidating the session.",
+        "operationId": "AuthController_logout_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Logged out successfully"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Revoke active session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "Returns profile, roles, and branch details of authenticated user.",
+        "operationId": "AuthController_getProfile_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/setup": {
+      "post": {
+        "description": "Generates RFC 6238 Base32 secret and otpauth URI for QR code scanning.",
+        "operationId": "AuthController_setupTotp_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP setup parameters returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Initiate Microsoft Authenticator 2FA setup",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/enable": {
+      "post": {
+        "description": "Verifies the 6-digit code with the generated secret and permanently locks 2FA.",
+        "operationId": "AuthController_enableTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpEnableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA enabled"
+          },
+          "400": {
+            "description": "Invalid verification code"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Confirm and enable Microsoft Authenticator 2FA",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/disable": {
+      "post": {
+        "description": "Requires current password to disable two-factor authentication.",
+        "operationId": "AuthController_disableTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA disabled"
+          },
+          "401": {
+            "description": "Invalid password"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Disable 2FA",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/login-mpin": {
+      "post": {
+        "description": "Quick biometric/MPIN login for field collection agents on mobile.",
+        "operationId": "AuthController_loginMpin_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MpinLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MPIN verified, tokens issued"
+          },
+          "401": {
+            "description": "Invalid phone or MPIN"
+          },
+          "429": {
+            "description": "Too many MPIN attempts. Account locked for 15 minutes."
+          }
+        },
+        "summary": "Mobile quick unlock with 6-digit MPIN",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/set-mpin": {
+      "post": {
+        "description": "Configures 6-digit MPIN hash for quick mobile unlock.",
+        "operationId": "AuthController_setMpin_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMpinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MPIN saved successfully"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Set or change 6-digit MPIN",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/customers": {
+      "post": {
+        "description": "Creates a customer record with auto-generated KC-CUST-XXXXX code, bilingual names, and masked Aadhaar (last 4 digits). Allowed: Super Admin, Branch Manager, Collection Agent.",
+        "operationId": "CustomerController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Customer created successfully"
+          },
+          "409": {
+            "description": "Phone number already registered"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Register a new customer profile",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "get": {
+        "description": "Returns paginated customer list with keyword search (name, phone, code) and optional KYC status filter. Allowed: Staff, Auditor.",
+        "operationId": "CustomerController_findAll_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search keyword matching full name, phone number, or customer code",
+            "schema": {
+              "example": "Sundaram",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts at 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (max 100)",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "isKycVerified",
+            "required": false,
+            "in": "query",
+            "description": "Filter by KYC verification status (true/false)",
+            "schema": {
+              "example": "true",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Search & list customers with pagination",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "description": "Returns complete customer profile with linked nominees, active chits, and KYC documents. Allowed: Staff, or Customer viewing own profile.",
+        "operationId": "CustomerController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer profile found"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get customer profile by ID",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "patch": {
+        "description": "Updates contact numbers, address, and profile details. Allowed: Super Admin, Branch Manager.",
+        "operationId": "CustomerController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Customer updated successfully"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Update customer profile details",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/nominees": {
+      "post": {
+        "description": "Registers a verified nominee with relationship, phone, and masked Aadhaar. Allowed: Staff, or Customer for self.",
+        "operationId": "CustomerController_addNominee_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNomineeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Nominee added successfully"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Add and link a nominee to a customer",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/nominees/{nomineeId}": {
+      "delete": {
+        "description": "Deletes a nominee record. Allowed: Super Admin, Branch Manager.",
+        "operationId": "CustomerController_removeNominee_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nomineeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nominee removed successfully"
+          },
+          "404": {
+            "description": "Nominee not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove a linked nominee",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/kyc-status": {
+      "patch": {
+        "description": "Approves or revokes KYC verification for customer profile. Allowed: Super Admin, Branch Manager, Accountant.",
+        "operationId": "CustomerController_updateKycStatus_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKycDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "KYC status updated"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Update customer KYC verification status",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/chits/new": {
+      "post": {
+        "description": "Initializes a new chit group in DRAFT status with automatic whole-rupee math, 4.00% commission lock, and fixed 1/4 ceiling. Allowed strictly: Super Admin.",
+        "operationId": "ChitController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChitGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chit group created successfully"
+          },
+          "409": {
+            "description": "Group code already exists"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Create a fresh chit scheme (Starts Month 1)",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/onboard-ongoing": {
+      "post": {
+        "description": "Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager.",
+        "operationId": "ChitController_onboardOngoing_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardOngoingChitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ongoing chit onboarded successfully"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits": {
+      "get": {
+        "description": "Returns paginated chit schemes. Allowed: All authenticated personas.",
+        "operationId": "ChitController_findAll_v1",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by scheme status (DRAFT, REGISTERED, ACTIVE, COMPLETED, CLOSED)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "REGISTERED",
+                "ACTIVE",
+                "COMPLETED",
+                "CLOSED"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search keyword matching group code or name",
+            "schema": {
+              "example": "KCA",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chit schemes list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List chit schemes with status & keyword filter",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/{id}": {
+      "get": {
+        "description": "Returns scheme parameters, financial rules, assigned tickets, and past auction progress. Allowed: All authenticated personas.",
+        "operationId": "ChitController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chit scheme found"
+          },
+          "404": {
+            "description": "Chit scheme not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get chit scheme details",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/{id}/tickets/assign": {
+      "post": {
+        "description": "Assigns ticket 1..N to a customer. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same chit group. Allowed: Super Admin, Branch Manager.",
+        "operationId": "ChitController_assignTicket_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket allocated successfully"
+          },
+          "409": {
+            "description": "Customer already holds a ticket or ticket taken"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Assign a ticket to a verified subscriber",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/{id}/tickets": {
+      "get": {
+        "description": "Lists all assigned tickets (1..N) with customer names and prized status. Allowed: All authenticated personas.",
+        "operationId": "ChitController_getTickets_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tickets list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "View all tickets in a chit group",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/{id}/activate": {
+      "post": {
+        "description": "Verifies that all N tickets are filled, permanently freezes 4.00% commission, and executes Month 1 rule (company ticket takes full pool, no auction, ₹0 dividend). Allowed: Super Admin.",
+        "operationId": "ChitController_activate_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateChitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chit activated successfully"
+          },
+          "400": {
+            "description": "Not all tickets assigned or already active"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lock terms and activate chit scheme",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/auctions/group/{chitGroupId}": {
+      "get": {
+        "description": "Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: All authenticated personas.",
+        "operationId": "AuctionController_getGroupAuctions_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auctions retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List all auctions and tie-break results for a chit scheme",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}": {
+      "get": {
+        "description": "Returns auction status, winning ticket, tied bidders, and statutory minutes. Allowed: All authenticated personas.",
+        "operationId": "AuctionController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction retrieved successfully"
+          },
+          "404": {
+            "description": "Auction not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get details of a specific auction",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/eligible-bidders": {
+      "get": {
+        "description": "ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.",
+        "operationId": "AuctionController_getEligibleBidders_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Installment month (required if ID is ChitGroup UUID)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible bidders list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Pre-Auction Defaulter Guard: List eligible non-prized subscribers",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/record-bid": {
+      "post": {
+        "description": "Records the in-office winning bid discount (Floor >= 4% Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.",
+        "operationId": "AuctionController_recordBid_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Installment month (required if ID is ChitGroup UUID)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBidDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bid recorded successfully"
+          },
+          "400": {
+            "description": "Ceiling exceeded or defaulter violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Record winning auction bid and whole-rupee discount",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/tie-break": {
+      "post": {
+        "description": "Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Super Admin, Branch Manager.",
+        "operationId": "AuctionController_recordTieBreak_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Installment month (required if ID is ChitGroup UUID)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordTieBreakDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tie-break recorded successfully"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Option A (Physical Paper Token Draw): Record ceiling tie-break winner",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/tie-break-record": {
+      "post": {
+        "operationId": "AuctionController_recordTieBreakAlias_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordTieBreakDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Alias for Option A Tie-Break (as in API Specification)",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/finalize": {
+      "post": {
+        "description": "Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.",
+        "operationId": "AuctionController_finalize_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeAuctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auction successfully finalized"
+          },
+          "403": {
+            "description": "Maker-Checker separation violated"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Finalize auction and commit results (Maker != Checker)",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/minutes": {
+      "get": {
+        "description": "Retrieves Form XVII statutory auction proceedings record with attendee count, discount, dividend, and Foreman signature flag. Allowed: Staff and Auditor.",
+        "operationId": "AuctionController_getMinutes_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction minutes retrieved"
+          },
+          "404": {
+            "description": "Minutes not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get statutory Auction Minutes proceedings text",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/minutes/pdf": {
+      "get": {
+        "description": "Returns formatted statutory auction minutes for printable dispatch and audit recordkeeping.",
+        "operationId": "AuctionController_getMinutesPdf_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minutes text layout retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get statutory Auction Minutes layout for printing / PDF",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/installments/group/{chitGroupId}/month/{month}": {
+      "get": {
+        "description": "Returns the list of all members with gross amount, dividend deduction, net payable amount, paid amount, and payment status for that month. Allowed: Staff and Auditor.",
+        "operationId": "InstallmentController_getGroupMonthDues_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by installment due status (UNPAID, PAID, OVERDUE)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNPAID",
+                "PAID",
+                "OVERDUE"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of records per page (max 100)",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly dues retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "View all subscriber dues for a specific month in a chit scheme",
+        "tags": [
+          "Installment Dues"
+        ]
+      }
+    },
+    "/api/v1/installments/group/{chitGroupId}/month/{month}/generate": {
+      "post": {
+        "description": "Calculates universal dividend deduction (Inet = Ibase - Div) across ALL members in that chit group (including auction winner and past winners) and creates or updates InstallmentDue records. Allowed: Super Admin, Branch Manager.",
+        "operationId": "InstallmentController_generateMonthlyDues_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDuesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monthly dues generated successfully"
+          },
+          "400": {
+            "description": "Prior auction not yet finalized or scheme not active"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate / sync monthly installment dues from auction dividend",
+        "tags": [
+          "Installment Dues"
+        ]
+      }
+    },
+    "/api/v1/installments/defaulters": {
+      "get": {
+        "description": "Returns subscribers with continuous unpaid dues. Allowed: Staff and Auditor.",
+        "operationId": "InstallmentController_getDefaultersAlias_v1",
+        "parameters": [
+          {
+            "name": "minConsecutiveMonths",
+            "required": false,
+            "in": "query",
+            "description": "Minimum consecutive unpaid months threshold (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Defaulters list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Alias to list defaulters with consecutive arrears",
+        "tags": [
+          "Installment Dues"
+        ]
+      }
+    },
+    "/api/v1/tickets/defaulters": {
+      "get": {
+        "description": "Retrieves all subscribers with 1 or more consecutive unpaid installments. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.",
+        "operationId": "TicketController_getDefaulters_v1",
+        "parameters": [
+          {
+            "name": "minConsecutiveMonths",
+            "required": false,
+            "in": "query",
+            "description": "Minimum consecutive unpaid months threshold (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Defaulters list retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List subscribers with consecutive arrears",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticketId}/dues": {
+      "get": {
+        "description": "Returns the full schedule of past and upcoming monthly dues (Gross, Dividend deduction, Net payable, Paid amount, Status). Customers can only view their own ticket. Allowed: All authenticated personas.",
+        "operationId": "TicketController_getTicketDues_v1",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket dues schedule retrieved"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "View all scheduled monthly dues for a subscriber ticket",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticketId}/passbook": {
+      "get": {
+        "description": "Provides a complete passbook statement from Month 1 to N, including cumulative gross dues, dividends earned, net payable, payments made, and current outstanding balance. Customers are restricted to their own ticket. Allowed: All authenticated personas.",
+        "operationId": "TicketController_getPassbook_v1",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passbook statement retrieved"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get detailed real-time digital passbook statement",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/remove-defaulter": {
+      "post": {
+        "description": "Executes company removal rights when a subscriber has defaulted on 3 or more consecutive monthly installments (consecutiveUnpaidMonths >= 3). Transitions ticket status to REMOVED_DEF_3M. Allowed strictly: Super Admin (Partners).",
+        "operationId": "TicketController_removeDefaulter_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveDefaulterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscriber ticket successfully removed for 3-month default"
+          },
+          "400": {
+            "description": "Ticket has fewer than 3 consecutive unpaid months"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12)",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/collections/agent-dues": {
+      "get": {
+        "description": "Returns pending subscriber dues for doorstep collection with customer code, name, address, and net payable amount. Allowed: Staff and Auditor.",
+        "operationId": "CollectionController_getAgentDues_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Agent dues retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List pending/overdue member dues for collection rounds",
+        "tags": [
+          "Collections & Cash Handover"
+        ]
+      }
+    },
+    "/api/v1/collections/record": {
+      "post": {
+        "description": "Records discrete single monthly installment collection. Strictly rejects partial payments or double payments (ADR-07). Generates sequential bilingual receipt and sets cashHandoverStatus. Allowed: Collection Agent, Desk Staff.",
+        "operationId": "CollectionController_recordCollection_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordCollectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Collection recorded & receipt generated"
+          },
+          "400": {
+            "description": "Partial payment or duplicate payment rejected"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Record doorstep field collection (Exact Inet Matching)",
+        "tags": [
+          "Collections & Cash Handover"
+        ]
+      }
+    },
+    "/api/v1/collections/daily-summary": {
+      "get": {
+        "description": "Summarizes total collections, cash pending handover, vault deposits, and digital payments for today. Collection agents see only their own collections. Allowed: Staff and Auditor.",
+        "operationId": "CollectionController_getDailySummary_v1",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Filter collection records by date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2026-10-18",
+              "type": "string"
+            }
+          },
+          {
+            "name": "collectorUserId",
+            "required": false,
+            "in": "query",
+            "description": "Filter collection records by specific collection agent UUID",
+            "schema": {
+              "example": "550e8400-e29b-41d4-a716-446655440000",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter collections by branch ID",
+            "schema": {
+              "example": "branch-prd-001",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily summary retrieved"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Daily collections register and vault handover status",
+        "tags": [
+          "Collections & Cash Handover"
+        ]
+      }
+    },
+    "/api/v1/collections/cash-handover/submit": {
+      "post": {
+        "description": "Aggregates all unhanded cash collections recorded by the field agent. Allowed: Collection Agent, Super Admin.",
+        "operationId": "CollectionController_submitHandover_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitHandoverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cash handover batch submitted"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Submit evening cash handover batch for office vault deposit",
+        "tags": [
+          "Collections & Cash Handover"
+        ]
+      }
+    },
+    "/api/v1/collections/cash-handover/acknowledge": {
+      "post": {
+        "description": "Physically counts notes and signs off cash into branch vault. STRICTLY ENFORCES: collector_user_id != acknowledger_user_id. The agent who collected cash can NEVER acknowledge their own cash. Allowed: Super Admin, Branch Manager, Accountant.",
+        "operationId": "CollectionController_acknowledgeHandover_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeHandoverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cash handover acknowledged into vault"
+          },
+          "403": {
+            "description": "Dual control violated: Collector cannot acknowledge own cash"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Acknowledge physical cash deposit into branch vault (Dual Control)",
+        "tags": [
+          "Collections & Cash Handover"
+        ]
+      }
+    },
+    "/api/v1/payments": {
+      "post": {
+        "description": "Records discrete payment for an installment due. Enforces ADR-07: Exact Inet matching, single discrete payment, zero partials, zero doubles. Generates bilingual receipt.",
+        "operationId": "PaymentController_recordPayment_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment recorded and receipt issued"
+          },
+          "400": {
+            "description": "Partial payment, duplicate payment, or invalid scheme state"
+          },
+          "404": {
+            "description": "Subscriber ticket or installment due not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Record discrete payment (Office Counter or Direct)",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      },
+      "get": {
+        "description": "List payments filtered by ticket, customer, scheme, mode, date range, or status. Customers are scoped strictly to their own payments.",
+        "operationId": "PaymentController_queryPayments_v1",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by subscriber ticket ID",
+            "schema": {
+              "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by customer ID",
+            "schema": {
+              "example": "0bc6e2ef-669b-4659-be24-74765d7fe997",
+              "type": "string"
+            }
+          },
+          {
+            "name": "chitGroupId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chit group ID",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "description": "Filter by payment method (CASH, UPI, BANK_TRANSFER, CHEQUE)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "UPI",
+                "BANK_TRANSFER",
+                "CHEQUE"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "description": "Filter by payment status (INITIATED, SUCCESS, FAILED, REVERSED)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "SUCCESS",
+                "FAILED",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter payments created on or after this ISO date",
+            "schema": {
+              "example": "2026-10-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter payments created on or before this ISO date",
+            "schema": {
+              "example": "2026-10-31T23:59:59.999Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of items per page",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payments list returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Query and list payments with filters and pagination",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}": {
+      "get": {
+        "description": "Retrieves single payment details including allocation, installment due, receipt, and reversal status. Customers scoped strictly to self.",
+        "operationId": "PaymentController_getPaymentById_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment record returned"
+          },
+          "403": {
+            "description": "Customer attempting to access another member record"
+          },
+          "404": {
+            "description": "Payment record not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get payment record details by ID",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/receipt": {
+      "get": {
+        "description": "Returns formatted bilingual receipt (English + தமிழ்) matching approved template with whole-rupee breakdown, chit code, ticket number, and collector details.",
+        "operationId": "PaymentController_getReceipt_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bilingual receipt data and formatted text layout"
+          },
+          "403": {
+            "description": "Customer attempting to access another member receipt"
+          },
+          "404": {
+            "description": "Receipt not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate bilingual receipt (English + தமிழ்)",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/request-reversal": {
+      "post": {
+        "description": "Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Requires Checker approval by Super Admin.",
+        "operationId": "PaymentController_requestReversal_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestReversalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment reversal requested successfully"
+          },
+          "400": {
+            "description": "Payment already reversed, not success, or request already pending"
+          },
+          "404": {
+            "description": "Payment not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Request payment reversal with justification",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/approve-reversal": {
+      "post": {
+        "description": "Approves payment reversal, updates Payment to REVERSED, restores InstallmentDue strictly to UNPAID, and logs AuditLog. Strictly enforces Maker != Checker (maker_user_id != checker_user_id).",
+        "operationId": "PaymentController_approveReversal_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveReversalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment reversal approved and installment restored to UNPAID"
+          },
+          "400": {
+            "description": "No pending reversal request found"
+          },
+          "403": {
+            "description": "Maker-Checker violation or insufficient role"
+          },
+          "404": {
+            "description": "Payment not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Authorize payment reversal (Super Admin strictly)",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/reject-reversal": {
+      "post": {
+        "description": "Rejects reversal request and retains payment in SUCCESS status. Strictly enforces Maker != Checker.",
+        "operationId": "PaymentController_rejectReversal_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectReversalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment reversal request rejected"
+          },
+          "400": {
+            "description": "No pending reversal request found"
+          },
+          "403": {
+            "description": "Maker-Checker violation or insufficient role"
+          },
+          "404": {
+            "description": "Payment not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Reject payment reversal request (Super Admin strictly)",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
+    "/api/v1/disbursements": {
+      "get": {
+        "description": "Returns prize winners, disbursement statuses, payout modes, and release references. Allowed: Staff and Auditor.",
+        "operationId": "DisbursementController_queryDisbursements_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": false,
+            "in": "query",
+            "description": "Filter disbursements by chit group ID",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "disbursementStatus",
+            "required": false,
+            "in": "query",
+            "description": "Filter by disbursement status (PENDING_VERIFICATION, VERIFIED_BY_MAKER, AUTHORIZED_BY_CHECKER, DISBURSED)",
+            "schema": {
+              "example": "PENDING_VERIFICATION",
+              "type": "string"
+            }
+          },
+          {
+            "name": "disbursementMode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by disbursement mode",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACCOUNT_PAYEE_CHEQUE",
+                "BANK_TRANSFER_NEFT",
+                "BANK_TRANSFER_RTGS",
+                "BANK_TRANSFER_IMPS",
+                "CASH"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter records on or after this ISO date",
+            "schema": {
+              "example": "2026-10-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter records on or before this ISO date",
+            "schema": {
+              "example": "2026-10-31T23:59:59.999Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum items per page",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disbursements list returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List prize disbursements across chit schemes with filters and pagination",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}": {
+      "get": {
+        "description": "Returns winner details, safety checklist status, authorized payout mode, and release timestamps. Customers scoped strictly to self.",
+        "operationId": "DisbursementController_getWinnerDisbursement_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Winner disbursement details returned"
+          },
+          "403": {
+            "description": "Customer attempting to access another member record"
+          },
+          "404": {
+            "description": "Auction or winner not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get prize disbursement details for a specific auction winner",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/verify-safety-proof": {
+      "post": {
+        "description": "Records verification of signed agreements, signed blank cheques, promissory notes, and scanned documents. Transitions status from PENDING_VERIFICATION to VERIFIED_BY_MAKER.",
+        "operationId": "DisbursementController_verifySafetyProof_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifySafetyProofDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Safety proof verified and ready for authorization"
+          },
+          "400": {
+            "description": "Auction not finalized or invalid status transition"
+          },
+          "404": {
+            "description": "Auction or winner not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Verify Company Safety Proof Checklist (ADR-15)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/authorize-payout": {
+      "post": {
+        "description": "Authorizes prize payout mode (Cheque, NEFT/RTGS/IMPS, Cash) and whole-rupee amount. Enforces Maker != Checker (verifiedByUserId != authorizedByUserId) and blocks Branch Manager.",
+        "operationId": "DisbursementController_authorizePayout_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizePayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payout voucher authorized successfully"
+          },
+          "400": {
+            "description": "Safety proof not verified yet or invalid transition"
+          },
+          "403": {
+            "description": "Maker-Checker violation or insufficient role"
+          },
+          "404": {
+            "description": "Auction or winner not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Authorize prize money payout voucher (Super Admin strictly)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/disburse": {
+      "post": {
+        "description": "Records transaction reference (Cheque number, Bank UTR, or Cash voucher) and release timestamp. Transitions status to DISBURSED.",
+        "operationId": "DisbursementController_releasePayout_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleasePayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prize payout released successfully"
+          },
+          "400": {
+            "description": "Payout not authorized yet"
+          },
+          "404": {
+            "description": "Auction or winner not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Release prize money disbursement and record official reference",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/voucher": {
+      "get": {
+        "description": "Returns formatted bilingual prize payout voucher with whole-rupee calculation breakdown, payout mode, transaction reference, and sign-off blocks. Customers scoped strictly to self.",
+        "operationId": "DisbursementController_getBilingualVoucher_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bilingual payout voucher data and text layout"
+          },
+          "403": {
+            "description": "Customer attempting to access another member voucher"
+          },
+          "404": {
+            "description": "Auction or winner not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate bilingual prize disbursement voucher (English + தமிழ்)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/reports/dashboard": {
+      "get": {
+        "description": "Provides high-level operational overview: active chits, collections by mode, prize payouts, vault cash balance, pending handovers, and arrears aging buckets. Scoped to branch for Branch Manager.",
+        "operationId": "ReportController_getDashboard_v1",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter dashboard metrics by branch ID (Super Admin / Auditor only)",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Executive dashboard metrics returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Executive KPI Dashboard & Vault Metrics",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/day-book": {
+      "get": {
+        "description": "Aggregates ALL payment modes (Cash, UPI, Bank Transfer, Cheques) for a given date. Displays receipts, vouchers, payment mode breakdowns, and net cash flow.",
+        "operationId": "ReportController_getDayBook_v1",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Transaction date (YYYY-MM-DD or ISO string). Defaults to current date.",
+            "schema": {
+              "example": "2026-10-18",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter day book records by branch ID (Super Admin / Accountant only)",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Day book journal returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Day Book: Daily Collection & Disbursement Journal",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/form-xxii": {
+      "get": {
+        "description": "Daily register strictly isolating physical currency notes and coins in the branch safe / vault. Enforces Closing Cash in Safe = Opening Cash + Cash Inflows - Cash Outflows.",
+        "operationId": "ReportController_getCashBookFormXxii_v1",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Transaction date (YYYY-MM-DD or ISO string). Defaults to current date.",
+            "schema": {
+              "example": "2026-10-18",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter cash book safe records by branch ID (Super Admin / Accountant only)",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cash book register returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Form XXII: Cash Book Register (Physical Cash Only) [UNVERIFIED-LEGAL]",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/form-xvii": {
+      "get": {
+        "description": "Consolidated chronological record of all auctions for a chit scheme (Months 2 to N-1). Includes winning discounts, 4% commission, dividends, tie-break draws, and statutory proceedings.",
+        "operationId": "ReportController_getAuctionMinutesFormXvii_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "query",
+            "description": "Chit group ID to retrieve consolidated auction minutes for",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter auctions on or after this ISO date",
+            "schema": {
+              "example": "2026-01-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter auctions on or before this ISO date",
+            "schema": {
+              "example": "2026-12-31T23:59:59.999Z",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction minutes register returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Form XVII: Auction Minutes Consolidated Register [UNVERIFIED-LEGAL]",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/form-xxi": {
+      "get": {
+        "description": "Continuous 20-month schedule of base dues, dividend credits, payments, and arrears per ticket. Customers are strictly restricted to their own ticket passbook statement.",
+        "operationId": "ReportController_getSubscriberLedgerFormXxi_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "query",
+            "description": "Chit group ID to retrieve subscriber ledger for",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "ticketNumber",
+            "required": false,
+            "in": "query",
+            "description": "Filter ledger by ticket number (1 to 20). If omitted, returns all tickets in group.",
+            "schema": {
+              "example": 5,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriber ledger returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Form XXI: Subscriber Ledger Register [UNVERIFIED-LEGAL]",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/defaulters": {
+      "get": {
+        "description": "Lists overdue subscribers categorized into 1-month, 2-month, and 3-month (DEFAULT_3_MONTHS) default buckets. Collection agents use this for field recovery rounds; Super Admin can identify candidates for company removal rights.",
+        "operationId": "ReportController_getDefaulters_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": false,
+            "in": "query",
+            "description": "Filter overdue accounts by chit scheme ID",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "minArrearsMonths",
+            "required": false,
+            "in": "query",
+            "description": "Minimum consecutive unpaid months (1, 2, or 3). Set to 3 for company removal candidates.",
+            "schema": {
+              "example": 3,
+              "type": "number"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter overdue accounts by branch ID (Super Admin / Accountant only)",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of records per page",
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Defaulters aging report returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Defaulters & Arrears Aging Register",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/audit-logs": {
+      "get": {
+        "description": "Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Customers can view their own account transaction logs only.",
+        "operationId": "ReportController_getAuditLogs_v1",
+        "parameters": [
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "description": "Filter audit trail by entity type (Payment, Auction, ChitGroup, AuctionWinner)",
+            "schema": {
+              "example": "Payment",
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "Filter audit trail by action (AUCTION_FINALIZED, PAYMENT_REVERSED, TIE_BREAK_DRAWN, etc.)",
+            "schema": {
+              "example": "PAYMENT_REVERSED",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by user ID who performed the action",
+            "schema": {
+              "example": "d9f96b99-3ea5-4191-be71-0cecaad62354",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter audit records on or after this ISO date",
+            "schema": {
+              "example": "2026-10-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Filter audit records on or before this ISO date",
+            "schema": {
+              "example": "2026-10-31T23:59:59.999Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of audit records per page",
+            "schema": {
+              "default": 50,
+              "example": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit trail records returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Immutable Audit Trail Register",
+        "tags": [
+          "Dashboards & Statutory Reports"
+        ]
+      }
+    },
+    "/api/v1/storage/file/{key}": {
+      "get": {
+        "description": "Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.",
+        "operationId": "StorageController_streamFile_v1",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File stream returned"
+          },
+          "403": {
+            "description": "Forbidden access to file key"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Stream a stored file securely (Local storage driver fallback)",
+        "tags": [
+          "Storage & Presigned Files"
+        ]
+      }
+    },
+    "/api/v1/pdf/receipt/{paymentId}": {
+      "get": {
+        "description": "Generates pixel-accurate 80mm bilingual (English + தமிழ்) thermal subscription receipt slip and saves to private storage.",
+        "operationId": "PdfController_getReceiptPdf_v1",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF stream or presigned URL returned"
+          },
+          "403": {
+            "description": "Forbidden access to receipt"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream bilingual 80mm subscription receipt PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/voucher/{auctionId}": {
+      "get": {
+        "description": "Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.",
+        "operationId": "PdfController_getVoucherPdf_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Voucher PDF stream or presigned URL returned"
+          },
+          "403": {
+            "description": "Forbidden access to voucher"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream bilingual prize payout voucher PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/minutes/{auctionId}": {
+      "get": {
+        "description": "Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.",
+        "operationId": "PdfController_getMinutesPdf_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction minutes PDF returned"
+          },
+          "403": {
+            "description": "Forbidden access to auction minutes"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream Form XVII statutory auction minutes PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/passbook/{ticketId}": {
+      "get": {
+        "description": "Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.",
+        "operationId": "PdfController_getPassbookPdf_v1",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passbook PDF returned"
+          },
+          "403": {
+            "description": "Forbidden access to passbook"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream Form XXI continuous 20-month passbook statement PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/jobs/run-daily-arrears": {
+      "post": {
+        "description": "Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.",
+        "operationId": "JobsController_runDailyArrears_v1",
+        "parameters": [
+          {
+            "name": "cutoffDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date string to test past or future due dates",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily arrears execution summary returned"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Manually trigger daily midnight arrears recalculation & default tagging",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/enqueue-daily-arrears": {
+      "post": {
+        "description": "Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.",
+        "operationId": "JobsController_enqueueDailyArrears_v1",
+        "parameters": [
+          {
+            "name": "cutoffDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Enqueue daily arrears job to BullMQ queue",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/run-reconciliation": {
+      "post": {
+        "description": "Reconciles payment records against gateway provider settlement data to resolve ghost drops.",
+        "operationId": "JobsController_runReconciliation_v1",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Trigger payment settlement reconciliation",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/enqueue-reconciliation": {
+      "post": {
+        "operationId": "JobsController_enqueueReconciliation_v1",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Enqueue reconciliation job to BullMQ queue",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
+      "post": {
+        "operationId": "JobsController_sendAuctionReminder_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Broadcast bilingual auction reminder to chit subscribers",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/queue-status": {
+      "get": {
+        "operationId": "JobsController_getQueueStatus_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get BullMQ queue health and job counts",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/notification-audit-logs": {
+      "get": {
+        "operationId": "JobsController_getNotificationLogs_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get audit logs of dispatched DLT SMS and WhatsApp notifications",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Kumaran Chits — Operations API",
+    "description": "Official backend RESTful API for Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu). Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "System health checks"
+    },
+    {
+      "name": "Auth",
+      "description": "Staff identity, MPIN, and TOTP 2FA"
+    },
+    {
+      "name": "Customers",
+      "description": "Customer intake, KYC, and Nominees"
+    },
+    {
+      "name": "Chits",
+      "description": "Chit schemes, tickets, and mid-cycle onboarding"
+    },
+    {
+      "name": "Auctions",
+      "description": "In-office auctions, bidding, and tie-breakers"
+    },
+    {
+      "name": "Installment Dues",
+      "description": "Monthly installment schedules and arrears"
+    },
+    {
+      "name": "Subscriber Tickets & Passbook",
+      "description": "Digital passbook and ticket ledger"
+    },
+    {
+      "name": "Collections & Cash Handover",
+      "description": "Doorstep field collections and end-of-day branch handover"
+    },
+    {
+      "name": "Payments, Receipts & Reversals",
+      "description": "Office counter payments, bilingual receipts, and dual-control reversals"
+    },
+    {
+      "name": "Prize Disbursements & Safety Proof",
+      "description": "Prize settlement, safety proof checklist, and bilingual payout vouchers"
+    },
+    {
+      "name": "Dashboards & Statutory Reports",
+      "description": "Form XXII, Form XVII, Form XXI, and executive dashboards"
+    },
+    {
+      "name": "Storage & Presigned Files",
+      "description": "Encrypted document uploads and 15-minute presigned URLs"
+    },
+    {
+      "name": "Bilingual PDF Documents",
+      "description": "On-demand 80mm receipts, A5 vouchers, minutes, and passbooks"
+    },
+    {
+      "name": "Background Jobs & Daily Maintenance",
+      "description": "BullMQ queues, midnight arrears, and settlement reconciliation"
+    }
+  ],
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Version 1 Base URL"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "JWT-auth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "name": "JWT",
+        "description": "Enter staff JWT access token",
+        "in": "header"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "example": "9876543210",
+            "description": "Registered mobile number (10 digits) or staff email address"
+          },
+          "password": {
+            "type": "string",
+            "example": "Admin@Kumaran2026",
+            "description": "Staff password (min 6 characters)"
+          }
+        },
+        "required": [
+          "identifier",
+          "password"
+        ]
+      },
+      "TotpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "tempToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Temporary session token returned from /auth/web/login when TOTP 2FA is required"
+          },
+          "totpCode": {
+            "type": "string",
+            "example": "492817",
+            "description": "6-digit rotating TOTP code generated by Microsoft Authenticator"
+          }
+        },
+        "required": [
+          "tempToken",
+          "totpCode"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Cryptographic refresh token issued during login"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "TotpEnableDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "JBSWY3DPEHPK3PXP",
+            "description": "Base32 secret key received from /auth/totp/setup"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Current 6-digit TOTP code generated by Microsoft Authenticator"
+          }
+        },
+        "required": [
+          "secret",
+          "code"
+        ]
+      },
+      "DisableTotpDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "example": "Admin@Kumaran2026",
+            "description": "Current user password to authorize 2FA deactivation"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "MpinLoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9876543210",
+            "description": "Registered 10-digit mobile number"
+          },
+          "mpin": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit MPIN for field agent quick unlock"
+          }
+        },
+        "required": [
+          "phone",
+          "mpin"
+        ]
+      },
+      "SetMpinDto": {
+        "type": "object",
+        "properties": {
+          "mpin": {
+            "type": "string",
+            "example": "123456",
+            "description": "New 6-digit MPIN"
+          }
+        },
+        "required": [
+          "mpin"
+        ]
+      },
+      "CreateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "Sundaram S",
+            "description": "Full name in English (minimum 2 characters)"
+          },
+          "fullNameTamil": {
+            "type": "string",
+            "example": "சுந்தரம் சு",
+            "description": "Full name in Tamil for native receipt rendering"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842712345",
+            "description": "10-digit primary mobile number (unique)"
+          },
+          "altPhone": {
+            "type": "string",
+            "example": "9443212345",
+            "description": "Alternate contact number"
+          },
+          "addressLine1": {
+            "type": "string",
+            "example": "14/2, Gandhi Nagar",
+            "description": "Primary street address line 1"
+          },
+          "addressLine2": {
+            "type": "string",
+            "example": "Near Bus Stand",
+            "description": "Address line 2 / Landmark"
+          },
+          "city": {
+            "type": "string",
+            "example": "Perundurai",
+            "description": "City or Town name"
+          },
+          "pincode": {
+            "type": "string",
+            "example": "638052",
+            "description": "6-digit Indian Postal PIN code"
+          },
+          "panNumber": {
+            "type": "string",
+            "example": "ABCDE1234F",
+            "description": "10-character alphanumeric PAN number"
+          },
+          "aadhaarLast4": {
+            "type": "string",
+            "example": "4821",
+            "description": "Masked last 4 digits of Aadhaar only (Data Minimization / DPDP Act 2023 compliance)"
+          },
+          "branchId": {
+            "type": "string",
+            "example": "94204d28-4a7b-49f5-bf3e-302a4107f750",
+            "description": "Assigned branch ID (defaults to current staff branch if omitted)"
+          }
+        },
+        "required": [
+          "fullName",
+          "phone",
+          "addressLine1",
+          "city",
+          "pincode"
+        ]
+      },
+      "UpdateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "Sundaram S",
+            "description": "Updated full name in English"
+          },
+          "fullNameTamil": {
+            "type": "string",
+            "example": "சுந்தரம் சு",
+            "description": "Updated full name in Tamil"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842712345",
+            "description": "Updated 10-digit primary mobile number"
+          },
+          "altPhone": {
+            "type": "string",
+            "example": "9443212345",
+            "description": "Updated alternate phone number"
+          },
+          "addressLine1": {
+            "type": "string",
+            "example": "15/A, North Street",
+            "description": "Updated address line 1"
+          },
+          "addressLine2": {
+            "type": "string",
+            "example": "Opp. Post Office",
+            "description": "Updated address line 2"
+          },
+          "city": {
+            "type": "string",
+            "example": "Perundurai",
+            "description": "Updated city or town"
+          },
+          "pincode": {
+            "type": "string",
+            "example": "638052",
+            "description": "Updated 6-digit PIN code"
+          },
+          "panNumber": {
+            "type": "string",
+            "example": "ABCDE1234F",
+            "description": "Updated 10-character PAN"
+          },
+          "aadhaarLast4": {
+            "type": "string",
+            "example": "4821",
+            "description": "Updated masked last 4 digits of Aadhaar"
+          }
+        }
+      },
+      "CreateNomineeDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "Kavitha S",
+            "description": "Full name of the nominee"
+          },
+          "relationship": {
+            "type": "string",
+            "example": "Spouse",
+            "description": "Relationship with the customer (e.g., Spouse, Son, Father, Mother)"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842798765",
+            "description": "10-digit mobile phone number of the nominee"
+          },
+          "aadhaarLast4": {
+            "type": "string",
+            "example": "8912",
+            "description": "Masked last 4 digits of nominee Aadhaar card"
+          }
+        },
+        "required": [
+          "fullName",
+          "relationship",
+          "phone"
+        ]
+      },
+      "UpdateKycDto": {
+        "type": "object",
+        "properties": {
+          "isKycVerified": {
+            "type": "boolean",
+            "example": true,
+            "description": "Set true to verify customer KYC or false to revoke verification"
+          }
+        },
+        "required": [
+          "isKycVerified"
+        ]
+      },
+      "CreateChitGroupDto": {
+        "type": "object",
+        "properties": {
+          "groupCode": {
+            "type": "string",
+            "example": "KCA-1L-20M-01",
+            "description": "Unique scheme group code"
+          },
+          "groupName": {
+            "type": "string",
+            "example": "₹1 Lakh 20 Months Group A",
+            "description": "Human-readable scheme name in English"
+          },
+          "groupNameTamil": {
+            "type": "string",
+            "example": "₹1 லட்சம் 20 மாதங்கள் குழு A",
+            "description": "Scheme name in Tamil for bilingual receipt rendering"
+          },
+          "chitValue": {
+            "type": "number",
+            "example": 100000,
+            "description": "Total chit value in whole integer Rupees (e.g., 100000 for ₹1 Lakh)"
+          },
+          "durationMonths": {
+            "type": "number",
+            "example": 20,
+            "description": "Duration of the chit scheme in months (e.g., 20, 25, 40)"
+          },
+          "totalTickets": {
+            "type": "number",
+            "example": 20,
+            "description": "Total number of subscriber tickets (must match durationMonths in standard chits)"
+          },
+          "sanctionOrderNumber": {
+            "type": "string",
+            "example": "ROC/ERD/CHIT/2026/045",
+            "description": "Prior sanction order number issued by Chit Registrar"
+          },
+          "sanctionDate": {
+            "type": "string",
+            "example": "2026-09-15T00:00:00.000Z",
+            "description": "Date of prior sanction order"
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-11-01T00:00:00.000Z",
+            "description": "Official commencement date (Month 1 start)"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2028-06-30T00:00:00.000Z",
+            "description": "Scheduled maturity date (Month N end)"
+          },
+          "branchId": {
+            "type": "string",
+            "example": "94204d28-4a7b-49f5-bf3e-302a4107f750",
+            "description": "Assigned branch ID (defaults to current staff branch if omitted)"
+          }
+        },
+        "required": [
+          "groupCode",
+          "groupName",
+          "chitValue",
+          "durationMonths",
+          "totalTickets",
+          "startDate",
+          "endDate"
+        ]
+      },
+      "HistoricalWinnerDto": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "number",
+            "example": 2,
+            "description": "Installment month of past auction (e.g., Months 2 to onboardedAtMonth - 1)"
+          },
+          "ticketNumber": {
+            "type": "number",
+            "example": 5,
+            "description": "Ticket number that won the past auction"
+          },
+          "bidDiscount": {
+            "type": "number",
+            "example": 22000,
+            "description": "Winning bid discount in whole integer Rupees (must be <= chitValue / 4)"
+          },
+          "auctionDate": {
+            "type": "string",
+            "example": "2026-05-15T00:00:00.000Z",
+            "description": "Date the past physical auction took place"
+          }
+        },
+        "required": [
+          "month",
+          "ticketNumber",
+          "bidDiscount",
+          "auctionDate"
+        ]
+      },
+      "OngoingMemberAllocationDto": {
+        "type": "object",
+        "properties": {
+          "ticketNumber": {
+            "type": "number",
+            "example": 1,
+            "description": "Ticket number (1 to totalTickets)"
+          },
+          "customerId": {
+            "type": "string",
+            "example": "76e354a9-31d0-4bbd-94e4-27c66e50b3bb",
+            "description": "Customer ID for this ticket"
+          },
+          "openingBalance": {
+            "type": "number",
+            "example": 0,
+            "description": "Opening balance in whole Rupees transcribed from paper notebook",
+            "default": 0
+          }
+        },
+        "required": [
+          "ticketNumber",
+          "customerId"
+        ]
+      },
+      "OnboardOngoingChitDto": {
+        "type": "object",
+        "properties": {
+          "groupCode": {
+            "type": "string",
+            "example": "KCA-1L-20M-ONGOING-07",
+            "description": "Group code for the ongoing chit scheme"
+          },
+          "groupName": {
+            "type": "string",
+            "example": "₹1 Lakh 20 Months Ongoing Group (Intake Month 7)",
+            "description": "Scheme name"
+          },
+          "groupNameTamil": {
+            "type": "string",
+            "example": "₹1 லட்சம் 20 மாதங்கள் நடைமுறை குழு"
+          },
+          "chitValue": {
+            "type": "number",
+            "example": 100000,
+            "description": "Total chit value in whole integer Rupees"
+          },
+          "durationMonths": {
+            "type": "number",
+            "example": 20,
+            "description": "Total scheme duration in months"
+          },
+          "totalTickets": {
+            "type": "number",
+            "example": 20,
+            "description": "Total tickets in the scheme"
+          },
+          "onboardedAtMonth": {
+            "type": "number",
+            "example": 7,
+            "description": "Current active month where digital tracking starts (e.g. Month 7)"
+          },
+          "sanctionOrderNumber": {
+            "type": "string",
+            "example": "ROC/ERD/CHIT/2026/012"
+          },
+          "sanctionDate": {
+            "type": "string",
+            "example": "2026-03-01T00:00:00.000Z"
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-04-01T00:00:00.000Z",
+            "description": "Original start date of Month 1 from physical notebook"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2027-11-30T00:00:00.000Z"
+          },
+          "historicalWinners": {
+            "description": "List of past auction winners transcribed from paper notebooks",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoricalWinnerDto"
+            }
+          },
+          "memberAllocations": {
+            "description": "Full roster of member tickets (1..N) transcribed from paper notebooks",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OngoingMemberAllocationDto"
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "example": "94204d28-4a7b-49f5-bf3e-302a4107f750"
+          }
+        },
+        "required": [
+          "groupCode",
+          "groupName",
+          "chitValue",
+          "durationMonths",
+          "totalTickets",
+          "onboardedAtMonth",
+          "startDate",
+          "endDate",
+          "historicalWinners",
+          "memberAllocations"
+        ]
+      },
+      "AssignTicketDto": {
+        "type": "object",
+        "properties": {
+          "ticketNumber": {
+            "type": "number",
+            "example": 4,
+            "description": "Ticket number to assign (between 1 and totalTickets)"
+          },
+          "customerId": {
+            "type": "string",
+            "example": "76e354a9-31d0-4bbd-94e4-27c66e50b3bb",
+            "description": "Verified customer UUID (Enforces ADR-13: max 1 ticket per customer in this group)"
+          },
+          "openingBalance": {
+            "type": "number",
+            "example": 0,
+            "description": "Opening balance in whole Rupees (used for mid-cycle intake adjustments)",
+            "default": 0
+          }
+        },
+        "required": [
+          "ticketNumber",
+          "customerId"
+        ]
+      },
+      "ActivateChitDto": {
+        "type": "object",
+        "properties": {
+          "companyTicketCustomerId": {
+            "type": "string",
+            "example": "76e354a9-31d0-4bbd-94e4-27c66e50b3bb",
+            "description": "Customer ID of company representative holding Ticket #1 for Month 1 full pool payout (Month 1 Rule)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Verified by Partner B against physical register",
+            "description": "Checker approval notes"
+          }
+        }
+      },
+      "RecordBidDto": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "UUID of the winning subscriber ticket (must be non-prized and with zero arrears)"
+          },
+          "bidDiscount": {
+            "type": "number",
+            "example": 22000,
+            "description": "Winning auction bid discount in whole integer Rupees (must be between 4% commission and 1/4 ceiling)"
+          },
+          "auctionDate": {
+            "type": "string",
+            "example": "2026-12-15T00:00:00.000Z",
+            "description": "Date the physical auction was conducted at the branch"
+          }
+        },
+        "required": [
+          "ticketId",
+          "bidDiscount",
+          "auctionDate"
+        ]
+      },
+      "TiedTicketDto": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "Ticket UUID that bid the maximum ceiling discount"
+          },
+          "tokenNumber": {
+            "type": "number",
+            "example": 1,
+            "description": "Physical paper token number drawn at the branch lot draw"
+          }
+        },
+        "required": [
+          "ticketId"
+        ]
+      },
+      "RecordTieBreakDto": {
+        "type": "object",
+        "properties": {
+          "tiedTickets": {
+            "description": "List of all subscriber tickets that simultaneously bid the maximum 1/4 ceiling discount",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TiedTicketDto"
+            }
+          },
+          "winningTicketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "UUID of the winning ticket drawn by the Foreman via physical paper token draw (Option A)"
+          },
+          "bidDiscount": {
+            "type": "number",
+            "example": 25000,
+            "description": "Tied bid discount (must equal exact 1/4 ceiling: chitValue / 4)"
+          },
+          "auctionDate": {
+            "type": "string",
+            "example": "2026-12-15T00:00:00.000Z",
+            "description": "Date the physical lot draw took place at the branch in front of members"
+          },
+          "witnessNames": {
+            "example": [
+              "S. Sundaram",
+              "K. Murugesan",
+              "M. Ramesh"
+            ],
+            "description": "Names of attending subscribers who witnessed the physical token draw",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "tiedTickets",
+          "winningTicketId",
+          "bidDiscount",
+          "auctionDate"
+        ]
+      },
+      "FinalizeAuctionDto": {
+        "type": "object",
+        "properties": {
+          "subscribersPresent": {
+            "type": "number",
+            "example": 14,
+            "description": "Number of attending subscribers physically present at the auction"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Auction conducted smoothly. Winning ticket #4 drawn under Option A tie-break.",
+            "description": "Statutory notes or observations recorded in the auction proceedings"
+          },
+          "signedByForeman": {
+            "type": "boolean",
+            "example": true,
+            "description": "Signed by Foreman confirmation",
+            "default": true
+          }
+        },
+        "required": [
+          "subscribersPresent"
+        ]
+      },
+      "GenerateDuesDto": {
+        "type": "object",
+        "properties": {
+          "dueDate": {
+            "type": "string",
+            "example": "2026-12-10T00:00:00.000Z",
+            "description": "Optional due date for this installment month (defaults to scheme monthly due date)"
+          }
+        }
+      },
+      "RemoveDefaulterDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Subscriber has defaulted on 3 consecutive monthly installments (Months 4, 5, 6) despite repeated formal notices. Company removal rights exercised per ADR-07 and ADR-12.",
+            "description": "Documented reason and justification for exercising company 3-month default removal rights for audit and legal compliance"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "RecordCollectionDto": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "UUID of the subscriber ticket receiving the collection"
+          },
+          "installmentMonth": {
+            "type": "number",
+            "example": 4,
+            "description": "Installment month number (1 to N) being collected"
+          },
+          "amount": {
+            "type": "number",
+            "example": 3950,
+            "description": "Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "UPI",
+              "BANK_TRANSFER",
+              "CHEQUE"
+            ],
+            "example": "CASH",
+            "description": "Payment method (CASH, UPI, CHEQUE, BANK_TRANSFER)"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "d9b2d63d-a232-4e45-814a-5f0962858b29",
+            "description": "Unique UUID generated by mobile app at point of physical collection for offline sync deduplication"
+          },
+          "transactionRef": {
+            "type": "string",
+            "example": "UPI/20261018/9876543210",
+            "description": "Optional transaction reference (UPI UTR number, Cheque number, or Bank transfer reference)"
+          },
+          "collectedAt": {
+            "type": "string",
+            "example": "2026-10-18T10:30:00.000Z",
+            "description": "Device timestamp when physical collection was recorded in the field"
+          }
+        },
+        "required": [
+          "ticketId",
+          "installmentMonth",
+          "amount",
+          "paymentMethod"
+        ]
+      },
+      "SubmitHandoverDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-10-18T00:00:00.000Z",
+            "description": "Collection date to batch for evening cash handover (defaults to current date)"
+          }
+        }
+      },
+      "AcknowledgeHandoverDto": {
+        "type": "object",
+        "properties": {
+          "collectorUserId": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "UUID of the field collection agent who collected the physical cash in the field"
+          },
+          "acknowledgedAmount": {
+            "type": "number",
+            "example": 45000,
+            "description": "Physically counted cash currency notes amount received into branch vault (must match total of specified paymentIds)"
+          },
+          "paymentIds": {
+            "example": [
+              "d7b68e74-2794-4366-a6fb-6dbf8615951c",
+              "c8b749fa-1152-47ef-84b2-a4f6696b9978"
+            ],
+            "description": "List of Payment UUIDs included in the physical cash batch being acknowledged",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "example": "Currency counted: ₹500 x 80 = ₹40,000; ₹200 x 20 = ₹4,000; ₹100 x 10 = ₹1,000. Total verified: ₹45,000.",
+            "description": "Physical denomination breakdown and verification notes by Partner/Super Admin"
+          }
+        },
+        "required": [
+          "collectorUserId",
+          "acknowledgedAmount",
+          "paymentIds"
+        ]
+      },
+      "CreatePaymentDto": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "UUID of the subscriber ticket receiving the payment"
+          },
+          "installmentMonth": {
+            "type": "number",
+            "example": 4,
+            "description": "Installment month number (1 to N) being paid"
+          },
+          "amount": {
+            "type": "number",
+            "example": 3750,
+            "description": "Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "UPI",
+              "BANK_TRANSFER",
+              "CHEQUE"
+            ],
+            "example": "CASH",
+            "description": "Payment method (CASH, UPI, BANK_TRANSFER, CHEQUE)"
+          },
+          "transactionRef": {
+            "type": "string",
+            "example": "UPI-20261018-9876543210",
+            "description": "Optional transaction reference (UPI UTR, Cheque number, Bank transfer UTR)"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "d9b2d63d-a232-4e45-814a-5f0962858b29",
+            "description": "Optional unique idempotency key to prevent duplicate payments on retry"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Paid at Perundurai head office counter",
+            "description": "Optional cashier remarks or notes"
+          },
+          "collectedAt": {
+            "type": "string",
+            "example": "2026-10-18T10:30:00.000Z",
+            "description": "Optional payment collection timestamp"
+          }
+        },
+        "required": [
+          "ticketId",
+          "installmentMonth",
+          "amount",
+          "paymentMethod"
+        ]
+      },
+      "RequestReversalDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "WRONG_TICKET_ENTERED",
+            "description": "Mandatory reason code or description for the payment reversal (e.g., WRONG_TICKET_ENTERED, CHEQUE_BOUNCED, DUPLICATE_ENTRY, CUSTOMER_DISPUTE)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Entered for Ticket 7 instead of Ticket 8 during evening rush at branch counter",
+            "description": "Detailed explanation and supporting notes for the Checker review"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "ApproveReversalDto": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string",
+            "example": "Verified counter receipt and confirmed customer mistake with Ticket 8",
+            "description": "Checker verification notes and audit justification"
+          }
+        }
+      },
+      "RejectReversalDto": {
+        "type": "object",
+        "properties": {
+          "rejectionReason": {
+            "type": "string",
+            "example": "Bank statement confirmed that cheque cleared successfully on 18-Oct-2026",
+            "description": "Mandatory reason for rejecting the reversal request"
+          }
+        },
+        "required": [
+          "rejectionReason"
+        ]
+      },
+      "VerifySafetyProofDto": {
+        "type": "object",
+        "properties": {
+          "isSecurityRequired": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether company safety proof / collateral is requested for this auction winner (ADR-15: not mandatory across the board, evaluated on-demand)"
+          },
+          "securityType": {
+            "type": "string",
+            "example": "BLANK_CHEQUE",
+            "description": "Type of security instrument submitted (e.g., BLANK_CHEQUE, SIGNED_AGREEMENT, PROMISSORY_NOTE, OTHER)"
+          },
+          "blankChequeDetails": {
+            "type": "string",
+            "example": "State Bank of India, Cheque #004512 & #004513, A/C: S. Sundaram",
+            "description": "Details of signed blank cheque(s) submitted: bank name, cheque numbers, and account holder"
+          },
+          "agreementSigned": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the chit agreement has been signed by the auction winner"
+          },
+          "nomineeSigned": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the nominee has signed the agreement / guarantee"
+          },
+          "securityDocS3Key": {
+            "type": "string",
+            "example": "kyc/payouts/KCA-1L-20M-01/winner-ticket-07-cheques.pdf",
+            "description": "Private AWS S3 key of scanned uploaded security papers / blank cheques"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Verified customer documents and signed blank cheques in office counter",
+            "description": "Maker verification remarks and observations"
+          }
+        },
+        "required": [
+          "isSecurityRequired",
+          "agreementSigned",
+          "nomineeSigned"
+        ]
+      },
+      "AuthorizePayoutDto": {
+        "type": "object",
+        "properties": {
+          "disbursementMode": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT_PAYEE_CHEQUE",
+              "BANK_TRANSFER_NEFT",
+              "BANK_TRANSFER_RTGS",
+              "BANK_TRANSFER_IMPS",
+              "CASH"
+            ],
+            "example": "ACCOUNT_PAYEE_CHEQUE",
+            "description": "Payment mode for prize money release (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS, CASH)"
+          },
+          "disbursedAmount": {
+            "type": "number",
+            "example": 75000,
+            "description": "Whole-rupee prize money amount to authorize (defaults to calculated auction prize money: chitValue - bidDiscount)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Authorized payout via Account Payee Cheque after verifying blank cheques",
+            "description": "Checker authorization remarks and conditions"
+          }
+        },
+        "required": [
+          "disbursementMode"
+        ]
+      },
+      "ReleasePayoutDto": {
+        "type": "object",
+        "properties": {
+          "paymentReference": {
+            "type": "string",
+            "example": "IOB-CHQ-009182",
+            "description": "Official transaction reference: Cheque number, Bank UTR (NEFT/RTGS/IMPS), or Cash voucher number"
+          },
+          "disbursedAt": {
+            "type": "string",
+            "example": "2026-10-18T11:30:00.000Z",
+            "description": "Actual release timestamp (defaults to current date and time)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Handed over Account Payee Cheque #009182 to subscriber in person at branch counter",
+            "description": "Cashier or accountant payout release notes"
+          }
+        },
+        "required": [
+          "paymentReference"
+        ]
+      }
+    }
+  }
+}
