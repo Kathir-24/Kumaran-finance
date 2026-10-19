@@ -297,6 +297,9 @@ export class StatutoryReportService {
         minutesProceedingsText: a.minutes?.minutesText || 'Minutes pending entry',
         signedByForeman: a.minutes?.signedByForeman || false,
         filedAtRegistrar: a.minutes?.filedAtRegistrar || false,
+        filedDate: a.minutes?.filedDate || null,
+        filingReference: a.minutes?.filingReference || null,
+        filingNotes: a.minutes?.filingNotes || null,
       };
     });
 

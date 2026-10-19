@@ -368,6 +368,39 @@
 
 ---
 
+### 5.4 `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`
+**Description**: Mark Form XVII auction minutes as physically filed with District Registrar of Chits with official challan/seal reference.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
+
+#### Request Body
+```json
+{
+  "filingReference": "CHALLAN-TN-ERD-2026-90412",
+  "filedDate": "2026-10-19T00:00:00.000Z",
+  "notes": "Filed in person at Perundurai Sub-Registrar Office; fee paid ₹100 via treasury challan."
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-19T14:30:00.000Z",
+  "data": {
+    "id": "minutes-uuid-001",
+    "auctionId": "auction-uuid-001",
+    "installmentMonth": 4,
+    "filedAtRegistrar": true,
+    "filedDate": "2026-10-19T00:00:00.000Z",
+    "filingReference": "CHALLAN-TN-ERD-2026-90412",
+    "filingNotes": "Filed in person at Perundurai Sub-Registrar Office; fee paid ₹100 via treasury challan."
+  }
+}
+```
+
+---
+
 ## 6. Module 5: Installments & Passbook (`/installments`, `/tickets`)
 
 ### 6.1 `GET /api/v1/tickets/:ticketId/passbook`

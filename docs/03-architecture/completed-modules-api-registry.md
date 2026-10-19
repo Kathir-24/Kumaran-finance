@@ -89,6 +89,7 @@
 | `POST` | `/auctions/:id/tie-break` | **Option A**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/finalize` | **Checker**: Commit results & mark `isPrized` | **Checker** (`maker != checker`) | **Checker per §6** (`maker != checker`) | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/auctions/:id/minutes` & `pdf` | Form XVII statutory auction minutes | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `PATCH` | `/auctions/:id/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 
 ---
 

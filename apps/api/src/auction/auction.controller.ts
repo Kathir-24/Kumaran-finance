@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -21,8 +22,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { AuctionService } from './auction.service';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
+import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 
@@ -218,5 +221,23 @@ export class AuctionController {
   @ApiResponse({ status: 200, description: 'Minutes text layout retrieved' })
   async getMinutesPdf(@Param('id') auctionId: string) {
     return this.auctionService.getAuctionMinutes(auctionId);
+  }
+
+  @Patch(':auctionId/mark-filed-with-registrar')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Mark auction minutes as filed with Government Chit Registrar',
+    description:
+      'Records official government challan/acknowledgement reference, filing date, and staff notes.',
+  })
+  @ApiResponse({ status: 200, description: 'Minutes marked as filed successfully' })
+  @ApiResponse({ status: 400, description: 'Auction not finalized or minutes not found' })
+  @ApiResponse({ status: 404, description: 'Auction not found' })
+  async markMinutesFiled(
+    @Param('auctionId') auctionId: string,
+    @Body() dto: MarkMinutesFiledDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.auctionService.markMinutesFiled(auctionId, dto, currentUser.sub);
   }
 }

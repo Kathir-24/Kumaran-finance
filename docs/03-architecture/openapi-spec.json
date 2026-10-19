@@ -1254,6 +1254,52 @@
         ]
       }
     },
+    "/api/v1/auctions/{auctionId}/mark-filed-with-registrar": {
+      "patch": {
+        "description": "Records official government challan/acknowledgement reference, filing date, and staff notes.",
+        "operationId": "AuctionController_markMinutesFiled_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkMinutesFiledDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Minutes marked as filed successfully"
+          },
+          "400": {
+            "description": "Auction not finalized or minutes not found"
+          },
+          "404": {
+            "description": "Auction not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Mark auction minutes as filed with Government Chit Registrar",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
     "/api/v1/installments/group/{chitGroupId}/month/{month}": {
       "get": {
         "description": "Returns the list of all members with gross amount, dividend deduction, net payable amount, paid amount, and payment status for that month. Allowed: Staff and Auditor.",
@@ -3903,6 +3949,26 @@
         "required": [
           "subscribersPresent"
         ]
+      },
+      "MarkMinutesFiledDto": {
+        "type": "object",
+        "properties": {
+          "filingReference": {
+            "type": "string",
+            "example": "DRC/ERD/CHAL-2026-00412",
+            "description": "Government challan, seal, or acknowledgement receipt number from Registrar office"
+          },
+          "filedDate": {
+            "type": "string",
+            "example": "2026-10-25T11:00:00.000Z",
+            "description": "Date minutes were physically submitted to Deputy Registrar office (defaults to current date)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Submitted in person at Erode Deputy Registrar office by Partner A",
+            "description": "Optional staff notes or remarks regarding physical filing"
+          }
+        }
       },
       "GenerateDuesDto": {
         "type": "object",

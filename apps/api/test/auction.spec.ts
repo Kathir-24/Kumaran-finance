@@ -60,6 +60,10 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       auctionMinutes: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        update: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
       },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
@@ -490,6 +494,117 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           orderBy: { installmentMonth: 'asc' },
         }),
       );
+    });
+  });
+
+  describe('6. Registrar Filing of Auction Minutes', () => {
+    const mockCompletedAuctionWithMinutes = {
+      id: mockAuctionId,
+      chitGroupId: mockChitGroupId,
+      installmentMonth: 2,
+      status: AuctionStatus.COMPLETED,
+      chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      minutes: {
+        id: 'minutes-uuid-001',
+        auctionId: mockAuctionId,
+        subscribersPresent: 18,
+        minutesText: 'Statutory proceedings...',
+        signedByForeman: true,
+        filedAtRegistrar: false,
+      },
+    };
+
+    it('should throw NotFoundException if auction does not exist', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(null);
+
+      await expect(
+        auctionService.markMinutesFiled(
+          'non-existent-auction-id',
+          { filingReference: 'DRC/ERD/CHAL-001' },
+          mockCheckerId,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if auction is not COMPLETED', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockCompletedAuctionWithMinutes,
+        status: AuctionStatus.SCHEDULED,
+      });
+
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          { filingReference: 'DRC/ERD/CHAL-001' },
+          mockCheckerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if minutes have not been generated', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockCompletedAuctionWithMinutes,
+        minutes: null,
+      });
+
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          { filingReference: 'DRC/ERD/CHAL-001' },
+          mockCheckerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should mark minutes as filed at Registrar with challan reference and date', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuctionWithMinutes);
+      const filedDate = new Date('2026-10-25T11:00:00.000Z');
+
+      prismaMock.auctionMinutes.update.mockResolvedValue({
+        id: 'minutes-uuid-001',
+        auctionId: mockAuctionId,
+        subscribersPresent: 18,
+        minutesText: 'Statutory proceedings...',
+        signedByForeman: true,
+        filedAtRegistrar: true,
+        filedDate,
+        filingReference: 'DRC/ERD/CHAL-2026-00412',
+        filingNotes: 'Handed over by Partner A at Erode office',
+      });
+
+      const result = await auctionService.markMinutesFiled(
+        mockAuctionId,
+        {
+          filingReference: 'DRC/ERD/CHAL-2026-00412',
+          filedDate: '2026-10-25T11:00:00.000Z',
+          notes: 'Handed over by Partner A at Erode office',
+        },
+        mockCheckerId,
+      );
+
+      expect(prismaMock.auctionMinutes.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { auctionId: mockAuctionId },
+          data: expect.objectContaining({
+            filedAtRegistrar: true,
+            filedDate,
+            filingReference: 'DRC/ERD/CHAL-2026-00412',
+            filingNotes: 'Handed over by Partner A at Erode office',
+          }),
+        }),
+      );
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'MINUTES_FILED_AT_REGISTRAR',
+            userId: mockCheckerId,
+            entityId: 'minutes-uuid-001',
+          }),
+        }),
+      );
+      expect(result.message).toBe('Auction minutes marked as filed with Registrar successfully.');
+      expect(result.minutes.filedAtRegistrar).toBe(true);
+      expect(result.minutes.filingReference).toBe('DRC/ERD/CHAL-2026-00412');
     });
   });
 });

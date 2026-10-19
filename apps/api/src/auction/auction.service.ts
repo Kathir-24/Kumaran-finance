@@ -13,6 +13,7 @@ import {
   PERCENT_DENOMINATOR,
 } from '../common/constants';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
+import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 
@@ -619,6 +620,75 @@ export class AuctionService {
     }
 
     throw new NotFoundException('Auction or Chit group not found');
+  }
+
+  /**
+   * Marks Form XVII statutory auction minutes as filed with the Deputy Registrar of Chits office.
+   * Records the official government challan/acknowledgement reference, filing date, and staff notes.
+   */
+  async markMinutesFiled(
+    auctionId: string,
+    dto: MarkMinutesFiledDto,
+    userId: string,
+  ) {
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { minutes: true, chitGroup: true },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (auction.status !== AuctionStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Cannot mark minutes as filed: Auction has not yet been finalized',
+      );
+    }
+
+    if (!auction.minutes) {
+      throw new BadRequestException(
+        'Cannot mark minutes as filed: Auction minutes have not been generated for this auction',
+      );
+    }
+
+    const filedDate = dto.filedDate ? new Date(dto.filedDate) : new Date();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const minutes = await tx.auctionMinutes.update({
+        where: { auctionId },
+        data: {
+          filedAtRegistrar: true,
+          filedDate,
+          filingReference: dto.filingReference?.trim() || null,
+          filingNotes: dto.notes?.trim() || null,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'MINUTES_FILED_AT_REGISTRAR',
+          entityType: 'AuctionMinutes',
+          entityId: minutes.id,
+          newValue: {
+            auctionId,
+            groupCode: auction.chitGroup.groupCode,
+            installmentMonth: auction.installmentMonth,
+            filedAtRegistrar: true,
+            filedDate,
+            filingReference: dto.filingReference || null,
+          },
+        },
+      });
+
+      return minutes;
+    });
+
+    return {
+      message: 'Auction minutes marked as filed with Registrar successfully.',
+      minutes: updated,
+    };
   }
 }
 
