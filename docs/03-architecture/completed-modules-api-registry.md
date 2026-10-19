@@ -197,7 +197,7 @@
   - English: e.g. `3750n` $\to$ `"Three Thousand Seven Hundred Fifty Rupees Only"`
   - Tamil: e.g. `3750n` $\to$ `"ரூபாய் மூன்றாயிரத்து எழுநூற்று ஐம்பது மட்டும்"`
 - **Canvas Templates**:
-  - `ThermalReceiptTemplate`: 80mm ESC/POS thermal printer layout (width: 226.77 pt) per `notification-and-receipt-templates.md` §1.
+  - `ThermalReceiptTemplate`: Compact 80mm digital receipt slip format (width: 226.77 pt) per `notification-and-receipt-templates.md` §1 for instant digital viewing and WhatsApp sharing.
   - `PayoutVoucherTemplate`: A5 landscape prize payout voucher with safety proof checklist stamps and Maker-Checker signature lines.
   - `FormXviiMinutesTemplate`: A4 statutory auction minutes with financial breakdown, tie-breaker paper token lot draw table, and Foreman declaration.
   - `FormXxiPassbookTemplate`: A4 landscape 20-month continuous schedule showing monthly base dues, dividend credits, payments, and arrears.
@@ -264,7 +264,7 @@
   $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Cash Inflows} - \text{Cash Outflows}$$
   Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
-- **Bilingual PDF Canvas Engine**: 80mm thermal receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
+- **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Indian DLT SMS & WhatsApp bilingual dispatchers, and 06:00 AM settlement reconciliation.
 - **Total Production Endpoints**: **73 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 7 background jobs routes).

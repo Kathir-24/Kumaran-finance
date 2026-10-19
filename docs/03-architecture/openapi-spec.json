@@ -2829,7 +2829,7 @@
     },
     "/api/v1/pdf/receipt/{paymentId}": {
       "get": {
-        "description": "Generates pixel-accurate 80mm bilingual (English + தமிழ்) thermal subscription receipt slip and saves to private storage.",
+        "description": "Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.",
         "operationId": "PdfController_getReceiptPdf_v1",
         "parameters": [
           {

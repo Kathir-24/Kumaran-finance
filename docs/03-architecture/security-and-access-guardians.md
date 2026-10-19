@@ -38,7 +38,7 @@ All files stored locally or in private AWS S3 adhere to strict directory namespa
 - `kyc/{customerId}/*`: Sensitive identity scans (Aadhaar, PAN, Photo, Signature).
 - `safety-proof/{auctionId}/*`: Company collateral (signed agreements, promissory notes, blank cheques).
 - `minutes/{chitGroupId}/*`: Statutory Form XVII auction minutes.
-- `receipts/{branchCode}/{year}/*`: Bilingual 80mm ESC/POS subscription thermal receipts.
+- `receipts/{branchCode}/{year}/*`: Bilingual 80mm subscription digital receipts.
 - `vouchers/{branchCode}/{year}/*`: Bilingual A5 prize payout vouchers.
 - `passbooks/{chitGroupId}/*`: Form XXI continuous 20-month member passbook statements.
 

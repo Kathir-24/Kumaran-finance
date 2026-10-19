@@ -623,7 +623,7 @@
 ## 10. Infrastructure Components: Storage, PDF Canvas & Background Jobs
 
 ### 10.1 `GET /api/v1/pdf/receipt/:paymentId?download=true`
-**Description**: Bilingual 80mm thermal receipt PDF with 15-minute presigned URL.  
+**Description**: Bilingual 80mm digital receipt PDF with 15-minute presigned URL.  
 **Roles**: Authenticated Staff, Member (Self)
 
 #### Success Response

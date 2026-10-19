@@ -42,7 +42,7 @@ export class PdfController {
   @ApiOperation({
     summary: 'Generate and stream bilingual 80mm subscription receipt PDF',
     description:
-      'Generates pixel-accurate 80mm bilingual (English + தமிழ்) thermal subscription receipt slip and saves to private storage.',
+      'Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.',
   })
   @ApiQuery({ name: 'download', required: false, type: Boolean, description: 'Return presigned URL JSON instead of streaming PDF' })
   @ApiResponse({ status: 200, description: 'PDF stream or presigned URL returned' })

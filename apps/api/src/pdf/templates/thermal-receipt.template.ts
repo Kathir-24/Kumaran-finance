@@ -27,7 +27,7 @@ export interface ReceiptPdfData {
 export class ThermalReceiptTemplate {
   static async generate(data: ReceiptPdfData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      // 80mm standard thermal roll width is 226.77 pt (~80mm)
+      // 80mm compact digital slip format (width: 226.77 pt)
       const doc = new PDFDocument({
         size: [226.77, 560],
         margins: { top: 10, bottom: 10, left: 10, right: 10 },

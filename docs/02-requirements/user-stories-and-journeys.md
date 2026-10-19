@@ -37,7 +37,7 @@ The system encompasses **10 Core Functional Modules** broken down into **28 Gran
 | 6.1 | Due Schedule Generation with Universal Dividends | Actor | Actor | Review | View Dues | View Dues | View |
 | 6.2 | Single Discrete Payment Validation (No Partial/Adv) | System | System | System | System | System | System |
 | **M7** | **Field Collections & Cash Handover** | | | | | | |
-| 7.1 | Doorstep Cash Collection & Bluetooth Receipt | Actor | Actor | Actor | Actor | Payee | View |
+| 7.1 | Doorstep Cash Collection & Passbook Signature | Actor | Actor | Actor | Actor | Payee | View |
 | 7.2 | Offline Collection Queue & Auto-Sync | — | — | — | Actor | — | — |
 | 7.3 | Evening Cash Handover (`collector != acknowledger`)| Checker | Checker | Checker | Maker | — | View |
 | **M8** | **In-Office Auctions & Tie-Breakers** | | | | | | |
@@ -75,7 +75,7 @@ The system encompasses **10 Core Functional Modules** broken down into **28 Gran
 
 ### Persona 4: Field Collection Agent
 - **Profile**: 2 to 3 field staff conducting daily/monthly doorstep collections in Perundurai and surrounding Erode rural areas.
-- **Device**: Android Smartphone running the Flutter Mobile App (`apps/mobile/`) + Portable Bluetooth Thermal Receipt Printer.
+- **Device**: Android Smartphone running the Flutter Mobile App (`apps/mobile/`) + Customer Physical Notebook/Passbook.
 - **Core Mindset**: Speed at doorstep (under 30 seconds), zero typing errors, working without mobile internet (offline resilience), and handing over physical cash safely at 5:00 PM.
 
 ### Persona 5: Customer / Chit Subscriber
@@ -265,14 +265,14 @@ journey
 
 ### Module 7: Field Collections & Cash Handover
 
-#### US-7.1: Doorstep Collection & Instant Bilingual Receipt
+#### US-7.1: Doorstep Collection & Customer Notebook Signature
 - **As a**: Field Collection Agent
-- **I want to**: Search a customer by code/name, tap "Record Cash", and print a Bluetooth receipt in under 30 seconds
-- **So that**: Field collection rounds are fast, error-free, and professional.
+- **I want to**: Search a customer by code/name, tap "Record Cash", sign their physical notebook, and issue a digital receipt in under 30 seconds
+- **So that**: Field collection rounds are fast, error-free, and follow the traditional customer notebook process.
 - **Acceptance Criteria**:
-  - **Given** I am at the customer's house with the mobile app,
+  - **Given** I am at the customer's house with the mobile app and customer's physical passbook,
   - **When** I tap "Record Collection" $\to$ "Cash ₹3,950",
-  - **Then** the app saves the payment, prints an English + தமிழ் thermal receipt, and triggers an automated WhatsApp / SMS receipt link to the customer.
+  - **Then** the app saves the payment, triggers an automated WhatsApp / SMS receipt link to the customer, and the agent enters the payment date, amount, and signature directly into the customer's physical notebook.
 
 #### US-7.2: Offline Collection in Remote Rural Areas
 - **As a**: Field Collection Agent
@@ -281,7 +281,7 @@ journey
 - **Acceptance Criteria**:
   - **Given** phone is in airplane mode / no signal,
   - **When** I record a collection,
-  - **Then** the app stores it locally with an immutable timestamp and UUID idempotency key, printing the offline receipt;
+  - **Then** the app stores it locally with an immutable timestamp and UUID idempotency key, generating the offline receipt record;
   - **When** cellular connection is restored,
   - **Then** the app automatically pushes the batch to the office server with zero duplicate entries.
 
