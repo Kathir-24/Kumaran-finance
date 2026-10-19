@@ -65,22 +65,22 @@ export class CreateCustomerDto {
   @IsString()
   addressLine2?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Perundurai',
-    description: 'City or Town name',
+    description: 'City or Town name (defaults to Perundurai if omitted)',
   })
-  @IsNotEmpty({ message: 'City is required' })
+  @IsOptional()
   @IsString()
-  city: string;
+  city?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '638052',
-    description: '6-digit Indian Postal PIN code',
+    description: '6-digit Indian Postal PIN code (defaults to 638052 if omitted)',
   })
-  @IsNotEmpty({ message: 'Pincode is required' })
+  @IsOptional()
   @IsString()
   @Matches(REGEX_INDIAN_PINCODE, { message: 'Pincode must be exactly 6 digits' })
-  pincode: string;
+  pincode?: string;
 
   @ApiPropertyOptional({
     example: 'ABCDE1234F',

@@ -112,6 +112,60 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       expect(prismaMock.customer.create).toHaveBeenCalled();
     });
 
+    it('should register a customer with only notebook fields (no Aadhaar, PAN, or pincode provided)', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(null);
+      prismaMock.customer.findFirst.mockResolvedValue(null);
+      prismaMock.branch.findFirst.mockResolvedValue({ id: mockBranchId });
+
+      const createdCustomer = {
+        id: mockCustomerId,
+        branchId: mockBranchId,
+        customerCode: 'KC-CUST-00001',
+        fullName: 'Kaliappan M',
+        fullNameTamil: null,
+        phone: '9842198765',
+        altPhone: null,
+        addressLine1: 'Main Road, Seenapuram',
+        addressLine2: null,
+        city: 'Perundurai',
+        pincode: '638052',
+        panNumber: null,
+        aadhaarLast4: null,
+        isKycVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        branch: { id: mockBranchId, code: 'PRD', name: 'Head Office' },
+      };
+
+      prismaMock.customer.create.mockResolvedValue(createdCustomer);
+
+      const result = await customerService.create(
+        {
+          fullName: 'Kaliappan M',
+          phone: '9842198765',
+          addressLine1: 'Main Road, Seenapuram',
+        },
+        mockBranchId,
+      );
+
+      expect(result).toHaveProperty('id', mockCustomerId);
+      expect(result.customerCode).toBe('KC-CUST-00001');
+      expect(result.city).toBe('Perundurai');
+      expect(result.pincode).toBe('638052');
+      expect(result.aadhaarLast4).toBeNull();
+      expect(result.panNumber).toBeNull();
+      expect(prismaMock.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            city: 'Perundurai',
+            pincode: '638052',
+            aadhaarLast4: null,
+            panNumber: null,
+          }),
+        }),
+      );
+    });
+
     it('should reject registration if phone number already exists (409 Conflict)', async () => {
       prismaMock.customer.findUnique.mockResolvedValue({
         id: 'existing-id',

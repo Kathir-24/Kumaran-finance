@@ -3414,12 +3414,12 @@
           "city": {
             "type": "string",
             "example": "Perundurai",
-            "description": "City or Town name"
+            "description": "City or Town name (defaults to Perundurai if omitted)"
           },
           "pincode": {
             "type": "string",
             "example": "638052",
-            "description": "6-digit Indian Postal PIN code"
+            "description": "6-digit Indian Postal PIN code (defaults to 638052 if omitted)"
           },
           "panNumber": {
             "type": "string",
@@ -3440,9 +3440,7 @@
         "required": [
           "fullName",
           "phone",
-          "addressLine1",
-          "city",
-          "pincode"
+          "addressLine1"
         ]
       },
       "UpdateCustomerDto": {

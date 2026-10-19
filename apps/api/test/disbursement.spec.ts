@@ -298,6 +298,40 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       );
       expect(result.winner.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
     });
+
+    it('should authorize prize payout in CASH for large amount (zero artificial cash block)', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
+      prismaMock.auctionWinner.update.mockResolvedValue({
+        ...mockVerifiedAuction.winner,
+        disbursementMode: DisbursementMode.CASH,
+        disbursedAmount: 375000n,
+        authorizedByUserId: mockCheckerId,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+      });
+
+      const result = await disbursementService.authorizePayout(
+        mockAuctionId,
+        {
+          disbursementMode: DisbursementMode.CASH,
+          disbursedAmount: 375000,
+          notes: 'Authorized ₹3,75,000 prize payout in hard cash at Perundurai head office',
+        },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            disbursementMode: DisbursementMode.CASH,
+            disbursedAmount: 375000n,
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+          }),
+        }),
+      );
+      expect(result.winner.disbursementMode).toBe(DisbursementMode.CASH);
+      expect(result.winner.disbursedAmount).toBe(375000n);
+    });
   });
 
   describe('3. Payout Release & Voucher Generation', () => {
