@@ -39,9 +39,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: apps/api
-        run: |
-          npm install
-          npm install --no-save @oxlint/binding-linux-x64-gnu
+        run: npm install --include=optional
 
       - name: Run Oxlint (Code Quality & Style)
         working-directory: apps/api
