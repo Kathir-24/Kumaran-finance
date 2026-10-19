@@ -26,7 +26,7 @@ import { StorageService } from './storage.service';
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
-  @Get('file/:key(*)')
+  @Get('file/*key')
   @ApiOperation({
     summary: 'Stream a stored file securely (Local storage driver fallback)',
     description:

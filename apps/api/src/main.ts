@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -7,6 +7,17 @@ import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
+
+  // Global routing prefix with exemptions for health checks and API documentation
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'api/docs'],
+  });
+
+  // Enable URI Versioning (Default: '1' -> /api/v1/...)
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   // Global DTO input validation & sanitization
   app.useGlobalPipes(
@@ -28,6 +39,8 @@ async function bootstrap() {
         'Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.',
     )
     .setVersion('1.0.0')
+    .addServer('/api/v1', 'Version 1 Base URL')
+
     .addBearerAuth(
       {
         type: 'http',

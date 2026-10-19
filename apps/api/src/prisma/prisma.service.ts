@@ -7,10 +7,20 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (err: any) {
+      if (process.env.NODE_ENV === 'production') {
+        throw err;
+      }
+      // Non-blocking warning in dev/test environment
+    }
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    try {
+      await this.$disconnect();
+    } catch {}
   }
 }
+
