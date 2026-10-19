@@ -47,10 +47,11 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 ### Module 3: Customer Management & KYC (`CONFIRMED-BY-DEVELOPER`)
 - **Unique Customer Code**: System-generated identifier (e.g., `KC-CUST-00101`).
 - **Bilingual Profiles**: Customer names captured in English and Tamil.
-- **Data Minimization KYC**:
-  - Stores masked Aadhaar (last 4 digits only, e.g., `XXXXXXXX1234`) as a data-protection safeguard.
-  - PAN, phone number, physical address, and nominee details (relationship, contact).
-- **Document Storage**: KYC and signed agreement scans stored in secure private AWS S3 storage with time-limited presigned access links.
+- **Lightweight Notebook-Style Intake (`CONFIRMED-BY-DEVELOPER`)**:
+  - Full name (English and optional Tamil), mobile phone number, physical address, and nominee details.
+  - Known local subscribers are onboarded immediately without forced identity paperwork.
+  - Optional Fields: Masked Aadhaar (last 4 digits only, e.g., `4821`), PAN number, and document uploads are strictly optional and never mandatory.
+- **Document Storage**: Optional identity and agreement scans stored in secure private AWS S3 storage with time-limited presigned access links.
 
 ### Module 4: Chit Scheme Management (New & Ongoing) (`CONFIRMED-BY-DEVELOPER`)
 - **Scheme Parameters**: Chit Value ($V$), Duration Months ($N$), Total Tickets ($M = N$), Base Monthly Installment ($I_{base} = V / N$). All values in whole integer Rupees (₹).
@@ -108,7 +109,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
   - Available as physical printed slips and downloadable digital PDFs.
 - **Prize Payout Vouchers (V1 Scope)**:
-  - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`).
+  - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount to match local business reality.
   - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).
   - Property documents are completely eliminated; security proof is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
 - **Payment Reversals**:

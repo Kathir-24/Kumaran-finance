@@ -27,9 +27,9 @@
 | **ADR-10** | Infrastructure & Code Ownership | Developer currently holds code, cloud account, and domain (`CONFIRMED-BY-DEVELOPER`). Handover terms to Kumaran Finance are `OPEN`. | `CONFIRMED-BY-DEVELOPER` (current) / `OPEN` (handover) | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-11** | Receipt Delivery & Passbook | Digital receipt (SMS/WhatsApp link) + Physical & Digital Passbook entry in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-12** | Notification Channels | Hybrid: SMS for OTP + WhatsApp for receipts/reminders in v1 scope (`CONFIRMED-BY-DEVELOPER`). Provider approval required; build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-13** | Customer Subscriptions & Limits | Single customer can join multiple chit groups, but **CANNOT hold 2 or more tickets in the SAME chit group** (Max 1 ticket per customer per group). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-14** | Prize Payout Modes | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash) in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. Cash limits are `UNVERIFIED-LEGAL`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
+| **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | 2026-10-17 | **Y** |
+| **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
 
 ---
 
@@ -95,3 +95,24 @@
   3. Promissory Note / Personal Guarantee.
   4. Other security proof accepted by branch management.
 - **System Role**: Operational checklist and digital attachment repository (`isSecurityRequired: boolean`, `securityType: string?`, `blankChequeDetails: string?`, `isWinnerSigned: boolean`, `isNomineeSigned: boolean`, `documentUrls: string[]`).
+
+---
+
+### ADR-14: Prize Payout Modes & Zero Cash Block (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: Kumaran Finance predominantly disburses prize money in physical hard cash at the branch office, in line with long-standing local business practices in Perundurai and Erode district.
+- **Architectural Decision**: The software must faithfully record operational truth. It **strictly enforces ZERO artificial cash blocks or limits**.
+- **Payout Modes**: Supports `CASH`, `ACCOUNT_PAYEE_CHEQUE`, `BANK_TRANSFER_NEFT`, `BANK_TRANSFER_RTGS`, and `BANK_TRANSFER_IMPS`.
+- **Zero Software Block**: Staff can disburse any authorized prize money amount (₹1,00,000, ₹2,00,000, ₹5,00,000, ₹10,00,000) in `CASH`. The system records the transaction without throwing artificial blocking errors.
+
+---
+
+### ADR-16: Lightweight Customer Intake & No Forced KYC (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: Kumaran Finance deals with known local subscribers (farmers, shopkeepers, weavers, and residents of Perundurai). Onboarding mirrors the physical paper notebook:
+  1. Full Name (English and optional Tamil)
+  2. Mobile Phone Number (10 digits)
+  3. Address / Town
+  4. Nominee Name & Relationship
+- **No Forced Aadhaar / Document Uploads**:
+  - Aadhaar number, PAN card number, and identity document uploads are **strictly OPTIONAL** and never mandatory.
+  - Known local subscribers are onboarded immediately upon entering their notebook details.
+  - Zero forced document scans, photocopies, or third-party digital KYC barriers are required to create a customer, assign a ticket, or participate in auctions.
