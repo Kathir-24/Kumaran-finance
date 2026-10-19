@@ -36,7 +36,12 @@ u:\Kumaran-finance\docs\
 │   ├── architecture.md                       # Modular monolith HLD & 3-tier auth
 │   ├── data-model.md                         # PostgreSQL ERD & Prisma schema (single company)
 │   ├── state-machines.md                     # Chit, payment, auction states
-│   └── api-spec.md                           # RESTful OpenAPI contracts & endpoints
+│   ├── api-spec.md                           # RESTful OpenAPI contracts & endpoints
+│   ├── api-request-response-catalog.md       # JSON payload specimens for all endpoints
+│   ├── completed-modules-api-registry.md     # 6-persona RBAC matrix for Modules 1–9
+│   ├── registrar-filing-protocol.md          # Form XVII Registrar filing protocol
+│   ├── security-and-access-guardians.md      # Anti-BOLA/IDOR & branch scoping defenses
+│   └── openapi-spec.json                     # Generated OpenAPI 3.0 JSON specification
 ├── 04-engineering/
 │   ├── setup-and-contributing.md             # Local environment & Docker guide
 │   ├── ai-coding-guidelines.md               # Prompt templates & AI guardrails
