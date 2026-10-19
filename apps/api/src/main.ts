@@ -1,5 +1,5 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -11,7 +11,9 @@ import {
   CORS_MAX_AGE_SECONDS,
   DEFAULT_CORS_ORIGINS,
 } from './common/constants';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
@@ -69,8 +71,15 @@ async function bootstrap() {
     }),
   );
 
-  // Global BigInt serializer for PostgreSQL whole-rupee integers
-  app.useGlobalInterceptors(new BigIntInterceptor());
+  // Global BigInt serializer & Standardized Success Response Envelope
+  const reflector = app.get(Reflector);
+  app.useGlobalInterceptors(
+    new BigIntInterceptor(),
+    new TransformResponseInterceptor(reflector),
+  );
+
+  // Global standardized error exception filter
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   // Swagger OpenAPI Documentation
   const swaggerConfig = new DocumentBuilder()
