@@ -52,40 +52,41 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
       - name: Setup Node.js 24 LTS
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
-          cache-dependency-path: apps/api/package-lock.json
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        working-directory: apps/api
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Run Oxlint (Fast Type-Aware Linter)
-        working-directory: apps/api
-        run: npm run lint
+      - name: Run Oxlint (Fast Linter)
+        run: pnpm --filter api run lint
 
       - name: Validate Prisma Schema & Generate Client
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
         run: |
-          npx prisma validate
-          npx prisma generate
-          npx prisma migrate deploy
-          npx prisma db seed
+          pnpm exec prisma validate
+          pnpm exec prisma generate
+          pnpm exec prisma migrate deploy
+          pnpm exec prisma db seed
 
       - name: Run Unit & Financial Invariant Tests
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
-        run: npm test
+        run: pnpm test
 
       - name: Compile NestJS Application
-        working-directory: apps/api
-        run: npm run build
+        run: pnpm --filter api run build
 
   build-and-deploy:
     name: Build Docker Container & Deploy to AWS

@@ -76,9 +76,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.2"
   },
-  "optionalDependencies": {
-    "@oxlint/binding-linux-x64-gnu": "1.88.0"
-  },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   }

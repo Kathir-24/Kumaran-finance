@@ -69,7 +69,7 @@ From the repository root:
 if (!(Test-Path apps\api\.env)) { Copy-Item apps\api\.env.example apps\api\.env }
 
 # Install Node.js dependencies across all workspaces
-npm install
+pnpm install
 ```
 
 ---
@@ -78,31 +78,29 @@ npm install
 Run directly from repository root:
 ```powershell
 # Apply Prisma migrations to PostgreSQL
-npm run prisma:migrate
+pnpm run prisma:migrate
 
 # Seed Head Office (PRD) and initial Super Admin partner
-npm run prisma:seed
+pnpm run prisma:seed
 ```
 
 ---
 
 ### Step 4: Verify Quality Gates & Start Development Server
 ```powershell
-# Run Oxlint type-aware linter (0 errors, 0 warnings expected)
-npm run lint
+# Run Oxlint linter (0 errors, 0 warnings expected)
+pnpm run lint
 
 # Run automated unit and financial invariant tests (100% pass expected)
-npm test
+pnpm test
 
 # Run NestJS in development watch mode
-npm run start:dev
+pnpm run start:dev
 ```
 - **API Base URL**: `http://localhost:3000`
 - **Health check endpoint**: `http://localhost:3000/health`
 - **Interactive Swagger / OpenAPI Explorer**: `http://localhost:3000/api/docs`
-- **Database visual inspector (Prisma Studio)**: `npm run prisma:studio` (opens `http://localhost:5555`)
-- **Automated Database Backup**: `npm run backup`
-- **Automated Database Restore**: `npm run restore`
+- **Database visual inspector (Prisma Studio)**: `pnpm run prisma:studio` (opens `http://localhost:5555`)
 
 ---
 
@@ -121,4 +119,4 @@ npm run start:dev
 ## 5. Security Checklist Before Committing
 1. **Never commit secrets**: Check `.env` files and API keys are in `.gitignore`.
 2. **Never commit real customer data**: Only synthetic test fixtures.
-3. **Run linter and tests**: Ensure `npm run lint` and `npm test` exit with 0 errors before pushing.
+3. **Run linter and tests**: Ensure `pnpm run lint` and `pnpm test` exit with 0 errors before pushing.

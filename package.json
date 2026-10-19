@@ -7,14 +7,15 @@
     "apps/*"
   ],
   "scripts": {
-    "start:dev": "npm --workspace=apps/api run start:dev",
-    "build": "npm --workspace=apps/api run build",
-    "test": "npm --workspace=apps/api test",
-    "lint": "npm --workspace=apps/api run lint",
-    "prisma:generate": "npm --workspace=apps/api run prisma:generate",
-    "prisma:migrate": "npm --workspace=apps/api run prisma:migrate",
-    "prisma:seed": "npm --workspace=apps/api run prisma:seed",
-    "prisma:studio": "npm --workspace=apps/api run prisma:studio"
+    "start:dev": "pnpm --filter api run start:dev",
+    "build": "pnpm --filter api run build",
+    "test": "pnpm --filter api test",
+    "test:e2e": "pnpm --filter api run test:e2e",
+    "lint": "pnpm --filter api run lint",
+    "prisma:generate": "pnpm --filter api run prisma:generate",
+    "prisma:migrate": "pnpm --filter api run prisma:migrate",
+    "prisma:seed": "pnpm --filter api run prisma:seed",
+    "prisma:studio": "pnpm --filter api run prisma:studio"
   },
   "keywords": [
     "chit-fund",

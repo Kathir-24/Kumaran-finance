@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+
+minimumReleaseAgeExclude:
+  - bullmq@6.3.17
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': true
+  bcrypt: true
+  msgpackr-extract: true
+  prisma: true
+  unrs-resolver: true

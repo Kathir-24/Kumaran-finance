@@ -16,6 +16,7 @@
   - Current business records exist **exclusively in physical hand-written paper notebooks and physical receipts** (no soft copies/Excel in current business).
   - Software supports fresh new chits as well as mid-cycle onboarding from physical notebooks.
 - **Tech Stack**:
+  - **Monorepo & Package Manager**: `pnpm 12+` (Workspace Monorepo with `pnpm-workspace.yaml`)
   - **Backend**: NestJS 12 (TypeScript, Modular Monolith) in `apps/api/`
   - **Database**: PostgreSQL 17 + Prisma ORM (Port `5433` via Docker)
   - **Web Dashboard**: React / Next.js (Admin, Accountant, Partners) in `apps/web/`

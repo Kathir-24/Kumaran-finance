@@ -84,7 +84,7 @@ flowchart TD
 Once every 90 days, the developer and Kumaran Finance administrator execute this drill in a staging environment:
 1. Trigger a restore of the latest RDS snapshot to a new temporary database instance.
 2. Spin up a temporary NestJS API container connected to the restored database.
-3. Execute the automated financial invariant tests (`npm test docs/05-testing/financial-tests.md`).
+3. Execute the automated financial invariant tests (`pnpm test docs/05-testing/financial-tests.md`).
 4. Verify that:
    $$\sum \text{Member Installment Dues} = \sum \text{Past Collections} + \text{Current Outstanding}$$
 5. Confirm pass rate and terminate temporary staging resources.

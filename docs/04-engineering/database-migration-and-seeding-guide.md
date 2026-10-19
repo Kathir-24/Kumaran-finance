@@ -60,26 +60,26 @@ The authoritative database schema is defined in [`docs/03-architecture/data-mode
 cd apps\api
 
 # Install Prisma CLI as a dev dependency
-npm install -D prisma
+pnpm add -D prisma
 
 # Install Prisma Client runtime dependency
-npm install @prisma/client
+pnpm add @prisma/client
 ```
 
 ### 3.2 Running Development Migrations
 When adding new entities or modifying the schema in `prisma/schema.prisma`:
 ```powershell
 # Creates a new SQL migration file and applies it to the local database
-npx prisma migrate dev --name init_kumaran_schema
+pnpm exec prisma migrate dev --name init_kumaran_schema
 
 # Regenerates the TypeScript Prisma Client
-npx prisma generate
+pnpm exec prisma generate
 ```
 
 ### 3.3 Visualizing and Inspecting Data (Prisma Studio)
 Prisma provides a visual browser GUI to view tables, inspect whole-rupee numbers, and audit records:
 ```powershell
-npx prisma studio
+pnpm exec prisma studio
 ```
 Opens in your browser at `http://localhost:5555`.
 
