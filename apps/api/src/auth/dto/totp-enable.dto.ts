@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { REGEX_TOTP_CODE } from '../../common/constants';
 
 export class TotpEnableDto {
   @ApiProperty({
@@ -16,6 +17,6 @@ export class TotpEnableDto {
   })
   @IsNotEmpty({ message: 'Verification code is required' })
   @IsString()
-  @Matches(/^\d{6}$/, { message: 'Code must be exactly 6 digits' })
+  @Matches(REGEX_TOTP_CODE, { message: 'Code must be exactly 6 digits' })
   code: string;
 }

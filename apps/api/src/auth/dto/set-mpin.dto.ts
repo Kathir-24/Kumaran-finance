@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { REGEX_MPIN } from '../../common/constants';
 
 export class SetMpinDto {
   @ApiProperty({
@@ -8,6 +9,6 @@ export class SetMpinDto {
   })
   @IsNotEmpty({ message: 'MPIN is required' })
   @IsString()
-  @Matches(/^\d{6}$/, { message: 'MPIN must be exactly 6 digits' })
+  @Matches(REGEX_MPIN, { message: 'MPIN must be exactly 6 digits' })
   mpin: string;
 }

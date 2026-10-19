@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ChitStatus, DueStatus, Role } from '@prisma/client';
+import {
+  COMPANY_POOL_MONTH,
+  CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
+} from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
@@ -52,7 +56,7 @@ export class InstallmentService {
     // Determine Universal Dividend for this month
     let dividendPerTicket = 0n;
 
-    if (month === 1) {
+    if (month === COMPANY_POOL_MONTH) {
       // Month 1 has NO auction. Full pool is taken by company ticket. Universal dividend is strictly ₹0.
       dividendPerTicket = 0n;
     } else {
@@ -450,7 +454,8 @@ export class InstallmentService {
         isPrized: t.isPrized,
         status: t.status,
         consecutiveUnpaidMonths: t.consecutiveUnpaidMonths,
-        eligibleForRemoval: t.consecutiveUnpaidMonths >= 3,
+        eligibleForRemoval:
+          t.consecutiveUnpaidMonths >= CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
         totalOverdueAmount,
         customer: t.customer,
         chitGroup: t.chitGroup,
@@ -482,9 +487,9 @@ export class InstallmentService {
     }
 
     // ADR-07 & ADR-12 Enforcement: Must have at least 3 consecutive unpaid months
-    if (ticket.consecutiveUnpaidMonths < 3) {
+    if (ticket.consecutiveUnpaidMonths < CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS) {
       throw new BadRequestException(
-        `ADR-07 Violation: Company default removal rights can only be exercised after at least 3 consecutive unpaid months. Ticket #${ticket.ticketNumber} currently has ${ticket.consecutiveUnpaidMonths} consecutive unpaid months.`,
+        `ADR-07 Violation: Company default removal rights can only be exercised after at least ${CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS} consecutive unpaid months. Ticket #${ticket.ticketNumber} currently has ${ticket.consecutiveUnpaidMonths} consecutive unpaid months.`,
       );
     }
 

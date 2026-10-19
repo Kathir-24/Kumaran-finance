@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DueStatus } from '@prisma/client';
+import { CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS } from '../../common/constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { DailyArrearsExecutionResult } from '../dto/job-payloads.dto';
 import { NotificationService } from './notification.service';
@@ -82,7 +83,8 @@ export class DailyArrearsService {
       }
 
       const wasInDefault = ticket.status === 'DEFAULT_3_MONTHS';
-      const isNowDefault = consecutiveUnpaid >= 3;
+      const isNowDefault =
+        consecutiveUnpaid >= CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS;
       const targetStatus = isNowDefault ? 'DEFAULT_3_MONTHS' : 'ACTIVE';
 
       if (consecutiveUnpaid > 0) {

@@ -6,13 +6,17 @@ import {
 } from '@nestjs/common';
 import { ChitStatus, InitializationMode, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  DISCOUNT_CEILING_DIVISOR,
+  FOREMAN_COMMISSION_NUMERATOR,
+  FOREMAN_COMMISSION_PERCENT,
+  PERCENT_DENOMINATOR,
+} from '../common/constants';
 import { ActivateChitDto } from './dto/activate-chit.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateChitGroupDto } from './dto/create-chit-group.dto';
 import { OnboardOngoingChitDto } from './dto/onboard-ongoing-chit.dto';
 import { QueryChitDto } from './dto/query-chit.dto';
-
-const FOREMAN_COMMISSION_PERCENT = 4.0;
 
 @Injectable()
 export class ChitService {
@@ -33,7 +37,7 @@ export class ChitService {
 
     const baseInstallment = chitValue / duration;
     // Fixed 1/4 ceiling: V / 4 (ADR-06)
-    const maxDiscountCeiling = chitValue / 4n;
+    const maxDiscountCeiling = chitValue / DISCOUNT_CEILING_DIVISOR;
 
     return {
       chitValue,
@@ -211,7 +215,8 @@ export class ChitService {
         }
 
         const bidDiscount = BigInt(hw.bidDiscount);
-        const commission = (math.chitValue * 4n) / 100n;
+        const commission =
+          (math.chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
         const totalDividend = bidDiscount - commission;
         const dividendPerTicket = totalDividend / BigInt(dto.durationMonths);
         const prizeMoney = math.chitValue - bidDiscount;

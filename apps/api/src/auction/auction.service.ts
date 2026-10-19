@@ -6,11 +6,15 @@ import {
 } from '@nestjs/common';
 import { AuctionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  FIRST_AUCTION_MONTH,
+  FOREMAN_COMMISSION_NUMERATOR,
+  FOREMAN_COMMISSION_PERCENT,
+  PERCENT_DENOMINATOR,
+} from '../common/constants';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
-
-const FOREMAN_COMMISSION_PERCENT = 4.0;
 
 @Injectable()
 export class AuctionService {
@@ -24,7 +28,8 @@ export class AuctionService {
     totalTickets: bigint,
     bidDiscount: bigint,
   ) {
-    const commissionAmount = (chitValue * 4n) / 100n;
+    const commissionAmount =
+      (chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
     const totalDividend = bidDiscount - commissionAmount;
     const dividendPerTicket = totalDividend / totalTickets;
     const prizeMoney = chitValue - bidDiscount;
@@ -50,7 +55,7 @@ export class AuctionService {
       throw new NotFoundException('Chit scheme not found');
     }
 
-    if (month < 2 || month >= chit.durationMonths) {
+    if (month < FIRST_AUCTION_MONTH || month >= chit.durationMonths) {
       throw new BadRequestException(
         `Auctions take place exclusively in Months 2 through ${chit.durationMonths - 1} (Month 1 and Month ${chit.durationMonths} have no auctions)`,
       );
@@ -96,7 +101,7 @@ export class AuctionService {
       throw new NotFoundException('Chit scheme not found');
     }
 
-    if (month < 2 || month >= chit.durationMonths) {
+    if (month < FIRST_AUCTION_MONTH || month >= chit.durationMonths) {
       throw new BadRequestException(
         `Auctions occur exclusively in Months 2 through ${chit.durationMonths - 1}`,
       );
@@ -112,7 +117,8 @@ export class AuctionService {
     }
 
     // 2. Minimum Floor: Bid discount >= 4% Commission
-    const minFloor = (chit.chitValue * 4n) / 100n;
+    const minFloor =
+      (chit.chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
     if (bidDiscount < minFloor) {
       throw new BadRequestException(
         `Bid discount ₹${bidDiscount.toString()} must be at least the 4.00% Foreman Commission of ₹${minFloor.toString()}`,

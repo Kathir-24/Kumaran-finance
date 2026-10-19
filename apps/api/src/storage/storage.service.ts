@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
 import { AwsS3StorageDriver } from './drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from './drivers/local-storage.driver';
 import {
@@ -64,11 +65,11 @@ export class StorageService {
   }
 
   /**
-   * Generates a 15-minute (900 seconds) time-limited presigned URL.
+   * Generates a time-limited presigned URL (defaults to 15 minutes / 900 seconds).
    */
   async getPresignedUrl(
     key: string,
-    expiresInSeconds: number = 900,
+    expiresInSeconds: number = PRESIGNED_URL_EXPIRES_IN_SECONDS,
   ): Promise<string> {
     return this.driver.getPresignedUrl(key, expiresInSeconds);
   }

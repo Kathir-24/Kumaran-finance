@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import {
+  REGEX_AADHAAR_LAST_4,
+  REGEX_INDIAN_PAN,
+  REGEX_INDIAN_PHONE,
+  REGEX_INDIAN_PINCODE,
+} from '../../common/constants';
 
 export class UpdateCustomerDto {
   @ApiPropertyOptional({
@@ -25,7 +31,7 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{10}$/, { message: 'Phone number must be exactly 10 digits' })
+  @Matches(REGEX_INDIAN_PHONE, { message: 'Phone number must be exactly 10 digits' })
   phone?: string;
 
   @ApiPropertyOptional({
@@ -34,7 +40,7 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{10}$/, { message: 'Alternate phone must be exactly 10 digits' })
+  @Matches(REGEX_INDIAN_PHONE, { message: 'Alternate phone must be exactly 10 digits' })
   altPhone?: string;
 
   @ApiPropertyOptional({
@@ -67,7 +73,7 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{6}$/, { message: 'Pincode must be exactly 6 digits' })
+  @Matches(REGEX_INDIAN_PINCODE, { message: 'Pincode must be exactly 6 digits' })
   pincode?: string;
 
   @ApiPropertyOptional({
@@ -76,7 +82,7 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, {
+  @Matches(REGEX_INDIAN_PAN, {
     message: 'PAN must be valid 10-character format (e.g. ABCDE1234F)',
   })
   panNumber?: string;
@@ -87,7 +93,7 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{4}$/, {
+  @Matches(REGEX_AADHAAR_LAST_4, {
     message: 'Aadhaar must be strictly the last 4 digits (e.g. 4821)',
   })
   aadhaarLast4?: string;

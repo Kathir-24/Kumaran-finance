@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
 import { PdfService } from './pdf.service';
 
 @ApiTags('Bilingual PDF Documents')
@@ -58,7 +59,7 @@ export class PdfController {
       return res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
-        expiresInSeconds: 900,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
     }
 
@@ -99,7 +100,7 @@ export class PdfController {
       return res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
-        expiresInSeconds: 900,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
     }
 
@@ -139,7 +140,7 @@ export class PdfController {
       return res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
-        expiresInSeconds: 900,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
     }
 
@@ -180,7 +181,7 @@ export class PdfController {
       return res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
-        expiresInSeconds: 900,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
     }
 

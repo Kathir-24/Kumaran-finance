@@ -10,6 +10,12 @@ import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  BCRYPT_SALT_ROUNDS,
+  DEFAULT_JWT_ACCESS_EXPIRES_IN,
+  DEFAULT_JWT_REFRESH_EXPIRES_IN,
+  TOTP_ISSUER_NAME,
+} from '../common/constants';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
@@ -18,8 +24,6 @@ import { SetMpinDto } from './dto/set-mpin.dto';
 import { TotpEnableDto } from './dto/totp-enable.dto';
 import { TotpVerifyDto } from './dto/totp-verify.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-
-const BCRYPT_SALT_ROUNDS = 12;
 
 export interface SanitizedUser {
   id: string;
@@ -170,7 +174,7 @@ export class AuthService {
 
     const secret = generateSecret();
     const otpauthUri = generateURI({
-      issuer: 'Kumaran Finance',
+      issuer: TOTP_ISSUER_NAME,
       label: user.phone,
       secret,
     });
@@ -178,7 +182,7 @@ export class AuthService {
     return {
       secret,
       otpauthUri,
-      issuer: 'Kumaran Finance',
+      issuer: TOTP_ISSUER_NAME,
       account: user.phone,
       instructions:
         'Scan this URI or enter the secret key into Microsoft Authenticator, then call /auth/totp/enable with the 6-digit code.',
@@ -364,8 +368,11 @@ export class AuthService {
       tokenType: 'refresh',
     };
 
-    const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ?? '15m') as any;
-    const refreshExpiresIn = (this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN') ?? '7d') as any;
+    const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??
+      DEFAULT_JWT_ACCESS_EXPIRES_IN) as any;
+    const refreshExpiresIn = (this.configService.get<string>(
+      'REFRESH_TOKEN_EXPIRES_IN',
+    ) ?? DEFAULT_JWT_REFRESH_EXPIRES_IN) as any;
 
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: jwtExpiresIn });
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });

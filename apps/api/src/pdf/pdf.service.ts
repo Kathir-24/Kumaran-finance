@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
 import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
@@ -107,7 +108,10 @@ export class PdfService {
       data: { pdfS3Key: upload.key },
     });
 
-    const presignedUrl = await this.storageService.getPresignedUrl(upload.key, 900);
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
 
     return { buffer, key: upload.key, presignedUrl };
   }
@@ -189,7 +193,10 @@ export class PdfService {
     const key = StorageKeyHelper.voucherPdf(branchCode, year, voucherNumber);
 
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
-    const presignedUrl = await this.storageService.getPresignedUrl(upload.key, 900);
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
 
     return { buffer, key: upload.key, presignedUrl };
   }
@@ -261,7 +268,10 @@ export class PdfService {
 
     const key = StorageKeyHelper.auctionMinutesPdf(chit.id, auction.installmentMonth);
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
-    const presignedUrl = await this.storageService.getPresignedUrl(upload.key, 900);
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
 
     return { buffer, key: upload.key, presignedUrl };
   }
@@ -356,7 +366,10 @@ export class PdfService {
 
     const key = `passbooks/${chit.id}/ticket-${ticket.ticketNumber}.pdf`;
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
-    const presignedUrl = await this.storageService.getPresignedUrl(upload.key, 900);
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
 
     return { buffer, key: upload.key, presignedUrl };
   }
