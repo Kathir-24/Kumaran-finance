@@ -31,3 +31,42 @@ export const THROTTLE_AUTH_LIMIT = 5;
 /** OTP / TOTP verification rate limit: 5 attempts per 5 minutes */
 export const THROTTLE_OTP_TTL_MS = 300_000;
 export const THROTTLE_OTP_LIMIT = 5;
+
+/** Default allowed web frontend origins */
+export const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+];
+
+/** Permitted HTTP request headers for cross-origin calls */
+export const CORS_ALLOWED_HEADERS = [
+  'Content-Type',
+  'Authorization',
+  'X-Branch-Id',
+  'Idempotency-Key',
+  'X-Requested-With',
+  'Accept',
+];
+
+/** Headers exposed to the client in browser cross-origin requests */
+export const CORS_EXPOSED_HEADERS = [
+  'Content-Disposition',
+  'Retry-After',
+  'X-RateLimit-Limit',
+  'X-RateLimit-Remaining',
+  'X-RateLimit-Reset',
+];
+
+/** Permitted HTTP methods */
+export const CORS_ALLOWED_METHODS = [
+  'GET',
+  'HEAD',
+  'PUT',
+  'PATCH',
+  'POST',
+  'DELETE',
+  'OPTIONS',
+];
+
+/** Preflight cache duration: 24 hours (86,400 seconds) */
+export const CORS_MAX_AGE_SECONDS = 86_400;

@@ -2,11 +2,52 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_ALLOWED_METHODS,
+  CORS_EXPOSED_HEADERS,
+  CORS_MAX_AGE_SECONDS,
+  DEFAULT_CORS_ORIGINS,
+} from './common/constants';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
+
+  // 1. Security Headers via Helmet
+  app.use(
+    helmet({
+      crossOriginEmbedderPolicy: false, // Allows PDF rendering and Swagger assets
+      contentSecurityPolicy: false, // Allows Swagger UI inline scripts without CDN failures
+      xFrameOptions: { action: 'sameorigin' }, // Prevents clickjacking while allowing passbook iframes from same origin
+    }),
+  );
+
+  // 2. Strict CORS Configuration
+  const configuredOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    : DEFAULT_CORS_ORIGINS;
+
+  app.enableCors({
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Allow non-browser requests (mobile Flutter apps, curl, server-to-server) where origin is undefined
+      if (!origin || configuredOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    methods: CORS_ALLOWED_METHODS,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    exposedHeaders: CORS_EXPOSED_HEADERS,
+    credentials: true,
+    maxAge: CORS_MAX_AGE_SECONDS,
+  });
 
   // Global routing prefix with exemptions for health checks and API documentation
   app.setGlobalPrefix('api', {
