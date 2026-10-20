@@ -90,9 +90,9 @@ Once every 90 days, the developer and Kumaran Finance administrator execute this
 5. Confirm pass rate and terminate temporary staging resources.
 
 ### 3.4 Local & Branch Database Backup / Restore Runbook
-For on-premise branch operations and local developer testing, automated PowerShell scripts in `infra/scripts/` provide immediate snapshot capabilities:
+For on-premise branch operations and local developer testing, automated scripts in `infra/scripts/` provide immediate snapshot capabilities:
 
-1. **Creating a Compressed Backup**:
+1. **Creating a Local Compressed Backup**:
    ```powershell
    powershell -ExecutionPolicy Bypass -File infra\scripts\backup-db.ps1
    ```
@@ -100,7 +100,31 @@ For on-premise branch operations and local developer testing, automated PowerShe
    - Executes `pg_dump -F c` creating a compressed binary archive in `infra/backups/`.
    - Guarantees whole-rupee `BigInt` precision and index integrity.
 
-2. **Restoring from a Backup**:
+2. **Automated S3 Off-Site Backup & 30-Day Retention Pruner**:
+   ```powershell
+   # PowerShell runner (Windows Task Scheduler / 02:00 AM IST)
+   powershell -ExecutionPolicy Bypass -File infra\scripts\backup-to-s3.ps1
+
+   # Or via pnpm shortcut:
+   pnpm db:backup:s3
+   ```
+   - Dumps PostgreSQL 17 database in custom compressed binary format (`-F c`).
+   - Uploads to S3 storage under `backups/db/YYYY/MM/kumaran_chits_backup_YYYYMMDD_HHMMSS.dump` with `AES256` server-side encryption.
+   - Automatically scans `backups/db/` and prunes backups older than **30 days** per §3.2.
+
+3. **Listing and Restoring from S3**:
+   ```powershell
+   # List all available backups in S3
+   pnpm db:backups:list
+
+   # Restore the latest backup from S3
+   pnpm db:restore:s3
+
+   # Or restore a specific backup key
+   powershell -ExecutionPolicy Bypass -File infra\scripts\restore-from-s3.ps1 -S3Key "backups/db/2026/10/kumaran_chits_backup_20261020_020000.dump"
+   ```
+
+4. **Restoring from a Local Backup File**:
    ```powershell
    powershell -ExecutionPolicy Bypass -File infra\scripts\restore-db.ps1 -BackupFilePath "infra\backups\kumaran_chits_backup_YYYYMMDD_HHMMSS.dump"
    ```
