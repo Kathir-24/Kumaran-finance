@@ -81,13 +81,28 @@ flowchart TD
 3. **S3 Versioning & Replication**: S3 buckets storing customer KYC and PDF receipts have **Object Versioning enabled**, preventing accidental deletions.
 
 ### 3.3 Quarterly Disaster Recovery Drill Procedure
-Once every 90 days, the developer and Kumaran Finance administrator execute this drill in a staging environment:
-1. Trigger a restore of the latest RDS snapshot to a new temporary database instance.
-2. Spin up a temporary NestJS API container connected to the restored database.
-3. Execute the automated financial invariant tests (`pnpm test docs/05-testing/financial-tests.md`).
-4. Verify that:
-   $$\sum \text{Member Installment Dues} = \sum \text{Past Collections} + \text{Current Outstanding}$$
-5. Confirm pass rate and terminate temporary staging resources.
+Once every 90 days (or on demand during audits), the developer and Kumaran Finance administrator execute this automated drill:
+
+```powershell
+# Run the automated DRP drill via pnpm shortcut
+pnpm run db:drp:drill
+
+# Or run via cross-platform PowerShell runner
+powershell -ExecutionPolicy Bypass -File infra/scripts/drp-drill.ps1
+```
+
+**Automated Drill Execution Flow**:
+1. Captures baseline entity counts from the source database (`chitflow_dev`).
+2. Triggers an automated S3/MinIO binary backup with timestamp and AES256 server-side encryption (`RPO Phase`).
+3. Provisions a completely isolated target database (`chitflow_drp_drill`), preserving active developer data.
+4. Downloads the S3 dump and restores via `pg_restore`, benchmarking recovery time against the 2-hour RTO standard (`RTO Phase`).
+5. Executes 5 strict mathematical & financial invariant assertions on the restored database:
+   - **Assertion 1**: Entity Row Parity (Users, Customers, Groups, Tickets, Dues, Payments).
+   - **Assertion 2**: 4.00% Foreman Commission Freeze (ADR-04).
+   - **Assertion 3**: Max 1 Ticket per subscriber per chit group (ADR-13).
+   - **Assertion 4**: Pure whole-rupee `BigInt` math (zero floats, zero fractional paise).
+   - **Assertion 5**: Accounting balance equation: $\sum \text{Dues Generated} = \sum \text{Payments} + \text{Remaining Unpaid Dues}$.
+6. Drops `chitflow_drp_drill` cleanly and outputs an audit compliance report.
 
 ### 3.4 Local & Branch Database Backup / Restore Runbook
 For on-premise branch operations and local developer testing, automated scripts in `infra/scripts/` provide immediate snapshot capabilities:

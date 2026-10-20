@@ -137,6 +137,9 @@ pnpm db:backups:list
 
 # 3. Restore the latest backup from S3 into PostgreSQL
 pnpm db:restore:s3
+
+# 4. Run automated Disaster Recovery (DRP) drill verifying RTO & financial invariants
+pnpm db:drp:drill
 ```
 
 ---
