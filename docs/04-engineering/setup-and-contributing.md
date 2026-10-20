@@ -34,31 +34,18 @@ Kumaran-finance/
 
 ---
 
-## 3. Local Development Quickstart
+## 3. Local Development & Verification Quickstart
 
-### Step 1: Start PostgreSQL Database
+### Step 1: Start Background Infrastructure (PostgreSQL 17, Redis 7 & MinIO S3)
+From the repository root:
 ```powershell
-# Navigate to docker infra folder
-cd infra\docker
-
-# Copy environment variables template if not present
-Copy-Item .env.example .env
-
-# Start the PostgreSQL 17 container
-docker compose up -d
-
-# Verify container is running
-docker compose ps
-
-# Return to repository root
-cd ..\..
+pnpm docker:up
 ```
-The database will be available at:
-- **Host**: `127.0.0.1`
-- **Port**: `5433` (mapped from container 5432)
-- **Database**: `chitflow_dev`
-- **User**: `chitflow`
-- **Password**: `chitflow_dev_only`
+This automatically boots:
+- **PostgreSQL 17 Database** on port `5433` (`chitflow-db`)
+- **Redis 7 In-Memory Queue** on port `6379` (`chitflow-redis`)
+- **MinIO S3 Local Storage** on port `9000` (API) and port `9001` (Web Console)
+- **Bucket Initializer** which auto-creates the private bucket `kumaran-chits-private`
 
 ---
 
@@ -91,16 +78,60 @@ pnpm run prisma:seed
 # Run Oxlint linter (0 errors, 0 warnings expected)
 pnpm run lint
 
-# Run automated unit and financial invariant tests (100% pass expected)
+# Run all 16 test suites (203 / 203 passing tests, 100% pass expected)
 pnpm test
 
 # Run NestJS in development watch mode
 pnpm run start:dev
 ```
-- **API Base URL**: `http://localhost:3000`
-- **Health check endpoint**: `http://localhost:3000/health`
-- **Interactive Swagger / OpenAPI Explorer**: `http://localhost:3000/api/docs`
-- **Database visual inspector (Prisma Studio)**: `pnpm run prisma:studio` (opens `http://localhost:5555`)
+
+---
+
+### Step 5: Interactive Web Dashboards & Portals
+
+Open your browser to test the 4 built-in administrative portals:
+
+| Portal / Tool | URL | Default Credentials | Description |
+|---|---|---|---|
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 74 REST endpoints. |
+| **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
+| **MinIO S3 Storage Console** | [http://localhost:9001](http://localhost:9001) | User: `chitflow_admin`<br>Pass: `chitflow_storage_secret` | Web file browser showing the `kumaran-chits-private` bucket. |
+| **Prisma Studio (DB GUI)** | Run `pnpm run prisma:studio` | Opens [http://localhost:5555](http://localhost:5555) | Visual database table browser and editor. |
+
+---
+
+### Step 6: Automated S3 Database Backup & Restore Runbook
+
+Test off-site database backups with zero external cloud dependencies:
+
+```powershell
+# 1. Take an automated binary backup and upload to S3 (with 30-day retention prune)
+pnpm db:backup:s3
+
+# 2. List all database backups stored in S3
+pnpm db:backups:list
+
+# 3. Restore the latest backup from S3 into PostgreSQL
+pnpm db:restore:s3
+```
+
+---
+
+### Step 7: Production Full-Stack Orchestration (With Nginx Ingress)
+
+To run the complete production-parity stack containerized behind Nginx reverse proxy:
+
+```powershell
+# Start PostgreSQL, Redis, MinIO, NestJS API, and Nginx reverse proxy
+pnpm docker:fullstack:up
+
+# Inspect logs
+pnpm docker:logs
+
+# Stop containers
+pnpm docker:fullstack:down
+```
+When running full-stack, access the system directly through Nginx on [http://localhost](http://localhost) (Port 80).
 
 ---
 
