@@ -14,6 +14,8 @@ import {
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
+import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middleware';
+import { BullBoardService } from './jobs/bull-board/bull-board.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
@@ -51,9 +53,9 @@ async function bootstrap() {
     maxAge: CORS_MAX_AGE_SECONDS,
   });
 
-  // Global routing prefix with exemptions for health checks and API documentation
+  // Global routing prefix with exemptions for health checks, API docs, and Bull Board queue monitor
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'api/docs'],
+    exclude: ['health', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
   });
 
   // Enable URI Versioning (Default: '1' -> /api/v1/...)
@@ -123,9 +125,19 @@ async function bootstrap() {
     customSiteTitle: 'Kumaran Chits API Documentation',
   });
 
+  // 6. Mount Bull Board Queue Monitor UI under /admin/queues with Super Admin Basic Auth
+  const bullBoardService = app.get(BullBoardService);
+  const bullBoardAuthMiddleware = app.get(BullBoardAuthMiddleware);
+  app.use('/admin/queues', (req: any, res: any, next: any) => {
+    bullBoardAuthMiddleware.use(req, res, () => {
+      bullBoardService.getRouter()(req, res, next);
+    });
+  });
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`🚀 Kumaran Chits API running on: http://localhost:${port}`);
   console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);
+  console.log(`📊 Bull Board Queue Monitor at: http://localhost:${port}/admin/queues`);
 }
 void bootstrap();

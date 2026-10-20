@@ -246,6 +246,7 @@
 | `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | Super Admin, Branch Manager |
 | `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin, Branch Manager, Auditor |
 | `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched DLT SMS and WhatsApp messages | Super Admin, Auditor |
+| `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin (`BULL_BOARD_USER` Basic Auth) |
 
 ---
 
@@ -267,8 +268,8 @@
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
-- **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Indian DLT SMS & WhatsApp bilingual dispatchers, and 06:00 AM settlement reconciliation.
-- **Total Production Endpoints**: **73 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 7 background jobs routes).
-- **Automated Test Coverage**: **188 / 188 tests passing across 15 test suites (100% pass rate)**.
+- **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Indian DLT SMS & WhatsApp bilingual dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
+- **Total Production Endpoints**: **74 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 8 background jobs & queue monitor routes).
+- **Automated Test Coverage**: **203 / 203 tests passing across 16 test suites (100% pass rate)**.
 
 

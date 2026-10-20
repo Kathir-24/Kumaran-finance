@@ -192,6 +192,18 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     return reports;
   }
 
+  getDailyMaintenanceQueue(): Queue | null {
+    return this.dailyMaintenanceQueue;
+  }
+
+  getNotificationQueue(): Queue | null {
+    return this.notificationQueue;
+  }
+
+  getReconciliationQueue(): Queue | null {
+    return this.reconciliationQueue;
+  }
+
   async onModuleDestroy(): Promise<void> {
     const workers = [this.maintenanceWorker, this.notificationWorker, this.reconciliationWorker];
     for (const worker of workers) {

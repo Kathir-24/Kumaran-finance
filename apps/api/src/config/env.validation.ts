@@ -31,6 +31,8 @@ export interface EnvironmentVariables {
   AWS_S3_FORCE_PATH_STYLE?: boolean;
   REDIS_HOST: string;
   REDIS_PORT: number;
+  BULL_BOARD_USER?: string;
+  BULL_BOARD_PASSWORD?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -117,5 +119,7 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     AWS_S3_FORCE_PATH_STYLE: s3ForcePathStyle,
     REDIS_HOST: (config.REDIS_HOST as string) ?? '127.0.0.1',
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
+    BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',
+    BULL_BOARD_PASSWORD: (config.BULL_BOARD_PASSWORD as string) ?? 'chitflow_secret',
   };
 }
