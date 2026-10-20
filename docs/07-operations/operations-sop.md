@@ -142,3 +142,42 @@ Once every 90 days, or ahead of any statutory audit by the Registrar of Chits, t
      - Accounting balance equation: $\sum \text{Dues} = \sum \text{Payments} + \text{Remaining Unpaid}$.
    - Drops the temporary drill database cleanly and outputs the signed compliance report.
 3. **Audit Log Filing**: The resulting audit log is retained in the operational records as proof of data disaster recoverability.
+
+---
+
+## 5. Indian DLT SMS Notification Operations & Maintenance SOP (`CONFIRMED-BY-DEVELOPER`)
+
+> **Regulatory Reference**: Section 2 of [`docs/02-requirements/notification-and-receipt-templates.md`](../02-requirements/notification-and-receipt-templates.md)  
+> **Telecom Mandate**: Telecom Regulatory Authority of India (TRAI) Distributed Ledger Technology (DLT) Registration  
+> **Guiding ADR**: ADR-11, ADR-12 & Open Question O-11
+
+### 5.1 Operating Principles & Financial Non-Blocking Guarantee
+1. **Financial Non-Blocking Guarantee**:
+   - Cash collections, payment receipt issuance, and accounting ledgers must **never** be held up or aborted due to telecom gateway latency or network timeouts.
+   - All SMS dispatches execute through resilient try-catch wrappers with exponential backoff retries (`SMS_RETRY_BASE_DELAY_MS * 2^attempt`).
+2. **Indian DPDP Act 2023 Compliance**:
+   - Customer phone numbers in application console logs and audit files are masked strictly as `+91******XXXX` via `PhoneHelper.maskPhone()`.
+3. **TRAI DLT Template Exact Matching**:
+   - Variables are mapped to registered `{#var#}` slots. Do not edit message body wording in code without registering the exact matching text on the DLT portal.
+
+### 5.2 Provider Configuration & Switching
+The system supports pluggable provider switching via `apps/api/.env`:
+
+```env
+# Local Development, Staging, QA or Offline Testing
+SMS_DRIVER=mock
+
+# Production Indian DLT Gateway
+SMS_DRIVER=msg91
+SMS_SENDER_ID=KMRCHT
+MSG91_AUTH_KEY=your_msg91_production_auth_key
+```
+
+### 5.3 Operator DLT Template Registry Reference
+
+| Purpose | DLT Template ID | Header | Registered Body Pattern |
+|---|---|:---:|---|
+| **Device OTP** | `1407169823412093847` | `KMRCHT` | `Kumaran Chits: Your one-time verification code is {#var#}. Valid for 5 minutes. Do not share this OTP with anyone. / உங்கள் சரிபார்ப்பு குறியீடு {#var#}. யாருடனும் பகிர வேண்டாம்.` |
+| **Payment Receipt** | `1407169823412093848` | `KMRCHT` | `Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}. Receipt: {#var#}. View passbook: {#var#}` |
+| **Auction Reminder**| `1407169823412093849` | `KMRCHT` | `Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}` |
+| **Default Warning** | `1407169823412093850` | `KMRCHT` | `Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}` |
