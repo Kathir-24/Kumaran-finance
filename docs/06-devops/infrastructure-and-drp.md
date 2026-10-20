@@ -192,4 +192,21 @@ Kumaran Chits provides real-time infrastructure and financial telemetry via Prom
   - **Chit Fund Invariants & KPIs**: Active chit groups, active subscribers, overdue tickets in 1-month and 3-month default buckets, pending Maker-Checker approvals, and today's total collection volume in whole Rupees (`BigInt`).
 - **Detailed Documentation & PromQL Recipes**: Consult [`apps/api/src/metrics/README.md`](../../apps/api/src/metrics/README.md).
 
+---
+
+## 6. Sentry Error Monitoring & Crash Tracking (`@sentry/nestjs`)
+
+Kumaran Chits utilizes Sentry for real-time application crash detection and server-side failure alerting:
+
+- **Integration**: Native NestJS integration via `@sentry/nestjs` initialized in `main.ts` and wired into `GlobalExceptionFilter`.
+- **Safe-Bypass Guarantee**: When `SENTRY_DSN` is empty or unset, Sentry operates in complete bypass mode with 0 external network requests and 0 latency overhead.
+- **Indian DPDP Act 2023 Compliance**:
+  - All outbound events pass through `beforeSend` sanitization.
+  - Automatically scrubs sensitive credentials (`password`, `mpin`, `refreshToken`, `token`, `totpSecret`, `aadhaar`, `pan`).
+  - Automatically normalizes and masks Indian phone numbers (`+91******3210`) via `PhoneHelper.maskPhone()`.
+- **Noise Suppression**: Client validation errors (400, 401, 403, 404) are handled by standard response envelopes and excluded from Sentry. Only true server faults ($\ge 500$) and unhandled runtime errors trigger alerts.
+- **Whole-Rupee BigInt Safety**: Automatically serializes `bigint` values to string format to prevent JSON serialization crashes during exception capture.
+- **Diagnostic Verification**: `GET /health/sentry-test` triggers a test internal error for verification in staging environments.
+- **Detailed Documentation**: Consult [`apps/api/src/common/sentry/README.md`](../../apps/api/src/common/sentry/README.md).
+
 

@@ -120,6 +120,7 @@ Open your browser and verify the built-in administrative & observability portals
 | **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 74 REST endpoints. |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
+| **Sentry APM & Crash Monitoring**| [http://localhost:3000/health/sentry-test](http://localhost:3000/health/sentry-test) | Config in `apps/api/.env` | `@sentry/nestjs` crash reporting with Indian DPDP Act PII scrubbing and safe bypass. |
 | **Pluggable DLT SMS Driver** | `SMS_DRIVER=mock` / `msg91` | Config in `apps/api/.env` | Indian TRAI DLT SMS engine (OTP, Receipts, Auctions, Warnings) with DPDP PII masking. |
 | **MinIO S3 Storage Console** | [http://localhost:9001](http://localhost:9001) | User: `chitflow_admin`<br>Pass: `chitflow_storage_secret` | Web file browser showing the `kumaran-chits-private` bucket. |
 | **Prisma Studio (DB GUI)** | Run `pnpm run prisma:studio` | Opens [http://localhost:5555](http://localhost:5555) | Visual database table browser and editor. |
@@ -154,7 +155,7 @@ Run the automated test suite verifying all 10 non-negotiable financial invariant
 # Run Oxlint linter (0 warnings, 0 errors expected)
 pnpm run lint
 
-# Run all 18 test suites (233 / 233 passing tests, 100% pass rate)
+# Run all 19 test suites (248 / 248 passing tests, 100% pass rate)
 pnpm test
 
 # Run production compilation check

@@ -16,8 +16,12 @@ import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middleware';
 import { BullBoardService } from './jobs/bull-board/bull-board.service';
+import { initSentry } from './common/sentry/sentry.config';
 
 async function bootstrap() {
+  // 0. Initialize Sentry APM & Crash Monitoring (Safe bypass if SENTRY_DSN is unset)
+  initSentry();
+
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
 
   // 1. Security Headers via Helmet

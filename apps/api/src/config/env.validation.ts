@@ -44,6 +44,9 @@ export interface EnvironmentVariables {
   SMS_MAX_RETRIES?: number;
   SMS_RETRY_BASE_DELAY_MS?: number;
   SMS_REQUEST_TIMEOUT_MS?: number;
+  SENTRY_DSN?: string;
+  SENTRY_ENVIRONMENT?: string;
+  SENTRY_TRACES_SAMPLE_RATE?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -103,6 +106,16 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     errors.push("Missing mandatory MSG91 variable when SMS_DRIVER is 'msg91': MSG91_AUTH_KEY");
   }
 
+  const tracesRate =
+    config.SENTRY_TRACES_SAMPLE_RATE !== undefined
+      ? Number(config.SENTRY_TRACES_SAMPLE_RATE)
+      : undefined;
+  if (tracesRate !== undefined && (isNaN(tracesRate) || tracesRate < 0 || tracesRate > 1)) {
+    errors.push(
+      `Invalid SENTRY_TRACES_SAMPLE_RATE: ${String(config.SENTRY_TRACES_SAMPLE_RATE)}. Must be between 0.0 and 1.0`,
+    );
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `\n❌ ENVIRONMENT CONFIGURATION ERROR:\n` +
@@ -151,5 +164,8 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     SMS_MAX_RETRIES: config.SMS_MAX_RETRIES !== undefined ? Number(config.SMS_MAX_RETRIES) : 2,
     SMS_RETRY_BASE_DELAY_MS: config.SMS_RETRY_BASE_DELAY_MS !== undefined ? Number(config.SMS_RETRY_BASE_DELAY_MS) : 400,
     SMS_REQUEST_TIMEOUT_MS: config.SMS_REQUEST_TIMEOUT_MS !== undefined ? Number(config.SMS_REQUEST_TIMEOUT_MS) : 15000,
+    SENTRY_DSN: config.SENTRY_DSN as string | undefined,
+    SENTRY_ENVIRONMENT: (config.SENTRY_ENVIRONMENT as string) ?? nodeEnv,
+    SENTRY_TRACES_SAMPLE_RATE: tracesRate,
   };
 }

@@ -25,6 +25,7 @@ import { PaymentModule } from './payment/payment.module';
 import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReportModule } from './report/report.module';
+import { SentryService } from './common/sentry/sentry.service';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
@@ -58,6 +59,7 @@ import { StorageModule } from './storage/storage.module';
   controllers: [AppController, HealthController],
   providers: [
     AppService,
+    SentryService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -67,5 +69,6 @@ import { StorageModule } from './storage/storage.module';
       useClass: HttpMetricsInterceptor,
     },
   ],
+  exports: [SentryService],
 })
 export class AppModule {}

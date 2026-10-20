@@ -6,7 +6,9 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Response } from 'express';
+import { captureSentryException, isSentryActive } from '../sentry/sentry.config';
 
 export interface StandardErrorResponse {
   success: false;
@@ -60,6 +62,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.error('Unknown exception caught', exception);
     }
 
+    // Capture unhandled server-side errors to Sentry (excludes expected 4xx client errors)
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.captureSentryError(exception, host, status, code);
+    }
+
     const payload: StandardErrorResponse = {
       success: false,
       statusCode: status,
@@ -72,6 +79,53 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     response.status(status).json(payload);
+  }
+
+  /**
+   * Safe Sentry exception capture with request and staff context
+   */
+  private captureSentryError(
+    exception: unknown,
+    host: ArgumentsHost,
+    status: number,
+    code: string,
+  ): void {
+    if (!isSentryActive()) {
+      return;
+    }
+
+    try {
+      const ctx = host.switchToHttp();
+      const req = ctx.getRequest<any>();
+
+      Sentry.withScope((scope) => {
+        scope.setTag('statusCode', String(status));
+        scope.setTag('errorCode', code);
+
+        if (req) {
+          if (req.method) scope.setTag('httpMethod', req.method);
+          if (req.originalUrl || req.url) scope.setTag('url', req.originalUrl || req.url);
+
+          if (req.user) {
+            scope.setUser({
+              id: req.user.id,
+              ...(req.user.roles
+                ? { roles: Array.isArray(req.user.roles) ? req.user.roles.join(',') : String(req.user.roles) }
+                : {}),
+              ...(req.user.branchId ? { branchId: req.user.branchId } : {}),
+            });
+          }
+
+          if (req.headers && req.headers['x-request-id']) {
+            scope.setTag('requestId', String(req.headers['x-request-id']));
+          }
+        }
+
+        captureSentryException(exception);
+      });
+    } catch {
+      // Safe non-blocking guarantee: Sentry capture failure must never crash the response filter
+    }
   }
 
   /**
