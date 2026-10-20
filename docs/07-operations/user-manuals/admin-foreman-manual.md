@@ -2,8 +2,9 @@
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Target Users**: Company Partners (Super Admin), Foremen, and Desk Accountants  
-> **Platform**: Web Dashboard (`https://admin.kumaranfinance.com`)  
+> **Platform**: Web Dashboard (`https://admin.kumaranfinance.com`) AND Partner Mobile App (`apps/mobile/`)  
 > **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)** (`CONFIRMED-BY-DEVELOPER`).
+> **Dual-Platform Parity**: The 4 Partners have 100% full feature parity across both Web and Mobile for both Maker and Checker roles.
 
 ---
 
@@ -86,3 +87,31 @@
 4. **Checker Authorization**:
    - Partner B (Super Admin) reviews the voucher and checklist, then clicks **"Authorize & Disburse Prize Money"** (`maker_user_id != checker_user_id`).
    - Software records disbursement timestamp and generates a bilingual payout receipt.
+
+---
+
+## 5. Partner Mobile App Operations — 1-Tap Pocket Approvals (`CONFIRMED-BY-DEVELOPER`)
+
+For partners on the move, at home, or in customer meetings, the **Kumaran Chits Mobile App (`apps/mobile/`)** provides an executive console with 100% operational parity:
+
+```mermaid
+flowchart TD
+    Unlock["1. Touch Fingerprint (0.5s Unlock)"] --> Pulse["2. Live Business Pulse\n(Today's collections, safe vault cash, defaulters)"]
+    Pulse --> Approvals["3. Push Notification Approval Queue\n• Handover: Murugan ₹42,500\n• Prize Payout: Sundaram ₹1.8L\n• Auction Finalization: KCA-1L"]
+    Approvals --> Auth["4. Review Scanned Cheques / Bids & Authorize\n(maker_user_id != checker_user_id)"]
+```
+
+### 5.1 Routine Daily Mobile Workflows:
+1. **Evening Cash Handover Sign-Off**:
+   - Field collection agent submits collection batch at 5:00 PM.
+   - Partner receives push notification: *"Murugan submitted ₹42,500 cash"*.
+   - Partner counts physical cash, opens app, taps **"Acknowledge Cash Received"** (`collector != acknowledger`).
+2. **Prize Money Authorization**:
+   - Desk accountant enters voucher on office PC (Maker).
+   - Partner receives push notification: *"Prize payout pending for Sundaram"*.
+   - Partner taps notification, reviews uploaded photos of signed blank cheques & agreement, and taps **"Authorize Disbursement"** with fingerprint confirmation (`maker != checker`).
+3. **Conducting In-Office Auction on Mobile**:
+   - In the auction room, Partner A holds smartphone, enters winning discount (system validates $D \le V/4$), records the paper lot ticket drawn (Option A), and taps **"Submit Bid"** (Maker).
+   - Partner B on phone or laptop taps **"Finalize Auction"** (Checker).
+4. **Instant PDF Receipt & Report Sharing**:
+   - View Form XXII Cash Book or subscriber passbooks and tap **"Share via WhatsApp"** to send statements directly to partners, subscribers, or the CA auditor.

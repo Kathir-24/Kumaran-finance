@@ -19,8 +19,8 @@
   - **Monorepo & Package Manager**: `pnpm 12+` (Workspace Monorepo with `pnpm-workspace.yaml`)
   - **Backend**: NestJS 12 (TypeScript, Modular Monolith) in `apps/api/`
   - **Database**: PostgreSQL 17 + Prisma ORM (Port `5433` via Docker)
-  - **Web Dashboard**: React / Next.js (Admin, Accountant, Partners) in `apps/web/`
-  - **Mobile App**: Flutter + Dart (Android-first for Field Agents & Customers) in `apps/mobile/`
+  - **Web Dashboard**: React / Next.js 15 (Admin, Accountant, Partners, Auditor) in `apps/web/`
+  - **Mobile App**: Flutter + Dart (Android-first: 100% full feature parity for Partners/Super Admin + Field Agents & Customers) in `apps/mobile/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
   - **Object Storage**: Private AWS S3 (Encrypted KYC scans & PDF receipts with 15-minute presigned URLs)
 
@@ -67,7 +67,7 @@ flowchart TD
 7. **Ticket Limit Constraint (ADR-13)**: A customer can join multiple chit groups, but **cannot hold 2 or more tickets in the same chit group** (Database enforced: `@@unique([chitGroupId, customerId])`).
 8. **Defaulter & Single Payment Rules (ADR-07)**: Any subscriber who has not paid their installment due for that month is **strictly ineligible to participate or bid** in that month's auction. 3 consecutive unpaid months grants the company removal rights. Each month has strictly a single discrete payment; **zero double payments**, **zero partial payments**, and **zero advance balances** exist. `DueStatus` is strictly `UNPAID`, `PAID`, `OVERDUE`.
 9. **Company Safety Proof Checklist (ADR-15)**: Property documents are completely eliminated. Collateral/surety is **not mandatory** across the board and requested only on-demand for company safety. Software acts as a flexible checklist and attachment recordkeeper (signed agreement with winner & nominee, signed blank cheques, promissory notes, and scanned uploads).
-10. **Maker-Checker Separation of Duties**: Critical actions (payment reversals, auction finalization, prize disbursements) strictly enforce **`maker_user_id != checker_user_id`** at application and database levels.
+10. **Maker-Checker Separation of Duties**: Critical actions (payment reversals, auction finalization, prize disbursements, cash handover) strictly enforce **`maker_user_id != checker_user_id`** at application and database levels, regardless of client device (Web-to-Web, Mobile-to-Mobile, or Cross-Device).
 
 ---
 
@@ -85,6 +85,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Functional Requirements (10 Modules)** | [`docs/02-requirements/prd.md`](docs/02-requirements/prd.md) |
 | **User Stories & 6-Persona Journey Maps** | [`docs/02-requirements/user-stories-and-journeys.md`](docs/02-requirements/user-stories-and-journeys.md) |
 | **API Endpoints, DTOs & HTTP Methods** | [`docs/03-architecture/api-spec.md`](docs/03-architecture/api-spec.md) |
+| **Frontend Architecture & Cross-Platform** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |
 | **Non-Functional Standards (NFR)** | [`docs/02-requirements/non-functional-requirements.md`](docs/02-requirements/non-functional-requirements.md) |
 | **Bilingual Receipts & Notification Templates**| [`docs/02-requirements/notification-and-receipt-templates.md`](docs/02-requirements/notification-and-receipt-templates.md) |

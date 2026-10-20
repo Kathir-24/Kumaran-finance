@@ -16,7 +16,7 @@ The system encompasses **10 Core Functional Modules** broken down into **28 Gran
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **M1** | **Authentication & Security** | | | | | | |
 | 1.1 | Web Login + Microsoft Authenticator 2FA | Actor | Actor | Actor | — | — | Actor |
-| 1.2 | Mobile App 6-digit MPIN Quick Unlock | — | — | Actor (Dual) | Actor | Actor | — |
+| 1.2 | Mobile App 6-digit MPIN Quick Unlock & Biometrics | Actor (Parity)| — | Actor (Dual) | Actor | Actor | — |
 | 1.3 | Session Management & Instant Logout | Actor | Actor | Actor | Actor | Actor | Actor |
 | **M2** | **Branch & Staff Management** | | | | | | |
 | 2.1 | Single Branch Configuration (`PRD`) | Actor | View | View | — | — | View |
@@ -59,9 +59,9 @@ The system encompasses **10 Core Functional Modules** broken down into **28 Gran
 
 ### Persona 1: Super Admin / Owner (The 4 Partners)
 - **Profile**: Equal partners of Kumaran Finance operating from Head Office (Perundurai).
-- **Device**: Desktop PC / Laptop via Web Portal (`apps/web/`).
-- **Core Mindset**: Safeguarding capital, preventing internal fraud, ensuring compliance, and expanding the customer base.
-- **Dual Role Invariant**: Acts as **Operational Maker** (entering auction bids or safety proof) or **Final Checker** (finalizing auctions, payment reversals, prize payouts). **Must never approve their own entries** (`maker != checker`).
+- **Device**: **100% Full Parity on BOTH Platforms** — Desktop PC / Laptop via Web Portal (`apps/web/`) AND Android Smartphone via Mobile App (`apps/mobile/`).
+- **Core Mindset**: Safeguarding capital, preventing internal fraud, ensuring compliance, and expanding the customer base with instant pocket approvals.
+- **Dual Role & Cross-Device Invariant**: Acts as **Operational Maker** (entering auction bids, safety proof, or reversals) or **Final Checker** (finalizing auctions, payment reversals, prize payouts, cash handover). **Must never approve their own entries** (`maker != checker`), regardless of whether Maker and Checker use Web or Mobile.
 
 ### Persona 2: Branch Manager
 - **Profile**: Operational head of the Perundurai branch office. In current business, the **4 partners fulfill all branch manager duties directly**; the software treats it as a scoped role for future expansion.

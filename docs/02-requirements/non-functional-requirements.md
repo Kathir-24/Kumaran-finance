@@ -50,3 +50,19 @@
   - The Android app must allow field collection agents (supporting dynamic $N$ agents) to record cash collections even when cellular network connectivity is lost in rural areas.
   - Collections are cached securely in local SQLite/Encrypted SharedPreferences with timestamps and synchronized via idempotent retry queues upon network reconnection.
 - **Single Discrete Payment Enforcement**: Each installment month accepts strictly one payment matching the net installment due. Once marked paid, duplicate payment attempts are rejected by the backend idempotency engine; zero double payments and zero advance balances exist (`CONFIRMED-BY-DEVELOPER`).
+
+---
+
+## 5. Client Device & Cross-Platform Resilience (`CONFIRMED-BY-DEVELOPER`)
+
+- **Web Portal Viewport Adaptability**:
+  - Desktop-first responsive layout (Next.js + Tailwind CSS) supporting full-screen displays ($\ge 1280\text{px}$) for spreadsheets and dense ledgers, adapting gracefully down to tablet ($\ge 768\text{px}$) and mobile viewports.
+  - Page load time (FCP) $\le 1.5\text{ seconds}$ on standard broadband; bundle chunking per route.
+- **Mobile App Performance & Hardware Support**:
+  - Android 8.0+ (API level 26) through Android 15.
+  - 60fps smooth rendering on budget hardware (2GB/3GB RAM, octa-core entry-level chipsets).
+  - Native Biometric Prompt API integration for sub-second ($< 0.5\text{s}$) fingerprint unlock.
+  - Native Android Intent dispatch for UPI deep-linking (`upi://pay`) and camera media capture for safety proof cheques.
+- **Cross-Device Maker-Checker Resilience**:
+  - Complete device independence: Maker and Checker can operate across any combination of Web and Mobile (`maker_user_id != checker_user_id`).
+  - Zero transaction loss: If the office PC experiences power failure or disconnects, partners can immediately continue and finalize operations from their mobile app.

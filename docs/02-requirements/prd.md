@@ -137,3 +137,40 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **Accountant Reports**: Day book, cash handover register, bank reconciliation journal, dividend schedules.
 - **Subscriber Passbook**: Personal digital passbook, dividend savings ledger, downloadable bilingual receipts.
 - **Statutory Registers (`UNVERIFIED-LEGAL`)**: Form XVII (Minutes), Form XXI (Subscriber Ledger), and Form XXII (Cash Book) layout labels retained as `UNVERIFIED-LEGAL` until physical specimen copies from the Registrar are verified.
+
+---
+
+## 3. Client Applications & Device Delivery Architecture (`CONFIRMED-BY-DEVELOPER`)
+
+The platform delivers its 10 functional modules through two purpose-built client frontends sharing a 100% unified backend API:
+
+```mermaid
+flowchart TD
+    subgraph Clients["Client Applications"]
+        Web["Web Portal (apps/web)\nNext.js 15 + Tailwind CSS\n• Desktop PC / Laptop\n• Responsive down to tablet/mobile"]
+        Mobile["Mobile App (apps/mobile)\nFlutter + Dart\n• Android-first (Play Store / APK)\n• Offline SQLite Auto-Sync"]
+    end
+
+    subgraph Personas["Persona Distribution"]
+        P_Partner["The 4 Partners (Super Admin)\n100% Feature Parity on BOTH Web & Mobile"]
+        P_Desk["Desk Accountant & CA Auditor\nPrimarily Web Portal"]
+        P_Field["Field Collection Agents & Customers\nPrimarily Mobile App"]
+    end
+
+    Web --> P_Partner
+    Web --> P_Desk
+    Mobile --> P_Partner
+    Mobile --> P_Field
+```
+
+1. **Web Dashboard (`apps/web/`)**:
+   - **Target Users**: The 4 Partners (Super Admin), Desk Accountant, and CA Auditor.
+   - **Tech Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, TanStack React Query.
+   - **Key Capabilities**: 20-month physical notebook onboarding grid, Form XXII 12-column daily cashbook, dual-control document comparison, PDF/Excel statutory exports.
+2. **Mobile Application (`apps/mobile/`)**:
+   - **Target Users**: The 4 Partners (Super Admin - 100% Full Parity), Field Collection Agents, and Chit Customers.
+   - **Tech Stack**: Flutter 3.x, Dart (Android-first).
+   - **Key Capabilities**: 1-second biometric fingerprint unlock, doorstep collections under 30 seconds, offline SQLite sync in rural 4G dead zones, native UPI app switching (GPay/PhonePe), 1-tap push notification Maker-Checker approvals.
+3. **100% Partner Feature Parity Mandate**:
+   - The 4 Partners have complete access to all administrative actions (auctions, prize disbursements, cash handover sign-off, reversals, business pulse) on **BOTH** Web and Mobile.
+   - Cross-device Maker-Checker (`maker_user_id != checker_user_id`) is supported across any permutation of mobile and desktop devices.

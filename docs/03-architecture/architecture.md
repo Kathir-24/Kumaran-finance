@@ -11,8 +11,8 @@
 ```mermaid
 flowchart TD
     subgraph Clients["Client Tier"]
-        Mobile["Flutter Android App\n(Collection Agents & Customers)\nMPIN + Biometrics"]
-        Web["React / Next.js Web Dashboard\n(Owner, Managers, Accountants)\nPassword + Microsoft Authenticator (TOTP)"]
+        Mobile["Flutter Android App\n(Partners, Collection Agents & Customers)\nMPIN + Biometrics (Fingerprint)"]
+        Web["React / Next.js Web Dashboard\n(Partners, Accountants, Managers, Auditors)\nPassword + Microsoft Authenticator (TOTP)"]
     end
 
     subgraph Edge["Security & Gateway Tier"]
@@ -51,7 +51,7 @@ flowchart TD
 
 ## 2. Bank-Grade 3-Tier Authentication Architecture
 
-### 2.1 Mobile App Authentication (Collection Agents & Customers)
+### 2.1 Mobile App Authentication (Partners, Collection Agents & Customers)
 1. **Initial Device Registration (One-Time Only)**:
    - User enters registered mobile phone number.
    - Backend sends a one-time OTP via registered Indian SMS (DLT route).
@@ -60,9 +60,10 @@ flowchart TD
 2. **Routine Daily App Usage (Zero SMS Cost, 1-Second Unlock)**:
    - The user unlocks the app using their **Fingerprint** or **6-digit MPIN**.
    - The backend validates the cryptographic device signature and MPIN hash, issuing a short-lived JWT Access Token (15-minute expiration) and a rotating Refresh Token.
+   - **Partner Executive Console**: Partners unlocking via fingerprint get immediate access to the high-level cash pulse, pending Maker-Checker approvals, and cash handover acknowledgment.
    - **Offline / Low-Network Resilience**: Collection agents can unlock the app and record draft collections even with intermittent network coverage.
 3. **Step-Up Authentication**:
-   - High-value collections, cash handovers, or profile changes require re-entering the 6-digit MPIN.
+   - High-value collections, cash handovers, prize payout authorizations, or profile changes require re-entering the 6-digit MPIN.
 
 ### 2.2 Office Web Portal Authentication (Admins, Accountants, Managers)
 1. **Credentials**: Email / Username + Strong Password (bcrypt hash with work factor 12).

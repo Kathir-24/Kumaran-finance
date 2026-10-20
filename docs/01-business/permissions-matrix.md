@@ -14,12 +14,25 @@ The software implements a standardized, industry-standard set of personas. Kumar
 
 | Role | Scope | Description | Status |
 |---|---|---|---|
-| **Super Admin / Owner** | Global (Company-wide) | **The 4 Equal Partners**. Can act as operational Maker (entering auction results, safety proof, reversals) and final Checker. Full administrative and financial authority. | `CONFIRMED-BY-DEVELOPER` |
-| **Branch Manager** | Assigned Branch | Optional role. In current operations, the **4 partners fulfill all branch manager duties directly**; no external manager is hired. | `CONFIRMED-BY-DEVELOPER` |
-| **Accountant** | Company-wide | Financial recordkeeper for day books, voucher preparation, and reconciliations. **Can be held by a field collection agent wearing the accountant hat**. | `CONFIRMED-BY-DEVELOPER` |
-| **Collection Agent** | Assigned Customers | Field staff (2–3 agents today) using mobile app for daily/monthly doorstep collections; **also handles office accounting tasks**. | `CONFIRMED-BY-DEVELOPER` |
-| **Customer / Member** | Self Only | Subscribers viewing their personal digital passbook, dividends, upcoming dues, and making online UPI/card payments. | `CONFIRMED-BY-DEVELOPER` |
-| **Auditor** | Read-Only (Global) | Independent chartered accountant / auditor viewing ledgers, auction minutes, and compliance reports without edit permissions. | `CONFIRMED-BY-DEVELOPER` |
+| **Super Admin / Owner** | Global (Company-wide) | **The 4 Equal Partners**. Can act as operational Maker (entering auction results, safety proof, reversals) and final Checker. Full administrative and financial authority. **100% full feature parity on BOTH Web and Mobile apps.** | `CONFIRMED-BY-DEVELOPER` |
+| **Branch Manager** | Assigned Branch | Optional role. In current operations, the **4 partners fulfill all branch manager duties directly**; no external manager is hired. Accessible via Web Portal. | `CONFIRMED-BY-DEVELOPER` |
+| **Accountant** | Company-wide | Financial recordkeeper for day books, voucher preparation, and reconciliations. **Can be held by a field collection agent wearing the accountant hat**. Primarily uses Web Portal for dense data entry; accessible on Mobile. | `CONFIRMED-BY-DEVELOPER` |
+| **Collection Agent** | Assigned Customers | Field staff (2–3 agents today) using mobile app for daily/monthly doorstep collections; **also handles office accounting tasks**. Primarily uses Mobile App. | `CONFIRMED-BY-DEVELOPER` |
+| **Customer / Member** | Self Only | Subscribers viewing their personal digital passbook, dividends, upcoming dues, and making online UPI/card payments. Uses Mobile App. | `CONFIRMED-BY-DEVELOPER` |
+| **Auditor** | Read-Only (Global) | Independent chartered accountant / auditor viewing ledgers, auction minutes, and compliance reports without edit permissions. Uses Web Portal. | `CONFIRMED-BY-DEVELOPER` |
+
+---
+
+### 1.1 Client Platform Delivery & Access Matrix (`CONFIRMED-BY-DEVELOPER`)
+
+| Persona | Primary Platform | Secondary Platform | Feature Parity & Workflows |
+|---|:---:|:---:|---|
+| **Super Admin (The 4 Partners)** | **Web Portal** (`apps/web/`) | **Mobile App** (`apps/mobile/`) | **100% Full Parity on BOTH Platforms**. Can act as Maker and Checker on either device. Instant push notifications for approvals on mobile; full-screen spreadsheets on web. |
+| **Branch Manager** *(Latent)* | **Web Portal** (`apps/web/`) | — | Branch-scoped intake, auction facilitation, staff management. |
+| **Desk Accountant** | **Web Portal** (`apps/web/`) | Mobile App | High-density physical notebook transcription, Form XXII Cash Book, day books, voucher preparation. |
+| **Field Collection Agent** | **Mobile App** (`apps/mobile/`) | Web Portal (Dual Role) | 1-second fingerprint unlock, doorstep collections (< 30s), offline SQLite sync, evening cash handover. |
+| **Customer (Chit Subscriber)** | **Mobile App** (`apps/mobile/`) | Web Passbook (Optional) | Bilingual digital passbook, 1-tap UPI payments (GPay/PhonePe), dividend tracker, auction results. |
+| **Auditor (Chartered Accountant)** | **Web Portal** (`apps/web/`) | — | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, immutable audit logs. |
 
 ---
 
@@ -99,6 +112,37 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 
 - **The Governing Principle**: Branch Manager is an **operational role**. Any action that involves **money leaving the company** or **correcting the financial ledger** is strictly reserved for **Super Admin (Partners)** as the final financial authority — regardless of whether a Branch Manager is ever hired in the future.
 - **Hard Guard**: Backend must reject any `checker_user_id` with `BRANCH_MANAGER`-only role attempting to approve a payment reversal or authorize a prize payout, even if that user's role array does not include `SUPER_ADMIN`.
+
+---
+
+### 7. Cross-Device Maker-Checker Agnostic Enforcement (`CONFIRMED-BY-DEVELOPER`)
+
+The fundamental invariant `maker_user_id != checker_user_id` is enforced strictly at the API and database levels. The backend is **device-agnostic**, allowing partners to initiate or authorize transactions across any combination of Web and Mobile clients:
+
+```mermaid
+flowchart LR
+    subgraph Maker["MAKER (Initiates Action)"]
+        M1["Partner A on Mobile Phone"]
+        M2["Partner A on Office Laptop/PC"]
+    end
+
+    subgraph Checker["CHECKER (Authorizes Action)"]
+        C1["Partner B on Mobile Phone"]
+        C2["Partner B on Office Laptop/PC"]
+    end
+
+    M1 -->|"Valid (Push Notification -> Fingerprint Approve)"| C1
+    M1 -->|"Valid (Mobile Maker -> Desktop Checker)"| C2
+    M2 -->|"Valid (Desktop Maker -> Mobile Checker)"| C1
+    M2 -->|"Valid (Desktop Maker -> Desktop Checker)"| C2
+```
+
+1. **Mobile-to-Mobile**: Partner A records the auction bid on their smartphone at the branch $\to$ Partner B receives an instant push notification on their smartphone, reviews the bid, and finalizes with fingerprint authentication.
+2. **Web-to-Mobile**: Desk Accountant prepares a prize payout voucher on the office PC $\to$ Partner B in transit receives an alert on their mobile phone, inspects the scanned cheque photo, and authorizes payout.
+3. **Mobile-to-Web**: Partner A enters a payment reversal request with justification on their phone $\to$ Partner B at the office PC reviews the audit impact and approves.
+4. **Web-to-Web**: Partner A enters transcription data on PC $\to$ Partner B verifies against physical paper notebook and commits activation on PC.
+
+**Invariant**: In every scenario, the database strictly asserts `maker_user_id != checker_user_id` and records both distinct user IDs, timestamps, and client device user-agents in the immutable audit log.
 
 ---
 

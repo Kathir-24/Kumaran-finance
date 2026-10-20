@@ -30,6 +30,7 @@
 | **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
 | **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | 2026-10-17 | **Y** |
 | **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
+| **ADR-17** | Dual-Platform Full Parity for Partners | 100% full feature parity on BOTH Web (`apps/web`) and Mobile (`apps/mobile`) for the 4 Partners across both Maker and Checker roles (`maker_user_id != checker_user_id` enforced regardless of device). Desk roles on Web; field/customers on Mobile. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-20 | **Y** |
 
 ---
 
@@ -116,3 +117,22 @@
   - Aadhaar number, PAN card number, and identity document uploads are **strictly OPTIONAL** and never mandatory.
   - Known local subscribers are onboarded immediately upon entering their notebook details.
   - Zero forced document scans, photocopies, or third-party digital KYC barriers are required to create a customer, assign a ticket, or participate in auctions.
+
+---
+
+### ADR-17: Dual-Platform Full Parity for Partners (Web & Mobile Parity for Maker & Checker) (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: The 4 equal partners (Super Admin / Owners) run Kumaran Finance on the move, at home, at the branch counter, and in customer meetings. They cannot be restricted exclusively to desktop computers, nor can they be forced to perform high-volume ledger entry on smartphones.
+- **Architectural Decision**:
+  1. **100% Feature Parity for Partners**: The 4 Partners have 100% full feature parity on **BOTH** the Web Portal (`apps/web/`) and the Android Mobile App (`apps/mobile/`).
+  2. **Cross-Device Maker-Checker**: The strict invariant `maker_user_id != checker_user_id` is enforced at the API and database levels, completely agnostic of client devices:
+     - Partner A on Mobile (Maker) $\to$ Partner B on Web (Checker)
+     - Partner A on Web (Maker) $\to$ Partner B on Mobile (Checker)
+     - Partner A on Mobile (Maker) $\to$ Partner B on Mobile (Checker)
+     - Partner A on Web (Maker) $\to$ Partner B on Web (Checker)
+  3. **Role-Tailored Platform Distribution**:
+     - **Partners (`SUPER_ADMIN`)**: 100% Full Parity on Web & Mobile (Auctions, Approvals, Payouts, Cash Handover, Reports).
+     - **Desk Accountant (`ACCOUNTANT`)**: Primarily Web Portal (transcribing 20-month physical notebooks, day books, voucher preparation).
+     - **CA Auditor (`AUDITOR`)**: Primarily Web Portal (read-only 12-column Form XXII Cash Book, Form XXI Ledgers, forensic audit trails).
+     - **Field Collection Agents (`COLLECTION_AGENT`)**: Primarily Mobile App (1-second fingerprint unlock, doorstep collections, offline SQLite auto-sync, WhatsApp receipts).
+     - **Customers (`CUSTOMER`)**: Primarily Mobile App (bilingual passbook, 1-tap UPI payment via GPay/PhonePe/Paytm, auction results).
+     - **Dual-Role Staff (`[COLLECTION_AGENT, ACCOUNTANT]`)**: Mobile App on collection rounds; Web Portal or Mobile App at office desk.
