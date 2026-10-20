@@ -106,3 +106,39 @@ Because a prized subscriber has already received the pool amount:
    - Demand notice is served on the subscriber and nominee based on the physical documents recorded in the **Company Safety Proof Checklist** during prize disbursement (signed agreement with winner & nominee signatures, signed blank cheques, promissory notes).
 2. **Statutory Recovery (`UNVERIFIED-LEGAL`)**:
    - Formal arbitration or legal petition before the Registrar of Chits for recovery of remaining installments. Legal citations are retained as `UNVERIFIED-LEGAL` pending inspection of primary Tamil Nadu regulatory orders.
+
+---
+
+## 4. Disaster Recovery & Off-Site Backup SOP (`CONFIRMED-BY-DEVELOPER`)
+
+> **Regulatory Reference**: Section 3.1 & 3.3 of [`docs/06-devops/infrastructure-and-drp.md`](../06-devops/infrastructure-and-drp.md)  
+> **Recovery Targets**: $\text{RPO} \le 15\text{ minutes}$, $\text{RTO} \le 2\text{ hours}$
+
+### 4.1 Daily Off-Site Automated Backup (02:00 AM IST)
+1. **Automated Snapshot**: Every night at 02:00 AM IST, the automated script ([`apps/api/scripts/backup-to-s3.ts`](../../apps/api/scripts/backup-to-s3.ts)) creates a compressed binary dump (`pg_dump -F c`) of the entire PostgreSQL database.
+2. **Encrypted Cloud Upload**: The dump is encrypted using `AES256` and streamed to the private S3 bucket under `backups/db/YYYY/MM/`.
+3. **Automated 30-Day Retention Prune**: Any backup older than 30 days is automatically purged to minimize storage overhead.
+4. **Manual Run Command**:
+   ```powershell
+   pnpm db:backup:s3
+   ```
+
+### 4.2 Quarterly Disaster Recovery (DRP) Drill SOP
+Once every 90 days, or ahead of any statutory audit by the Registrar of Chits, the Lead Developer and Kumaran Finance Administrator must execute the automated DRP drill:
+
+1. **Execution**:
+   ```powershell
+   pnpm db:drp:drill
+   ```
+2. **What the Drill Automatically Executes**:
+   - Takes a fresh S3 snapshot of the active database.
+   - Creates an isolated database (`chitflow_drp_drill`) to avoid touching active business records.
+   - Downloads the S3 dump and restores it, recording the exact recovery time in seconds (verifying $\text{RTO} \le 2\text{ hours}$).
+   - Automatically asserts 5 core financial invariants:
+     - Record row parity between live and restored datasets.
+     - 4.00% Foreman Commission lock (ADR-04).
+     - Unique subscriber ticket constraints per chit group (ADR-13).
+     - 64-bit integer Rupee math integrity (zero floats, zero paise).
+     - Accounting balance equation: $\sum \text{Dues} = \sum \text{Payments} + \text{Remaining Unpaid}$.
+   - Drops the temporary drill database cleanly and outputs the signed compliance report.
+3. **Audit Log Filing**: The resulting audit log is retained in the operational records as proof of data disaster recoverability.
