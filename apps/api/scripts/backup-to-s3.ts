@@ -5,7 +5,9 @@
 // ==============================================================================
 
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -193,18 +195,38 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
   const fileBuffer = fs.readFileSync(localFilePath);
 
   console.log(`[BACKUP] Local dump created successfully (${fileStats.size} bytes).`);
-  console.log(`[BACKUP] Uploading to S3 storage with AES256 server-side encryption...`);
+  console.log(`[BACKUP] Ensuring S3 bucket '${config.bucket}' exists...`);
 
-  // 2. Upload to S3 storage
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: s3Key,
-      Body: fileBuffer,
-      ContentType: 'application/octet-stream',
-      ServerSideEncryption: 'AES256',
-    }),
+  // Ensure bucket exists on S3 / MinIO
+  try {
+    await s3Client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+  } catch {
+    try {
+      await s3Client.send(new CreateBucketCommand({ Bucket: config.bucket }));
+      console.log(`[BACKUP] Created bucket '${config.bucket}' in S3 storage.`);
+    } catch {
+      // Ignore if exists
+    }
+  }
+
+  console.log(
+    config.endpoint
+      ? `[BACKUP] Uploading to S3/MinIO storage...`
+      : `[BACKUP] Uploading to AWS S3 storage with AES256 server-side encryption...`,
   );
+
+  // 2. Upload to S3 storage (AES256 SSE on AWS S3; standard on local MinIO)
+  const putParams: any = {
+    Bucket: config.bucket,
+    Key: s3Key,
+    Body: fileBuffer,
+    ContentType: 'application/octet-stream',
+  };
+  if (!config.endpoint) {
+    putParams.ServerSideEncryption = 'AES256';
+  }
+
+  await s3Client.send(new PutObjectCommand(putParams));
 
   console.log(`[SUCCESS] Database backup uploaded to S3: s3://${config.bucket}/${s3Key}`);
 

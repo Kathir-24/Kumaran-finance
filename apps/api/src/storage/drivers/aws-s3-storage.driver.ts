@@ -1,6 +1,8 @@
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -28,9 +30,11 @@ export interface AwsS3Config {
 export class AwsS3StorageDriver implements StorageDriver {
   private readonly s3Client: S3Client;
   private readonly bucket: string;
+  private readonly isCustomEndpoint: boolean;
 
   constructor(config: AwsS3Config) {
     this.bucket = config.bucket;
+    this.isCustomEndpoint = !!config.endpoint;
     this.s3Client = new S3Client({
       region: config.region,
       endpoint: config.endpoint,
@@ -42,18 +46,36 @@ export class AwsS3StorageDriver implements StorageDriver {
     });
   }
 
+  async ensureBucketExists(): Promise<void> {
+    try {
+      await this.s3Client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      try {
+        await this.s3Client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      } catch {
+        // Bucket may already exist or be owned
+      }
+    }
+  }
+
   async upload(key: string, buffer: Buffer, mimeType: string): Promise<UploadResult> {
     const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
 
-    const command = new PutObjectCommand({
+    const putParams: any = {
       Bucket: this.bucket,
       Key: sanitizedKey,
       Body: buffer,
       ContentType: mimeType,
-      ServerSideEncryption: 'AES256', // Mandatory server-side encryption
-    });
+      ...(this.isCustomEndpoint ? {} : { ServerSideEncryption: 'AES256' }),
+    };
 
-    await this.s3Client.send(command);
+    try {
+      await this.s3Client.send(new PutObjectCommand(putParams));
+    } catch {
+      // If bucket does not exist yet (e.g. fresh MinIO instance), create and retry once
+      await this.ensureBucketExists();
+      await this.s3Client.send(new PutObjectCommand(putParams));
+    }
 
     const presignedUrl = await this.getPresignedUrl(sanitizedKey, 900);
 
