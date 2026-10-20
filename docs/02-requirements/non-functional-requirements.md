@@ -35,6 +35,7 @@
 - **API Response Latency**:
   - Read endpoints (`GET /customers`, `GET /tickets/:id/passbook`): 95th percentile latency $\le 200\text{ ms}$.
   - Financial mutation endpoints (`POST /payments`, `POST /collections`): 95th percentile latency $\le 500\text{ ms}$.
+  - **Live Verification**: Continuously measured by the Prometheus exporter (`http_request_duration_seconds`) at `/metrics` (see [`apps/api/src/metrics/README.md`](../../apps/api/src/metrics/README.md)).
 - **Concurrency & Row Locking**:
   - Auction bid recording and payment allocations must use database transactions with explicit pessimistic row locks (`SELECT FOR UPDATE`) to prevent race conditions.
 - **System Availability**: Target 99.9% uptime during operational business hours (08:00 AM to 09:00 PM IST).

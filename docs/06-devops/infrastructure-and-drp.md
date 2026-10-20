@@ -177,3 +177,19 @@ In production container environments (AWS ECS Fargate or Docker):
   ```
 - AWS ECS injects the decrypted values directly into process environment variables in memory at container boot time, preventing disk exposure.
 
+---
+
+## 5. APM Observability & Prometheus Telemetry (`/metrics`)
+
+Kumaran Chits provides real-time infrastructure and financial telemetry via Prometheus metrics exporter:
+
+- **Endpoint**: `http://localhost:3000/metrics` (or `http://localhost/metrics` via Nginx ingress)
+- **Authentication**: Protected via HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`, default: `admin` / `chitflow_secret`).
+- **Telemetry Catalog**:
+  - **Latency Histograms**: `http_request_duration_seconds` measuring p95 read ($\le 200\text{ ms}$) and financial write ($\le 500\text{ ms}$) latencies per NFR §3.
+  - **PostgreSQL Database Health**: `chitflow_db_connected` (1 = healthy, 0 = down).
+  - **BullMQ Background Queues**: `bullmq_queue_jobs_count` tracking active, delayed, waiting, and failed jobs across all 3 queues.
+  - **Chit Fund Invariants & KPIs**: Active chit groups, active subscribers, overdue tickets in 1-month and 3-month default buckets, pending Maker-Checker approvals, and today's total collection volume in whole Rupees (`BigInt`).
+- **Detailed Documentation & PromQL Recipes**: Consult [`apps/api/src/metrics/README.md`](../../apps/api/src/metrics/README.md).
+
+
