@@ -115,3 +115,33 @@ flowchart TD
    - Partner B on phone or laptop taps **"Finalize Auction"** (Checker).
 4. **Instant PDF Receipt & Report Sharing**:
    - View Form XXII Cash Book or subscriber passbooks and tap **"Share via WhatsApp"** to send statements directly to partners, subscribers, or the CA auditor.
+
+---
+
+## 6. Bull Board Background Queue Monitor (`/admin/queues`)
+
+For operational visibility over asynchronous background workers, partners can open the visual **Bull Board Queue Monitor**:
+
+### 6.1 Accessing the Queue Monitor
+1. Open your browser and navigate to:  
+   `http://localhost:3000/admin/queues` (or `https://admin.kumaranfinance.com/admin/queues` in production).
+2. When the native browser authentication dialog appears:
+   - **Username**: Enter configured `BULL_BOARD_USER` (defaults to `admin`).
+   - **Password**: Enter configured `BULL_BOARD_PASSWORD`.
+3. Click **Log In** to view the live dashboard.
+
+### 6.2 Monitored Background Queues
+- **`daily-maintenance-queue`**:
+  - Tracks daily arrears calculation running at 02:00 AM IST.
+  - Verifies automated 3-month continuous defaulter tagging (ADR-07).
+- **`notification-queue`**:
+  - Monitors DLT SMS and WhatsApp bilingual delivery batches.
+  - Displays any delivery failures caused by telecom timeouts.
+- **`reconciliation-queue`**:
+  - Tracks the 06:00 AM IST payment gateway settlement audit.
+  - Shows auto-resolved ghost drops and gateway mismatch alerts.
+
+### 6.3 Handling Failed Jobs
+1. In Bull Board, click the **"Failed"** tab under the relevant queue.
+2. Click on the failed job to read the error stack trace (e.g., SMS provider gateway timeout).
+3. Click **"Retry"** to re-dispatch the job immediately without restarting any server processes.
