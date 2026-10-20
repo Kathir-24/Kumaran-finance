@@ -53,9 +53,9 @@ async function bootstrap() {
     maxAge: CORS_MAX_AGE_SECONDS,
   });
 
-  // Global routing prefix with exemptions for health checks, API docs, and Bull Board queue monitor
+  // Global routing prefix with exemptions for health checks, API docs, Bull Board queue monitor, and Prometheus metrics
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
+    exclude: ['health', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
   });
 
   // Enable URI Versioning (Default: '1' -> /api/v1/...)
@@ -139,5 +139,6 @@ async function bootstrap() {
   console.log(`🚀 Kumaran Chits API running on: http://localhost:${port}`);
   console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);
   console.log(`📊 Bull Board Queue Monitor at: http://localhost:${port}/admin/queues`);
+  console.log(`📈 Prometheus Metrics Exporter at: http://localhost:${port}/metrics`);
 }
 void bootstrap();

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,6 +18,8 @@ import { DisbursementModule } from './disbursement/disbursement.module';
 import { HealthController } from './health/health.controller';
 import { InstallmentModule } from './installment/installment.module';
 import { JobsModule } from './jobs/jobs.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
 import { PaymentModule } from './payment/payment.module';
 import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -49,6 +51,7 @@ import { StorageModule } from './storage/storage.module';
     StorageModule,
     PdfModule,
     JobsModule,
+    MetricsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
@@ -56,6 +59,10 @@ import { StorageModule } from './storage/storage.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpMetricsInterceptor,
     },
   ],
 })
