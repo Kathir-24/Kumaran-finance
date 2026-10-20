@@ -95,6 +95,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Financial Invariants & Test Assertions** | [`docs/05-testing/financial-tests.md`](docs/05-testing/financial-tests.md) |
 | **Payment Gateway Sandbox & Reconciliations**| [`docs/05-testing/payment-integration.md`](docs/05-testing/payment-integration.md) |
 | **Physical Notebook Onboarding SOP** | [`docs/07-operations/manual-onboarding-sop.md`](docs/07-operations/manual-onboarding-sop.md) |
+| **Troubleshooting & Diagnostics (N-Modes)**| [`docs/04-engineering/troubleshooting-guide.md`](docs/04-engineering/troubleshooting-guide.md) |
 | **Daily Operations, Cash Handover & Reversals**| [`docs/07-operations/operations-sop.md`](docs/07-operations/operations-sop.md) |
 | **Web Admin Portal Operations** | [`docs/07-operations/user-manuals/admin-foreman-manual.md`](docs/07-operations/user-manuals/admin-foreman-manual.md) |
 | **Field Agent Android Mobile App** | [`docs/07-operations/user-manuals/agent-mobile-manual.md`](docs/07-operations/user-manuals/agent-mobile-manual.md) |

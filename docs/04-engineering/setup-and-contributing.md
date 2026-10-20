@@ -151,3 +151,13 @@ When running full-stack, access the system directly through Nginx on [http://loc
 1. **Never commit secrets**: Check `.env` files and API keys are in `.gitignore`.
 2. **Never commit real customer data**: Only synthetic test fixtures.
 3. **Run linter and tests**: Ensure `pnpm run lint` and `pnpm test` exit with 0 errors before pushing.
+
+---
+
+## 6. Troubleshooting & Diagnostics
+
+If you encounter any port conflicts, database drift, MinIO S3 upload errors, Redis connectivity warnings, or financial invariant guardrail rejections, consult the comprehensive:
+
+👉 [**docs/04-engineering/troubleshooting-guide.md**](troubleshooting-guide.md)
+
+It contains exact error strings, root causes, copy-paste remedies for Categories A through H, and the **Nuclear Clean Slate Runbook** (reset entire local stack in < 60 seconds).

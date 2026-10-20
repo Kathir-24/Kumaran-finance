@@ -1,0 +1,277 @@
+# Kumaran Chits — Comprehensive Troubleshooting Guide
+
+> **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
+> **Scope**: Diagnostic runbooks and remedies for all operational, infrastructural, database, financial, and development failure modes across the entire platform.
+
+---
+
+## 1. Quick Diagnostic Decision Matrix
+
+```mermaid
+flowchart TD
+    Start([Encountered an Error]) --> CheckType{Where did it occur?}
+    
+    CheckType -->|Containers & Ports| CatA[Category A: Docker & Ports]
+    CheckType -->|Database & Migrations| CatB[Category B: PostgreSQL & Prisma]
+    CheckType -->|S3 & Document Storage| CatC[Category C: S3 & MinIO Storage]
+    CheckType -->|Background Queues| CatD[Category D: BullMQ & Redis]
+    CheckType -->|Financial & Business Logic| CatE[Category E: Invariants & Guardrails]
+    CheckType -->|Auth & Permissions| CatF[Category F: JWT & RBAC]
+    CheckType -->|PowerShell & Windows| CatG[Category G: Tooling & CLI]
+    CheckType -->|Nginx & Gateway| CatH[Category H: Ingress & CORS]
+
+    CatA --> Resolve([Apply Section Remediation])
+    CatB --> Resolve
+    CatC --> Resolve
+    CatD --> Resolve
+    CatE --> Resolve
+    CatF --> Resolve
+    CatG --> Resolve
+    CatH --> Resolve
+```
+
+---
+
+## Category A: Docker & Container Infrastructure Failures
+
+### A.1. Port Collision (`bind: address already in use`)
+- **Symptoms**: `Error response from daemon: driver failed programming external connectivity on endpoint chitflow-db: bind: address already in use: 0.0.0.0:5433` (or port `6379`, `9000`, `9001`, `80`).
+- **Root Cause**: A leftover background instance of PostgreSQL, Redis, MinIO, or host service is already listening on that port.
+- **Remedy**:
+  ```powershell
+  # 1. Identify which process is holding the port (e.g. port 5433)
+  netstat -ano | findstr :5433
+
+  # 2. Kill the conflicting PID (replace <PID> with number from column 5)
+  Stop-Process -Id <PID> -Force
+
+  # 3. If port is held by orphan docker container:
+  docker stop $(docker ps -q)
+  pnpm docker:up
+  ```
+
+### A.2. Docker Daemon Not Running
+- **Symptoms**: `error during connect: This error may indicate that the docker daemon is not running.`
+- **Root Cause**: Docker Desktop is not started, or the WSL2 Linux subsystem backend crashed.
+- **Remedy**:
+  ```powershell
+  # Start Docker Desktop on Windows
+  Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+  # Or restart the WSL2 engine
+  wsl --shutdown
+  ```
+
+### A.3. MinIO Image Deprecation & Distroless Startup
+- **Symptoms**: `pull access denied for minio/minio, repository does not exist or may require 'docker login'`
+- **Root Cause**: Legacy Docker Hub MinIO images now require authentication or are deprecated.
+- **Remedy**: Use the official Chainguard drop-in image configured in [`infra/docker/docker-compose.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.yml):
+  ```yaml
+  image: cgr.dev/chainguard/minio:latest
+  ```
+  *(Note: Do not attach `minio/mc` shell scripts; the backend TypeScript drivers handle bucket auto-initialization autonomously).*
+
+---
+
+## Category B: Database & Prisma ORM Failures
+
+### B.1. Database Connection Refused (`Can't reach database server at 127.0.0.1:5433`)
+- **Symptoms**: `PrismaClientInitializationError: Can't reach database server at 127.0.0.1:5433`
+- **Root Cause**: Container `chitflow-db` is stopped, still booting, or `.env` points to the wrong port.
+- **Remedy**:
+  ```powershell
+  # Check if container is running and healthy
+  docker ps --filter "name=chitflow-db"
+
+  # If not running, start container:
+  pnpm docker:up
+
+  # Verify connection string in apps/api/.env:
+  # DATABASE_URL="postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public"
+  ```
+
+### B.2. Migration Drift or Schema Drift (`P3005: The database schema is not empty`)
+- **Symptoms**: `prisma migrate dev` halts reporting pending changes or conflict.
+- **Root Cause**: Manual schema edits were applied directly to PostgreSQL without generating a migration.
+- **Remedy**:
+  ```powershell
+  # Synchronize schema without losing seed data:
+  pnpm run prisma:migrate
+
+  # If developing in a dirty branch and a complete wipe is acceptable:
+  pnpm --filter api exec prisma migrate reset --force
+  pnpm run prisma:seed
+  ```
+
+### B.3. Unique Constraint Violation on Seed (`P2002`)
+- **Symptoms**: `Unique constraint failed on the fields: (chitGroupId, customerId)` (ADR-13).
+- **Root Cause**: Attempting to insert a subscriber ticket for a customer who already holds a ticket in that exact same chit group.
+- **Remedy**: A customer can hold tickets across multiple chit groups, but strictly **max 1 ticket** per individual chit group. Assign a different customer or different chit group.
+
+---
+
+## Category C: S3 Object Storage & Backup Automation Failures
+
+### C.1. Server-Side Encryption Unsupported on MinIO (`NotImplemented: KMS not configured`)
+- **Symptoms**: `NotImplemented: Server side encryption specified but KMS is not configured` when uploading or running backups.
+- **Root Cause**: AWS S3 natively supports `ServerSideEncryption: 'AES256'`, but local MinIO requires external KMS/KES services if SSE is passed explicitly.
+- **Remedy**:
+  - The system dynamically detects `endpoint` / `S3_ENDPOINT`:
+    - When `S3_ENDPOINT` is configured (local MinIO / Cloudflare R2), `ServerSideEncryption` is automatically bypassed.
+    - When running in production without `S3_ENDPOINT` (AWS S3), `AES256` is strictly enforced.
+  - Verify your [`apps/api/.env`](file:///u:/Kumaran-finance/apps/api/.env) has:
+    ```ini
+    STORAGE_DRIVER=s3
+    S3_ENDPOINT=http://127.0.0.1:9000
+    S3_FORCE_PATH_STYLE=true
+    ```
+
+### C.2. S3 Bucket Does Not Exist (`NoSuchBucket`)
+- **Symptoms**: `NoSuchBucket: The specified bucket does not exist`
+- **Root Cause**: Fresh MinIO volume started without creating `kumaran-chits-private`.
+- **Remedy**:
+  - Both [`AwsS3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) and [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/backup-to-s3.ts) feature self-healing `ensureBucketExists()` routines via `HeadBucketCommand` and `CreateBucketCommand`.
+  - To manually verify or recreate via MinIO Web Console: open [http://localhost:9001](http://localhost:9001) (`chitflow_admin` / `chitflow_storage_secret`) and create bucket `kumaran-chits-private`.
+
+### C.3. Clock Skew Error (`RequestTimeTooSkewed`)
+- **Symptoms**: `RequestTimeTooSkewed: The difference between the request time and the current time is too large.`
+- **Root Cause**: Host OS clock (Windows) drifted out of sync with Docker VM clock after system sleep/hibernate.
+- **Remedy**:
+  ```powershell
+  # Resynchronize Windows system clock
+  w32tm /resync
+
+  # Restart Docker engine
+  wsl --shutdown
+  pnpm docker:up
+  ```
+
+---
+
+## Category D: BullMQ & Redis Job Queue Failures
+
+### D.1. Redis Offline Fallback (`ECONNREFUSED 127.0.0.1:6379`)
+- **Symptoms**: Warning in logs: `[BullMqQueueProvider] Redis client not available. Operating BullMQ queues in direct-execution mode.`
+- **Design Behavior**: The system is designed with **zero hard failure on Redis outage**. When Redis is offline, jobs execute in-process directly via fallback mode (`BullMqQueueProvider`).
+- **Remedy to Restore Queued Mode**:
+  ```powershell
+  docker start chitflow-redis
+  ```
+
+### D.2. Bull Board Queue Monitor Returns `401 Unauthorized`
+- **Symptoms**: Navigating to `http://localhost:3000/admin/queues` prompts for HTTP Basic Auth and fails.
+- **Root Cause**: Incorrect credentials or missing environment variables.
+- **Remedy**:
+  - Check `.env` settings:
+    - Default Username: `BULL_BOARD_USER=admin`
+    - Default Password: `BULL_BOARD_PASSWORD=chitflow_secret`
+  - Enter credentials in browser Basic Auth modal.
+
+---
+
+## Category E: Financial Invariants & Domain Guardrail Rejections
+
+The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transactions by design:
+
+| Guardrail Rejected | HTTP Status & Error Message | Root Cause | Legitimate Operator Action |
+|---|---|---|---|
+| **Maker $\ne$ Checker** | `403 Forbidden`<br>`Maker and checker cannot be the same user` | The user approving a reversal, payout, or auction is the same user who initiated it. | Have a different Partner or Super Admin review and approve the request. |
+| **1/4 Discount Ceiling** | `400 Bad Request`<br>`Maximum auction discount cannot exceed 25% of chit value` | Bid exceeds $\frac{V}{4}$ (e.g. ₹25,000 for a ₹1,00,000 chit). | Enter bid at or below the 25% ceiling ($D \le \frac{V}{4}$). |
+| **Defaulter Ineligible** | `400 Bad Request`<br>`Subscriber ineligible due to unpaid dues` | Customer attempted to bid in month $M$'s auction while their installment for month $M$ is `UNPAID`. | Record payment receipt for current month due before bidding. |
+| **Month 1 & N Auction** | `400 Bad Request`<br>`Auctions strictly forbidden in Month 1 and Month N` | Attempted to schedule/conduct auction in month 1 (foreman pool) or month $N$ (final settlement). | Month 1 belongs to company ticket; Month $N$ is settled directly with 4% commission. |
+| **Paise / Float Rejection** | `400 Bad Request`<br>`Floating point or fractional amounts prohibited` | API payload submitted decimal numbers (e.g. `2500.50`). | Submit whole integer Rupees (`BigInt`). All chit math is strictly integer Rupees. |
+
+---
+
+## Category F: Authentication & RBAC Access Failures
+
+### F.1. Missing / Expired Bearer Token (`401 Unauthorized`)
+- **Symptoms**: `{"statusCode": 401, "message": "Unauthorized"}`
+- **Root Cause**: Request header missing `Authorization: Bearer <token>` or token expired past 8 hours.
+- **Remedy**:
+  1. Login via `POST /api/v1/auth/login` with your username and password.
+  2. Extract `accessToken` from response.
+  3. Include in header: `Authorization: Bearer <accessToken>`.
+
+### F.2. Role Permission Denied (`403 Forbidden`)
+- **Symptoms**: `{"statusCode": 403, "message": "Forbidden resource"}`
+- **Root Cause**: User role (e.g. `FIELD_AGENT`, `ACCOUNTANT`, `AUDITOR`) lacks permission for the endpoint.
+- **Reference**: Cross-check [`docs/01-business/permissions-matrix.md`](file:///u:/Kumaran-finance/docs/01-business/permissions-matrix.md). Field agents are strictly restricted to cash collection and customer onboarding.
+
+---
+
+## Category G: Windows PowerShell & Monorepo Tooling
+
+### G.1. PowerShell Operator Syntax Error (`&&`)
+- **Symptoms**: `The token '&&' is not a valid statement separator in this version.`
+- **Root Cause**: Windows PowerShell 5.1 does not support the bash `&&` operator.
+- **Remedy**: Use `;` (semicolon) instead:
+  ```powershell
+  # Correct in PowerShell:
+  pnpm run lint; pnpm test
+  ```
+
+### G.2. PowerShell Script Execution Blocked (`PSSecurityException`)
+- **Symptoms**: `File ...\activate.ps1 cannot be loaded because running scripts is disabled on this system.`
+- **Remedy**:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+
+### G.3. `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT`
+- **Symptoms**: `None of the selected packages has a "db:backup:s3" script` when running `pnpm --filter api run db:backup:s3`.
+- **Root Cause**: The script is defined in the root monorepo `package.json`, not in `apps/api/package.json`.
+- **Remedy**: Run directly from root:
+  ```powershell
+  pnpm run db:backup:s3
+  pnpm run db:backups:list
+  pnpm run db:restore:s3
+  ```
+
+---
+
+## Category H: Reverse Proxy & Ingress Layer (Nginx)
+
+### H.1. `502 Bad Gateway`
+- **Symptoms**: Visiting `http://localhost/api` returns `502 Bad Gateway`.
+- **Root Cause**: Ingress container `chitflow-ingress` is running, but the upstream `api` container is stopped or still starting.
+- **Remedy**:
+  ```powershell
+  # Check if API is healthy
+  docker logs chitflow-api
+
+  # Verify API is listening on port 3000
+  curl http://localhost:3000/api/health
+  ```
+
+### H.2. `413 Request Entity Too Large`
+- **Symptoms**: KYC scan upload fails with HTTP 413.
+- **Root Cause**: File size exceeds client max body size (15 MB default).
+- **Remedy**: Compress scanned image/PDF to under 15 MB. In Nginx ingress, `client_max_body_size 20M;` is configured.
+
+---
+
+## 2. Nuclear Clean Slate Runbook (Reset in < 60 Seconds)
+
+If the local development environment enters an irrecoverable state, run this sequence to restore a verified clean state:
+
+```powershell
+# 1. Stop and purge all local Docker volumes and containers
+docker compose -f infra/docker/docker-compose.yml down -v
+
+# 2. Restart fresh containers (Postgres 17, Redis 7, MinIO S3)
+pnpm docker:up
+
+# 3. Wait 5 seconds for Postgres to become healthy, then apply migrations
+pnpm run prisma:migrate
+
+# 4. Seed foundational head office branch and default Super Admin
+pnpm run prisma:seed
+
+# 5. Run test suite to verify 100% pass rate
+pnpm test
+
+# 6. Start API server
+pnpm run start:dev
+```
+Following this nuclear sequence brings the entire local development stack back to a 100% green state.
