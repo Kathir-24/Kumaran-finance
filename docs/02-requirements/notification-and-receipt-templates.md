@@ -57,10 +57,34 @@ Kumaran Chits: Your one-time verification code is {#var#}. Valid for 5 minutes. 
 ```
 
 ### 2.2 Payment Receipt Alert (SMS)
+- **Sender ID (Header)**: `KMRCHT`
+- **Template ID**: `1407169823412093848`
 - **Template Text**:
 ```text
 Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}. Receipt: {#var#}. View passbook: {#var#}
 ```
+
+### 2.3 Upcoming Monthly Auction Reminder (SMS)
+- **Sender ID (Header)**: `KMRCHT`
+- **Template ID**: `1407169823412093849`
+- **Template Text**:
+```text
+Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}
+```
+
+### 2.4 Default Arrears Warning Notice (SMS)
+- **Sender ID (Header)**: `KMRCHT`
+- **Template ID**: `1407169823412093850`
+- **Template Text**:
+```text
+Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}
+```
+
+### 2.5 Implementation & Pluggable Driver Architecture
+- Implementation: [`apps/api/src/notification/`](../../apps/api/src/notification/)
+- Pluggable Drivers: `MockSmsDriver` (local dev & testing) and `Msg91SmsDriver` (production Indian DLT gateway)
+- Telecommunication Guarantee: **Financial Non-Blocking Guarantee** — SMS gateway delays or failures never cause payment records or financial ledgers to abort or roll back.
+- PII Protection: Fully compliant with Indian DPDP Act 2023 via `+91******XXXX` phone masking in all system logs and audit traces.
 
 ---
 

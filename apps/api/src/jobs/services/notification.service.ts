@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { SmsService } from '../../notification/services/sms.service';
 import type {
   AuctionReminderJobPayload,
   DefaultWarningJobPayload,
@@ -21,6 +22,8 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
   private readonly sentLog: SentNotificationRecord[] = [];
 
+  constructor(@Optional() private readonly smsService?: SmsService) {}
+
   /**
    * Formats and records/dispatches bilingual payment receipt alert (DLT SMS + WhatsApp).
    */
@@ -29,9 +32,24 @@ export class NotificationService {
   ): Promise<{ smsId: string; whatsappId: string }> {
     const formattedAmount = BigInt(payload.amountPaid).toLocaleString('en-IN');
 
-    // 1. Indian DLT-Compliant SMS
+    // 1. Indian DLT-Compliant SMS via pluggable SmsService
+    let smsId = `sms-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    if (this.smsService) {
+      const smsResult = await this.smsService.sendPaymentReceiptSms({
+        recipientPhone: payload.recipientPhone,
+        amountPaid: payload.amountPaid,
+        chitCode: payload.chitCode,
+        ticketNumber: payload.ticketNumber,
+        transactionTimestamp: payload.transactionTimestamp,
+        receiptNumber: payload.receiptNumber,
+        passbookAppUrl: payload.passbookAppUrl,
+      });
+      if (smsResult.messageId) {
+        smsId = smsResult.messageId;
+      }
+    }
+
     const smsText = `Kumaran Chits: Received Rs.${formattedAmount} for Chit ${payload.chitCode}, Ticket #${payload.ticketNumber} on ${payload.transactionTimestamp}. Receipt: ${payload.receiptNumber}. View passbook: ${payload.passbookAppUrl}`;
-    const smsId = `sms-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     this.sentLog.push({
       id: smsId,
       channel: 'SMS_DLT',
@@ -95,6 +113,20 @@ ${payload.passbookAppUrl}
     let count = 0;
 
     for (const sub of payload.subscribers) {
+      // 1. Pluggable DLT SMS Dispatch
+      if (this.smsService) {
+        await this.smsService.sendAuctionReminderSms({
+          recipientPhone: sub.phone,
+          chitCode: payload.chitCode,
+          installmentMonth: payload.installmentMonth,
+          auctionDate: payload.auctionDate,
+          auctionTime: payload.auctionTime,
+          branchName: payload.branchName,
+          branchPhone: payload.branchPhone,
+        });
+      }
+
+      // 2. Bilingual Notification Recording (WhatsApp / Sent Log)
       const messageText = `வணக்கம் திரு. *${sub.name}*,
 
 குமரன் சீட்ஸ் *${payload.chitCode}* குழுவின் *மாதம் ${payload.installmentMonth}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது:
@@ -134,6 +166,19 @@ ${payload.passbookAppUrl}
     payload: DefaultWarningJobPayload,
   ): Promise<{ notificationId: string }> {
     const formattedOverdue = BigInt(payload.totalOverdueAmount).toLocaleString('en-IN');
+
+    // 1. Pluggable DLT SMS Dispatch
+    if (this.smsService) {
+      await this.smsService.sendDefaultWarningSms({
+        recipientPhone: payload.customerPhone,
+        customerName: payload.customerName,
+        chitCode: payload.chitCode,
+        ticketNumber: payload.ticketNumber,
+        consecutiveUnpaidMonths: payload.consecutiveUnpaidMonths,
+        totalOverdueAmount: payload.totalOverdueAmount,
+        branchPhone: '0424-2223333',
+      });
+    }
 
     const messageText = `எச்சரிக்கை அறிவிப்பு / DEFAULT WARNING NOTICE
 

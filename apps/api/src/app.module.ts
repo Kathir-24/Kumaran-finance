@@ -20,6 +20,7 @@ import { InstallmentModule } from './installment/installment.module';
 import { JobsModule } from './jobs/jobs.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
+import { NotificationModule } from './notification/notification.module';
 import { PaymentModule } from './payment/payment.module';
 import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -52,6 +53,7 @@ import { StorageModule } from './storage/storage.module';
     PdfModule,
     JobsModule,
     MetricsModule,
+    NotificationModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

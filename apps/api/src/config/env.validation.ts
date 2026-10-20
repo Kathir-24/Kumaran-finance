@@ -33,6 +33,17 @@ export interface EnvironmentVariables {
   REDIS_PORT: number;
   BULL_BOARD_USER?: string;
   BULL_BOARD_PASSWORD?: string;
+  SMS_DRIVER?: 'mock' | 'msg91';
+  SMS_SENDER_ID?: string;
+  MSG91_AUTH_KEY?: string;
+  MSG91_DLT_TE_ID?: string;
+  MSG91_DLT_OTP_TEMPLATE_ID?: string;
+  MSG91_DLT_RECEIPT_TEMPLATE_ID?: string;
+  MSG91_DLT_AUCTION_TEMPLATE_ID?: string;
+  MSG91_DLT_DEFAULT_TEMPLATE_ID?: string;
+  SMS_MAX_RETRIES?: number;
+  SMS_RETRY_BASE_DELAY_MS?: number;
+  SMS_REQUEST_TIMEOUT_MS?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -84,6 +95,14 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     }
   }
 
+  const smsDriver = (config.SMS_DRIVER as string) ?? 'mock';
+  if (smsDriver !== 'mock' && smsDriver !== 'msg91') {
+    errors.push(`Invalid SMS_DRIVER: ${smsDriver}. Must be 'mock' or 'msg91'`);
+  }
+  if (smsDriver === 'msg91' && !config.MSG91_AUTH_KEY) {
+    errors.push("Missing mandatory MSG91 variable when SMS_DRIVER is 'msg91': MSG91_AUTH_KEY");
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `\n❌ ENVIRONMENT CONFIGURATION ERROR:\n` +
@@ -121,5 +140,16 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
     BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',
     BULL_BOARD_PASSWORD: (config.BULL_BOARD_PASSWORD as string) ?? 'chitflow_secret',
+    SMS_DRIVER: smsDriver as 'mock' | 'msg91',
+    SMS_SENDER_ID: (config.SMS_SENDER_ID as string) ?? 'KMRCHT',
+    MSG91_AUTH_KEY: config.MSG91_AUTH_KEY as string | undefined,
+    MSG91_DLT_TE_ID: config.MSG91_DLT_TE_ID as string | undefined,
+    MSG91_DLT_OTP_TEMPLATE_ID: config.MSG91_DLT_OTP_TEMPLATE_ID as string | undefined,
+    MSG91_DLT_RECEIPT_TEMPLATE_ID: config.MSG91_DLT_RECEIPT_TEMPLATE_ID as string | undefined,
+    MSG91_DLT_AUCTION_TEMPLATE_ID: config.MSG91_DLT_AUCTION_TEMPLATE_ID as string | undefined,
+    MSG91_DLT_DEFAULT_TEMPLATE_ID: config.MSG91_DLT_DEFAULT_TEMPLATE_ID as string | undefined,
+    SMS_MAX_RETRIES: config.SMS_MAX_RETRIES !== undefined ? Number(config.SMS_MAX_RETRIES) : 2,
+    SMS_RETRY_BASE_DELAY_MS: config.SMS_RETRY_BASE_DELAY_MS !== undefined ? Number(config.SMS_RETRY_BASE_DELAY_MS) : 400,
+    SMS_REQUEST_TIMEOUT_MS: config.SMS_REQUEST_TIMEOUT_MS !== undefined ? Number(config.SMS_REQUEST_TIMEOUT_MS) : 15000,
   };
 }
