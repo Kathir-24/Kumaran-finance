@@ -20,10 +20,26 @@ export class StorageService {
     const configuredDriver =
       this.configService.get<string>('STORAGE_DRIVER') || 'local';
 
-    const s3Bucket = this.configService.get<string>('AWS_S3_BUCKET');
-    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
-    const region = this.configService.get<string>('AWS_REGION') || 'ap-south-1';
+    const s3Bucket =
+      this.configService.get<string>('S3_BUCKET') ||
+      this.configService.get<string>('AWS_S3_BUCKET') ||
+      this.configService.get<string>('AWS_S3_BUCKET_NAME');
+    const accessKeyId =
+      this.configService.get<string>('S3_ACCESS_KEY_ID') ||
+      this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey =
+      this.configService.get<string>('S3_SECRET_ACCESS_KEY') ||
+      this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const region =
+      this.configService.get<string>('S3_REGION') ||
+      this.configService.get<string>('AWS_REGION') ||
+      'ap-south-1';
+    const endpoint =
+      this.configService.get<string>('S3_ENDPOINT') ||
+      this.configService.get<string>('AWS_ENDPOINT');
+    const forcePathStyle =
+      this.configService.get<boolean>('S3_FORCE_PATH_STYLE') ??
+      this.configService.get<boolean>('AWS_S3_FORCE_PATH_STYLE');
 
     if (
       configuredDriver === 's3' &&
@@ -37,8 +53,14 @@ export class StorageService {
         region,
         accessKeyId,
         secretAccessKey,
+        endpoint: endpoint || undefined,
+        forcePathStyle: forcePathStyle !== undefined ? forcePathStyle : undefined,
       });
-      this.logger.log(`Initialized StorageService with AWS S3 driver (Bucket: ${s3Bucket})`);
+      this.logger.log(
+        `Initialized StorageService with S3 driver (Bucket: ${s3Bucket}${
+          endpoint ? `, Endpoint: ${endpoint}` : ''
+        })`,
+      );
     } else {
       const localBasePath =
         this.configService.get<string>('LOCAL_STORAGE_PATH') || './storage/uploads';

@@ -200,7 +200,23 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       expect(service.getActiveDriverName()).toBe('local');
     });
 
-    it('should switch to AwsS3StorageDriver when credentials are fully configured', () => {
+    it('should switch to S3 driver when provider-agnostic S3_* credentials are configured', () => {
+      const configMock = {
+        get: jest.fn((key: string) => {
+          if (key === 'STORAGE_DRIVER') return 's3';
+          if (key === 'S3_BUCKET') return 'kumaran-chits-private';
+          if (key === 'S3_ACCESS_KEY_ID') return 'sample-access-key';
+          if (key === 'S3_SECRET_ACCESS_KEY') return 'sample-secret-key';
+          if (key === 'S3_REGION') return 'ap-south-1';
+          return null;
+        }),
+      } as unknown as ConfigService;
+
+      const service = new StorageService(configMock);
+      expect(service.getActiveDriverName()).toBe('s3');
+    });
+
+    it('should switch to S3 driver when legacy AWS_* credentials are configured as fallback', () => {
       const configMock = {
         get: jest.fn((key: string) => {
           if (key === 'STORAGE_DRIVER') return 's3';
@@ -208,6 +224,24 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
           if (key === 'AWS_ACCESS_KEY_ID') return 'AKIA_SAMPLE_KEY';
           if (key === 'AWS_SECRET_ACCESS_KEY') return 'SECRET_SAMPLE_KEY';
           if (key === 'AWS_REGION') return 'ap-south-1';
+          return null;
+        }),
+      } as unknown as ConfigService;
+
+      const service = new StorageService(configMock);
+      expect(service.getActiveDriverName()).toBe('s3');
+    });
+
+    it('should configure S3 driver with S3_ENDPOINT and S3_FORCE_PATH_STYLE for MinIO / Cloudflare / DO', () => {
+      const configMock = {
+        get: jest.fn((key: string) => {
+          if (key === 'STORAGE_DRIVER') return 's3';
+          if (key === 'S3_BUCKET') return 'kumaran-chits-private';
+          if (key === 'S3_ACCESS_KEY_ID') return 'chitflow_admin';
+          if (key === 'S3_SECRET_ACCESS_KEY') return 'chitflow_storage_secret';
+          if (key === 'S3_REGION') return 'ap-south-1';
+          if (key === 'S3_ENDPOINT') return 'http://127.0.0.1:9000';
+          if (key === 'S3_FORCE_PATH_STYLE') return true;
           return null;
         }),
       } as unknown as ConfigService;

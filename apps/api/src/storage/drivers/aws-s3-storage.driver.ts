@@ -20,6 +20,8 @@ export interface AwsS3Config {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
+  endpoint?: string;
+  forcePathStyle?: boolean;
 }
 
 @Injectable()
@@ -31,6 +33,8 @@ export class AwsS3StorageDriver implements StorageDriver {
     this.bucket = config.bucket;
     this.s3Client = new S3Client({
       region: config.region,
+      endpoint: config.endpoint,
+      forcePathStyle: config.forcePathStyle ?? (!!config.endpoint),
       credentials: {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
