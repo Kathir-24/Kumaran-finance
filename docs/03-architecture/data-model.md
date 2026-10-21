@@ -103,6 +103,7 @@ model User {
   isTotpEnabled    Boolean   @default(false)
   mpinHash         String?   // 6-digit MPIN bcrypt hash for mobile quick unlock
   refreshTokenHash String?   // Hashed refresh token for active session revocation
+  fcmToken         String?   // Firebase Cloud Messaging device push token for mobile instant approvals
   lastLoginAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -130,6 +131,7 @@ model Customer {
   pincode      String
   panNumber    String?
   aadhaarLast4 String?            // Storing only masked last 4 digits for data minimization
+  fcmToken     String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
   isKycVerified Boolean           @default(false)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt

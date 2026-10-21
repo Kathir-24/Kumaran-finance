@@ -226,6 +226,32 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(whatsapp?.messageText).toContain('https://storage.kumaranfinance.com/receipt-00412.pdf');
     });
 
+    it('should dispatch free Mobile App Push Notification when fcmToken is available', async () => {
+      const res = await notificationService.dispatchPaymentReceipt({
+        paymentId: 'pay-002',
+        receiptNumber: 'KC-REC-PRD-2026-00413',
+        recipientPhone: '9842143210',
+        subscriberName: 'S. Sundaram',
+        amountPaid: '4100',
+        chitCode: 'KCA-1L-20M-01',
+        ticketNumber: 7,
+        paymentMode: 'CASH',
+        transactionTimestamp: '21-Oct-2026 11:30 AM',
+        receiptDownloadUrl: 'https://storage.kumaranfinance.com/receipt-00413.pdf',
+        passbookAppUrl: 'https://app.kumaranfinance.com/passbook/tkt-7',
+        fcmToken: 'fcm-device-token-android-sundaram-phone',
+      });
+
+      expect(res.channel).toBe('PUSH_NOTIFICATION');
+      expect(res.pushId).toBeDefined();
+      expect(res.whatsappId).toBeDefined();
+
+      const logs = notificationService.getSentNotificationLog();
+      const pushNotif = logs.find((l) => l.channel === 'PUSH_NOTIFICATION');
+      expect(pushNotif).toBeDefined();
+      expect(pushNotif?.messageText).toContain('மாத தவணை தொகை ரூ. 4,100 பெறப்பட்டது! ரசீது எண்: KC-REC-PRD-2026-00413');
+    });
+
     it('should broadcast upcoming auction reminder to subscribers in Tamil', async () => {
       const res = await notificationService.dispatchAuctionReminder({
         chitGroupId: 'group-001',

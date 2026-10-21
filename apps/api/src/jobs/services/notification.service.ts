@@ -8,7 +8,7 @@ import type {
 
 export interface SentNotificationRecord {
   id: string;
-  channel: 'SMS_DLT' | 'WHATSAPP';
+  channel: 'SMS_DLT' | 'WHATSAPP' | 'PUSH_NOTIFICATION';
   recipientPhone: string;
   templateType: 'RECEIPT' | 'AUCTION_REMINDER' | 'DEFAULT_WARNING' | 'OTP';
   messageText: string;
@@ -25,41 +25,70 @@ export class NotificationService {
   constructor(@Optional() private readonly smsService?: SmsService) {}
 
   /**
-   * Formats and records/dispatches bilingual payment receipt alert (DLT SMS + WhatsApp).
+   * Formats and records/dispatches bilingual payment receipt alert:
+   * - Primary (₹0 Cost): Mobile App Push Notification (FCM) deep-linking to /passbook.
+   * - Fallback: Indian DLT-Compliant SMS via SmsService (only if customer has no registered smartphone/FCM token).
    */
   async dispatchPaymentReceipt(
     payload: PaymentReceiptNotificationJobPayload,
-  ): Promise<{ smsId: string; whatsappId: string }> {
+  ): Promise<{ smsId?: string; pushId?: string; whatsappId: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
     const formattedAmount = BigInt(payload.amountPaid).toLocaleString('en-IN');
 
-    // 1. Indian DLT-Compliant SMS via pluggable SmsService
-    let smsId = `sms-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    if (this.smsService) {
-      const smsResult = await this.smsService.sendPaymentReceiptSms({
-        recipientPhone: payload.recipientPhone,
-        amountPaid: payload.amountPaid,
-        chitCode: payload.chitCode,
-        ticketNumber: payload.ticketNumber,
-        transactionTimestamp: payload.transactionTimestamp,
-        receiptNumber: payload.receiptNumber,
-        passbookAppUrl: payload.passbookAppUrl,
-      });
-      if (smsResult.messageId) {
-        smsId = smsResult.messageId;
-      }
-    }
+    let smsId: string | undefined;
+    let pushId: string | undefined;
 
-    const smsText = `Kumaran Chits: Received Rs.${formattedAmount} for Chit ${payload.chitCode}, Ticket #${payload.ticketNumber} on ${payload.transactionTimestamp}. Receipt: ${payload.receiptNumber}. View passbook: ${payload.passbookAppUrl}`;
-    this.sentLog.push({
-      id: smsId,
-      channel: 'SMS_DLT',
-      recipientPhone: payload.recipientPhone,
-      templateType: 'RECEIPT',
-      messageText: smsText,
-      variables: { ...payload },
-      sentAt: new Date(),
-      status: 'DELIVERED',
-    });
+    // Check if customer has an active Mobile App Push Token (Primary & ₹0 Cost Channel)
+    const isPushEligible = Boolean(payload.fcmToken) && payload.channelPreference !== 'SMS_FALLBACK';
+
+    if (isPushEligible && payload.fcmToken) {
+      pushId = `push-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
+      const pushBody = `மாத தவணை தொகை ரூ. ${formattedAmount} பெறப்பட்டது! ரசீது எண்: ${payload.receiptNumber}. / Payment of Rs. ${formattedAmount} received!`;
+
+      this.logger.log(
+        `Dispatched free Mobile App Push Notification for Receipt ${payload.receiptNumber}`,
+      );
+
+      this.sentLog.push({
+        id: pushId,
+        channel: 'PUSH_NOTIFICATION',
+        recipientPhone: payload.recipientPhone,
+        templateType: 'RECEIPT',
+        messageText: `${pushTitle}: ${pushBody}`,
+        variables: { ...payload },
+        sentAt: new Date(),
+        status: 'DELIVERED',
+      });
+    } else {
+      // Fallback: Indian DLT-Compliant SMS via pluggable SmsService (Reserved for non-smartphone users)
+      smsId = `sms-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      if (this.smsService) {
+        const smsResult = await this.smsService.sendPaymentReceiptSms({
+          recipientPhone: payload.recipientPhone,
+          amountPaid: payload.amountPaid,
+          chitCode: payload.chitCode,
+          ticketNumber: payload.ticketNumber,
+          transactionTimestamp: payload.transactionTimestamp,
+          receiptNumber: payload.receiptNumber,
+          passbookAppUrl: payload.passbookAppUrl,
+        });
+        if (smsResult.messageId) {
+          smsId = smsResult.messageId;
+        }
+      }
+
+      const smsText = `Kumaran Chits: Received Rs.${formattedAmount} for Chit ${payload.chitCode}, Ticket #${payload.ticketNumber} on ${payload.transactionTimestamp}. Receipt: ${payload.receiptNumber}. View passbook: ${payload.passbookAppUrl}`;
+      this.sentLog.push({
+        id: smsId,
+        channel: 'SMS_DLT',
+        recipientPhone: payload.recipientPhone,
+        templateType: 'RECEIPT',
+        messageText: smsText,
+        variables: { ...payload },
+        sentAt: new Date(),
+        status: 'DELIVERED',
+      });
+    }
 
     // 2. Bilingual WhatsApp Notification
     const whatsappText = `வணக்கம் திரு. *${payload.subscriberName}*,
@@ -101,7 +130,12 @@ ${payload.passbookAppUrl}
       `Dispatched bilingual receipt notifications to ${payload.recipientPhone} for Receipt ${payload.receiptNumber}`,
     );
 
-    return { smsId, whatsappId };
+    return {
+      smsId,
+      pushId,
+      whatsappId,
+      channel: isPushEligible ? 'PUSH_NOTIFICATION' : 'SMS_DLT',
+    };
   }
 
   /**

@@ -10,6 +10,8 @@ export interface PaymentReceiptNotificationJobPayload {
   transactionTimestamp: string;
   receiptDownloadUrl: string;
   passbookAppUrl: string;
+  fcmToken?: string;
+  channelPreference?: 'PUSH_NOTIFICATION' | 'SMS_FALLBACK';
 }
 
 export interface AuctionReminderJobPayload {
