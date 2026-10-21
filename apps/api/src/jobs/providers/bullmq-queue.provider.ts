@@ -1,5 +1,15 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
+import {
+  CRON_DAILY_ARREARS,
+  CRON_PRE_AUCTION_REMINDERS,
+  CRON_SETTLEMENT_RECONCILIATION,
+  JOB_SCAN_PRE_AUCTION_REMINDERS,
+  REPEATABLE_JOB_DAILY_ARREARS,
+  REPEATABLE_JOB_PRE_AUCTION_REMINDERS,
+  REPEATABLE_JOB_SETTLEMENT_RECONCILIATION,
+  TIMEZONE_IST,
+} from '../constants/cron-schedules.constant';
 import {
   DAILY_MAINTENANCE_QUEUE,
   JOB_DISPATCH_AUCTION_REMINDER,
@@ -10,6 +20,7 @@ import {
   NOTIFICATION_QUEUE,
   RECONCILIATION_QUEUE,
 } from '../constants/queue-names.constant';
+import { AuctionReminderSchedulerService } from '../services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from '../services/daily-arrears.service';
 import { NotificationService } from '../services/notification.service';
 import { ReconciliationService } from '../services/reconciliation.service';
@@ -41,9 +52,10 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     private readonly dailyArrearsService: DailyArrearsService,
     private readonly notificationService: NotificationService,
     private readonly reconciliationService: ReconciliationService,
+    @Optional() private readonly auctionReminderSchedulerService?: AuctionReminderSchedulerService,
   ) {}
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     const client = this.redisProvider.getClient();
     if (!client) {
       this.logger.warn('Redis client not available. Operating BullMQ queues in direct-execution mode.');
@@ -88,6 +100,11 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
           if (job.name === JOB_DISPATCH_DEFAULT_WARNING) {
             return await this.notificationService.dispatchDefaultWarning(job.data);
           }
+          if (job.name === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {
+            return await this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(
+              job.data?.targetDate ? new Date(job.data.targetDate) : undefined,
+            );
+          }
         },
         { connection: client as any },
       );
@@ -102,10 +119,99 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
         { connection: client as any },
       );
 
-      this.logger.log('BullMQ Queues and Workers initialized successfully.');
+      // 3. Register Automated Repeatable Cron Jobs (Asia/Kolkata timezone)
+      await this.registerRepeatableJobs();
+
+      this.logger.log('BullMQ Queues, Workers, and Repeatable Crons initialized successfully.');
     } catch (err: any) {
       this.logger.warn(`Could not start BullMQ workers on Redis: ${err.message}. Using direct execution.`);
     }
+  }
+
+  /**
+   * Registers automated Indian Standard Time (Asia/Kolkata) repeatable cron jobs on BullMQ queues.
+   */
+  async registerRepeatableJobs(): Promise<void> {
+    if (!this.dailyMaintenanceQueue || !this.reconciliationQueue || !this.notificationQueue) {
+      return;
+    }
+
+    try {
+      // 1. Daily Midnight Arrears & 3-Month Default Recalculation (00:01 AM IST)
+      await this.dailyMaintenanceQueue.upsertJobScheduler(
+        REPEATABLE_JOB_DAILY_ARREARS,
+        {
+          pattern: CRON_DAILY_ARREARS,
+          tz: TIMEZONE_IST,
+        },
+        {
+          name: JOB_PROCESS_DAILY_ARREARS,
+          data: {},
+        },
+      );
+
+      // 2. Daily Payment Settlement Reconciliation (06:00 AM IST)
+      await this.reconciliationQueue.upsertJobScheduler(
+        REPEATABLE_JOB_SETTLEMENT_RECONCILIATION,
+        {
+          pattern: CRON_SETTLEMENT_RECONCILIATION,
+          tz: TIMEZONE_IST,
+        },
+        {
+          name: JOB_RUN_DAILY_RECONCILIATION,
+          data: { records: [] },
+        },
+      );
+
+      // 3. Pre-Auction Reminders Broadcast (09:00 AM IST)
+      await this.notificationQueue.upsertJobScheduler(
+        REPEATABLE_JOB_PRE_AUCTION_REMINDERS,
+        {
+          pattern: CRON_PRE_AUCTION_REMINDERS,
+          tz: TIMEZONE_IST,
+        },
+        {
+          name: JOB_SCAN_PRE_AUCTION_REMINDERS,
+          data: {},
+        },
+      );
+
+      this.logger.log('Registered 3 automated repeatable cron jobs on BullMQ (Asia/Kolkata).');
+    } catch (err: any) {
+      this.logger.warn(`Failed to register repeatable cron jobs: ${err.message}`);
+    }
+  }
+
+  /**
+   * Returns list of registered repeatable jobs across active queues.
+   */
+  async getRepeatableJobs(): Promise<Array<{ queue: string; id: string; pattern?: string; tz?: string; next?: number }>> {
+    const list: Array<{ queue: string; id: string; pattern?: string; tz?: string; next?: number }> = [];
+    const queues = [
+      { name: DAILY_MAINTENANCE_QUEUE, queue: this.dailyMaintenanceQueue },
+      { name: RECONCILIATION_QUEUE, queue: this.reconciliationQueue },
+      { name: NOTIFICATION_QUEUE, queue: this.notificationQueue },
+    ];
+
+    for (const q of queues) {
+      if (q.queue) {
+        try {
+          const schedulers = await q.queue.getJobSchedulers();
+          for (const s of schedulers) {
+            list.push({
+              queue: q.name,
+              id: s.id || '',
+              pattern: s.pattern,
+              tz: s.tz,
+              next: s.next,
+            });
+          }
+        } catch {
+          // Ignore if queue unavailable
+        }
+      }
+    }
+    return list;
   }
 
   /**
@@ -143,6 +249,10 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
       await this.notificationService.dispatchDefaultWarning(data);
     } else if (jobName === JOB_RUN_DAILY_RECONCILIATION) {
       await this.reconciliationService.reconcileSettlement(data?.records || []);
+    } else if (jobName === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {
+      await this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(
+        data?.targetDate ? new Date(data.targetDate) : undefined,
+      );
     }
 
     return { jobId: `direct-${Date.now()}`, status: 'EXECUTED_DIRECT' };

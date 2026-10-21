@@ -182,3 +182,24 @@ MSG91_AUTH_KEY=your_msg91_production_auth_key
 | **Payment Receipt** | `1407169823412093848` | `KMRCHT` | `Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}. Receipt: {#var#}. View passbook: {#var#}` |
 | **Auction Reminder**| `1407169823412093849` | `KMRCHT` | `Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}` |
 | **Default Warning** | `1407169823412093850` | `KMRCHT` | `Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}` |
+
+---
+
+## 6. Automated Background Cron Schedules & 24-Hour Timeline (`CONFIRMED-BY-DEVELOPER`)
+
+The platform executes autonomous maintenance jobs scheduled strictly in Indian Standard Time (`Asia/Kolkata` / UTC+05:30) via BullMQ repeatable workers:
+
+### 6.1 Daily Operations Timeline
+
+| Time (IST) | Scheduled Routine | Automated Action Executed | Manual Trigger Override |
+|:---:|---|---|---|
+| **00:01 AM** | **Midnight Arrears Recalculation** | Transitions past unpaid dues to `OVERDUE`. Recalculates consecutive missed months, tags tickets with $\ge 3$ consecutive missed installments as `DEFAULT_3_MONTHS` (ADR-07), and emits warning notices. | `POST /api/v1/jobs/run-daily-arrears` |
+| **02:00 AM** | **Off-Site Encrypted S3 Backup** | `pg_dump` binary dump encrypted with `AES256` and streamed to AWS S3. Purges dumps older than 30 days. | `pnpm db:backup:s3` |
+| **06:00 AM** | **Payment Settlement Reconciliation** | Compares payment gateway orders against settlement reports to auto-resolve ghost drops (`INITIATED` $\to$ `SUCCESS`). | `POST /api/v1/jobs/run-reconciliation` |
+| **09:00 AM** | **Pre-Auction Broadcast Reminder** | Scans chits with auctions in 3 days; broadcasts bilingual mobile Push & DLT SMS alerts with date, time, and branch venue. | `POST /api/v1/jobs/run-pre-auction-scan` |
+
+### 6.2 Monitoring & Queue Inspection
+- **Bull Board Dashboard**: `http://localhost:3000/admin/queues` (Basic Auth: `BULL_BOARD_USER`).
+- **Repeatable Schedules Audit**: `GET /api/v1/jobs/repeatable-schedules`.
+- **Queue Health Metrics**: `GET /api/v1/jobs/queue-status`.
+

@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { PushService } from '../../notification/services/push.service';
 import { SmsService } from '../../notification/services/sms.service';
 import type {
   AuctionReminderJobPayload,
@@ -23,7 +24,10 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
   private readonly sentLog: SentNotificationRecord[] = [];
 
-  constructor(@Optional() private readonly smsService?: SmsService) {}
+  constructor(
+    @Optional() private readonly smsService?: SmsService,
+    @Optional() private readonly pushService?: PushService,
+  ) {}
 
   /**
    * Formats and records/dispatches bilingual payment receipt alert:
@@ -45,6 +49,23 @@ export class NotificationService {
       pushId = `push-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
       const pushBody = `மாத தவணை தொகை ரூ. ${formattedAmount} பெறப்பட்டது! ரசீது எண்: ${payload.receiptNumber}. / Payment of Rs. ${formattedAmount} received!`;
+
+      if (this.pushService) {
+        const pushRes = await this.pushService.sendPushNotification({
+          recipientToken: payload.fcmToken,
+          title: pushTitle,
+          body: pushBody,
+          data: {
+            type: 'RECEIPT',
+            receiptNumber: payload.receiptNumber,
+            passbookUrl: payload.passbookAppUrl,
+            chitCode: payload.chitCode,
+          },
+        });
+        if (pushRes.messageId) {
+          pushId = pushRes.messageId;
+        }
+      }
 
       this.logger.log(
         `Dispatched free Mobile App Push Notification for Receipt ${payload.receiptNumber}`,
@@ -154,9 +175,25 @@ ${payload.passbookAppUrl}
     for (const sub of payload.subscribers) {
       if (sub.fcmToken) {
         // Primary: Free Mobile Push Notification
-        const pushId = `push-auc-${Date.now()}-${count}`;
+        let pushId = `push-auc-${Date.now()}-${count}`;
         const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
         const pushBody = `மாதம் ${payload.installmentMonth} ஏல அறிவிப்பு: ${payload.auctionDate} ${payload.auctionTime} (${payload.branchName}). / Chit ${payload.chitCode} Month ${payload.installmentMonth} auction on ${payload.auctionDate} at ${payload.auctionTime}.`;
+
+        if (this.pushService) {
+          const pushRes = await this.pushService.sendPushNotification({
+            recipientToken: sub.fcmToken,
+            title: pushTitle,
+            body: pushBody,
+            data: {
+              type: 'AUCTION_REMINDER',
+              chitCode: payload.chitCode,
+              installmentMonth: String(payload.installmentMonth),
+            },
+          });
+          if (pushRes.messageId) {
+            pushId = pushRes.messageId;
+          }
+        }
 
         this.sentLog.push({
           id: pushId,
@@ -224,6 +261,22 @@ ${payload.passbookAppUrl}
       const pushTitle = 'எச்சரிக்கை அறிவிப்பு / Kumaran Finance Warning';
       const pushBody = `குமரன் சீட்ஸ்: டிக்கெட் #${payload.ticketNumber} (${payload.chitCode}) தொடர்ந்து ${payload.consecutiveUnpaidMonths} மாத தவணைகள் நிலுவையில் உள்ளது (₹${formattedOverdue}). உடனடியாக செலுத்தவும். / Urgent: 3-month default warning.`;
 
+      if (this.pushService) {
+        const pushRes = await this.pushService.sendPushNotification({
+          recipientToken: payload.fcmToken,
+          title: pushTitle,
+          body: pushBody,
+          data: {
+            type: 'DEFAULT_WARNING',
+            ticketId: payload.ticketId,
+            chitCode: payload.chitCode,
+          },
+        });
+        if (pushRes.messageId) {
+          notificationId = pushRes.messageId;
+        }
+      }
+
       this.sentLog.push({
         id: notificationId,
         channel: 'PUSH_NOTIFICATION',
@@ -288,9 +341,25 @@ ${payload.passbookAppUrl}
 
     for (const sub of payload.subscribers) {
       if (sub.fcmToken) {
-        const pushId = `push-res-${Date.now()}-${count}`;
+        let pushId = `push-res-${Date.now()}-${count}`;
         const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
         const pushBody = `மாதம் ${payload.installmentMonth} ஏல முடிவு: வெற்றி கழிவு ரூ. ${formattedDiscount}. லாபப்பங்கு ரூ. ${formattedDividend}. அடுத்த மாத தவணை: ரூ. ${formattedPayable}. / Dividend credit: Rs.${formattedDividend}. Next month: Rs.${formattedPayable}.`;
+
+        if (this.pushService) {
+          const pushRes = await this.pushService.sendPushNotification({
+            recipientToken: sub.fcmToken,
+            title: pushTitle,
+            body: pushBody,
+            data: {
+              type: 'AUCTION_RESULT',
+              chitCode: payload.chitCode,
+              installmentMonth: String(payload.installmentMonth),
+            },
+          });
+          if (pushRes.messageId) {
+            pushId = pushRes.messageId;
+          }
+        }
 
         this.sentLog.push({
           id: pushId,

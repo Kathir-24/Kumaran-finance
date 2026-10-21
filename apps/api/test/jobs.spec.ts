@@ -2,6 +2,7 @@ import { DueStatus, PaymentStatus } from '@prisma/client';
 import { JobsController } from '../src/jobs/jobs.controller';
 import { BullMqQueueProvider } from '../src/jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../src/jobs/providers/redis-connection.provider';
+import { AuctionReminderSchedulerService } from '../src/jobs/services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from '../src/jobs/services/daily-arrears.service';
 import { NotificationService } from '../src/jobs/services/notification.service';
 import { ReconciliationService } from '../src/jobs/services/reconciliation.service';
@@ -12,6 +13,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
   let notificationService: NotificationService;
   let dailyArrearsService: DailyArrearsService;
   let reconciliationService: ReconciliationService;
+  let auctionReminderSchedulerService: AuctionReminderSchedulerService;
   let redisProviderMock: any;
   let queueProvider: BullMqQueueProvider;
   let jobsController: JobsController;
@@ -33,6 +35,9 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      auction: {
+        findMany: jest.fn(),
+      },
     };
 
     dailyArrearsService = new DailyArrearsService(
@@ -42,6 +47,11 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
     reconciliationService = new ReconciliationService(
       prismaMock as unknown as PrismaService,
+    );
+
+    auctionReminderSchedulerService = new AuctionReminderSchedulerService(
+      prismaMock as unknown as PrismaService,
+      notificationService,
     );
 
     redisProviderMock = {
@@ -54,6 +64,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       dailyArrearsService,
       notificationService,
       reconciliationService,
+      auctionReminderSchedulerService,
     );
     queueProvider.onModuleInit();
 
@@ -61,6 +72,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       dailyArrearsService,
       notificationService,
       reconciliationService,
+      auctionReminderSchedulerService,
       queueProvider,
     );
   });
@@ -472,6 +484,76 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       const result = await jobsController.runDailyArrears('2026-10-19T00:00:00Z');
       expect(result.duesTransitionedToOverdue).toBe(0);
       expect(result.ticketsEvaluated).toBe(0);
+    });
+  });
+
+  describe('5. Repeatable Cron Schedules & AuctionReminderSchedulerService', () => {
+    it('should scan scheduled auctions on target date and dispatch reminders to subscribers', async () => {
+      const mockAuctionDate = new Date('2026-10-25T10:30:00Z');
+      const mockAuctions = [
+        {
+          id: 'auc-001',
+          installmentMonth: 4,
+          auctionDate: mockAuctionDate,
+          chitGroup: {
+            id: 'group-001',
+            groupCode: 'KCA-1L-20M-01',
+            branch: {
+              name: 'Head Office - Perundurai',
+              addressLine1: 'Main Road, Perundurai',
+              phone: '0424-2223333',
+            },
+            tickets: [
+              {
+                id: 'tkt-01',
+                customer: {
+                  fullName: 'S. Sundaram',
+                  phone: '9842143210',
+                  fcmToken: 'fcm-token-app-user',
+                },
+              },
+              {
+                id: 'tkt-02',
+                customer: {
+                  fullName: 'K. Palanisamy',
+                  phone: '9842111222',
+                  fcmToken: null,
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      prismaMock.auction.findMany.mockResolvedValue(mockAuctions);
+
+      const res = await auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(mockAuctionDate);
+      expect(res.chitsCount).toBe(1);
+      expect(res.remindersCount).toBe(2);
+      expect(res.details[0]).toContain('KCA-1L-20M-01 Month 4: 2 reminders dispatched (1 Push, 1 SMS)');
+    });
+
+    it('should handle zero scheduled auctions gracefully', async () => {
+      prismaMock.auction.findMany.mockResolvedValue([]);
+
+      const res = await auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions();
+      expect(res.chitsCount).toBe(0);
+      expect(res.remindersCount).toBe(0);
+      expect(res.details.length).toBe(0);
+    });
+
+    it('should allow JobsController to run pre-auction scan manually', async () => {
+      prismaMock.auction.findMany.mockResolvedValue([]);
+
+      const res = await jobsController.runPreAuctionScan('2026-10-25T00:00:00Z');
+      expect(res.chitsCount).toBe(0);
+      expect(res.remindersCount).toBe(0);
+    });
+
+    it('should return empty repeatable list when queues are operating in direct fallback mode', async () => {
+      const schedules = await jobsController.getRepeatableSchedules();
+      expect(Array.isArray(schedules)).toBe(true);
+      expect(schedules.length).toBe(0);
     });
   });
 });

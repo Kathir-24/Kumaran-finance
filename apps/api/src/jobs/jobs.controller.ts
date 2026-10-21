@@ -28,6 +28,7 @@ import {
   RECONCILIATION_QUEUE,
 } from './constants/queue-names.constant';
 import { BullMqQueueProvider } from './providers/bullmq-queue.provider';
+import { AuctionReminderSchedulerService } from './services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from './services/daily-arrears.service';
 import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
@@ -41,6 +42,7 @@ export class JobsController {
     private readonly dailyArrearsService: DailyArrearsService,
     private readonly notificationService: NotificationService,
     private readonly reconciliationService: ReconciliationService,
+    private readonly auctionReminderSchedulerService: AuctionReminderSchedulerService,
     private readonly queueProvider: BullMqQueueProvider,
   ) {}
 
@@ -144,5 +146,31 @@ export class JobsController {
   })
   getNotificationLogs(@Query('limit') limit?: number) {
     return this.notificationService.getSentNotificationLog(limit ? Number(limit) : 50);
+  }
+
+  @Post('run-pre-auction-scan')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Manually trigger pre-auction reminders scan (default 3 days ahead)',
+    description: 'Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.',
+  })
+  @ApiQuery({
+    name: 'targetDate',
+    required: false,
+    type: String,
+    description: 'ISO date string to test a specific auction date',
+  })
+  async runPreAuctionScan(@Query('targetDate') targetDate?: string) {
+    const date = targetDate ? new Date(targetDate) : undefined;
+    return this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(date);
+  }
+
+  @Get('repeatable-schedules')
+  @Roles(Role.SUPER_ADMIN, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'List active BullMQ repeatable cron jobs and next execution timestamps',
+  })
+  async getRepeatableSchedules() {
+    return this.queueProvider.getRepeatableJobs();
   }
 }

@@ -6,6 +6,7 @@ import { BullBoardService } from './bull-board/bull-board.service';
 import { JobsController } from './jobs.controller';
 import { BullMqQueueProvider } from './providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from './providers/redis-connection.provider';
+import { AuctionReminderSchedulerService } from './services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from './services/daily-arrears.service';
 import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
@@ -18,6 +19,7 @@ import { ReconciliationService } from './services/reconciliation.service';
     NotificationService,
     DailyArrearsService,
     ReconciliationService,
+    AuctionReminderSchedulerService,
     BullMqQueueProvider,
     BullBoardService,
     BullBoardAuthMiddleware,
@@ -27,6 +29,7 @@ import { ReconciliationService } from './services/reconciliation.service';
     NotificationService,
     DailyArrearsService,
     ReconciliationService,
+    AuctionReminderSchedulerService,
     BullMqQueueProvider,
     BullBoardService,
     BullBoardAuthMiddleware,
