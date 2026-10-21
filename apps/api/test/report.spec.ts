@@ -115,6 +115,9 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
         findMany: jest.fn(),
         count: jest.fn(),
       },
+      paymentReversal: {
+        findMany: jest.fn(),
+      },
     };
 
     statutoryReportService = new StatutoryReportService(
@@ -679,6 +682,175 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
           branchManagerUser,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('9. Unified Maker-Checker Approvals Queue (`/reports/pending-approvals`)', () => {
+    it('should aggregate pending cash handovers, disbursement authorizations, reversals, and safety proofs', async () => {
+      // 1. Mock pending cash payments
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-handover-1',
+          branchId: mockBranchId,
+          recordedByUserId: 'collector-agent-1',
+          amount: 3950n,
+          paymentMethod: 'CASH',
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          createdAt: new Date('2026-10-21T09:00:00Z'),
+          recordedByUser: {
+            id: 'collector-agent-1',
+            name: 'K. Senthil',
+            phone: '9842111111',
+          },
+        },
+        {
+          id: 'pmt-handover-2',
+          branchId: mockBranchId,
+          recordedByUserId: 'collector-agent-1',
+          amount: 3950n,
+          paymentMethod: 'CASH',
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          createdAt: new Date('2026-10-21T09:30:00Z'),
+          recordedByUser: {
+            id: 'collector-agent-1',
+            name: 'K. Senthil',
+            phone: '9842111111',
+          },
+        },
+      ]);
+
+      // 2. Mock pending disbursement authorizations
+      prismaMock.auctionWinner.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'winner-auth-1',
+            auctionId: 'auc-01',
+            disbursementStatus: 'VERIFIED_BY_MAKER',
+            disbursedAmount: 75000n,
+            disbursementMode: 'NEFT',
+            verifiedByUserId: 'staff-maker-1',
+            agreementSigned: true,
+            nomineeSigned: true,
+            securityDocS3Key: 'docs/winner-agreement.pdf',
+            auction: {
+              installmentMonth: 4,
+              auctionDate: new Date('2026-10-20T10:00:00Z'),
+              chitGroup: {
+                groupCode: 'KCA-1L-20M-01',
+                groupName: 'Perundurai 1L Scheme',
+                branchId: mockBranchId,
+              },
+            },
+            ticket: {
+              ticketNumber: 5,
+              customer: {
+                customerCode: 'KC-CUST-00005',
+                fullName: 'M. Duraisamy',
+                phone: '9842155555',
+              },
+            },
+          },
+        ]) // 4. Mock pending safety proof verifications
+        .mockResolvedValueOnce([
+          {
+            id: 'winner-verify-1',
+            auctionId: 'auc-02',
+            disbursementStatus: 'PENDING_VERIFICATION',
+            disbursedAmount: null,
+            auction: {
+              installmentMonth: 5,
+              prizeMoney: 80000n,
+              auctionDate: new Date('2026-10-21T11:00:00Z'),
+              chitGroup: {
+                groupCode: 'KCA-1L-20M-02',
+                groupName: 'Perundurai 1L Scheme 2',
+              },
+            },
+            ticket: {
+              ticketNumber: 8,
+              customer: {
+                customerCode: 'KC-CUST-00008',
+                fullName: 'P. Shanmugam',
+                phone: '9842188888',
+              },
+            },
+          },
+        ]);
+
+      // 3. Mock pending payment reversals
+      prismaMock.paymentReversal.findMany.mockResolvedValue([
+        {
+          id: 'rev-01',
+          paymentId: 'pmt-wrong-01',
+          reason: 'Duplicate entry by field agent',
+          notes: 'Customer already paid in office',
+          initiatedByUserId: 'agent-maker-01',
+          createdAt: new Date('2026-10-21T08:00:00Z'),
+          payment: {
+            amount: 3950n,
+            branchId: mockBranchId,
+            receipt: { receiptNumber: 'KC-REC-PRD-2026-00010' },
+            allocations: [
+              {
+                ticket: {
+                  customer: {
+                    customerCode: 'KC-CUST-00003',
+                    fullName: 'Ramasamy K',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      const res = await reportService.getPendingApprovals(superAdminUser);
+
+      // Verify Summary Counts & Amounts
+      expect(res.summary.totalPendingCount).toBe(4);
+      expect(res.summary.cashHandoversCount).toBe(1); // Grouped by agent
+      expect(res.summary.disbursementAuthorizationsCount).toBe(1);
+      expect(res.summary.paymentReversalsCount).toBe(1);
+      expect(res.summary.safetyProofVerificationsCount).toBe(1);
+      expect(res.summary.cashHandoversTotalAmount).toBe('7900');
+      expect(res.summary.disbursementsTotalAmount).toBe('75000');
+      expect(res.summary.reversalsTotalAmount).toBe('3950');
+
+      // Verify Cash Handover Details
+      expect(res.cashHandovers[0].collectorName).toBe('K. Senthil');
+      expect(res.cashHandovers[0].paymentCount).toBe(2);
+      expect(res.cashHandovers[0].totalAmount).toBe('7900');
+
+      // Verify Disbursement Details
+      expect(res.disbursementAuthorizations[0].customerName).toBe('M. Duraisamy');
+      expect(res.disbursementAuthorizations[0].netPayableAmount).toBe('75000');
+      expect(res.disbursementAuthorizations[0].hasSecurityDoc).toBe(true);
+
+      // Verify Reversal Details
+      expect(res.paymentReversals[0].receiptNumber).toBe('KC-REC-PRD-2026-00010');
+      expect(res.paymentReversals[0].amount).toBe('3950');
+      expect(res.paymentReversals[0].customerName).toBe('Ramasamy K');
+    });
+
+    it('should restrict Branch Manager to pending approvals strictly belonging to their branch', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      prismaMock.auctionWinner.findMany.mockResolvedValue([]);
+      prismaMock.paymentReversal.findMany.mockResolvedValue([]);
+
+      await reportService.getPendingApprovals(branchManagerUser);
+
+      expect(prismaMock.payment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ branchId: mockBranchId }),
+        }),
+      );
+      expect(prismaMock.paymentReversal.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            payment: { branchId: mockBranchId },
+          }),
+        }),
+      );
     });
   });
 });

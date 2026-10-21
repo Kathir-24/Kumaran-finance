@@ -1,4 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  MessageEvent,
+  Query,
+  Sse,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -6,6 +13,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { interval, Observable } from 'rxjs';
+import { startWith, switchMap } from 'rxjs/operators';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,6 +27,7 @@ import { QueryDayBookDto } from './dto/query-day-book.dto';
 import { QueryDefaultersReportDto } from './dto/query-defaulters-report.dto';
 import { QueryFormXviiDto } from './dto/query-form-xvii.dto';
 import { QueryFormXxiDto } from './dto/query-form-xxi.dto';
+import { QueryPendingApprovalsDto } from './dto/query-pending-approvals.dto';
 import { ReportService } from './report.service';
 
 @ApiTags('Dashboards & Statutory Reports')
@@ -40,6 +50,53 @@ export class ReportController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.reportService.getExecutiveDashboard(query, currentUser);
+  }
+
+  @Get('pending-approvals')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'Aggregated Maker-Checker Pending Approvals Queue',
+    description:
+      'Aggregates pending operational items requiring partner or branch manager action: unacknowledged cash handovers, prize disbursement authorizations, payment reversal requests, and pending safety proof verifications. Scoped to branch for Branch Manager.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Aggregated pending approvals queue returned',
+  })
+  async getPendingApprovals(
+    @Query() query: QueryPendingApprovalsDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.reportService.getPendingApprovals(currentUser, query.branchId);
+  }
+
+  @Sse('approvals-stream')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'Real-Time Server-Sent Events (SSE) Stream for Pending Approvals',
+    description:
+      'Streams live pending approval counters and alerts to web dashboard and mobile app via SSE every 15 seconds. Scoped to user branch permissions.',
+  })
+  streamPendingApprovals(
+    @Query() query: QueryPendingApprovalsDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ): Observable<MessageEvent> {
+    return interval(15000).pipe(
+      startWith(0),
+      switchMap(async () => {
+        const approvals = await this.reportService.getPendingApprovals(
+          currentUser,
+          query.branchId,
+        );
+        return {
+          data: {
+            type: 'APPROVALS_UPDATE',
+            summary: approvals.summary,
+            timestamp: new Date().toISOString(),
+          },
+        } as MessageEvent;
+      }),
+    );
   }
 
   @Get('day-book')

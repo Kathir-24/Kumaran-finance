@@ -20,6 +20,7 @@
 | **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
 | **Module 8: Prize Disbursements** | `/disbursements` | 6 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout | 11 passing |
+| **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 13 passing |
 | **TOTAL VERIFIED SCOPE** | — | **54** | **All Invariants 100% Satisfied** | **120 / 120 PASSING** |
 
@@ -161,6 +162,8 @@
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/reports/dashboard` | Executive KPI dashboard & vault metrics | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/pending-approvals` | Aggregated Maker-Checker pending approvals queue | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/reports/approvals-stream` | Real-time SSE event stream for pending approvals | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/reports/day-book` | Daily collection & disbursement journal | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/reports/form-xxii` | Form XXII: Cash Book (Physical Cash Only) | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/reports/form-xvii` | Form XVII: Auction Minutes Register | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |

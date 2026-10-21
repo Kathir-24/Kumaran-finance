@@ -9,7 +9,73 @@ import { QueryDayBookDto } from './dto/query-day-book.dto';
 import { QueryDefaultersReportDto } from './dto/query-defaulters-report.dto';
 import { QueryFormXviiDto } from './dto/query-form-xvii.dto';
 import { QueryFormXxiDto } from './dto/query-form-xxi.dto';
+import { QueryPendingApprovalsDto } from './dto/query-pending-approvals.dto';
 import { StatutoryReportService } from './statutory-report.service';
+
+export interface PendingApprovalsResponse {
+  summary: {
+    totalPendingCount: number;
+    cashHandoversCount: number;
+    disbursementAuthorizationsCount: number;
+    paymentReversalsCount: number;
+    safetyProofVerificationsCount: number;
+    cashHandoversTotalAmount: string;
+    disbursementsTotalAmount: string;
+    reversalsTotalAmount: string;
+  };
+  cashHandovers: Array<{
+    collectorId: string;
+    collectorName: string;
+    collectorPhone?: string | null;
+    branchId: string;
+    totalAmount: string;
+    paymentCount: number;
+    oldestCollectionAt: Date;
+    paymentIds: string[];
+  }>;
+  disbursementAuthorizations: Array<{
+    id: string;
+    auctionId: string;
+    chitGroupCode: string;
+    chitGroupName: string;
+    installmentMonth: number;
+    customerCode: string;
+    customerName: string;
+    customerPhone: string;
+    ticketNumber: number;
+    netPayableAmount: string;
+    disbursementMode?: string | null;
+    verifiedByUserId?: string | null;
+    agreementSigned: boolean;
+    nomineeSigned: boolean;
+    hasSecurityDoc: boolean;
+  }>;
+  paymentReversals: Array<{
+    id: string;
+    paymentId: string;
+    receiptNumber: string;
+    amount: string;
+    customerCode?: string;
+    customerName?: string;
+    reason: string;
+    notes?: string | null;
+    initiatedByUserId: string;
+    createdAt: Date;
+  }>;
+  safetyProofVerifications: Array<{
+    id: string;
+    auctionId: string;
+    chitGroupCode: string;
+    chitGroupName: string;
+    installmentMonth: number;
+    customerCode: string;
+    customerName: string;
+    customerPhone: string;
+    ticketNumber: number;
+    netPayableAmount: string;
+    auctionDate: Date;
+  }>;
+}
 
 @Injectable()
 export class ReportService {
@@ -574,5 +640,235 @@ export class ReportService {
 
   async getSubscriberLedgerFormXxi(query: QueryFormXxiDto, requestingUser: JwtPayload) {
     return this.statutoryReportService.getSubscriberLedgerFormXxi(query, requestingUser);
+  }
+
+  /**
+   * Aggregated Maker-Checker Pending Approvals Queue
+   * Centralizes pending cash handovers, prize disbursements, payment reversals, and safety proofs.
+   * Scoped to branch for Branch Manager; Global for Super Admin & Accountant.
+   */
+  async getPendingApprovals(
+    requestingUser: JwtPayload,
+    queryBranchId?: string,
+  ): Promise<PendingApprovalsResponse> {
+    const branchId =
+      requestingUser.roles.includes(Role.BRANCH_MANAGER) &&
+      !requestingUser.roles.includes(Role.SUPER_ADMIN)
+        ? requestingUser.branchId || undefined
+        : queryBranchId;
+
+    // 1. Pending Cash Handovers
+    const pendingCashPayments = await this.prisma.payment.findMany({
+      where: {
+        paymentMethod: 'CASH',
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        paymentStatus: 'SUCCESS',
+        ...(branchId ? { branchId } : {}),
+      },
+      include: {
+        recordedByUser: { select: { id: true, name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const cashHandoverMap = new Map<
+      string,
+      {
+        collectorId: string;
+        collectorName: string;
+        collectorPhone?: string | null;
+        branchId: string;
+        totalAmount: bigint;
+        paymentCount: number;
+        oldestCollectionAt: Date;
+        paymentIds: string[];
+      }
+    >();
+
+    let cashHandoversTotalBigInt = 0n;
+    for (const p of pendingCashPayments) {
+      cashHandoversTotalBigInt += p.amount;
+      const existing = cashHandoverMap.get(p.recordedByUserId);
+      if (existing) {
+        existing.totalAmount += p.amount;
+        existing.paymentCount += 1;
+        existing.paymentIds.push(p.id);
+        if (p.createdAt < existing.oldestCollectionAt) {
+          existing.oldestCollectionAt = p.createdAt;
+        }
+      } else {
+        cashHandoverMap.set(p.recordedByUserId, {
+          collectorId: p.recordedByUserId,
+          collectorName: p.recordedByUser?.name || 'Unknown Agent',
+          collectorPhone: p.recordedByUser?.phone || null,
+          branchId: p.branchId,
+          totalAmount: p.amount,
+          paymentCount: 1,
+          oldestCollectionAt: p.createdAt,
+          paymentIds: [p.id],
+        });
+      }
+    }
+
+    const cashHandovers = Array.from(cashHandoverMap.values()).map((h) => ({
+      ...h,
+      totalAmount: h.totalAmount.toString(),
+    }));
+
+    // 2. Pending Disbursement Authorizations (Checker step)
+    const pendingAuthorizations = await this.prisma.auctionWinner.findMany({
+      where: {
+        disbursementStatus: 'VERIFIED_BY_MAKER',
+        ...(branchId ? { auction: { chitGroup: { branchId } } } : {}),
+      },
+      include: {
+        auction: {
+          include: {
+            chitGroup: {
+              select: { groupCode: true, groupName: true, branchId: true },
+            },
+          },
+        },
+        ticket: {
+          include: {
+            customer: {
+              select: { customerCode: true, fullName: true, phone: true },
+            },
+          },
+        },
+      },
+      orderBy: { auction: { auctionDate: 'desc' } },
+    });
+
+    let disbursementsTotalBigInt = 0n;
+    const disbursementAuthorizations = pendingAuthorizations.map((w) => {
+      const netAmount = w.disbursedAmount || w.auction.prizeMoney || 0n;
+      disbursementsTotalBigInt += netAmount;
+      return {
+        id: w.id,
+        auctionId: w.auctionId,
+        chitGroupCode: w.auction.chitGroup.groupCode,
+        chitGroupName: w.auction.chitGroup.groupName,
+        installmentMonth: w.auction.installmentMonth,
+        customerCode: w.ticket.customer.customerCode,
+        customerName: w.ticket.customer.fullName,
+        customerPhone: w.ticket.customer.phone,
+        ticketNumber: w.ticket.ticketNumber,
+        netPayableAmount: netAmount.toString(),
+        disbursementMode: w.disbursementMode,
+        verifiedByUserId: w.verifiedByUserId,
+        agreementSigned: w.agreementSigned,
+        nomineeSigned: w.nomineeSigned,
+        hasSecurityDoc: !!w.securityDocS3Key,
+      };
+    });
+
+    // 3. Pending Payment Reversals (Checker step)
+    const pendingReversals = await this.prisma.paymentReversal.findMany({
+      where: {
+        status: 'REQUESTED',
+        ...(branchId ? { payment: { branchId } } : {}),
+      },
+      include: {
+        payment: {
+          include: {
+            receipt: { select: { receiptNumber: true } },
+            allocations: {
+              include: {
+                ticket: {
+                  include: {
+                    customer: {
+                      select: { customerCode: true, fullName: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let reversalsTotalBigInt = 0n;
+    const paymentReversals = pendingReversals.map((r) => {
+      reversalsTotalBigInt += r.payment.amount;
+      const primaryCustomer =
+        r.payment.allocations[0]?.ticket?.customer;
+      return {
+        id: r.id,
+        paymentId: r.paymentId,
+        receiptNumber: r.payment.receipt?.receiptNumber || 'N/A',
+        amount: r.payment.amount.toString(),
+        customerCode: primaryCustomer?.customerCode,
+        customerName: primaryCustomer?.fullName,
+        reason: r.reason,
+        notes: r.notes,
+        initiatedByUserId: r.initiatedByUserId,
+        createdAt: r.createdAt,
+      };
+    });
+
+    // 4. Pending Safety Proof Verifications (Maker step)
+    const pendingSafetyProofs = await this.prisma.auctionWinner.findMany({
+      where: {
+        disbursementStatus: 'PENDING_VERIFICATION',
+        ...(branchId ? { auction: { chitGroup: { branchId } } } : {}),
+      },
+      include: {
+        auction: {
+          include: {
+            chitGroup: {
+              select: { groupCode: true, groupName: true },
+            },
+          },
+        },
+        ticket: {
+          include: {
+            customer: {
+              select: { customerCode: true, fullName: true, phone: true },
+            },
+          },
+        },
+      },
+      orderBy: { auction: { auctionDate: 'desc' } },
+    });
+
+    const safetyProofVerifications = pendingSafetyProofs.map((w) => ({
+      id: w.id,
+      auctionId: w.auctionId,
+      chitGroupCode: w.auction.chitGroup.groupCode,
+      chitGroupName: w.auction.chitGroup.groupName,
+      installmentMonth: w.auction.installmentMonth,
+      customerCode: w.ticket.customer.customerCode,
+      customerName: w.ticket.customer.fullName,
+      customerPhone: w.ticket.customer.phone,
+      ticketNumber: w.ticket.ticketNumber,
+      netPayableAmount: (w.disbursedAmount || w.auction.prizeMoney || 0n).toString(),
+      auctionDate: w.auction.auctionDate,
+    }));
+
+    const totalPendingCount =
+      cashHandovers.length +
+      disbursementAuthorizations.length +
+      paymentReversals.length +
+      safetyProofVerifications.length;
+
+    return {
+      summary: {
+        totalPendingCount,
+        cashHandoversCount: cashHandovers.length,
+        disbursementAuthorizationsCount: disbursementAuthorizations.length,
+        paymentReversalsCount: paymentReversals.length,
+        safetyProofVerificationsCount: safetyProofVerifications.length,
+        cashHandoversTotalAmount: cashHandoversTotalBigInt.toString(),
+        disbursementsTotalAmount: disbursementsTotalBigInt.toString(),
+        reversalsTotalAmount: reversalsTotalBigInt.toString(),
+      },
+      cashHandovers,
+      disbursementAuthorizations,
+      paymentReversals,
+      safetyProofVerifications,
+    };
   }
 }

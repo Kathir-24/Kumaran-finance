@@ -203,3 +203,26 @@ The platform executes autonomous maintenance jobs scheduled strictly in Indian S
 - **Repeatable Schedules Audit**: `GET /api/v1/jobs/repeatable-schedules`.
 - **Queue Health Metrics**: `GET /api/v1/jobs/queue-status`.
 
+---
+
+## 7. Real-Time Maker-Checker Approvals Queue & Operational Monitoring
+
+To enforce Invariant Guardrail #10 (Maker $\ne$ Checker) without administrative friction, the platform consolidates all pending operational sign-offs into a unified queue:
+
+### 7.1 Unified Approvals Queue (`GET /reports/pending-approvals`)
+- **Authorized Roles**: `SUPER_ADMIN` (Partners), `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`.
+- **Data Categories Aggregated**:
+  1. **Cash Handovers**: Field collections awaiting vault counting and confirmation by partner/manager (`collectorUserId != acknowledgerUserId`).
+  2. **Prize Disbursements**: Verified auction winner safety proofs awaiting Checker payout release authorization.
+  3. **Payment Reversals**: Reversal requests awaiting Partner sign-off (`makerUserId != checkerUserId`).
+  4. **Safety Proof Verifications**: Auction winners awaiting desk verification of signed agreement, blank cheques, and promissory notes.
+- **Branch Scoping**:
+  - `BRANCH_MANAGER` view is restricted strictly to their branch.
+  - `SUPER_ADMIN` view encompasses all branches.
+
+### 7.2 Real-Time SSE Stream (`GET /reports/approvals-stream`)
+- Emits live `APPROVALS_UPDATE` payloads over Server-Sent Events every 15 seconds.
+- Automatically powers the notification badge counter on the React Admin Portal and Mobile App.
+- Enables partners to approve cash handovers and vouchers in real-time as staff enter them.
+
+

@@ -130,12 +130,15 @@
 | `POST` | `/auctions/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/auctions/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
 
-### 2.10 Statutory Reports (`/reports`)
+### 2.10 Statutory Reports, Dashboards & Real-Time Approvals (`/reports`)
 
 > **Note on Statutory Form Labels (`UNVERIFIED-LEGAL`)**: Form numbers XVII, XXI, and XXII are working references from generic chit-fund literature. Do not treat these as confirmed Tamil Nadu statutory layouts until physical specimen forms from the Registrar of Chits are verified. See `compliance-checklist.md` §3.
 
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
+| `GET` | `/reports/dashboard` | Executive KPI dashboard and vault metrics | Staff, Auditor |
+| `GET` | `/reports/pending-approvals` | Aggregated Maker-Checker pending approvals queue (Handovers, Payouts, Reversals, Safety Proofs) | Staff, Auditor |
+| `GET` | `/reports/approvals-stream` | Real-time Server-Sent Events (SSE) stream for live pending approval counts | Staff, Auditor |
 | `GET` | `/reports/day-book` | Daily collection and disbursement journal | `ACCOUNTANT`, `SUPER_ADMIN` |
 | `GET` | `/reports/form-xxi` | Form XXI: Subscriber Ledger for Registrar (`UNVERIFIED-LEGAL`) | `AUDITOR`, `SUPER_ADMIN` |
 | `GET` | `/reports/form-xvii` | Form XVII: Auction Minutes Consolidated Register (`UNVERIFIED-LEGAL`) — lists all auction results, winning discounts, tied bidders, and physical draw outcomes across all months | `AUDITOR`, `SUPER_ADMIN` |
