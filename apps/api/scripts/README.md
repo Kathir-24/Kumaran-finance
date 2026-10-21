@@ -14,6 +14,7 @@
 | [`backup-to-s3.ts`](backup-to-s3.ts) | **Off-Site Database Backup & Retention Pruner**<br>Dumps PostgreSQL 17 in binary format (`pg_dump -F c`) and prunes dumps > 30 days. | `pnpm db:backup:s3` | `backups/db/YYYY/MM/*.dump` |
 | [`restore-from-s3.ts`](restore-from-s3.ts) | **S3 Snapshot Restore & Listing CLI**<br>Lists S3 snapshots and executes `pg_restore --clean --if-exists`. | `pnpm db:restore:s3`<br>`pnpm db:backups:list` | Reads from `backups/db/` |
 | [`export-openapi.ts`](export-openapi.ts) | **OpenAPI Spec Generator**<br>Exports current NestJS Swagger definitions to JSON. | `pnpm --filter api run openapi:export` | `docs/03-architecture/openapi-spec.json` |
+| [`seed-test-db.ts`](seed-test-db.ts) | **Automated Test Database Seeder with Safety Guard**<br>Resets the isolated `chitflow_test` database with 28 unpaid dues and guards against non-test execution. | `pnpm --filter api test:db:seed`<br>`pnpm --filter api test:e2e:fresh` | Isolated `chitflow_test` (Port 5433) |
 
 ---
 
@@ -116,3 +117,28 @@ bash infra/scripts/drp-drill.sh
   ```powershell
   pnpm --filter api exec ts-node scripts/restore-from-s3.ts "backups/db/2026/10/kumaran_chits_backup_20261020_173719.dump"
   ```
+
+---
+
+## 5. Automated Test Database Seeder (`seed-test-db.ts`)
+
+### Why This Exists:
+Under repeated automated E2E test runs, test suites transition `UNPAID` installment dues to `PAID`. Without an automated reset mechanism, consecutive test executions deplete the pool of unpaid dues, causing downstream payment and business-rule tests to fail.
+
+`seed-test-db.ts` provides a deterministic, cross-platform mechanism to re-establish the baseline seed state in ~3.5 seconds.
+
+### Safety Guardrail:
+- **Database Name Verification**: Inspects the connection URL and strictly refuses execution if the database name does not contain `"test"` (e.g., `chitflow_test`).
+- **Credential Masking**: Automatically masks database passwords in console output (`:****@`).
+- **Target Isolation**: Defaults to `postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_test?schema=public`.
+
+### Commands:
+- **Standalone Test Database Seed**:
+  ```powershell
+  pnpm --filter api test:db:seed
+  ```
+- **Fresh E2E Test Execution (Seed + Run All 10 Suites)**:
+  ```powershell
+  pnpm --filter api test:e2e:fresh
+  ```
+
