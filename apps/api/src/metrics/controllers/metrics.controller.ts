@@ -4,15 +4,17 @@
 // Compliance: docs/02-requirements/non-functional-requirements.md (§3)
 // ==============================================================================
 
-import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiBasicAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { BypassEnvelope } from '../../common/decorators/bypass-envelope.decorator';
 import { DomainMetricsCollector } from '../collectors/domain-metrics.collector';
 import { MetricsAuthGuard } from '../guards/metrics-auth.guard';
 import { MetricsService } from '../services/metrics.service';
 
 @ApiTags('Observability & Metrics')
-@Controller('metrics')
+@BypassEnvelope()
+@Controller({ path: 'metrics', version: VERSION_NEUTRAL })
 export class MetricsController {
   constructor(
     private readonly metricsService: MetricsService,

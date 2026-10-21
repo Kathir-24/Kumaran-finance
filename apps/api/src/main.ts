@@ -57,9 +57,9 @@ async function bootstrap() {
     maxAge: CORS_MAX_AGE_SECONDS,
   });
 
-  // Global routing prefix with exemptions for health checks, API docs, Bull Board queue monitor, and Prometheus metrics
+  // Global routing prefix with exemptions for root, health checks, API docs, Bull Board queue monitor, and Prometheus metrics
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
+    exclude: ['', '/', 'health', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
   });
 
   // Enable URI Versioning (Default: '1' -> /api/v1/...)

@@ -1,7 +1,9 @@
 import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
+import { BypassEnvelope } from './common/decorators/bypass-envelope.decorator';
 import { AppService } from './app.service';
 
-@Controller({ version: VERSION_NEUTRAL })
+@BypassEnvelope()
+@Controller({ path: '', version: VERSION_NEUTRAL })
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
@@ -10,4 +12,3 @@ export class AppController {
     return this.appService.getHello();
   }
 }
-
