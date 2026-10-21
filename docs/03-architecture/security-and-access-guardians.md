@@ -165,6 +165,6 @@ Every rule documented above is backed by automated negative and positive test as
    - Section 8: Direct storage key access rules (`PASS` across all personas).
 2. **[`apps/api/test/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/jobs.spec.ts)**:
    - Section 1: Daily arrears state machine and 3-month default tagging with warning notification (`PASS`).
-   - Section 2: Indian DLT SMS and bilingual WhatsApp message format verification (`PASS`).
+   - Section 2: Smart Notification Router (Push-first for app users, DLT SMS fallback for keypad phones across payments, auctions, dividends, and defaults) verification (`PASS`).
    - Section 3: 06:00 AM settlement reconciliation, ghost drop auto-resolution, and discrepancy flagging (`PASS`).
    - Section 4: BullMQ queue health and administrative controller endpoint execution (`PASS`).

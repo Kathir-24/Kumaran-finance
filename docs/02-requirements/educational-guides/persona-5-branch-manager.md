@@ -282,7 +282,7 @@ Auction winner Mani visits the branch 3 days later to claim his ₹75,000 prize 
 | Potential Trap / Mistake | What Happens in the Software | How the Branch Manager Resolves It |
 |---|---|---|
 | **Branch Manager attempts to view collections from another branch** | System intercepts request via `DocumentAccessHelper` and throws `HTTP 403: Forbidden`. | Adhere strictly to assigned branch boundary. Cross-branch auditing is restricted to Super Admins and Auditors. |
-| **Branch Manager tries to click "Authorize Payout" on prize voucher** | Button does not exist. System restricts authorization to `SUPER_ADMIN`. | Call or WhatsApp a Partner to review the attached cheque scan and authorize the release. |
+| **Branch Manager tries to click "Authorize Payout" on prize voucher** | Button does not exist. System restricts authorization to `SUPER_ADMIN`. | Call a Partner to review the attached cheque scan and authorize the release. |
 | **Subscriber wants to take 2 tickets in the same scheme** | Software database constraint `@@unique([chitGroupId, customerId])` rejects assignment. | Explain to subscriber: *"Company rules permit 1 ticket per customer per chit. You are welcome to take a second ticket in our 2 Lakh scheme instead."* |
 | **Ceiling tie in branch auction (3 members bid ₹25,000)** | Software requires a single winning ticket number. | Conduct physical lot draw with 3 paper tokens in front of all members. Enter the drawn winning ticket into the software. |
 | **Field agent reports cash loss on the road** | Never acknowledge a short handover. | Count the actual cash in the pouch. If pouch contains ₹35,000 instead of ₹38,900, record the actual physical cash received, and immediately alert the Partners to investigate the shortage. |

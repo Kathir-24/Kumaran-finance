@@ -274,6 +274,94 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(logs[0].messageText).toContain('*மாதம் 4* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது');
       expect(logs[0].messageText).toContain('25-Oct-2026');
     });
+
+    it('should route auction reminders to Push for app users and SMS fallback for keypad phone users', async () => {
+      notificationService.clearLog();
+      const res = await notificationService.dispatchAuctionReminder({
+        chitGroupId: 'group-001',
+        chitCode: 'KCA-1L-20M-01',
+        installmentMonth: 4,
+        auctionDate: '25-Oct-2026',
+        auctionTime: '10:00 AM',
+        branchName: 'Head Office',
+        branchAddress: 'Perundurai, Erode',
+        branchPhone: '+91 98765 43210',
+        subscribers: [
+          { name: 'S. Sundaram', phone: '9842143210', fcmToken: 'fcm-token-app-user' },
+          { name: 'K. Palanisamy', phone: '9842111222' }, // Keypad phone user
+        ],
+      });
+
+      expect(res.dispatchedCount).toBe(2);
+      expect(res.pushCount).toBe(1);
+      expect(res.smsCount).toBe(1);
+
+      const logs = notificationService.getSentNotificationLog();
+      const pushNotif = logs.find((l) => l.recipientPhone === '9842143210');
+      const smsNotif = logs.find((l) => l.recipientPhone === '9842111222');
+
+      expect(pushNotif?.channel).toBe('PUSH_NOTIFICATION');
+      expect(smsNotif?.channel).toBe('SMS_DLT');
+    });
+
+    it('should route 3-month default warning to Push when fcmToken is present and SMS fallback when absent', async () => {
+      notificationService.clearLog();
+
+      // App user with fcmToken
+      const appResult = await notificationService.dispatchDefaultWarning({
+        ticketId: 'tkt-app',
+        customerName: 'S. Sundaram',
+        customerPhone: '9842143210',
+        chitCode: 'KCA-1L-20M-01',
+        ticketNumber: 7,
+        consecutiveUnpaidMonths: 3,
+        totalOverdueAmount: '11250',
+        fcmToken: 'fcm-sundaram-phone',
+      });
+      expect(appResult.channel).toBe('PUSH_NOTIFICATION');
+
+      // Keypad user without fcmToken
+      const keypadResult = await notificationService.dispatchDefaultWarning({
+        ticketId: 'tkt-keypad',
+        customerName: 'K. Palanisamy',
+        customerPhone: '9842111222',
+        chitCode: 'KCA-1L-20M-01',
+        ticketNumber: 12,
+        consecutiveUnpaidMonths: 3,
+        totalOverdueAmount: '11250',
+      });
+      expect(keypadResult.channel).toBe('SMS_DLT');
+    });
+
+    it('should broadcast auction result and dividend credit to subscribers via Push and SMS fallback', async () => {
+      notificationService.clearLog();
+      const res = await notificationService.dispatchAuctionResult({
+        chitGroupId: 'group-001',
+        chitCode: 'KCA-1L-20M-01',
+        installmentMonth: 4,
+        winningTicketNumber: 7,
+        winningDiscountAmount: '25000',
+        dividendPerTicket: '1050',
+        nextMonthNetPayable: '3950',
+        subscribers: [
+          { name: 'S. Sundaram', phone: '9842143210', fcmToken: 'fcm-sundaram' },
+          { name: 'K. Palanisamy', phone: '9842111222' }, // Keypad phone user
+        ],
+      });
+
+      expect(res.dispatchedCount).toBe(2);
+      expect(res.pushCount).toBe(1);
+      expect(res.smsCount).toBe(1);
+
+      const logs = notificationService.getSentNotificationLog();
+      const pushNotif = logs.find((l) => l.recipientPhone === '9842143210');
+      const smsNotif = logs.find((l) => l.recipientPhone === '9842111222');
+
+      expect(pushNotif?.channel).toBe('PUSH_NOTIFICATION');
+      expect(pushNotif?.messageText).toContain('லாபப்பங்கு ரூ. 1,050');
+      expect(smsNotif?.channel).toBe('SMS_DLT');
+      expect(smsNotif?.messageText).toContain('Dividend credit: Rs.1,050');
+    });
   });
 
   describe('3. ReconciliationService (06:00 AM Payment Settlement)', () => {

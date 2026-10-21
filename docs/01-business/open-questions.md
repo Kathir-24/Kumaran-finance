@@ -21,7 +21,7 @@
 | **O-08** | **Multiple Tickets per Scheme** | A single customer can join multiple chit groups, but **cannot hold 2 or more tickets in the same chit group** (Max 1 ticket per customer per scheme). | `decision-log.md` (ADR-13) | `CONFIRMED-BY-DEVELOPER` |
 | **O-09** | **Password Reset Delegation** | Staff credential resets are handled strictly by Super Admin. Customers perform self-resets via verified mobile OTP/MPIN. | `permissions-matrix.md` | `CONFIRMED-BY-DEVELOPER` |
 | **O-10** | **Handover & Cloud Terms** | What are the commercial and handover terms under which code, AWS cloud accounts, and domain will transition from Developer to Kumaran Finance? | `decision-log.md` (ADR-10) | `OPEN` |
-| **O-11** | **Provider Onboarding** | Has Kumaran Finance initiated merchant onboarding for Indian Telecom DLT SMS and WhatsApp Business API under the financial/chit-fund category? | `decision-log.md` (ADR-12) | `OPEN` |
+| **O-11** | **Provider Onboarding** | Indian Telecom DLT SMS configured with MSG91 for OTP and keypad fallback. WhatsApp Business API is officially parked in V1 to eliminate recurring SaaS costs (`CONFIRMED-BY-DEVELOPER`). | `decision-log.md` (ADR-12) | `RESOLVED` |
 
 ---
 

@@ -20,7 +20,8 @@ sequenceDiagram
     Agent->>App: Records Collection (Ticket #, Exact Amount, Method: CASH)
     App->>Server: POST /collections/record (with Idempotency-Key)
     Server-->>App: Issues Digital Bilingual Receipt (English + Tamil)
-    App-->>Customer: Displays Receipt & sends SMS/WhatsApp link
+    App-->>Customer: Displays Receipt & sends Push Notification (or SMS if keypad phone)
+    Agent->>Customer: Signs physical paper passbook booklet with pen
 
     Note over Agent,Partner: End of Day: Field Agent returns to Perundurai Branch Office
 
@@ -85,7 +86,7 @@ Financial transactions can never be deleted from the database. If a staff member
 
 ```mermaid
 flowchart LR
-    D1["Day 1 to 5\nGrace Period\nZero late fee"] --> D2["Month 1 Unpaid\nAuction Disqualified\nSMS / WhatsApp notification"]
+    D1["Day 1 to 5\nGrace Period\nZero late fee"] --> D2["Month 1 Unpaid\nAuction Disqualified\nPush / SMS notification"]
     D2 --> D3["Month 2 Unpaid\nAuction Disqualified\nField Agent Visit"]
     D3 --> D4["Month 3 Consecutive Unpaid\nTicket Flagged: DEFAULT_3_MONTHS\nCompany Removal Rights Triggered"]
     D4 --> D5["Company Removal Action\nPartner authorizes removal\nTicket reassigned / settled"]

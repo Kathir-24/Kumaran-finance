@@ -56,5 +56,5 @@ flowchart TD
 ---
 
 ## 3. Help & Support
-- Tap **"Contact Branch / கிளை தொடர்பு"** to call the Kumaran Finance Head Office (Perundurai) or WhatsApp the partners directly.
+- Tap **"Contact Branch / கிளை தொடர்பு"** to place a direct phone call to the Kumaran Finance Head Office in Perundurai (`0424-2223333`).
 - View branch address and working hours.

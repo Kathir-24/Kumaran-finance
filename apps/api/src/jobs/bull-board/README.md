@@ -15,7 +15,7 @@ The Bull Board Queue Monitor provides a visual web interface mounted at `/admin/
    - Executes daily midnight overdue installment recalculation.
    - Tags 3-month consecutive defaulters for company removal rights per ADR-07.
 2. **`notification-queue`**:
-   - Dispatches Indian Telecom DLT SMS and WhatsApp Business bilingual receipts.
+   - Dispatches In-App Mobile Push Notifications with Indian Telecom DLT SMS fallback for keypad phones.
    - Broadcasts upcoming monthly auction reminders.
    - Sends default warning notices to subscribers entering arrears.
 3. **`reconciliation-queue`**:

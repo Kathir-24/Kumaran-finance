@@ -198,7 +198,7 @@
   - English: e.g. `3750n` $\to$ `"Three Thousand Seven Hundred Fifty Rupees Only"`
   - Tamil: e.g. `3750n` $\to$ `"ரூபாய் மூன்றாயிரத்து எழுநூற்று ஐம்பது மட்டும்"`
 - **Canvas Templates**:
-  - `SubscriptionReceiptTemplate`: Compact digital receipt slip format (width: 226.77 pt) per `notification-and-receipt-templates.md` §1 for instant digital viewing and WhatsApp sharing.
+  - `SubscriptionReceiptTemplate`: Compact digital receipt slip format (width: 226.77 pt) per `notification-and-receipt-templates.md` §1 for instant digital viewing and digital passbook archival.
   - `PayoutVoucherTemplate`: A5 landscape prize payout voucher with safety proof checklist stamps and Maker-Checker signature lines.
   - `FormXviiMinutesTemplate`: A4 statutory auction minutes with financial breakdown, tie-breaker paper token lot draw table, and Foreman declaration.
   - `FormXxiPassbookTemplate`: A4 landscape 20-month continuous schedule showing monthly base dues, dividend credits, payments, and arrears.
@@ -227,9 +227,9 @@
   - Recalculates consecutive unpaid months for each subscriber ticket.
   - Automatically tags tickets with 3+ consecutive unpaid months as `DEFAULT_3_MONTHS` per ADR-07 and emits statutory warning notices.
   - Automatically restores tickets from `DEFAULT_3_MONTHS` back to `ACTIVE` when delinquent dues are cleared.
-- **Bilingual Notification Dispatcher (`NotificationService`)**:
-  - **Indian Telecom DLT SMS**: Pre-registered header `KMRCHT` / Template ID `1407169823412093847` with whole-rupee amounts (`Rs.{amount}`) and passbook URLs.
-  - **Bilingual WhatsApp Business API**: Rich Tamil & English message templates for payment receipt confirmations, auction reminders, and 3-month default warning notices.
+- **Smart Notification Router (`NotificationService`)**:
+  - **In-App Mobile Push Notifications (FCM)**: Primary, free channel delivering instant payment receipts, upcoming auction reminders, post-auction dividend credits, and default notices to smartphone users.
+  - **Indian Telecom DLT SMS Fallback**: Header `KMRCHT` / Templates for OTP authentication and fallback for keypad phone users. WhatsApp Business API parked in V1.
   - **In-Memory Audit Registry**: Preserves full notification payloads for review and automated test assertions.
 - **Payment Settlement Reconciliation (`ReconciliationService`)**:
   - Runs daily at 06:00 AM IST to compare payment gateway settlement records against internal database entries.
@@ -245,7 +245,7 @@
 | `POST` | `/jobs/enqueue-reconciliation` | Enqueue payment reconciliation job onto BullMQ queue | Super Admin, Accountant |
 | `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | Super Admin, Branch Manager |
 | `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin, Branch Manager, Auditor |
-| `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched DLT SMS and WhatsApp messages | Super Admin, Auditor |
+| `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | Super Admin, Auditor |
 | `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin (`BULL_BOARD_USER` Basic Auth) |
 
 ---
@@ -268,7 +268,7 @@
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
-- **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Indian DLT SMS & WhatsApp bilingual dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
+- **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
 - **Total Production Endpoints**: **74 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 8 background jobs & queue monitor routes).
 - **Automated Test Coverage**: **203 / 203 tests passing across 16 test suites (100% pass rate)**.
 

@@ -47,7 +47,8 @@ flowchart TD
      - *"ரசீது எண் / Receipt No: KC-REC-PRD-2026-00124"*
      - *"சந்தாதாரர் பெயர் / Subscriber Name: S. Sundaram"*
      - *"செலுத்திய தொகை / Amount Paid: ₹3,700"*
-   - Tap **"Share via WhatsApp / SMS"** to immediately send a receipt link to the customer.
+   - The app automatically dispatches a free Push Notification to the customer's phone (or SMS if keypad phone).
+   - Hand-write the date, month, amount, and sign the customer's physical paper passbook booklet with a pen.
 
 ### 2.3 Working Offline in Low-Network Areas
 - If mobile signal is lost, the app displays an **Offline Mode** indicator.

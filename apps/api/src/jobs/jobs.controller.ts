@@ -112,7 +112,7 @@ export class JobsController {
       branchName: string;
       branchAddress: string;
       branchPhone: string;
-      subscribers: Array<{ name: string; phone: string }>;
+      subscribers: Array<{ name: string; phone: string; fcmToken?: string }>;
     },
   ) {
     return this.queueProvider.addJob(NOTIFICATION_QUEUE, JOB_DISPATCH_AUCTION_REMINDER, {
@@ -140,7 +140,7 @@ export class JobsController {
   @Get('notification-audit-logs')
   @Roles(Role.SUPER_ADMIN, Role.AUDITOR)
   @ApiOperation({
-    summary: 'Get audit logs of dispatched DLT SMS and WhatsApp notifications',
+    summary: 'Get audit logs of dispatched Push Notifications and DLT SMS messages',
   })
   getNotificationLogs(@Query('limit') limit?: number) {
     return this.notificationService.getSentNotificationLog(limit ? Number(limit) : 50);

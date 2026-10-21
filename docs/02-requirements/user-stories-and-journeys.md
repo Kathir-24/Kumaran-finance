@@ -50,7 +50,7 @@ The system encompasses **10 Core Functional Modules** broken down into **28 Gran
 | 9.2 | Dual-Control Prize Payout Authorization | Checker | — | Voucher Prep| — | Recipient | View |
 | **M10**| **Accounting, Reports & Audit Trail** | | | | | | |
 | 10.1| Day Book, Cash Book & Handover Reconciliation | Actor | Branch Scope| Global Scope| — | — | Read-only |
-| 10.2| Bilingual Receipts (English + தமிழ் SMS/WhatsApp) | Trigger | Trigger | Trigger | Trigger | Receiver | View |
+| 10.2| Bilingual Receipts (Push Notification / SMS Fallback) | Trigger | Trigger | Trigger | Trigger | Receiver | View |
 | 10.3| Immutable Append-Only Audit Trail | Global | Branch Scope| Read-only | — | Own History | Global |
 
 ---
@@ -101,7 +101,7 @@ journey
       Accountant verifies opening cash in Day Book: 5: Accountant
     section Doorstep Rounds (10:00 AM - 4:30 PM)
       Agent visits customer, collects ₹7,900 cash: 5: Collection Agent
-      Customer receives Tamil SMS/WhatsApp receipt: 5: Customer
+      Customer receives Push Notification (or SMS on keypad phone): 5: Customer
       Customer pays online via Google Pay UPI: 4: Customer
     section Monthly Auction (5:00 PM - 5:45 PM)
       Foreman verifies no unpaid bidders can participate: 5: Super Admin
@@ -272,7 +272,7 @@ journey
 - **Acceptance Criteria**:
   - **Given** I am at the customer's house with the mobile app and customer's physical passbook,
   - **When** I tap "Record Collection" $\to$ "Cash ₹3,950",
-  - **Then** the app saves the payment, triggers an automated WhatsApp / SMS receipt link to the customer, and the agent enters the payment date, amount, and signature directly into the customer's physical notebook.
+  - **Then** the app saves the payment, triggers an instant free Push Notification to the customer's phone (or SMS if keypad phone), and the agent enters the payment date, amount, and signature directly into the customer's physical paper passbook.
 
 #### US-7.2: Offline Collection in Remote Rural Areas
 - **As a**: Field Collection Agent

@@ -104,10 +104,12 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 
 ### Module 8: Payments, Reversals, & Bilingual Receipts (`CONFIRMED-BY-DEVELOPER`)
 - **Payment Modes**: Cash, UPI, Bank Transfer (NEFT/RTGS/IMPS), and Cheque.
-- **Bilingual Receipts (V1 Scope)**:
-  - Formatted in both English and Tamil.
-  - Sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
-  - Hand-written and signed directly in customer's physical paper passbook booklet; confirmed digitally via free mobile app push notification; downloadable digital PDFs available on-demand. Costly SMS reserved strictly for OTPs and fallback for non-smartphone users.
+- **Bilingual Receipts & Unified Notification Hierarchy (V1 Scope)**:
+  - Formatted in both English and Tamil with sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
+  - Hand-written and signed directly in customer's physical paper passbook booklet; confirmed digitally via free mobile app push notification; downloadable digital PDFs available on-demand.
+  - **Smart Channel Hierarchy**: Free In-App Push Notifications (FCM, ₹0) for smartphone app users; Telecom DLT SMS fallback for keypad phone users across Payments, Upcoming Auctions, Post-Auction Dividends, and 3-Month Default warnings.
+  - **Authentication**: OTP delivered strictly via Telecom DLT SMS.
+  - **Help Desk**: Direct phone calls to Perundurai Head Office (`0424-2223333`); WhatsApp Business API parked in V1.
 - **Prize Payout Vouchers (V1 Scope)**:
   - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount to match local business reality.
   - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).

@@ -26,6 +26,22 @@ export interface AuctionReminderJobPayload {
   subscribers: Array<{
     name: string;
     phone: string;
+    fcmToken?: string;
+  }>;
+}
+
+export interface AuctionResultNotificationJobPayload {
+  chitGroupId: string;
+  chitCode: string;
+  installmentMonth: number;
+  winningTicketNumber: number;
+  winningDiscountAmount: string;
+  dividendPerTicket: string;
+  nextMonthNetPayable: string;
+  subscribers: Array<{
+    name: string;
+    phone: string;
+    fcmToken?: string;
   }>;
 }
 
@@ -37,6 +53,7 @@ export interface DefaultWarningJobPayload {
   ticketNumber: number;
   consecutiveUnpaidMonths: number;
   totalOverdueAmount: string; // Serialized string
+  fcmToken?: string;
 }
 
 export interface DailyArrearsExecutionResult {

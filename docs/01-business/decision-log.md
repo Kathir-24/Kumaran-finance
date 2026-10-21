@@ -25,8 +25,8 @@
 | **ADR-08** | Receipt Language & Standards | Bilingual (English + Tamil) digital PDF receipts in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-09** | Customer Mobile App Scope | Phase 1: Passbook, dividend tracker, online payment, auction results display (`PROPOSED`). Build order `OPEN`. | `PROPOSED` | AI-assisted draft | None | 2026-10-17 | **Y** |
 | **ADR-10** | Infrastructure & Code Ownership | Developer currently holds code, cloud account, and domain (`CONFIRMED-BY-DEVELOPER`). Handover terms to Kumaran Finance are `OPEN`. | `CONFIRMED-BY-DEVELOPER` (current) / `OPEN` (handover) | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-11** | Receipt Delivery & Passbook | Digital receipt (SMS/WhatsApp link) + Physical & Digital Passbook entry in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-12** | Notification Channels | Hybrid: SMS for OTP + WhatsApp for receipts/reminders in v1 scope (`CONFIRMED-BY-DEVELOPER`). Provider approval required; build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-11** | Receipt Delivery & Passbook | Signed physical paper passbook is primary physical proof. Software records digital receipt ID for Form XXII cash book. Mobile App Push notification is primary (₹0 cost); SMS fallback for keypad phones (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
+| **ADR-12** | Notification Channels & Help Desk | Smart Hierarchy: OTP via SMS only; All operational alerts (Payments, Auctions, Dividends, Defaults) via Free Mobile Push with SMS fallback for keypad phones; WhatsApp Business API parked in V1; Direct phone calls for support (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
 | **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
 | **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | 2026-10-17 | **Y** |
 | **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
@@ -74,6 +74,23 @@
 ### ADR-10: Ownership of Code, Cloud, and Domain (`CONFIRMED-BY-DEVELOPER` / `OPEN`)
 - **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, AWS cloud account, and domain registration.
 - **Future Handover (`OPEN`)**: A formal handover to Kumaran Finance may occur later. Handover terms, intellectual property assignment, and ongoing maintenance responsibilities are **OPEN** and subject to future commercial agreement.
+
+---
+
+### ADR-11: Physical Passbook Primacy & Smart Digital Receipts (`CONFIRMED-BY-DEVELOPER`)
+- **Ground Truth**: In Kumaran Finance operations, the customer's physical paper passbook (சீட்டு பாஸ்புக்) is their primary, legally acknowledged proof of installment payment. At doorstep collections, the agent enters the date, amount, and signs with a pen. Loose paper receipt slips are completely eliminated.
+- **Software Role**: Every transaction generates a sequential receipt number (`KC-REC-...`) solely for company ledger integrity (Form XXII Cash Book), evening handover reconciliation, and dispute backup.
+- **Delivery**: Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt.
+
+---
+
+### ADR-12: Smart Notification Hierarchy, OTP via SMS & Direct Phone Support (`CONFIRMED-BY-DEVELOPER`)
+- **Authentication**: All user login OTPs (Partners, Staff, Customers) strictly use **Telecom DLT SMS** (Header: `KMRCHT`, Template `1407169823412093847`).
+- **Operational Alerts**: Payments, upcoming auction reminders, post-auction dividend credits, and 3-month default warnings follow a unified smart hierarchy:
+  - **Smartphone Users**: Free Mobile App Push Notifications (FCM, ₹0 cost).
+  - **Keypad Phone Users**: Telecom DLT SMS fallback.
+- **WhatsApp Business API**: Officially **Parked / Shelved in V1** to avoid third-party SaaS fees and Meta per-conversation charges.
+- **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobile numbers).
 
 ---
 
@@ -133,6 +150,6 @@
      - **Partners (`SUPER_ADMIN`)**: 100% Full Parity on Web & Mobile (Auctions, Approvals, Payouts, Cash Handover, Reports).
      - **Desk Accountant (`ACCOUNTANT`)**: Primarily Web Portal (transcribing 20-month physical notebooks, day books, voucher preparation).
      - **CA Auditor (`AUDITOR`)**: Primarily Web Portal (read-only 12-column Form XXII Cash Book, Form XXI Ledgers, forensic audit trails).
-     - **Field Collection Agents (`COLLECTION_AGENT`)**: Primarily Mobile App (1-second fingerprint unlock, doorstep collections, offline SQLite auto-sync, WhatsApp receipts).
+     - **Field Collection Agents (`COLLECTION_AGENT`)**: Primarily Mobile App (1-second fingerprint unlock, doorstep collections, offline SQLite auto-sync, push/SMS receipts).
      - **Customers (`CUSTOMER`)**: Primarily Mobile App (bilingual passbook, 1-tap UPI payment via GPay/PhonePe/Paytm, auction results).
      - **Dual-Role Staff (`[COLLECTION_AGENT, ACCOUNTANT]`)**: Mobile App on collection rounds; Web Portal or Mobile App at office desk.

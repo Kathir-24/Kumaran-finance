@@ -1,14 +1,29 @@
 # Kumaran Chits — Bilingual Notification & Receipt Templates
 
-> **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Supported Channels**: Customer Physical Passbook (Hand-written & Signed), Mobile App Push Notifications (Primary ₹0 Cost), Bilingual PDF Receipts, Indian DLT SMS (Reserved for OTPs & Non-App Fallback), WhatsApp Business API, and Digital Passbook  
-> **Core Principle**: Avoid wasteful recurring telecom SMS charges. Routine monthly payments rely on the customer's signed physical paper passbook + instant in-app mobile push notifications. SMS is reserved strictly for OTP device verification and optional fallback.
+> **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
+> **Supported Channels**: Customer Physical Paper Passbook (Hand-written & Signed with Pen), Mobile App Push Notifications (Primary ₹0 Cost), Indian DLT SMS (Reserved for OTPs & Keypad Phone Fallback), Bilingual PDF Receipts (Internal Accounting & Dispute Backup), and Digital Passbook.  
+> **Unified Rule (`CONFIRMED-BY-DEVELOPER`)**:
+> 1. **Authentication (Device Login OTP)**: **SMS only** (DLT Template `1407169823412093847`).
+> 2. **All Financial & Operational Events**: Follow a single, elegant **Smart Channel Hierarchy**:
+>    - **Smartphone Users (App installed / `fcmToken` present)**: Receive **Free In-App Push Notifications (FCM, ₹0 cost)** deep-linking to the passbook or auction screen.
+>    - **Keypad Phone Users (Non-app / No `fcmToken`)**: Fall back to **Telecom DLT SMS**.
+> 3. **WhatsApp Business API**: **Parked / Shelved in V1** to eliminate third-party SaaS and per-conversation fees.
+> 4. **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobiles).
+> 5. **Report Sharing**: Manual on-demand utility (A4 PDF download & Excel/CSV export) for Form XXII, Form XXI, and Handover tallies.
 > **Languages**: English & தமிழ் (Tamil)  
-> **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations (`CONFIRMED-BY-DEVELOPER`).
+> **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)** (`CONFIRMED-BY-DEVELOPER`).
 
 ---
 
 ## 1. Bilingual Digital Receipt (PDF & Print Layout) (`CONFIRMED-BY-DEVELOPER`)
+
+### 1.1 Purpose & Role in Kumaran Finance
+In daily operations in Perundurai and rural Erode, the customer's primary proof of payment is the **hand-written entry and pen signature** placed by the agent or cashier inside the customer's **physical paper passbook booklet (சீட்டு பாஸ்புக்)**. Customers do not want or keep loose paper slips.
+
+However, the software generates and archives a computer-generated digital receipt for three vital reasons:
+1. **Company Internal Accounting**: Provides a unique sequential receipt number (`KC-REC-PRD-2026-00412`) required for the Form XXII Chit Cash Book and evening field cash reconciliation.
+2. **UPI / Online Payments**: When a subscriber pays self-service via GPay or PhonePe without an agent physically present, the app generates an instant receipt record.
+3. **Dispute Resolution & Lost Passbooks**: If a customer misplaces their physical paper booklet, Kumaran Finance can instantly reprint their entire historical transaction ledger.
 
 ```text
 ================================================================================
@@ -45,22 +60,43 @@
 
 ---
 
-## 1.5 Mobile App Push Notification (Primary & Free Channel) (`CONFIRMED-BY-DEVELOPER`)
+## 2. The Unified Smart Channel Hierarchy (`CONFIRMED-BY-DEVELOPER`)
 
-For all customers using the Kumaran Chits Android app, routine monthly payment receipts trigger an **instant, free Mobile Push Notification** (via Firebase Cloud Messaging / FCM), eliminating recurring telecom SMS costs:
+For all operational notifications, Kumaran Finance applies an automated device-aware routing hierarchy:
 
-- **Notification Title**: `குமரன் பைனான்ஸ் / Kumaran Finance`
-- **Notification Body**: `மாத தவணை தொகை ரூ. {#amount#} பெறப்பட்டது! ரசீது எண்: {#receipt_number#}. / Payment of Rs. {#amount#} received! Tap to view digital passbook.`
-- **Interactive Action**: Tapping the notification directly deep-links into the customer's **Digital Passbook (`/passbook`)**, highlighting the updated `PAID` row and offering instant PDF receipt download.
-- **Physical Proof Invariant**: The customer's primary physical proof remains the **hand-written entry and signature** placed by the agent/cashier inside the customer's physical paper passbook booklet.
+```mermaid
+flowchart TD
+    subgraph Trigger["Operational Triggers"]
+        T1["Payment Received"]
+        T2["Upcoming Auction (3 days before)"]
+        T3["Auction Finalized & Dividend Credit"]
+        T4["3-Month Defaulter Legal Warning"]
+    end
+
+    Trigger --> Check{"Customer App Registered?\n(fcmToken present?)"}
+
+    Check -->|YES - Smartphone App User| PUSH["📲 In-App Push Notification (FCM)\n• ₹0 Recurring Cost\n• 1-Tap Deep-Link to /passbook or /auctions"]
+    Check -->|NO - Keypad Phone User| SMS["✉️ Indian DLT SMS Fallback\n• Essential telecom delivery to basic phones\n• Guaranteed reach for legal compliance"]
+```
+
+### 2.1 Event-by-Event Routing Specification:
+
+| Operational Event | Smartphone App User (`fcmToken` present) | Keypad Phone User (No App / No `fcmToken`) |
+|---|---|---|
+| **1. Payment Confirmation** | **Push**: `மாத தவணை தொகை ரூ. {#amount#} பெறப்பட்டது! ரசீது எண்: {#receipt_number#}.` (Deep-links to `/passbook`) | **SMS**: `Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#}. Receipt: {#var#}. View passbook: {#var#}` |
+| **2. Upcoming Auction Reminder** | **Push**: `மாதம் {#month#} ஏல அறிவிப்பு: {#date#} {#time#} ({#branch#}).` (Deep-links to `/auctions/{#id}`) | **SMS**: `Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}` |
+| **3. Auction Result & Dividend** | **Push**: `மாதம் {#month#} ஏல முடிவு: லாபப்பங்கு ரூ. {#div#}. அடுத்த மாத தவணை: ரூ. {#payable#}.` | **SMS**: `Kumaran Chits: Chit {#var#} Month {#var#} Auction won at Rs.{#discount#}. Dividend: Rs.{#div#}. Next month: Rs.{#payable#}.` |
+| **4. 3-Month Defaulter Warning** | **Push**: `எச்சரிக்கை: டிக்கெட் #{#tkt#} ({#chit#}) தொடர்ந்து {#m#} மாதங்கள் நிலுவையில் உள்ளது (ரூ. {#amt#}).` (Urgent Red Banner) | **SMS**: `Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid cancellation. Contact: {#var#}` |
 
 ---
 
-## 2. Indian Telecom DLT-Compliant SMS Templates (`CONFIRMED-BY-DEVELOPER`)
+## 3. Indian Telecom DLT-Compliant SMS Templates (`CONFIRMED-BY-DEVELOPER`)
 
-> **Cost Optimization Rule**: Under Kumaran Finance policy, SMS is reserved strictly for **OTP Device Registration**, critical security alerts, and as an optional fallback for non-smartphone subscribers who do not have the mobile app installed. Standard monthly payment receipts are delivered via free In-App Push Notifications.
+SMS is reserved exclusively for:
+1. **Device Login OTP Authentication** (All users).
+2. **Fallback for Keypad Phone Users** who do not have a smartphone or the mobile app installed.
 
-### 2.1 Device Registration OTP
+### 3.1 Device Registration OTP (Authentication)
 - **Sender ID (Header)**: `KMRCHT`
 - **Template ID**: `1407169823412093847`
 - **Template Text**:
@@ -68,7 +104,7 @@ For all customers using the Kumaran Chits Android app, routine monthly payment r
 Kumaran Chits: Your one-time verification code is {#var#}. Valid for 5 minutes. Do not share this OTP with anyone. / உங்கள் சரிபார்ப்பு குறியீடு {#var#}. யாருடனும் பகிர வேண்டாம்.
 ```
 
-### 2.2 Payment Receipt Alert (SMS)
+### 3.2 Payment Receipt Alert (Keypad Fallback)
 - **Sender ID (Header)**: `KMRCHT`
 - **Template ID**: `1407169823412093848`
 - **Template Text**:
@@ -76,7 +112,7 @@ Kumaran Chits: Your one-time verification code is {#var#}. Valid for 5 minutes. 
 Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}. Receipt: {#var#}. View passbook: {#var#}
 ```
 
-### 2.3 Upcoming Monthly Auction Reminder (SMS)
+### 3.3 Upcoming Monthly Auction Reminder (Keypad Fallback)
 - **Sender ID (Header)**: `KMRCHT`
 - **Template ID**: `1407169823412093849`
 - **Template Text**:
@@ -84,7 +120,7 @@ Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}.
 Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}
 ```
 
-### 2.4 Default Arrears Warning Notice (SMS)
+### 3.4 Default Arrears Warning Notice (Keypad Fallback & Statutory Notice)
 - **Sender ID (Header)**: `KMRCHT`
 - **Template ID**: `1407169823412093850`
 - **Template Text**:
@@ -92,63 +128,51 @@ Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at
 Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}
 ```
 
-### 2.5 Implementation & Pluggable Driver Architecture
-- Implementation: [`apps/api/src/notification/`](../../apps/api/src/notification/)
-- Pluggable Drivers: `MockSmsDriver` (local dev & testing) and `Msg91SmsDriver` (production Indian DLT gateway)
-- Telecommunication Guarantee: **Financial Non-Blocking Guarantee** — SMS gateway delays or failures never cause payment records or financial ledgers to abort or roll back.
-- PII Protection: Fully compliant with Indian DPDP Act 2023 via `+91******XXXX` phone masking in all system logs and audit traces.
+### 3.5 Pluggable SMS Architecture & Compliance
+- **Implementation**: [`apps/api/src/notification/`](../../apps/api/src/notification/)
+- **Pluggable Drivers**: `MockSmsDriver` (local dev & testing) and `Msg91SmsDriver` (production Indian DLT gateway).
+- **Non-Blocking Invariant**: Telecom SMS timeouts or failures never block financial ledger updates or database transactions.
+- **DPDP Act 2023 Compliance**: Recipient phone numbers are masked as `+91******XXXX` in all application logs and telemetry.
 
 ---
 
-## 3. WhatsApp Business API Rich Notification Templates (`CONFIRMED-BY-DEVELOPER`)
+## 4. WhatsApp Business API Status — Parked in V1 (`CONFIRMED-BY-DEVELOPER`)
 
-### 3.1 Instant Payment Confirmation (WhatsApp)
-```text
-வணக்கம் திரு. *{{subscriber_name}}*,
-
-குமரன் சீட்ஸ்-ல் உங்கள் சீட்டு தவணை தொகை வெற்றிகரமாக பெறப்பட்டது.
-Your chit subscription payment has been received successfully.
-
-📋 *கட்டண விவரம் / Payment Details:*
--------------------------------------------
-• சீட்டு குழு / Chit Group: *{{chit_code}}*
-• டிக்கெட் எண் / Ticket No: *{{ticket_number}}*
-• செலுத்திய தொகை / Amount: *₹{{amount_paid}}*
-• கட்டண முறை / Mode: *{{payment_mode}}*
-• ரசீது எண் / Receipt No: *{{receipt_number}}*
-• தேதி & நேரம் / Date: *{{transaction_timestamp}}*
-
-📥 *டிஜிட்டல் ரசீதை பதிவிறக்க / Download Receipt PDF:*
-{{receipt_download_url}}
-
-📲 *உங்கள் டிஜிட்டல் பாஸ்புக்கை பார்க்க / View Passbook:*
-{{passbook_app_url}}
-
-நன்றி / Thank you,
-*குமரன் பைனான்ஸ் / Kumaran Finance*
-```
+To maintain the leanest possible operational expenditure and eliminate third-party SaaS fees, **WhatsApp Business Cloud API integration is officially Parked / Shelved in V1**:
+- Automated server-to-user WhatsApp background messages are deactivated.
+- **Help Desk & Customer Support**: Handled via **Direct Phone Calls** to the Kumaran Finance Head Office (`0424-2223333` / Partner mobile numbers).
+- In the mobile app, tapping "Help / உதவி" provides direct one-touch phone dialer access (`tel:04242223333`).
 
 ---
 
-### 3.2 Upcoming Monthly Auction Reminder (WhatsApp)
-```text
-வணக்கம் திரு. *{{subscriber_name}}*,
+## 5. Report Sharing Specification (`CONFIRMED-BY-DEVELOPER`)
 
-குமரன் சீட்ஸ் *{{chit_code}}* குழுவின் *மாதம் {{installment_month}}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது:
+"Report Sharing" in Kumaran Finance is strictly a **manual, on-demand utility** for office staff, partners, and the CA auditor. It does not send automated broadcasts.
 
-📅 *ஏல தேதி / Auction Date:* {{auction_date}}
-⏰ *நேரம் / Time:* {{auction_time}}
-📍 *இடம் / Venue:* {{branch_name}}, {{branch_address}}
+### 5.1 The 4 Core Operational Reports
+1. **Form XXII — Daily Chit Cash Book (தினசரி ரொக்க ஏடு)**:
+   - 12-column daily cash register recording all collections, prize money disbursements, bank transactions, and the closing physical cash in the office safe vault.
+   - **Primary Users**: Desk Accountant, Partners, and CA Auditor.
+2. **Form XXI — Subscriber Ledger / Passbook Statement (சந்தாதாரர் கணக்கு ஏடு)**:
+   - Complete 20-month historical account statement for a subscriber ticket showing monthly installments, dividends credited, net amounts paid, and receipt numbers.
+   - **Primary Users**: Subscriber (on-demand printed statement) and CA Auditor.
+3. **Form XVII — Auction Minutes (ஏல நடவடிக்கைகள் மற்றும் மினிட்ஸ்)**:
+   - Statutory auction proceedings document listing attendees, bidding ceiling compliance ($D \le V/4$), winning ticket, commission, and dividend per subscriber.
+   - **Primary Users**: Filed with the Chit Registrar within statutory deadlines.
+4. **Daily Field Agent Handover Tally**:
+   - Evening summary reconciling cash collected by each field agent against digital receipts before vault deposit.
+   - **Primary Users**: Field Agents, Desk Accountant, and Partners.
 
-அனைத்து சந்தாதாரர்களும் தவறாமல் ஏலத்தில் கலந்துகொள்ளுமாறு கேட்டுக்கொள்கிறோம்.
-
-குமரன் பைனான்ஸ்
-தொடர்புக்கு: {{branch_phone}}
-```
+### 5.2 Delivery & Export Methods
+- **Web Admin Portal (Desktop PC)**:
+  - **"Download PDF"**: Generates official A4 PDF formatted with Kumaran Finance letterhead for office filing or printing for a visiting customer.
+  - **"Export Excel / CSV"**: Structured tabular export for the CA Auditor to import into Tally or spreadsheet tools.
+- **Mobile App (For Partners on the Move)**:
+  - **"Share Statement / Summary"**: Uses the native Android share sheet to transfer the generated PDF via Bluetooth, Email, or messaging without recurring API costs.
 
 ---
 
-## 4. Digital Passbook Data Structure (Mobile App View) (`CONFIRMED-BY-DEVELOPER`)
+## 6. Digital Passbook Data Structure (Mobile App View) (`CONFIRMED-BY-DEVELOPER`)
 
 In the mobile app, the subscriber's **Digital Passbook (டிஜிட்டல் சந்தா புத்தகம்)** renders each month in chronological order with strictly whole integer Rupees:
 

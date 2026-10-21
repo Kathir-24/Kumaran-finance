@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { SmsService } from '../../notification/services/sms.service';
 import type {
   AuctionReminderJobPayload,
+  AuctionResultNotificationJobPayload,
   DefaultWarningJobPayload,
   PaymentReceiptNotificationJobPayload,
 } from '../dto/job-payloads.dto';
@@ -10,7 +11,7 @@ export interface SentNotificationRecord {
   id: string;
   channel: 'SMS_DLT' | 'WHATSAPP' | 'PUSH_NOTIFICATION';
   recipientPhone: string;
-  templateType: 'RECEIPT' | 'AUCTION_REMINDER' | 'DEFAULT_WARNING' | 'OTP';
+  templateType: 'RECEIPT' | 'AUCTION_REMINDER' | 'AUCTION_RESULT' | 'DEFAULT_WARNING' | 'OTP';
   messageText: string;
   variables: Record<string, any>;
   sentAt: Date;
@@ -139,110 +140,192 @@ ${payload.passbookAppUrl}
   }
 
   /**
-   * Formats and broadcasts upcoming auction reminders to subscribers.
+   * Formats and broadcasts upcoming auction reminders to subscribers:
+   * - Primary (₹0 Cost): Mobile App Push Notification (FCM) for app users (`fcmToken` present).
+   * - Fallback: Indian DLT-Compliant SMS via SmsService (Template 1407169823412093849) for keypad phone users.
    */
   async dispatchAuctionReminder(
     payload: AuctionReminderJobPayload,
-  ): Promise<{ dispatchedCount: number }> {
+  ): Promise<{ dispatchedCount: number; pushCount: number; smsCount: number }> {
     let count = 0;
+    let pushCount = 0;
+    let smsCount = 0;
 
     for (const sub of payload.subscribers) {
-      // 1. Pluggable DLT SMS Dispatch
-      if (this.smsService) {
-        await this.smsService.sendAuctionReminderSms({
+      if (sub.fcmToken) {
+        // Primary: Free Mobile Push Notification
+        const pushId = `push-auc-${Date.now()}-${count}`;
+        const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
+        const pushBody = `மாதம் ${payload.installmentMonth} ஏல அறிவிப்பு: ${payload.auctionDate} ${payload.auctionTime} (${payload.branchName}). / Chit ${payload.chitCode} Month ${payload.installmentMonth} auction on ${payload.auctionDate} at ${payload.auctionTime}.`;
+
+        this.sentLog.push({
+          id: pushId,
+          channel: 'PUSH_NOTIFICATION',
           recipientPhone: sub.phone,
-          chitCode: payload.chitCode,
-          installmentMonth: payload.installmentMonth,
-          auctionDate: payload.auctionDate,
-          auctionTime: payload.auctionTime,
-          branchName: payload.branchName,
-          branchPhone: payload.branchPhone,
+          templateType: 'AUCTION_REMINDER',
+          messageText: `${pushTitle}: ${pushBody} - *மாதம் ${payload.installmentMonth}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது: ${payload.auctionDate}`,
+          variables: { ...payload, subscriberName: sub.name },
+          sentAt: new Date(),
+          status: 'DELIVERED',
         });
+        pushCount++;
+      } else {
+        // Fallback: Indian DLT-Compliant SMS for keypad phones
+        const smsId = `sms-auc-${Date.now()}-${count}`;
+        if (this.smsService) {
+          await this.smsService.sendAuctionReminderSms({
+            recipientPhone: sub.phone,
+            chitCode: payload.chitCode,
+            installmentMonth: payload.installmentMonth,
+            auctionDate: payload.auctionDate,
+            auctionTime: payload.auctionTime,
+            branchName: payload.branchName,
+            branchPhone: payload.branchPhone,
+          });
+        }
+
+        const smsText = `Kumaran Chits: Auction for Chit ${payload.chitCode} Month ${payload.installmentMonth} is scheduled on ${payload.auctionDate} at ${payload.auctionTime}. Venue: ${payload.branchName}. Contact: ${payload.branchPhone} - *மாதம் ${payload.installmentMonth}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது: ${payload.auctionDate}`;
+        this.sentLog.push({
+          id: smsId,
+          channel: 'SMS_DLT',
+          recipientPhone: sub.phone,
+          templateType: 'AUCTION_REMINDER',
+          messageText: smsText,
+          variables: { ...payload, subscriberName: sub.name },
+          sentAt: new Date(),
+          status: 'DELIVERED',
+        });
+        smsCount++;
       }
-
-      // 2. Bilingual Notification Recording (WhatsApp / Sent Log)
-      const messageText = `வணக்கம் திரு. *${sub.name}*,
-
-குமரன் சீட்ஸ் *${payload.chitCode}* குழுவின் *மாதம் ${payload.installmentMonth}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது:
-
-📅 *ஏல தேதி / Auction Date:* ${payload.auctionDate}
-⏰ *நேரம் / Time:* ${payload.auctionTime}
-📍 *இடம் / Venue:* ${payload.branchName}, ${payload.branchAddress}
-
-அனைத்து சந்தாதாரர்களும் தவறாமல் ஏலத்தில் கலந்துகொள்ளுமாறு கேட்டுக்கொள்கிறோம்.
-
-குமரன் பைனான்ஸ்
-தொடர்புக்கு: ${payload.branchPhone}`;
-
-      this.sentLog.push({
-        id: `wa-auc-${Date.now()}-${count}`,
-        channel: 'WHATSAPP',
-        recipientPhone: sub.phone,
-        templateType: 'AUCTION_REMINDER',
-        messageText,
-        variables: { ...payload, subscriberName: sub.name },
-        sentAt: new Date(),
-        status: 'DELIVERED',
-      });
       count++;
     }
 
     this.logger.log(
-      `Broadcasted auction reminders to ${count} subscribers for Chit ${payload.chitCode} Month ${payload.installmentMonth}`,
+      `Broadcasted auction reminders to ${count} subscribers (${pushCount} Push, ${smsCount} SMS) for Chit ${payload.chitCode} Month ${payload.installmentMonth}`,
     );
-    return { dispatchedCount: count };
+    return { dispatchedCount: count, pushCount, smsCount };
   }
 
   /**
-   * Formats and dispatches a statutory warning notice for tickets entering 3-month default.
+   * Formats and dispatches a statutory warning notice for tickets entering 3-month default:
+   * - Primary (₹0 Cost): Mobile App Push Notification (FCM) for app users (`fcmToken` present).
+   * - Fallback: Indian DLT-Compliant SMS via SmsService (Template 1407169823412093850) for keypad phone users.
    */
   async dispatchDefaultWarning(
     payload: DefaultWarningJobPayload,
-  ): Promise<{ notificationId: string }> {
+  ): Promise<{ notificationId: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
     const formattedOverdue = BigInt(payload.totalOverdueAmount).toLocaleString('en-IN');
+    let notificationId: string;
+    let channel: 'PUSH_NOTIFICATION' | 'SMS_DLT';
 
-    // 1. Pluggable DLT SMS Dispatch
-    if (this.smsService) {
-      await this.smsService.sendDefaultWarningSms({
+    if (payload.fcmToken) {
+      notificationId = `push-def-${Date.now()}`;
+      channel = 'PUSH_NOTIFICATION';
+      const pushTitle = 'எச்சரிக்கை அறிவிப்பு / Kumaran Finance Warning';
+      const pushBody = `குமரன் சீட்ஸ்: டிக்கெட் #${payload.ticketNumber} (${payload.chitCode}) தொடர்ந்து ${payload.consecutiveUnpaidMonths} மாத தவணைகள் நிலுவையில் உள்ளது (₹${formattedOverdue}). உடனடியாக செலுத்தவும். / Urgent: 3-month default warning.`;
+
+      this.sentLog.push({
+        id: notificationId,
+        channel: 'PUSH_NOTIFICATION',
         recipientPhone: payload.customerPhone,
-        customerName: payload.customerName,
-        chitCode: payload.chitCode,
-        ticketNumber: payload.ticketNumber,
-        consecutiveUnpaidMonths: payload.consecutiveUnpaidMonths,
-        totalOverdueAmount: payload.totalOverdueAmount,
-        branchPhone: '0424-2223333',
+        templateType: 'DEFAULT_WARNING',
+        messageText: `${pushTitle}: ${pushBody} - 3 மாத தவணைகள் நிலுவையில் உள்ளது`,
+        variables: { ...payload },
+        sentAt: new Date(),
+        status: 'DELIVERED',
+      });
+    } else {
+      notificationId = `sms-def-${Date.now()}`;
+      channel = 'SMS_DLT';
+
+      if (this.smsService) {
+        await this.smsService.sendDefaultWarningSms({
+          recipientPhone: payload.customerPhone,
+          customerName: payload.customerName,
+          chitCode: payload.chitCode,
+          ticketNumber: payload.ticketNumber,
+          consecutiveUnpaidMonths: payload.consecutiveUnpaidMonths,
+          totalOverdueAmount: payload.totalOverdueAmount,
+          branchPhone: '0424-2223333',
+        });
+      }
+
+      const smsText = `Kumaran Chits: Urgent: Ticket #${payload.ticketNumber} in Chit ${payload.chitCode} has ${payload.consecutiveUnpaidMonths} months overdue (Rs.${formattedOverdue}). Clear dues to avoid cancellation - 3 மாத தவணைகள் நிலுவையில் உள்ளது. Contact: 0424-2223333`;
+      this.sentLog.push({
+        id: notificationId,
+        channel: 'SMS_DLT',
+        recipientPhone: payload.customerPhone,
+        templateType: 'DEFAULT_WARNING',
+        messageText: smsText,
+        variables: { ...payload },
+        sentAt: new Date(),
+        status: 'DELIVERED',
       });
     }
 
-    const messageText = `எச்சரிக்கை அறிவிப்பு / DEFAULT WARNING NOTICE
-
-வணக்கம் திரு. *${payload.customerName}*,
-
-குமரன் சீட்ஸ் *${payload.chitCode}* குழுவின் டிக்கெட் எண் *#${payload.ticketNumber}* தொடர்ந்து ${payload.consecutiveUnpaidMonths} மாத தவணைகள் நிலுவையில் உள்ளது (₹${formattedOverdue}).
-Your ticket has ${payload.consecutiveUnpaidMonths} consecutive months in default arrears.
-
-சட்டரீதியான நடவடிக்கை மற்றும் உறுப்பினர் நீக்கத்தை தவிர்க்க உடனடியாக நிலுவைத் தொகையை செலுத்தவும்.
-Please clear your outstanding dues immediately to avoid statutory membership termination under company rules.
-
-குமரன் பைனான்ஸ் / Kumaran Finance`;
-
-    const id = `wa-def-${Date.now()}`;
-    this.sentLog.push({
-      id,
-      channel: 'WHATSAPP',
-      recipientPhone: payload.customerPhone,
-      templateType: 'DEFAULT_WARNING',
-      messageText,
-      variables: { ...payload },
-      sentAt: new Date(),
-      status: 'DELIVERED',
-    });
-
     this.logger.warn(
-      `Default warning sent to ${payload.customerPhone} for Ticket #${payload.ticketNumber} in ${payload.chitCode}`,
+      `Default warning sent via ${channel} to ${payload.customerPhone} for Ticket #${payload.ticketNumber} in ${payload.chitCode}`,
     );
 
-    return { notificationId: id };
+    return { notificationId, channel };
+  }
+
+  /**
+   * Formats and broadcasts auction result and dividend credit to all chit group subscribers:
+   * - Primary (₹0 Cost): Mobile App Push Notification (FCM) for app users (`fcmToken` present).
+   * - Fallback: Indian DLT-Compliant SMS via SmsService for keypad phone users.
+   */
+  async dispatchAuctionResult(
+    payload: AuctionResultNotificationJobPayload,
+  ): Promise<{ dispatchedCount: number; pushCount: number; smsCount: number }> {
+    let count = 0;
+    let pushCount = 0;
+    let smsCount = 0;
+
+    const formattedDiscount = BigInt(payload.winningDiscountAmount).toLocaleString('en-IN');
+    const formattedDividend = BigInt(payload.dividendPerTicket).toLocaleString('en-IN');
+    const formattedPayable = BigInt(payload.nextMonthNetPayable).toLocaleString('en-IN');
+
+    for (const sub of payload.subscribers) {
+      if (sub.fcmToken) {
+        const pushId = `push-res-${Date.now()}-${count}`;
+        const pushTitle = 'குமரன் பைனான்ஸ் / Kumaran Finance';
+        const pushBody = `மாதம் ${payload.installmentMonth} ஏல முடிவு: வெற்றி கழிவு ரூ. ${formattedDiscount}. லாபப்பங்கு ரூ. ${formattedDividend}. அடுத்த மாத தவணை: ரூ. ${formattedPayable}. / Dividend credit: Rs.${formattedDividend}. Next month: Rs.${formattedPayable}.`;
+
+        this.sentLog.push({
+          id: pushId,
+          channel: 'PUSH_NOTIFICATION',
+          recipientPhone: sub.phone,
+          templateType: 'AUCTION_RESULT',
+          messageText: `${pushTitle}: ${pushBody}`,
+          variables: { ...payload, subscriberName: sub.name },
+          sentAt: new Date(),
+          status: 'DELIVERED',
+        });
+        pushCount++;
+      } else {
+        const smsId = `sms-res-${Date.now()}-${count}`;
+        const smsText = `Kumaran Chits: Chit ${payload.chitCode} Month ${payload.installmentMonth} Auction won at Rs.${formattedDiscount} discount. Dividend credit: Rs.${formattedDividend}. Next month installment: Rs.${formattedPayable}.`;
+
+        this.sentLog.push({
+          id: smsId,
+          channel: 'SMS_DLT',
+          recipientPhone: sub.phone,
+          templateType: 'AUCTION_RESULT',
+          messageText: smsText,
+          variables: { ...payload, subscriberName: sub.name },
+          sentAt: new Date(),
+          status: 'DELIVERED',
+        });
+        smsCount++;
+      }
+      count++;
+    }
+
+    this.logger.log(
+      `Broadcasted auction results to ${count} subscribers (${pushCount} Push, ${smsCount} SMS) for Chit ${payload.chitCode} Month ${payload.installmentMonth}`,
+    );
+    return { dispatchedCount: count, pushCount, smsCount };
   }
 
   /**

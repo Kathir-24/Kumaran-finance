@@ -117,6 +117,7 @@ export class DailyArrearsService {
             ticketNumber: ticket.ticketNumber,
             consecutiveUnpaidMonths: consecutiveUnpaid,
             totalOverdueAmount: totalOverdue.toString(),
+            fcmToken: (ticket.customer as any).fcmToken ?? undefined,
           });
         }
       }

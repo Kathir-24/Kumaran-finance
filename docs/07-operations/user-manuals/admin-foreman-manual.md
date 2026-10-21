@@ -114,7 +114,7 @@ flowchart TD
    - In the auction room, Partner A holds smartphone, enters winning discount (system validates $D \le V/4$), records the paper lot ticket drawn (Option A), and taps **"Submit Bid"** (Maker).
    - Partner B on phone or laptop taps **"Finalize Auction"** (Checker).
 4. **Instant PDF Receipt & Report Sharing**:
-   - View Form XXII Cash Book or subscriber passbooks and tap **"Share via WhatsApp"** to send statements directly to partners, subscribers, or the CA auditor.
+   - View Form XXII Cash Book or subscriber passbooks and click **"Download PDF"** or **"Export Excel"** (or use native mobile share) to send statements directly to partners or the CA auditor.
 
 ---
 
@@ -135,7 +135,7 @@ For operational visibility over asynchronous background workers, partners can op
   - Tracks daily arrears calculation running at 02:00 AM IST.
   - Verifies automated 3-month continuous defaulter tagging (ADR-07).
 - **`notification-queue`**:
-  - Monitors DLT SMS and WhatsApp bilingual delivery batches.
+  - Monitors Push notification delivery batches and DLT SMS fallback queues.
   - Displays any delivery failures caused by telecom timeouts.
 - **`reconciliation-queue`**:
   - Tracks the 06:00 AM IST payment gateway settlement audit.

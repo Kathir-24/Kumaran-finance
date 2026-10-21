@@ -149,8 +149,9 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
     - Promissory note / personal guarantee submitted? [Yes / No]
     - Upload scanned copies of submitted papers / cheques to secure private storage.
 - **Receipts & Notifications (`CONFIRMED-BY-DEVELOPER`)**:
-  - Generation of bilingual (English + Tamil) receipts (physical and digital PDF) is in V1 scope (`CONFIRMED-BY-DEVELOPER`).
-  - SMS & WhatsApp payment notifications are in V1 scope (`CONFIRMED-BY-DEVELOPER`).
+  - The customer's physical paper passbook signed with pen by the agent/cashier is the primary physical proof.
+  - Generation of bilingual (English + Tamil) digital PDF receipts (for company ledger and dispute backup) is in V1 scope (`CONFIRMED-BY-DEVELOPER`).
+  - Notifications follow a Smart Hierarchy: Free In-App Push Notifications for smartphone app users, and DLT SMS fallback for keypad phone users. WhatsApp Business API is parked in V1 (`CONFIRMED-BY-DEVELOPER`).
   - Payout vouchers support Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`).
 
 ---

@@ -179,10 +179,10 @@ apps/mobile/lib/
 │   │   ├── screens/approval_queue.dart    # 1-Tap Maker-Checker approval queue (Handover, Payouts, Reversals)
 │   │   ├── screens/auction_console.dart   # Bid discount entry, 1/4 ceiling guard, paper lot token draw
 │   │   ├── screens/safety_checklist.dart  # Camera capture for signed blank cheques & agreement authorization
-│   │   └── screens/report_share.dart      # View Form XXII / Passbooks & 1-tap "Share via WhatsApp"
+│   │   └── screens/report_share.dart      # View Form XXII / Passbooks & on-demand PDF/Excel export
 │   ├── field_agent/                       # FIELD COLLECTION AGENT WORKFLOWS
 │   │   ├── screens/route_dues.dart        # Today's assigned customer route sorted by area
-│   │   ├── screens/quick_collect.dart     # Collect cash (< 30s), passbook sign reminder, WhatsApp receipt
+│   │   ├── screens/quick_collect.dart     # Collect cash (< 30s), passbook sign reminder, Push/SMS receipt
 │   │   ├── screens/offline_queue.dart     # Pending sync transactions recorded in rural 4G dead zones
 │   │   └── screens/cash_handover.dart     # End-of-day cash collection tally submission
 │   └── customer/                          # SUBSCRIBER SELF-SERVICE

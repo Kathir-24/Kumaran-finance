@@ -49,7 +49,7 @@ Role permissions & Maker-Checker    -->   docs/01-business/permissions-matrix.md
 Module functional requirements      -->   docs/02-requirements/prd.md
 API routes, methods, and DTOs       -->   docs/03-architecture/api-spec.md
 State transitions & lifecycle guards -->   docs/03-architecture/state-machines.md
-Receipt formatting & SMS/WhatsApp   -->   docs/02-requirements/notification-and-receipt-templates.md
+Receipt formatting & Push/SMS      -->   docs/02-requirements/notification-and-receipt-templates.md
 Writing unit/invariant tests        -->   docs/05-testing/financial-tests.md
 Database migrations & seeding       -->   docs/04-engineering/database-migration-and-seeding-guide.md
 Quality gate checklist before merge  -->   docs/04-engineering/definition-of-done.md

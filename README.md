@@ -31,7 +31,7 @@ u:\Kumaran-finance\docs\
 │   ├── prd.md                                # 10 core modules acceptance criteria
 │   ├── user-stories-and-journeys.md          # 6 personas, 28 features, user stories & journey maps
 │   ├── non-functional-requirements.md        # Security, latency, precision standards
-│   └── notification-and-receipt-templates.md # Bilingual Tamil+English SMS, WhatsApp, & PDF receipts
+│   └── notification-and-receipt-templates.md # Smart Push Notifications, DLT SMS, & Bilingual PDF receipts
 ├── 03-architecture/
 │   ├── architecture.md                       # Modular monolith HLD & 3-tier auth
 │   ├── frontend-architecture.md              # Web & Mobile architecture, PWA, & cross-device Maker-Checker

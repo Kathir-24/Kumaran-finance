@@ -3220,7 +3220,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Get audit logs of dispatched DLT SMS and WhatsApp notifications",
+        "summary": "Get audit logs of dispatched Push Notifications and DLT SMS messages",
         "tags": [
           "Background Jobs & Daily Maintenance"
         ]

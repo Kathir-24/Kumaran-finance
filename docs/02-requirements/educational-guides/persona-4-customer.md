@@ -77,7 +77,7 @@ Here are the formal Agile user stories defining every capability the Customer ha
 * **US-1.2 (Strict Privacy & Anti-IDOR)**: *As a Subscriber*, I want the system to ensure that only I can see my chit tickets and receipts, *so that* no other subscriber can view my financial balance.
 
 ### Module 2: Branch Information & Customer Support (M2)
-* **US-2.1 (Branch Contact & Help Desk)**: *As a Subscriber*, I want to see Kumaran Finance's Perundurai Head Office address, phone number, and a direct WhatsApp button, *so that* I can easily contact the partners for questions.
+* **US-2.1 (Branch Contact & Direct Phone Help Desk)**: *As a Subscriber*, I want to see Kumaran Finance's Perundurai Head Office address and direct phone dialer button (`0424-2223333` / partner mobiles), *so that* I can easily contact the branch partners directly with one tap.
 
 ### Module 3: Customer Profile & Nominee (M3)
 * **US-3.1 (Viewing My Profile & Nominee)**: *As a Subscriber*, I want to verify my registered address, masked Aadhaar (`XXXXXXXX1234`), and registered Nominee name, *so that* I know my family's claim is properly recorded in company files.
