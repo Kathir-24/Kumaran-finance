@@ -148,6 +148,7 @@ export class PaymentService {
           idempotencyKey: dto.idempotencyKey || null,
           transactionRef: dto.transactionRef || null,
           cashHandoverStatus,
+          notes: dto.notes?.trim() || null,
           createdAt: paymentDate,
         },
       });

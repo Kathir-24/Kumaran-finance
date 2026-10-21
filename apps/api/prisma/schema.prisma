@@ -355,6 +355,7 @@ model Payment {
   cashHandoverStatus               String?             // PENDING_HANDOVER, ACKNOWLEDGED
   cashHandoverAcknowledgedByUserId String?             // Partner / Cashier who counted and verified physical cash
   cashHandoverAcknowledgedAt       DateTime?
+  notes                            String?             // Optional cashier remarks or collection notes
   createdAt                        DateTime            @default(now())
 
   allocations                      PaymentAllocation[]

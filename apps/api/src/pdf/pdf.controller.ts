@@ -44,8 +44,36 @@ export class PdfController {
     description:
       'Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.',
   })
-  @ApiQuery({ name: 'download', required: false, type: Boolean, description: 'Return presigned URL JSON instead of streaming PDF' })
-  @ApiResponse({ status: 200, description: 'PDF stream or presigned URL returned' })
+  @ApiQuery({
+    name: 'download',
+    required: false,
+    type: Boolean,
+    description: 'Return presigned URL JSON instead of streaming PDF binary',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bilingual receipt PDF stream or presigned URL JSON',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+          description: '80mm thermal receipt PDF document binary stream',
+        },
+      },
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', example: 'receipts/KC-REC-PRD-2026-00001.pdf' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/receipts/KC-REC-PRD-2026-00001.pdf?sig=...' },
+            expiresInSeconds: { type: 'number', example: 900 },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to receipt' })
   async getReceiptPdf(
     @Param('paymentId') paymentId: string,
@@ -85,8 +113,36 @@ export class PdfController {
     description:
       'Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.',
   })
-  @ApiQuery({ name: 'download', required: false, type: Boolean })
-  @ApiResponse({ status: 200, description: 'Voucher PDF stream or presigned URL returned' })
+  @ApiQuery({
+    name: 'download',
+    required: false,
+    type: Boolean,
+    description: 'Return presigned URL JSON instead of streaming PDF binary',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Payout voucher PDF stream or presigned URL JSON',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+          description: 'A4 prize disbursement voucher PDF binary stream',
+        },
+      },
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', example: 'vouchers/payout-voucher-2026-01.pdf' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/vouchers/...?sig=...' },
+            expiresInSeconds: { type: 'number', example: 900 },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to voucher' })
   async getVoucherPdf(
     @Param('auctionId') auctionId: string,
@@ -125,8 +181,36 @@ export class PdfController {
     description:
       'Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.',
   })
-  @ApiQuery({ name: 'download', required: false, type: Boolean })
-  @ApiResponse({ status: 200, description: 'Auction minutes PDF returned' })
+  @ApiQuery({
+    name: 'download',
+    required: false,
+    type: Boolean,
+    description: 'Return presigned URL JSON instead of streaming PDF binary',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Auction minutes PDF stream or presigned URL JSON',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+          description: 'Statutory Form XVII auction minutes PDF binary stream',
+        },
+      },
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', example: 'minutes/form-xvii-2026-01.pdf' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/minutes/...?sig=...' },
+            expiresInSeconds: { type: 'number', example: 900 },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to auction minutes' })
   async getMinutesPdf(
     @Param('auctionId') auctionId: string,
@@ -166,8 +250,36 @@ export class PdfController {
     description:
       'Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.',
   })
-  @ApiQuery({ name: 'download', required: false, type: Boolean })
-  @ApiResponse({ status: 200, description: 'Passbook PDF returned' })
+  @ApiQuery({
+    name: 'download',
+    required: false,
+    type: Boolean,
+    description: 'Return presigned URL JSON instead of streaming PDF binary',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Passbook statement PDF stream or presigned URL JSON',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+          description: 'Continuous subscriber passbook statement PDF binary stream',
+        },
+      },
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', example: 'passbooks/form-xxi-passbook-01.pdf' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/passbooks/...?sig=...' },
+            expiresInSeconds: { type: 'number', example: 900 },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to passbook' })
   async getPassbookPdf(
     @Param('ticketId') ticketId: string,

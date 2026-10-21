@@ -31,6 +31,8 @@ import { PaymentService } from './payment.service';
 @ApiTags('Payments, Receipts & Reversals')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('payments')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}

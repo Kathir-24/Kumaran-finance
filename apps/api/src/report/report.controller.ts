@@ -33,6 +33,8 @@ import { ReportService } from './report.service';
 @ApiTags('Dashboards & Statutory Reports')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('reports')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}

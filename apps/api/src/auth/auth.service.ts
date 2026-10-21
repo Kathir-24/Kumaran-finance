@@ -338,7 +338,7 @@ export class AuthService {
       select: {
         id: true,
         email: true,
-        role: true,
+        roles: true,
         fcmToken: true,
         updatedAt: true,
       },

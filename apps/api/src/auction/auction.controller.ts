@@ -32,6 +32,8 @@ import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 @ApiTags('Auctions')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('auctions')
 export class AuctionController {
   constructor(private readonly auctionService: AuctionService) {}
@@ -168,6 +170,13 @@ export class AuctionController {
   @ApiOperation({
     summary: 'Alias for Option A Tie-Break (as in API Specification)',
   })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: Number,
+    description: 'Installment month (required if ID is ChitGroup UUID)',
+  })
+  @ApiResponse({ status: 200, description: 'Tie-break recorded successfully' })
   async recordTieBreakAlias(
     @Param('id') id: string,
     @Body() dto: RecordTieBreakDto,

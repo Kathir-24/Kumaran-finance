@@ -32,7 +32,19 @@ export class StorageController {
     description:
       'Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.',
   })
-  @ApiResponse({ status: 200, description: 'File stream returned' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stored document binary stream returned',
+    content: {
+      'application/octet-stream': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to file key' })
   @ApiResponse({ status: 404, description: 'File not found' })
   async streamFile(

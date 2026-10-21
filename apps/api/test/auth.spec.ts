@@ -379,7 +379,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       id: mockUserId,
       email: 'agent@kumaran.in',
       phone: '9842143210',
-      role: Role.COLLECTION_AGENT,
+      roles: [Role.COLLECTION_AGENT],
       isActive: true,
     } as any;
 
@@ -389,7 +389,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.update.mockResolvedValue({
         id: mockUserId,
         email: 'agent@kumaran.in',
-        role: Role.COLLECTION_AGENT,
+        roles: [Role.COLLECTION_AGENT],
         fcmToken: mockToken,
         updatedAt: new Date(),
       });
@@ -410,7 +410,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.update.mockResolvedValue({
         id: mockUserId,
         email: 'agent@kumaran.in',
-        role: Role.COLLECTION_AGENT,
+        roles: [Role.COLLECTION_AGENT],
         fcmToken: null,
         updatedAt: new Date(),
       });

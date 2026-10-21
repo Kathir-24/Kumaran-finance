@@ -343,7 +343,7 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       prismaMock.customer.update.mockResolvedValue({
         id: mockCustomerId,
         customerCode: 'KC-CUST-00001',
-        primaryPhone: '9842712345',
+        phone: '9842712345',
         fcmToken: mockToken,
         updatedAt: new Date(),
       });
@@ -364,7 +364,7 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       prismaMock.customer.update.mockResolvedValue({
         id: mockCustomerId,
         customerCode: 'KC-CUST-00001',
-        primaryPhone: '9842712345',
+        phone: '9842712345',
         fcmToken: null,
         updatedAt: new Date(),
       });
@@ -393,7 +393,7 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       prismaMock.customer.update.mockResolvedValue({
         id: mockCustomerId,
         customerCode: 'KC-CUST-00001',
-        primaryPhone: '9842712345',
+        phone: '9842712345',
         fcmToken: 'token-self',
         updatedAt: new Date(),
       });
@@ -420,7 +420,7 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       prismaMock.customer.update.mockResolvedValue({
         id: mockCustomerId,
         customerCode: 'KC-CUST-00001',
-        primaryPhone: '9842712345',
+        phone: '9842712345',
         fcmToken: 'token-staff-assigned',
         updatedAt: new Date(),
       });

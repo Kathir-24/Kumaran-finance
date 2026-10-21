@@ -337,7 +337,7 @@ export class CustomerService {
       select: {
         id: true,
         customerCode: true,
-        primaryPhone: true,
+        phone: true,
         fcmToken: true,
         updatedAt: true,
       },

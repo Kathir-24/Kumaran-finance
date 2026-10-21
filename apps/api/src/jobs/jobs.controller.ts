@@ -32,10 +32,14 @@ import { AuctionReminderSchedulerService } from './services/auction-reminder-sch
 import { DailyArrearsService } from './services/daily-arrears.service';
 import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
+import { ReconcileSettlementDto } from './dto/reconcile-settlement.dto';
+import { SendAuctionReminderDto } from './dto/send-auction-reminder.dto';
 
 @ApiTags('Background Jobs & Daily Maintenance')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('jobs')
 export class JobsController {
   constructor(
@@ -71,6 +75,13 @@ export class JobsController {
     summary: 'Enqueue daily arrears job to BullMQ queue',
     description: 'Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.',
   })
+  @ApiQuery({
+    name: 'cutoffDate',
+    required: false,
+    type: String,
+    description: 'ISO date string to test past or future due dates',
+  })
+  @ApiResponse({ status: 200, description: 'Daily arrears job enqueued to BullMQ' })
   async enqueueDailyArrears(@Query('cutoffDate') cutoffDate?: string) {
     return this.queueProvider.addJob(DAILY_MAINTENANCE_QUEUE, JOB_PROCESS_DAILY_ARREARS, {
       cutoffDate,
@@ -83,18 +94,28 @@ export class JobsController {
     summary: 'Trigger payment settlement reconciliation',
     description: 'Reconciles payment records against gateway provider settlement data to resolve ghost drops.',
   })
-  async runReconciliation(@Body('records') records: any[]) {
-    return this.reconciliationService.reconcileSettlement(records || []);
+  @ApiResponse({ status: 200, description: 'Reconciliation summary returned' })
+  async runReconciliation(@Body() dto: ReconcileSettlementDto) {
+    const records = (dto.records || []).map((r) => ({
+      gatewayOrderId: r.gatewayOrderId,
+      gatewayPaymentId: r.gatewayPaymentId,
+      amount: BigInt(r.amount),
+      status: r.status,
+      settledAt: new Date(r.settledAt),
+    }));
+    return this.reconciliationService.reconcileSettlement(records);
   }
 
   @Post('enqueue-reconciliation')
   @Roles(Role.SUPER_ADMIN, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Enqueue reconciliation job to BullMQ queue',
+    description: 'Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.',
   })
-  async enqueueReconciliation(@Body('records') records: any[]) {
+  @ApiResponse({ status: 200, description: 'Reconciliation job enqueued to BullMQ' })
+  async enqueueReconciliation(@Body() dto: ReconcileSettlementDto) {
     return this.queueProvider.addJob(RECONCILIATION_QUEUE, JOB_RUN_DAILY_RECONCILIATION, {
-      records: records || [],
+      records: dto.records || [],
     });
   }
 
@@ -102,31 +123,24 @@ export class JobsController {
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Broadcast bilingual auction reminder to chit subscribers',
+    description: 'Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.',
   })
+  @ApiResponse({ status: 200, description: 'Auction reminder broadcast job enqueued' })
   async sendAuctionReminder(
     @Param('chitGroupId') chitGroupId: string,
     @Param('month', ParseIntPipe) month: number,
-    @Body()
-    body: {
-      chitCode: string;
-      auctionDate: string;
-      auctionTime: string;
-      branchName: string;
-      branchAddress: string;
-      branchPhone: string;
-      subscribers: Array<{ name: string; phone: string; fcmToken?: string }>;
-    },
+    @Body() dto: SendAuctionReminderDto,
   ) {
     return this.queueProvider.addJob(NOTIFICATION_QUEUE, JOB_DISPATCH_AUCTION_REMINDER, {
       chitGroupId,
-      chitCode: body.chitCode,
+      chitCode: dto.chitCode,
       installmentMonth: month,
-      auctionDate: body.auctionDate,
-      auctionTime: body.auctionTime,
-      branchName: body.branchName,
-      branchAddress: body.branchAddress,
-      branchPhone: body.branchPhone,
-      subscribers: body.subscribers || [],
+      auctionDate: dto.auctionDate,
+      auctionTime: dto.auctionTime,
+      branchName: dto.branchName,
+      branchAddress: dto.branchAddress,
+      branchPhone: dto.branchPhone,
+      subscribers: dto.subscribers || [],
     });
   }
 

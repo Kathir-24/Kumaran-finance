@@ -83,6 +83,7 @@ export class AuthController {
     description: 'Clears the refresh token hash and device FCM push token in database, invalidating the session.',
   })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async logout(@CurrentUser('sub') userId: string) {
     return this.authService.logout(userId);
   }
@@ -97,7 +98,7 @@ export class AuthController {
       'Updates the Firebase Cloud Messaging push token for the authenticated user for real-time mobile push notifications and instant Maker-Checker approvals. Pass null/empty to deregister.',
   })
   @ApiResponse({ status: 200, description: 'Device FCM token updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async updateFcmToken(
     @CurrentUser('sub') userId: string,
     @Body() dto: UpdateFcmTokenDto,
@@ -113,6 +114,7 @@ export class AuthController {
     description: 'Returns profile, roles, and branch details of authenticated user.',
   })
   @ApiResponse({ status: 200, description: 'Profile retrieved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async getProfile(@CurrentUser('sub') userId: string) {
     return this.authService.getProfile(userId);
   }
@@ -125,6 +127,7 @@ export class AuthController {
     description: 'Generates RFC 6238 Base32 secret and otpauth URI for QR code scanning.',
   })
   @ApiResponse({ status: 200, description: 'TOTP setup parameters returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async setupTotp(@CurrentUser('sub') userId: string) {
     return this.authService.setupTotp(userId);
   }
@@ -139,6 +142,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: '2FA enabled' })
   @ApiResponse({ status: 400, description: 'Invalid verification code' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   @ApiResponse({ status: 429, description: 'Too many verification attempts' })
   async enableTotp(@CurrentUser('sub') userId: string, @Body() dto: TotpEnableDto) {
     return this.authService.enableTotp(userId, dto);
@@ -152,7 +156,7 @@ export class AuthController {
     description: 'Requires current password to disable two-factor authentication.',
   })
   @ApiResponse({ status: 200, description: '2FA disabled' })
-  @ApiResponse({ status: 401, description: 'Invalid password' })
+  @ApiResponse({ status: 401, description: 'Invalid password or unauthorized' })
   async disableTotp(@CurrentUser('sub') userId: string, @Body() dto: DisableTotpDto) {
     return this.authService.disableTotp(userId, dto);
   }
@@ -179,6 +183,7 @@ export class AuthController {
     description: 'Configures 6-digit MPIN hash for quick mobile unlock.',
   })
   @ApiResponse({ status: 200, description: 'MPIN saved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async setMpin(@CurrentUser('sub') userId: string, @Body() dto: SetMpinDto) {
     return this.authService.setMpin(userId, dto);
   }

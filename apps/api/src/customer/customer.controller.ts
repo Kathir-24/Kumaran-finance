@@ -35,6 +35,8 @@ import { UpdateKycDto } from './dto/update-kyc.dto';
 @ApiTags('Customers')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('customers')
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}

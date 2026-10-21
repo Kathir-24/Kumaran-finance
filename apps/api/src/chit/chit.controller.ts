@@ -30,6 +30,8 @@ import { QueryChitDto } from './dto/query-chit.dto';
 @ApiTags('Chits')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('chits')
 export class ChitController {
   constructor(private readonly chitService: ChitService) {}

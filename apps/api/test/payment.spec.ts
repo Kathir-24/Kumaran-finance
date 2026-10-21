@@ -174,6 +174,53 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       expect(result.paidAmount).toBe(3750n);
     });
 
+    it('should persist optional cashier notes when provided in payment dto', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(412);
+      prismaMock.payment.create.mockResolvedValue({
+        id: mockPaymentId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        notes: 'Paid at Perundurai head office counter',
+        createdAt: new Date('2026-10-18T10:45:00.000Z'),
+      });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-02' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-02',
+        receiptNumber: 'KC-REC-PRD-2026-00413',
+        isBilingual: true,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({
+        ...mockDue,
+        status: DueStatus.PAID,
+        paidAmount: 3750n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+
+      await paymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+          notes: 'Paid at Perundurai head office counter',
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      expect(prismaMock.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            notes: 'Paid at Perundurai head office counter',
+          }),
+        }),
+      );
+    });
+
     it('should reject partial payment (< Inet) with 400 PARTIAL_PAYMENTS_NOT_ALLOWED', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);

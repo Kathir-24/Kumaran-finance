@@ -30,6 +30,8 @@ import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
 @ApiTags('Prize Disbursements & Safety Proof')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('disbursements')
 export class DisbursementController {
   constructor(private readonly disbursementService: DisbursementService) {}

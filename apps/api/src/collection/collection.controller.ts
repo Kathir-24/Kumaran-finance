@@ -29,6 +29,8 @@ import { SyncOfflineQueueDto } from './dto/sync-offline-collection.dto';
 @ApiTags('Collections & Cash Handover')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('collections')
 export class CollectionController {
   constructor(private readonly collectionService: CollectionService) {}

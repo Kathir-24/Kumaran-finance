@@ -144,6 +144,9 @@
         "responses": {
           "200": {
             "description": "Logged out successfully"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
           }
         },
         "security": [
@@ -177,7 +180,7 @@
             "description": "Device FCM token updated successfully"
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized — missing or invalid Bearer token"
           }
         },
         "security": [
@@ -199,6 +202,9 @@
         "responses": {
           "200": {
             "description": "Profile retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
           }
         },
         "security": [
@@ -220,6 +226,9 @@
         "responses": {
           "200": {
             "description": "TOTP setup parameters returned"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
           }
         },
         "security": [
@@ -254,6 +263,9 @@
           },
           "400": {
             "description": "Invalid verification code"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
           },
           "429": {
             "description": "Too many verification attempts"
@@ -290,7 +302,7 @@
             "description": "2FA disabled"
           },
           "401": {
-            "description": "Invalid password"
+            "description": "Invalid password or unauthorized"
           }
         },
         "security": [
@@ -354,6 +366,9 @@
         "responses": {
           "200": {
             "description": "MPIN saved successfully"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
           }
         },
         "security": [
@@ -385,6 +400,12 @@
         "responses": {
           "201": {
             "description": "Customer created successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "409": {
             "description": "Phone number already registered"
@@ -450,6 +471,12 @@
         "responses": {
           "200": {
             "description": "Customer list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -480,6 +507,12 @@
         "responses": {
           "200": {
             "description": "Customer profile found"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Customer not found"
@@ -521,6 +554,12 @@
         "responses": {
           "200": {
             "description": "Customer updated successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Customer not found"
@@ -565,6 +604,12 @@
           "201": {
             "description": "Nominee added successfully"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Customer not found"
           }
@@ -605,6 +650,12 @@
         "responses": {
           "200": {
             "description": "Nominee removed successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Nominee not found"
@@ -649,6 +700,12 @@
           "200": {
             "description": "KYC status updated"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Customer not found"
           }
@@ -692,6 +749,9 @@
           "200": {
             "description": "Customer FCM token updated successfully"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
           "403": {
             "description": "Forbidden: Customers can only update own token"
           },
@@ -729,6 +789,12 @@
           "201": {
             "description": "Chit group created successfully"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "409": {
             "description": "Group code already exists"
           }
@@ -762,6 +828,12 @@
         "responses": {
           "201": {
             "description": "Ongoing chit onboarded successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -830,6 +902,12 @@
         "responses": {
           "200": {
             "description": "Chit schemes list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -860,6 +938,12 @@
         "responses": {
           "200": {
             "description": "Chit scheme found"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Chit scheme not found"
@@ -904,6 +988,12 @@
           "201": {
             "description": "Ticket allocated successfully"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "409": {
             "description": "Customer already holds a ticket or ticket taken"
           }
@@ -936,6 +1026,12 @@
         "responses": {
           "200": {
             "description": "Tickets list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -979,6 +1075,12 @@
           },
           "400": {
             "description": "Not all tickets assigned or already active"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1009,6 +1111,12 @@
         "responses": {
           "200": {
             "description": "Auctions retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1039,6 +1147,12 @@
         "responses": {
           "200": {
             "description": "Auction retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Auction not found"
@@ -1081,6 +1195,12 @@
         "responses": {
           "200": {
             "description": "Eligible bidders list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1133,6 +1253,12 @@
           },
           "400": {
             "description": "Ceiling exceeded or defaulter violation"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1182,6 +1308,12 @@
         "responses": {
           "200": {
             "description": "Tie-break recorded successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1209,10 +1341,11 @@
           },
           {
             "name": "month",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Installment month (required if ID is ChitGroup UUID)",
             "schema": {
-              "type": "string"
+              "type": "number"
             }
           }
         ],
@@ -1228,7 +1361,13 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Tie-break recorded successfully"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1270,6 +1409,9 @@
           "200": {
             "description": "Auction successfully finalized"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
           "403": {
             "description": "Maker-Checker separation violated"
           }
@@ -1303,6 +1445,12 @@
           "200": {
             "description": "Auction minutes retrieved"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Minutes not found"
           }
@@ -1335,6 +1483,12 @@
         "responses": {
           "200": {
             "description": "Minutes text layout retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1378,6 +1532,12 @@
           },
           "400": {
             "description": "Auction not finalized or minutes not found"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Auction not found"
@@ -1455,6 +1615,12 @@
         "responses": {
           "200": {
             "description": "Monthly dues retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1506,6 +1672,12 @@
           },
           "400": {
             "description": "Prior auction not yet finalized or scheme not active"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1537,6 +1709,12 @@
         "responses": {
           "200": {
             "description": "Defaulters list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1568,6 +1746,12 @@
         "responses": {
           "200": {
             "description": "Defaulters list retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1598,6 +1782,12 @@
         "responses": {
           "200": {
             "description": "Ticket dues schedule retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Ticket not found"
@@ -1631,6 +1821,12 @@
         "responses": {
           "200": {
             "description": "Passbook statement retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Ticket not found"
@@ -1678,6 +1874,12 @@
           "400": {
             "description": "Ticket has fewer than 3 consecutive unpaid months"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Ticket not found"
           }
@@ -1701,6 +1903,12 @@
         "responses": {
           "200": {
             "description": "Agent dues retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1735,6 +1943,12 @@
           },
           "400": {
             "description": "Partial payment or duplicate payment rejected"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1766,6 +1980,12 @@
         "responses": {
           "200": {
             "description": "Batch sync completed with summary and item results"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1818,6 +2038,12 @@
         "responses": {
           "200": {
             "description": "Daily summary retrieved"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1849,6 +2075,12 @@
         "responses": {
           "200": {
             "description": "Cash handover batch submitted"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -1880,6 +2112,9 @@
         "responses": {
           "200": {
             "description": "Cash handover acknowledged into vault"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Dual control violated: Collector cannot acknowledge own cash"
@@ -1917,6 +2152,12 @@
           },
           "400": {
             "description": "Partial payment, duplicate payment, or invalid scheme state"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           },
           "404": {
             "description": "Subscriber ticket or installment due not found"
@@ -2042,6 +2283,12 @@
         "responses": {
           "200": {
             "description": "Payments list returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2072,6 +2319,9 @@
         "responses": {
           "200": {
             "description": "Payment record returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Customer attempting to access another member record"
@@ -2108,6 +2358,9 @@
         "responses": {
           "200": {
             "description": "Bilingual receipt data and formatted text layout"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Customer attempting to access another member receipt"
@@ -2158,6 +2411,12 @@
           "400": {
             "description": "Payment already reversed, not success, or request already pending"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Payment not found"
           }
@@ -2203,6 +2462,9 @@
           },
           "400": {
             "description": "No pending reversal request found"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Maker-Checker violation or insufficient role"
@@ -2252,6 +2514,9 @@
           },
           "400": {
             "description": "No pending reversal request found"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Maker-Checker violation or insufficient role"
@@ -2358,6 +2623,12 @@
         "responses": {
           "200": {
             "description": "Disbursements list returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2388,6 +2659,9 @@
         "responses": {
           "200": {
             "description": "Winner disbursement details returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Customer attempting to access another member record"
@@ -2438,6 +2712,12 @@
           "400": {
             "description": "Auction not finalized or invalid status transition"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Auction or winner not found"
           }
@@ -2483,6 +2763,9 @@
           },
           "400": {
             "description": "Safety proof not verified yet or invalid transition"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Maker-Checker violation or insufficient role"
@@ -2533,6 +2816,12 @@
           "400": {
             "description": "Payout not authorized yet"
           },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
           "404": {
             "description": "Auction or winner not found"
           }
@@ -2565,6 +2854,9 @@
         "responses": {
           "200": {
             "description": "Bilingual payout voucher data and text layout"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
             "description": "Customer attempting to access another member voucher"
@@ -2603,6 +2895,12 @@
         "responses": {
           "200": {
             "description": "Executive dashboard metrics returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2635,6 +2933,12 @@
         "responses": {
           "200": {
             "description": "Aggregated pending approvals queue returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2667,6 +2971,12 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2709,6 +3019,12 @@
         "responses": {
           "200": {
             "description": "Day book journal returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2751,6 +3067,12 @@
         "responses": {
           "200": {
             "description": "Cash book register returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2803,6 +3125,12 @@
         "responses": {
           "200": {
             "description": "Auction minutes register returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2845,6 +3173,12 @@
         "responses": {
           "200": {
             "description": "Subscriber ledger returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -2919,6 +3253,12 @@
         "responses": {
           "200": {
             "description": "Defaulters aging report returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3013,6 +3353,12 @@
         "responses": {
           "200": {
             "description": "Audit trail records returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3042,7 +3388,18 @@
         ],
         "responses": {
           "200": {
-            "description": "File stream returned"
+            "description": "Stored document binary stream returned",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden access to file key"
@@ -3079,7 +3436,7 @@
             "name": "download",
             "required": false,
             "in": "query",
-            "description": "Return presigned URL JSON instead of streaming PDF",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
             "schema": {
               "type": "boolean"
             }
@@ -3087,7 +3444,38 @@
         ],
         "responses": {
           "200": {
-            "description": "PDF stream or presigned URL returned"
+            "description": "Bilingual receipt PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "80mm thermal receipt PDF document binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "receipts/KC-REC-PRD-2026-00001.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.com/receipts/KC-REC-PRD-2026-00001.pdf?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden access to receipt"
@@ -3121,6 +3509,7 @@
             "name": "download",
             "required": false,
             "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
             "schema": {
               "type": "boolean"
             }
@@ -3128,7 +3517,38 @@
         ],
         "responses": {
           "200": {
-            "description": "Voucher PDF stream or presigned URL returned"
+            "description": "Payout voucher PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A4 prize disbursement voucher PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "vouchers/payout-voucher-2026-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.com/vouchers/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden access to voucher"
@@ -3162,6 +3582,7 @@
             "name": "download",
             "required": false,
             "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
             "schema": {
               "type": "boolean"
             }
@@ -3169,7 +3590,38 @@
         ],
         "responses": {
           "200": {
-            "description": "Auction minutes PDF returned"
+            "description": "Auction minutes PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Statutory Form XVII auction minutes PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "minutes/form-xvii-2026-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.com/minutes/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden access to auction minutes"
@@ -3203,6 +3655,7 @@
             "name": "download",
             "required": false,
             "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
             "schema": {
               "type": "boolean"
             }
@@ -3210,7 +3663,38 @@
         ],
         "responses": {
           "200": {
-            "description": "Passbook PDF returned"
+            "description": "Passbook statement PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Continuous subscriber passbook statement PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "passbooks/form-xxi-passbook-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.com/passbooks/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden access to passbook"
@@ -3245,6 +3729,12 @@
         "responses": {
           "200": {
             "description": "Daily arrears execution summary returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3265,16 +3755,23 @@
         "parameters": [
           {
             "name": "cutoffDate",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "ISO date string to test past or future due dates",
             "schema": {
               "type": "string"
             }
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Daily arrears job enqueued to BullMQ"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3293,9 +3790,25 @@
         "description": "Reconciles payment records against gateway provider settlement data to resolve ghost drops.",
         "operationId": "JobsController_runReconciliation_v1",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileSettlementDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Reconciliation summary returned"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3311,11 +3824,28 @@
     },
     "/api/v1/jobs/enqueue-reconciliation": {
       "post": {
+        "description": "Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.",
         "operationId": "JobsController_enqueueReconciliation_v1",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileSettlementDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Reconciliation job enqueued to BullMQ"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3331,6 +3861,7 @@
     },
     "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
       "post": {
+        "description": "Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.",
         "operationId": "JobsController_sendAuctionReminder_v1",
         "parameters": [
           {
@@ -3350,9 +3881,25 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendAuctionReminderDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Auction reminder broadcast job enqueued"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3373,6 +3920,12 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3404,6 +3957,12 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3435,6 +3994,12 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -3455,6 +4020,12 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
           }
         },
         "security": [
@@ -4677,6 +5248,138 @@
         },
         "required": [
           "paymentReference"
+        ]
+      },
+      "SettlementRecordDto": {
+        "type": "object",
+        "properties": {
+          "gatewayOrderId": {
+            "type": "string",
+            "example": "ORD_20261021_001",
+            "description": "Payment gateway order / reference ID (transactionRef)"
+          },
+          "gatewayPaymentId": {
+            "type": "string",
+            "example": "pay_1234567890",
+            "description": "External gateway payment transaction ID"
+          },
+          "amount": {
+            "type": "number",
+            "example": 3750,
+            "description": "Settlement amount in whole integer Rupees"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "REFUNDED"
+            ],
+            "example": "SUCCESS",
+            "description": "Gateway settlement transaction status"
+          },
+          "settledAt": {
+            "type": "string",
+            "example": "2026-10-21T10:00:00.000Z",
+            "description": "Gateway settlement timestamp"
+          }
+        },
+        "required": [
+          "gatewayOrderId",
+          "gatewayPaymentId",
+          "amount",
+          "status",
+          "settledAt"
+        ]
+      },
+      "ReconcileSettlementDto": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "description": "List of external gateway settlement records to reconcile against internal payments",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementRecordDto"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "ReminderSubscriberItemDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "S. Sundaram",
+            "description": "Subscriber full name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842712345",
+            "description": "10-digit primary mobile phone number"
+          },
+          "fcmToken": {
+            "type": "string",
+            "example": "fcm_token_sample_abc123",
+            "description": "Optional FCM device token for mobile passbook push notification"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "SendAuctionReminderDto": {
+        "type": "object",
+        "properties": {
+          "chitCode": {
+            "type": "string",
+            "example": "KCA-1L-20M-01",
+            "description": "Unique chit group code"
+          },
+          "auctionDate": {
+            "type": "string",
+            "example": "2026-11-15",
+            "description": "Scheduled auction date"
+          },
+          "auctionTime": {
+            "type": "string",
+            "example": "10:30 AM",
+            "description": "Scheduled auction time"
+          },
+          "branchName": {
+            "type": "string",
+            "example": "Head Office - Perundurai",
+            "description": "Branch name where auction is physically conducted"
+          },
+          "branchAddress": {
+            "type": "string",
+            "example": "14/2, Gandhi Nagar, Perundurai",
+            "description": "Branch physical address"
+          },
+          "branchPhone": {
+            "type": "string",
+            "example": "04294-220123",
+            "description": "Branch contact telephone number"
+          },
+          "subscribers": {
+            "description": "List of chit subscribers to receive bilingual auction reminder",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReminderSubscriberItemDto"
+            }
+          }
+        },
+        "required": [
+          "chitCode",
+          "auctionDate",
+          "auctionTime",
+          "branchName",
+          "branchAddress",
+          "branchPhone",
+          "subscribers"
         ]
       }
     }

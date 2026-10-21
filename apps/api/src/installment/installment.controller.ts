@@ -29,6 +29,8 @@ import { InstallmentService } from './installment.service';
 @ApiTags('Installment Dues')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
+@ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('installments')
 export class InstallmentController {
   constructor(private readonly installmentService: InstallmentService) {}
