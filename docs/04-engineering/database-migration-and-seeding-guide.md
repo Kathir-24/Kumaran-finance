@@ -153,74 +153,49 @@ app.useGlobalInterceptors(new BigIntInterceptor());
 
 ---
 
-## 5. Database Seeding Runbook (`prisma/seed.ts`)
+## 5. Comprehensive Database Seeding Runbook (`prisma/seed.ts`)
 
-Seeding guarantees that every developer and test environment starts with the required foundational records:
+Seeding guarantees that every developer and test environment starts with comprehensive, realistic operational records covering all 17 Prisma models and 10 canonical $N$-scenarios.
 
-### 5.1 Seeding Script Structure (`apps/api/prisma/seed.ts`)
-```typescript
-import { PrismaClient, Role } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+### 5.1 Modular Seeder Architecture
+The seeder is organized into specialized modules under `apps/api/prisma/seeders/`:
 
-const prisma = new PrismaClient();
-
-async function main() {
-  console.log('🌱 Starting Kumaran Chits database seed...');
-
-  // 1. Seed Single Physical Branch (Head Office - Perundurai, Erode)
-  const branch = await prisma.branch.upsert({
-    where: { code: 'PRD' },
-    update: {},
-    create: {
-      code: 'PRD',
-      name: 'Head Office - Perundurai',
-      nameTamil: 'தலைமை கிளை - பெருந்துறை',
-      address: 'Main Road, Perundurai, Erode, Tamil Nadu',
-      phone: '+91 98765 43210',
-      isActive: true,
-    },
-  });
-  console.log(`✅ Branch seeded: ${branch.name} (${branch.code})`);
-
-  // 2. Seed Initial Super Admin User (Partner Account)
-  const saltRounds = 12;
-  const passwordHash = await bcrypt.hash('Admin@Kumaran2026', saltRounds);
-
-  const admin = await prisma.user.upsert({
-    where: { phone: '9876543210' },
-    update: {},
-    create: {
-      branchId: branch.id,
-      name: 'Kumaran Partner Admin',
-      phone: '9876543210',
-      email: 'admin@kumaranfinance.com',
-      passwordHash,
-      roles: [Role.SUPER_ADMIN],
-      isActive: true,
-    },
-  });
-  console.log(`✅ Super Admin seeded: ${admin.name} (${admin.phone})`);
-}
-
-main()
-  .catch((e) => {
-    console.error('❌ Seeding failed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+```
+apps/api/prisma/
+├── schema.prisma
+├── seed.ts                                  # Orchestrator
+└── seeders/
+    ├── 01-branch-users.seeder.ts           # Branch & 7 Staff accounts across 6 RBAC roles
+    ├── 02-customers.seeder.ts              # 25 Verified Tamil Nadu customers, Nominees & KYC
+    ├── 03-schemes-groups.seeder.ts         # 5 Schemes/ChitGroups & unique SubscriberTickets (ADR-13)
+    └── 04-scenarios.seeder.ts              # All 10 operational edge cases & N scenarios
 ```
 
-### 5.2 Configuring `package.json` for Seeding
-Add the `prisma.seed` configuration to `apps/api/package.json`:
-```json
-"prisma": {
-  "seed": "ts-node prisma/seed.ts"
-}
-```
+### 5.2 The 10 Seeded $N$-Scenarios
+| Scenario # | Scenario / Model Target | Seeded Characteristics |
+|---|---|---|
+| **Scenario 1** | **Staff Hierarchy & Personas** | 4 Partners (`SUPER_ADMIN`), 1 Branch Manager, 1 Accountant, 2 Field Agents, 1 Auditor. |
+| **Scenario 2** | **Month 1 Company Pool Invariant** | `KCA-1L-20M-01`: Ticket #1 takes full pool without auction (₹0 dividend). 12 tickets paid at counter. |
+| **Scenario 3** | **Active Competitive Bidding Group** | `KCB-2L-20M-01` (Month 4): Past auctions at ₹30k and ₹40k discounts with universal dividends. |
+| **Scenario 4** | **Fixed 25% Ceiling Tie-Break (ADR-06)**| `KCA-1L-20M-02`: 3 subscribers bid max ceiling (₹25,000); physical token draw recorded with Ticket #7 drawn. |
+| **Scenario 5** | **Defaulters & Arrears (ADR-07)** | `KCB-2L-20M-01`: Ticket #5 has 1 overdue month (ineligible to bid); Ticket #9 has 3 months continuous arrears (`DEFAULT_3_MONTHS`). |
+| **Scenario 6** | **Mid-Cycle Notebook Onboarding (ADR-14)**| `KCC-5L-25M-LEGACY`: Migrated from handwritten records at Month 7. Months 1–6 recorded as historical imports. |
+| **Scenario 7** | **Field Doorstep Collection & Handover**| Doorstep cash payment collected by Agent Murugan with `cashHandoverStatus: PENDING_HANDOVER`. |
+| **Scenario 8** | **Maker-Checker Dual Control Reversal** | 1 Approved Reversal (Maker Murugan != Checker Senthil); 1 Pending Reversal awaiting admin UI review. |
+| **Scenario 9** | **Prize Settlement & Safety Proof (ADR-15)**| Prize disbursement with signed blank cheques, promissory notes recorded, and voucher issued. |
+| **Scenario 10**| **Mature Group Final Settlement (Month N)**| `KCA-1L-20M-MATURE`: Final non-prized subscriber awarded chit pool directly with 4% commission (no auction). |
 
-### 5.3 Executing the Seed
+### 5.3 Test Credentials
+All seeded staff members use password `Admin@Kumaran2026` and mobile MPIN `123456`:
+- **Managing Partner / Super Admin**: `9876543210` (`kumaran@kumaranfinance.com`)
+- **Operations Partner / Checker**: `9876543211` (`senthil@kumaranfinance.com`)
+- **Branch Manager (Maker)**: `9876543212` (`manager.prd@kumaranfinance.com`)
+- **Desk Accountant (Maker)**: `9876543213` (`accounts@kumaranfinance.com`)
+- **Field Agent 1 (Perundurai Route)**: `9876543214` (`murugan.agent@kumaranfinance.com`)
+- **Field Agent 2 (Erode Route)**: `9876543215` (`karthik.agent@kumaranfinance.com`)
+- **Statutory Auditor**: `9876543216` (`auditor@natarajanca.com`)
+
+### 5.4 Executing the Seed
 ```powershell
 cd apps\api
 pnpm exec prisma db seed
