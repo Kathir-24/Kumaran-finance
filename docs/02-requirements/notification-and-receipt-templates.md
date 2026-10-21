@@ -183,3 +183,30 @@ In the mobile app, the subscriber's **Digital Passbook (டிஜிட்டல
 | **Month 3** | 10-Jul-2026 | ₹5,000 | ₹1,300 | ₹3,700 | 10-Jul-2026 | Cash | REC-0280 | **PAID** |
 | **Month 4** | 10-Aug-2026 | ₹5,000 | ₹1,200 | ₹3,800 | 12-Aug-2026 | Cash | REC-0412 | **PAID** |
 | **Month 5** | 10-Sep-2026 | ₹5,000 | ₹1,150 | ₹3,850 | - | - | - | **UPCOMING** |
+
+---
+
+## 7. Mobile App Push Notification Hierarchy & FCM Payloads (`CONFIRMED-BY-DEVELOPER`)
+
+Push notifications provide **₹0-cost real-time delivery** over Android FCM and Apple APNs networks.
+
+### 7.1 Delivery Priority Hierarchy
+```
+1. Mobile App Push Notification (FCM HTTP v1) ---> [Primary, ₹0 Cost for smartphone users]
+2. Indian Telecom DLT SMS (KMRCHT Header)    ---> [Fallback for keypad phones / unregistered devices]
+```
+
+### 7.2 High-Priority Channels & Deep-Link Data Payloads
+
+All push payloads configure high importance (`kumaran_high_importance`) to display alerts instantly even when phone is in doze mode:
+
+| Purpose | Android Sound | Title | Body Text | Deep-Link Payload | Target Route |
+|---|:---:|---|---|---|---|
+| **Payment Receipt** | Default | `குமரன் பைனான்ஸ்` | `மாத தவணை தொகை ரூ. {#amount#} பெறப்பட்டது! ரசீது: {#receiptNumber#}` | `{ type: "RECEIPT", passbookUrl: "...", receiptNumber: "..." }` | `/passbook` |
+| **Auction Reminder** | Default | `குமரன் பைனான்ஸ்` | `மாதம் {#month#} ஏல அறிவிப்பு: {#date#} {#time#}` | `{ type: "AUCTION_REMINDER", chitCode: "...", month: "..." }` | `/auctions` |
+| **Default Warning** | Alert | `எச்சரிக்கை அறிவிப்பு` | `டிக்கெட் #{#ticket#} தொடர்ந்து 3 மாத தவணைகள் நிலுவையில் உள்ளது.` | `{ type: "DEFAULT_WARNING", ticketId: "..." }` | `/dues` |
+| **Maker-Checker Approval** | Alert | `ஒப்புதல் தேவை` | `பரிசு தொகை பட்டுவாடா சரிபார்ப்பு / Prize payout authorization required` | `{ type: "DISBURSEMENT_APPROVAL", winnerId: "..." }` | `/approvals` |
+
+### 7.3 Stale Device Token Pruning
+If a smartphone uninstalls the app or rotates device tokens, FCM responds with `messaging/registration-token-not-registered`. The backend automatically clears `fcmToken = null` on the subscriber record in PostgreSQL. Future alerts immediately fall back to **TRAI DLT SMS** without message loss.
+
