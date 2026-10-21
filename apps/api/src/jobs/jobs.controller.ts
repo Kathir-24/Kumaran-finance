@@ -144,6 +144,13 @@ export class JobsController {
   @ApiOperation({
     summary: 'Get audit logs of dispatched Push Notifications and DLT SMS messages',
   })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 50,
+    description: 'Number of recent notification logs to retrieve (defaults to 50)',
+  })
   getNotificationLogs(@Query('limit') limit?: number) {
     return this.notificationService.getSentNotificationLog(limit ? Number(limit) : 50);
   }
