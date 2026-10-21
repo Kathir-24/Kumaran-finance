@@ -67,7 +67,7 @@ export class ReportController {
     @Query() query: QueryPendingApprovalsDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.reportService.getPendingApprovals(currentUser, query.branchId);
+    return this.reportService.getPendingApprovals(currentUser, query);
   }
 
   @Sse('approvals-stream')
@@ -86,7 +86,7 @@ export class ReportController {
       switchMap(async () => {
         const approvals = await this.reportService.getPendingApprovals(
           currentUser,
-          query.branchId,
+          query,
         );
         return {
           data: {

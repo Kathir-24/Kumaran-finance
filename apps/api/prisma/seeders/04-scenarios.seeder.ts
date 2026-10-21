@@ -62,33 +62,40 @@ export async function seedScenarios(
     });
 
     if (isPaid) {
-      const payment = await prisma.payment.create({
-        data: {
-          branchId,
-          recordedByUserId: accountantPriya.id,
-          customerId: t.customerId,
-          amount: 5000n,
-          paymentMethod: PaymentMethod.CASH,
-          paymentStatus: PaymentStatus.SUCCESS,
-          cashHandoverStatus: 'ACKNOWLEDGED',
-          cashHandoverAcknowledgedByUserId: partnerKumaran.id,
-          cashHandoverAcknowledgedAt: new Date('2026-10-15T18:00:00Z'),
-          allocations: {
-            create: {
-              ticketId: t.id,
-              installmentDueId: due.id,
-              amountAllocated: 5000n,
-            },
-          },
-          receipt: {
-            create: {
-              branchId,
-              receiptNumber: `KC-REC-PRD-2026-1L-M1-${String(t.ticketNumber).padStart(3, '0')}`,
-              isBilingual: true,
-            },
-          },
-        },
+      const receiptNumber = `KC-REC-PRD-2026-1L-M1-${String(t.ticketNumber).padStart(3, '0')}`;
+      const existingReceipt = await prisma.receipt.findUnique({
+        where: { receiptNumber },
       });
+
+      if (!existingReceipt) {
+        await prisma.payment.create({
+          data: {
+            branchId,
+            recordedByUserId: accountantPriya.id,
+            customerId: t.customerId,
+            amount: 5000n,
+            paymentMethod: PaymentMethod.CASH,
+            paymentStatus: PaymentStatus.SUCCESS,
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            cashHandoverAcknowledgedByUserId: partnerKumaran.id,
+            cashHandoverAcknowledgedAt: new Date('2026-10-15T18:00:00Z'),
+            allocations: {
+              create: {
+                ticketId: t.id,
+                installmentDueId: due.id,
+                amountAllocated: 5000n,
+              },
+            },
+            receipt: {
+              create: {
+                branchId,
+                receiptNumber,
+                isBilingual: true,
+              },
+            },
+          },
+        });
+      }
     }
   }
 
@@ -421,81 +428,99 @@ export async function seedScenarios(
   // SCENARIO 7 & 8: Doorstep Field Collections, Branch Handover & Maker-Checker Reversals
   // ===========================================================================
   // Agent Murugan collected cash from Customer #4 for Group 1L Month 1
-  const paymentFieldPending = await prisma.payment.create({
-    data: {
-      branchId,
-      recordedByUserId: agentMurugan.id,
-      customerId: tickets1L[3].customerId,
-      amount: 5000n,
-      paymentMethod: PaymentMethod.CASH,
-      paymentStatus: PaymentStatus.SUCCESS,
-      cashHandoverStatus: 'PENDING_HANDOVER', // Pending evening branch handover
-      receipt: {
-        create: {
-          branchId,
-          receiptNumber: 'KC-REC-PRD-2026-FLD-00091',
-          isBilingual: true,
+  const existingFieldReceipt = await prisma.receipt.findUnique({
+    where: { receiptNumber: 'KC-REC-PRD-2026-FLD-00091' },
+  });
+  if (!existingFieldReceipt) {
+    await prisma.payment.create({
+      data: {
+        branchId,
+        recordedByUserId: agentMurugan.id,
+        customerId: tickets1L[3].customerId,
+        amount: 5000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.SUCCESS,
+        cashHandoverStatus: 'PENDING_HANDOVER', // Pending evening branch handover
+        receipt: {
+          create: {
+            branchId,
+            receiptNumber: 'KC-REC-PRD-2026-FLD-00091',
+            isBilingual: true,
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   // Accidental entry by Murugan: Approved Reversal (Maker: Murugan, Checker: Partner Senthil)
-  const paymentReversed = await prisma.payment.create({
-    data: {
-      branchId,
-      recordedByUserId: agentMurugan.id,
-      customerId: tickets1L[4].customerId,
-      amount: 5000n,
-      paymentMethod: PaymentMethod.CASH,
-      paymentStatus: PaymentStatus.REVERSED,
-      cashHandoverStatus: 'ACKNOWLEDGED',
-      receipt: {
-        create: {
-          branchId,
-          receiptNumber: 'KC-REC-PRD-2026-REV-00012',
-          isBilingual: true,
-        },
-      },
-      reversal: {
-        create: {
-          reason: 'Erroneous subscriber phone entered during field collection',
-          status: 'APPROVED',
-          initiatedByUserId: agentMurugan.id,
-          approvedByUserId: partnerSenthil.id, // Maker != Checker
-          reversedAt: new Date(),
-        },
-      },
-    },
+  const existingRevReceipt = await prisma.receipt.findUnique({
+    where: { receiptNumber: 'KC-REC-PRD-2026-REV-00012' },
   });
+  let paymentReversed = existingRevReceipt
+    ? await prisma.payment.findUnique({ where: { id: existingRevReceipt.paymentId } })
+    : null;
+  if (!paymentReversed) {
+    paymentReversed = await prisma.payment.create({
+      data: {
+        branchId,
+        recordedByUserId: agentMurugan.id,
+        customerId: tickets1L[4].customerId,
+        amount: 5000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.REVERSED,
+        cashHandoverStatus: 'ACKNOWLEDGED',
+        receipt: {
+          create: {
+            branchId,
+            receiptNumber: 'KC-REC-PRD-2026-REV-00012',
+            isBilingual: true,
+          },
+        },
+        reversal: {
+          create: {
+            reason: 'Erroneous subscriber phone entered during field collection',
+            status: 'APPROVED',
+            initiatedByUserId: agentMurugan.id,
+            approvedByUserId: partnerSenthil.id, // Maker != Checker
+            reversedAt: new Date(),
+          },
+        },
+      },
+    });
+  }
 
   // Second Payment Reversal in REQUESTED status (Pending for Admin UI test review)
-  const paymentPendingRev = await prisma.payment.create({
-    data: {
-      branchId,
-      recordedByUserId: accountantPriya.id,
-      customerId: tickets1L[5].customerId,
-      amount: 5000n,
-      paymentMethod: PaymentMethod.UPI,
-      transactionRef: 'UPI/2026/1029192931',
-      paymentStatus: PaymentStatus.SUCCESS,
-      receipt: {
-        create: {
-          branchId,
-          receiptNumber: 'KC-REC-PRD-2026-PEN-00033',
-          isBilingual: true,
-        },
-      },
-      reversal: {
-        create: {
-          reason: 'Duplicate UPI credit received from bank gateway reconciliation',
-          status: 'REQUESTED',
-          initiatedByUserId: accountantPriya.id, // Maker
-          notes: 'Awaiting Managing Partner authorization',
-        },
-      },
-    },
+  const existingPenReceipt = await prisma.receipt.findUnique({
+    where: { receiptNumber: 'KC-REC-PRD-2026-PEN-00033' },
   });
+  if (!existingPenReceipt) {
+    await prisma.payment.create({
+      data: {
+        branchId,
+        recordedByUserId: accountantPriya.id,
+        customerId: tickets1L[5].customerId,
+        amount: 5000n,
+        paymentMethod: PaymentMethod.UPI,
+        transactionRef: 'UPI/2026/1029192931',
+        paymentStatus: PaymentStatus.SUCCESS,
+        receipt: {
+          create: {
+            branchId,
+            receiptNumber: 'KC-REC-PRD-2026-PEN-00033',
+            isBilingual: true,
+          },
+        },
+        reversal: {
+          create: {
+            reason: 'Duplicate UPI credit received from bank gateway reconciliation',
+            status: 'REQUESTED',
+            initiatedByUserId: accountantPriya.id, // Maker
+            notes: 'Awaiting Managing Partner authorization',
+          },
+        },
+      },
+    });
+  }
 
   // ===========================================================================
   // SCENARIO 9: Mature Group Final Settlement (KCA-1L-20M-MATURE) — Month N Rule

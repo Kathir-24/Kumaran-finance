@@ -649,13 +649,18 @@ export class ReportService {
    */
   async getPendingApprovals(
     requestingUser: JwtPayload,
-    queryBranchId?: string,
+    queryOrBranchId?: QueryPendingApprovalsDto | string,
   ): Promise<PendingApprovalsResponse> {
+    const rawBranchId =
+      typeof queryOrBranchId === 'string'
+        ? queryOrBranchId
+        : queryOrBranchId?.branchId;
+
     const branchId =
       requestingUser.roles.includes(Role.BRANCH_MANAGER) &&
       !requestingUser.roles.includes(Role.SUPER_ADMIN)
         ? requestingUser.branchId || undefined
-        : queryBranchId;
+        : rawBranchId;
 
     // 1. Pending Cash Handovers
     const pendingCashPayments = await this.prisma.payment.findMany({

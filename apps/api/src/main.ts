@@ -95,7 +95,7 @@ async function bootstrap() {
         'Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.',
     )
     .setVersion('1.0.0')
-    .addServer('/api/v1', 'Version 1 Base URL')
+    .addServer('/', 'Default Base URL')
 
     .addBearerAuth(
       {

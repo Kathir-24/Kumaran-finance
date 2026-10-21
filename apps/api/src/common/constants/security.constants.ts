@@ -20,17 +20,19 @@ export const DEFAULT_JWT_REFRESH_EXPIRES_IN = '7d';
 
 export const TOTP_ISSUER_NAME = 'Kumaran Finance';
 
-/** Global default rate limit: 60 requests per minute */
+const isDev = process.env.NODE_ENV !== 'production';
+
+/** Global default rate limit: 60 requests per minute in production, 10,000 in dev */
 export const THROTTLE_DEFAULT_TTL_MS = 60_000;
-export const THROTTLE_DEFAULT_LIMIT = 60;
+export const THROTTLE_DEFAULT_LIMIT = isDev ? 10_000 : 60;
 
-/** High-security auth rate limit: 5 attempts per 15 minutes */
-export const THROTTLE_AUTH_TTL_MS = 900_000;
-export const THROTTLE_AUTH_LIMIT = 5;
+/** High-security auth rate limit: 5 attempts per 15 minutes in production, 1,000 in dev */
+export const THROTTLE_AUTH_TTL_MS = isDev ? 60_000 : 900_000;
+export const THROTTLE_AUTH_LIMIT = isDev ? 1_000 : 5;
 
-/** OTP / TOTP verification rate limit: 5 attempts per 5 minutes */
-export const THROTTLE_OTP_TTL_MS = 300_000;
-export const THROTTLE_OTP_LIMIT = 5;
+/** OTP / TOTP verification rate limit: 5 attempts per 5 minutes in production, 1,000 in dev */
+export const THROTTLE_OTP_TTL_MS = isDev ? 60_000 : 300_000;
+export const THROTTLE_OTP_LIMIT = isDev ? 1_000 : 5;
 
 /** Default allowed web frontend origins */
 export const DEFAULT_CORS_ORIGINS = [
