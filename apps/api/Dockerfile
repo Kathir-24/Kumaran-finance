@@ -45,8 +45,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install runtime dependencies for Prisma engine
-RUN apk add --no-cache openssl libc6-compat
+# Install runtime dependencies for Prisma engine and pg_dump utilities
+RUN apk add --no-cache openssl libc6-compat postgresql-client
 
 # Copy package descriptors and pruned production node_modules
 COPY package*.json ./

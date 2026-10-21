@@ -155,16 +155,25 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
   console.log(`[BACKUP] S3 Destination Key: ${s3Key}`);
 
   // 1. Generate pg_dump in custom binary format (-F c)
-  const isDockerRunning = (() => {
-    try {
-      const output = execSync('docker ps --filter "name=chitflow-db" --format "{{.Names}}"', {
-        encoding: 'utf-8',
-      });
-      return output.includes('chitflow-db');
-    } catch {
-      return false;
-    }
-  })();
+  const isDirectPgDump =
+    process.env.DIRECT_PG_DUMP === 'true' ||
+    (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@db:'));
+
+  const isDockerRunning =
+    !isDirectPgDump &&
+    (() => {
+      try {
+        const output = execSync(
+          'docker ps --filter "name=chitflow-db" --format "{{.Names}}"',
+          {
+            encoding: 'utf-8',
+          },
+        );
+        return output.includes('chitflow-db');
+      } catch {
+        return false;
+      }
+    })();
 
   if (isDockerRunning) {
     console.log(`[BACKUP] Detected running Docker container 'chitflow-db'. Dumping via container...`);

@@ -121,11 +121,15 @@ For on-premise branch operations and local developer testing, automated scripts 
    powershell -ExecutionPolicy Bypass -File infra\scripts\backup-to-s3.ps1
 
    # Or via pnpm shortcut:
-   pnpm db:backup:s3
+   pnpm --filter api db:backup:s3
+
+   # Or trigger on-demand snapshot via Docker cron container:
+   docker exec chitflow-backup-cron /scripts/backup-cron-job.sh
    ```
+   - Autonomous `chitflow-backup-cron` container executes nightly at 02:00 AM IST (`30 20 * * *` UTC).
    - Dumps PostgreSQL 17 database in custom compressed binary format (`-F c`).
    - Uploads to S3 storage under `backups/db/YYYY/MM/kumaran_chits_backup_YYYYMMDD_HHMMSS.dump` with `AES256` server-side encryption.
-   - Automatically scans `backups/db/` and prunes backups older than **30 days** per §3.2.
+   - Automatically scans `backups/db/` and prunes backups older than **30 days** per §3.2. Local dumps are pruned after 7 days.
 
 3. **Listing and Restoring from S3**:
    ```powershell
@@ -208,5 +212,19 @@ Kumaran Chits utilizes Sentry for real-time application crash detection and serv
 - **Whole-Rupee BigInt Safety**: Automatically serializes `bigint` values to string format to prevent JSON serialization crashes during exception capture.
 - **Diagnostic Verification**: `GET /health/sentry-test` triggers a test internal error for verification in staging environments.
 - **Detailed Documentation**: Consult [`apps/api/src/common/sentry/README.md`](../../apps/api/src/common/sentry/README.md).
+
+---
+
+## 7. Production Nginx TLS 1.3 & Server-Sent Events (SSE) Reverse Proxy
+
+Kumaran Chits deploys Nginx 1.27 as the production edge ingress:
+
+- **TLS Hardening**: Terminates SSL on port 443 with TLS 1.2 and TLS 1.3 only, modern ECDHE ciphers, HSTS (`max-age=15768000; includeSubDomains; preload`), and automatic 301 redirection from HTTP (port 80).
+- **Server-Sent Events (SSE) Unbuffered Streaming**:
+  - The live Maker-Checker Approvals stream (`/api/v1/reports/approvals-stream`) requires zero proxy buffering.
+  - Configured with `proxy_buffering off; chunked_transfer_encoding on; proxy_read_timeout 24h;` to eliminate 60-second gateway timeouts.
+- **Automated Certificate Provisioning**: Supports Let's Encrypt / Certbot automated renewals via `/.well-known/acme-challenge/` and local self-signed certificates via `generate-self-signed.sh` / `.ps1`.
+- **Detailed Step-by-Step Guide**: Consult [`infra/docker/PRODUCTION-DEPLOYMENT-GUIDE.md`](../../infra/docker/PRODUCTION-DEPLOYMENT-GUIDE.md).
+
 
 

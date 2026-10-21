@@ -11,7 +11,7 @@
 
 | Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
 |---|---|:---:|---|:---:|
-| **Foundation & DX** | `/health`, `/` | 2 | PostgreSQL 17, Docker port 5433, BigInt serializer, multi-stage Dockerfile | 3 passing |
+| **Foundation, DevOps & DX** | `/health`, `/` | 2 | PostgreSQL 17, Port 5433, Nginx TLS 1.3, SSE unbuffered reverse proxy, Nightly S3 backup cron | 3 passing |
 | **Module 1: Auth & Staff Identity** | `/auth` | 11 | bcrypt (salt 12), RFC 6238 TOTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 15 passing |
 | **Module 2: Customer & KYC Intake** | `/customers` | 8 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), Anti-IDOR FCM device push | 20 passing |
 | **Module 3: Chit Groups & Intake** | `/chits` | 6 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool | 16 passing |

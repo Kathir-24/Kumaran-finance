@@ -28,3 +28,9 @@ Thumbs.db
 infra/backups/
 *.dump
 *.sql.gz
+
+# SSL certificates and private keys
+infra/docker/nginx/ssl/live/*.pem
+infra/docker/nginx/ssl/live/*.key
+infra/docker/nginx/ssl/live/*.pfx
+!infra/docker/nginx/ssl/live/.gitkeep

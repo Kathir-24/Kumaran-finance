@@ -119,9 +119,16 @@ Because a prized subscriber has already received the pool amount:
 1. **Automated Snapshot**: Every night at 02:00 AM IST, the automated script ([`apps/api/scripts/backup-to-s3.ts`](../../apps/api/scripts/backup-to-s3.ts)) creates a compressed binary dump (`pg_dump -F c`) of the entire PostgreSQL database.
 2. **Encrypted Cloud Upload**: The dump is encrypted using `AES256` and streamed to the private S3 bucket under `backups/db/YYYY/MM/`.
 3. **Automated 30-Day Retention Prune**: Any backup older than 30 days is automatically purged to minimize storage overhead.
-4. **Manual Run Command**:
-   ```powershell
-   pnpm db:backup:s3
+4. **Manual Run & Container Inspection**:
+   ```bash
+   # Host / Developer runner:
+   pnpm --filter api db:backup:s3
+
+   # Docker Container on-demand snapshot:
+   docker exec chitflow-backup-cron /scripts/backup-cron-job.sh
+
+   # Inspect backup cron logs:
+   docker exec chitflow-backup-cron cat /var/log/backup-cron.log
    ```
 
 ### 4.2 Quarterly Disaster Recovery (DRP) Drill SOP
