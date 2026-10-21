@@ -107,7 +107,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **Bilingual Receipts (V1 Scope)**:
   - Formatted in both English and Tamil.
   - Sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
-  - Available as physical printed slips and downloadable digital PDFs.
+  - Hand-written and signed directly in customer's physical paper passbook booklet; confirmed digitally via free mobile app push notification; downloadable digital PDFs available on-demand. Costly SMS reserved strictly for OTPs and fallback for non-smartphone users.
 - **Prize Payout Vouchers (V1 Scope)**:
   - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount to match local business reality.
   - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).

@@ -89,7 +89,7 @@ Here are the formal Agile user stories defining every capability of the Branch M
 * **US-7.3 (Anti-Self-Acknowledgment Assertion)**: *As a Branch Manager*, if I personally collected cash in the field, I want the software to prevent me from acknowledging my own handover, requiring an independent Partner to sign off, *so that* dual control is maintained.
 
 ### Module 8: Payments, Digital Receipts & Reversals (M8)
-* **US-8.1 (Branch Counter Payment Handling)**: *As a Branch Manager*, I want to assist at the counter during peak morning hours by recording walk-in payments, signing customer physical passbooks, and issuing instant bilingual SMS/PDF receipts, *so that* subscriber wait times are minimized.
+* **US-8.1 (Branch Counter Payment Handling)**: *As a Branch Manager*, I want to assist at the counter during peak morning hours by recording walk-in payments, signing customer physical passbooks, and triggering free in-app mobile push notifications (with fallback SMS if non-smartphone), *so that* subscriber wait times are minimized without wasteful SMS gateway costs.
 * **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Branch Manager*, if a counter cashier makes a posting mistake, I want to submit a formal reversal request with the attached physical receipt photo and reason, *so that* a Partner can review and approve the correction.
 
 ### Module 9: Conducting Branch Auctions & Payout Prep (M9)

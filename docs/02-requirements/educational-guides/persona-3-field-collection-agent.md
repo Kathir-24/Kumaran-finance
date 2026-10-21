@@ -19,7 +19,7 @@ Their day-to-day reality is entirely mobile and on the road:
 - They ride 100cc/125cc motorcycles carrying a durable **leather cash-collection shoulder pouch**.
 - They visit power-loom weavers, textile printing workshops, tea-stall owners, grocery merchants, and agricultural households at their doorsteps.
 - In their bag, they carry their **Android smartphone**, a ballpoint pen, an official Kumaran Finance rubber seal, and subscribers' physical passbooks.
-- **The 30-Second Doorstep Imperative**: When an agent pulls up to a busy weaver's shed or tea stall, the merchant cannot stop work for 10 minutes. The agent must unlock their phone, select the subscriber, count the cash, record the payment, stamp the physical passbook, and trigger a bilingual SMS receipt—all in **under 30 seconds**.
+- **The 30-Second Doorstep Imperative**: When an agent pulls up to a busy weaver's shed or tea stall, the merchant cannot stop work for 10 minutes. The agent must unlock their phone, select the subscriber, count the cash, record the payment in the app, write the date and sign the customer's physical paper passbook, triggering an instant mobile push notification confirmation—all in **under 30 seconds**.
 
 ### Why Rural Offline Architecture Is Vital
 In the agricultural belt between Perundurai and Chennimalai, cellular 4G/5G signals frequently drop into dead zones:
@@ -78,7 +78,7 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 * **US-7.4 (Evening Cash Handover Batch Submission)**: *As a Field Agent*, when I return to the Head Office at 5:00 PM, I want to tap "Submit Cash Handover" to present my daily tally (e.g., `₹42,500`) to the branch cashier/partner for physical counting and sign-off.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (Immediate Bilingual Digital Receipt)**: *As a Field Agent*, immediately upon confirming a collection, I want the app to show a clean bilingual receipt (English and Tamil) and a one-tap button to share it via WhatsApp or SMS, *so that* the customer receives instant proof of payment.
+* **US-8.1 (Immediate Bilingual Digital Receipt & App Alert)**: *As a Field Agent*, immediately upon confirming a collection, I want the app to show a clean bilingual receipt and trigger a push notification to the customer's mobile app (or fallback SMS if non-smartphone), *so that* the customer receives instant digital confirmation alongside their physical passbook entry.
 * **US-8.2 (Payment Reversal Restriction)**: *As a Field Agent*, I want the system to block me from reversing or deleting any payment, *so that* if a cash mistake happens, I must report it to the office accountant to initiate a formal Maker-Checker reversal.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
@@ -115,8 +115,8 @@ sequenceDiagram
     APP->>DB: Stores locally (Status: CACHED_OFFLINE)
     APP->>API: POST /payments (Live sync)
     API-->>APP: 200 OK -> Generates Receipt #KC-REC-PRD-2026-00412
-    APP-->>C: Sends instant bilingual SMS to Mani's phone
-    A->>C: Stamps Mani's physical passbook: "PAID ₹4,100 - KC-REC-00412"
+    APP-->>C: Sends instant free Mobile Push Notification to Mani's phone (App updates to PAID)
+    A->>C: Writes date, ₹4,100, receipt #, and signs Mani's physical passbook booklet
 ```
 
 ---
@@ -155,8 +155,8 @@ flowchart TD
     S1["1. Tap 'Search' -> Type 'Mani' or 'Ticket 9'"] --> S2["2. Screen shows: Net Due: ₹4,100 (Month 4)"]
     S2 --> S3["3. Receive 4 x ₹1000 + 1 x ₹100 notes from Mani"]
     S3 --> S4["4. Tap 'Cash' -> Tap 'Confirm Collection'"]
-    S4 --> S5["5. Server generates Receipt #KC-REC-PRD-2026-00412\nSMS sent to Mani's phone!"]
-    S5 --> S6["6. Murugan stamps Mani's paper passbook & departs\n(Total time: 24 seconds)"]
+    S4 --> S5["5. Server commits Receipt #KC-REC-PRD-2026-00412\nPush notification sent to Mani's phone!"]
+    S5 --> S6["6. Murugan hand-writes entry in Mani's paper passbook, signs & departs\n(Total time: 24 seconds)"]
 ```
 
 #### Detailed Step-by-Step Actions:
@@ -174,12 +174,12 @@ flowchart TD
 4. **Confirm Collection in App (4 seconds)**:
    - Tap **"Record Cash Collection"**.
    - Amount is auto-locked to `₹4,100` (Discrete single payment).
-   - Tap **"Confirm & Issue Receipt"**.
-5. **Instant Receipt & Passbook Stamp (5 seconds)**:
+   - Tap **"Confirm & Record Collection"**.
+5. **Instant App Push Notification & Passbook Entry (5 seconds)**:
    - The app shows a green checkmark: *"Payment Confirmed — Receipt #KC-REC-PRD-2026-00412"*.
-   - Mani's phone buzzes with an incoming SMS from `KMRCHT`:
-     > *"Kumaran Chits: Received Rs. 4,100 cash from Mani for Ticket #9 (KCA-1L M4). Receipt: KC-REC-PRD-2026-00412. Thank you!"*
-   - Murugan inks the date stamp, stamps line 4 of Mani's physical paper passbook, writes `₹4,100` and his initials, and hands it back.
+   - Mani's phone chimes with a free **Mobile App Push Notification**:
+     > *"குமரன் பைனான்ஸ்: மணி அவர்களுக்கு நன்றி. சீட்டு KCA-1L #9 மாத தவணை 4-க்கான தொகை ரூ. 4,100 ரொக்கமாக பெறப்பட்டது. ரசீது எண்: KC-REC-PRD-2026-00412."*
+   - Murugan opens Mani's physical paper passbook, writes `21/10/2026`, `Month 4`, `₹4,100`, `KC-REC-00412`, signs his initials with pen, and hands it back.
    - Murugan places the ₹4,100 into his leather pouch.
    - **App Metrics Update**: `Collected: ₹4,100 / ₹45,000 | Cash-in-Hand: ₹4,100`.
 
@@ -200,14 +200,14 @@ At 1:30 PM, Murugan visits farmer Ramasamy whose farm is in a hollow with zero c
 4. **Offline Receipt Generation**:
    - The app commits the record to the local SQLite database.
    - The app generates an **Offline Pending Receipt** (`OFFLINE-SYNC-9842100001-1729497000`).
-   - Murugan stamps Ramasamy's physical passbook, writes the offline receipt code, and explains: *"Network is currently out, Uncle. You will receive your official SMS receipt as soon as I reach the main road."*
-   - Ramasamy is completely reassured because his physical passbook is stamped and signed.
+   - Murugan writes the entry in Ramasamy's physical passbook, writes the offline receipt code, signs with pen, and explains: *"Network is currently out, Uncle. You will see your app confirmation as soon as I reach the main road."*
+   - Ramasamy is completely reassured because his physical passbook is written and signed.
 5. **Automatic Reconnection Sync (2:15 PM)**:
    - Murugan rides 3 kilometers out to the Thingalur junction. His phone reconnects to 4G LTE.
    - The app detects internet connectivity in the background and silently triggers the sync queue.
    - An HTTP POST with the unique `idempotencyKey` uploads Ramasamy's collection to the server.
    - The server converts the offline record into permanent official receipt `KC-REC-PRD-2026-00413`.
-   - Ramasamy's phone immediately receives the official SMS confirmation.
+   - Ramasamy's phone immediately receives the in-app push notification (or fallback SMS if non-smartphone).
    - Murugan's app shows: *"1 offline transaction successfully synchronized with Head Office!"*
 
 ---

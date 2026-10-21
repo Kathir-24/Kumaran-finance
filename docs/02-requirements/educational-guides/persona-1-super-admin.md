@@ -88,7 +88,7 @@ Here are the formal Agile user stories defining every capability the Super Admin
 * **US-7.3 (Anti-Self-Acknowledgment Guard)**: *As a Partner*, if I personally collected cash in the field, I want the software to block me from acknowledging my own handover, requiring one of the other 3 partners to sign off, *so that* dual-control integrity is maintained.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and immediately issue a bilingual (English + Tamil) digital receipt via SMS/PDF, *so that* customers get instant proof of payment.
+* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and trigger an instant mobile app push notification (or optional fallback SMS for non-app users), *so that* customers get instant proof of payment without incurring unnecessary telecom SMS costs.
 * **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A to initiate a reversal with a written reason and Partner B to verify and approve it, *so that* no single person can manipulate cash entries.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)

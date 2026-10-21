@@ -1,7 +1,8 @@
 # Kumaran Chits — Bilingual Notification & Receipt Templates
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Supported Channels**: Bilingual PDF Receipts, Indian DLT SMS, WhatsApp Business API, and Digital Passbook  
+> **Supported Channels**: Customer Physical Passbook (Hand-written & Signed), Mobile App Push Notifications (Primary ₹0 Cost), Bilingual PDF Receipts, Indian DLT SMS (Reserved for OTPs & Non-App Fallback), WhatsApp Business API, and Digital Passbook  
+> **Core Principle**: Avoid wasteful recurring telecom SMS charges. Routine monthly payments rely on the customer's signed physical paper passbook + instant in-app mobile push notifications. SMS is reserved strictly for OTP device verification and optional fallback.
 > **Languages**: English & தமிழ் (Tamil)  
 > **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations (`CONFIRMED-BY-DEVELOPER`).
 
@@ -44,9 +45,20 @@
 
 ---
 
+## 1.5 Mobile App Push Notification (Primary & Free Channel) (`CONFIRMED-BY-DEVELOPER`)
+
+For all customers using the Kumaran Chits Android app, routine monthly payment receipts trigger an **instant, free Mobile Push Notification** (via Firebase Cloud Messaging / FCM), eliminating recurring telecom SMS costs:
+
+- **Notification Title**: `குமரன் பைனான்ஸ் / Kumaran Finance`
+- **Notification Body**: `மாத தவணை தொகை ரூ. {#amount#} பெறப்பட்டது! ரசீது எண்: {#receipt_number#}. / Payment of Rs. {#amount#} received! Tap to view digital passbook.`
+- **Interactive Action**: Tapping the notification directly deep-links into the customer's **Digital Passbook (`/passbook`)**, highlighting the updated `PAID` row and offering instant PDF receipt download.
+- **Physical Proof Invariant**: The customer's primary physical proof remains the **hand-written entry and signature** placed by the agent/cashier inside the customer's physical paper passbook booklet.
+
+---
+
 ## 2. Indian Telecom DLT-Compliant SMS Templates (`CONFIRMED-BY-DEVELOPER`)
 
-Under Indian Telecom Regulatory Authority of India (TRAI) DLT mandates, SMS headers and message bodies must be pre-registered:
+> **Cost Optimization Rule**: Under Kumaran Finance policy, SMS is reserved strictly for **OTP Device Registration**, critical security alerts, and as an optional fallback for non-smartphone subscribers who do not have the mobile app installed. Standard monthly payment receipts are delivered via free In-App Push Notifications.
 
 ### 2.1 Device Registration OTP
 - **Sender ID (Header)**: `KMRCHT`

@@ -96,7 +96,7 @@ Here are the formal Agile user stories defining every capability the Customer ha
 * **US-6.2 (Single Discrete Payment Rule)**: *As a Subscriber*, I want to pay the full net installment in one transaction, knowing that partial payments and advance balances are disallowed to keep books clean.
 
 ### Module 7: Doorstep Payments to Field Agents (M7)
-* **US-7.1 (Instant Payment SMS on Doorstep)**: *As a Subscriber*, when I hand physical cash to Agent Murugan at my home, I want my phone to receive an immediate official SMS receipt from `KMRCHT` before the agent leaves my porch, *so that* I have proof of payment.
+* **US-7.1 (Instant App Push Notification on Doorstep)**: *As a Subscriber*, when I hand physical cash and my paper passbook to Agent Murugan at my home, I want my phone to receive an immediate in-app push notification and digital passbook update before the agent leaves, *so that* I have instant digital confirmation alongside my signed paper passbook.
 
 ### Module 8: Online UPI Payments & Bilingual Receipts (M8)
 * **US-8.1 (1-Tap UPI Payment)**: *As a Subscriber*, I want to pay my monthly due using Google Pay, PhonePe, Paytm, or BHIM directly from my mobile app, *so that* I don't have to wait for the field agent or visit the branch office.
@@ -132,7 +132,7 @@ sequenceDiagram
     UPI-->>API: Bank Webhook confirms payment success (Order ID)
     API-->>APP: Pushes instant payment confirmation
     APP-->>C: Green Screen: "Payment Successful! Receipt #KC-REC-00412"
-    APP-->>C: Dispatches Bilingual SMS Receipt to Mani's phone
+    APP-->>C: Sends instant free Mobile Push Notification & updates Digital Passbook
 ```
 
 ---
@@ -223,18 +223,19 @@ Mani decides to pay online from his textile shop without waiting for the agent:
 
 ---
 
-### Journey 4: Paying Cash at the Doorstep & Receiving Instant SMS
+### Journey 4: Paying Cash at the Doorstep & Receiving Instant Push Notification
 
 If Mani prefers paying physical cash when Field Agent Murugan visits his shop:
 
 1. Agent Murugan arrives on his motorcycle and quotes the exact due: `₹4,100`.
-2. Mani hands over 4 notes of ₹1,000 + 1 note of ₹100.
-3. Murugan counts the notes, taps confirm on his agent mobile app, and stamps Mani's physical passbook.
-4. Within **3 seconds**, Mani's mobile phone buzzes with an official SMS from `KMRCHT`:
-   > *"குமரன் சிட்ஸ்: சந்தாதாரர் மணி அவர்களுக்கு நன்றி. சீட்டு KCA-1L #9 மாத தவணை 4-க்கான தொகை ரூ. 4,100 ரொக்கமாக பெறப்பட்டது. ரசீது எண்: KC-REC-PRD-2026-00412."*
-5. Mani opens his **Kumaran Chits app** and refreshes:
-   - Month 4 is automatically marked **`PAID`**.
-   - The digital passbook updates instantly.
+2. Mani hands over 4 notes of ₹1,000 + 1 note of ₹100 along with his **physical paper passbook booklet**.
+3. Murugan counts the notes, taps confirm on his agent mobile app, hand-writes the entry in Mani's physical passbook, and signs with pen.
+4. Within **3 seconds**, Mani's smartphone chimes with a **free Mobile App Push Notification**:
+   > *"குமரன் பைனான்ஸ்: மணி அவர்களுக்கு நன்றி. சீட்டு KCA-1L #9 மாத தவணை 4-க்கான தொகை ரூ. 4,100 ரொக்கமாக பெறப்பட்டது. ரசீது எண்: KC-REC-PRD-2026-00412."*
+5. Mani taps the notification:
+   - The Kumaran Chits app opens directly to his **Digital Passbook**.
+   - Month 4 is automatically marked **`PAID`** with a green shield.
+   - Mani has his double guarantee: **his signed paper passbook in hand** and his **digital app passbook updated**!
 
 ---
 

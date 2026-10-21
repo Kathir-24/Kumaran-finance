@@ -86,7 +86,7 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 * **US-7.2 (Anti-Self-Acknowledgment Defense)**: *As a Staff Member with dual roles*, if I personally collected money in the field, I want the software to strictly block me from acknowledging my own cash handover, *so that* cash is always verified by an independent second pair of eyes.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and trigger an automated bilingual (English + Tamil) SMS receipt, *so that* the customer walks away with verified proof of payment.
+* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and trigger an automated free mobile app push notification (with fallback SMS for non-app users), *so that* the customer walks away with verified proof of payment without telecom billing waste.
 * **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Desk Accountant*, if I accidentally post cash to the wrong customer's ticket, I want to submit a reversal request with a mandatory reason and receipt scan, *so that* a Partner can review and approve the correction.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
@@ -107,7 +107,7 @@ sequenceDiagram
     actor C as Walk-In Customer (Mani)
     actor A as Desk Accountant (Selvi)
     participant UI as Web Admin Portal
-    participant SMS as MSG91 SMS Gateway
+    participant NOTIF as Notification Service (Push/SMS)
     participant DB as PostgreSQL 17
 
     C->>A: "I want to pay Month 4 for Ticket #9 (KCA-1L)" & hands physical passbook
@@ -118,7 +118,7 @@ sequenceDiagram
     A->>UI: Selects "Cash" -> Enters Amount ₹4,100 -> Clicks "Record Payment"
     UI->>DB: Commits BigInt ₹4,100 (Status: PAID)
     DB-->>UI: Generates Receipt #KC-REC-PRD-2026-00412
-    UI->>SMS: Automatically triggers bilingual SMS to Mani's phone
+    UI->>NOTIF: Sends free Mobile App Push Notification (and fallback SMS if non-app)
     A->>A: Writes date, amount ₹4,100, receipt #, and signs Mani's physical passbook
     A->>C: Returns signed physical passbook to Mani
 ```
@@ -208,9 +208,9 @@ At 11:30 AM, customer Velusamy walks up to the counter to pay his monthly chit i
    - Payment Mode: Select **`Cash`**.
    - Amount: Auto-locked to exact net due **`₹4,100`** (No partial amounts permitted).
    - Click **`"Confirm & Record Collection"`**.
-5. **Physical Passbook Entry & Automated SMS Confirmation**:
+5. **Physical Passbook Entry & In-App Notification**:
    - The system displays the confirmed Receipt No: **`KC-REC-PRD-2026-00415`**.
-   - An automated bilingual SMS is simultaneously dispatched to Velusamy's mobile phone via MSG91 Flow API.
+   - A free mobile push notification is instantly dispatched to Velusamy's smartphone, updating his in-app digital passbook (with fallback SMS only if the user has no smartphone).
    - The accountant takes Velusamy's **physical paper passbook booklet**:
      - Writes the date: `21-Oct-2026`
      - Writes the month: `Month 4`
