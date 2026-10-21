@@ -48,11 +48,16 @@ export class StorageController {
   @ApiResponse({ status: 403, description: 'Forbidden access to file key' })
   @ApiResponse({ status: 404, description: 'File not found' })
   async streamFile(
-    @Param('key') key: string,
+    @Param('key') rawKey: string | string[],
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
-    const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
+    const rawKeyStr = Array.isArray(rawKey)
+      ? rawKey.join('/')
+      : typeof rawKey === 'string'
+        ? rawKey
+        : '';
+    const sanitizedKey = StorageKeyHelper.sanitizeKey(rawKeyStr);
     DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser);
 
     const result = await this.storageService.getFile(sanitizedKey);

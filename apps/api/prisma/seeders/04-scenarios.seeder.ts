@@ -47,7 +47,10 @@ export async function seedScenarios(
           installmentMonth: 1,
         },
       },
-      update: {},
+      update: {
+        paidAmount: isPaid ? 5000n : 0n,
+        status: isPaid ? DueStatus.PAID : DueStatus.UNPAID,
+      },
       create: {
         chitGroupId: group1L.id,
         ticketId: t.id,
@@ -266,7 +269,10 @@ export async function seedScenarios(
           installmentMonth: 4,
         },
       },
-      update: {},
+      update: {
+        paidAmount: 0n,
+        status: DueStatus.UNPAID,
+      },
       create: {
         chitGroupId: group2L.id,
         ticketId: t.id,
