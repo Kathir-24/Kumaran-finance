@@ -201,10 +201,12 @@ export class InstallmentService {
             payment: {
               select: {
                 id: true,
-                receiptNumber: true,
                 paymentMethod: true,
-                paidAt: true,
+                createdAt: true,
                 paymentStatus: true,
+                receipt: {
+                  select: { receiptNumber: true },
+                },
               },
             },
           },
@@ -254,10 +256,12 @@ export class InstallmentService {
                 payment: {
                   select: {
                     id: true,
-                    receiptNumber: true,
                     paymentMethod: true,
-                    paidAt: true,
+                    createdAt: true,
                     paymentStatus: true,
+                    receipt: {
+                      select: { receiptNumber: true },
+                    },
                   },
                 },
               },
@@ -308,8 +312,8 @@ export class InstallmentService {
         netPayableAmount: due.netPayableAmount,
         paidAmount: due.paidAmount,
         status: due.status,
-        receiptNumber: successfulAllocation?.payment.receiptNumber || null,
-        paymentDate: successfulAllocation?.payment.paidAt || null,
+        receiptNumber: (successfulAllocation?.payment as any)?.receipt?.receiptNumber || null,
+        paymentDate: successfulAllocation?.payment.createdAt || null,
         paymentMethod: successfulAllocation?.payment.paymentMethod || null,
       };
     });
