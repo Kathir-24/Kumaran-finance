@@ -428,4 +428,180 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       );
     });
   });
+
+  describe('5. Offline Queue Batch Synchronization (POST /collections/sync-offline-queue)', () => {
+    it('should successfully sync batch of offline collections and return receipts', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(null);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(10);
+
+      const createdPayment = {
+        id: 'pmt-sync-01',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-21T09:30:00.000Z'),
+      };
+      prismaMock.payment.create.mockResolvedValue(createdPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-sync-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        receiptNumber: 'KC-REC-PRD-2026-00011',
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.count.mockResolvedValue(0);
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      const syncDto = {
+        items: [
+          {
+            idempotencyKey: 'idemp-sync-001',
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3950,
+            paymentMethod: PaymentMethod.CASH,
+            collectedAt: '2026-10-21T09:30:00.000Z',
+          },
+        ],
+      };
+
+      const result = await collectionService.syncOfflineQueue(
+        syncDto,
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(result.totalSubmitted).toBe(1);
+      expect(result.successCount).toBe(1);
+      expect(result.failureCount).toBe(0);
+      expect(result.synced[0].idempotencyKey).toBe('idemp-sync-001');
+      expect(result.synced[0].receiptNumber).toBe('KC-REC-PRD-2026-00011');
+      expect(result.synced[0].isDuplicate).toBe(false);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should handle idempotent re-submission cleanly by returning existing receipt (isDuplicate = true)', async () => {
+      const existingPayment = {
+        id: 'existing-pmt-001',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-21T09:00:00.000Z'),
+        receipt: { receiptNumber: 'KC-REC-PRD-2026-00005' },
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(existingPayment);
+
+      const syncDto = {
+        items: [
+          {
+            idempotencyKey: 'existing-idemp-key',
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3950,
+            paymentMethod: PaymentMethod.CASH,
+            collectedAt: '2026-10-21T09:00:00.000Z',
+          },
+        ],
+      };
+
+      const result = await collectionService.syncOfflineQueue(
+        syncDto,
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(result.totalSubmitted).toBe(1);
+      expect(result.successCount).toBe(1);
+      expect(result.failureCount).toBe(0);
+      expect(result.synced[0].idempotencyKey).toBe('existing-idemp-key');
+      expect(result.synced[0].paymentId).toBe('existing-pmt-001');
+      expect(result.synced[0].receiptNumber).toBe('KC-REC-PRD-2026-00005');
+      expect(result.synced[0].isDuplicate).toBe(true);
+      expect(prismaMock.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('should provide partial success isolation when one item succeeds and others fail', async () => {
+      // Item 1: Valid payment
+      // Item 2: Fails because due is already paid
+      // Item 3: Fails because amount does not match exact Inet
+      const alreadyPaidDue = {
+        ...mockDue,
+        id: 'due-paid-002',
+        status: DueStatus.PAID,
+      };
+
+      // Mock sequential calls
+      prismaMock.payment.findUnique.mockResolvedValue(null);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique
+        .mockResolvedValueOnce(mockDue) // Item 1: Valid
+        .mockResolvedValueOnce(alreadyPaidDue) // Item 2: Already Paid
+        .mockResolvedValueOnce(mockDue); // Item 3: Partial mismatch
+      prismaMock.receipt.count.mockResolvedValue(50);
+      prismaMock.payment.create.mockResolvedValue({
+        id: 'pmt-item-1',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        createdAt: new Date(),
+      });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-1' });
+      prismaMock.receipt.create.mockResolvedValue({
+        receiptNumber: 'KC-REC-PRD-2026-00051',
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.count.mockResolvedValue(0);
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      const syncDto = {
+        items: [
+          {
+            idempotencyKey: 'item-1-ok',
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3950,
+            paymentMethod: PaymentMethod.CASH,
+            collectedAt: '2026-10-21T10:00:00.000Z',
+          },
+          {
+            idempotencyKey: 'item-2-already-paid',
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3950,
+            paymentMethod: PaymentMethod.CASH,
+            collectedAt: '2026-10-21T10:05:00.000Z',
+          },
+          {
+            idempotencyKey: 'item-3-partial-fail',
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 2000, // Invalid partial amount
+            paymentMethod: PaymentMethod.CASH,
+            collectedAt: '2026-10-21T10:10:00.000Z',
+          },
+        ],
+      };
+
+      const result = await collectionService.syncOfflineQueue(
+        syncDto,
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(result.totalSubmitted).toBe(3);
+      expect(result.successCount).toBe(1);
+      expect(result.failureCount).toBe(2);
+
+      // Item 1 succeeded
+      expect(result.synced[0].idempotencyKey).toBe('item-1-ok');
+      expect(result.synced[0].receiptNumber).toBe('KC-REC-PRD-2026-00051');
+
+      // Item 2 failed with INSTALLMENT_ALREADY_PAID
+      expect(result.failed[0].idempotencyKey).toBe('item-2-already-paid');
+      expect(result.failed[0].errorCode).toBe('INSTALLMENT_ALREADY_PAID');
+
+      // Item 3 failed with PARTIAL_PAYMENTS_NOT_ALLOWED
+      expect(result.failed[1].idempotencyKey).toBe('item-3-partial-fail');
+      expect(result.failed[1].errorCode).toBe('PARTIAL_PAYMENTS_NOT_ALLOWED');
+    });
+  });
 });

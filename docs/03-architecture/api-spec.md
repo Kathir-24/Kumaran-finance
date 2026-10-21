@@ -57,7 +57,8 @@
 | `POST` | `/auth/web/login` | Office staff login with Username/Email + Password | Public |
 | `POST` | `/auth/web/verify-totp` | Verify 6-digit Microsoft Authenticator code | Session Token |
 | `POST` | `/auth/refresh-token` | Obtain new 15-minute JWT Access Token | Refresh Token |
-| `POST` | `/auth/logout` | Revoke active session and refresh token | Bearer JWT |
+| `POST` | `/auth/logout` | Revoke active session and refresh token (clears `fcmToken`) | Bearer JWT |
+| `PATCH`| `/auth/fcm-token` | Register or clear staff device Firebase FCM push token | Bearer JWT (Staff) |
 
 ### 2.2 Branches & Users (`/branches`, `/users`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -76,6 +77,7 @@
 | `GET` | `/customers/:id` | Get customer details, active chits, and passbook | Staff, Self (Customer) |
 | `POST` | `/customers/:id/documents` | Upload KYC doc (Aadhaar, PAN, Photo) to S3 | Staff |
 | `GET` | `/customers/:id/documents/:docId/url` | Get 15-minute S3 presigned viewing URL | Staff |
+| `PATCH`| `/customers/:id/fcm-token` | Register subscriber Firebase FCM device push token (Anti-IDOR) | Staff, Self (Customer) |
 
 ### 2.4 Chit Groups & Mid-Cycle Onboarding (`/chits`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -107,6 +109,7 @@
 |---|---|---|---|
 | `GET` | `/collections/agent-dues` | List dues assigned to field agent | `COLLECTION_AGENT` |
 | `POST` | `/collections/record` | Agent records collection (Requires exact $I_{net}$; throws 400 on partial or duplicate) | `COLLECTION_AGENT`, `ACCOUNTANT` |
+| `POST` | `/collections/sync-offline-queue` | Batch sync offline field collection queue (1 to 100 items with item-level failure isolation & idempotency) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
 | `GET` | `/collections/daily-summary` | Summary of today's field collections | `COLLECTION_AGENT`, `SUPER_ADMIN` |
 | `POST` | `/collections/cash-handover/submit` | Agent submits cash handover request | `COLLECTION_AGENT` |
 | `POST` | `/collections/cash-handover/acknowledge` | Partner acknowledges cash into vault (**Enforces** `collector_user_id != acknowledger_user_id`) | `SUPER_ADMIN`, `ACCOUNTANT` |

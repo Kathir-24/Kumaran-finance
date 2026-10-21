@@ -10,6 +10,34 @@ import { AcknowledgeHandoverDto } from './dto/acknowledge-handover.dto';
 import { QueryCollectionDto } from './dto/query-collection.dto';
 import { RecordCollectionDto } from './dto/record-collection.dto';
 import { SubmitHandoverDto } from './dto/submit-handover.dto';
+import { SyncOfflineQueueDto } from './dto/sync-offline-collection.dto';
+
+export interface SyncedOfflineItemResult {
+  idempotencyKey: string;
+  paymentId: string;
+  receiptNumber: string;
+  amount: string;
+  status: string;
+  isDuplicate: boolean;
+  collectedAt: Date | string;
+}
+
+export interface FailedOfflineItemResult {
+  idempotencyKey: string;
+  ticketId: string;
+  installmentMonth: number;
+  amount: number;
+  errorCode: string;
+  errorMessage: string;
+}
+
+export interface SyncOfflineQueueResponse {
+  totalSubmitted: number;
+  successCount: number;
+  failureCount: number;
+  synced: SyncedOfflineItemResult[];
+  failed: FailedOfflineItemResult[];
+}
 
 @Injectable()
 export class CollectionService {
@@ -40,6 +68,10 @@ export class CollectionService {
           duplicateIgnored: true,
           message: 'Payment already recorded with this idempotency key',
           payment: existingPayment,
+          paymentId: existingPayment.id,
+          receiptNumber: existingPayment.receipt?.receiptNumber || '',
+          amount: existingPayment.amount,
+          collectedAt: existingPayment.createdAt,
         };
       }
     }
@@ -469,5 +501,89 @@ export class CollectionService {
         },
       },
     });
+  }
+
+  /**
+   * Batch Offline Collection Queue Synchronization.
+   * Processes a list of locally queued offline collections submitted by field agents.
+   * Guarantees item-level isolation (partial success) and idempotent deduplication.
+   */
+  async syncOfflineQueue(
+    dto: SyncOfflineQueueDto,
+    collectorUserId: string,
+    staffBranchId?: string | null,
+  ): Promise<SyncOfflineQueueResponse> {
+    const synced: SyncedOfflineItemResult[] = [];
+    const failed: FailedOfflineItemResult[] = [];
+
+    for (const item of dto.items) {
+      try {
+        const result: any = await this.recordCollection(
+          {
+            ticketId: item.ticketId,
+            installmentMonth: item.installmentMonth,
+            amount: item.amount,
+            paymentMethod: item.paymentMethod,
+            idempotencyKey: item.idempotencyKey,
+            collectedAt: item.collectedAt,
+            transactionRef: item.transactionRef,
+          },
+          collectorUserId,
+          staffBranchId,
+        );
+
+        synced.push({
+          idempotencyKey: item.idempotencyKey,
+          paymentId: result.paymentId || result.payment?.id || '',
+          receiptNumber:
+            result.receiptNumber ||
+            result.payment?.receipt?.receiptNumber ||
+            '',
+          amount: (
+            result.amount ??
+            result.payment?.amount ??
+            item.amount
+          ).toString(),
+          status: 'SUCCESS',
+          isDuplicate: !!result.duplicateIgnored,
+          collectedAt: result.collectedAt || item.collectedAt,
+        });
+      } catch (err: any) {
+        const errorMessage =
+          err?.message || 'Failed to record offline collection';
+        let errorCode = 'SYNC_FAILED';
+
+        if (errorMessage.includes('INSTALLMENT_ALREADY_PAID')) {
+          errorCode = 'INSTALLMENT_ALREADY_PAID';
+        } else if (errorMessage.includes('PARTIAL_PAYMENTS_NOT_ALLOWED')) {
+          errorCode = 'PARTIAL_PAYMENTS_NOT_ALLOWED';
+        } else if (errorMessage.includes('Subscriber ticket not found')) {
+          errorCode = 'TICKET_NOT_FOUND';
+        } else if (errorMessage.includes('Chit scheme is not active')) {
+          errorCode = 'CHIT_NOT_ACTIVE';
+        } else if (errorMessage.includes('removed from this chit scheme')) {
+          errorCode = 'TICKET_REMOVED';
+        } else if (errorMessage.includes('has not been generated')) {
+          errorCode = 'DUE_NOT_FOUND';
+        }
+
+        failed.push({
+          idempotencyKey: item.idempotencyKey,
+          ticketId: item.ticketId,
+          installmentMonth: item.installmentMonth,
+          amount: item.amount,
+          errorCode,
+          errorMessage,
+        });
+      }
+    }
+
+    return {
+      totalSubmitted: dto.items.length,
+      successCount: synced.length,
+      failureCount: failed.length,
+      synced,
+      failed,
+    };
   }
 }

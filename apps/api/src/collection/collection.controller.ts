@@ -24,6 +24,7 @@ import { AcknowledgeHandoverDto } from './dto/acknowledge-handover.dto';
 import { QueryCollectionDto } from './dto/query-collection.dto';
 import { RecordCollectionDto } from './dto/record-collection.dto';
 import { SubmitHandoverDto } from './dto/submit-handover.dto';
+import { SyncOfflineQueueDto } from './dto/sync-offline-collection.dto';
 
 @ApiTags('Collections & Cash Handover')
 @ApiBearerAuth('JWT-auth')
@@ -77,6 +78,35 @@ export class CollectionController {
     @CurrentUser('branchId') staffBranchId?: string | null,
   ) {
     return this.collectionService.recordCollection(
+      dto,
+      collectorUserId,
+      staffBranchId,
+    );
+  }
+
+  @Post('sync-offline-queue')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+  )
+  @ApiOperation({
+    summary: 'Batch sync offline field collections with partial success isolation',
+    description:
+      'Processes an offline queue of doorstep collections (1 to 100 items). Features item-level failure isolation and idempotency deduplication. Ineligible/conflicting payments are rejected with granular error codes without failing the entire batch. Allowed: Collection Agent, Desk Staff, Super Admin.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Batch sync completed with summary and item results',
+  })
+  async syncOfflineQueue(
+    @Body() dto: SyncOfflineQueueDto,
+    @CurrentUser('sub') collectorUserId: string,
+    @CurrentUser('branchId') staffBranchId?: string | null,
+  ) {
+    return this.collectionService.syncOfflineQueue(
       dto,
       collectorUserId,
       staffBranchId,

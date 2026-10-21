@@ -50,10 +50,16 @@ flowchart TD
    - The app automatically dispatches a free Push Notification to the customer's phone (or SMS if keypad phone).
    - Hand-write the date, month, amount, and sign the customer's physical paper passbook booklet with a pen.
 
-### 2.3 Working Offline in Low-Network Areas
+### 2.3 Working Offline in Low-Network Areas (Perundurai & Rural Erode)
 - If mobile signal is lost, the app displays an **Offline Mode** indicator.
-- You can continue recording collections normally.
-- The transactions are saved securely on your phone and automatically upload to the office server as soon as mobile connectivity returns.
+- You can continue recording collections normally. The app generates a tamper-proof local UUID tracking key and timestamps the physical collection time (`collectedAt`).
+- **Batch Synchronization (`POST /collections/sync-offline-queue`)**:
+  - As soon as cellular network (4G/5G) is restored or when you return to the branch Wi-Fi, the app transmits all queued collections as a single batch (up to 100 payments per batch).
+  - **Idempotency Guarantee**: If a sync request is interrupted by an unstable network connection and retried, the server recognizes the UUID tracking key and returns the original receipt without creating a duplicate charge.
+  - **Conflict Handling (Partial Success Isolation)**:
+    - If a subscriber paid their installment at the head office counter while you were on the road, that specific ticket will be flagged as `INSTALLMENT_ALREADY_PAID` in the sync report.
+    - All other valid collections in your batch succeed and issue official sequential bilingual receipt numbers (`KC-REC-PRD-YYYY-XXXXX`).
+    - The app alerts you to the conflict so you can immediately return the physical cash to the customer or adjust records with the office accountant.
 
 ---
 

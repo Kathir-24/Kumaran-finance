@@ -12,12 +12,12 @@
 | Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
 |---|---|:---:|---|:---:|
 | **Foundation & DX** | `/health`, `/` | 2 | PostgreSQL 17, Docker port 5433, BigInt serializer, multi-stage Dockerfile | 3 passing |
-| **Module 1: Auth & Staff Identity** | `/auth` | 8 | bcrypt (salt 12), RFC 6238 TOTP, 6-digit MPIN, token revocation (`/logout`) | 12 passing |
-| **Module 2: Customer & KYC Intake** | `/customers` | 7 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), PAN | 13 passing |
+| **Module 1: Auth & Staff Identity** | `/auth` | 11 | bcrypt (salt 12), RFC 6238 TOTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 15 passing |
+| **Module 2: Customer & KYC Intake** | `/customers` | 8 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), Anti-IDOR FCM device push | 20 passing |
 | **Module 3: Chit Groups & Intake** | `/chits` | 6 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool | 16 passing |
 | **Module 4: In-Office Auctions** | `/auctions` | 7 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker | 16 passing |
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
-| **Module 6: Collections & Handover** | `/collections` | 5 | Exact $I_{net}$ matching, sequential bilingual receipt, dual control (`collector != acknowledger`) | 11 passing |
+| **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
 | **Module 8: Prize Disbursements** | `/disbursements` | 6 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout | 11 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 13 passing |
@@ -36,6 +36,7 @@
 | `POST` | `/auth/mobile/login-mpin` | Mobile quick unlock with 6-digit MPIN | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/refresh-token` | Rotate 15-min access & 7-day refresh tokens | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/logout` | Revoke active session and refresh token hash | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
+| `PATCH`| `/auth/fcm-token` | Register or clear staff device FCM token | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | 🚫 **Blocked** | **Auth (Staff)** |
 | `GET` | `/auth/me` | Get authenticated user profile and roles | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
 | `POST` | `/auth/totp/setup` | Generate Base32 TOTP secret & QR URI | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
 | `POST` | `/auth/totp/enable` | Verify 6-digit code and lock 2FA | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
@@ -57,6 +58,7 @@
 | `POST` | `/customers/:id/nominees` | Link verified nominee with relationship | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | **Self Account Only** | 🚫 **Blocked** |
 | `DELETE`| `/customers/:id/nominees/:id`| Remove linked nominee record | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/customers/:id/kyc-status` | Approve or revoke KYC verification flag | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `PATCH` | `/customers/:id/fcm-token` | Register or clear subscriber device FCM token | **Allowed** | **Branch Scope** | 🚫 **Blocked** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
 
 ---
 
@@ -116,6 +118,7 @@
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/collections/agent-dues` | View dues for field collection rounds | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/collections/record` | Record doorstep cash collection (Exact $I_{net}$) | **Allowed** | **Allowed (Branch)** | **Allowed (Desk)** | **Allowed (Field)** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/collections/sync-offline-queue` | Batch sync offline field collection queue (1 to 100 items) | **Allowed** | **Allowed (Branch)** | **Allowed (Desk)** | **Allowed (Field)** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/collections/daily-summary` | View today's collection register & vault cash | **All** | **Branch Scope** | **Company-wide** | **Own Collections**| 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/collections/cash-handover/submit` | Submit evening cash handover batch | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Allowed (Collector)** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/collections/cash-handover/acknowledge` | Acknowledge physical cash into vault | **Checker** | **Checker (Branch)** | **Checker** | 🚫 **STRICTLY BLOCKED** *(collector != acknowledger)* | 🚫 **Blocked** | 🚫 **Blocked** |
@@ -227,10 +230,15 @@
   - Recalculates consecutive unpaid months for each subscriber ticket.
   - Automatically tags tickets with 3+ consecutive unpaid months as `DEFAULT_3_MONTHS` per ADR-07 and emits statutory warning notices.
   - Automatically restores tickets from `DEFAULT_3_MONTHS` back to `ACTIVE` when delinquent dues are cleared.
-- **Smart Notification Router (`NotificationService`)**:
-  - **In-App Mobile Push Notifications (FCM)**: Primary, free channel delivering instant payment receipts, upcoming auction reminders, post-auction dividend credits, and default notices to smartphone users.
-  - **Indian Telecom DLT SMS Fallback**: Header `KMRCHT` / Templates for OTP authentication and fallback for keypad phone users. WhatsApp Business API parked in V1.
+- **Smart Notification Router (`NotificationService` & `PushService`)**:
+  - **In-App Mobile Push Notifications (FCM HTTP v1)**: Primary, free channel delivering instant payment receipts, upcoming auction reminders, post-auction dividend credits, and default notices to smartphone users. Powered by `PushService` and pluggable `FirebasePushDriver` (`firebase-admin`) + `MockPushDriver`.
+  - **Automated Stale Token Pruning**: Automatically clears invalid/expired FCM tokens (`fcmToken = null`) in PostgreSQL when FCM returns `registration-token-not-registered`.
+  - **Indian Telecom DLT SMS Fallback**: Header `KMRCHT` / Templates for OTP authentication and fallback for keypad phone users via `SmsService` (`Msg91SmsDriver` + `MockSmsDriver`). WhatsApp Business API parked in V1.
   - **In-Memory Audit Registry**: Preserves full notification payloads for review and automated test assertions.
+- **Automated Repeatable Cron Schedulers (`Asia/Kolkata` Timezone)**:
+  - **00:01 AM IST (`1 0 * * *`)**: `DailyArrearsService` runs daily arrears recalculation, marks past-due items `OVERDUE`, tags 3-month defaults (`DEFAULT_3_MONTHS`), and emits warnings.
+  - **06:00 AM IST (`0 6 * * *`)**: `ReconciliationService` runs daily settlement reconciliation against gateway logs, auto-resolving ghost drops.
+  - **09:00 AM IST (`0 9 * * *`)**: `AuctionReminderSchedulerService` scans upcoming auctions 3 days ahead and broadcasts bilingual Push & SMS reminders.
 - **Payment Settlement Reconciliation (`ReconciliationService`)**:
   - Runs daily at 06:00 AM IST to compare payment gateway settlement records against internal database entries.
   - Auto-resolves ghost drops (updates internal `INITIATED` payment to `SUCCESS` and issues receipts).
@@ -244,6 +252,8 @@
 | `POST` | `/jobs/run-reconciliation` | Manually trigger payment settlement reconciliation | Super Admin, Accountant |
 | `POST` | `/jobs/enqueue-reconciliation` | Enqueue payment reconciliation job onto BullMQ queue | Super Admin, Accountant |
 | `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | Super Admin, Branch Manager |
+| `POST` | `/jobs/run-pre-auction-scan` | Manually trigger pre-auction scan & reminder broadcast (default 3 days ahead) | Super Admin, Branch Manager |
+| `GET` | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | Super Admin, Auditor |
 | `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin, Branch Manager, Auditor |
 | `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | Super Admin, Auditor |
 | `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin (`BULL_BOARD_USER` Basic Auth) |
