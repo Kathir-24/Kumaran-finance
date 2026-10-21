@@ -14,10 +14,10 @@
 
 ### Who Is the Desk Accountant at Kumaran Finance?
 In the Perundurai Head Office, the **Desk Accountant** (often assisted by senior staff or field agents wearing the accounting hat) sits behind the physical customer service counter. Their operational desk looks like this:
-- A desktop computer connected to an **80mm thermal receipt slip printer**.
+- A desktop computer running the Kumaran Chits Web Portal.
 - A high-speed **electronic currency note-sorting & counting machine** on the counter.
 - A physical safe-drawer with separate slots for ₹500, ₹200, ₹100, and ₹50 notes.
-- Heavy **hand-written paper day-book ledgers** and physical receipt carbon-copy books.
+- Heavy **hand-written paper day-book ledgers** and customer physical passbooks.
 - Files of signed subscriber agreements, blank bank cheques, and promissory notes in metal filing cabinets.
 
 ### The Dual-Role Reality (Field Agent + Accountant)
@@ -86,7 +86,7 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 * **US-7.2 (Anti-Self-Acknowledgment Defense)**: *As a Staff Member with dual roles*, if I personally collected money in the field, I want the software to strictly block me from acknowledging my own cash handover, *so that* cash is always verified by an independent second pair of eyes.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT and immediately print a bilingual (English + Tamil) 80mm thermal slip, *so that* the customer walks away with a formal signed proof of payment.
+* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and trigger an automated bilingual (English + Tamil) SMS receipt, *so that* the customer walks away with verified proof of payment.
 * **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Desk Accountant*, if I accidentally post cash to the wrong customer's ticket, I want to submit a reversal request with a mandatory reason and receipt scan, *so that* a Partner can review and approve the correction.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
@@ -107,10 +107,10 @@ sequenceDiagram
     actor C as Walk-In Customer (Mani)
     actor A as Desk Accountant (Selvi)
     participant UI as Web Admin Portal
-    participant PRN as 80mm Thermal Printer
+    participant SMS as MSG91 SMS Gateway
     participant DB as PostgreSQL 17
 
-    C->>A: "I want to pay Month 4 for Ticket #9 (KCA-1L)"
+    C->>A: "I want to pay Month 4 for Ticket #9 (KCA-1L)" & hands physical passbook
     A->>UI: Searches "Mani" / Phone "9842143210"
     UI-->>A: Shows Ticket #9 | Due: ₹4,100 (Status: UNPAID)
     C->>A: Hands over ₹4,100 in cash (4 x ₹1000 + 1 x ₹100)
@@ -118,8 +118,9 @@ sequenceDiagram
     A->>UI: Selects "Cash" -> Enters Amount ₹4,100 -> Clicks "Record Payment"
     UI->>DB: Commits BigInt ₹4,100 (Status: PAID)
     DB-->>UI: Generates Receipt #KC-REC-PRD-2026-00412
-    UI->>PRN: Automatically prints bilingual 80mm receipt
-    A->>C: Hands customer thermal receipt + physical passbook stamp
+    UI->>SMS: Automatically triggers bilingual SMS to Mani's phone
+    A->>A: Writes date, amount ₹4,100, receipt #, and signs Mani's physical passbook
+    A->>C: Returns signed physical passbook to Mani
 ```
 
 ---
@@ -206,32 +207,17 @@ At 11:30 AM, customer Velusamy walks up to the counter to pay his monthly chit i
    - Click **`"Record Payment"`**.
    - Payment Mode: Select **`Cash`**.
    - Amount: Auto-locked to exact net due **`₹4,100`** (No partial amounts permitted).
-   - Click **`"Confirm & Print Receipt"`**.
-5. **Thermal Receipt Printing & SMS**:
-   - The connected USB thermal printer instantly prints an 80mm slip in bilingual English and Tamil:
-     ```text
-     ================================
-             KUMARAN FINANCE
-         Perundurai Head Office
-     ================================
-     Receipt No: KC-REC-PRD-2026-00415
-     Date: 21-Oct-2026 11:32 AM
-     Subscriber: K. Velusamy (வேலுசாமி)
-     Chit Scheme: KCA-1L-20M-01
-     Ticket No: #5  | Month: 4 / 20
-     --------------------------------
-     Base Installment:     Rs. 5,000
-     Dividend Savings:   - Rs.   900
-     --------------------------------
-     NET AMOUNT PAID:      Rs. 4,100
-     Payment Mode: CASH
-     Received By: Staff Selvi (Cashier)
-     ================================
-        Thank You! / நன்றி!
-     ================================
-     ```
+   - Click **`"Confirm & Record Collection"`**.
+5. **Physical Passbook Entry & Automated SMS Confirmation**:
+   - The system displays the confirmed Receipt No: **`KC-REC-PRD-2026-00415`**.
    - An automated bilingual SMS is simultaneously dispatched to Velusamy's mobile phone via MSG91 Flow API.
-   - The accountant stamps Velusamy's physical passbook with the official branch stamp and hands it back.
+   - The accountant takes Velusamy's **physical paper passbook booklet**:
+     - Writes the date: `21-Oct-2026`
+     - Writes the month: `Month 4`
+     - Writes the amount paid: `₹4,100` (Cash)
+     - Writes receipt number: `KC-REC-00415`
+     - Signs her initials with pen in the passbook column.
+   - The accountant hands the physical passbook back to Velusamy. (Optional: A digital PDF receipt is accessible on screen for downloading if requested).
 
 ---
 
@@ -330,7 +316,7 @@ At 6:00 PM, before locking the branch vault and leaving for the day:
 | **Walk-in customer wants to pay ₹3,000 instead of ₹4,100 net due** | System rejects entering ₹3,000 (Field strictly expects exact net due). | Explain to customer: *"Chit installments cannot be accepted in partial amounts. Please pay the remaining ₹1,100 to receive your official receipt."* |
 | **Accountant tries to approve a payment reversal they initiated** | Button is disabled. System asserts `maker_user_id != checker_user_id`. | Notify a Partner to log in on desktop or mobile app to inspect the receipt and approve the reversal. |
 | **Customer asks for a loan against their chit** | Software has no loan module. Kumaran Finance operations do not issue informal loans against chit balances. | Inform customer politely that Kumaran Finance is strictly a registered chit-fund company and does not issue personal loans. |
-| **Thermal receipt paper roll runs out mid-print** | Transaction is already safely committed to database with permanent receipt number. | Replace 80mm paper roll, open **Receipts $\to$ KC-REC-PRD-2026-00415**, and click **"Reprint Receipt"**. |
+| **Customer forgot their physical passbook booklet** | Transaction is safely committed to the database and SMS receipt is dispatched to customer's phone immediately. | Advise customer to bring passbook on next visit; cashier can enter previous month's entry by looking up receipt history in the portal. |
 
 ---
 

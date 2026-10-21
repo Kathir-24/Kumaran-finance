@@ -5,7 +5,7 @@
 > **Persona**: **Customer / Chit Subscriber (சந்தாதாரர்)**  
 > **Target Audience**: Subscribers, Beginners, Customer Support, and Mobile Engineers learning subscriber workflows.  
 > **Primary Platform**: **Android Mobile App (`apps/mobile/`)** (Bilingual English & தமிழ், 1-tap UPI, digital passbook)  
-> **Secondary Platform**: **Physical Paper Passbook & 80mm Thermal Receipts** (For traditional subscribers)  
+> **Secondary Platform**: **Customer Physical Paper Passbook** (Where agent/staff hand-writes and signs monthly entries)  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---

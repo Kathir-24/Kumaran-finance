@@ -7,7 +7,7 @@ import { PdfService } from '../src/pdf/pdf.service';
 import { FormXviiMinutesTemplate } from '../src/pdf/templates/form-xvii-minutes.template';
 import { FormXxiPassbookTemplate } from '../src/pdf/templates/form-xxi-passbook.template';
 import { PayoutVoucherTemplate } from '../src/pdf/templates/payout-voucher.template';
-import { ThermalReceiptTemplate } from '../src/pdf/templates/thermal-receipt.template';
+import { SubscriptionReceiptTemplate } from '../src/pdf/templates/subscription-receipt.template';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { DocumentAccessHelper } from '../src/storage/helpers/document-access.helper';
 import { StorageService } from '../src/storage/storage.service';
@@ -140,8 +140,8 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
   });
 
   describe('3. Canvas Templates Generation (Buffer & PDF Header Verification)', () => {
-    it('should generate a valid 80mm thermal subscription receipt PDF buffer', async () => {
-      const buffer = await ThermalReceiptTemplate.generate({
+    it('should generate a valid subscription receipt PDF buffer', async () => {
+      const buffer = await SubscriptionReceiptTemplate.generate({
         receiptNumber: 'KC-REC-PRD-2026-00412',
         date: new Date('2026-10-18T10:45:00Z'),
         groupCode: 'KCA-1L-20M-01',

@@ -198,7 +198,7 @@
   - English: e.g. `3750n` $\to$ `"Three Thousand Seven Hundred Fifty Rupees Only"`
   - Tamil: e.g. `3750n` $\to$ `"ரூபாய் மூன்றாயிரத்து எழுநூற்று ஐம்பது மட்டும்"`
 - **Canvas Templates**:
-  - `ThermalReceiptTemplate`: Compact 80mm digital receipt slip format (width: 226.77 pt) per `notification-and-receipt-templates.md` §1 for instant digital viewing and WhatsApp sharing.
+  - `SubscriptionReceiptTemplate`: Compact digital receipt slip format (width: 226.77 pt) per `notification-and-receipt-templates.md` §1 for instant digital viewing and WhatsApp sharing.
   - `PayoutVoucherTemplate`: A5 landscape prize payout voucher with safety proof checklist stamps and Maker-Checker signature lines.
   - `FormXviiMinutesTemplate`: A4 statutory auction minutes with financial breakdown, tie-breaker paper token lot draw table, and Foreman declaration.
   - `FormXxiPassbookTemplate`: A4 landscape 20-month continuous schedule showing monthly base dues, dividend credits, payments, and arrears.

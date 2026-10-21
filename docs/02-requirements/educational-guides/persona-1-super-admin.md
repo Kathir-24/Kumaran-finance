@@ -19,7 +19,7 @@ Kumaran Finance is owned and actively run by **4 equal partners** based in Perun
 - They physically count cash, inspect signed blank cheques and promissory notes before releasing lakhs of rupees in prize money.
 
 ### Why Do They Need 100% Parity on Both Web and Mobile?
-- **At the Desk (Web Portal)**: When sitting at the Head Office PC, a partner needs a full-screen view for high-density tasks—transcribing 20-month physical notebooks into the system, reviewing Form XXII 12-column daily cash books, and printing bilingual 80mm thermal receipts.
+- **At the Desk (Web Portal)**: When sitting at the Head Office PC, a partner needs a full-screen view for high-density tasks—transcribing 20-month physical notebooks into the system, reviewing Form XXII 12-column daily cash books, and issuing bilingual digital receipts.
 - **On the Move (Android Mobile App)**: When a partner is at home, in the field, or visiting subscribers, they cannot wait to get back to the office to approve transactions. The Android app provides **1-second fingerprint unlock** and **1-tap push notification approvals** for prize disbursements, payment reversals, and evening cash handovers.
 
 ### Core Chit Fund Concepts Explained for Beginners
@@ -88,7 +88,7 @@ Here are the formal Agile user stories defining every capability the Super Admin
 * **US-7.3 (Anti-Self-Acknowledgment Guard)**: *As a Partner*, if I personally collected cash in the field, I want the software to block me from acknowledging my own handover, requiring one of the other 3 partners to sign off, *so that* dual-control integrity is maintained.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT and immediately print a bilingual (English + Tamil) 80mm thermal receipt, *so that* customers get instant proof of payment.
+* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and immediately issue a bilingual (English + Tamil) digital receipt via SMS/PDF, *so that* customers get instant proof of payment.
 * **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A to initiate a reversal with a written reason and Partner B to verify and approve it, *so that* no single person can manipulate cash entries.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)

@@ -12,7 +12,7 @@ import { StorageService } from '../storage/storage.service';
 import { FormXviiMinutesTemplate } from './templates/form-xvii-minutes.template';
 import { FormXxiPassbookTemplate } from './templates/form-xxi-passbook.template';
 import { PayoutVoucherTemplate } from './templates/payout-voucher.template';
-import { ThermalReceiptTemplate } from './templates/thermal-receipt.template';
+import { SubscriptionReceiptTemplate } from './templates/subscription-receipt.template';
 
 export interface GeneratedPdfResult {
   buffer: Buffer;
@@ -74,7 +74,7 @@ export class PdfService {
     const due = firstAlloc.due;
     const customer = ticket.customer;
 
-    const buffer = await ThermalReceiptTemplate.generate({
+    const buffer = await SubscriptionReceiptTemplate.generate({
       receiptNumber: payment.receipt.receiptNumber,
       date: payment.createdAt,
       groupCode: chit.groupCode,

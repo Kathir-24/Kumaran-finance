@@ -24,10 +24,10 @@ export interface ReceiptPdfData {
   branchPhone?: string;
 }
 
-export class ThermalReceiptTemplate {
+export class SubscriptionReceiptTemplate {
   static async generate(data: ReceiptPdfData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      // 80mm compact digital slip format (width: 226.77 pt)
+      // Compact digital receipt slip format (width: 226.77 pt)
       const doc = new PDFDocument({
         size: [226.77, 560],
         margins: { top: 10, bottom: 10, left: 10, right: 10 },
