@@ -29,6 +29,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { UpdateCustomerFcmTokenDto } from './dto/update-customer-fcm-token.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
 
 @ApiTags('Customers')
@@ -186,5 +187,39 @@ export class CustomerController {
     @Body() dto: UpdateKycDto,
   ) {
     return this.customerService.updateKycStatus(id, dto);
+  }
+
+  @Patch(':id/fcm-token')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+  )
+  @ApiOperation({
+    summary: 'Register or update customer device FCM push token',
+    description:
+      'Registers or clears subscriber device Firebase Cloud Messaging push token for digital passbook receipt alerts and auction reminders. Allowed: Super Admin, Branch Manager, Collection Agent, or Customer self-service.',
+  })
+  @ApiResponse({ status: 200, description: 'Customer FCM token updated successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Customers can only update own token' })
+  @ApiResponse({ status: 404, description: 'Customer not found' })
+  async updateFcmToken(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerFcmTokenDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    // Anti-IDOR: Customer persona can only register/update their own device token
+    if (
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
+      currentUser.sub !== id
+    ) {
+      throw new ForbiddenException(
+        'ACCESS_DENIED: Customers are only permitted to update their own device push token',
+      );
+    }
+
+    return this.customerService.updateFcmToken(id, dto.fcmToken);
   }
 }

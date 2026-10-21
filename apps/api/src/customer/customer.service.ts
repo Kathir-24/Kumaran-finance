@@ -318,4 +318,37 @@ export class CustomerService {
       message: `KYC verification status updated to ${dto.isKycVerified ? 'VERIFIED' : 'PENDING'}.`,
     };
   }
+
+  /**
+   * Registers, updates, or clears the Firebase Cloud Messaging device push token for a customer
+   */
+  async updateFcmToken(id: string, fcmToken?: string | null) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    const updatedCustomer = await this.prisma.customer.update({
+      where: { id },
+      data: { fcmToken: fcmToken || null },
+      select: {
+        id: true,
+        customerCode: true,
+        primaryPhone: true,
+        fcmToken: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: fcmToken
+        ? 'Customer device FCM token registered successfully.'
+        : 'Customer device FCM token deregistered successfully.',
+      fcmToken: updatedCustomer.fcmToken,
+    };
+  }
 }

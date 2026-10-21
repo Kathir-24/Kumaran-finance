@@ -86,7 +86,11 @@ Opens in your browser at `http://localhost:5555`.
 ### 3.4 Applied Migrations & Verification Log
 | Migration Name | Applied At | Description | Verification Status |
 |---|---|---|:---:|
-| `20261018110459_init_kumaran_schema` | 2026-10-18 | Initial schema creation: 10 models, 8 enums, `roles Role[]`, `BigInt` currency fields, `@@unique([chitGroupId, customerId])` ticket limit. | **Applied & Verified** (`22/22` automated tests passing) |
+| `20261018110459_init_kumaran_schema` | 2026-10-18 | Initial schema creation: 10 models, 8 enums, `roles Role[]`, `BigInt` currency fields, `@@unique([chitGroupId, customerId])` ticket limit. | **Applied & Verified** |
+| `20261018125155_add_auth_credentials_to_user` | 2026-10-18 | Added password authentication, TOTP secrets, MPIN bcrypt hash, and refresh token hashes to `User`. | **Applied & Verified** |
+| `20261018171620_payment_reversal_maker_checker` | 2026-10-18 | Added PaymentReversal table enforcing dual control (`requestedByUserId != reviewedByUserId`). | **Applied & Verified** |
+| `20261019120630_add_registrar_filing_to_auction_minutes` | 2026-10-19 | Added Form XVII filing reference and statutory filing date fields to `AuctionMinutes`. | **Applied & Verified** |
+| `20261021142000_add_fcm_token_to_user_and_customer` | 2026-10-21 | Added nullable `fcmToken` column to both `User` and `Customer` tables for Firebase Cloud Messaging push dispatch. | **Applied & Verified** (`261/261` automated tests passing) |
 
 ---
 

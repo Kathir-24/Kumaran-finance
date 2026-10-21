@@ -335,4 +335,130 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('7. Customer Device FCM Push Token Registration', () => {
+    it('should register a valid FCM token for the customer via service', async () => {
+      const mockToken = 'fcm-subscriber-token-99999';
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customer.update.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        primaryPhone: '9842712345',
+        fcmToken: mockToken,
+        updatedAt: new Date(),
+      });
+
+      const res = await customerService.updateFcmToken(mockCustomerId, mockToken);
+      expect(res.success).toBe(true);
+      expect(res.fcmToken).toBe(mockToken);
+      expect(res.message).toContain('registered successfully');
+      expect(prismaMock.customer.update).toHaveBeenCalledWith({
+        where: { id: mockCustomerId },
+        data: { fcmToken: mockToken },
+        select: expect.any(Object),
+      });
+    });
+
+    it('should clear/deregister the FCM token when null', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customer.update.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        primaryPhone: '9842712345',
+        fcmToken: null,
+        updatedAt: new Date(),
+      });
+
+      const res = await customerService.updateFcmToken(mockCustomerId, null);
+      expect(res.success).toBe(true);
+      expect(res.fcmToken).toBeNull();
+      expect(res.message).toContain('deregistered successfully');
+      expect(prismaMock.customer.update).toHaveBeenCalledWith({
+        where: { id: mockCustomerId },
+        data: { fcmToken: null },
+        select: expect.any(Object),
+      });
+    });
+
+    it('should throw NotFoundException if customer not found', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(null);
+
+      await expect(
+        customerService.updateFcmToken('unknown-cust', 'token-123'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow customer to update their own FCM token via controller', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customer.update.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        primaryPhone: '9842712345',
+        fcmToken: 'token-self',
+        updatedAt: new Date(),
+      });
+
+      const customerPayload = {
+        sub: mockCustomerId,
+        phone: '9842712345',
+        email: null,
+        roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      const res = await customerController.updateFcmToken(
+        mockCustomerId,
+        { fcmToken: 'token-self' },
+        customerPayload,
+      );
+      expect(res.success).toBe(true);
+    });
+
+    it('should allow staff (SUPER_ADMIN / COLLECTION_AGENT) to update customer FCM token via controller', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customer.update.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        primaryPhone: '9842712345',
+        fcmToken: 'token-staff-assigned',
+        updatedAt: new Date(),
+      });
+
+      const staffPayload = {
+        sub: 'staff-user-001',
+        phone: '9876543210',
+        email: 'admin@kumaranfinance.com',
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      const res = await customerController.updateFcmToken(
+        mockCustomerId,
+        { fcmToken: 'token-staff-assigned' },
+        staffPayload,
+      );
+      expect(res.success).toBe(true);
+    });
+
+    it('should throw ForbiddenException if customer attempts to update another subscriber token (Anti-IDOR)', async () => {
+      const customerPayload = {
+        sub: 'different-customer-id',
+        phone: '9842799999',
+        email: null,
+        roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      await expect(
+        customerController.updateFcmToken(
+          mockCustomerId,
+          { fcmToken: 'token-hijack' },
+          customerPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
 });

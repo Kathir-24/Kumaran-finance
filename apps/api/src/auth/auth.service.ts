@@ -306,17 +306,50 @@ export class AuthService {
   }
 
   /**
-   * Invalidates active session by clearing stored refresh token hash
+   * Invalidates active session by clearing stored refresh token hash and device FCM push token
    */
   async logout(userId: string) {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { refreshTokenHash: null },
+      data: { refreshTokenHash: null, fcmToken: null },
     });
 
     return {
       success: true,
       message: 'Logged out successfully.',
+    };
+  }
+
+  /**
+   * Registers, updates, or clears the Firebase Cloud Messaging device push token for an authenticated user
+   */
+  async updateFcmToken(userId: string, fcmToken?: string | null) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: fcmToken || null },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        fcmToken: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: fcmToken
+        ? 'Device FCM token registered successfully.'
+        : 'Device FCM token deregistered successfully.',
+      fcmToken: updatedUser.fcmToken,
     };
   }
 

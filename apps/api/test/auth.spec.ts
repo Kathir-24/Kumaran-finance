@@ -1,4 +1,4 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -298,14 +298,14 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       expect(refreshRes).toHaveProperty('refreshToken');
     });
 
-    it('should clear refresh token on logout', async () => {
+    it('should clear refresh token and fcmToken on logout', async () => {
       prismaMock.user.update.mockResolvedValue({});
 
       const result = await authService.logout(mockUserId);
       expect(result.success).toBe(true);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { id: mockUserId },
-        data: { refreshTokenHash: null },
+        data: { refreshTokenHash: null, fcmToken: null },
       });
     });
   });
@@ -371,6 +371,67 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       });
 
       expect(() => rolesGuard.canActivate(context)).toThrow(ForbiddenException);
+    });
+  });
+
+  describe('5. User Device FCM Push Token Registration', () => {
+    const mockUser = {
+      id: mockUserId,
+      email: 'agent@kumaran.in',
+      phone: '9842143210',
+      role: Role.COLLECTION_AGENT,
+      isActive: true,
+    } as any;
+
+    it('should register a valid FCM token for the user', async () => {
+      const mockToken = 'fcm-device-token-sample-12345';
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue({
+        id: mockUserId,
+        email: 'agent@kumaran.in',
+        role: Role.COLLECTION_AGENT,
+        fcmToken: mockToken,
+        updatedAt: new Date(),
+      });
+
+      const res = await authService.updateFcmToken(mockUserId, mockToken);
+      expect(res.success).toBe(true);
+      expect(res.fcmToken).toBe(mockToken);
+      expect(res.message).toContain('registered successfully');
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUserId },
+        data: { fcmToken: mockToken },
+        select: expect.any(Object),
+      });
+    });
+
+    it('should deregister/clear the FCM token when token is null', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue({
+        id: mockUserId,
+        email: 'agent@kumaran.in',
+        role: Role.COLLECTION_AGENT,
+        fcmToken: null,
+        updatedAt: new Date(),
+      });
+
+      const res = await authService.updateFcmToken(mockUserId, null);
+      expect(res.success).toBe(true);
+      expect(res.fcmToken).toBeNull();
+      expect(res.message).toContain('deregistered successfully');
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUserId },
+        data: { fcmToken: null },
+        select: expect.any(Object),
+      });
+    });
+
+    it('should throw NotFoundException if user is not found', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        authService.updateFcmToken('unknown-user-id', 'some-token'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

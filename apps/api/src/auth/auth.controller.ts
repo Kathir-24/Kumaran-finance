@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SetMpinDto } from './dto/set-mpin.dto';
 import { TotpEnableDto } from './dto/totp-enable.dto';
 import { TotpVerifyDto } from './dto/totp-verify.dto';
+import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -78,11 +80,29 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Revoke active session',
-    description: 'Clears the refresh token hash in database, invalidating the session.',
+    description: 'Clears the refresh token hash and device FCM push token in database, invalidating the session.',
   })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(@CurrentUser('sub') userId: string) {
     return this.authService.logout(userId);
+  }
+
+  @Patch('fcm-token')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Register or clear user device FCM push token',
+    description:
+      'Updates the Firebase Cloud Messaging push token for the authenticated user for real-time mobile push notifications and instant Maker-Checker approvals. Pass null/empty to deregister.',
+  })
+  @ApiResponse({ status: 200, description: 'Device FCM token updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateFcmToken(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateFcmTokenDto,
+  ) {
+    return this.authService.updateFcmToken(userId, dto.fcmToken);
   }
 
   @Get('me')
