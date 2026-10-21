@@ -12,7 +12,7 @@ async function exportOpenApi() {
   });
 
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'api/docs'],
+    exclude: ['', '/', 'health', 'health/(.*)', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
   });
 
   app.enableVersioning({
@@ -27,7 +27,7 @@ async function exportOpenApi() {
         'Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.',
     )
     .setVersion('1.0.0')
-    .addServer('/api/v1', 'Version 1 Base URL')
+    .addServer('/', 'Default Base URL')
     .addBearerAuth(
       {
         type: 'http',
@@ -38,6 +38,14 @@ async function exportOpenApi() {
         in: 'header',
       },
       'JWT-auth',
+    )
+    .addBasicAuth(
+      {
+        type: 'http',
+        scheme: 'basic',
+        description: 'Enter HTTP Basic Auth credentials for Prometheus metrics',
+      },
+      'basic',
     )
     .addTag('Health', 'System health checks')
     .addTag('Auth', 'Staff identity, MPIN, and TOTP 2FA')
@@ -53,6 +61,7 @@ async function exportOpenApi() {
     .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
     .addTag('Bilingual PDF Documents', 'On-demand 80mm receipts, A5 vouchers, minutes, and passbooks')
     .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
+    .addTag('Observability & Metrics', 'Prometheus metrics, latency histograms, and system telemetry')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

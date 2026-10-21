@@ -59,7 +59,7 @@ async function bootstrap() {
 
   // Global routing prefix with exemptions for root, health checks, API docs, Bull Board queue monitor, and Prometheus metrics
   app.setGlobalPrefix('api', {
-    exclude: ['', '/', 'health', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
+    exclude: ['', '/', 'health', 'health/(.*)', 'metrics', 'api/docs', 'admin/queues', 'admin/queues/(.*)'],
   });
 
   // Enable URI Versioning (Default: '1' -> /api/v1/...)
@@ -108,6 +108,14 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
+    .addBasicAuth(
+      {
+        type: 'http',
+        scheme: 'basic',
+        description: 'Enter HTTP Basic Auth credentials for Prometheus metrics',
+      },
+      'basic',
+    )
     .addTag('Health', 'System health checks')
     .addTag('Auth', 'Staff identity, MPIN, and TOTP 2FA')
     .addTag('Customers', 'Customer intake, KYC, and Nominees')
@@ -122,6 +130,7 @@ async function bootstrap() {
     .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
     .addTag('Bilingual PDF Documents', 'On-demand 80mm receipts, A5 vouchers, minutes, and passbooks')
     .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
+    .addTag('Observability & Metrics', 'Prometheus metrics, latency histograms, and system telemetry')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

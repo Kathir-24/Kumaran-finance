@@ -97,11 +97,10 @@ export class InstallmentController {
   @ApiResponse({ status: 200, description: 'Defaulters list retrieved' })
   async getDefaultersAlias(
     @CurrentUser('branchId') branchId?: string | null,
-    @Query('minConsecutiveMonths') minConsecutiveMonths?: string,
+    @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
+    minConsecutiveMonths?: number,
   ) {
-    const minMonths = minConsecutiveMonths
-      ? parseInt(minConsecutiveMonths, 10)
-      : 1;
+    const minMonths = minConsecutiveMonths ?? 1;
     return this.installmentService.getDefaulters(
       branchId || undefined,
       minMonths,

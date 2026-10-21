@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   UseGuards,
@@ -47,11 +48,10 @@ export class TicketController {
   @ApiResponse({ status: 200, description: 'Defaulters list retrieved' })
   async getDefaulters(
     @CurrentUser('branchId') branchId?: string | null,
-    @Query('minConsecutiveMonths') minConsecutiveMonths?: string,
+    @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
+    minConsecutiveMonths?: number,
   ) {
-    const minMonths = minConsecutiveMonths
-      ? parseInt(minConsecutiveMonths, 10)
-      : 1;
+    const minMonths = minConsecutiveMonths ?? 1;
     return this.installmentService.getDefaulters(
       branchId || undefined,
       minMonths,
