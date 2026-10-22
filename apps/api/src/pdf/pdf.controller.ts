@@ -58,7 +58,7 @@ export class PdfController {
         schema: {
           type: 'string',
           format: 'binary',
-          description: '80mm thermal receipt PDF document binary stream',
+          description: 'Bilingual subscription receipt digital PDF document binary stream',
         },
       },
       'application/json': {

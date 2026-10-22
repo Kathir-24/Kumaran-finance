@@ -5735,7 +5735,7 @@
                 "schema": {
                   "type": "string",
                   "format": "binary",
-                  "description": "80mm thermal receipt PDF document binary stream"
+                  "description": "Bilingual subscription receipt digital PDF document binary stream"
                 }
               },
               "application/json": {
@@ -10386,7 +10386,7 @@
           },
           "data": {
             "type": "object",
-            "description": "Structured receipt fields for thermal printer rendering"
+            "description": "Structured bilingual digital receipt fields and metadata"
           },
           "formattedText": {
             "type": "string",

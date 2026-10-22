@@ -92,7 +92,7 @@ export class BilingualReceiptResponseDto {
   @ApiProperty({ example: false, description: 'Whether the payment is currently reversed' })
   isReversed: boolean;
 
-  @ApiProperty({ description: 'Structured receipt fields for thermal printer rendering' })
+  @ApiProperty({ description: 'Structured bilingual digital receipt fields and metadata' })
   data: any;
 
   @ApiProperty({ description: 'Formatted bilingual 80mm monospace text receipt layout' })

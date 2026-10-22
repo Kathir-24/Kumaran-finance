@@ -187,7 +187,7 @@ flowchart TD
 
 ---
 
-### Journey 3: Counter Walk-In Cash Collection & 80mm Receipt Printing
+### Journey 3: Counter Walk-In Cash Collection & Physical Passbook Entry
 
 At 11:30 AM, customer Velusamy walks up to the counter to pay his monthly chit installment:
 

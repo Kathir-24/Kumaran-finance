@@ -4157,7 +4157,7 @@ export interface components {
              * @example false
              */
             isReversed: boolean;
-            /** @description Structured receipt fields for thermal printer rendering */
+            /** @description Structured bilingual digital receipt fields and metadata */
             data: Record<string, never>;
             /** @description Formatted bilingual 80mm monospace text receipt layout */
             formattedText: string;

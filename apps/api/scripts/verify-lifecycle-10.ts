@@ -129,9 +129,9 @@ async function run() {
   let uploadedReceiptKey = '';
 
   // --------------------------------------------------------------------------
-  // Step 1: GET /pdf/receipt/:paymentId (80mm Thermal Receipt PDF)
+  // Step 1: GET /pdf/receipt/:paymentId (Subscription Receipt PDF)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [1/5] GET /pdf/receipt/:paymentId (Bilingual 80mm Receipt PDF) ---`);
+  console.log(`\n--- [1/5] GET /pdf/receipt/:paymentId (Bilingual Subscription Receipt PDF) ---`);
   
   // 1A: Direct Binary Stream
   console.log(`   [1A: Binary PDF Stream] Requesting /pdf/receipt/${paymentId} ...`);
@@ -144,7 +144,7 @@ async function run() {
   console.log(`   Magic Header starts with '%PDF-': ${isPdfHeader}`);
 
   if (streamRes.status === 200 && streamRes.contentType.includes('application/pdf') && isPdfHeader) {
-    console.log(`   ✅ 1A PASSED: 80mm thermal receipt PDF generated and streamed directly.`);
+    console.log(`   ✅ 1A PASSED: Bilingual digital subscription receipt PDF generated and streamed directly.`);
   } else {
     console.error(`   ❌ 1A FAILED:`, streamRes.data || streamRes.buffer);
     process.exit(1);
@@ -315,7 +315,7 @@ async function run() {
   console.log(`\n======================================================`);
   console.log(`🎉 LIFECYCLE 10 LIVE VERIFICATION PASSED (100% SUCCESS)`);
   console.log(`   All 5 Endpoints fully verified against live NestJS, MinIO S3 & PDFKit`);
-  console.log(`   Thermal receipts, vouchers, minutes, passbooks & anti-traversal verified.`);
+  console.log(`   Digital receipts, vouchers, minutes, passbooks & anti-traversal verified.`);
   console.log(`======================================================\n`);
 }
 
