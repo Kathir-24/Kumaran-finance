@@ -69,7 +69,7 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
     // Authenticate Super Admin
     const adminLoginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
-      .send({ identifier: '9876543210', password: 'Admin@Kumaran2026' });
+      .send({ phone: '9876543210', password: 'Admin@Kumaran2026' });
 
     superAdminToken = adminLoginRes.body.data.accessToken;
 

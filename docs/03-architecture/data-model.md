@@ -95,7 +95,6 @@ model User {
   branch           Branch?   @relation(fields: [branchId], references: [id])
   name             String
   phone            String    @unique
-  email            String?   @unique
   passwordHash     String
   roles            Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
   isActive         Boolean   @default(true)

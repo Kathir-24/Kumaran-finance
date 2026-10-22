@@ -373,7 +373,6 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       const staffUser: JwtPayload = {
         sub: mockMakerId,
         phone: '9842199999',
-        email: 'partner@kumaran.com',
         roles: [Role.SUPER_ADMIN],
         branchId: mockBranchId,
         tokenType: 'access',
@@ -633,7 +632,6 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       const customerUser: JwtPayload = {
         sub: 'user-cust-001',
         phone: '9842100000',
-        email: null,
         roles: [Role.CUSTOMER],
         branchId: null,
         tokenType: 'access',

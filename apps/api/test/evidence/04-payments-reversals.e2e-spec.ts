@@ -62,19 +62,19 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     // Login Managing Partner (Super Admin)
     const adminLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
-      .send({ identifier: '9876543210', password: 'Admin@Kumaran2026' });
+      .send({ phone: '9876543210', password: 'Admin@Kumaran2026' });
     superAdminToken = adminLogin.body.data.accessToken;
 
     // Login Checker Partner (Super Admin)
     const checkerLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
-      .send({ identifier: '9876543211', password: 'Admin@Kumaran2026' });
+      .send({ phone: '9876543211', password: 'Admin@Kumaran2026' });
     checkerToken = checkerLogin.body.data.accessToken;
 
     // Login Branch Manager (Maker)
     const bmLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
-      .send({ identifier: '9876543212', password: 'Admin@Kumaran2026' });
+      .send({ phone: '9876543212', password: 'Admin@Kumaran2026' });
     branchManagerToken = bmLogin.body.data.accessToken;
   }, 30000);
 

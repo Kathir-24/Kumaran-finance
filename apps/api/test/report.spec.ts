@@ -16,7 +16,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const superAdminUser: JwtPayload = {
     sub: 'user-partner-001',
     phone: '9842100001',
-    email: 'partner1@kumaranfinance.com',
     roles: [Role.SUPER_ADMIN],
     branchId: null,
     tokenType: 'access',
@@ -25,7 +24,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const branchManagerUser: JwtPayload = {
     sub: 'user-bm-001',
     phone: '9842100002',
-    email: 'bm@kumaranfinance.com',
     roles: [Role.BRANCH_MANAGER],
     branchId: mockBranchId,
     tokenType: 'access',
@@ -34,7 +32,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const accountantUser: JwtPayload = {
     sub: 'user-acc-001',
     phone: '9842100003',
-    email: 'accountant@kumaranfinance.com',
     roles: [Role.ACCOUNTANT],
     branchId: mockBranchId,
     tokenType: 'access',
@@ -43,7 +40,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const collectionAgentUser: JwtPayload = {
     sub: 'user-agent-001',
     phone: '9842100004',
-    email: 'agent@kumaranfinance.com',
     roles: [Role.COLLECTION_AGENT],
     branchId: mockBranchId,
     tokenType: 'access',
@@ -52,7 +48,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const customerUser: JwtPayload = {
     sub: 'user-cust-001',
     phone: '9842143210',
-    email: 'customer@gmail.com',
     roles: [Role.CUSTOMER],
     branchId: null,
     tokenType: 'access',
@@ -61,7 +56,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
   const auditorUser: JwtPayload = {
     sub: 'user-auditor-001',
     phone: '9842100005',
-    email: 'auditor@ca-firm.com',
     roles: [Role.AUDITOR],
     branchId: null,
     tokenType: 'access',

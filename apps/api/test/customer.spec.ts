@@ -294,7 +294,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const staffPayload = {
         sub: 'staff-user-001',
         phone: '9876543210',
-        email: 'staff@kumaranfinance.com',
         roles: [Role.SUPER_ADMIN],
         branchId: mockBranchId,
         tokenType: 'access' as const,
@@ -310,7 +309,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const customerPayload = {
         sub: mockCustomerId,
         phone: '9842712345',
-        email: null,
         roles: [Role.CUSTOMER],
         branchId: mockBranchId,
         tokenType: 'access' as const,
@@ -324,7 +322,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const customerPayload = {
         sub: 'different-customer-id',
         phone: '9842799999',
-        email: null,
         roles: [Role.CUSTOMER],
         branchId: mockBranchId,
         tokenType: 'access' as const,
@@ -401,7 +398,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const customerPayload = {
         sub: mockCustomerId,
         phone: '9842712345',
-        email: null,
         roles: [Role.CUSTOMER],
         branchId: mockBranchId,
         tokenType: 'access' as const,
@@ -428,7 +424,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const staffPayload = {
         sub: 'staff-user-001',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         roles: [Role.SUPER_ADMIN],
         branchId: mockBranchId,
         tokenType: 'access' as const,
@@ -446,7 +441,6 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       const customerPayload = {
         sub: 'different-customer-id',
         phone: '9842799999',
-        email: null,
         roles: [Role.CUSTOMER],
         branchId: mockBranchId,
         tokenType: 'access' as const,

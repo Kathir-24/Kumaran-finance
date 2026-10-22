@@ -28,59 +28,50 @@ export async function seedBranchAndUsers(prisma: PrismaClient) {
     {
       phone: '9876543210',
       name: 'P. Kumaran (Managing Partner)',
-      email: 'kumaran@kumaranfinance.com',
       roles: [Role.SUPER_ADMIN],
     },
     {
       phone: '9876543211',
       name: 'K. Senthil (Operations Partner / Checker)',
-      email: 'senthil@kumaranfinance.com',
       roles: [Role.SUPER_ADMIN],
     },
     {
       phone: '9876543217',
       name: 'A. Velusamy (Finance Partner)',
-      email: 'velusamy@kumaranfinance.com',
       roles: [Role.SUPER_ADMIN],
     },
     {
       phone: '9876543218',
       name: 'R. Selvaraj (Compliance Partner)',
-      email: 'selvaraj@kumaranfinance.com',
       roles: [Role.SUPER_ADMIN],
     },
     // Branch Manager (Maker for auction entries & onboarding)
     {
       phone: '9876543212',
       name: 'M. Rajendran (Branch Manager)',
-      email: 'manager.prd@kumaranfinance.com',
       roles: [Role.BRANCH_MANAGER],
     },
     // Desk Accountant (Maker for receipts, vouchers, day closure)
     {
       phone: '9876543213',
       name: 'S. Priya (Desk Accountant)',
-      email: 'accounts@kumaranfinance.com',
       roles: [Role.ACCOUNTANT],
     },
     // Field Collection Agents (Doorstep mobile app)
     {
       phone: '9876543214',
       name: 'R. Murugan (Field Collection Agent - Perundurai Route)',
-      email: 'murugan.agent@kumaranfinance.com',
       roles: [Role.COLLECTION_AGENT],
     },
     {
       phone: '9876543215',
       name: 'V. Karthik (Field Collection Agent - Erode Route)',
-      email: 'karthik.agent@kumaranfinance.com',
       roles: [Role.COLLECTION_AGENT],
     },
     // Statutory Auditor (Read-only Compliance)
     {
       phone: '9876543216',
       name: 'CA V. Natarajan (Statutory Auditor)',
-      email: 'auditor@natarajanca.com',
       roles: [Role.AUDITOR],
     },
   ];
@@ -98,7 +89,6 @@ export async function seedBranchAndUsers(prisma: PrismaClient) {
         branchId: branch.id,
         name: staff.name,
         phone: staff.phone,
-        email: staff.email,
         passwordHash: defaultPasswordHash,
         mpinHash: defaultMpinHash,
         roles: staff.roles,

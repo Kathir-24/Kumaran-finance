@@ -58,7 +58,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -75,7 +74,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() });
 
       const result = await authService.login({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: rawPassword,
       });
 
@@ -93,7 +92,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -110,7 +108,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
 
       await expect(
         authService.login({
-          identifier: '9876543210',
+          phone: '9876543210',
           password: 'WrongPassword123!',
         }),
       ).rejects.toThrow(UnauthorizedException);
@@ -122,7 +120,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Deactivated Staff',
         phone: '9876543210',
-        email: 'staff@kumaranfinance.com',
         passwordHash,
         roles: [Role.COLLECTION_AGENT],
         isActive: false,
@@ -139,7 +136,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
 
       await expect(
         authService.login({
-          identifier: '9876543210',
+          phone: '9876543210',
           password: rawPassword,
         }),
       ).rejects.toThrow(UnauthorizedException);
@@ -154,7 +151,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -170,7 +166,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.findFirst.mockResolvedValue(mockUserWithTotp);
 
       const loginResult = await authService.login({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: rawPassword,
       });
 
@@ -186,7 +182,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -204,7 +199,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.update.mockResolvedValue(mockUserWithTotp);
 
       const loginResult = await authService.login({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: rawPassword,
       });
 
@@ -227,7 +222,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -244,7 +238,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.findUnique.mockResolvedValue(mockUserWithTotp);
 
       const loginResult = await authService.login({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: rawPassword,
       });
 
@@ -264,7 +258,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         branchId: mockBranchId,
         name: 'Kumaran Partner Admin',
         phone: '9876543210',
-        email: 'admin@kumaranfinance.com',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
         isActive: true,
@@ -281,7 +274,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.update.mockResolvedValue(mockUser);
 
       const loginRes = await authService.login({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: rawPassword,
       });
 
@@ -377,7 +370,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
   describe('5. User Device FCM Push Token Registration', () => {
     const mockUser = {
       id: mockUserId,
-      email: 'agent@kumaran.in',
       phone: '9842143210',
       roles: [Role.COLLECTION_AGENT],
       isActive: true,
@@ -388,7 +380,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.findUnique.mockResolvedValue(mockUser);
       prismaMock.user.update.mockResolvedValue({
         id: mockUserId,
-        email: 'agent@kumaran.in',
         roles: [Role.COLLECTION_AGENT],
         fcmToken: mockToken,
         updatedAt: new Date(),
@@ -409,7 +400,6 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock.user.findUnique.mockResolvedValue(mockUser);
       prismaMock.user.update.mockResolvedValue({
         id: mockUserId,
-        email: 'agent@kumaran.in',
         roles: [Role.COLLECTION_AGENT],
         fcmToken: null,
         updatedAt: new Date(),

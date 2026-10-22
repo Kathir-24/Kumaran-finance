@@ -66,7 +66,7 @@ describe('Evidence Suite 2: Customer Intake, KYC, Nominees & Anti-BOLA (e2e)', (
     const adminLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: 'Admin@Kumaran2026',
       });
     superAdminToken = adminLogin.body.data.accessToken;
@@ -75,7 +75,7 @@ describe('Evidence Suite 2: Customer Intake, KYC, Nominees & Anti-BOLA (e2e)', (
     const accLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({
-        identifier: '9876543213',
+        phone: '9876543213',
         password: 'Admin@Kumaran2026',
       });
     accountantToken = accLogin.body.data.accessToken;

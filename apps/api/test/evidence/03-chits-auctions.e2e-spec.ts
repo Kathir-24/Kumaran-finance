@@ -63,7 +63,7 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({
-        identifier: '9876543210',
+        phone: '9876543210',
         password: 'Admin@Kumaran2026',
       });
     superAdminToken = loginRes.body.data.accessToken;

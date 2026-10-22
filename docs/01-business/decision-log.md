@@ -153,3 +153,13 @@
      - **Field Collection Agents (`COLLECTION_AGENT`)**: Primarily Mobile App (1-second fingerprint unlock, doorstep collections, offline SQLite auto-sync, push/SMS receipts).
      - **Customers (`CUSTOMER`)**: Primarily Mobile App (bilingual passbook, 1-tap UPI payment via GPay/PhonePe/Paytm, auction results).
      - **Dual-Role Staff (`[COLLECTION_AGENT, ACCOUNTANT]`)**: Mobile App on collection rounds; Web Portal or Mobile App at office desk.
+
+
+---
+
+### ADR-18: Phone-Only Identity Architecture & Complete Email Elimination (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: Kumaran Finance operates as a physical branch chit fund in Perundurai, Erode. The 4 Managing Partners, desk accountant, field collection agents, and all chit subscribers interact exclusively using **10-digit Indian mobile phone numbers** (`^[6-9]\d{9}$`). Staff and subscribers do not possess or use company email accounts for daily operations, receipts, or approvals.
+- **Architectural Decision**:
+  1. **Sole Communication & Login Handle**: `phone` is the single, non-nullable, unique identity across both staff (`User`) and subscribers (`Customer`).
+  2. **Total Elimination of Email**: The `email` column is dropped entirely from the database schema (`User` table), JWT token payloads, API request DTOs (`LoginDto`), and user profile responses.
+  3. **Strict Phone Validation**: Authentication endpoints (`POST /auth/web/login`, `POST /auth/mobile/login-mpin`) enforce 10-digit Indian mobile regex matching (`REGEX_INDIAN_PHONE`). Ambiguous `identifier` fields accepting email are permanently eliminated.

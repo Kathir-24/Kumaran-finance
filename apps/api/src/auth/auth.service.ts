@@ -29,7 +29,6 @@ export interface SanitizedUser {
   id: string;
   name: string;
   phone: string;
-  email: string | null;
   roles: string[];
   branchId: string | null;
   isTotpEnabled: boolean;
@@ -53,7 +52,6 @@ export class AuthService {
       id: user.id,
       name: user.name,
       phone: user.phone,
-      email: user.email,
       roles: user.roles,
       branchId: user.branchId,
       isTotpEnabled: user.isTotpEnabled,
@@ -63,13 +61,13 @@ export class AuthService {
   }
 
   /**
-   * Authenticates staff using username/email/phone + password.
+   * Authenticates staff using 10-digit mobile phone number + password.
    * If TOTP 2FA is active, returns a short-lived tempToken for 2FA step.
    */
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findFirst({
       where: {
-        OR: [{ phone: dto.identifier }, { email: dto.identifier }],
+        phone: dto.phone,
       },
     });
 
@@ -87,7 +85,6 @@ export class AuthService {
       const tempPayload: JwtPayload = {
         sub: user.id,
         phone: user.phone,
-        email: user.email,
         roles: user.roles,
         branchId: user.branchId,
         tokenType: 'totp_pending',
@@ -337,7 +334,6 @@ export class AuthService {
       data: { fcmToken: fcmToken || null },
       select: {
         id: true,
-        email: true,
         roles: true,
         fcmToken: true,
         updatedAt: true,
@@ -386,7 +382,6 @@ export class AuthService {
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
-      email: user.email,
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'access',
@@ -395,7 +390,6 @@ export class AuthService {
     const refreshPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
-      email: user.email,
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'refresh',

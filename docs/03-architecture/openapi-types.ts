@@ -75,7 +75,7 @@ export interface paths {
         put?: never;
         /**
          * Office staff credentials login
-         * @description Authenticates staff via phone/email and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.
+         * @description Authenticates staff via 10-digit Indian mobile number and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.
          */
         post: operations["AuthController_login_v1"];
         delete?: never;
@@ -1767,11 +1767,6 @@ export interface components {
              */
             phone: string;
             /**
-             * @description Email address
-             * @example sengottaiyan@kumaranfinance.com
-             */
-            email: Record<string, never> | null;
-            /**
              * @description Assigned system roles
              * @example [
              *       "SUPER_ADMIN"
@@ -1815,10 +1810,10 @@ export interface components {
         };
         LoginDto: {
             /**
-             * @description Registered mobile number (10 digits) or staff email address
+             * @description Registered 10-digit Indian mobile number
              * @example 9876543210
              */
-            identifier: string;
+            phone: string;
             /**
              * @description Staff password (min 6 characters)
              * @example Admin@Kumaran2026
@@ -1919,11 +1914,6 @@ export interface components {
              * @example 9842100001
              */
             phone: string;
-            /**
-             * @description Email address
-             * @example sengottaiyan@kumaranfinance.com
-             */
-            email: Record<string, never> | null;
             /**
              * @description Assigned system roles
              * @example [

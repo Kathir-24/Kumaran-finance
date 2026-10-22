@@ -83,7 +83,7 @@
     },
     "/api/v1/auth/web/login": {
       "post": {
-        "description": "Authenticates staff via phone/email and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.",
+        "description": "Authenticates staff via 10-digit Indian mobile number and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.",
         "operationId": "AuthController_login_v1",
         "parameters": [],
         "requestBody": {
@@ -6776,12 +6776,6 @@
             "example": "9842100001",
             "description": "Primary mobile number"
           },
-          "email": {
-            "type": "object",
-            "example": "sengottaiyan@kumaranfinance.com",
-            "description": "Email address",
-            "nullable": true
-          },
           "roles": {
             "type": "array",
             "example": [
@@ -6827,7 +6821,6 @@
           "id",
           "name",
           "phone",
-          "email",
           "roles",
           "branchId",
           "isTotpEnabled",
@@ -6866,10 +6859,10 @@
       "LoginDto": {
         "type": "object",
         "properties": {
-          "identifier": {
+          "phone": {
             "type": "string",
             "example": "9876543210",
-            "description": "Registered mobile number (10 digits) or staff email address"
+            "description": "Registered 10-digit Indian mobile number"
           },
           "password": {
             "type": "string",
@@ -6878,7 +6871,7 @@
           }
         },
         "required": [
-          "identifier",
+          "phone",
           "password"
         ]
       },
@@ -7023,12 +7016,6 @@
             "example": "9842100001",
             "description": "Primary mobile number"
           },
-          "email": {
-            "type": "object",
-            "example": "sengottaiyan@kumaranfinance.com",
-            "description": "Email address",
-            "nullable": true
-          },
           "roles": {
             "type": "array",
             "example": [
@@ -7084,7 +7071,6 @@
           "id",
           "name",
           "phone",
-          "email",
           "roles",
           "branchId",
           "isTotpEnabled",

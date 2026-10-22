@@ -50,7 +50,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Office staff credentials login',
     description:
-      'Authenticates staff via phone/email and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.',
+      'Authenticates staff via 10-digit Indian mobile number and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.',
   })
   @ApiOkResponseEnvelope(AuthTokensResponseDto, {
     description: 'Login successful (returns JWT tokens) or 2FA challenge issued (returns tempToken)',

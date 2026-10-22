@@ -109,7 +109,7 @@ describe('Evidence Suite 1: Authentication, Security Headers & Session Protocol 
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/web/login')
         .send({
-          identifier: '9876543210',
+          phone: '9876543210',
           password: 'Admin@Kumaran2026',
         });
 
@@ -156,7 +156,7 @@ describe('Evidence Suite 1: Authentication, Security Headers & Session Protocol 
   // 2. REQUEST VALIDATION
   // ===========================================================================
   describe('Category 2: Request Input Validation', () => {
-    it('TC-VAL-01: Rejects login with missing mandatory identifier', async () => {
+    it('TC-VAL-01: Rejects login with missing mandatory phone', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/web/login')
         .send({
@@ -166,14 +166,14 @@ describe('Evidence Suite 1: Authentication, Security Headers & Session Protocol 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
       expect(res.body.error.details).toBeDefined();
-      expect(res.body.error.details.some((d: string) => d.includes('Identifier'))).toBe(true);
+      expect(res.body.error.details.some((d: string) => d.includes('Phone'))).toBe(true);
     });
 
     it('TC-VAL-02: Rejects login with password shorter than 6 characters', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/web/login')
         .send({
-          identifier: '9876543210',
+          phone: '9876543210',
           password: '123',
         });
 
@@ -186,7 +186,7 @@ describe('Evidence Suite 1: Authentication, Security Headers & Session Protocol 
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/web/login')
         .send({
-          identifier: '9876543210',
+          phone: '9876543210',
           password: 'Admin@Kumaran2026',
           maliciousRoleInject: 'SUPER_ADMIN',
         });

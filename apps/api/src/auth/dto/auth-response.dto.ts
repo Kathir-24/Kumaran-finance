@@ -25,9 +25,6 @@ export class SanitizedUserDto {
   @ApiProperty({ example: '9842100001', description: 'Primary mobile number' })
   phone: string;
 
-  @ApiProperty({ example: 'sengottaiyan@kumaranfinance.com', description: 'Email address', nullable: true })
-  email?: string | null;
-
   @ApiProperty({
     enum: Role,
     isArray: true,
