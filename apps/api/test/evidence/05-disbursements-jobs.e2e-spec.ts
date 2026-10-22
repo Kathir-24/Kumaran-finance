@@ -267,5 +267,76 @@ describe('Evidence Suite 5: Prize Disbursements, Safety Proof & Jobs DTOs (e2e)'
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
+
+    it('TC-JOB-01: Retrieves BullMQ queue health report (GET /api/v1/jobs/queue-status)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/jobs/queue-status')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('TC-JOB-02: Retrieves dispatched notification audit logs (GET /api/v1/jobs/notification-audit-logs)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/jobs/notification-audit-logs?limit=25')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('TC-JOB-03: Retrieves active repeatable cron schedules (GET /api/v1/jobs/repeatable-schedules)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/jobs/repeatable-schedules')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('TC-JOB-04: Manually triggers pre-auction scan (POST /api/v1/jobs/run-pre-auction-scan)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/jobs/run-pre-auction-scan')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('TC-JOB-05: Enqueues daily arrears to BullMQ queue (POST /api/v1/jobs/enqueue-daily-arrears)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/jobs/enqueue-daily-arrears')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('jobId');
+      expect(res.body.data).toHaveProperty('status', 'ENQUEUED');
+    });
+
+    it('TC-JOB-06: Enqueues reconciliation to BullMQ queue (POST /api/v1/jobs/enqueue-reconciliation)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/jobs/enqueue-reconciliation')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          records: [
+            {
+              gatewayOrderId: 'ORDER-E2E-TEST-001',
+              gatewayPaymentId: 'pay_test_001',
+              amount: 5000,
+              status: 'SUCCESS',
+              settledAt: new Date().toISOString(),
+            },
+          ],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('jobId');
+    });
   });
 });
