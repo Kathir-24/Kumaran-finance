@@ -47,6 +47,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout Source Code
@@ -79,11 +88,19 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec prisma db seed
 
-      - name: Run Unit & Financial Invariant Tests
+      - name: Run Unit & Financial Invariant Tests (278 tests)
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
         run: pnpm test
+
+      - name: Run End-to-End (E2E) Integration Tests (82 tests)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: pnpm run test:e2e
 
       - name: Compile NestJS Application
         run: pnpm --filter api run build
@@ -126,6 +143,6 @@ jobs:
 
 The repository must enforce the following GitHub branch protections:
 1. **Require status checks to pass before merging**:
-   - `Lint, Test & Validate` job must be green.
+   - `Lint, Test & Validate` job must be green (enforces 100% pass across all **360 tests: 278 Unit + 82 E2E**, with zero oxlint warnings).
 2. **Require linear history**: Fast-forward merges or squashed commits only.
 3. **No direct pushes**: All changes must arrive via reviewed pull requests.

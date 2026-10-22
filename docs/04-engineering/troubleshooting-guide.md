@@ -251,6 +251,34 @@ The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transacti
 
 ---
 
+## Category I: Windows Developer Environment & SQL Diagnostics
+
+### I.1. Windows Docker CLI Named Pipe Error (`pipe/dockerDesktopLinuxEngine`)
+- **Symptoms**: `docker ps` returns:
+  `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`
+- **Root Cause**: The Docker CLI context on Windows defaulted to an orphaned desktop endpoint (`desktop-linux`) rather than the active system engine (`default`).
+- **Remedy**:
+  ```powershell
+  # Switch Docker CLI context to default
+  docker context use default
+
+  # Verify containers are visible
+  docker ps
+  ```
+
+### I.2. PostgreSQL Reserved Keyword Conflict on `"User"` Table
+- **Symptoms**: Executing `SELECT count(*) FROM User;` returns `1` instead of the actual number of seeded staff users (9).
+- **Root Cause**: In PostgreSQL, `User` without double quotes is an internal system pseudo-function returning the current database user (`current_user` = `chitflow`, 1 row).
+- **Remedy**:
+  - Always quote the table name as `public."User"`:
+    ```powershell
+    # Query via standard input piping in PowerShell
+    'SELECT count(*) FROM public."User";' | docker exec -i chitflow-db psql -U chitflow -d chitflow_dev
+    ```
+  - Prisma ORM automatically quotes model names as `"User"` in generated queries.
+
+---
+
 ## 2. Nuclear Clean Slate Runbook (Reset in < 60 Seconds)
 
 If the local development environment enters an irrecoverable state, run this sequence to restore a verified clean state:

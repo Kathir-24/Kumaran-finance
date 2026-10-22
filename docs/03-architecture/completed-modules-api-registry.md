@@ -1,9 +1,9 @@
 # Kumaran Chits — Completed Modules API & 6-Persona RBAC Registry
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Current Status**: **Modules 1, 2, 3, 4, 5, 6, 7, and 8 Complete**  
+> **Current Status**: **All 10 Modules, 3 System Components & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**120 / 120 passing tests**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**360 / 360 passing tests: 278 Unit + 82 E2E**).
 
 ---
 
@@ -11,18 +11,22 @@
 
 | Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
 |---|---|:---:|---|:---:|
-| **Foundation, DevOps & DX** | `/health`, `/` | 2 | PostgreSQL 17, Port 5433, Nginx TLS 1.3, SSE unbuffered reverse proxy, Nightly S3 backup cron | 3 passing |
+| **Foundation, Health & Metrics** | `/health`, `/`, `/metrics` | 3 | PostgreSQL 17, Port 5433, Redis 7, MinIO S3, Prometheus APM Telemetry | 3 unit passing |
 | **Module 1: Auth & Staff Identity** | `/auth` | 11 | bcrypt (salt 12), RFC 6238 TOTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 15 passing |
 | **Module 2: Customer & KYC Intake** | `/customers` | 8 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), Anti-IDOR FCM device push | 20 passing |
-| **Module 3: Chit Groups & Intake** | `/chits` | 6 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool | 16 passing |
-| **Module 4: In-Office Auctions** | `/auctions` | 7 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker | 16 passing |
+| **Module 3: Chit Groups & Intake** | `/chits` | 7 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool | 16 passing |
+| **Module 4: In-Office Auctions** | `/auctions` | 8 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker | 16 passing |
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
 | **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
 | **Module 8: Prize Disbursements** | `/disbursements` | 6 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout | 11 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
-| **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 13 passing |
-| **TOTAL VERIFIED SCOPE** | — | **54** | **All Invariants 100% Satisfied** | **120 / 120 PASSING** |
+| **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
+| **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | 80mm receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
+| **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board UI | 25 passing |
+| **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
+| **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
+| **TOTAL VERIFIED SCOPE** | — | **88 (89 ops)** | **All Invariants 100% Satisfied** | **360 / 360 PASSING** |
 
 ---
 
@@ -282,9 +286,9 @@
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **86 paths / 89 operations fully implemented, documented, and tested** (61 domain module routes + 1 storage route + 4 PDF routes + 9 background jobs & queue monitor routes + health & root routes).
+- **Total Production Endpoints**: **88 physical endpoints across 86 paths / 89 operations fully implemented, documented, and tested** (61 domain module routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes).
 - **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 89 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **278 unit tests passing across 20 test suites + 76 E2E tests passing across 10 suites (354 / 354 total tests, 100% pass rate)**.
+- **Automated Test Coverage**: **278 unit tests passing across 20 test suites + 82 E2E tests passing across 10 suites (360 / 360 total tests, 100% pass rate)**.
 
 
 

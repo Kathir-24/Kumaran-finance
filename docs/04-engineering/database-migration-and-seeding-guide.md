@@ -201,6 +201,22 @@ cd apps\api
 pnpm exec prisma db seed
 ```
 
+### 5.5 Production Seeding Safety Guard
+To prevent accidental corruption of real Perundurai subscriber records, [`apps/api/prisma/seed.ts`](file:///u:/Kumaran-finance/apps/api/prisma/seed.ts) features an **immutable safety guard** at the entry of `main()`:
+```typescript
+const targetUrl = process.env.DATABASE_URL || '';
+const isProduction =
+  process.env.NODE_ENV === 'production' ||
+  targetUrl.toLowerCase().includes('prod') ||
+  targetUrl.toLowerCase().includes('kumaran-prod');
+
+if (isProduction) {
+  console.error('❌ [Safety Guard] Refusing to run deterministic seed in PRODUCTION environment.');
+  process.exit(1);
+}
+```
+If `pnpm exec prisma db seed` is run against a live production database or with `NODE_ENV=production`, the process immediately halts with exit code 1.
+
 ---
 
 ## 6. Migration Reset & Disaster Recovery (Local Dev)
