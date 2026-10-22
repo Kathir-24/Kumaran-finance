@@ -24,7 +24,8 @@
     "db:backup:s3": "pnpm --filter api exec ts-node scripts/backup-to-s3.ts",
     "db:restore:s3": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts",
     "db:backups:list": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts --list",
-    "db:drp:drill": "pnpm --filter api exec ts-node scripts/drp-drill.ts"
+    "db:drp:drill": "pnpm --filter api exec ts-node scripts/drp-drill.ts",
+    "codegen:types": "openapi-typescript docs/03-architecture/openapi-spec.json -o docs/03-architecture/openapi-types.ts"
   },
   "keywords": [
     "chit-fund",
@@ -33,5 +34,8 @@
     "tamil-nadu"
   ],
   "author": "Kumaran Finance",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0"
+  }
 }
