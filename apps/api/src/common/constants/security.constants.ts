@@ -34,11 +34,13 @@ export const THROTTLE_AUTH_LIMIT = isDev ? 1_000 : 5;
 export const THROTTLE_OTP_TTL_MS = isDev ? 60_000 : 300_000;
 export const THROTTLE_OTP_LIMIT = isDev ? 1_000 : 5;
 
-/** Default allowed web frontend origins */
-export const DEFAULT_CORS_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-];
+/** Allowed web frontend origins (configurable via CORS_ALLOWED_ORIGINS in .env) */
+export const DEFAULT_CORS_ORIGINS = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+  : [
+      'http://localhost:3000',
+      'http://localhost:3001',
+    ];
 
 /** Permitted HTTP request headers for cross-origin calls */
 export const CORS_ALLOWED_HEADERS = [

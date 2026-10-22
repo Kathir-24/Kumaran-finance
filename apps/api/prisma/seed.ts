@@ -7,6 +7,19 @@ import { seedScenarios } from './seeders/04-scenarios.seeder';
 const prisma = new PrismaClient();
 
 async function main() {
+  const targetUrl = process.env.DATABASE_URL || '';
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    targetUrl.toLowerCase().includes('prod') ||
+    targetUrl.toLowerCase().includes('kumaran-prod');
+
+  if (isProduction) {
+    console.error('❌ [Safety Guard] Refusing to run deterministic seed in PRODUCTION environment.');
+    console.error('   Seeding fake demo data into a live branch database causes financial corruption.');
+    console.error(`   Target URL: ${targetUrl.replace(/:[^:@]+@/, ':****@')}`);
+    process.exit(1);
+  }
+
   console.log('================================================================');
   console.log('🌱 Starting Kumaran Chits Comprehensive Database Seed (All N Scenarios)');
   console.log('================================================================');

@@ -6,12 +6,13 @@
 
 export interface EnvironmentVariables {
   PORT: number;
-  NODE_ENV: 'development' | 'production' | 'test';
+  NODE_ENV: 'development' | 'production' | 'test' | 'staging';
   API_PREFIX: string;
   DATABASE_URL: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
   REFRESH_TOKEN_EXPIRES_IN: string;
+  CORS_ALLOWED_ORIGINS?: string;
   DEFAULT_FOREMAN_COMMISSION_PERCENT: number;
   PRIMARY_BRANCH_CODE: string;
   STORAGE_DRIVER: 'local' | 's3';
@@ -44,6 +45,10 @@ export interface EnvironmentVariables {
   SMS_MAX_RETRIES?: number;
   SMS_RETRY_BASE_DELAY_MS?: number;
   SMS_REQUEST_TIMEOUT_MS?: number;
+  PUSH_DRIVER?: 'mock' | 'firebase';
+  FIREBASE_PROJECT_ID?: string;
+  FIREBASE_CLIENT_EMAIL?: string;
+  FIREBASE_PRIVATE_KEY?: string;
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
   SENTRY_TRACES_SAMPLE_RATE?: number;
@@ -64,7 +69,7 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     errors.push(`Invalid PORT number: ${String(config.PORT)}`);
   }
 
-  const validEnvironments = ['development', 'production', 'test'];
+  const validEnvironments = ['development', 'production', 'test', 'staging'];
   const nodeEnv = (config.NODE_ENV as string) ?? 'development';
   if (!validEnvironments.includes(nodeEnv)) {
     errors.push(`Invalid NODE_ENV: ${nodeEnv}. Must be one of: ${validEnvironments.join(', ')}`);
@@ -126,12 +131,13 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
 
   return {
     PORT: port,
-    NODE_ENV: nodeEnv as 'development' | 'production' | 'test',
+    NODE_ENV: nodeEnv as 'development' | 'production' | 'test' | 'staging',
     API_PREFIX: (config.API_PREFIX as string) ?? 'api/v1',
     DATABASE_URL: config.DATABASE_URL as string,
     JWT_SECRET: config.JWT_SECRET as string,
     JWT_EXPIRES_IN: (config.JWT_EXPIRES_IN as string) ?? '15m',
     REFRESH_TOKEN_EXPIRES_IN: (config.REFRESH_TOKEN_EXPIRES_IN as string) ?? '7d',
+    CORS_ALLOWED_ORIGINS: config.CORS_ALLOWED_ORIGINS as string | undefined,
     DEFAULT_FOREMAN_COMMISSION_PERCENT: Number(config.DEFAULT_FOREMAN_COMMISSION_PERCENT ?? 4.0),
     PRIMARY_BRANCH_CODE: (config.PRIMARY_BRANCH_CODE as string) ?? 'PRD',
     STORAGE_DRIVER: storageDriver as 'local' | 's3',
@@ -164,6 +170,10 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     SMS_MAX_RETRIES: config.SMS_MAX_RETRIES !== undefined ? Number(config.SMS_MAX_RETRIES) : 2,
     SMS_RETRY_BASE_DELAY_MS: config.SMS_RETRY_BASE_DELAY_MS !== undefined ? Number(config.SMS_RETRY_BASE_DELAY_MS) : 400,
     SMS_REQUEST_TIMEOUT_MS: config.SMS_REQUEST_TIMEOUT_MS !== undefined ? Number(config.SMS_REQUEST_TIMEOUT_MS) : 15000,
+    PUSH_DRIVER: (config.PUSH_DRIVER as string) as 'mock' | 'firebase' | undefined,
+    FIREBASE_PROJECT_ID: config.FIREBASE_PROJECT_ID as string | undefined,
+    FIREBASE_CLIENT_EMAIL: config.FIREBASE_CLIENT_EMAIL as string | undefined,
+    FIREBASE_PRIVATE_KEY: config.FIREBASE_PRIVATE_KEY as string | undefined,
     SENTRY_DSN: config.SENTRY_DSN as string | undefined,
     SENTRY_ENVIRONMENT: (config.SENTRY_ENVIRONMENT as string) ?? nodeEnv,
     SENTRY_TRACES_SAMPLE_RATE: tracesRate,
