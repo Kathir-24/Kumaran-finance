@@ -57,7 +57,7 @@ flowchart TD
 Here are the formal Agile user stories defining every capability the Super Admin partner has across the platform:
 
 ### Module 1: Authentication & Security (M1)
-* **US-1.1 (Web Login & 2FA)**: *As a Partner*, I want to log in to the Web Portal using my registered phone/email, password, and Microsoft Authenticator 6-digit TOTP code, *so that* unauthorized persons cannot access company funds even if they know my password.
+* **US-1.1 (Web Login & 2FA)**: *As a Partner*, I want to log in to the Web Portal using my registered 10-digit mobile phone number, password, and Microsoft Authenticator 6-digit TOTP code, *so that* unauthorized persons cannot access company funds even if they know my password.
 * **US-1.2 (Mobile Biometric Unlock)**: *As a Partner*, I want to unlock the Android app using my fingerprint or 6-digit MPIN in under 1 second, *so that* I can instantly review urgent approvals in the field.
 * **US-1.3 (Remote Session Revocation)**: *As a Partner*, I want to log out and invalidate all active session tokens immediately, *so that* my account remains secure if I misplace my device.
 

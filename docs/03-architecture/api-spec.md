@@ -54,7 +54,7 @@
 | `POST` | `/auth/mobile/set-mpin` | Establish 6-digit MPIN for the registered device | Device Token |
 | `POST` | `/auth/mobile/login-mpin` | Login using Phone + 6-digit MPIN | Public |
 | `POST` | `/auth/mobile/login-biometric` | Login using cryptographic biometric device signature | Public |
-| `POST` | `/auth/web/login` | Office staff login with Username/Email + Password | Public |
+| `POST` | `/auth/web/login` | Office staff login with registered 10-digit Phone Number + Password | Public |
 | `POST` | `/auth/web/verify-totp` | Verify 6-digit Microsoft Authenticator code | Session Token |
 | `POST` | `/auth/refresh-token` | Obtain new 15-minute JWT Access Token | Refresh Token |
 | `POST` | `/auth/logout` | Revoke active session and refresh token (clears `fcmToken`) | Bearer JWT |

@@ -168,7 +168,7 @@ To maintain the leanest possible operational expenditure and eliminate third-par
   - **"Download PDF"**: Generates official A4 PDF formatted with Kumaran Finance letterhead for office filing or printing for a visiting customer.
   - **"Export Excel / CSV"**: Structured tabular export for the CA Auditor to import into Tally or spreadsheet tools.
 - **Mobile App (For Partners on the Move)**:
-  - **"Share Statement / Summary"**: Uses the native Android share sheet to transfer the generated PDF via Bluetooth, Email, or messaging without recurring API costs.
+  - **"Share Statement / Summary"**: Uses the native Android share sheet to transfer the generated PDF via WhatsApp, Bluetooth, or messaging without recurring API costs.
 
 ---
 

@@ -113,7 +113,7 @@ The Web Portal is the high-density workstation for office administration, accoun
 ```text
 apps/web/src/app/
 ├── (auth)/
-│   ├── login/page.tsx                     # Email/Password login
+│   ├── login/page.tsx                     # 10-digit Phone/Password login
 │   └── 2fa/page.tsx                       # RFC 6238 Microsoft Authenticator TOTP verification
 ├── (dashboard)/
 │   ├── layout.tsx                         # Sidebar, Topbar with branch badge, Profile, Inactivity timer

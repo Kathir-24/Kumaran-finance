@@ -66,7 +66,7 @@ flowchart TD
    - High-value collections, cash handovers, prize payout authorizations, or profile changes require re-entering the 6-digit MPIN.
 
 ### 2.2 Office Web Portal Authentication (Admins, Accountants, Managers)
-1. **Credentials**: Email / Username + Strong Password (bcrypt hash with work factor 12).
+1. **Credentials**: Registered 10-digit Indian Mobile Phone + Strong Password (bcrypt hash with work factor 12).
 2. **Mandatory 2FA via Microsoft Authenticator (TOTP)**:
    - Conforms strictly to **RFC 6238** (Time-based One-Time Password algorithm).
    - Staff scans a QR code during initial onboarding into their **Microsoft Authenticator** app.

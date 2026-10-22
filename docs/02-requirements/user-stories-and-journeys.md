@@ -123,7 +123,7 @@ journey
 
 #### US-1.1: Web Login with Microsoft Authenticator 2FA
 - **As a**: Super Admin (Partner), Branch Manager, or Accountant
-- **I want to**: Log into the Web Portal using my Phone/Email, Password, and a 6-digit Microsoft Authenticator rotating code
+- **I want to**: Log into the Web Portal using my registered 10-digit Phone Number, Password, and a 6-digit Microsoft Authenticator rotating code
 - **So that**: Office financial operations are protected by enterprise-grade multi-factor security.
 - **Acceptance Criteria**:
   - **Given** I enter valid credentials on `/auth/web/login`,

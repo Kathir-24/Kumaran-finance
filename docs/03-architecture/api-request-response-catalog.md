@@ -44,7 +44,7 @@
 #### Request Body
 ```json
 {
-  "phoneOrEmail": "9842100001",
+  "phone": "9842100001",
   "password": "Password@123"
 }
 ```
@@ -78,7 +78,6 @@
       "id": "user-uuid-001",
       "name": "K. Sengottaiyan (Managing Partner)",
       "phone": "9842100001",
-      "email": "sengottaiyan@kumaranfinance.com",
       "roles": ["SUPER_ADMIN"],
       "branchId": "branch-prd-001"
     }

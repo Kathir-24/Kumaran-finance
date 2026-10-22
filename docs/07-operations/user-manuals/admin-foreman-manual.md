@@ -11,7 +11,7 @@
 ## 1. Logging In with 2-Factor Authentication (2FA)
 
 1. Open the Web Portal in your browser.
-2. Enter your registered Email / Phone and Password.
+2. Enter your registered 10-digit Mobile Phone Number and Password.
 3. When prompted, open your **Microsoft Authenticator** app on your phone.
 4. Enter the current 6-digit rotating TOTP code.
 5. Select your active Branch Office (e.g., *Head Office - Perundurai*).
