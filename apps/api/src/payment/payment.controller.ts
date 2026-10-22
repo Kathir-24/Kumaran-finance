@@ -21,8 +21,20 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import {
+  ApiCreatedResponseEnvelope,
+  ApiOkResponseEnvelope,
+  ApiPaginatedResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import {
+  BilingualReceiptResponseDto,
+  PaymentDetailResponseDto,
+  PaymentRecordDto,
+  PaymentReversalResponseDto,
+  RecordPaymentResponseDto,
+} from './dto/payment-response.dto';
 import { QueryPaymentDto } from './dto/query-payment.dto';
 import { RejectReversalDto } from './dto/reject-reversal.dto';
 import { RequestReversalDto } from './dto/request-reversal.dto';
@@ -50,7 +62,7 @@ export class PaymentController {
     description:
       'Records discrete payment for an installment due. Enforces ADR-07: Exact Inet matching, single discrete payment, zero partials, zero doubles. Generates bilingual receipt.',
   })
-  @ApiResponse({ status: 201, description: 'Payment recorded and receipt issued' })
+  @ApiCreatedResponseEnvelope(RecordPaymentResponseDto, { description: 'Payment recorded and receipt issued' })
   @ApiResponse({
     status: 400,
     description: 'Partial payment, duplicate payment, or invalid scheme state',
@@ -84,7 +96,7 @@ export class PaymentController {
     description:
       'List payments filtered by ticket, customer, scheme, mode, date range, or status. Customers are scoped strictly to their own payments.',
   })
-  @ApiResponse({ status: 200, description: 'Payments list returned' })
+  @ApiPaginatedResponseEnvelope(PaymentRecordDto, { description: 'Payments list returned' })
   async queryPayments(
     @Query() query: QueryPaymentDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -106,7 +118,7 @@ export class PaymentController {
     description:
       'Retrieves single payment details including allocation, installment due, receipt, and reversal status. Customers scoped strictly to self.',
   })
-  @ApiResponse({ status: 200, description: 'Payment record returned' })
+  @ApiOkResponseEnvelope(PaymentDetailResponseDto, { description: 'Payment record returned' })
   @ApiResponse({
     status: 403,
     description: 'Customer attempting to access another member record',
@@ -133,8 +145,7 @@ export class PaymentController {
     description:
       'Returns formatted bilingual receipt (English + தமிழ்) matching approved template with whole-rupee breakdown, chit code, ticket number, and collector details.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(BilingualReceiptResponseDto, {
     description: 'Bilingual receipt data and formatted text layout',
   })
   @ApiResponse({
@@ -157,8 +168,7 @@ export class PaymentController {
     description:
       'Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Requires Checker approval by Super Admin.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(PaymentReversalResponseDto, {
     description: 'Payment reversal requested successfully',
   })
   @ApiResponse({
@@ -183,8 +193,7 @@ export class PaymentController {
     description:
       'Approves payment reversal, updates Payment to REVERSED, restores InstallmentDue strictly to UNPAID, and logs AuditLog. Strictly enforces Maker != Checker (maker_user_id != checker_user_id).',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(PaymentReversalResponseDto, {
     description:
       'Payment reversal approved and installment restored to UNPAID',
   })
@@ -215,8 +224,7 @@ export class PaymentController {
     description:
       'Rejects reversal request and retains payment in SUCCESS status. Strictly enforces Maker != Checker.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(PaymentReversalResponseDto, {
     description: 'Payment reversal request rejected',
   })
   @ApiResponse({ status: 400, description: 'No pending reversal request found' })
@@ -238,3 +246,4 @@ export class PaymentController {
     );
   }
 }
+

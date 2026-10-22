@@ -282,7 +282,9 @@
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **74 fully implemented and tested endpoints** (61 domain module routes + 1 storage route + 4 PDF routes + 8 background jobs & queue monitor routes).
-- **Automated Test Coverage**: **203 / 203 tests passing across 16 test suites (100% pass rate)**.
+- **Total Production Endpoints**: **86 paths / 89 operations fully implemented, documented, and tested** (61 domain module routes + 1 storage route + 4 PDF routes + 9 background jobs & queue monitor routes + health & root routes).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 89 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **278 unit tests passing across 20 test suites + 76 E2E tests passing across 10 suites (354 / 354 total tests, 100% pass rate)**.
+
 
 

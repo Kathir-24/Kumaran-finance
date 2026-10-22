@@ -20,6 +20,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import {
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
+import {
   DAILY_MAINTENANCE_QUEUE,
   JOB_DISPATCH_AUCTION_REMINDER,
   JOB_PROCESS_DAILY_ARREARS,
@@ -27,13 +30,22 @@ import {
   NOTIFICATION_QUEUE,
   RECONCILIATION_QUEUE,
 } from './constants/queue-names.constant';
+import {
+  DailyArrearsExecutionResultDto,
+  EnqueuedJobResponseDto,
+  NotificationLogItemDto,
+  PreAuctionScanResultDto,
+  QueueStatusReportDto,
+  ReconciliationResultDto,
+  RepeatableScheduleDto,
+} from './dto/jobs-response.dto';
+import { ReconcileSettlementDto } from './dto/reconcile-settlement.dto';
+import { SendAuctionReminderDto } from './dto/send-auction-reminder.dto';
 import { BullMqQueueProvider } from './providers/bullmq-queue.provider';
 import { AuctionReminderSchedulerService } from './services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from './services/daily-arrears.service';
 import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
-import { ReconcileSettlementDto } from './dto/reconcile-settlement.dto';
-import { SendAuctionReminderDto } from './dto/send-auction-reminder.dto';
 
 @ApiTags('Background Jobs & Daily Maintenance')
 @ApiBearerAuth('JWT-auth')
@@ -63,7 +75,7 @@ export class JobsController {
     type: String,
     description: 'ISO date string to test past or future due dates',
   })
-  @ApiResponse({ status: 200, description: 'Daily arrears execution summary returned' })
+  @ApiOkResponseEnvelope(DailyArrearsExecutionResultDto, { description: 'Daily arrears execution summary returned' })
   async runDailyArrears(@Query('cutoffDate') cutoffDate?: string) {
     const cutoff = cutoffDate ? new Date(cutoffDate) : undefined;
     return this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
@@ -81,7 +93,7 @@ export class JobsController {
     type: String,
     description: 'ISO date string to test past or future due dates',
   })
-  @ApiResponse({ status: 200, description: 'Daily arrears job enqueued to BullMQ' })
+  @ApiOkResponseEnvelope(EnqueuedJobResponseDto, { description: 'Daily arrears job enqueued to BullMQ' })
   async enqueueDailyArrears(@Query('cutoffDate') cutoffDate?: string) {
     return this.queueProvider.addJob(DAILY_MAINTENANCE_QUEUE, JOB_PROCESS_DAILY_ARREARS, {
       cutoffDate,
@@ -94,7 +106,7 @@ export class JobsController {
     summary: 'Trigger payment settlement reconciliation',
     description: 'Reconciles payment records against gateway provider settlement data to resolve ghost drops.',
   })
-  @ApiResponse({ status: 200, description: 'Reconciliation summary returned' })
+  @ApiOkResponseEnvelope(ReconciliationResultDto, { description: 'Reconciliation summary returned' })
   async runReconciliation(@Body() dto: ReconcileSettlementDto) {
     const records = (dto.records || []).map((r) => ({
       gatewayOrderId: r.gatewayOrderId,
@@ -112,7 +124,7 @@ export class JobsController {
     summary: 'Enqueue reconciliation job to BullMQ queue',
     description: 'Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.',
   })
-  @ApiResponse({ status: 200, description: 'Reconciliation job enqueued to BullMQ' })
+  @ApiOkResponseEnvelope(EnqueuedJobResponseDto, { description: 'Reconciliation job enqueued to BullMQ' })
   async enqueueReconciliation(@Body() dto: ReconcileSettlementDto) {
     return this.queueProvider.addJob(RECONCILIATION_QUEUE, JOB_RUN_DAILY_RECONCILIATION, {
       records: dto.records || [],
@@ -125,7 +137,7 @@ export class JobsController {
     summary: 'Broadcast bilingual auction reminder to chit subscribers',
     description: 'Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.',
   })
-  @ApiResponse({ status: 200, description: 'Auction reminder broadcast job enqueued' })
+  @ApiOkResponseEnvelope(EnqueuedJobResponseDto, { description: 'Auction reminder broadcast job enqueued' })
   async sendAuctionReminder(
     @Param('chitGroupId') chitGroupId: string,
     @Param('month', ParseIntPipe) month: number,
@@ -149,6 +161,7 @@ export class JobsController {
   @ApiOperation({
     summary: 'Get BullMQ queue health and job counts',
   })
+  @ApiOkResponseEnvelope(QueueStatusReportDto, { isArray: true, description: 'BullMQ queue health reports' })
   async getQueueStatus() {
     return this.queueProvider.getQueueStatusReports();
   }
@@ -165,6 +178,7 @@ export class JobsController {
     example: 50,
     description: 'Number of recent notification logs to retrieve (defaults to 50)',
   })
+  @ApiOkResponseEnvelope(NotificationLogItemDto, { isArray: true, description: 'Notification audit logs' })
   getNotificationLogs(@Query('limit') limit?: number) {
     return this.notificationService.getSentNotificationLog(limit ? Number(limit) : 50);
   }
@@ -181,6 +195,7 @@ export class JobsController {
     type: String,
     description: 'ISO date string to test a specific auction date',
   })
+  @ApiOkResponseEnvelope(PreAuctionScanResultDto, { description: 'Pre-auction scan completed' })
   async runPreAuctionScan(@Query('targetDate') targetDate?: string) {
     const date = targetDate ? new Date(targetDate) : undefined;
     return this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(date);
@@ -191,7 +206,9 @@ export class JobsController {
   @ApiOperation({
     summary: 'List active BullMQ repeatable cron jobs and next execution timestamps',
   })
+  @ApiOkResponseEnvelope(RepeatableScheduleDto, { isArray: true, description: 'Active repeatable schedules' })
   async getRepeatableSchedules() {
     return this.queueProvider.getRepeatableJobs();
   }
 }
+

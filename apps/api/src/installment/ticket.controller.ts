@@ -22,6 +22,15 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import {
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
+import {
+  DefaulterItemResponseDto,
+  InstallmentDueResponseDto,
+  PassbookResponseDto,
+  RemoveDefaulterResponseDto,
+} from './dto/installment-response.dto';
 import { RemoveDefaulterDto } from './dto/remove-defaulter.dto';
 import { InstallmentService } from './installment.service';
 
@@ -47,7 +56,7 @@ export class TicketController {
     type: Number,
     description: 'Minimum consecutive unpaid months threshold (default: 1)',
   })
-  @ApiResponse({ status: 200, description: 'Defaulters list retrieved' })
+  @ApiOkResponseEnvelope(DefaulterItemResponseDto, { isArray: true, description: 'Defaulters list retrieved' })
   async getDefaulters(
     @CurrentUser('branchId') branchId?: string | null,
     @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
@@ -74,7 +83,7 @@ export class TicketController {
     description:
       'Returns the full schedule of past and upcoming monthly dues (Gross, Dividend deduction, Net payable, Paid amount, Status). Customers can only view their own ticket. Allowed: All authenticated personas.',
   })
-  @ApiResponse({ status: 200, description: 'Ticket dues schedule retrieved' })
+  @ApiOkResponseEnvelope(InstallmentDueResponseDto, { isArray: true, description: 'Ticket dues schedule retrieved' })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async getTicketDues(
     @Param('ticketId') ticketId: string,
@@ -103,7 +112,7 @@ export class TicketController {
     description:
       'Provides a complete passbook statement from Month 1 to N, including cumulative gross dues, dividends earned, net payable, payments made, and current outstanding balance. Customers are restricted to their own ticket. Allowed: All authenticated personas.',
   })
-  @ApiResponse({ status: 200, description: 'Passbook statement retrieved' })
+  @ApiOkResponseEnvelope(PassbookResponseDto, { description: 'Passbook statement retrieved' })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async getPassbook(
     @Param('ticketId') ticketId: string,
@@ -126,8 +135,7 @@ export class TicketController {
     description:
       'Executes company removal rights when a subscriber has defaulted on 3 or more consecutive monthly installments (consecutiveUnpaidMonths >= 3). Transitions ticket status to REMOVED_DEF_3M. Allowed strictly: Super Admin (Partners).',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
     description: 'Subscriber ticket successfully removed for 3-month default',
   })
   @ApiResponse({
@@ -147,3 +155,4 @@ export class TicketController {
     );
   }
 }
+

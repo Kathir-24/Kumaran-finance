@@ -19,8 +19,20 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import {
+  ApiCreatedResponseEnvelope,
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { CollectionService } from './collection.service';
 import { AcknowledgeHandoverDto } from './dto/acknowledge-handover.dto';
+import {
+  AgentDueItemResponseDto,
+  CashHandoverBatchResponseDto,
+  CollectionRecordResponseDto,
+  DailyCollectionSummaryResponseDto,
+  HandoverAcknowledgementResponseDto,
+  SyncOfflineQueueResponseDto,
+} from './dto/collection-response.dto';
 import { QueryCollectionDto } from './dto/query-collection.dto';
 import { RecordCollectionDto } from './dto/record-collection.dto';
 import { SubmitHandoverDto } from './dto/submit-handover.dto';
@@ -48,7 +60,7 @@ export class CollectionController {
     description:
       'Returns pending subscriber dues for doorstep collection with customer code, name, address, and net payable amount. Allowed: Staff and Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Agent dues retrieved' })
+  @ApiOkResponseEnvelope(AgentDueItemResponseDto, { isArray: true, description: 'Agent dues retrieved' })
   async getAgentDues(
     @CurrentUser('sub') userId: string,
     @CurrentUser('branchId') branchId?: string | null,
@@ -69,7 +81,7 @@ export class CollectionController {
     description:
       'Records discrete single monthly installment collection. Strictly rejects partial payments or double payments (ADR-07). Generates sequential bilingual receipt and sets cashHandoverStatus. Allowed: Collection Agent, Desk Staff.',
   })
-  @ApiResponse({ status: 201, description: 'Collection recorded & receipt generated' })
+  @ApiCreatedResponseEnvelope(CollectionRecordResponseDto, { description: 'Collection recorded & receipt generated' })
   @ApiResponse({
     status: 400,
     description: 'Partial payment or duplicate payment rejected',
@@ -99,8 +111,7 @@ export class CollectionController {
     description:
       'Processes an offline queue of doorstep collections (1 to 100 items). Features item-level failure isolation and idempotency deduplication. Ineligible/conflicting payments are rejected with granular error codes without failing the entire batch. Allowed: Collection Agent, Desk Staff, Super Admin.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(SyncOfflineQueueResponseDto, {
     description: 'Batch sync completed with summary and item results',
   })
   async syncOfflineQueue(
@@ -128,7 +139,7 @@ export class CollectionController {
     description:
       'Summarizes total collections, cash pending handover, vault deposits, and digital payments for today. Collection agents see only their own collections. Allowed: Staff and Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Daily summary retrieved' })
+  @ApiOkResponseEnvelope(DailyCollectionSummaryResponseDto, { description: 'Daily summary retrieved' })
   async getDailySummary(
     @Query() query: QueryCollectionDto,
     @CurrentUser('sub') userId: string,
@@ -150,7 +161,7 @@ export class CollectionController {
     description:
       'Aggregates all unhanded cash collections recorded by the field agent. Allowed: Collection Agent, Super Admin.',
   })
-  @ApiResponse({ status: 200, description: 'Cash handover batch submitted' })
+  @ApiOkResponseEnvelope(CashHandoverBatchResponseDto, { description: 'Cash handover batch submitted' })
   async submitHandover(
     @CurrentUser('sub') collectorUserId: string,
     @Body() dto?: SubmitHandoverDto,
@@ -166,8 +177,7 @@ export class CollectionController {
     description:
       'Physically counts notes and signs off cash into branch vault. STRICTLY ENFORCES: collector_user_id != acknowledger_user_id. The agent who collected cash can NEVER acknowledge their own cash. Allowed: Super Admin, Branch Manager, Accountant.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(HandoverAcknowledgementResponseDto, {
     description: 'Cash handover acknowledged into vault',
   })
   @ApiResponse({
@@ -184,3 +194,4 @@ export class CollectionController {
     );
   }
 }
+

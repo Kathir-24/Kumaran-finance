@@ -24,9 +24,22 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import {
+  ApiCreatedResponseEnvelope,
+  ApiOkResponseEnvelope,
+  ApiPaginatedResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
+import { ActionSuccessResponseDto } from '../common/dto/action-success.dto';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
+import {
+  CustomerDetailResponseDto,
+  CustomerFcmUpdateResponseDto,
+  CustomerListItemDto,
+  CustomerResponseDto,
+  NomineeResponseDto,
+} from './dto/customer-response.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { UpdateCustomerFcmTokenDto } from './dto/update-customer-fcm-token.dto';
@@ -49,7 +62,7 @@ export class CustomerController {
     description:
       'Creates a customer record with auto-generated KC-CUST-XXXXX code, bilingual names, and masked Aadhaar (last 4 digits). Allowed: Super Admin, Branch Manager, Collection Agent.',
   })
-  @ApiResponse({ status: 201, description: 'Customer created successfully' })
+  @ApiCreatedResponseEnvelope(CustomerResponseDto, { description: 'Customer created successfully' })
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
   async create(
     @Body() dto: CreateCustomerDto,
@@ -71,7 +84,7 @@ export class CustomerController {
     description:
       'Returns paginated customer list with keyword search (name, phone, code) and optional KYC status filter. Allowed: Staff, Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Customer list retrieved' })
+  @ApiPaginatedResponseEnvelope(CustomerListItemDto, { description: 'Customer list retrieved' })
   async findAll(@Query() query: QueryCustomerDto) {
     return this.customerService.findAll(query);
   }
@@ -90,7 +103,7 @@ export class CustomerController {
     description:
       'Returns complete customer profile with linked nominees, active chits, and KYC documents. Allowed: Staff, or Customer viewing own profile.',
   })
-  @ApiResponse({ status: 200, description: 'Customer profile found' })
+  @ApiOkResponseEnvelope(CustomerDetailResponseDto, { description: 'Customer profile found' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async findOne(
     @Param('id') id: string,
@@ -117,7 +130,7 @@ export class CustomerController {
     description:
       'Updates contact numbers, address, and profile details. Allowed: Super Admin, Branch Manager.',
   })
-  @ApiResponse({ status: 200, description: 'Customer updated successfully' })
+  @ApiOkResponseEnvelope(CustomerResponseDto, { description: 'Customer updated successfully' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async update(
     @Param('id') id: string,
@@ -139,7 +152,7 @@ export class CustomerController {
     description:
       'Registers a verified nominee with relationship, phone, and masked Aadhaar. Allowed: Staff, or Customer for self.',
   })
-  @ApiResponse({ status: 201, description: 'Nominee added successfully' })
+  @ApiCreatedResponseEnvelope(NomineeResponseDto, { description: 'Nominee added successfully' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async addNominee(
     @Param('id') customerId: string,
@@ -166,7 +179,7 @@ export class CustomerController {
     summary: 'Remove a linked nominee',
     description: 'Deletes a nominee record. Allowed: Super Admin, Branch Manager.',
   })
-  @ApiResponse({ status: 200, description: 'Nominee removed successfully' })
+  @ApiOkResponseEnvelope(ActionSuccessResponseDto, { description: 'Nominee removed successfully' })
   @ApiResponse({ status: 404, description: 'Nominee not found' })
   async removeNominee(
     @Param('id') customerId: string,
@@ -182,7 +195,7 @@ export class CustomerController {
     description:
       'Approves or revokes KYC verification for customer profile. Allowed: Super Admin, Branch Manager, Accountant.',
   })
-  @ApiResponse({ status: 200, description: 'KYC status updated' })
+  @ApiOkResponseEnvelope(CustomerResponseDto, { description: 'KYC status updated' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async updateKycStatus(
     @Param('id') id: string,
@@ -203,7 +216,7 @@ export class CustomerController {
     description:
       'Registers or clears subscriber device Firebase Cloud Messaging push token for digital passbook receipt alerts and auction reminders. Allowed: Super Admin, Branch Manager, Collection Agent, or Customer self-service.',
   })
-  @ApiResponse({ status: 200, description: 'Customer FCM token updated successfully' })
+  @ApiOkResponseEnvelope(CustomerFcmUpdateResponseDto, { description: 'Customer FCM token updated successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden: Customers can only update own token' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async updateFcmToken(
@@ -225,3 +238,4 @@ export class CustomerController {
     return this.customerService.updateFcmToken(id, dto.fcmToken);
   }
 }
+

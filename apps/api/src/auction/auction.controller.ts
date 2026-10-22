@@ -23,7 +23,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import {
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { AuctionService } from './auction.service';
+import {
+  AuctionDetailResponseDto,
+  AuctionMinutesDto,
+  AuctionResponseDto,
+  EligibleBidderResponseDto,
+  FinalizeAuctionResponseDto,
+  MarkMinutesFiledResponseDto,
+} from './dto/auction-response.dto';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
@@ -52,7 +63,7 @@ export class AuctionController {
     description:
       'Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: All authenticated personas.',
   })
-  @ApiResponse({ status: 200, description: 'Auctions retrieved successfully' })
+  @ApiOkResponseEnvelope(AuctionResponseDto, { isArray: true, description: 'Auctions retrieved successfully' })
   async getGroupAuctions(@Param('chitGroupId') chitGroupId: string) {
     return this.auctionService.getGroupAuctions(chitGroupId);
   }
@@ -71,7 +82,7 @@ export class AuctionController {
     description:
       'Returns auction status, winning ticket, tied bidders, and statutory minutes. Allowed: All authenticated personas.',
   })
-  @ApiResponse({ status: 200, description: 'Auction retrieved successfully' })
+  @ApiOkResponseEnvelope(AuctionDetailResponseDto, { description: 'Auction retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async findOne(@Param('id') id: string) {
     return this.auctionService.findOne(id);
@@ -90,7 +101,7 @@ export class AuctionController {
     type: Number,
     description: 'Installment month (required if ID is ChitGroup UUID)',
   })
-  @ApiResponse({ status: 200, description: 'Eligible bidders list retrieved' })
+  @ApiOkResponseEnvelope(EligibleBidderResponseDto, { isArray: true, description: 'Eligible bidders list retrieved' })
   async getEligibleBidders(
     @Param('id') id: string,
     @Query('month') month?: string,
@@ -113,7 +124,7 @@ export class AuctionController {
     type: Number,
     description: 'Installment month (required if ID is ChitGroup UUID)',
   })
-  @ApiResponse({ status: 200, description: 'Bid recorded successfully' })
+  @ApiOkResponseEnvelope(AuctionResponseDto, { description: 'Bid recorded successfully' })
   @ApiResponse({
     status: 400,
     description: 'Ceiling exceeded or defaulter violation',
@@ -148,7 +159,7 @@ export class AuctionController {
     type: Number,
     description: 'Installment month (required if ID is ChitGroup UUID)',
   })
-  @ApiResponse({ status: 200, description: 'Tie-break recorded successfully' })
+  @ApiOkResponseEnvelope(AuctionResponseDto, { description: 'Tie-break recorded successfully' })
   async recordTieBreak(
     @Param('id') id: string,
     @Body() dto: RecordTieBreakDto,
@@ -176,7 +187,7 @@ export class AuctionController {
     type: Number,
     description: 'Installment month (required if ID is ChitGroup UUID)',
   })
-  @ApiResponse({ status: 200, description: 'Tie-break recorded successfully' })
+  @ApiOkResponseEnvelope(AuctionResponseDto, { description: 'Tie-break recorded successfully' })
   async recordTieBreakAlias(
     @Param('id') id: string,
     @Body() dto: RecordTieBreakDto,
@@ -194,7 +205,7 @@ export class AuctionController {
     description:
       'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.',
   })
-  @ApiResponse({ status: 200, description: 'Auction successfully finalized' })
+  @ApiOkResponseEnvelope(FinalizeAuctionResponseDto, { description: 'Auction successfully finalized' })
   @ApiResponse({
     status: 403,
     description: 'Maker-Checker separation violated',
@@ -214,7 +225,7 @@ export class AuctionController {
     description:
       'Retrieves Form XVII statutory auction proceedings record with attendee count, discount, dividend, and Foreman signature flag. Allowed: Staff and Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Auction minutes retrieved' })
+  @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Auction minutes retrieved' })
   @ApiResponse({ status: 404, description: 'Minutes not found' })
   async getMinutes(@Param('id') auctionId: string) {
     return this.auctionService.getAuctionMinutes(auctionId);
@@ -227,7 +238,7 @@ export class AuctionController {
     description:
       'Returns formatted statutory auction minutes for printable dispatch and audit recordkeeping.',
   })
-  @ApiResponse({ status: 200, description: 'Minutes text layout retrieved' })
+  @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Minutes text layout retrieved' })
   async getMinutesPdf(@Param('id') auctionId: string) {
     return this.auctionService.getAuctionMinutes(auctionId);
   }
@@ -239,7 +250,7 @@ export class AuctionController {
     description:
       'Records official government challan/acknowledgement reference, filing date, and staff notes.',
   })
-  @ApiResponse({ status: 200, description: 'Minutes marked as filed successfully' })
+  @ApiOkResponseEnvelope(MarkMinutesFiledResponseDto, { description: 'Minutes marked as filed successfully' })
   @ApiResponse({ status: 400, description: 'Auction not finalized or minutes not found' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async markMinutesFiled(
@@ -250,3 +261,4 @@ export class AuctionController {
     return this.auctionService.markMinutesFiled(auctionId, dto, currentUser.sub);
   }
 }
+

@@ -1,0 +1,75 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { DisbursementMode } from '@prisma/client';
+
+export class WinnerDisbursementItemDto {
+  @ApiProperty({ example: 'winner-uuid-001', description: 'Winner record ID' })
+  id: string;
+
+  @ApiProperty({ example: 'auc-uuid-001', description: 'Auction ID' })
+  auctionId: string;
+
+  @ApiProperty({ example: 'ticket-uuid-001', description: 'Prized ticket ID' })
+  ticketId: string;
+
+  @ApiProperty({ example: 'PENDING_VERIFICATION', description: 'Safety proof and settlement workflow state' })
+  disbursementStatus: string;
+
+  @ApiProperty({ enum: DisbursementMode, example: DisbursementMode.BANK_TRANSFER_NEFT, description: 'Authorized payment mode', nullable: true })
+  disbursementMode?: DisbursementMode | null;
+
+  @ApiProperty({ example: 75000, description: 'Prize money amount in whole Rupees', nullable: true })
+  disbursedAmount?: number | null;
+
+  @ApiProperty({ example: 'UTR-NEFT-12345678', description: 'Bank UTR or Cheque number', nullable: true })
+  disbursementReference?: string | null;
+
+  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Payout release timestamp', nullable: true })
+  disbursedAt?: Date | string | null;
+
+  @ApiProperty({ description: 'Auction and scheme details' })
+  auction?: any;
+
+  @ApiProperty({ description: 'Subscriber ticket details' })
+  ticket?: any;
+}
+
+export class SafetyProofVerificationResponseDto {
+  @ApiProperty({ example: 'Safety proof verified successfully and marked ready for authorization', description: 'Status message' })
+  message: string;
+
+  @ApiProperty({ type: WinnerDisbursementItemDto, description: 'Updated winner settlement record' })
+  winner: WinnerDisbursementItemDto;
+}
+
+export class DisbursementAuthorizationResponseDto {
+  @ApiProperty({ example: 'Payout voucher authorized successfully', description: 'Status message' })
+  message: string;
+
+  @ApiProperty({ type: WinnerDisbursementItemDto, description: 'Authorized winner settlement record' })
+  winner: WinnerDisbursementItemDto;
+}
+
+export class DisbursementReleaseResponseDto {
+  @ApiProperty({ example: 'Prize payout released successfully', description: 'Status message' })
+  message: string;
+
+  @ApiProperty({ type: WinnerDisbursementItemDto, description: 'Released winner settlement record' })
+  winner: WinnerDisbursementItemDto;
+}
+
+export class BilingualVoucherResponseDto {
+  @ApiProperty({ example: 'KC-VCHR-202610-00001', description: 'Voucher number' })
+  voucherNumber: string;
+
+  @ApiProperty({ example: true, description: 'Bilingual flag' })
+  isBilingual: boolean;
+
+  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Voucher issue timestamp' })
+  issuedAt: Date | string;
+
+  @ApiProperty({ description: 'Structured voucher parameters' })
+  data: any;
+
+  @ApiProperty({ description: 'A4 / A5 monospace formatted voucher layout' })
+  formattedText: string;
+}

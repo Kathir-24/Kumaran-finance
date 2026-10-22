@@ -21,8 +21,19 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import {
+  ApiOkResponseEnvelope,
+  ApiPaginatedResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { DisbursementService } from './disbursement.service';
 import { AuthorizePayoutDto } from './dto/authorize-payout.dto';
+import {
+  BilingualVoucherResponseDto,
+  DisbursementAuthorizationResponseDto,
+  DisbursementReleaseResponseDto,
+  SafetyProofVerificationResponseDto,
+  WinnerDisbursementItemDto,
+} from './dto/disbursement-response.dto';
 import { QueryDisbursementDto } from './dto/query-disbursement.dto';
 import { ReleasePayoutDto } from './dto/release-payout.dto';
 import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
@@ -49,7 +60,7 @@ export class DisbursementController {
     description:
       'Returns prize winners, disbursement statuses, payout modes, and release references. Allowed: Staff and Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Disbursements list returned' })
+  @ApiPaginatedResponseEnvelope(WinnerDisbursementItemDto, { description: 'Disbursements list returned' })
   async queryDisbursements(
     @Query() query: QueryDisbursementDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -71,7 +82,7 @@ export class DisbursementController {
     description:
       'Returns winner details, safety checklist status, authorized payout mode, and release timestamps. Customers scoped strictly to self.',
   })
-  @ApiResponse({ status: 200, description: 'Winner disbursement details returned' })
+  @ApiOkResponseEnvelope(WinnerDisbursementItemDto, { description: 'Winner disbursement details returned' })
   @ApiResponse({ status: 403, description: 'Customer attempting to access another member record' })
   @ApiResponse({ status: 404, description: 'Auction or winner not found' })
   async getWinnerDisbursement(
@@ -92,7 +103,7 @@ export class DisbursementController {
     description:
       'Records verification of signed agreements, signed blank cheques, promissory notes, and scanned documents. Transitions status from PENDING_VERIFICATION to VERIFIED_BY_MAKER.',
   })
-  @ApiResponse({ status: 200, description: 'Safety proof verified and ready for authorization' })
+  @ApiOkResponseEnvelope(SafetyProofVerificationResponseDto, { description: 'Safety proof verified and ready for authorization' })
   @ApiResponse({ status: 400, description: 'Auction not finalized or invalid status transition' })
   @ApiResponse({ status: 404, description: 'Auction or winner not found' })
   async verifySafetyProof(
@@ -115,7 +126,7 @@ export class DisbursementController {
     description:
       'Authorizes prize payout mode (Cheque, NEFT/RTGS/IMPS, Cash) and whole-rupee amount. Enforces Maker != Checker (verifiedByUserId != authorizedByUserId) and blocks Branch Manager.',
   })
-  @ApiResponse({ status: 200, description: 'Payout voucher authorized successfully' })
+  @ApiOkResponseEnvelope(DisbursementAuthorizationResponseDto, { description: 'Payout voucher authorized successfully' })
   @ApiResponse({ status: 400, description: 'Safety proof not verified yet or invalid transition' })
   @ApiResponse({ status: 403, description: 'Maker-Checker violation or insufficient role' })
   @ApiResponse({ status: 404, description: 'Auction or winner not found' })
@@ -140,7 +151,7 @@ export class DisbursementController {
     description:
       'Records transaction reference (Cheque number, Bank UTR, or Cash voucher) and release timestamp. Transitions status to DISBURSED.',
   })
-  @ApiResponse({ status: 200, description: 'Prize payout released successfully' })
+  @ApiOkResponseEnvelope(DisbursementReleaseResponseDto, { description: 'Prize payout released successfully' })
   @ApiResponse({ status: 400, description: 'Payout not authorized yet' })
   @ApiResponse({ status: 404, description: 'Auction or winner not found' })
   async releasePayout(
@@ -168,7 +179,7 @@ export class DisbursementController {
     description:
       'Returns formatted bilingual prize payout voucher with whole-rupee calculation breakdown, payout mode, transaction reference, and sign-off blocks. Customers scoped strictly to self.',
   })
-  @ApiResponse({ status: 200, description: 'Bilingual payout voucher data and text layout' })
+  @ApiOkResponseEnvelope(BilingualVoucherResponseDto, { description: 'Bilingual payout voucher data and text layout' })
   @ApiResponse({ status: 403, description: 'Customer attempting to access another member voucher' })
   @ApiResponse({ status: 404, description: 'Auction or winner not found' })
   async getBilingualVoucher(
@@ -178,3 +189,4 @@ export class DisbursementController {
     return this.disbursementService.getBilingualVoucher(auctionId, currentUser);
   }
 }
+

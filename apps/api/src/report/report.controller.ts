@@ -20,6 +20,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import {
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
 import { QueryDashboardDto } from './dto/query-dashboard.dto';
@@ -28,6 +31,16 @@ import { QueryDefaultersReportDto } from './dto/query-defaulters-report.dto';
 import { QueryFormXviiDto } from './dto/query-form-xvii.dto';
 import { QueryFormXxiDto } from './dto/query-form-xxi.dto';
 import { QueryPendingApprovalsDto } from './dto/query-pending-approvals.dto';
+import {
+  AuditLogsReportResponseDto,
+  DayBookReportResponseDto,
+  DefaultersReportResponseDto,
+  ExecutiveDashboardKpiResponseDto,
+  FormXviiReportResponseDto,
+  FormXxiReportResponseDto,
+  FormXxiiReportResponseDto,
+  PendingApprovalsResponseDto,
+} from './dto/report-response.dto';
 import { ReportService } from './report.service';
 
 @ApiTags('Dashboards & Statutory Reports')
@@ -46,7 +59,7 @@ export class ReportController {
     description:
       'Provides high-level operational overview: active chits, collections by mode, prize payouts, vault cash balance, pending handovers, and arrears aging buckets. Scoped to branch for Branch Manager.',
   })
-  @ApiResponse({ status: 200, description: 'Executive dashboard metrics returned' })
+  @ApiOkResponseEnvelope(ExecutiveDashboardKpiResponseDto, { description: 'Executive dashboard metrics returned' })
   async getDashboard(
     @Query() query: QueryDashboardDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -61,8 +74,7 @@ export class ReportController {
     description:
       'Aggregates pending operational items requiring partner or branch manager action: unacknowledged cash handovers, prize disbursement authorizations, payment reversal requests, and pending safety proof verifications. Scoped to branch for Branch Manager.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(PendingApprovalsResponseDto, {
     description: 'Aggregated pending approvals queue returned',
   })
   async getPendingApprovals(
@@ -78,6 +90,18 @@ export class ReportController {
     summary: 'Real-Time Server-Sent Events (SSE) Stream for Pending Approvals',
     description:
       'Streams live pending approval counters and alerts to web dashboard and mobile app via SSE every 15 seconds. Scoped to user branch permissions.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Live Server-Sent Events stream emitting approval summary events',
+    content: {
+      'text/event-stream': {
+        schema: {
+          type: 'string',
+          example: 'data: {"type":"APPROVALS_UPDATE","summary":{"totalPendingCount":3},"timestamp":"2026-10-22T07:28:14.000Z"}\n\n',
+        },
+      },
+    },
   })
   streamPendingApprovals(
     @Query() query: QueryPendingApprovalsDto,
@@ -108,7 +132,7 @@ export class ReportController {
     description:
       'Aggregates ALL payment modes (Cash, UPI, Bank Transfer, Cheques) for a given date. Displays receipts, vouchers, payment mode breakdowns, and net cash flow.',
   })
-  @ApiResponse({ status: 200, description: 'Day book journal returned' })
+  @ApiOkResponseEnvelope(DayBookReportResponseDto, { description: 'Day book journal returned' })
   async getDayBook(
     @Query() query: QueryDayBookDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -123,7 +147,7 @@ export class ReportController {
     description:
       'Daily register strictly isolating physical currency notes and coins in the branch safe / vault. Enforces Closing Cash in Safe = Opening Cash + Cash Inflows - Cash Outflows.',
   })
-  @ApiResponse({ status: 200, description: 'Cash book register returned' })
+  @ApiOkResponseEnvelope(FormXxiiReportResponseDto, { description: 'Cash book register returned' })
   async getCashBookFormXxii(
     @Query() query: QueryCashBookDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -138,7 +162,7 @@ export class ReportController {
     description:
       'Consolidated chronological record of all auctions for a chit scheme (Months 2 to N-1). Includes winning discounts, 4% commission, dividends, tie-break draws, and statutory proceedings.',
   })
-  @ApiResponse({ status: 200, description: 'Auction minutes register returned' })
+  @ApiOkResponseEnvelope(FormXviiReportResponseDto, { description: 'Auction minutes register returned' })
   async getAuctionMinutesFormXvii(
     @Query() query: QueryFormXviiDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -159,7 +183,7 @@ export class ReportController {
     description:
       'Continuous 20-month schedule of base dues, dividend credits, payments, and arrears per ticket. Customers are strictly restricted to their own ticket passbook statement.',
   })
-  @ApiResponse({ status: 200, description: 'Subscriber ledger returned' })
+  @ApiOkResponseEnvelope(FormXxiReportResponseDto, { description: 'Subscriber ledger returned' })
   async getSubscriberLedgerFormXxi(
     @Query() query: QueryFormXxiDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -180,7 +204,7 @@ export class ReportController {
     description:
       'Lists overdue subscribers categorized into 1-month, 2-month, and 3-month (DEFAULT_3_MONTHS) default buckets. Collection agents use this for field recovery rounds; Super Admin can identify candidates for company removal rights.',
   })
-  @ApiResponse({ status: 200, description: 'Defaulters aging report returned' })
+  @ApiOkResponseEnvelope(DefaultersReportResponseDto, { description: 'Defaulters aging report returned' })
   async getDefaulters(
     @Query() query: QueryDefaultersReportDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -201,7 +225,7 @@ export class ReportController {
     description:
       'Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Customers can view their own account transaction logs only.',
   })
-  @ApiResponse({ status: 200, description: 'Audit trail records returned' })
+  @ApiOkResponseEnvelope(AuditLogsReportResponseDto, { description: 'Audit trail records returned' })
   async getAuditLogs(
     @Query() query: QueryAuditLogsDto,
     @CurrentUser() currentUser: JwtPayload,
@@ -209,3 +233,4 @@ export class ReportController {
     return this.reportService.getAuditLogs(query, currentUser);
   }
 }
+

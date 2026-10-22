@@ -22,7 +22,15 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import {
+  ApiOkResponseEnvelope,
+} from '../common/decorators/api-response-envelope.decorator';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
+import {
+  DefaulterItemResponseDto,
+  GenerateDuesResultResponseDto,
+  InstallmentDueResponseDto,
+} from './dto/installment-response.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
 import { InstallmentService } from './installment.service';
 
@@ -42,7 +50,7 @@ export class InstallmentController {
     description:
       'Returns the list of all members with gross amount, dividend deduction, net payable amount, paid amount, and payment status for that month. Allowed: Staff and Auditor.',
   })
-  @ApiResponse({ status: 200, description: 'Monthly dues retrieved' })
+  @ApiOkResponseEnvelope(InstallmentDueResponseDto, { isArray: true, description: 'Monthly dues retrieved' })
   async getGroupMonthDues(
     @Param('chitGroupId') chitGroupId: string,
     @Param('month', ParseIntPipe) month: number,
@@ -63,8 +71,7 @@ export class InstallmentController {
     description:
       'Calculates universal dividend deduction (Inet = Ibase - Div) across ALL members in that chit group (including auction winner and past winners) and creates or updates InstallmentDue records. Allowed: Super Admin, Branch Manager.',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponseEnvelope(GenerateDuesResultResponseDto, {
     description: 'Monthly dues generated successfully',
   })
   @ApiResponse({
@@ -96,7 +103,7 @@ export class InstallmentController {
     type: Number,
     description: 'Minimum consecutive unpaid months threshold (default: 1)',
   })
-  @ApiResponse({ status: 200, description: 'Defaulters list retrieved' })
+  @ApiOkResponseEnvelope(DefaulterItemResponseDto, { isArray: true, description: 'Defaulters list retrieved' })
   async getDefaultersAlias(
     @CurrentUser('branchId') branchId?: string | null,
     @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
@@ -109,3 +116,4 @@ export class InstallmentController {
     );
   }
 }
+
