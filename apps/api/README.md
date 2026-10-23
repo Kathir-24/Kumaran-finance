@@ -128,8 +128,10 @@ Every engineer and AI assistant contributing to `apps/api/` must strictly uphold
 
 ```text
 apps/api/src/
-├── auth/            # 6-persona identity, 2FA TOTP, JWT, RBAC guards
-├── customer/        # Notebook customer intake & directory
+├── auth/            # 6-persona identity, SMS OTP, MPIN, 2FA TOTP, JWT, RBAC guards
+├── branch/          # Branch office administration (PRD, ERD) & bilingual Tamil names
+├── user/            # Staff user administration, RBAC role assignment & status toggle
+├── customer/        # Customer intake, S3 KYC scans, directory & nominees
 ├── chit/            # Chit schemes, groups, lifecycle & mid-cycle onboarding
 ├── auction/         # In-office auctions, Option A physical token tie-break, Registrar filing
 ├── installment/     # Universal dividend dues generation, digital passbook, defaulters

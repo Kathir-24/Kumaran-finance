@@ -8203,6 +8203,11 @@
             "type": "number",
             "example": 300,
             "description": "OTP expiration period in seconds"
+          },
+          "debugOtp": {
+            "type": "string",
+            "example": "123456",
+            "description": "Generated OTP for automated local testing (only returned when NODE_ENV !== production)"
           }
         },
         "required": [

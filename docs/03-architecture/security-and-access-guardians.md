@@ -70,6 +70,18 @@ At [`StorageController.streamFile()`](file:///u:/Kumaran-finance/apps/api/src/st
 | `vouchers/*` | Winning voucher | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
 | `passbooks/*` | Own passbook | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
 
+### 2.4 Customer KYC Document Upload & 15-Minute Presigned Viewing URLs
+Direct document interactions at [`CustomerController`](file:///u:/Kumaran-finance/apps/api/src/customer/customer.controller.ts) enforce anti-IDOR checks:
+- **Upload (`POST /api/v1/customers/:id/documents`)**:
+  - Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`) can upload identity scans during in-office or doorstep intake.
+  - Subscribers (`CUSTOMER`) can upload identity scans **strictly for their own account** (`currentUser.sub === customerId`). Attempting to upload to a third-party `customerId` throws `403 Forbidden`.
+  - File restrictions: Allowed MIME types (`image/jpeg`, `image/png`, `image/webp`, `application/pdf`), maximum size 10 MB, and path-sanitized key generation (`kyc/{customerId}/{docType}-{uuid}.{ext}`).
+- **Presigned Viewing URL (`GET /api/v1/customers/:id/documents/:docId/url`)**:
+  - Direct S3 bucket access is completely blocked to the public (private AWS S3 bucket).
+  - Time-limited presigned URL generated with strict 900-second (15-minute) TTL.
+  - Field collection agents are blocked (`403 Forbidden`) from viewing customer KYC documents per DPDP Act 2023 least-privilege principles.
+  - Subscribers (`CUSTOMER`) are restricted strictly to viewing their own documents (`currentUser.sub === customerId`).
+
 ---
 
 ## 3. Component 2: Bilingual PDF Canvas Access Guardians

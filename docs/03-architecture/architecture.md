@@ -85,6 +85,7 @@ The backend is built as a single deployable application with strict internal mod
 apps/api/src/
 ├── auction/              # In-office auction recording, physical tie-break, minutes
 ├── auth/                 # Phone-only auth (ADR-18), OTP via DLT, MPIN, TOTP, JWT guards
+├── branch/               # Branch office CRUD, bilingual Tamil names, branch metadata
 ├── chit/                 # Scheme configuration, terms, ongoing chit onboarding
 ├── collection/           # Field collection recording, offline sync, cash handover
 ├── common/               # BigInt interceptor, exception filters, DTO helpers
@@ -100,7 +101,8 @@ apps/api/src/
 ├── pdf/                  # Bilingual PDF canvas engine (80mm receipts, vouchers, Form XVII/XXI)
 ├── prisma/               # Prisma database service & transactions
 ├── report/               # Day book, cash book (Form XXII), statutory registers
-└── storage/              # Encrypted private S3 & local storage driver
+├── storage/              # Encrypted private S3 & local storage driver
+└── user/                 # Staff user administration, RBAC roles, branch links
 ```
 
 ---

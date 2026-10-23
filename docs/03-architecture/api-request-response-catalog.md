@@ -87,8 +87,121 @@
 
 ---
 
-### 2.2 `POST /api/v1/auth/mobile/login-mpin`
-**Description**: Quick mobile unlock with 6-digit MPIN for field collection agents.  
+### 2.2 `POST /api/v1/auth/mobile/request-otp`
+**Description**: Request SMS OTP for mobile onboarding or subscriber login.  
+**Roles**: Public (Throttled: 3 requests / 15 min per IP)
+
+#### Request Body
+```json
+{
+  "phone": "9876543210"
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "success": true,
+    "message": "OTP sent successfully to registered mobile number.",
+    "expiresInSeconds": 300
+  }
+}
+```
+
+---
+
+### 2.3 `POST /api/v1/auth/mobile/verify-otp`
+**Description**: Verify SMS OTP; returns `setupToken` for onboarding or immediate JWT session for customers.  
+**Roles**: Public (Throttled: 5 attempts / 15 min)
+
+#### Request Body
+```json
+{
+  "phone": "9876543210",
+  "otp": "310544"
+}
+```
+
+#### Success Response (Staff Onboarding Mode — `setupToken`)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "verified": true,
+    "setupToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "message": "OTP verified successfully. Please configure your 6-digit MPIN."
+  }
+}
+```
+
+#### Success Response (Customer Login Mode — Session Tokens)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "verified": true,
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "cust-uuid-001",
+      "name": "K. Thangavel",
+      "phone": "9842100101",
+      "roles": ["CUSTOMER"],
+      "branchId": "branch-prd-001"
+    },
+    "message": "OTP verified successfully. Subscriber logged in."
+  }
+}
+```
+
+---
+
+### 2.4 `POST /api/v1/auth/mobile/set-mpin`
+**Description**: Establish or update 6-digit MPIN using `setupToken` (first-time onboarding) or current MPIN.  
+**Roles**: Public with `setupToken` OR Authenticated Staff
+
+#### Request Body
+```json
+{
+  "mpin": "123456",
+  "setupToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "success": true,
+    "message": "6-digit MPIN configured successfully.",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "agent-uuid-001",
+      "name": "Murugan R (Field Agent)",
+      "phone": "9842154321",
+      "roles": ["COLLECTION_AGENT"],
+      "hasMpin": true
+    }
+  }
+}
+```
+
+---
+
+### 2.5 `POST /api/v1/auth/mobile/login-mpin`
+**Description**: Quick mobile unlock with 6-digit MPIN for field collection agents and staff.  
 **Roles**: Public (Throttled: 5 attempts / 15 min)
 
 #### Request Body
@@ -170,9 +283,253 @@
 
 ---
 
-## 4. Module 3: Chit Schemes & Intake (`/chits`)
+### 3.2 `POST /api/v1/customers/:id/documents`
+**Description**: Upload customer KYC verification document (Aadhaar front/back, PAN, Photo, Signature) to private S3 bucket.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`
 
-### 4.1 `POST /api/v1/chits/new`
+#### Request (Multipart Form-Data)
+```text
+POST /api/v1/customers/cust-uuid-001/documents
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary...
+
+------WebKitFormBoundary...
+Content-Disposition: form-data; name="docType"
+
+AADHAAR_FRONT
+------WebKitFormBoundary...
+Content-Disposition: form-data; name="file"; filename="aadhaar_front.jpg"
+Content-Type: image/jpeg
+
+<binary image data>
+------WebKitFormBoundary...--
+```
+
+#### Success Response (HTTP 201)
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "id": "doc-uuid-001",
+    "customerId": "cust-uuid-001",
+    "docType": "AADHAAR_FRONT",
+    "fileName": "aadhaar_front.jpg",
+    "verified": false,
+    "uploadedAt": "2026-10-23T14:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 3.3 `GET /api/v1/customers/:id/documents/:docId/url`
+**Description**: Generate a time-limited 15-minute S3 presigned viewing URL.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `CUSTOMER`, `AUDITOR`
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "url": "https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-uuid-001/AADHAAR_FRONT-xyz.jpg?X-Amz-Expires=900&X-Amz-Signature=...",
+    "expiresInSeconds": 900
+  }
+}
+```
+
+---
+
+## 4. Module 2.1: Company Branch Office Administration (`/branches`)
+
+### 4.1 `POST /api/v1/branches`
+**Description**: Create a new company branch office.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "code": "ERD",
+  "name": "Erode Main Branch",
+  "nameTamil": "ஈரோடு முதன்மை கிளை",
+  "address": "12, Brough Road, Erode - 638001",
+  "phone": "9842143210"
+}
+```
+
+#### Success Response (HTTP 201)
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "id": "branch-uuid-002",
+    "code": "ERD",
+    "name": "Erode Main Branch",
+    "nameTamil": "ஈரோடு முதன்மை கிளை",
+    "address": "12, Brough Road, Erode - 638001",
+    "phone": "9842143210",
+    "isActive": true,
+    "createdAt": "2026-10-23T14:30:00.000Z",
+    "updatedAt": "2026-10-23T14:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 4.2 `GET /api/v1/branches`
+**Description**: List active company branch offices.  
+**Roles**: Authenticated Staff
+
+#### Query Parameters
+- `activeOnly` (optional boolean, e.g. `?activeOnly=true`)
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": [
+    {
+      "id": "branch-uuid-001",
+      "code": "PRD",
+      "name": "Head Office - Perundurai",
+      "nameTamil": "தலைமை கிளை - பெருந்துறை",
+      "address": "14/2, Main Road, Perundurai - 638052",
+      "phone": "9876543210",
+      "isActive": true
+    },
+    {
+      "id": "branch-uuid-002",
+      "code": "ERD",
+      "name": "Erode Main Branch",
+      "nameTamil": "ஈரோடு முதன்மை கிளை",
+      "address": "12, Brough Road, Erode - 638001",
+      "phone": "9842143210",
+      "isActive": true
+    }
+  ]
+}
+```
+
+---
+
+## 5. Module 2.2: Staff User Administration (`/users`)
+
+### 5.1 `POST /api/v1/users`
+**Description**: Create a staff user profile with assigned RBAC roles and branch assignment.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "name": "R. Murugan",
+  "phone": "9842154321",
+  "roles": ["COLLECTION_AGENT"],
+  "branchId": "branch-uuid-002",
+  "password": "Agent@Kumaran2026"
+}
+```
+
+#### Success Response (HTTP 201)
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "id": "user-uuid-002",
+    "name": "R. Murugan",
+    "phone": "9842154321",
+    "roles": ["COLLECTION_AGENT"],
+    "branchId": "branch-uuid-002",
+    "isActive": true,
+    "isTotpEnabled": false,
+    "hasMpin": false,
+    "branch": {
+      "id": "branch-uuid-002",
+      "code": "ERD",
+      "name": "Erode Main Branch",
+      "nameTamil": "ஈரோடு முதன்மை கிளை"
+    },
+    "createdAt": "2026-10-23T14:30:00.000Z",
+    "updatedAt": "2026-10-23T14:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 5.2 `GET /api/v1/users`
+**Description**: Paginated directory of staff users with multi-parameter filtering.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `AUDITOR`
+
+#### Query Parameters
+- `search` (name or phone substring)
+- `role` (enum: `COLLECTION_AGENT`, `ACCOUNTANT`, etc.)
+- `branchId` (UUID string)
+- `isActive` (`"true"` or `"false"`)
+- `page` (default: 1)
+- `limit` (default: 20)
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T14:30:00.000Z",
+  "data": {
+    "data": [
+      {
+        "id": "user-uuid-002",
+        "name": "R. Murugan",
+        "phone": "9842154321",
+        "roles": ["COLLECTION_AGENT"],
+        "isActive": true,
+        "branch": {
+          "code": "ERD",
+          "name": "Erode Main Branch"
+        }
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+### 5.3 `PATCH /api/v1/users/:id/status` & `PATCH /api/v1/users/:id/roles`
+**Description**: Activate/deactivate staff user (deactivation invalidates all active sessions), or reassign RBAC roles.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body (`PATCH /users/:id/status`)
+```json
+{
+  "isActive": false
+}
+```
+
+#### Request Body (`PATCH /users/:id/roles`)
+```json
+{
+  "roles": ["COLLECTION_AGENT", "ACCOUNTANT"]
+}
+```
+
+---
+
+## 6. Module 3: Chit Schemes & Intake (`/chits`)
+
+### 6.1 `POST /api/v1/chits/new`
 **Description**: Create fresh chit scheme starting at Month 1 in DRAFT status.  
 **Roles**: `SUPER_ADMIN`
 

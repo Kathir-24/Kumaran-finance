@@ -244,6 +244,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/mobile/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request 6-digit SMS OTP for mobile device registration or login
+         * @description Dispatches a TRAI DLT-compliant SMS OTP (Template ID 1407169823412093847) to registered phone number for field agents, partners, or customers.
+         */
+        post: operations["AuthController_requestOtp_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mobile/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify 6-digit SMS OTP for mobile device registration or login
+         * @description Validates 6-digit SMS OTP. For subscribers, returns full JWT tokens. For staff, returns an mpin_setup token if first-time setup or full tokens if MPIN is already configured.
+         */
+        post: operations["AuthController_verifyOtp_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/mobile/login-mpin": {
         parameters: {
             query?: never;
@@ -274,14 +314,142 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Set or change 6-digit MPIN
-         * @description Configures 6-digit MPIN hash for quick mobile unlock.
+         * Set or change 6-digit MPIN for mobile quick unlock
+         * @description Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.
          */
         post: operations["AuthController_setMpin_v1"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List company branch offices
+         * @description Returns all registered physical branch offices of Kumaran Finance. Allowed: Staff, Auditor.
+         */
+        get: operations["BranchController_findAll_v1"];
+        put?: never;
+        /**
+         * Create a new company branch office
+         * @description Creates a new physical branch office record for Kumaran Finance. Allowed: Super Admin only.
+         */
+        post: operations["BranchController_create_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get branch details by ID
+         * @description Returns metadata for a specific branch office. Allowed: Staff, Auditor.
+         */
+        get: operations["BranchController_findOne_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search & list staff users with pagination
+         * @description Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager.
+         */
+        get: operations["UserController_findAll_v1"];
+        put?: never;
+        /**
+         * Create a new staff user account
+         * @description Creates a new staff account (e.g. Field Collection Agent, Accountant, Partner) with assigned RBAC roles and default credentials. Allowed: Super Admin only.
+         */
+        post: operations["UserController_create_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get staff user profile by ID
+         * @description Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager.
+         */
+        get: operations["UserController_findOne_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Activate or deactivate a staff user account
+         * @description Enables or disables login access for a staff user. Deactivation immediately revokes active sessions. Allowed: Super Admin only.
+         */
+        patch: operations["UserController_updateStatus_v1"];
+        trace?: never;
+    };
+    "/api/v1/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update assigned RBAC roles for a staff user
+         * @description Modifies RBAC role personas for a staff user account. Allowed: Super Admin only.
+         */
+        patch: operations["UserController_updateRoles_v1"];
         trace?: never;
     };
     "/api/v1/customers": {
@@ -410,6 +578,66 @@ export interface paths {
          * @description Registers or clears subscriber device Firebase Cloud Messaging push token for digital passbook receipt alerts and auction reminders. Allowed: Super Admin, Branch Manager, Collection Agent, or Customer self-service.
          */
         patch: operations["CustomerController_updateFcmToken_v1"];
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload and link a KYC verification document
+         * @description Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.
+         */
+        post: operations["CustomerController_uploadDocument_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/documents/{docId}/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate 15-minute presigned viewing URL for customer KYC scan
+         * @description Returns a secure, time-limited S3 presigned URL for viewing the KYC document. Field agents are excluded per compliance rules; Customers restricted to self.
+         */
+        get: operations["CustomerController_getDocumentUrl_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/file/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream a stored file securely (Local storage driver fallback)
+         * @description Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.
+         */
+        get: operations["StorageController_streamFile_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/chits/new": {
@@ -1453,26 +1681,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/storage/file/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stream a stored file securely (Local storage driver fallback)
-         * @description Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.
-         */
-        get: operations["StorageController_streamFile_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/pdf/receipt/{paymentId}": {
         parameters: {
             query?: never;
@@ -2022,6 +2230,76 @@ export interface components {
              */
             password: string;
         };
+        RequestOtpResponseDto: {
+            /**
+             * @description Whether OTP was successfully dispatched
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example OTP sent successfully to registered mobile number.
+             */
+            message: string;
+            /**
+             * @description OTP expiration period in seconds
+             * @example 300
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Generated OTP for automated local testing (only returned when NODE_ENV !== production)
+             * @example 123456
+             */
+            debugOtp?: string;
+        };
+        RequestOtpDto: {
+            /**
+             * @description Registered 10-digit Indian mobile number of staff or customer
+             * @example 9842154321
+             */
+            phone: string;
+        };
+        VerifyOtpResponseDto: {
+            /**
+             * @description Whether OTP verification was successful
+             * @example true
+             */
+            verified: boolean;
+            /**
+             * @description Scoped setup token for configuring MPIN (issued when first-time staff onboarding)
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            setupToken?: string;
+            /**
+             * @description Full JWT access token (issued for customers or staff with pre-existing MPIN)
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            accessToken?: string;
+            /**
+             * @description Rotating refresh token
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            refreshToken?: string;
+            /** @description Authenticated user or customer profile */
+            user?: components["schemas"]["UserProfileResponseDto"];
+            /**
+             * @description Status message
+             * @example OTP verified successfully.
+             */
+            message: string;
+        };
+        VerifyOtpDto: {
+            /**
+             * @description Registered 10-digit Indian mobile number
+             * @example 9842154321
+             */
+            phone: string;
+            /**
+             * @description 6-digit SMS OTP received on registered device
+             * @example 123456
+             */
+            otp: string;
+        };
         MpinLoginDto: {
             /**
              * @description Registered 10-digit mobile number
@@ -2040,6 +2318,192 @@ export interface components {
              * @example 123456
              */
             mpin: string;
+            /**
+             * @description Temporary setup token returned from verify-otp (required during first-time device registration)
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            setupToken?: string;
+        };
+        BranchResponseDto: {
+            /**
+             * @description Unique branch ID
+             * @example branch-prd-001
+             */
+            id: string;
+            /**
+             * @description Unique branch code
+             * @example PRD
+             */
+            code: string;
+            /**
+             * @description Branch name in English
+             * @example Head Office - Perundurai
+             */
+            name: string;
+            /**
+             * @description Branch name in Tamil
+             * @example தலைமை கிளை - பெருந்துறை
+             */
+            nameTamil: Record<string, never> | null;
+            /**
+             * @description Physical address
+             * @example 142, Erode Main Road, Perundurai - 638052
+             */
+            address: string;
+            /**
+             * @description Contact phone
+             * @example 9876543210
+             */
+            phone: string;
+            /**
+             * @description Whether branch is active
+             * @example true
+             */
+            isActive: boolean;
+            /**
+             * @description Creation timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            createdAt: Record<string, never>;
+            /**
+             * @description Last update timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            updatedAt: Record<string, never>;
+        };
+        CreateBranchDto: {
+            /**
+             * @description Unique uppercase branch code
+             * @example ERD
+             */
+            code: string;
+            /**
+             * @description Official branch name in English
+             * @example Erode Town Branch
+             */
+            name: string;
+            /**
+             * @description Official branch name in Tamil
+             * @example ஈரோடு கிளை
+             */
+            nameTamil?: string;
+            /**
+             * @description Physical street address
+             * @example 12, Brough Road, Erode - 638001
+             */
+            address: string;
+            /**
+             * @description 10-digit Indian phone number
+             * @example 9842143210
+             */
+            phone: string;
+        };
+        UserResponseDto: {
+            /**
+             * @description User unique ID
+             * @example user-uuid-001
+             */
+            id: string;
+            /**
+             * @description Staff name in English
+             * @example R. Murugan
+             */
+            name: string;
+            /**
+             * @description Contact mobile number
+             * @example 9842154321
+             */
+            phone: string;
+            /**
+             * @description Assigned RBAC roles
+             * @example [
+             *       "COLLECTION_AGENT"
+             *     ]
+             */
+            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            /**
+             * @description Whether the staff account is active
+             * @example true
+             */
+            isActive: boolean;
+            /**
+             * @description Whether TOTP 2FA is active
+             * @example false
+             */
+            isTotpEnabled: boolean;
+            /**
+             * @description Whether 6-digit MPIN is configured
+             * @example true
+             */
+            hasMpin: boolean;
+            /**
+             * @description Branch ID
+             * @example branch-prd-001
+             */
+            branchId: Record<string, never> | null;
+            /** @description Assigned branch details */
+            branch: components["schemas"]["BranchSummaryDto"] | null;
+            /**
+             * @description Last login timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            lastLoginAt: Record<string, never> | null;
+            /**
+             * @description Account creation timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            createdAt: Record<string, never>;
+            /**
+             * @description Last update timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            updatedAt: Record<string, never>;
+        };
+        CreateUserDto: {
+            /**
+             * @description Full staff name in English
+             * @example R. Murugan
+             */
+            name: string;
+            /**
+             * @description 10-digit Indian mobile phone number
+             * @example 9842154321
+             */
+            phone: string;
+            /**
+             * @description Assigned RBAC role personas for this staff user
+             * @example [
+             *       "COLLECTION_AGENT"
+             *     ]
+             */
+            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            /**
+             * @description Assigned branch ID. Defaults to Head Office (PRD) if omitted.
+             * @example branch-prd-001
+             */
+            branchId?: string;
+            /**
+             * @description Initial password. Defaults to "Admin@Kumaran2026" if omitted.
+             * @example Admin@Kumaran2026
+             */
+            password?: string;
+        };
+        UpdateUserStatusDto: {
+            /**
+             * @description Active status for staff user account
+             * @example false
+             */
+            isActive: boolean;
+        };
+        UpdateUserRolesDto: {
+            /**
+             * @description Updated RBAC roles for staff account
+             * @example [
+             *       "COLLECTION_AGENT",
+             *       "ACCOUNTANT"
+             *     ]
+             */
+            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
         };
         CustomerResponseDto: {
             /**
@@ -2532,6 +2996,50 @@ export interface components {
              * @enum {string}
              */
             deviceType?: "ANDROID" | "IOS" | "WEB";
+        };
+        CustomerDocumentResponseDto: {
+            /**
+             * @description Document unique ID
+             * @example doc-uuid-001
+             */
+            id: string;
+            /**
+             * @description Customer ID
+             * @example cust-uuid-001
+             */
+            customerId: string;
+            /**
+             * @description Document type
+             * @example AADHAAR_FRONT
+             */
+            docType: string;
+            /**
+             * @description Original file name
+             * @example aadhaar_front.jpg
+             */
+            fileName: string;
+            /**
+             * @description Whether staff verified this document
+             * @example false
+             */
+            verified: boolean;
+            /**
+             * @description Upload timestamp
+             * @example 2026-10-23T10:00:00.000Z
+             */
+            uploadedAt: Record<string, never>;
+        };
+        DocumentPresignedUrlResponseDto: {
+            /**
+             * @description Time-limited 15-minute viewing URL
+             * @example https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...
+             */
+            url: string;
+            /**
+             * @description URL expiration duration in seconds (15 minutes)
+             * @example 900
+             */
+            expiresInSeconds: number;
         };
         ChitGroupResponseDto: {
             /**
@@ -5415,6 +5923,98 @@ export interface operations {
             };
         };
     };
+    AuthController_requestOtp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestOtpDto"];
+            };
+        };
+        responses: {
+            /** @description SMS OTP dispatched successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RequestOtpResponseDto"];
+                    };
+                };
+            };
+            /** @description Phone number not registered */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many OTP requests. Please wait 5 minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_verifyOtp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyOtpDto"];
+            };
+        };
+        responses: {
+            /** @description OTP verified successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["VerifyOtpResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid or expired OTP */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many verification attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AuthController_loginMpin_v1: {
         parameters: {
             query?: never;
@@ -5464,7 +6064,9 @@ export interface operations {
     AuthController_setMpin_v1: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                authorization: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5474,7 +6076,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description MPIN saved successfully */
+            /** @description MPIN saved successfully or full auth tokens issued */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5491,8 +6093,344 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unauthorized — missing or invalid Bearer token */
+            /** @description Unauthorized — missing or invalid setup token / Bearer token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BranchController_findAll_v1: {
+        parameters: {
+            query: {
+                activeOnly: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of branches retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["BranchResponseDto"][];
+                    };
+                };
+            };
+        };
+    };
+    BranchController_create_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBranchDto"];
+            };
+        };
+        responses: {
+            /** @description Branch created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["BranchResponseDto"];
+                    };
+                };
+            };
+            /** @description Branch code already in use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BranchController_findOne_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Branch details retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["BranchResponseDto"];
+                    };
+                };
+            };
+            /** @description Branch not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserController_findAll_v1: {
+        parameters: {
+            query?: {
+                /** @description Search by staff name or phone */
+                search?: string;
+                /** @description Filter by specific staff role */
+                role?: "SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR";
+                /** @description Filter by assigned branch ID */
+                branchId?: string;
+                /** @description Filter by active status ("true" | "false") */
+                isActive?: string;
+                /** @description Page number */
+                page?: number;
+                /** @description Page limit */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff user list retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: {
+                            data: components["schemas"]["UserResponseDto"][];
+                            /** @example 50 */
+                            total: number;
+                            /** @example 1 */
+                            page: number;
+                            /** @example 20 */
+                            limit: number;
+                            /** @example 3 */
+                            totalPages: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    UserController_create_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserDto"];
+            };
+        };
+        responses: {
+            /** @description Staff user created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UserResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid branch or payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Phone number already registered to staff */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserController_findOne_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff user retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UserResponseDto"];
+                    };
+                };
+            };
+            /** @description Staff user not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserController_updateStatus_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserStatusDto"];
+            };
+        };
+        responses: {
+            /** @description Staff user status updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UserResponseDto"];
+                    };
+                };
+            };
+            /** @description Cannot deactivate own account */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Staff user not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UserController_updateRoles_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRolesDto"];
+            };
+        };
+        responses: {
+            /** @description Staff user roles updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UserResponseDto"];
+                    };
+                };
+            };
+            /** @description Cannot revoke own Super Admin role */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Staff user not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5929,6 +6867,169 @@ export interface operations {
                 content?: never;
             };
             /** @description Customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_uploadDocument_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * @example AADHAAR_FRONT
+                     * @enum {string}
+                     */
+                    docType: "AADHAAR_FRONT" | "AADHAAR_BACK" | "PAN" | "PHOTO" | "SIGNATURE";
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Document uploaded and linked successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["CustomerDocumentResponseDto"];
+                    };
+                };
+            };
+            /** @description Missing file or unsupported file format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Customers can only upload for their own profile */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_getDocumentUrl_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                docId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Presigned viewing URL generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["DocumentPresignedUrlResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Access to KYC document restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Customer or document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_streamFile_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stored document binary stream returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to file key */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8707,47 +9808,6 @@ export interface operations {
             };
             /** @description Forbidden — Insufficient role permissions or BOLA violation */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StorageController_streamFile_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Stored document binary stream returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to file key */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description File not found */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
