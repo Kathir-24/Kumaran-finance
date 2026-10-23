@@ -35,6 +35,23 @@ async function request(method: string, path: string, body?: any, token?: string)
   return { status, json };
 }
 
+async function requestMultipart(path: string, formData: FormData, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const status = res.status;
+  const json = await res.json().catch(() => null);
+  return { status, json };
+}
+
 async function run() {
   console.log(`\n======================================================`);
   console.log(`🚀 STARTING LIVE SERVER E2E: LIFECYCLE 2 (CUSTOMER & NOMINEE)`);
@@ -43,7 +60,7 @@ async function run() {
   console.log(`======================================================\n`);
 
   // Step 0: Obtain Admin Auth Token
-  console.log(`--- [0/8] Authenticating Admin for Lifecycle 2 ---`);
+  console.log(`--- [0/10] Authenticating Admin for Lifecycle 2 ---`);
   // Ensure TOTP is disabled for smooth admin login in test run
   queryDb(`UPDATE public."User" SET "isTotpEnabled" = false, "totpSecret" = NULL WHERE phone = '9876543210'`);
   
@@ -61,6 +78,7 @@ async function run() {
   // Clean up any test customer with phone '9842711223' to ensure repeatable runs
   const existingCustId = queryDb(`SELECT id FROM public."Customer" WHERE phone = '9842711223'`);
   if (existingCustId && !existingCustId.startsWith('[DB ERROR]')) {
+    queryDb(`DELETE FROM public."CustomerDocument" WHERE "customerId" = '${existingCustId}'`);
     queryDb(`DELETE FROM public."Nominee" WHERE "customerId" = '${existingCustId}'`);
     queryDb(`DELETE FROM public."Customer" WHERE id = '${existingCustId}'`);
     console.log(`   Cleaned up pre-existing test customer ${existingCustId}`);
@@ -69,11 +87,12 @@ async function run() {
   let customerId = '';
   let customerCode = '';
   let nomineeId = '';
+  let documentId = '';
 
   // --------------------------------------------------------------------------
   // Step 1: POST /customers (Register new customer)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [1/8] POST /customers (Register customer) ---`);
+  console.log(`\n--- [1/10] POST /customers (Register customer) ---`);
   const createPayload = {
     fullName: 'Sundaram S',
     fullNameTamil: 'சுந்தரம் சு',
@@ -109,7 +128,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 2: GET /customers (List customers with pagination & filter)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [2/8] GET /customers (List & search customers) ---`);
+  console.log(`\n--- [2/10] GET /customers (List & search customers) ---`);
   const listRes = await request('GET', `/customers?search=Sundaram&page=1&limit=10`, undefined, token);
   console.log(`   Status: ${listRes.status}`);
   const items = listRes.json?.data?.data || [];
@@ -125,7 +144,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 3: GET /customers/:id (Customer 360 profile)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [3/8] GET /customers/${customerId} (Customer 360 profile) ---`);
+  console.log(`\n--- [3/10] GET /customers/${customerId} (Customer 360 profile) ---`);
   const profileRes = await request('GET', `/customers/${customerId}`, undefined, token);
   console.log(`   Status: ${profileRes.status}`);
   console.log(`   Profile Full Name: ${profileRes.json?.data?.fullName}`);
@@ -141,7 +160,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 4: PATCH /customers/:id (Update address & alt phone)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [4/8] PATCH /customers/${customerId} (Update address details) ---`);
+  console.log(`\n--- [4/10] PATCH /customers/${customerId} (Update address details) ---`);
   const updatePayload = {
     addressLine1: '15/A, North Street',
     addressLine2: 'Opposite Murugan Temple',
@@ -169,7 +188,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 5: POST /customers/:id/nominees (Add nominee)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [5/8] POST /customers/${customerId}/nominees (Add nominee) ---`);
+  console.log(`\n--- [5/10] POST /customers/${customerId}/nominees (Add nominee) ---`);
   const nomineePayload = {
     fullName: 'Kavitha S',
     relationship: 'Spouse',
@@ -198,7 +217,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 6: PATCH /customers/:id/kyc-status (Approve KYC verification)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [6/8] PATCH /customers/${customerId}/kyc-status (Verify KYC) ---`);
+  console.log(`\n--- [6/10] PATCH /customers/${customerId}/kyc-status (Verify KYC) ---`);
   const kycPayload = {
     isKycVerified: true,
   };
@@ -221,7 +240,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 7: PATCH /customers/:id/fcm-token (Register device push token)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [7/8] PATCH /customers/${customerId}/fcm-token (Register push token) ---`);
+  console.log(`\n--- [7/10] PATCH /customers/${customerId}/fcm-token (Register push token) ---`);
   const fcmPayload = {
     fcmToken: 'fcm_mock_token_sundaram_device_android_xyz123',
     deviceType: 'ANDROID',
@@ -245,7 +264,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 8: DELETE /customers/:id/nominees/:nomineeId (Remove nominee)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [8/8] DELETE /customers/${customerId}/nominees/${nomineeId} (Remove nominee) ---`);
+  console.log(`\n--- [8/10] DELETE /customers/${customerId}/nominees/${nomineeId} (Remove nominee) ---`);
   const deleteNomineeRes = await request('DELETE', `/customers/${customerId}/nominees/${nomineeId}`, undefined, token);
   console.log(`   Status: ${deleteNomineeRes.status}`);
   console.log(`   Response Data:`, JSON.stringify(deleteNomineeRes.json?.data, null, 2));
@@ -262,8 +281,56 @@ async function run() {
   console.log(`   [PostgreSQL DB Verification]:`);
   console.log(`   Nominee count for deleted ID = ${dbNomineeCheck} (Expected: 0)`);
 
+  // --------------------------------------------------------------------------
+  // Step 9: POST /customers/:id/documents (Upload KYC verification document)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [9/10] POST /customers/${customerId}/documents (Upload KYC document scan) ---`);
+  const docFormData = new FormData();
+  docFormData.append('docType', 'AADHAAR_FRONT');
+  const dummyAadhaarImage = Buffer.from('FAKE_JPEG_BINARY_DATA_FOR_AADHAAR_FRONT_KUMARAN_CHITS_2026');
+  docFormData.append(
+    'file',
+    new Blob([dummyAadhaarImage], { type: 'image/jpeg' }),
+    'aadhaar_front_sundaram.jpg',
+  );
+  console.log(`   Payload: Form-Data { docType: 'AADHAAR_FRONT', fileName: 'aadhaar_front_sundaram.jpg' }`);
+
+  const uploadDocRes = await requestMultipart(`/customers/${customerId}/documents`, docFormData, token);
+  console.log(`   Status: ${uploadDocRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(uploadDocRes.json?.data, null, 2));
+
+  if (uploadDocRes.status !== 201 || !uploadDocRes.json?.data?.id) {
+    console.error('Failed to upload KYC document:', uploadDocRes);
+    process.exit(1);
+  }
+  documentId = uploadDocRes.json.data.id;
+
+  // DB Verification
+  const dbDoc = queryDb(
+    `SELECT id, "customerId", "docType", "s3Key", "fileName", verified FROM public."CustomerDocument" WHERE id = '${documentId}'`
+  );
+  console.log(`   [PostgreSQL DB Verification]:`);
+  console.log(`   ${dbDoc}`);
+
+  // --------------------------------------------------------------------------
+  // Step 10: GET /customers/:id/documents/:docId/url (Presigned viewing URL)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [10/10] GET /customers/${customerId}/documents/${documentId}/url (Presigned URL) ---`);
+  const presignedUrlRes = await request('GET', `/customers/${customerId}/documents/${documentId}/url`, undefined, token);
+  console.log(`   Status: ${presignedUrlRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(presignedUrlRes.json?.data, null, 2));
+
+  if (presignedUrlRes.status !== 200 || !presignedUrlRes.json?.data?.url) {
+    console.error('Failed to get presigned URL:', presignedUrlRes);
+    process.exit(1);
+  }
+  if (presignedUrlRes.json.data.expiresInSeconds !== 900) {
+    console.error('Expected expiresInSeconds to be 900:', presignedUrlRes.json.data);
+    process.exit(1);
+  }
+
   console.log(`\n======================================================`);
-  console.log(`🎉 ALL 8 LIFECYCLE 2 ENDPOINTS VERIFIED SUCCESSFULLY!`);
+  console.log(`🎉 ALL 10 LIFECYCLE 2 ENDPOINTS VERIFIED SUCCESSFULLY!`);
   console.log(`   Live Server (:3000) <--> Live Postgres (:5433)`);
   console.log(`======================================================\n`);
 }

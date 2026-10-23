@@ -340,6 +340,7 @@ export class AuthService {
       success: true,
       message: 'OTP sent successfully to registered mobile number.',
       expiresInSeconds: OTP_EXPIRY_SECONDS,
+      ...(process.env.NODE_ENV !== 'production' ? { debugOtp: otpCode } : {}),
     };
   }
 

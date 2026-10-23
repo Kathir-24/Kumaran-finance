@@ -136,6 +136,13 @@ export class RequestOtpResponseDto {
 
   @ApiProperty({ example: 300, description: 'OTP expiration period in seconds' })
   expiresInSeconds: number;
+
+  @ApiProperty({
+    example: '123456',
+    description: 'Generated OTP for automated local testing (only returned when NODE_ENV !== production)',
+    required: false,
+  })
+  debugOtp?: string;
 }
 
 export class VerifyOtpResponseDto {
