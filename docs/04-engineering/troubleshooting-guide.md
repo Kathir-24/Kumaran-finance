@@ -187,16 +187,16 @@ The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transacti
 
 ### F.1. Missing / Expired Bearer Token (`401 Unauthorized`)
 - **Symptoms**: `{"statusCode": 401, "message": "Unauthorized"}`
-- **Root Cause**: Request header missing `Authorization: Bearer <token>` or token expired past 8 hours.
+- **Root Cause**: Request header missing `Authorization: Bearer <token>` or token expired past its 15-minute lifespan.
 - **Remedy**:
-  1. Login via `POST /api/v1/auth/login` with your username and password.
+  1. Login via `POST /api/v1/auth/web/login` with your 10-digit mobile number (`identifier`) and password (or `/api/v1/auth/mobile/login-mpin`).
   2. Extract `accessToken` from response.
   3. Include in header: `Authorization: Bearer <accessToken>`.
 
 ### F.2. Role Permission Denied (`403 Forbidden`)
 - **Symptoms**: `{"statusCode": 403, "message": "Forbidden resource"}`
-- **Root Cause**: User role (e.g. `FIELD_AGENT`, `ACCOUNTANT`, `AUDITOR`) lacks permission for the endpoint.
-- **Reference**: Cross-check [`docs/01-business/permissions-matrix.md`](file:///u:/Kumaran-finance/docs/01-business/permissions-matrix.md). Field agents are strictly restricted to cash collection and customer onboarding.
+- **Root Cause**: User role (e.g. `COLLECTION_AGENT`, `ACCOUNTANT`, `AUDITOR`) lacks permission for the endpoint.
+- **Reference**: Cross-check [`docs/01-business/permissions-matrix.md`](file:///u:/Kumaran-finance/docs/01-business/permissions-matrix.md). Field collection agents are strictly restricted to cash collection and customer onboarding.
 
 ---
 

@@ -35,6 +35,8 @@ The **Customer Module** governs subscriber intake, nominee relationships, KYC ve
 | `DELETE`| `/api/v1/customers/:id/nominees/:nomineeId` | Remove linked nominee | Super Admin, Branch Manager |
 | `PATCH`| `/api/v1/customers/:id/kyc-status` | Approve or revoke KYC verification | Super Admin, Branch Manager, Accountant |
 | `PATCH`| `/api/v1/customers/:id/fcm-token` | Register subscriber FCM device token | Staff or Self Customer (Anti-IDOR) |
+| `POST` | `/api/v1/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo) to S3 | Staff or Self Customer |
+| `GET`  | `/api/v1/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL | Staff, Auditor, or Self Customer |
 
 ---
 

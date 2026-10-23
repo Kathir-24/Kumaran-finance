@@ -1,9 +1,9 @@
-# Master Live Server E2E Verification Plan (All 89 Endpoints + SQL Proofs)
+# Master Live Server E2E Verification Plan (All 102 Operations across 97 Paths + SQL Proofs)
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Target**: Live NestJS Server (`http://localhost:3000`) + PostgreSQL 17 (`chitflow_dev` Port 5433) + Redis (`:6379`) + MinIO S3 (`:9000`)  
 > **Core Requirement**: Every endpoint tested with **Full Request Payload $\to$ Live HTTP Server $\to$ Database Persistence (Checked via SQL) $\to$ API Response Verification**.  
-> **Status**: Ready for User Review & Approval (Step 1 of 3)
+> **Status**: Verified & Active (Lifecycles 1 & 2 Completed 100% with Live Proofs)
 
 ---
 
@@ -52,22 +52,22 @@ Before initiating live endpoint testing, we will execute the startup sequence:
    - `chitflow-redis`: Redis 7 on `127.0.0.1:6379`.
    - `chitflow-minio`: MinIO S3 on `127.0.0.1:9000` (Bucket: `kumaran-chits-private`).
 2. **Start Backend Server**:
-   - Launch NestJS application on `http://localhost:3000` using `pnpm --filter api run start:dev` (running as a managed background daemon).
+   - Launch NestJS application on `http://localhost:3000` using `pnpm --filter api run start` (running as a managed background daemon).
 3. **Health Check Probing**:
    - Poll `GET http://localhost:3000/health` until the server returns HTTP 200 with `{ status: "ok", info: { database: { status: "up" }, redis: { status: "up" }, storage: { status: "up" } } }`.
 
 ---
 
-## 3. The 11 Sequential Operational Lifecycles (All 88 Endpoints)
+## 3. The 11 Sequential Operational Lifecycles (All 102 Operations)
 
-To test all 88 endpoints realistically, we organize them into an end-to-end chronological lifecycle of Kumaran Finance. For **every single step**, we will log:
+To test all 102 operations realistically, we organize them into an end-to-end chronological lifecycle of Kumaran Finance. For **every single step**, we log:
 - **Request**: Method, Endpoint, Headers, and Full JSON Body.
 - **Response**: HTTP Status Code and Full Response JSON.
 - **SQL Verification**: The exact `psql` query run against PostgreSQL showing the row and columns saved in `chitflow_dev`.
 
 ```mermaid
 flowchart LR
-    S1["1. Auth & Staff Identity\n(11 Endpoints)"] --> S2["2. Customer & Nominee Intake\n(8 Endpoints)"]
+    S1["1. Auth, Branches & Users\n(21 Endpoints) ✅"] --> S2["2. Customer, Nominee & KYC\n(10 Endpoints) ✅"]
     S2 --> S3["3. Chit Scheme & Onboarding\n(7 Endpoints)"]
     S3 --> S4["4. In-Office Auction & Tie-Break\n(8 Endpoints)"]
     S4 --> S5["5. Installments & Dues\n(6 Endpoints)"]
@@ -81,30 +81,42 @@ flowchart LR
 
 ---
 
-### Lifecycle 1: Authentication, Staff Identity & 2FA (11 Endpoints)
-1. `POST /api/v1/auth/web/login`: Login as Super Admin (`9876543210`) $\to$ Verify returned JWT access & refresh tokens $\to$ SQL: Check `lastLoginAt` updated in `User` table.
-2. `POST /api/v1/auth/totp/setup`: Generate Base32 TOTP secret and QR URI $\to$ SQL: Verify `totpSecret` exists in `User`.
-3. `POST /api/v1/auth/totp/enable`: Submit valid 6-digit TOTP code $\to$ SQL: Verify `isTotpEnabled = true`.
-4. `POST /api/v1/auth/web/verify-totp`: Authenticate second-factor challenge $\to$ Verify final access token.
-5. `POST /api/v1/auth/mobile/set-mpin`: Establish 6-digit MPIN hash $\to$ SQL: Verify `mpinHash` updated in `User`.
-6. `POST /api/v1/auth/mobile/login-mpin`: Authenticate mobile login using MPIN $\to$ Verify tokens returned.
-7. `GET /api/v1/auth/me`: Fetch authenticated user profile $\to$ Verify payload matches database record.
-8. `PATCH /api/v1/auth/fcm-token`: Register FCM device token $\to$ SQL: Verify `fcmToken` updated in `User`.
-9. `POST /api/v1/auth/refresh-token`: Rotate access token using refresh token $\to$ SQL: Verify `refreshTokenHash` rotated.
-10. `POST /api/v1/auth/totp/disable`: Disable 2FA with password confirmation $\to$ SQL: Verify `isTotpEnabled = false`.
-11. `POST /api/v1/auth/logout`: Revoke active session $\to$ SQL: Verify `refreshTokenHash` is set to `NULL`.
+### Lifecycle 1: Authentication, 2FA, Branches & Staff User Administration (21 Endpoints) — ✅ 100% VERIFIED
+1. `POST /api/v1/auth/web/login`: Login as Super Admin (`9876543210`) $\to$ SQL: Check `lastLoginAt` updated in `User`.
+2. `GET /api/v1/auth/me`: Fetch authenticated user profile and branch details.
+3. `PATCH /api/v1/auth/fcm-token`: Register FCM device token $\to$ SQL: Verify `fcmToken` in `User`.
+4. `POST /api/v1/auth/totp/setup`: Generate Base32 TOTP secret and QR URI $\to$ SQL: Verify `totpSecret` in `User`.
+5. `POST /api/v1/auth/totp/enable`: Submit valid 6-digit TOTP code $\to$ SQL: Verify `isTotpEnabled = true`.
+6. `POST /api/v1/auth/web/login`: Test challenge mode when 2FA is active (requires `totpCode`).
+7. `POST /api/v1/auth/web/verify-totp`: Authenticate second-factor challenge $\to$ Verify final access token.
+8. `POST /api/v1/auth/mobile/set-mpin`: Establish 6-digit MPIN hash $\to$ SQL: Verify `mpinHash` in `User`.
+9. `POST /api/v1/auth/mobile/login-mpin`: Authenticate mobile login using MPIN.
+10. `POST /api/v1/auth/refresh-token`: Rotate access token using refresh token $\to$ SQL: Verify `refreshTokenHash` rotated.
+11. `POST /api/v1/auth/totp/disable` & `POST /api/v1/auth/logout`: Disable 2FA and revoke session $\to$ SQL: Verify `refreshTokenHash = NULL`.
+12. `POST /api/v1/auth/mobile/request-otp` (Staff): Request 6-digit SMS OTP $\to$ returns `debugOtp` in dev.
+13. `POST /api/v1/auth/mobile/verify-otp` (Staff): Verify OTP $\to$ returns 10-minute `setupToken`.
+14. `POST /api/v1/auth/mobile/set-mpin` (Onboarding): Set MPIN with `setupToken` $\to$ SQL: Verify `mpinHash`.
+15. `POST /api/v1/auth/mobile/request-otp` & `POST /api/v1/auth/mobile/verify-otp` (Customer): Instant OTP passbook session with `Role.CUSTOMER`.
+16. `POST /api/v1/branches`: Create new company branch (ERD) with bilingual Tamil name $\to$ SQL: Verify row in `Branch`.
+17. `GET /api/v1/branches` & `GET /api/v1/branches/:id`: Filter active branches and fetch branch profile.
+18. `POST /api/v1/users`: Create staff user (Murugan R) with branch link & password $\to$ SQL: Verify `User`.
+19. `GET /api/v1/users`: Search staff directory across all 6 query filters.
+20. `GET /api/v1/users/:id`: Fetch staff user 360 profile.
+21. `PATCH /api/v1/users/:id/status` & `PATCH /api/v1/users/:id/roles`: Deactivate staff member and update RBAC roles $\to$ SQL: Verify status & session revocation.
 
 ---
 
-### Lifecycle 2: Customer Intake, Nominees & KYC (8 Endpoints)
-12. `POST /api/v1/customers`: Register new customer with full details (Name, Tamil Name, Phone, Address, Masked Aadhaar `XXXXXXXX1234`, PAN) $\to$ SQL: Verify row created in `Customer` table with auto-generated code `KC-CUST-XXXXX`.
-13. `GET /api/v1/customers`: Search and list customers $\to$ Verify pagination and filters.
-14. `GET /api/v1/customers/:id`: Get full Customer 360 profile $\to$ Verify all fields match database.
-15. `PATCH /api/v1/customers/:id`: Update address and phone $\to$ SQL: Verify columns updated in `Customer`.
-16. `POST /api/v1/customers/:id/nominees`: Link verified nominee with relationship and Aadhaar $\to$ SQL: Verify row in `Nominee` table.
-17. `PATCH /api/v1/customers/:id/kyc-status`: Verify KYC status (`VERIFIED`) $\to$ SQL: Verify `kycStatus = 'VERIFIED'`.
-18. `PATCH /api/v1/customers/:id/fcm-token`: Register customer mobile FCM token $\to$ SQL: Verify `fcmToken` saved in `Customer`.
-19. `DELETE /api/v1/customers/:id/nominees/:nomineeId`: Remove linked nominee record $\to$ SQL: Verify nominee deleted.
+### Lifecycle 2: Customer Intake, Nominees & KYC Documents (10 Endpoints) — ✅ 100% VERIFIED
+22. `POST /api/v1/customers`: Register new customer with full details (Name, Tamil Name, Phone, Address, Masked Aadhaar `XXXXXXXX1234`, PAN) $\to$ SQL: Verify row created in `Customer` table with auto-generated code `KC-CUST-XXXXX`.
+23. `GET /api/v1/customers`: Search and list customers $\to$ Verify pagination and filters.
+24. `GET /api/v1/customers/:id`: Get full Customer 360 profile $\to$ Verify all fields match database.
+25. `PATCH /api/v1/customers/:id`: Update address and phone $\to$ SQL: Verify columns updated in `Customer`.
+26. `POST /api/v1/customers/:id/nominees`: Link verified nominee with relationship and Aadhaar $\to$ SQL: Verify row in `Nominee` table.
+27. `PATCH /api/v1/customers/:id/kyc-status`: Verify KYC status (`isKycVerified: true`) $\to$ SQL: Verify in database.
+28. `PATCH /api/v1/customers/:id/fcm-token`: Register customer mobile FCM token $\to$ SQL: Verify `fcmToken` saved in `Customer`.
+29. `DELETE /api/v1/customers/:id/nominees/:nomineeId`: Remove linked nominee record $\to$ SQL: Verify nominee deleted.
+30. `POST /api/v1/customers/:id/documents`: Multipart upload of KYC scan (Aadhaar front) to private S3 bucket $\to$ SQL: Verify row in `CustomerDocument` table.
+31. `GET /api/v1/customers/:id/documents/:docId/url`: Generate 15-minute S3 presigned viewing URL $\to$ Verify 900-second TTL.
 
 ---
 

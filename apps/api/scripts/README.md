@@ -150,8 +150,8 @@ A collection of 11 live-server end-to-end verification runners designed to execu
 
 | Runner Script | Lifecycle Focus | Verification Scope |
 |---|---|---|
-| [`verify-lifecycle-1.ts`](verify-lifecycle-1.ts) | Lifecycle 1: Auth & Security | Phone login, TOTP 2FA, MPIN, Biometrics, token revocation |
-| [`verify-lifecycle-2.ts`](verify-lifecycle-2.ts) | Lifecycle 2: Customer Intake & KYC | Lightweight intake, masked Aadhaar, KYC presigned uploads |
+| [`verify-lifecycle-1.ts`](verify-lifecycle-1.ts) | Lifecycle 1: Auth, Branches & Users | Web login, TOTP 2FA, SMS OTP onboarding, MPIN, Branch CRUD, Staff User administration (21 steps) ✅ |
+| [`verify-lifecycle-2.ts`](verify-lifecycle-2.ts) | Lifecycle 2: Customer Intake & KYC | Lightweight intake, masked Aadhaar, Nominees, S3 KYC scans, 15-min presigned URLs (10 steps) ✅ |
 | [`verify-lifecycle-3.ts`](verify-lifecycle-3.ts) | Lifecycle 3: Chit Scheme Lifecycle | Scheme creation, activation, Month 1 pool, ongoing onboarding |
 | [`verify-lifecycle-4.ts`](verify-lifecycle-4.ts) | Lifecycle 4: In-Office Auctions | Offline bidding, 1/4 ceiling, Option A tie-break draw, Maker $\ne$ Checker |
 | [`verify-lifecycle-5.ts`](verify-lifecycle-5.ts) | Lifecycle 5: Installments & Passbook | Universal dividends, cycle start/end dates, 6-col passbook ledger |

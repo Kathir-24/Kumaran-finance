@@ -28,6 +28,8 @@ The **Auth Module** provides multi-factor authentication, session management, an
 |---|---|---|---|
 | `POST` | `/api/v1/auth/web/login` | Office credentials login (Step 1) | Public |
 | `POST` | `/api/v1/auth/web/verify-totp` | Verify 6-digit TOTP code (Step 2) | Public |
+| `POST` | `/api/v1/auth/mobile/request-otp` | Request 6-digit SMS OTP for mobile onboarding/login | Public (Throttled) |
+| `POST` | `/api/v1/auth/mobile/verify-otp` | Verify 6-digit SMS OTP; returns setupToken or session | Public (Throttled) |
 | `POST` | `/api/v1/auth/mobile/login-mpin`| Mobile quick unlock with 6-digit MPIN | Public |
 | `POST` | `/api/v1/auth/refresh-token` | Rotate access & refresh tokens | Public |
 | `POST` | `/api/v1/auth/logout` | Revoke session & clear `fcmToken` | Authenticated |
@@ -36,7 +38,7 @@ The **Auth Module** provides multi-factor authentication, session management, an
 | `POST` | `/api/v1/auth/totp/setup` | Generate Base32 TOTP secret & QR code | Authenticated |
 | `POST` | `/api/v1/auth/totp/enable` | Verify OTP and lock 2FA requirement | Authenticated |
 | `POST` | `/api/v1/auth/totp/disable`| Disable 2FA with password confirmation | Authenticated |
-| `POST` | `/api/v1/auth/mobile/set-mpin` | Establish or update 6-digit MPIN | Authenticated |
+| `POST` | `/api/v1/auth/mobile/set-mpin` | Establish 6-digit MPIN (setupToken or session) | Setup Token / Auth Staff |
 
 ---
 
