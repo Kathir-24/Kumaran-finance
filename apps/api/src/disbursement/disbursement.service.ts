@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -14,6 +14,7 @@ import {
 import { AuthorizePayoutDto } from './dto/authorize-payout.dto';
 import { QueryDisbursementDto } from './dto/query-disbursement.dto';
 import { ReleasePayoutDto } from './dto/release-payout.dto';
+import { SettleFinalMonthDto } from './dto/settle-final-month.dto';
 import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
 
 @Injectable()
@@ -503,5 +504,166 @@ export class DisbursementService {
       data: voucherInput,
       formattedText,
     };
+  }
+
+  /**
+   * Final Month (Month N) Maturity Settlement:
+   * Direct settlement to the final remaining subscriber without auction.
+   * Retains 4% Foreman Commission.
+   * Marks subscriber ticket as prized and transitions chit scheme to COMPLETED.
+   */
+  async settleFinalMonth(
+    chitGroupId: string,
+    dto: SettleFinalMonthDto,
+    checkerUserId: string,
+    checkerRoles: Role[],
+  ) {
+    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to authorize final month settlements',
+      );
+    }
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: {
+        tickets: true,
+        branch: true,
+      },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    if (chit.status !== 'ACTIVE') {
+      throw new BadRequestException('Chit scheme must be ACTIVE to perform final month settlement');
+    }
+
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: dto.ticketId },
+      include: { customer: true },
+    });
+
+    if (!ticket || ticket.chitGroupId !== chitGroupId) {
+      throw new NotFoundException('Selected ticket does not belong to this chit scheme');
+    }
+
+    if (ticket.isPrized) {
+      throw new BadRequestException(
+        `Ticket #${ticket.ticketNumber} is already prized and cannot receive final settlement`,
+      );
+    }
+
+    // Verify this is indeed the single remaining unprized subscriber
+    const unprizedCount = await this.prisma.subscriberTicket.count({
+      where: {
+        chitGroupId,
+        isPrized: false,
+      },
+    });
+
+    if (unprizedCount > 1) {
+      throw new BadRequestException(
+        `Cannot execute final settlement: There are still ${unprizedCount} unprized tickets. Final settlement is exclusively for the single remaining subscriber in Month ${chit.durationMonths}`,
+      );
+    }
+
+    const finalMonth = chit.durationMonths;
+    const commissionAmount = (chit.chitValue * 4n) / 100n; // 4.00%
+    const prizeMoney = chit.chitValue - commissionAmount;
+    const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      // Create settlement auction record for Month N
+      const settlementAuction = await tx.auction.create({
+        data: {
+          chitGroupId,
+          installmentMonth: finalMonth,
+          auctionDate: releaseDate,
+          status: 'COMPLETED',
+          isHistoricalEntry: false,
+          bidDiscount: commissionAmount,
+          foremanCommissionRate: new Prisma.Decimal(4.0),
+          foremanCommissionAmount: commissionAmount,
+          totalDividend: 0n,
+          dividendPerTicket: 0n,
+          prizeMoney,
+          conductedByUserId: checkerUserId,
+          finalizedByUserId: checkerUserId,
+        },
+      });
+
+      // Create AuctionWinner record
+      const winner = await tx.auctionWinner.create({
+        data: {
+          auctionId: settlementAuction.id,
+          ticketId: ticket.id,
+          wasTieBreakWinner: false,
+          disbursementStatus: 'DISBURSED',
+          disbursementMode: dto.disbursementMode,
+          disbursedAmount: prizeMoney,
+          authorizedByUserId: checkerUserId,
+          disbursedAt: releaseDate,
+          paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
+          agreementSigned: true,
+          nomineeSigned: true,
+        },
+      });
+
+      // Update ticket to prized
+      await tx.subscriberTicket.update({
+        where: { id: ticket.id },
+        data: {
+          isPrized: true,
+          prizedAuctionId: settlementAuction.id,
+        },
+      });
+
+      // Transition chit group to COMPLETED
+      await tx.chitGroup.update({
+        where: { id: chitGroupId },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          userId: checkerUserId,
+          action: 'FINAL_MONTH_SETTLEMENT_EXECUTED',
+          entityType: 'ChitGroup',
+          entityId: chitGroupId,
+          newValue: {
+            ticketId: ticket.id,
+            ticketNumber: ticket.ticketNumber,
+            grossPrize: chit.chitValue.toString(),
+            foremanCommission: commissionAmount.toString(),
+            netPrizeMoney: prizeMoney.toString(),
+            disbursementMode: dto.disbursementMode,
+            paymentReference: dto.paymentReference,
+            status: 'COMPLETED',
+          },
+        },
+      });
+
+      return {
+        message: `Final Month ${finalMonth} maturity settlement successfully executed for Ticket #${ticket.ticketNumber} (${ticket.customer.fullName}). Scheme marked as COMPLETED.`,
+        settlement: {
+          chitGroupId,
+          installmentMonth: finalMonth,
+          ticketNumber: ticket.ticketNumber,
+          customerName: ticket.customer.fullName,
+          grossPrize: chit.chitValue,
+          foremanCommission: commissionAmount,
+          netPrizeMoney: prizeMoney,
+          disbursementMode: dto.disbursementMode,
+          paymentReference: dto.paymentReference,
+          disbursedAt: releaseDate,
+          auctionId: settlementAuction.id,
+        },
+      };
+    });
   }
 }

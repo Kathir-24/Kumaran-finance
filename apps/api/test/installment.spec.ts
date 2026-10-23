@@ -237,6 +237,135 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ).toBe(passbook.summary.outstandingBalance);
     });
 
+    it('should calculate 6-column physical passbook ledger matching real-world schema (₹3L / 30M)', async () => {
+      const mockTicketReal = {
+        id: 'ticket-real-passbook',
+        ticketNumber: 5,
+        status: 'ACTIVE',
+        isPrized: false,
+        consecutiveUnpaidMonths: 0,
+        joiningDate: new Date('2022-11-22T00:00:00.000Z'),
+        customer: {
+          id: 'cust-real',
+          customerCode: 'KC-CUST-REAL',
+          fullName: 'Kathi Real',
+          fullNameTamil: 'கதி',
+          phone: '9842100005',
+        },
+        chitGroup: {
+          id: 'chit-real-3L',
+          groupCode: 'KC-3L-30M-01',
+          groupName: '₹3 Lakh 30 Months Scheme',
+          chitValue: 300000n,
+          durationMonths: 30,
+          baseInstallment: 10000n,
+          startDate: new Date('2022-11-22T00:00:00.000Z'),
+          endDate: new Date('2025-05-22T00:00:00.000Z'),
+        },
+        dues: [
+          {
+            installmentMonth: 1,
+            cycleStartDate: new Date('2022-11-22T00:00:00.000Z'),
+            cycleEndDate: new Date('2022-12-22T00:00:00.000Z'),
+            dueDate: new Date('2022-12-22T00:00:00.000Z'),
+            grossAmount: 10000n,
+            dividendDeduction: 0n,
+            netPayableAmount: 10000n,
+            paidAmount: 10000n,
+            status: DueStatus.PAID,
+            allocations: [
+              {
+                payment: {
+                  receiptNumber: 'KC-REC-00101',
+                  paymentMethod: 'CASH',
+                  createdAt: new Date('2022-12-15T00:00:00.000Z'),
+                  paymentStatus: 'SUCCESS',
+                  receipt: { receiptNumber: 'KC-REC-00101' },
+                },
+              },
+            ],
+          },
+          {
+            installmentMonth: 2,
+            cycleStartDate: new Date('2022-12-22T00:00:00.000Z'),
+            cycleEndDate: new Date('2023-01-22T00:00:00.000Z'),
+            dueDate: new Date('2023-01-22T00:00:00.000Z'),
+            grossAmount: 10000n,
+            dividendDeduction: 2100n,
+            netPayableAmount: 7900n,
+            paidAmount: 7900n,
+            status: DueStatus.PAID,
+            allocations: [
+              {
+                payment: {
+                  receiptNumber: 'KC-REC-00142',
+                  paymentMethod: 'CASH',
+                  createdAt: new Date('2023-01-04T00:00:00.000Z'),
+                  paymentStatus: 'SUCCESS',
+                  receipt: { receiptNumber: 'KC-REC-00142' },
+                },
+              },
+            ],
+          },
+          {
+            installmentMonth: 3,
+            cycleStartDate: new Date('2023-01-22T00:00:00.000Z'),
+            cycleEndDate: new Date('2023-02-22T00:00:00.000Z'),
+            dueDate: new Date('2023-02-22T00:00:00.000Z'),
+            grossAmount: 10000n,
+            dividendDeduction: 2100n,
+            netPayableAmount: 7900n,
+            paidAmount: 7900n,
+            status: DueStatus.PAID,
+            allocations: [
+              {
+                payment: {
+                  receiptNumber: 'KC-REC-00198',
+                  paymentMethod: 'CASH',
+                  createdAt: new Date('2023-02-01T00:00:00.000Z'),
+                  paymentStatus: 'SUCCESS',
+                  receipt: { receiptNumber: 'KC-REC-00198' },
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicketReal);
+
+      const passbook = await installmentService.getPassbook('ticket-real-passbook');
+
+      expect(passbook.ledgerEntries).toHaveLength(3);
+
+      // Month 1 assertions (Paid ₹10,000, Dividend ₹0 -> Total ₹10,000)
+      expect(passbook.ledgerEntries[0].month).toBe(1);
+      expect(passbook.ledgerEntries[0].amountPaid).toBe(10000n);
+      expect(passbook.ledgerEntries[0].dividend).toBe(0n);
+      expect(passbook.ledgerEntries[0].total).toBe(10000n);
+      expect(passbook.ledgerEntries[0].amountPaid + passbook.ledgerEntries[0].dividend).toBe(
+        passbook.ledgerEntries[0].total,
+      );
+
+      // Month 2 assertions (Paid ₹7,900, Dividend ₹2,100 -> Total ₹10,000)
+      expect(passbook.ledgerEntries[1].month).toBe(2);
+      expect(passbook.ledgerEntries[1].amountPaid).toBe(7900n);
+      expect(passbook.ledgerEntries[1].dividend).toBe(2100n);
+      expect(passbook.ledgerEntries[1].total).toBe(10000n);
+      expect(passbook.ledgerEntries[1].amountPaid + passbook.ledgerEntries[1].dividend).toBe(
+        passbook.ledgerEntries[1].total,
+      );
+
+      // Month 3 assertions (Paid ₹7,900, Dividend ₹2,100 -> Total ₹10,000)
+      expect(passbook.ledgerEntries[2].month).toBe(3);
+      expect(passbook.ledgerEntries[2].amountPaid).toBe(7900n);
+      expect(passbook.ledgerEntries[2].dividend).toBe(2100n);
+      expect(passbook.ledgerEntries[2].total).toBe(10000n);
+      expect(passbook.ledgerEntries[2].amountPaid + passbook.ledgerEntries[2].dividend).toBe(
+        passbook.ledgerEntries[2].total,
+      );
+    });
+
     it('should enforce customer isolation: subscriber can only view own passbook', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
         id: mockTicketId1,

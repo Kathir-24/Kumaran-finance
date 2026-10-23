@@ -351,7 +351,9 @@ model InstallmentDue {
   ticketId           String
   ticket             SubscriberTicket    @relation(fields: [ticketId], references: [id])
   installmentMonth   Int                 // Month 1 to 20
-  dueDate            DateTime
+  cycleStartDate     DateTime?           // Payment Date / Cycle start (e.g. 22/11/2022)
+  cycleEndDate       DateTime?           // Cycle end date (e.g. 22/12/2022)
+  dueDate            DateTime            // Payment Due Date
   grossAmount        BigInt              // Base installment in whole Rupees (e.g., 5000)
   dividendDeduction  BigInt              @default(0) // Allocated dividend in whole Rupees
   netPayableAmount   BigInt              // grossAmount - dividendDeduction

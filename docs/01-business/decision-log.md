@@ -65,6 +65,7 @@
 
 ### ADR-07: Field Agent Collection, Sync, Single Payment & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)
 - **Single Discrete Payment per Month**: Each installment month accepts strictly a single payment matching the net installment amount. **Double payments for the same specified month will never happen** in business operations.
+- **Cycle Date Window (30-day collection frame)**: Each cycle operates on a date window (`cycleStartDate` to `cycleEndDate`, e.g. 22/11/2022 to 22/12/2022). Subscribers can pay on **any day** within this window (e.g. 15/12/2022).
 - **Zero Partial Payments**: Installments must be paid in full for the exact net amount due ($I_{net}$). Partial payments are strictly prohibited in the product. The `DueStatus` enum is strictly `UNPAID`, `PAID`, `OVERDUE`.
 - **Zero Advance Balance**: The concept of "Advance Balance" is completely eliminated from the architecture and data models. No advance ledger or carry-forward balance exists.
 - **Offline Sync & Reconciliation**: When agents collect offline, entries are recorded as `PENDING_SYNC` with device timestamp. Upon syncing with the server, the payment marks that specific month's installment as `PAID`. End-of-day cash handover reconciles physical cash against recorded receipts.
@@ -79,6 +80,9 @@
 
 ### ADR-11: Physical Passbook Primacy & Smart Digital Receipts (`CONFIRMED-BY-DEVELOPER`)
 - **Ground Truth**: In Kumaran Finance operations, the customer's physical paper passbook (சீட்டு பாஸ்புக்) is their primary, legally acknowledged proof of installment payment. At doorstep collections, the agent enters the date, amount, and signs with a pen. Loose paper receipt slips are completely eliminated.
+- **6-Column Passbook Ledger Standard**: The physical passbook and software digital passbook maintain identical columns:
+  $$\text{Month \#} \mid \text{Payment Date (Cycle Start)} \mid \text{Paid Date (Doorstep)} \mid \text{Amount Paid } (I_{net}) \mid \text{Dividend } (Div) \mid \text{Total } (I_{base})$$
+  Invariant: $\text{Amount Paid} + \text{Dividend} = \text{Total Base Installment}$ on every row.
 - **Software Role**: Every transaction generates a sequential receipt number (`KC-REC-...`) solely for company ledger integrity (Form XXII Cash Book), evening handover reconciliation, and dispute backup.
 - **Delivery**: Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt.
 

@@ -31,6 +31,39 @@
 
 ---
 
+## 1.1 Physical Passbook 6-Column Ledger Specification (`CONFIRMED-BY-DEVELOPER`)
+
+Every subscriber's physical paper passbook at Kumaran Finance maintains strictly this 6-column ledger structure:
+
+| Month # | Payment Date (Cycle Start) | Paid Date (Actual Payment) | Amount Paid ($I_{net}$) | Dividend ($Div$) | Total ($I_{base}$) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | `22/11/2022` | `15/12/2022` | **₹10,000** | **₹0** | **₹10,000** |
+| **2** | `22/12/2022` | `04/01/2023` | **₹7,900** | **₹2,100** | **₹10,000** |
+| **3** | `22/01/2023` | `01/02/2023` | **₹7,900** | **₹2,100** | **₹10,000** |
+| ... | ... | ... | ... | ... | ... |
+| **$N$** | `22/04/2025` | `...` | Net Due | Prior Div | **₹10,000** |
+
+### Mathematical Invariants of the Physical Passbook:
+1. **The Row Sum Invariant**:
+   $$\text{Amount Paid } (I_{net}) + \text{Dividend } (Div) = \text{Total Base Gross Installment } (I_{base})$$
+2. **Cycle Date Window (30-day collection frame)**:
+   - `Payment Date`: Opening date of the monthly billing cycle (e.g., 22nd of each month).
+   - `Paid Date`: Actual calendar date when subscriber paid at doorstep or counter.
+   - Collections are valid on **any day** between `Payment Date` and the next cycle date.
+3. **Auction Date & Dividend Linkage**:
+   - The in-branch auction is conducted on the cycle date (e.g., `22/12/2022`).
+   - Its winning discount directly populates the universal dividend for that **immediate upcoming collection cycle** (`22/12/2022` to `22/01/2023`), so members pay the discounted net amount ($I_{base} - Div$) starting right in Month 2.
+4. **Dynamic Discount Ceiling**:
+   - In every auction month, the discount is **competitive and dynamic**:
+     $$4\% \text{ Foreman Commission} \le \text{Bid Discount } (D) \le \frac{1}{4} \text{ Ceiling } \left(\frac{V}{4}\right)$$
+   - Discount does not have to be static. In quiet months it may be lower (e.g. ₹30,000 or ₹40,000); when competition hits the 25% ceiling (₹75,000), physical paper token lot draws are conducted in front of members.
+5. **Final Month (Month $N$) Settlement**:
+   - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission:
+     $$\text{Final Settlement Payout} = V - (V \times 0.04)$$
+   - Executed via `POST /api/v1/disbursements/group/{chitGroupId}/final-settlement` by Super Admin. Scheme status transitions to `COMPLETED`.
+
+---
+
 ## 2. Walkthrough Example (₹1,00,000 Chit, 20 Months, 4% Commission)
 
 The numbers below illustrate arithmetic relationships based on confirmed rules:

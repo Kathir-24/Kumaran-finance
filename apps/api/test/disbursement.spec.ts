@@ -96,14 +96,25 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
 
   beforeEach(() => {
     prismaMock = {
+      chitGroup: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      subscriberTicket: {
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        update: jest.fn(),
+      },
       auction: {
         findUnique: jest.fn(),
+        create: jest.fn(),
       },
       auctionWinner: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+        create: jest.fn(),
       },
       user: {
         findUnique: jest.fn(),
@@ -470,6 +481,112 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       await expect(
         disbursementService.getWinnerDisbursement('non-existent-id', staffUser),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('5. Final Month (Month N) Maturity Settlement Tests', () => {
+    it('should reject final settlement if caller is not SUPER_ADMIN', async () => {
+      await expect(
+        disbursementService.settleFinalMonth(
+          mockChitGroup.id,
+          {
+            ticketId: mockTicketId,
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          },
+          mockMakerId,
+          [Role.BRANCH_MANAGER],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject final settlement if more than 1 unprized ticket remains', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        ...mockChitGroup,
+        status: 'ACTIVE',
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId,
+        chitGroupId: mockChitGroup.id,
+        ticketNumber: 20,
+        isPrized: false,
+        customer: mockCustomer,
+      });
+      prismaMock.subscriberTicket.count.mockResolvedValue(2); // 2 unprized tickets!
+
+      await expect(
+        disbursementService.settleFinalMonth(
+          mockChitGroup.id,
+          {
+            ticketId: mockTicketId,
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should successfully execute final Month N settlement (₹1L chit -> ₹4,000 commission -> ₹96,000 net payout)', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        ...mockChitGroup,
+        status: 'ACTIVE',
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId,
+        chitGroupId: mockChitGroup.id,
+        ticketNumber: 20,
+        isPrized: false,
+        customer: mockCustomer,
+      });
+      prismaMock.subscriberTicket.count.mockResolvedValue(1); // exactly 1 remaining unprized subscriber!
+
+      prismaMock.auction.create.mockResolvedValue({
+        id: 'auction-settle-final',
+        installmentMonth: 20,
+        prizeMoney: 96000n,
+      });
+      prismaMock.auctionWinner.create.mockResolvedValue({
+        id: 'winner-settle-final',
+        disbursedAmount: 96000n,
+        disbursementStatus: 'DISBURSED',
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        id: mockTicketId,
+        isPrized: true,
+      });
+      prismaMock.chitGroup.update.mockResolvedValue({
+        id: mockChitGroup.id,
+        status: 'COMPLETED',
+      });
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-log-final' });
+
+      const result = await disbursementService.settleFinalMonth(
+        mockChitGroup.id,
+        {
+          ticketId: mockTicketId,
+          disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          paymentReference: 'IOB-CHQ-FINAL-999',
+        },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.settlement.grossPrize).toBe(100000n);
+      expect(result.settlement.foremanCommission).toBe(4000n); // 4% of 100,000
+      expect(result.settlement.netPrizeMoney).toBe(96000n);    // 100,000 - 4,000
+      expect(result.settlement.installmentMonth).toBe(20);
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({ isPrized: true }),
+        }),
+      );
+      expect(prismaMock.chitGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockChitGroup.id },
+          data: expect.objectContaining({ status: 'COMPLETED' }),
+        }),
+      );
     });
   });
 });

@@ -4922,6 +4922,58 @@
         ]
       }
     },
+    "/api/v1/disbursements/group/{chitGroupId}/final-settlement": {
+      "post": {
+        "description": "Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.",
+        "operationId": "DisbursementController_settleFinalMonth_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleFinalMonthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Final month settlement successfully executed"
+          },
+          "400": {
+            "description": "Invalid settlement request or more than 1 unprized ticket exists"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Super Admin exclusivity"
+          },
+          "404": {
+            "description": "Chit group or ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Super Admin: Settle final remaining subscriber for Month N (Maturity Settlement)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
     "/api/v1/reports/dashboard": {
       "get": {
         "description": "Provides high-level operational overview: active chits, collections by mode, prize payouts, vault cash balance, pending handovers, and arrears aging buckets. Scoped to branch for Branch Manager.",
@@ -9255,10 +9307,20 @@
       "GenerateDuesDto": {
         "type": "object",
         "properties": {
+          "cycleStartDate": {
+            "type": "string",
+            "example": "2022-11-22T00:00:00.000Z",
+            "description": "Payment Date / Cycle start date (defaults to scheme cycle day for this month, e.g. 22nd)"
+          },
+          "cycleEndDate": {
+            "type": "string",
+            "example": "2022-12-22T00:00:00.000Z",
+            "description": "Cycle end date / Due date (defaults to next cycle date, e.g. next month 22nd)"
+          },
           "dueDate": {
             "type": "string",
-            "example": "2026-12-10T00:00:00.000Z",
-            "description": "Optional due date for this installment month (defaults to scheme monthly due date)"
+            "example": "2022-12-22T00:00:00.000Z",
+            "description": "Optional payment due date for this installment month (defaults to cycleEndDate)"
           }
         }
       },
@@ -10831,6 +10893,47 @@
           "issuedAt",
           "data",
           "formattedText"
+        ]
+      },
+      "SettleFinalMonthDto": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Ticket ID of the single remaining unprized subscriber for Month N settlement"
+          },
+          "disbursementMode": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT_PAYEE_CHEQUE",
+              "BANK_TRANSFER_NEFT",
+              "BANK_TRANSFER_RTGS",
+              "BANK_TRANSFER_IMPS",
+              "CASH"
+            ],
+            "example": "ACCOUNT_PAYEE_CHEQUE",
+            "description": "Payment settlement mode (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS, CASH)"
+          },
+          "paymentReference": {
+            "type": "string",
+            "example": "CHQ-889921",
+            "description": "Official cheque number, bank UTR, or cash voucher reference"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Final Month 30 maturity settlement payout per Section 16 Chit Rules",
+            "description": "Foreman settlement notes or audit remarks"
+          },
+          "disbursedAt": {
+            "type": "string",
+            "example": "2025-04-22T00:00:00.000Z",
+            "description": "Settlement disbursement timestamp (defaults to current date)"
+          }
+        },
+        "required": [
+          "ticketId",
+          "disbursementMode"
         ]
       },
       "ExecutiveDashboardKpiResponseDto": {

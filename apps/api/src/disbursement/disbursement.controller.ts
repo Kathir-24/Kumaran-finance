@@ -36,6 +36,7 @@ import {
 } from './dto/disbursement-response.dto';
 import { QueryDisbursementDto } from './dto/query-disbursement.dto';
 import { ReleasePayoutDto } from './dto/release-payout.dto';
+import { SettleFinalMonthDto } from './dto/settle-final-month.dto';
 import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
 
 @ApiTags('Prize Disbursements & Safety Proof')
@@ -187,6 +188,31 @@ export class DisbursementController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.disbursementService.getBilingualVoucher(auctionId, currentUser);
+  }
+
+  @Post('group/:chitGroupId/final-settlement')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Super Admin: Settle final remaining subscriber for Month N (Maturity Settlement)',
+    description:
+      'Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Final month settlement successfully executed' })
+  @ApiResponse({ status: 400, description: 'Invalid settlement request or more than 1 unprized ticket exists' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Super Admin exclusivity' })
+  @ApiResponse({ status: 404, description: 'Chit group or ticket not found' })
+  async settleFinalMonth(
+    @Param('chitGroupId') chitGroupId: string,
+    @Body() dto: SettleFinalMonthDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.disbursementService.settleFinalMonth(
+      chitGroupId,
+      dto,
+      currentUser.sub,
+      currentUser.roles,
+    );
   }
 }
 

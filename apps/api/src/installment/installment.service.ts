@@ -60,23 +60,34 @@ export class InstallmentService {
       // Month 1 has NO auction. Full pool is taken by company ticket. Universal dividend is strictly ₹0.
       dividendPerTicket = 0n;
     } else {
-      // Months 2 through N: dividend is determined by prior month's auction
-      const priorAuction = await this.prisma.auction.findUnique({
+      // Months 2 through N: dividend is determined by the auction for this cycle month (or prior month)
+      let auction = await this.prisma.auction.findUnique({
         where: {
           chitGroupId_installmentMonth: {
             chitGroupId,
-            installmentMonth: month - 1,
+            installmentMonth: month,
           },
         },
       });
 
-      if (!priorAuction || priorAuction.dividendPerTicket === null) {
+      if (!auction || auction.dividendPerTicket === null) {
+        auction = await this.prisma.auction.findUnique({
+          where: {
+            chitGroupId_installmentMonth: {
+              chitGroupId,
+              installmentMonth: month - 1,
+            },
+          },
+        });
+      }
+
+      if (!auction || auction.dividendPerTicket === null) {
         throw new BadRequestException(
-          `Cannot generate Month ${month} dues: Prior Month ${month - 1} auction has not yet been recorded and finalized`,
+          `Cannot generate Month ${month} dues: Auction for Month ${month} has not yet been recorded and finalized`,
         );
       }
 
-      dividendPerTicket = priorAuction.dividendPerTicket;
+      dividendPerTicket = auction.dividendPerTicket;
     }
 
     const grossAmount = chit.baseInstallment;
@@ -88,14 +99,28 @@ export class InstallmentService {
       );
     }
 
-    // Determine due date
+    // Determine cycle window (Payment Date to Next Cycle Date)
+    let cycleStartDate: Date;
+    if (dto?.cycleStartDate) {
+      cycleStartDate = new Date(dto.cycleStartDate);
+    } else {
+      cycleStartDate = new Date(chit.startDate);
+      cycleStartDate.setMonth(cycleStartDate.getMonth() + (month - 1));
+    }
+
+    let cycleEndDate: Date;
+    if (dto?.cycleEndDate) {
+      cycleEndDate = new Date(dto.cycleEndDate);
+    } else {
+      cycleEndDate = new Date(cycleStartDate);
+      cycleEndDate.setMonth(cycleEndDate.getMonth() + 1);
+    }
+
     let dueDate: Date;
     if (dto?.dueDate) {
       dueDate = new Date(dto.dueDate);
     } else {
-      // Default: scheme start date + (month - 1) months
-      dueDate = new Date(chit.startDate);
-      dueDate.setMonth(dueDate.getMonth() + (month - 1));
+      dueDate = new Date(cycleEndDate);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -124,6 +149,8 @@ export class InstallmentService {
               grossAmount,
               dividendDeduction: dividendPerTicket,
               netPayableAmount,
+              cycleStartDate,
+              cycleEndDate,
               dueDate,
             },
           });
@@ -134,6 +161,8 @@ export class InstallmentService {
               chitGroupId,
               ticketId: ticket.id,
               installmentMonth: month,
+              cycleStartDate,
+              cycleEndDate,
               dueDate,
               grossAmount,
               dividendDeduction: dividendPerTicket,
@@ -149,6 +178,8 @@ export class InstallmentService {
       return {
         chitGroupId,
         installmentMonth: month,
+        cycleStartDate,
+        cycleEndDate,
         grossAmount,
         dividendDeduction: dividendPerTicket,
         netPayableAmount,
@@ -304,8 +335,20 @@ export class InstallmentService {
         (a) => a.payment.paymentStatus === 'SUCCESS',
       );
 
+      const cycleStart = due.cycleStartDate || due.dueDate;
+      const cycleEnd = due.cycleEndDate || due.dueDate;
+      const actualPaidDate = successfulAllocation?.payment.createdAt || null;
+
       return {
+        month: due.installmentMonth,
         installmentMonth: due.installmentMonth,
+        cycleStartDate: cycleStart,
+        cycleEndDate: cycleEnd,
+        paymentDate: cycleStart,
+        paidDate: actualPaidDate,
+        amountPaid: due.paidAmount,
+        dividend: due.dividendDeduction,
+        total: due.grossAmount,
         dueDate: due.dueDate,
         grossAmount: due.grossAmount,
         dividendDeduction: due.dividendDeduction,
@@ -313,7 +356,6 @@ export class InstallmentService {
         paidAmount: due.paidAmount,
         status: due.status,
         receiptNumber: (successfulAllocation?.payment as any)?.receipt?.receiptNumber || null,
-        paymentDate: successfulAllocation?.payment.createdAt || null,
         paymentMethod: successfulAllocation?.payment.paymentMethod || null,
       };
     });

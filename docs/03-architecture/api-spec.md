@@ -125,10 +125,13 @@
 ### 2.9 Prize Disbursements & Safety Proof Checklist (`/disbursements`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET` | `/auctions/:id/winner` | View auction winner details & disbursement status | Staff, Member |
-| `POST` | `/auctions/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, promissory notes, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
-| `POST` | `/auctions/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `GET` | `/disbursements` | List prize disbursement records across chit groups with pagination | Staff |
+| `GET` | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff, Member |
+| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, promissory notes, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `GET` | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize disbursement voucher (English + தமிழ்) | Staff, Member |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Maturity Settlement**: Direct payout to final subscriber without auction (Less 4% Foreman Commission; marks scheme COMPLETED) | `SUPER_ADMIN` |
 
 ### 2.10 Statutory Reports, Dashboards & Real-Time Approvals (`/reports`)
 

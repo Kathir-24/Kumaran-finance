@@ -1253,6 +1253,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disbursements/group/{chitGroupId}/final-settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Super Admin: Settle final remaining subscriber for Month N (Maturity Settlement)
+         * @description Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.
+         */
+        post: operations["DisbursementController_settleFinalMonth_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/dashboard": {
         parameters: {
             query?: never;
@@ -3420,8 +3440,18 @@ export interface components {
         };
         GenerateDuesDto: {
             /**
-             * @description Optional due date for this installment month (defaults to scheme monthly due date)
-             * @example 2026-12-10T00:00:00.000Z
+             * @description Payment Date / Cycle start date (defaults to scheme cycle day for this month, e.g. 22nd)
+             * @example 2022-11-22T00:00:00.000Z
+             */
+            cycleStartDate?: string;
+            /**
+             * @description Cycle end date / Due date (defaults to next cycle date, e.g. next month 22nd)
+             * @example 2022-12-22T00:00:00.000Z
+             */
+            cycleEndDate?: string;
+            /**
+             * @description Optional payment due date for this installment month (defaults to cycleEndDate)
+             * @example 2022-12-22T00:00:00.000Z
              */
             dueDate?: string;
         };
@@ -4427,6 +4457,34 @@ export interface components {
             data: Record<string, never>;
             /** @description A4 / A5 monospace formatted voucher layout */
             formattedText: string;
+        };
+        SettleFinalMonthDto: {
+            /**
+             * @description Ticket ID of the single remaining unprized subscriber for Month N settlement
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            ticketId: string;
+            /**
+             * @description Payment settlement mode (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS, CASH)
+             * @example ACCOUNT_PAYEE_CHEQUE
+             * @enum {string}
+             */
+            disbursementMode: "ACCOUNT_PAYEE_CHEQUE" | "BANK_TRANSFER_NEFT" | "BANK_TRANSFER_RTGS" | "BANK_TRANSFER_IMPS" | "CASH";
+            /**
+             * @description Official cheque number, bank UTR, or cash voucher reference
+             * @example CHQ-889921
+             */
+            paymentReference?: string;
+            /**
+             * @description Foreman settlement notes or audit remarks
+             * @example Final Month 30 maturity settlement payout per Section 16 Chit Rules
+             */
+            notes?: string;
+            /**
+             * @description Settlement disbursement timestamp (defaults to current date)
+             * @example 2025-04-22T00:00:00.000Z
+             */
+            disbursedAt?: string;
         };
         ExecutiveDashboardKpiResponseDto: {
             /**
@@ -8130,6 +8188,58 @@ export interface operations {
                 content?: never;
             };
             /** @description Auction or winner not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_settleFinalMonth_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chitGroupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleFinalMonthDto"];
+            };
+        };
+        responses: {
+            /** @description Final month settlement successfully executed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid settlement request or more than 1 unprized ticket exists */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Super Admin exclusivity */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chit group or ticket not found */
             404: {
                 headers: {
                     [name: string]: unknown;
