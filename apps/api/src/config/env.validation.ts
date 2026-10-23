@@ -34,6 +34,8 @@ export interface EnvironmentVariables {
   REDIS_PORT: number;
   BULL_BOARD_USER?: string;
   BULL_BOARD_PASSWORD?: string;
+  METRICS_USER?: string;
+  METRICS_PASSWORD?: string;
   SMS_DRIVER?: 'mock' | 'msg91';
   SMS_SENDER_ID?: string;
   MSG91_AUTH_KEY?: string;
@@ -159,6 +161,8 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
     BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',
     BULL_BOARD_PASSWORD: (config.BULL_BOARD_PASSWORD as string) ?? 'chitflow_secret',
+    METRICS_USER: (config.METRICS_USER as string) ?? 'prometheus',
+    METRICS_PASSWORD: (config.METRICS_PASSWORD as string) ?? 'prometheus_scrape_secret',
     SMS_DRIVER: smsDriver as 'mock' | 'msg91',
     SMS_SENDER_ID: (config.SMS_SENDER_ID as string) ?? 'KMRCHT',
     MSG91_AUTH_KEY: config.MSG91_AUTH_KEY as string | undefined,

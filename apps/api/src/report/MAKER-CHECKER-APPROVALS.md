@@ -4,7 +4,7 @@
 In **Kumaran Chits** (Kumaran Finance), strict dual control is an invariant architectural guardrail (Guardrail #10: Maker $\ne$ Checker). Sensitive actions cannot be finalized by a single individual:
 1. **Cash Handover**: Field collection agents collect physical cash door-to-door, but only an authorized partner or branch manager (who did not collect the money) can count and sign off the cash into the branch vault (`POST /collections/cash-handover/acknowledge`).
 2. **Payment Reversals**: Staff or collection agents initiate a reversal request with a business reason, but only a Super Admin (Partner) can commit the reversal (`POST /payments/:id/approve-reversal`).
-3. **Prize Disbursements**: Desk staff verifies the physical safety proof documents (agreements, cheques, promissory notes), but only an authorized Checker can authorize releasing the funds (`POST /auctions/:id/authorize-payout`).
+3. **Prize Disbursements**: Desk staff verifies the physical safety proof documents (agreements, cheques, promissory notes), but only an authorized Checker can authorize releasing the funds (`POST /disbursements/auction/:auctionId/authorize-payout`).
 
 To empower Partners (Super Admin) and Branch Managers to act promptly without navigating between 4 separate screens or repeatedly refreshing browser tabs, this module provides:
 - A unified, actionable pending approvals endpoint (`GET /reports/pending-approvals`).

@@ -324,14 +324,18 @@ model AuctionTieBidder {
 }
 
 model AuctionMinutes {
-  id                 String   @id @default(uuid())
-  auctionId          String   @unique
-  auction            Auction  @relation(fields: [auctionId], references: [id])
+  id                 String    @id @default(uuid())
+  auctionId          String    @unique
+  auction            Auction   @relation(fields: [auctionId], references: [id])
   subscribersPresent Int
-  minutesText        String   @db.Text
-  signedByForeman    Boolean  @default(false)
-  filedAtRegistrar   Boolean  @default(false)
-  createdAt          DateTime @default(now())
+  minutesText        String    @db.Text
+  signedByForeman    Boolean   @default(false)
+  filedAtRegistrar   Boolean   @default(false)
+  filedDate          DateTime?
+  filingReference    String?   // Government Challan No / Acknowledgement Slip No
+  filingNotes        String?   // Staff remarks or filing details
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
 }
 
 // -------------------------------------------------------------
@@ -428,13 +432,17 @@ model Receipt {
 }
 
 model PaymentReversal {
-  id                 String   @id @default(uuid())
-  paymentId          String   @unique
-  payment            Payment  @relation(fields: [paymentId], references: [id])
-  reason             String
-  initiatedByUserId  String   // Maker
-  approvedByUserId   String   // Checker (Super Admin / Partner) - maker != checker
-  reversedAt         DateTime @default(now())
+  id                String    @id @default(uuid())
+  paymentId         String    @unique
+  payment           Payment   @relation(fields: [paymentId], references: [id])
+  reason            String
+  status            String    @default("REQUESTED") // REQUESTED, APPROVED, REJECTED
+  notes             String?
+  initiatedByUserId String    // Maker
+  approvedByUserId  String?   // Checker (Super Admin / Partner) - maker != checker
+  reversedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // -------------------------------------------------------------
