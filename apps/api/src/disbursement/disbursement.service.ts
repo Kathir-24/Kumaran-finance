@@ -595,7 +595,7 @@ export class DisbursementService {
       });
 
       // Create AuctionWinner record
-      const winner = await tx.auctionWinner.create({
+      await tx.auctionWinner.create({
         data: {
           auctionId: settlementAuction.id,
           ticketId: ticket.id,

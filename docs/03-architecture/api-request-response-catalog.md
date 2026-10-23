@@ -554,7 +554,7 @@
 
 ## 8. Module 8: Prize Disbursements & Safety Proof (`/disbursements`)
 
-### 8.1 `POST /api/v1/disbursements/:auctionId/verify-safety-proof`
+### 8.1 `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`
 **Description**: **Maker**: Check off safety proof items (agreement, cheques, promissory notes).  
 **Roles**: `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`
 
@@ -589,7 +589,7 @@
 
 ---
 
-### 8.2 `POST /api/v1/disbursements/:auctionId/authorize-payout`
+### 8.2 `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`
 **Description**: **Checker**: Authorize net payout voucher (`maker != checker`).  
 **Roles**: `SUPER_ADMIN`
 
@@ -616,6 +616,74 @@
     "payoutMode": "NEFT",
     "checkerUserId": "partner-uuid-002",
     "authorizedAt": "2026-10-19T14:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 8.3 `POST /api/v1/disbursements/auction/:auctionId/disburse`
+**Description**: Record final payout release reference and timestamp.  
+**Roles**: `ACCOUNTANT`, `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "paymentReference": "UTR998877665544",
+  "disbursedAt": "2026-10-19T15:00:00.000Z"
+}
+```
+
+#### Success Response
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-19T15:00:00.000Z",
+  "data": {
+    "disbursementId": "disb-uuid-001",
+    "status": "DISBURSED",
+    "prizeMoney": 75000,
+    "paymentReference": "UTR998877665544",
+    "disbursedAt": "2026-10-19T15:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 8.4 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`
+**Description**: **Month N Maturity Settlement**: Final payout to unprized subscriber without auction (deducts 4% commission; transitions chit to COMPLETED).  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "disbursementMode": "BANK_TRANSFER_NEFT",
+  "paymentReference": "FINAL_SETTLEMENT_UTR_12345",
+  "disbursedAt": "2026-10-23T10:00:00.000Z",
+  "notes": "Month N final maturity prize money paid to unprized subscriber."
+}
+```
+
+#### Success Response
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-23T10:00:00.000Z",
+  "data": {
+    "auctionId": "auction-uuid-final",
+    "chitGroupId": "group-uuid-001",
+    "installmentMonth": 20,
+    "winningTicketNumber": 20,
+    "subscriberName": "P. Murugesan",
+    "disbursementMode": "BANK_TRANSFER_NEFT",
+    "disbursedAmount": 96000,
+    "foremanCommission": 4000,
+    "grossChitValue": 100000,
+    "chitGroupStatus": "COMPLETED",
+    "paymentReference": "FINAL_SETTLEMENT_UTR_12345"
   }
 }
 ```

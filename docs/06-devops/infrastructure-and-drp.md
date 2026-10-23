@@ -11,7 +11,7 @@
 ```mermaid
 flowchart TD
     Internet((Internet)) --> WAF[AWS WAF / CloudFront\nDDoS Protection & TLS Termination]
-    WAF --> ALB[Application Load Balancer / Caddy]
+    WAF --> ALB[Application Load Balancer / Nginx]
 
     subgraph VPC["AWS Virtual Private Cloud (ap-south-1)"]
         subgraph PublicSubnet["Public Subnet (AZ-1 & AZ-2)"]

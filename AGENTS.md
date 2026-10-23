@@ -79,7 +79,7 @@ Before starting any task, read the exact corresponding specification document in
 |---|---|
 | **Database Models & Prisma Schema** | [`docs/03-architecture/data-model.md`](docs/03-architecture/data-model.md) |
 | **Financial Formulas & Chit Math** | [`docs/01-business/financial-rules.md`](docs/01-business/financial-rules.md) |
-| **Architectural Decisions (ADR 01-15)** | [`docs/01-business/decision-log.md`](docs/01-business/decision-log.md) |
+| **Architectural Decisions (ADR 01-18)** | [`docs/01-business/decision-log.md`](docs/01-business/decision-log.md) |
 | **Personas, Roles & RBAC Matrix** | [`docs/01-business/permissions-matrix.md`](docs/01-business/permissions-matrix.md) |
 | **Security & Anti-BOLA/IDOR Guardians** | [`docs/03-architecture/security-and-access-guardians.md`](docs/03-architecture/security-and-access-guardians.md) |
 | **Functional Requirements (10 Modules)** | [`docs/02-requirements/prd.md`](docs/02-requirements/prd.md) |

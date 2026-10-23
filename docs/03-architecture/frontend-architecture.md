@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Status**: Authoritative Architectural Specification (`CONFIRMED-BY-DEVELOPER`)  
-> **Key Architecture Decisions**: [ADR-01 through ADR-17](../01-business/decision-log.md), [permissions-matrix.md](../01-business/permissions-matrix.md), [financial-rules.md](../01-business/financial-rules.md)  
+> **Key Architecture Decisions**: [ADR-01 through ADR-18](../01-business/decision-log.md), [permissions-matrix.md](../01-business/permissions-matrix.md), [financial-rules.md](../01-business/financial-rules.md)  
 > **Core Mandate**: The 4 Partners (Super Admin) have **100% full operational parity on BOTH Web and Mobile frontends for BOTH Maker and Checker roles**. The backend is completely device-agnostic (`maker_user_id != checker_user_id`).
 
 ---
@@ -19,7 +19,7 @@ flowchart TD
     end
 
     subgraph API["Backend Modular Monolith (apps/api)"]
-        Nest["79 REST Endpoints | BigInt Math | RBAC Guards\nSingle Source of Financial Truth"]
+        Nest["89 REST Endpoints (90 Operations) | BigInt Math | RBAC Guards\nSingle Source of Financial Truth"]
     end
 
     subgraph Personas["Persona Delivery Mapping"]

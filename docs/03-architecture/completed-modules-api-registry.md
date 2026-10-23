@@ -19,14 +19,14 @@
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
 | **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
-| **Module 8: Prize Disbursements** | `/disbursements` | 6 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout | 11 passing |
+| **Module 8: Prize Disbursements** | `/disbursements` | 7 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout, Month N Final Settlement | 15 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
 | **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | 80mm receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **88 (89 ops)** | **All Invariants 100% Satisfied** | **360 / 360 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **89 (90 ops)** | **All Invariants 100% Satisfied** | **371 / 371 PASSING** |
 
 ---
 
@@ -158,6 +158,7 @@
 | `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/auction/:id/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/disbursements/auction/:id/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Payout to final subscriber without auction (Less 4% commission; completes chit) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ## 10. Module 9: Dashboards & Statutory Reports (`apps/api/src/report/`)
 
@@ -286,9 +287,9 @@
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **88 physical endpoints across 86 paths / 89 operations fully implemented, documented, and tested** (61 domain module routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes).
-- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 89 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **278 unit tests passing across 20 test suites + 82 E2E tests passing across 10 suites (360 / 360 total tests, 100% pass rate)**.
+- **Total Production Endpoints**: **89 physical endpoints across 87 paths / 90 operations fully implemented, documented, and tested** (62 domain module routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 90 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **289 unit tests passing across 21 test suites + 82 E2E tests passing across 10 suites (371 / 371 total tests, 100% pass rate)**.
 
 
 

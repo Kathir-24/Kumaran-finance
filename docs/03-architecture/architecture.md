@@ -16,7 +16,7 @@ flowchart TD
     end
 
     subgraph Edge["Security & Gateway Tier"]
-        Caddy["Reverse Proxy (TLS / HTTPS)\nRate Limiting & Header Validation"]
+        Nginx["Nginx Reverse Proxy (TLS / HTTPS)\nRate Limiting & Header Validation"]
     end
 
     subgraph AppTier["Application Tier (Modular Monolith)"]
@@ -35,9 +35,9 @@ flowchart TD
         SMS["Indian Telecom DLT SMS Gateway\n(Initial Device Registration OTP Only)"]
     end
 
-    Mobile -->|HTTPS / REST API| Caddy
-    Web -->|HTTPS / REST API| Caddy
-    Caddy --> Nest
+    Mobile -->|HTTPS / REST API| Nginx
+    Web -->|HTTPS / REST API| Nginx
+    Nginx --> Nest
 
     Nest -->|Prisma ORM / Transactions| Postgres
     Nest -->|BullMQ Queue| Redis
@@ -83,18 +83,24 @@ The backend is built as a single deployable application with strict internal mod
 
 ```text
 apps/api/src/
-├── auth/                 # Device registration, MPIN, TOTP, JWT strategy, Guards
-├── branch/               # Branch management, settings, branch-scoping interceptor
-├── user/                 # Staff & Customer identity, RBAC decorators
-├── customer/             # Customer profiles, KYC uploads to S3, Nominees
-├── chit/                 # Scheme configuration, terms, ongoing chit onboarding
-├── ticket/               # Subscriber memberships, ticket allocation (1..N)
 ├── auction/              # In-office auction recording, physical tie-break, minutes
-├── installment/          # Due schedule generation, dividend deductions, balances
+├── auth/                 # Phone-only auth (ADR-18), OTP via DLT, MPIN, TOTP, JWT guards
+├── chit/                 # Scheme configuration, terms, ongoing chit onboarding
 ├── collection/           # Field collection recording, offline sync, cash handover
+├── common/               # BigInt interceptor, exception filters, DTO helpers
+├── config/               # Environment validation (strict fail-fast)
+├── customer/             # Customer profiles, KYC uploads to S3, Nominees
+├── disbursement/         # Prize disbursements, safety proof checklist, Month N settlement
+├── health/               # Terminus health checks & Sentry crash verification
+├── installment/          # Due schedule generation, 6-col passbook, ticket endpoints
+├── jobs/                 # BullMQ queues, daily arrears, notifications, recon
+├── metrics/              # Prometheus HTTP, BullMQ & business telemetry
+├── notification/         # Pluggable SMS (MSG91/Mock) & Mobile Push (FCM/Mock)
 ├── payment/              # Payments, allocations, bilingual receipts, reversals
-├── report/               # Day book, cash book, statutory Tamil Nadu registers
-└── audit/                # Immutable append-only audit event interceptor
+├── pdf/                  # Bilingual PDF canvas engine (80mm receipts, vouchers, Form XVII/XXI)
+├── prisma/               # Prisma database service & transactions
+├── report/               # Day book, cash book (Form XXII), statutory registers
+└── storage/              # Encrypted private S3 & local storage driver
 ```
 
 ---

@@ -91,7 +91,7 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
   describe('Category 1: Happy Path Scenarios', () => {
     it('TC-HP-01: Lists active chit schemes with locked 4.00% foreman commission', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/chits')
+        .get('/api/v1/chits?search=KCA-1L-20M-01')
         .set('Authorization', `Bearer ${superAdminToken}`);
 
       expect(res.status).toBe(200);

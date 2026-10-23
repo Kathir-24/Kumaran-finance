@@ -22,7 +22,7 @@ The entire project blueprint, architecture, compliance, and operational manual s
 ```text
 u:\Kumaran-finance\docs\
 ├── 01-business/
-│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-15)
+│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-18)
 │   ├── financial-rules.md                    # Confirmed financial math (whole-rupee mandate, 4% commission, dividends)
 │   ├── permissions-matrix.md                 # RBAC + maker-checker dual controls (4 partners & field agents)
 │   ├── compliance-checklist.md               # Regulatory items, data minimization, & statutory review
@@ -30,6 +30,7 @@ u:\Kumaran-finance\docs\
 ├── 02-requirements/
 │   ├── prd.md                                # 10 core modules acceptance criteria
 │   ├── user-stories-and-journeys.md          # 6 personas, 28 features, user stories & journey maps
+│   ├── educational-guides/                   # 6-persona educational training & operational guides
 │   ├── non-functional-requirements.md        # Security, latency, precision standards
 │   └── notification-and-receipt-templates.md # Smart Push Notifications, DLT SMS, & Bilingual PDF receipts
 ├── 03-architecture/
@@ -42,7 +43,8 @@ u:\Kumaran-finance\docs\
 │   ├── completed-modules-api-registry.md     # 6-persona RBAC matrix for Modules 1–9
 │   ├── registrar-filing-protocol.md          # Form XVII Registrar filing protocol
 │   ├── security-and-access-guardians.md      # Anti-BOLA/IDOR & branch scoping defenses
-│   └── openapi-spec.json                     # Generated OpenAPI 3.0 JSON specification
+│   ├── openapi-spec.json                     # Generated OpenAPI 3.0 JSON specification
+│   └── openapi-types.ts                      # Strongly-typed TypeScript client SDK contract
 ├── 04-engineering/
 │   ├── setup-and-contributing.md             # Local environment & Docker guide
 │   ├── ai-coding-guidelines.md               # Prompt templates & AI guardrails
@@ -117,7 +119,7 @@ Open your browser and verify the built-in administrative & observability portals
 
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 74 REST endpoints. |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 89 physical REST endpoints (90 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
 | **Sentry APM & Crash Monitoring**| [http://localhost:3000/health/sentry-test](http://localhost:3000/health/sentry-test) | Config in `apps/api/.env` | `@sentry/nestjs` crash reporting with Indian DPDP Act PII scrubbing and safe bypass. |
@@ -155,8 +157,11 @@ Run the automated test suite verifying all 10 non-negotiable financial invariant
 # Run Oxlint linter (0 warnings, 0 errors expected)
 pnpm run lint
 
-# Run all 19 test suites (248 / 248 passing tests, 100% pass rate)
+# Run all 21 unit test suites (289 / 289 passing tests, 100% pass rate)
 pnpm test
+
+# Run all 10 end-to-end integration test suites (82 / 82 passing tests)
+pnpm test:e2e
 
 # Run production compilation check
 pnpm run build

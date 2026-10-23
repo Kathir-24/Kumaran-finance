@@ -34,6 +34,16 @@ function seedTestDatabase(): void {
   const apiDir = path.resolve(__dirname, '..');
 
   try {
+    execSync('npx prisma migrate deploy', {
+      cwd: apiDir,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        DATABASE_URL: targetUrl,
+        NODE_ENV: 'test',
+      },
+    });
+
     execSync('npx prisma db seed', {
       cwd: apiDir,
       stdio: 'inherit',
@@ -43,7 +53,7 @@ function seedTestDatabase(): void {
         NODE_ENV: 'test',
       },
     });
-    console.log('✅ Test database seeded successfully with deterministic baseline.');
+    console.log('✅ Test database migrated and seeded successfully with deterministic baseline.');
   } catch (error: any) {
     console.error('❌ Failed to seed test database:', error.message);
     process.exit(1);

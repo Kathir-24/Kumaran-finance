@@ -63,22 +63,30 @@ Environment variables are validated fail-fast at server startup via [`src/config
 | Variable | Type | Mandatory? | Default (Local Dev) | Description |
 |---|:---:|:---:|---|---|
 | `PORT` | `number` | Optional | `3000` | HTTP port for NestJS server. |
-| `NODE_ENV` | `string` | Optional | `development` | Runtime environment (`development`, `production`, `test`). |
+| `NODE_ENV` | `string` | Optional | `development` | Runtime environment (`development`, `staging`, `production`, `test`). |
 | `API_PREFIX` | `string` | Optional | `api/v1` | Global URI prefix for all REST controllers. |
 | `DATABASE_URL` | `string` | **Yes** | `postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public` | PostgreSQL connection string. |
 | `JWT_SECRET` | `string` | **Yes** | Configured in `.env` | Secret key for signing staff JWT access tokens. |
 | `JWT_EXPIRES_IN` | `string` | Optional | `15m` | Access token lifespan. |
 | `REFRESH_TOKEN_EXPIRES_IN`| `string` | Optional | `7d` | Refresh token lifespan. |
+| `CORS_ALLOWED_ORIGINS` | `string` | Optional | `http://localhost:3000,http://localhost:3001` | Comma-separated allowed web origins. |
 | `DEFAULT_FOREMAN_COMMISSION_PERCENT`| `number` | Optional | `4.00` | Default Foreman commission rate frozen per group upon activation (ADR-04). |
 | `PRIMARY_BRANCH_CODE` | `string` | Optional | `PRD` | Branch code for Head Office (Perundurai). |
 | `STORAGE_DRIVER` | `string` | Optional | `local` | Attachment storage driver (`local` or `s3`). |
 | `LOCAL_STORAGE_PATH` | `string` | Optional | `./storage/uploads` | Path for uploaded KYC documents and PDF receipts in local mode. |
-| `AWS_REGION` | `string` | Optional | `ap-south-1` | AWS region for S3 object storage. |
-| `AWS_ACCESS_KEY_ID` | `string` | If S3 | `undefined` | AWS IAM Access Key (mandatory when `STORAGE_DRIVER=s3`). |
-| `AWS_SECRET_ACCESS_KEY`| `string` | If S3 | `undefined` | AWS IAM Secret Key (mandatory when `STORAGE_DRIVER=s3`). |
-| `AWS_S3_BUCKET` | `string` | If S3 | `undefined` | Private S3 bucket name (mandatory when `STORAGE_DRIVER=s3`). |
+| `S3_BUCKET` | `string` | If S3 | `kumaran-chits-private` | Universal S3 bucket name (AWS S3, MinIO, Cloudflare R2). |
+| `S3_REGION` | `string` | Optional | `ap-south-1` | S3 region (Mumbai). |
+| `S3_ACCESS_KEY_ID` | `string` | If S3 | `undefined` | S3 access key ID. |
+| `S3_SECRET_ACCESS_KEY`| `string` | If S3 | `undefined` | S3 secret access key. |
+| `S3_ENDPOINT` | `string` | Optional | `undefined` | Custom S3 endpoint (e.g. `http://127.0.0.1:9000` for MinIO). |
+| `S3_FORCE_PATH_STYLE` | `boolean`| Optional | `false` | Required true for local MinIO compatibility. |
 | `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ scheduled jobs. |
 | `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues. |
+| `BULL_BOARD_USER` | `string` | Optional | `admin` | HTTP Basic Auth user for Bull Board at `/admin/queues`. |
+| `BULL_BOARD_PASSWORD` | `string` | Optional | `chitflow_secret` | HTTP Basic Auth password for Bull Board. |
+| `SMS_DRIVER` | `string` | Optional | `mock` | SMS gateway driver (`mock` for dev/test, `msg91` for production DLT). |
+| `PUSH_DRIVER` | `string` | Optional | `mock` | Mobile Push driver (`mock` or `firebase` for FCM). |
+| `SENTRY_DSN` | `string` | Optional | `""` | Sentry DSN (safe-bypass when empty). |
 
 ---
 

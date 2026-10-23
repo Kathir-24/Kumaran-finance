@@ -90,7 +90,10 @@ Opens in your browser at `http://localhost:5555`.
 | `20261018125155_add_auth_credentials_to_user` | 2026-10-18 | Added password authentication, TOTP secrets, MPIN bcrypt hash, and refresh token hashes to `User`. | **Applied & Verified** |
 | `20261018171620_payment_reversal_maker_checker` | 2026-10-18 | Added PaymentReversal table enforcing dual control (`requestedByUserId != reviewedByUserId`). | **Applied & Verified** |
 | `20261019120630_add_registrar_filing_to_auction_minutes` | 2026-10-19 | Added Form XVII filing reference and statutory filing date fields to `AuctionMinutes`. | **Applied & Verified** |
-| `20261021142000_add_fcm_token_to_user_and_customer` | 2026-10-21 | Added nullable `fcmToken` column to both `User` and `Customer` tables for Firebase Cloud Messaging push dispatch. | **Applied & Verified** (`261/261` automated tests passing) |
+| `20261021142000_add_fcm_token_to_user_and_customer` | 2026-10-21 | Added nullable `fcmToken` column to both `User` and `Customer` tables for Firebase Cloud Messaging push dispatch. | **Applied & Verified** |
+| `20261021170132_add_payment_notes` | 2026-10-21 | Added optional `notes` column to `Payment` for cashier remarks and collection logs. | **Applied & Verified** |
+| `20261022205000_remove_user_email` | 2026-10-22 | Dropped `email` column from `User` table to enforce strict phone-only identity (ADR-18). | **Applied & Verified** |
+| `20261023095606_add_cycle_date_windows` | 2026-10-23 | Added `cycleStartDate` and `cycleEndDate` to `InstallmentDue` for physical 6-column passbook ledger alignment. | **Applied & Verified** (`289/289` unit tests, `82/82` E2E tests passing) |
 
 ---
 

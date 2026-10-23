@@ -22,6 +22,7 @@
 | **O-09** | **Password Reset Delegation** | Staff credential resets are handled strictly by Super Admin. Customers perform self-resets via verified mobile OTP/MPIN. | `permissions-matrix.md` | `CONFIRMED-BY-DEVELOPER` |
 | **O-10** | **Handover & Cloud Terms** | What are the commercial and handover terms under which code, AWS cloud accounts, and domain will transition from Developer to Kumaran Finance? | `decision-log.md` (ADR-10) | `OPEN` |
 | **O-11** | **Provider Onboarding** | Indian Telecom DLT SMS configured with MSG91 for OTP and keypad fallback. WhatsApp Business API is officially parked in V1 to eliminate recurring SaaS costs (`CONFIRMED-BY-DEVELOPER`). | `decision-log.md` (ADR-12) | `RESOLVED` |
+| **O-12** | **Phone-Only Architecture & Email Elimination** | The 4 Partners, desk accountant, field agents, and subscribers interact exclusively via 10-digit Indian mobile numbers (`^[6-9]\d{9}$`). `email` is completely removed from User database, JWT tokens, DTOs, and login forms (`CONFIRMED-BY-DEVELOPER`). | `decision-log.md` (ADR-18) | `CONFIRMED-BY-DEVELOPER` |
 
 ---
 

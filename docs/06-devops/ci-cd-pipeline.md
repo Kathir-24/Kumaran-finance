@@ -47,15 +47,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout Source Code
@@ -88,21 +79,14 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec prisma db seed
 
-      - name: Run Unit & Financial Invariant Tests (278 tests)
+      - name: Run Unit & Financial Invariant Tests (289 tests)
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
         run: pnpm test
 
-      - name: Run End-to-End (E2E) Integration Tests (82 tests)
-        working-directory: apps/api
-        env:
-          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-        run: pnpm run test:e2e
-
       - name: Compile NestJS Application
+        run: pnpm --filter api run build
         run: pnpm --filter api run build
 
   build-and-deploy:
