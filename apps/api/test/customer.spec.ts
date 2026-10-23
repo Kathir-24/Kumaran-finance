@@ -1,18 +1,36 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CustomerController } from '../src/customer/customer.controller';
 import { CustomerService } from '../src/customer/customer.service';
+import { KycDocumentType } from '../src/customer/dto/upload-customer-document.dto';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Module 2: Customer & Nominee Management Tests', () => {
   let customerService: CustomerService;
   let customerController: CustomerController;
   let prismaMock: any;
+  let storageServiceMock: any;
 
   const mockBranchId = 'branch-prd-001';
   const mockCustomerId = 'cust-uuid-001';
 
   beforeEach(() => {
+    storageServiceMock = {
+      uploadFile: jest.fn().mockResolvedValue({
+        key: 'kyc/cust-uuid-001/AADHAAR_FRONT-test.jpg',
+        url: 'https://storage/kyc/cust-uuid-001/AADHAAR_FRONT-test.jpg',
+        sizeBytes: 1024,
+      }),
+      getPresignedUrl: jest
+        .fn()
+        .mockResolvedValue('https://storage-presigned/kyc/cust-uuid-001/doc.jpg?sig=xyz'),
+    };
+
     prismaMock = {
       customer: {
         findFirst: jest.fn(),
@@ -21,6 +39,10 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      customerDocument: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
       },
       nominee: {
         findUnique: jest.fn(),
@@ -32,7 +54,10 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       },
     };
 
-    customerService = new CustomerService(prismaMock as unknown as PrismaService);
+    customerService = new CustomerService(
+      prismaMock as unknown as PrismaService,
+      storageServiceMock as any,
+    );
     customerController = new CustomerController(customerService);
   });
 
@@ -450,6 +475,172 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
         customerController.updateFcmToken(
           mockCustomerId,
           { fcmToken: 'token-hijack' },
+          customerPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('7. Customer KYC Document Uploads & Presigned URLs', () => {
+    const mockFile = {
+      originalname: 'aadhaar_front.jpg',
+      mimetype: 'image/jpeg',
+      size: 512 * 1024,
+      buffer: Buffer.from('fake-image-bytes'),
+    };
+
+    const mockCreatedDoc = {
+      id: 'doc-uuid-001',
+      customerId: mockCustomerId,
+      docType: KycDocumentType.AADHAAR_FRONT,
+      fileName: 'aadhaar_front.jpg',
+      verified: false,
+      uploadedAt: new Date(),
+    };
+
+    it('should successfully upload a KYC document and record in DB', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId, customerCode: 'KC-CUST-00001' });
+      prismaMock.customerDocument.create.mockResolvedValue(mockCreatedDoc);
+
+      const res = await customerService.uploadDocument(
+        mockCustomerId,
+        { docType: KycDocumentType.AADHAAR_FRONT },
+        mockFile,
+      );
+
+      expect(res.id).toBe('doc-uuid-001');
+      expect(storageServiceMock.uploadFile).toHaveBeenCalled();
+      expect(prismaMock.customerDocument.create).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException if file is missing', async () => {
+      await expect(
+        customerService.uploadDocument(
+          mockCustomerId,
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          undefined as any,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for unsupported file format', async () => {
+      const badFile = {
+        ...mockFile,
+        mimetype: 'application/x-executable',
+      };
+
+      await expect(
+        customerService.uploadDocument(
+          mockCustomerId,
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          badFile,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if file exceeds 10 MB limit', async () => {
+      const oversizedFile = {
+        ...mockFile,
+        size: 11 * 1024 * 1024,
+      };
+
+      await expect(
+        customerService.uploadDocument(
+          mockCustomerId,
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          oversizedFile,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if customer does not exist on upload', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(null);
+
+      await expect(
+        customerService.uploadDocument(
+          'non-existent-id',
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          mockFile,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow customer to upload document for their own profile via controller', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customerDocument.create.mockResolvedValue(mockCreatedDoc);
+
+      const customerPayload = {
+        sub: mockCustomerId,
+        phone: '9842712345',
+        roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      const res = await customerController.uploadDocument(
+        mockCustomerId,
+        { docType: KycDocumentType.AADHAAR_FRONT },
+        mockFile,
+        customerPayload,
+      );
+
+      expect(res.id).toBe('doc-uuid-001');
+    });
+
+    it('should throw ForbiddenException if customer uploads for another customer ID (Anti-IDOR)', async () => {
+      const customerPayload = {
+        sub: 'other-cust-id',
+        phone: '9842799999',
+        roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      await expect(
+        customerController.uploadDocument(
+          mockCustomerId,
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          mockFile,
+          customerPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should generate a 15-minute presigned viewing URL for valid document', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customerDocument.findFirst.mockResolvedValue({
+        id: 'doc-uuid-001',
+        customerId: mockCustomerId,
+        s3Key: 'kyc/cust-uuid-001/doc.jpg',
+      });
+
+      const res = await customerService.getDocumentPresignedUrl(mockCustomerId, 'doc-uuid-001');
+      expect(res.url).toContain('https://storage-presigned/');
+      expect(res.expiresInSeconds).toBe(900);
+    });
+
+    it('should throw NotFoundException if document does not exist for customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({ id: mockCustomerId });
+      prismaMock.customerDocument.findFirst.mockResolvedValue(null);
+
+      await expect(
+        customerService.getDocumentPresignedUrl(mockCustomerId, 'doc-non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if customer views document of another customer (Anti-IDOR)', async () => {
+      const customerPayload = {
+        sub: 'other-cust-id',
+        phone: '9842799999',
+        roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+      };
+
+      await expect(
+        customerController.getDocumentUrl(
+          mockCustomerId,
+          'doc-uuid-001',
           customerPayload,
         ),
       ).rejects.toThrow(ForbiddenException);

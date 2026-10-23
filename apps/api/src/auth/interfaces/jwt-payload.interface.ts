@@ -1,6 +1,6 @@
 import { Role } from '@prisma/client';
 
-export type TokenType = 'access' | 'refresh' | 'totp_pending';
+export type TokenType = 'access' | 'refresh' | 'totp_pending' | 'mpin_setup';
 
 export interface JwtPayload {
   sub: string;

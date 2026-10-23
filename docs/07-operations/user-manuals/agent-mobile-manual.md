@@ -3,6 +3,9 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Target Users**: Field Collection Agents  
 > **Platform**: Android Mobile App (Flutter)
+>
+> [!NOTE]
+> **Operational Status**: This manual specifies field collection workflows designed against the completed backend API (`apps/api/`). Flutter client app initialization in `apps/mobile/` is scheduled in Phase 2.
 
 ---
 

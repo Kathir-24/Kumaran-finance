@@ -118,6 +118,8 @@ async function bootstrap() {
     )
     .addTag('Health', 'System health checks')
     .addTag('Auth', 'Staff identity, MPIN, and TOTP 2FA')
+    .addTag('Branches', 'Company branch offices')
+    .addTag('Staff Users', 'Office staff user administration')
     .addTag('Customers', 'Customer intake, KYC, and Nominees')
     .addTag('Chits', 'Chit schemes, tickets, and mid-cycle onboarding')
     .addTag('Auctions', 'In-office auctions, bidding, and tie-breakers')

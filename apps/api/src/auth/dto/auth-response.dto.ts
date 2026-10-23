@@ -126,3 +126,51 @@ export class FcmTokenUpdateResponseDto {
   @ApiProperty({ example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
   fcmToken?: string | null;
 }
+
+export class RequestOtpResponseDto {
+  @ApiProperty({ example: true, description: 'Whether OTP was successfully dispatched' })
+  success: boolean;
+
+  @ApiProperty({ example: 'OTP sent successfully to registered mobile number.', description: 'Status message' })
+  message: string;
+
+  @ApiProperty({ example: 300, description: 'OTP expiration period in seconds' })
+  expiresInSeconds: number;
+}
+
+export class VerifyOtpResponseDto {
+  @ApiProperty({ example: true, description: 'Whether OTP verification was successful' })
+  verified: boolean;
+
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsIn...',
+    description: 'Scoped setup token for configuring MPIN (issued when first-time staff onboarding)',
+    required: false,
+  })
+  setupToken?: string;
+
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsIn...',
+    description: 'Full JWT access token (issued for customers or staff with pre-existing MPIN)',
+    required: false,
+  })
+  accessToken?: string;
+
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsIn...',
+    description: 'Rotating refresh token',
+    required: false,
+  })
+  refreshToken?: string;
+
+  @ApiProperty({
+    type: UserProfileResponseDto,
+    description: 'Authenticated user or customer profile',
+    required: false,
+  })
+  user?: any;
+
+  @ApiProperty({ example: 'OTP verified successfully.', description: 'Status message' })
+  message: string;
+}
+

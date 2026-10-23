@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { REGEX_MPIN } from '../../common/constants';
 
 export class SetMpinDto {
@@ -11,4 +11,14 @@ export class SetMpinDto {
   @IsString()
   @Matches(REGEX_MPIN, { message: 'MPIN must be exactly 6 digits' })
   mpin: string;
+
+  @ApiPropertyOptional({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description:
+      'Temporary setup token returned from verify-otp (required during first-time device registration)',
+  })
+  @IsOptional()
+  @IsString()
+  setupToken?: string;
 }
+

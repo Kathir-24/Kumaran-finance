@@ -19,12 +19,12 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
   });
 
   describe('Section 1: OpenAPI Path and Operation Metrics', () => {
-    it('should contain exactly 87 paths matching backend controllers', () => {
+    it('should contain exactly 97 paths matching backend controllers', () => {
       const pathKeys = Object.keys(openApiSpec.paths);
-      expect(pathKeys.length).toBe(87);
+      expect(pathKeys.length).toBe(97);
     });
 
-    it('should contain exactly 90 total HTTP operations', () => {
+    it('should contain exactly 102 total HTTP operations', () => {
       let operationCount = 0;
       for (const p of Object.values(openApiSpec.paths) as any[]) {
         for (const method of ['get', 'post', 'put', 'patch', 'delete', 'options', 'head']) {
@@ -33,15 +33,17 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
           }
         }
       }
-      expect(operationCount).toBe(90);
+      expect(operationCount).toBe(102);
     });
   });
 
   describe('Section 2: Strongly-Typed Paths & Component Schemas', () => {
-    it('should export all 14 core business domain modules in the schema', () => {
+    it('should export all 16 core business domain modules in the schema', () => {
       const tags: string[] = openApiSpec.tags.map((t: any) => t.name);
       expect(tags).toContain('Health');
       expect(tags).toContain('Auth');
+      expect(tags).toContain('Branches');
+      expect(tags).toContain('Staff Users');
       expect(tags).toContain('Customers');
       expect(tags).toContain('Chits');
       expect(tags).toContain('Auctions');

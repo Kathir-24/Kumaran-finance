@@ -121,3 +121,35 @@ export class CustomerFcmUpdateResponseDto {
   @ApiProperty({ example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
   fcmToken?: string | null;
 }
+
+export class CustomerDocumentResponseDto {
+  @ApiProperty({ example: 'doc-uuid-001', description: 'Document unique ID' })
+  id: string;
+
+  @ApiProperty({ example: 'cust-uuid-001', description: 'Customer ID' })
+  customerId: string;
+
+  @ApiProperty({ example: 'AADHAAR_FRONT', description: 'Document type' })
+  docType: string;
+
+  @ApiProperty({ example: 'aadhaar_front.jpg', description: 'Original file name' })
+  fileName: string;
+
+  @ApiProperty({ example: false, description: 'Whether staff verified this document' })
+  verified: boolean;
+
+  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Upload timestamp' })
+  uploadedAt: Date | string;
+}
+
+export class DocumentPresignedUrlResponseDto {
+  @ApiProperty({
+    example: 'https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...',
+    description: 'Time-limited 15-minute viewing URL',
+  })
+  url: string;
+
+  @ApiProperty({ example: 900, description: 'URL expiration duration in seconds (15 minutes)' })
+  expiresInSeconds: number;
+}
+

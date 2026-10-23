@@ -1,21 +1,36 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UploadCustomerDocumentDto } from './dto/upload-customer-document.dto';
 
 const CUSTOMER_CODE_PREFIX = 'KC-CUST-';
+const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+];
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   /**
    * Generates sequential, collision-free customer code: KC-CUST-00001, KC-CUST-00002...
@@ -349,6 +364,90 @@ export class CustomerService {
         ? 'Customer device FCM token registered successfully.'
         : 'Customer device FCM token deregistered successfully.',
       fcmToken: updatedCustomer.fcmToken,
+    };
+  }
+
+  /**
+   * Uploads and links a KYC document scan (Aadhaar, PAN, Photo, Signature)
+   */
+  async uploadDocument(
+    customerId: string,
+    dto: UploadCustomerDocumentDto,
+    file?: { originalname: string; mimetype: string; size: number; buffer: Buffer },
+  ) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('A valid document file is required for upload');
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Unsupported file type: ${file.mimetype}. Allowed formats: JPG, PNG, WEBP, PDF`,
+      );
+    }
+
+    if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      throw new BadRequestException('Document file size exceeds the 10 MB limit');
+    }
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, customerCode: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    const rawExt = path.extname(file.originalname).toLowerCase() || '.bin';
+    const sanitizedExt = rawExt.replace(/[^a-z0-9.]/gi, '');
+    const s3Key = `kyc/${customerId}/${dto.docType}-${randomUUID()}${sanitizedExt}`;
+
+    await this.storageService.uploadFile(s3Key, file.buffer, file.mimetype);
+
+    return this.prisma.customerDocument.create({
+      data: {
+        customerId,
+        docType: dto.docType,
+        s3Key,
+        fileName: file.originalname || `${dto.docType}${sanitizedExt}`,
+        verified: false,
+      },
+      select: {
+        id: true,
+        customerId: true,
+        docType: true,
+        fileName: true,
+        verified: true,
+        uploadedAt: true,
+      },
+    });
+  }
+
+  /**
+   * Generates a 15-minute time-limited presigned URL to view a customer KYC document
+   */
+  async getDocumentPresignedUrl(customerId: string, docId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    const document = await this.prisma.customerDocument.findFirst({
+      where: { id: docId, customerId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${docId} not found for this customer`);
+    }
+
+    const url = await this.storageService.getPresignedUrl(document.s3Key, 900);
+    return {
+      url,
+      expiresInSeconds: 900,
     };
   }
 }

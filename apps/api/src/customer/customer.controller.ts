@@ -10,10 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -35,15 +40,18 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
 import {
   CustomerDetailResponseDto,
+  CustomerDocumentResponseDto,
   CustomerFcmUpdateResponseDto,
   CustomerListItemDto,
   CustomerResponseDto,
+  DocumentPresignedUrlResponseDto,
   NomineeResponseDto,
 } from './dto/customer-response.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { UpdateCustomerFcmTokenDto } from './dto/update-customer-fcm-token.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UploadCustomerDocumentDto } from './dto/upload-customer-document.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth('JWT-auth')
@@ -236,6 +244,100 @@ export class CustomerController {
     }
 
     return this.customerService.updateFcmToken(id, dto.fcmToken);
+  }
+
+  @Post(':id/documents')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'docType'],
+      properties: {
+        docType: {
+          type: 'string',
+          enum: ['AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN', 'PHOTO', 'SIGNATURE'],
+          example: 'AADHAAR_FRONT',
+        },
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+  )
+  @ApiOperation({
+    summary: 'Upload and link a KYC verification document',
+    description:
+      'Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.',
+  })
+  @ApiCreatedResponseEnvelope(CustomerDocumentResponseDto, {
+    description: 'Document uploaded and linked successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Missing file or unsupported file format' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Customers can only upload for their own profile' })
+  @ApiResponse({ status: 404, description: 'Customer not found' })
+  async uploadDocument(
+    @Param('id') customerId: string,
+    @Body() dto: UploadCustomerDocumentDto,
+    @UploadedFile() file: any,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    if (
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
+      currentUser.sub !== customerId
+    ) {
+      throw new ForbiddenException(
+        'Subscribers are only permitted to upload KYC documents for their own account',
+      );
+    }
+
+    return this.customerService.uploadDocument(customerId, dto, file);
+  }
+
+  @Get(':id/documents/:docId/url')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate 15-minute presigned viewing URL for customer KYC scan',
+    description:
+      'Returns a secure, time-limited S3 presigned URL for viewing the KYC document. Field agents are excluded per compliance rules; Customers restricted to self.',
+  })
+  @ApiOkResponseEnvelope(DocumentPresignedUrlResponseDto, {
+    description: 'Presigned viewing URL generated successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden: Access to KYC document restricted' })
+  @ApiResponse({ status: 404, description: 'Customer or document not found' })
+  async getDocumentUrl(
+    @Param('id') customerId: string,
+    @Param('docId') docId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    if (
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
+      currentUser.sub !== customerId
+    ) {
+      throw new ForbiddenException(
+        'Subscribers are only permitted to view their own KYC documents',
+      );
+    }
+
+    return this.customerService.getDocumentPresignedUrl(customerId, docId);
   }
 }
 

@@ -6,23 +6,28 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service';
+import { SmsService } from '../notification/services/sms.service';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
   DEFAULT_JWT_REFRESH_EXPIRES_IN,
+  OTP_EXPIRY_SECONDS,
   TOTP_ISSUER_NAME,
 } from '../common/constants';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
 import { SetMpinDto } from './dto/set-mpin.dto';
 import { TotpEnableDto } from './dto/totp-enable.dto';
 import { TotpVerifyDto } from './dto/totp-verify.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 export interface SanitizedUser {
@@ -38,10 +43,26 @@ export interface SanitizedUser {
 
 @Injectable()
 export class AuthService {
+  private readonly otpStore = new Map<
+    string,
+    {
+      hashedOtp: string;
+      expiresAt: number;
+      attempts: number;
+      entityId: string;
+      name: string;
+      roles: Role[];
+      branchId: string | null;
+      phone: string;
+      isCustomer: boolean;
+    }
+  >();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly smsService: SmsService,
   ) {}
 
   /**
@@ -255,19 +276,238 @@ export class AuthService {
   }
 
   /**
+   * Requests a 6-digit SMS OTP for mobile device onboarding
+   */
+  async requestOtp(dto: RequestOtpDto) {
+    const trimmedPhone = dto.phone.trim();
+
+    // Check staff user
+    const user = await this.prisma.user.findUnique({
+      where: { phone: trimmedPhone },
+    });
+
+    let entityId: string;
+    let name: string;
+    let roles: Role[];
+    let branchId: string | null;
+    let isCustomer = false;
+
+    if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedException('Staff account is deactivated. Please contact Super Admin.');
+      }
+      entityId = user.id;
+      name = user.name;
+      roles = user.roles;
+      branchId = user.branchId;
+    } else {
+      // Check customer
+      const customer = await this.prisma.customer.findUnique({
+        where: { phone: trimmedPhone },
+      });
+
+      if (!customer) {
+        throw new NotFoundException(
+          'No registered staff or customer profile found with this phone number',
+        );
+      }
+
+      entityId = customer.id;
+      name = customer.fullName;
+      roles = [Role.CUSTOMER];
+      branchId = customer.branchId;
+      isCustomer = true;
+    }
+
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const hashedOtp = crypto.createHash('sha256').update(otpCode).digest('hex');
+
+    this.otpStore.set(trimmedPhone, {
+      hashedOtp,
+      expiresAt: Date.now() + OTP_EXPIRY_SECONDS * 1000,
+      attempts: 0,
+      entityId,
+      name,
+      roles,
+      branchId,
+      phone: trimmedPhone,
+      isCustomer,
+    });
+
+    await this.smsService.sendOtpSms(trimmedPhone, otpCode);
+
+    return {
+      success: true,
+      message: 'OTP sent successfully to registered mobile number.',
+      expiresInSeconds: OTP_EXPIRY_SECONDS,
+    };
+  }
+
+  /**
+   * Verifies 6-digit SMS OTP and returns setupToken or full session tokens
+   */
+  async verifyOtp(dto: VerifyOtpDto) {
+    const trimmedPhone = dto.phone.trim();
+    const record = this.otpStore.get(trimmedPhone);
+
+    if (!record || Date.now() > record.expiresAt) {
+      throw new BadRequestException('OTP has expired or was not requested. Please request a new OTP.');
+    }
+
+    record.attempts += 1;
+    if (record.attempts > 3) {
+      this.otpStore.delete(trimmedPhone);
+      throw new BadRequestException('Too many invalid verification attempts. Please request a new OTP.');
+    }
+
+    const candidateHash = crypto.createHash('sha256').update(dto.otp.trim()).digest('hex');
+    if (candidateHash !== record.hashedOtp) {
+      throw new BadRequestException('Invalid OTP code. Please enter the correct 6-digit code.');
+    }
+
+    this.otpStore.delete(trimmedPhone);
+
+    if (record.isCustomer) {
+      return this.generateCustomerAuthTokens({
+        id: record.entityId,
+        fullName: record.name,
+        phone: record.phone,
+        branchId: record.branchId,
+      });
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: record.entityId },
+    });
+
+    if (user?.mpinHash) {
+      const tokens = await this.generateAuthTokens(user);
+      return {
+        verified: true,
+        ...tokens,
+        message: 'OTP verified successfully.',
+      };
+    }
+
+    const tempPayload: JwtPayload = {
+      sub: record.entityId,
+      phone: record.phone,
+      roles: record.roles,
+      branchId: record.branchId,
+      tokenType: 'mpin_setup',
+    };
+
+    const setupToken = this.jwtService.sign(tempPayload, { expiresIn: '10m' });
+
+    return {
+      verified: true,
+      setupToken,
+      message: 'OTP verified successfully. Please configure your 6-digit MPIN.',
+    };
+  }
+
+  /**
    * Sets or updates 6-digit MPIN for mobile quick unlock
    */
-  async setMpin(userId: string, dto: SetMpinDto) {
+  async setMpin(userIdFromAuth: string | undefined, dto: SetMpinDto) {
+    let targetUserId = userIdFromAuth;
+
+    if (dto.setupToken) {
+      let payload: JwtPayload;
+      try {
+        payload = this.jwtService.verify<JwtPayload>(dto.setupToken);
+      } catch {
+        throw new UnauthorizedException('Invalid or expired MPIN setup token');
+      }
+
+      if (payload.tokenType !== 'mpin_setup' && payload.tokenType !== 'access') {
+        throw new UnauthorizedException('Invalid token type for MPIN setup');
+      }
+      targetUserId = payload.sub;
+    }
+
+    if (!targetUserId) {
+      throw new UnauthorizedException('Valid authentication token or setup token is required to set MPIN');
+    }
+
     const mpinHash = await bcrypt.hash(dto.mpin, BCRYPT_SALT_ROUNDS);
 
-    await this.prisma.user.update({
-      where: { id: userId },
+    const user = await this.prisma.user.update({
+      where: { id: targetUserId },
       data: { mpinHash },
     });
+
+    if (dto.setupToken) {
+      const tokens = await this.generateAuthTokens(user);
+      return {
+        success: true,
+        message: '6-digit MPIN configured successfully.',
+        ...tokens,
+      };
+    }
 
     return {
       success: true,
       message: '6-digit MPIN updated successfully.',
+    };
+  }
+
+  /**
+   * Verifies and decodes a JWT token
+   */
+  verifyToken(token: string): JwtPayload {
+    return this.jwtService.verify<JwtPayload>(token);
+  }
+
+  /**
+   * Helper to issue JWT tokens for Chit Subscribers (Role.CUSTOMER)
+   */
+  private generateCustomerAuthTokens(customer: {
+    id: string;
+    fullName: string;
+    phone: string;
+    branchId: string | null;
+  }) {
+    const accessPayload: JwtPayload = {
+      sub: customer.id,
+      phone: customer.phone,
+      roles: [Role.CUSTOMER],
+      branchId: customer.branchId,
+      tokenType: 'access',
+    };
+
+    const refreshPayload: JwtPayload = {
+      sub: customer.id,
+      phone: customer.phone,
+      roles: [Role.CUSTOMER],
+      branchId: customer.branchId,
+      tokenType: 'refresh',
+    };
+
+    const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??
+      DEFAULT_JWT_ACCESS_EXPIRES_IN) as any;
+    const refreshExpiresIn = (this.configService.get<string>(
+      'REFRESH_TOKEN_EXPIRES_IN',
+    ) ?? DEFAULT_JWT_REFRESH_EXPIRES_IN) as any;
+
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: jwtExpiresIn });
+    const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
+
+    return {
+      verified: true,
+      accessToken,
+      refreshToken,
+      user: {
+        id: customer.id,
+        name: customer.fullName,
+        phone: customer.phone,
+        roles: [Role.CUSTOMER],
+        branchId: customer.branchId,
+        isTotpEnabled: false,
+        hasMpin: false,
+        lastLoginAt: new Date(),
+      },
+      message: 'OTP verified successfully. Subscriber logged in.',
     };
   }
 

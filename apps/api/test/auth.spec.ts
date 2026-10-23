@@ -1,4 +1,9 @@
-import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -7,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { generateSecret, generateSync } from 'otplib';
 import { AuthService } from '../src/auth/auth.service';
 import { RolesGuard } from '../src/auth/guards/roles.guard';
+import { SmsService } from '../src/notification/services/sms.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Module 1: Auth & Staff Identity Tests', () => {
@@ -14,6 +20,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
   let prismaMock: any;
   let jwtService: JwtService;
   let configService: ConfigService;
+  let smsServiceMock: any;
 
   const mockBranchId = 'branch-prd-001';
   const mockUserId = 'user-admin-001';
@@ -25,11 +32,21 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
   });
 
   beforeEach(() => {
+    smsServiceMock = {
+      sendOtpSms: jest.fn().mockResolvedValue({ success: true, messageId: 'sms-otp-123' }),
+      sendPaymentReceiptSms: jest.fn(),
+      sendAuctionReminderSms: jest.fn(),
+      sendDefaultWarningSms: jest.fn(),
+    };
+
     prismaMock = {
       user: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      customer: {
+        findUnique: jest.fn(),
       },
     };
 
@@ -48,6 +65,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       prismaMock as unknown as PrismaService,
       jwtService,
       configService,
+      smsServiceMock as unknown as SmsService,
     );
   });
 
@@ -422,6 +440,164 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       await expect(
         authService.updateFcmToken('unknown-user-id', 'some-token'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('6. Mobile First-Time Onboarding (SMS-OTP & MPIN Setup)', () => {
+    const staffPhone = '9876543210';
+    const customerPhone = '9842100101';
+
+    const mockStaffUser: User = {
+      id: mockUserId,
+      branchId: mockBranchId,
+      name: 'Kumaran Partner Admin',
+      phone: staffPhone,
+      passwordHash,
+      roles: [Role.SUPER_ADMIN],
+      isActive: true,
+      totpSecret: null,
+      isTotpEnabled: false,
+      mpinHash: null,
+      refreshTokenHash: null,
+      fcmToken: null,
+      lastLoginAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockCustomer = {
+      id: 'cust-uuid-001',
+      branchId: mockBranchId,
+      customerCode: 'KC-CUST-00101',
+      fullName: 'K. Thangavel',
+      phone: customerPhone,
+      isKycVerified: true,
+    };
+
+    it('should dispatch SMS OTP successfully for registered staff user', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+
+      const res = await authService.requestOtp({ phone: staffPhone });
+      expect(res.success).toBe(true);
+      expect(res.expiresInSeconds).toBe(300);
+      expect(smsServiceMock.sendOtpSms).toHaveBeenCalledWith(
+        staffPhone,
+        expect.stringMatching(/^\d{6}$/),
+      );
+    });
+
+    it('should dispatch SMS OTP successfully for registered subscriber/customer', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.customer.findUnique.mockResolvedValue(mockCustomer);
+
+      const res = await authService.requestOtp({ phone: customerPhone });
+      expect(res.success).toBe(true);
+      expect(smsServiceMock.sendOtpSms).toHaveBeenCalledWith(
+        customerPhone,
+        expect.stringMatching(/^\d{6}$/),
+      );
+    });
+
+    it('should throw NotFoundException if phone number is not found in staff or customer records', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.customer.findUnique.mockResolvedValue(null);
+
+      await expect(
+        authService.requestOtp({ phone: '9999999999' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw UnauthorizedException if staff account is deactivated', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockStaffUser,
+        isActive: false,
+      });
+
+      await expect(
+        authService.requestOtp({ phone: staffPhone }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should verify OTP and return mpin_setup token for staff without MPIN', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      await authService.requestOtp({ phone: staffPhone });
+
+      const sentOtp = smsServiceMock.sendOtpSms.mock.calls[0][1];
+
+      const verifyRes = await authService.verifyOtp({
+        phone: staffPhone,
+        otp: sentOtp,
+      });
+
+      expect(verifyRes.verified).toBe(true);
+      expect(verifyRes.setupToken).toBeDefined();
+
+      const decoded = jwtService.verify(verifyRes.setupToken!) as any;
+      expect(decoded.tokenType).toBe('mpin_setup');
+      expect(decoded.sub).toBe(mockUserId);
+    });
+
+    it('should verify OTP and return full session tokens for subscribers', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.customer.findUnique.mockResolvedValue(mockCustomer);
+      await authService.requestOtp({ phone: customerPhone });
+
+      const sentOtp = smsServiceMock.sendOtpSms.mock.calls[0][1];
+
+      const verifyRes = await authService.verifyOtp({
+        phone: customerPhone,
+        otp: sentOtp,
+      });
+
+      expect(verifyRes.verified).toBe(true);
+      expect(verifyRes.accessToken).toBeDefined();
+      expect(verifyRes.refreshToken).toBeDefined();
+      expect(verifyRes.user.roles).toContain(Role.CUSTOMER);
+    });
+
+    it('should throw BadRequestException if OTP code is incorrect', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      await authService.requestOtp({ phone: staffPhone });
+
+      await expect(
+        authService.verifyOtp({
+          phone: staffPhone,
+          otp: '000000',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should set MPIN using valid setupToken and return full session tokens', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue({
+        ...mockStaffUser,
+        mpinHash: '$2b$12$newMpinHash',
+      });
+
+      const tempPayload = {
+        sub: mockUserId,
+        phone: staffPhone,
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        tokenType: 'mpin_setup' as const,
+      };
+      const setupToken = jwtService.sign(tempPayload, { expiresIn: '10m' });
+
+      const setMpinRes = await authService.setMpin(undefined, {
+        mpin: '123456',
+        setupToken,
+      });
+
+      expect(setMpinRes.success).toBe(true);
+      expect((setMpinRes as any).accessToken).toBeDefined();
+      expect(prismaMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockUserId },
+          data: expect.objectContaining({
+            mpinHash: expect.any(String),
+          }),
+        }),
+      );
     });
   });
 });

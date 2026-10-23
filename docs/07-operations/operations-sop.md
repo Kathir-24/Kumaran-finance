@@ -30,7 +30,7 @@ sequenceDiagram
     alt Cash Matches Exactly & Collector != Acknowledger
         Partner->>Server: POST /collections/cash-handover/acknowledge (Enforces Collector != Acknowledger)
         Server-->>Partner: Generates Daily Cash Settlement Voucher
-        Server-->>Agent: Handover Cleared & Receipt Status: CONFIRMED
+        Server-->>Agent: Handover Cleared & Cash Handover Status: ACKNOWLEDGED (Payment Status: SUCCESS)
     else Cash Shortage Detected
         Partner->>Server: Records Discrepancy (Cash Shortage Voucher)
         Server-->>Agent: Flags Agent Balance Owed (Audit Event)
@@ -49,7 +49,7 @@ sequenceDiagram
      $$\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$$
    - An agent who collected the cash can **never** acknowledge their own handover.
    - An independent **Partner (Super Admin)** must physically count the currency notes, enter their credentials, and officially acknowledge the cash deposit into the branch vault.
-   - Until acknowledged, payment status remains `PENDING_HANDOVER`. Once acknowledged, it updates to `CONFIRMED`.
+   - Customer installment due is satisfied immediately (`paymentStatus: SUCCESS`), while branch vault custody is tracked via `cashHandoverStatus`. Until acknowledged, cash custody remains `PENDING_HANDOVER`. Once acknowledged by Partner B, it transitions to `ACKNOWLEDGED`.
 
 ---
 

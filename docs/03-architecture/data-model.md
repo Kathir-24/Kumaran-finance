@@ -304,7 +304,7 @@ model AuctionWinner {
   securityDocS3Key       String?           // Scanned papers, signed cheques, agreements
   verifiedByUserId       String?           // Staff / Branch Manager (Maker)
   
-  disbursementStatus     String            @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, APPROVED, DISBURSED
+  disbursementStatus     String            @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, VERIFIED_BY_MAKER, AUTHORIZED_BY_CHECKER, DISBURSED
   disbursementMode       DisbursementMode? // Cheque, NEFT/RTGS/IMPS, Cash
   disbursedAmount        BigInt?           // Whole integer Rupees
   authorizedByUserId     String?           // Super Admin / Partner (Checker)
@@ -369,6 +369,7 @@ model InstallmentDue {
   allocations        PaymentAllocation[]
 
   @@unique([ticketId, installmentMonth])
+  @@index([chitGroupId, installmentMonth])
 }
 
 enum PaymentMethod {

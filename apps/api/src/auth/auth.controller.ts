@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Patch,
@@ -25,18 +26,22 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import {
   AuthTokensResponseDto,
   FcmTokenUpdateResponseDto,
+  RequestOtpResponseDto,
   TotpSetupResponseDto,
   TotpStatusResponseDto,
   UserProfileResponseDto,
+  VerifyOtpResponseDto,
 } from './dto/auth-response.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
 import { SetMpinDto } from './dto/set-mpin.dto';
 import { TotpEnableDto } from './dto/totp-enable.dto';
 import { TotpVerifyDto } from './dto/totp-verify.dto';
 import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -190,6 +195,40 @@ export class AuthController {
     return this.authService.disableTotp(userId, dto);
   }
 
+  @Post('mobile/request-otp')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: THROTTLE_OTP_LIMIT, ttl: THROTTLE_OTP_TTL_MS } })
+  @ApiOperation({
+    summary: 'Request 6-digit SMS OTP for mobile device registration or login',
+    description:
+      'Dispatches a TRAI DLT-compliant SMS OTP (Template ID 1407169823412093847) to registered phone number for field agents, partners, or customers.',
+  })
+  @ApiOkResponseEnvelope(RequestOtpResponseDto, {
+    description: 'SMS OTP dispatched successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Phone number not registered' })
+  @ApiResponse({ status: 429, description: 'Too many OTP requests. Please wait 5 minutes.' })
+  async requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto);
+  }
+
+  @Post('mobile/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: THROTTLE_OTP_LIMIT, ttl: THROTTLE_OTP_TTL_MS } })
+  @ApiOperation({
+    summary: 'Verify 6-digit SMS OTP for mobile device registration or login',
+    description:
+      'Validates 6-digit SMS OTP. For subscribers, returns full JWT tokens. For staff, returns an mpin_setup token if first-time setup or full tokens if MPIN is already configured.',
+  })
+  @ApiOkResponseEnvelope(VerifyOtpResponseDto, {
+    description: 'OTP verified successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 429, description: 'Too many verification attempts' })
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto);
+  }
+
   @Post('mobile/login-mpin')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: THROTTLE_AUTH_LIMIT, ttl: THROTTLE_AUTH_TTL_MS } })
@@ -207,17 +246,30 @@ export class AuthController {
   }
 
   @Post('mobile/set-mpin')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Set or change 6-digit MPIN',
-    description: 'Configures 6-digit MPIN hash for quick mobile unlock.',
+    summary: 'Set or change 6-digit MPIN for mobile quick unlock',
+    description:
+      'Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.',
   })
   @ApiOkResponseEnvelope(ActionSuccessResponseDto, {
-    description: 'MPIN saved successfully',
+    description: 'MPIN saved successfully or full auth tokens issued',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
-  async setMpin(@CurrentUser('sub') userId: string, @Body() dto: SetMpinDto) {
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid setup token / Bearer token' })
+  async setMpin(
+    @Body() dto: SetMpinDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    let userId: string | undefined;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      try {
+        const payload = this.authService.verifyToken(token);
+        userId = payload.sub;
+      } catch {
+        // Fall back to dto.setupToken
+      }
+    }
     return this.authService.setMpin(userId, dto);
   }
 }

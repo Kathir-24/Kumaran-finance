@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuctionModule } from './auction/auction.module';
 import { AuthModule } from './auth/auth.module';
+import { BranchModule } from './branch/branch.module';
 import { ChitModule } from './chit/chit.module';
 import { CollectionModule } from './collection/collection.module';
 import {
@@ -27,6 +28,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ReportModule } from './report/report.module';
 import { SentryService } from './common/sentry/sentry.service';
 import { StorageModule } from './storage/storage.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { StorageModule } from './storage/storage.module';
     ]),
     PrismaModule,
     AuthModule,
+    BranchModule,
+    UserModule,
     CustomerModule,
     ChitModule,
     AuctionModule,

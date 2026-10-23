@@ -5,6 +5,9 @@
 > **Platform**: Web Dashboard (`https://admin.kumaranfinance.com`) AND Partner Mobile App (`apps/mobile/`)  
 > **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)** (`CONFIRMED-BY-DEVELOPER`).
 > **Dual-Platform Parity**: The 4 Partners have 100% full feature parity across both Web and Mobile for both Maker and Checker roles.
+>
+> [!NOTE]
+> **Operational Status**: This manual specifies the standard operational workflows for the Web Dashboard and Partner Mobile App designed against the completed backend API. Client app initialization in `apps/web/` is scheduled in Phase 2.
 
 ---
 

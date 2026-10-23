@@ -4,6 +4,9 @@
 > **Target Users**: Chit Subscribers / Members  
 > **Platform**: Android Mobile App (Flutter)  
 > **Languages**: Bilingual (English & தமிழ்)
+>
+> [!NOTE]
+> **Operational Status**: This guide specifies subscriber self-service workflows designed against the completed backend API (`apps/api/`). Flutter client app initialization in `apps/mobile/` is scheduled in Phase 2.
 
 ---
 

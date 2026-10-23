@@ -624,6 +624,130 @@
         ]
       }
     },
+    "/api/v1/auth/mobile/request-otp": {
+      "post": {
+        "description": "Dispatches a TRAI DLT-compliant SMS OTP (Template ID 1407169823412093847) to registered phone number for field agents, partners, or customers.",
+        "operationId": "AuthController_requestOtp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SMS OTP dispatched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RequestOtpResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone number not registered"
+          },
+          "429": {
+            "description": "Too many OTP requests. Please wait 5 minutes."
+          }
+        },
+        "summary": "Request 6-digit SMS OTP for mobile device registration or login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/verify-otp": {
+      "post": {
+        "description": "Validates 6-digit SMS OTP. For subscribers, returns full JWT tokens. For staff, returns an mpin_setup token if first-time setup or full tokens if MPIN is already configured.",
+        "operationId": "AuthController_verifyOtp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyOtpResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired OTP"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "summary": "Verify 6-digit SMS OTP for mobile device registration or login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/mobile/login-mpin": {
       "post": {
         "description": "Quick biometric/MPIN login for field collection agents on mobile.",
@@ -688,9 +812,18 @@
     },
     "/api/v1/auth/mobile/set-mpin": {
       "post": {
-        "description": "Configures 6-digit MPIN hash for quick mobile unlock.",
+        "description": "Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.",
         "operationId": "AuthController_setMpin_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -703,7 +836,7 @@
         },
         "responses": {
           "200": {
-            "description": "MPIN saved successfully",
+            "description": "MPIN saved successfully or full auth tokens issued",
             "content": {
               "application/json": {
                 "schema": {
@@ -736,7 +869,65 @@
             }
           },
           "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
+            "description": "Unauthorized — missing or invalid setup token / Bearer token"
+          }
+        },
+        "summary": "Set or change 6-digit MPIN for mobile quick unlock",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/branches": {
+      "get": {
+        "description": "Returns all registered physical branch offices of Kumaran Finance. Allowed: Staff, Auditor.",
+        "operationId": "BranchController_findAll_v1",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of branches retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BranchResponseDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
           }
         },
         "security": [
@@ -744,9 +935,567 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Set or change 6-digit MPIN",
+        "summary": "List company branch offices",
         "tags": [
-          "Auth"
+          "Branches"
+        ]
+      },
+      "post": {
+        "description": "Creates a new physical branch office record for Kumaran Finance. Allowed: Super Admin only.",
+        "operationId": "BranchController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Branch created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BranchResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Branch code already in use"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Create a new company branch office",
+        "tags": [
+          "Branches"
+        ]
+      }
+    },
+    "/api/v1/branches/{id}": {
+      "get": {
+        "description": "Returns metadata for a specific branch office. Allowed: Staff, Auditor.",
+        "operationId": "BranchController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BranchResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Branch not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get branch details by ID",
+        "tags": [
+          "Branches"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "description": "Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager.",
+        "operationId": "UserController_findAll_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search by staff name or phone",
+            "schema": {
+              "example": "Murugan",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Filter by specific staff role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by assigned branch ID",
+            "schema": {
+              "example": "branch-prd-001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter by active status (\"true\" | \"false\")",
+            "schema": {
+              "example": "true",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page limit",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff user list retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/UserResponseDto"
+                          }
+                        },
+                        "total": {
+                          "type": "number",
+                          "example": 50
+                        },
+                        "page": {
+                          "type": "number",
+                          "example": 1
+                        },
+                        "limit": {
+                          "type": "number",
+                          "example": 20
+                        },
+                        "totalPages": {
+                          "type": "number",
+                          "example": 3
+                        }
+                      },
+                      "required": [
+                        "data",
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Search & list staff users with pagination",
+        "tags": [
+          "Staff Users"
+        ]
+      },
+      "post": {
+        "description": "Creates a new staff account (e.g. Field Collection Agent, Accountant, Partner) with assigned RBAC roles and default credentials. Allowed: Super Admin only.",
+        "operationId": "UserController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Staff user created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid branch or payload"
+          },
+          "409": {
+            "description": "Phone number already registered to staff"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Create a new staff user account",
+        "tags": [
+          "Staff Users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "description": "Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager.",
+        "operationId": "UserController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff user retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Staff user not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get staff user profile by ID",
+        "tags": [
+          "Staff Users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/status": {
+      "patch": {
+        "description": "Enables or disables login access for a staff user. Deactivation immediately revokes active sessions. Allowed: Super Admin only.",
+        "operationId": "UserController_updateStatus_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staff user status updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot deactivate own account"
+          },
+          "404": {
+            "description": "Staff user not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Activate or deactivate a staff user account",
+        "tags": [
+          "Staff Users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/roles": {
+      "patch": {
+        "description": "Modifies RBAC role personas for a staff user account. Allowed: Super Admin only.",
+        "operationId": "UserController_updateRoles_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRolesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staff user roles updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot revoke own Super Admin role"
+          },
+          "404": {
+            "description": "Staff user not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Update assigned RBAC roles for a staff user",
+        "tags": [
+          "Staff Users"
         ]
       }
     },
@@ -1406,6 +2155,224 @@
         "summary": "Register or update customer device FCM push token",
         "tags": [
           "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/documents": {
+      "post": {
+        "description": "Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.",
+        "operationId": "CustomerController_uploadDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "docType"
+                ],
+                "properties": {
+                  "docType": {
+                    "type": "string",
+                    "enum": [
+                      "AADHAAR_FRONT",
+                      "AADHAAR_BACK",
+                      "PAN",
+                      "PHOTO",
+                      "SIGNATURE"
+                    ],
+                    "example": "AADHAAR_FRONT"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document uploaded and linked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerDocumentResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file or unsupported file format"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Customers can only upload for their own profile"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Upload and link a KYC verification document",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/documents/{docId}/url": {
+      "get": {
+        "description": "Returns a secure, time-limited S3 presigned URL for viewing the KYC document. Field agents are excluded per compliance rules; Customers restricted to self.",
+        "operationId": "CustomerController_getDocumentUrl_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "docId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presigned viewing URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DocumentPresignedUrlResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Access to KYC document restricted"
+          },
+          "404": {
+            "description": "Customer or document not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate 15-minute presigned viewing URL for customer KYC scan",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/storage/file/{key}": {
+      "get": {
+        "description": "Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.",
+        "operationId": "StorageController_streamFile_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Stored document binary stream returned",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to file key"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Stream a stored file securely (Local storage driver fallback)",
+        "tags": [
+          "Storage & Presigned Files"
         ]
       }
     },
@@ -5748,44 +6715,6 @@
         ]
       }
     },
-    "/api/v1/storage/file/{key}": {
-      "get": {
-        "description": "Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.",
-        "operationId": "StorageController_streamFile_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Stored document binary stream returned",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to file key"
-          },
-          "404": {
-            "description": "File not found"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Stream a stored file securely (Local storage driver fallback)",
-        "tags": [
-          "Storage & Presigned Files"
-        ]
-      }
-    },
     "/api/v1/pdf/receipt/{paymentId}": {
       "get": {
         "description": "Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.",
@@ -6734,6 +7663,14 @@
       "description": "Staff identity, MPIN, and TOTP 2FA"
     },
     {
+      "name": "Branches",
+      "description": "Company branch offices"
+    },
+    {
+      "name": "Staff Users",
+      "description": "Office staff user administration"
+    },
+    {
       "name": "Customers",
       "description": "Customer intake, KYC, and Nominees"
     },
@@ -7249,6 +8186,105 @@
           "password"
         ]
       },
+      "RequestOtpResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether OTP was successfully dispatched"
+          },
+          "message": {
+            "type": "string",
+            "example": "OTP sent successfully to registered mobile number.",
+            "description": "Status message"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 300,
+            "description": "OTP expiration period in seconds"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "expiresInSeconds"
+        ]
+      },
+      "RequestOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "Registered 10-digit Indian mobile number of staff or customer"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "VerifyOtpResponseDto": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether OTP verification was successful"
+          },
+          "setupToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Scoped setup token for configuring MPIN (issued when first-time staff onboarding)"
+          },
+          "accessToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Full JWT access token (issued for customers or staff with pre-existing MPIN)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Rotating refresh token"
+          },
+          "user": {
+            "description": "Authenticated user or customer profile",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileResponseDto"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "OTP verified successfully.",
+            "description": "Status message"
+          }
+        },
+        "required": [
+          "verified",
+          "message"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "Registered 10-digit Indian mobile number"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit SMS OTP received on registered device"
+          }
+        },
+        "required": [
+          "phone",
+          "otp"
+        ]
+      },
       "MpinLoginDto": {
         "type": "object",
         "properties": {
@@ -7275,10 +8311,300 @@
             "type": "string",
             "example": "123456",
             "description": "New 6-digit MPIN"
+          },
+          "setupToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Temporary setup token returned from verify-otp (required during first-time device registration)"
           }
         },
         "required": [
           "mpin"
+        ]
+      },
+      "BranchResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "branch-prd-001",
+            "description": "Unique branch ID"
+          },
+          "code": {
+            "type": "string",
+            "example": "PRD",
+            "description": "Unique branch code"
+          },
+          "name": {
+            "type": "string",
+            "example": "Head Office - Perundurai",
+            "description": "Branch name in English"
+          },
+          "nameTamil": {
+            "type": "object",
+            "example": "தலைமை கிளை - பெருந்துறை",
+            "description": "Branch name in Tamil",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "example": "142, Erode Main Road, Perundurai - 638052",
+            "description": "Physical address"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9876543210",
+            "description": "Contact phone"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether branch is active"
+          },
+          "createdAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "nameTamil",
+          "address",
+          "phone",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateBranchDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ERD",
+            "description": "Unique uppercase branch code"
+          },
+          "name": {
+            "type": "string",
+            "example": "Erode Town Branch",
+            "description": "Official branch name in English"
+          },
+          "nameTamil": {
+            "type": "string",
+            "example": "ஈரோடு கிளை",
+            "description": "Official branch name in Tamil"
+          },
+          "address": {
+            "type": "string",
+            "example": "12, Brough Road, Erode - 638001",
+            "description": "Physical street address"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842143210",
+            "description": "10-digit Indian phone number"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "address",
+          "phone"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "user-uuid-001",
+            "description": "User unique ID"
+          },
+          "name": {
+            "type": "string",
+            "example": "R. Murugan",
+            "description": "Staff name in English"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "Contact mobile number"
+          },
+          "roles": {
+            "type": "array",
+            "example": [
+              "COLLECTION_AGENT"
+            ],
+            "description": "Assigned RBAC roles",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the staff account is active"
+          },
+          "isTotpEnabled": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether TOTP 2FA is active"
+          },
+          "hasMpin": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether 6-digit MPIN is configured"
+          },
+          "branchId": {
+            "type": "object",
+            "example": "branch-prd-001",
+            "description": "Branch ID",
+            "nullable": true
+          },
+          "branch": {
+            "nullable": true,
+            "description": "Assigned branch details",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BranchSummaryDto"
+              }
+            ]
+          },
+          "lastLoginAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Last login timestamp",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Account creation timestamp"
+          },
+          "updatedAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "roles",
+          "isActive",
+          "isTotpEnabled",
+          "hasMpin",
+          "branchId",
+          "branch",
+          "lastLoginAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "R. Murugan",
+            "description": "Full staff name in English"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "10-digit Indian mobile phone number"
+          },
+          "roles": {
+            "type": "array",
+            "example": [
+              "COLLECTION_AGENT"
+            ],
+            "description": "Assigned RBAC role personas for this staff user",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "example": "branch-prd-001",
+            "description": "Assigned branch ID. Defaults to Head Office (PRD) if omitted."
+          },
+          "password": {
+            "type": "string",
+            "example": "Admin@Kumaran2026",
+            "description": "Initial password. Defaults to \"Admin@Kumaran2026\" if omitted."
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "roles"
+        ]
+      },
+      "UpdateUserStatusDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "example": false,
+            "description": "Active status for staff user account"
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "UpdateUserRolesDto": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "example": [
+              "COLLECTION_AGENT",
+              "ACCOUNTANT"
+            ],
+            "description": "Updated RBAC roles for staff account",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          }
+        },
+        "required": [
+          "roles"
         ]
       },
       "CustomerResponseDto": {
@@ -7970,6 +9296,68 @@
             "example": "ANDROID"
           }
         }
+      },
+      "CustomerDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "doc-uuid-001",
+            "description": "Document unique ID"
+          },
+          "customerId": {
+            "type": "string",
+            "example": "cust-uuid-001",
+            "description": "Customer ID"
+          },
+          "docType": {
+            "type": "string",
+            "example": "AADHAAR_FRONT",
+            "description": "Document type"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "aadhaar_front.jpg",
+            "description": "Original file name"
+          },
+          "verified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether staff verified this document"
+          },
+          "uploadedAt": {
+            "type": "object",
+            "example": "2026-10-23T10:00:00.000Z",
+            "description": "Upload timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "docType",
+          "fileName",
+          "verified",
+          "uploadedAt"
+        ]
+      },
+      "DocumentPresignedUrlResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...",
+            "description": "Time-limited 15-minute viewing URL"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 900,
+            "description": "URL expiration duration in seconds (15 minutes)"
+          }
+        },
+        "required": [
+          "url",
+          "expiresInSeconds"
+        ]
       },
       "ChitGroupResponseDto": {
         "type": "object",

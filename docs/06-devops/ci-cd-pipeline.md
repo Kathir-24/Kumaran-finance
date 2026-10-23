@@ -87,8 +87,8 @@ jobs:
 
       - name: Compile NestJS Application
         run: pnpm --filter api run build
-        run: pnpm --filter api run build
 
+  # Note: The build-and-deploy stage is staged for activation once AWS ECR/ECS infrastructure is provisioned
   build-and-deploy:
     name: Build Docker Container & Deploy to AWS
     needs: code-quality-and-tests

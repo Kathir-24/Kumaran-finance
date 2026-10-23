@@ -150,7 +150,7 @@ When running full-stack, access the system directly through Nginx on [http://loc
 - **Commit Messages**: Follow Conventional Commits format:
   - `feat(api): add company and branch schema with migration`
   - `test(api): add financial invariant tests for chit auction dividend`
-  - `docs(business): update financial rules with approved 5% commission`
+  - `docs(business): update financial rules with approved 4% commission`
 
 ---
 
