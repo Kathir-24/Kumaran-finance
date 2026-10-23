@@ -7,6 +7,7 @@ import {
 import { Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import {
   formatBilingualVoucherText,
   VoucherDataInput,
@@ -17,9 +18,20 @@ import { ReleasePayoutDto } from './dto/release-payout.dto';
 import { SettleFinalMonthDto } from './dto/settle-final-month.dto';
 import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
 
+const MAX_SAFETY_PROOF_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_SAFETY_PROOF_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+];
+
 @Injectable()
 export class DisbursementService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   /**
    * Helper to resolve customer ID for authenticated subscriber.
@@ -258,6 +270,111 @@ export class DisbursementService {
         winner: updated,
       };
     });
+  }
+
+  /**
+   * Uploads photos of signed blank cheques, promissory notes, or agreement to private S3 bucket.
+   */
+  async uploadSafetyProof(
+    auctionId: string,
+    file: { originalname: string; mimetype: string; size: number; buffer: Buffer },
+    makerUserId: string,
+  ) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('A valid document file is required for safety proof upload');
+    }
+
+    if (!ALLOWED_SAFETY_PROOF_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Unsupported file type: ${file.mimetype}. Allowed formats: JPG, PNG, WEBP, PDF`,
+      );
+    }
+
+    if (file.size > MAX_SAFETY_PROOF_SIZE_BYTES) {
+      throw new BadRequestException('Safety proof document file size exceeds the 10 MB limit');
+    }
+
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { winner: true },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (!auction.winner) {
+      throw new BadRequestException('Cannot upload safety proof: No winner recorded for this auction');
+    }
+
+    const sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const s3Key = `safety-proofs/${auctionId}/${Date.now()}_${sanitizedFilename}`;
+
+    await this.storageService.uploadFile(s3Key, file.buffer, file.mimetype);
+
+    await this.prisma.auctionWinner.update({
+      where: { id: auction.winner.id },
+      data: {
+        securityDocS3Key: s3Key,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: makerUserId,
+        action: 'SAFETY_PROOF_DOCUMENT_UPLOADED',
+        entityType: 'AuctionWinner',
+        entityId: auction.winner.id,
+        newValue: {
+          s3Key,
+          fileName: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Safety proof collateral document uploaded and linked successfully.',
+      auctionId,
+      securityDocS3Key: s3Key,
+      fileName: file.originalname,
+      uploadedAt: new Date(),
+    };
+  }
+
+  /**
+   * Generates a 15-minute secure presigned viewing URL for Partner B (Checker) to inspect safety proof.
+   */
+  async getSafetyProofPresignedUrl(auctionId: string) {
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { winner: true },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (!auction.winner) {
+      throw new BadRequestException('No winner recorded for this auction');
+    }
+
+    if (!auction.winner.securityDocS3Key) {
+      throw new NotFoundException('No safety proof document uploaded for this auction winner');
+    }
+
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      auction.winner.securityDocS3Key,
+      900, // 15 minutes
+    );
+
+    return {
+      url: presignedUrl,
+      expiresInSeconds: 900,
+      securityDocS3Key: auction.winner.securityDocS3Key,
+    };
   }
 
   /**

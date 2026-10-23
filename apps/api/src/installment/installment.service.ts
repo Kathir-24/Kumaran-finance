@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -13,6 +14,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
 import { RemoveDefaulterDto } from './dto/remove-defaulter.dto';
+import { SettleRemovalDto } from './dto/settle-removal.dto';
+import { SubstituteSubscriberDto } from './dto/substitute-subscriber.dto';
 
 @Injectable()
 export class InstallmentService {
@@ -563,6 +566,192 @@ export class InstallmentService {
         removedByUserId: updated.removedByUserId,
         removalReason: dto.reason,
       },
+    };
+  }
+
+  /**
+   * Assigns a replacement subscriber to a ticket previously removed under REMOVED_DEF_3M.
+   * Enforces ADR-13: a customer cannot hold 2 or more tickets in the same chit scheme.
+   * Allowed strictly: Super Admin.
+   */
+  async substituteSubscriber(
+    ticketId: string,
+    adminUserId: string,
+    dto: SubstituteSubscriberDto,
+  ) {
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: ticketId },
+      include: { customer: true, chitGroup: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Subscriber ticket not found');
+    }
+
+    if (ticket.status !== 'REMOVED_DEF_3M') {
+      throw new BadRequestException(
+        `Subscriber substitution can only be executed on tickets with REMOVED_DEF_3M status (current status: ${ticket.status})`,
+      );
+    }
+
+    const newCustomer = await this.prisma.customer.findUnique({
+      where: { id: dto.newCustomerId },
+    });
+
+    if (!newCustomer) {
+      throw new NotFoundException('Replacement customer profile not found');
+    }
+
+    if (!newCustomer.isKycVerified) {
+      throw new BadRequestException(
+        'Replacement subscriber customer must have verified KYC status before ticket substitution',
+      );
+    }
+
+    // ADR-13 Invariant: Customer cannot hold 2 or more tickets in the same chit group
+    const existingInGroup = await this.prisma.subscriberTicket.findUnique({
+      where: {
+        chitGroupId_customerId: {
+          chitGroupId: ticket.chitGroupId,
+          customerId: dto.newCustomerId,
+        },
+      },
+    });
+
+    if (existingInGroup) {
+      throw new ConflictException(
+        `ADR-13 Violation: Customer ${newCustomer.fullName} already holds Ticket #${existingInGroup.ticketNumber} in Chit Group ${ticket.chitGroup.groupCode}. A customer cannot hold 2 or more tickets in the same scheme.`,
+      );
+    }
+
+    const previousCustomerId = ticket.customerId;
+    const previousCustomerName = ticket.customer.fullName;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const subTicket = await tx.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
+          customerId: dto.newCustomerId,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+          removedAt: null,
+          removedByUserId: null,
+        },
+        include: { customer: true, chitGroup: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
+          entityType: 'SubscriberTicket',
+          entityId: ticketId,
+          oldValue: {
+            customerId: previousCustomerId,
+            customerName: previousCustomerName,
+            status: 'REMOVED_DEF_3M',
+          },
+          newValue: {
+            customerId: dto.newCustomerId,
+            customerName: newCustomer.fullName,
+            status: 'ACTIVE',
+            reason: dto.reason,
+          },
+        },
+      });
+
+      return subTicket;
+    });
+
+    return {
+      success: true,
+      message: `Subscriber replacement successfully executed. Ticket #${updated.ticketNumber} re-assigned to ${updated.customer.fullName} and restored to ACTIVE status.`,
+      ticket: {
+        id: updated.id,
+        ticketNumber: updated.ticketNumber,
+        status: updated.status,
+        previousCustomerId,
+        previousCustomerName,
+        newCustomerId: updated.customer.id,
+        newCustomerName: updated.customer.fullName,
+      },
+    };
+  }
+
+  /**
+   * Settles the account of a subscriber removed under 3-month consecutive default.
+   * Calculates Total Paid Dues minus 4.00% Foreman Commission damages.
+   * Allowed: Super Admin, Accountant.
+   */
+  async settleRemoval(
+    ticketId: string,
+    adminUserId: string,
+    dto: SettleRemovalDto,
+  ) {
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: ticketId },
+      include: { customer: true, chitGroup: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Subscriber ticket not found');
+    }
+
+    if (ticket.status !== 'REMOVED_DEF_3M') {
+      throw new BadRequestException(
+        `Defaulter account settlement can only be executed on tickets with REMOVED_DEF_3M status (current status: ${ticket.status})`,
+      );
+    }
+
+    // Whole Rupee Math: Total paid installments for this ticket
+    const allocations = await this.prisma.paymentAllocation.findMany({
+      where: { ticketId },
+    });
+
+    const totalPaidAmount = allocations.reduce(
+      (sum, a) => sum + a.amountAllocated,
+      0n,
+    );
+
+    // 4.00% Foreman Commission damages based on total chit value
+    const damagesAmount = (ticket.chitGroup.chitValue * 4n) / 100n;
+
+    // Refund is remaining paid dues minus damages (bounded at ₹0)
+    const refundAmount =
+      totalPaidAmount > damagesAmount ? totalPaidAmount - damagesAmount : 0n;
+
+    const voucherNumber = `KC-VOU-DEF-${Date.now().toString().slice(-6)}`;
+    const settledAt = new Date();
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: adminUserId,
+        action: 'DEF_SETTLEMENT_PROCESSED',
+        entityType: 'SubscriberTicket',
+        entityId: ticketId,
+        newValue: {
+          totalPaid: totalPaidAmount.toString(),
+          damagesDeducted: damagesAmount.toString(),
+          refundAmount: refundAmount.toString(),
+          voucherNumber,
+          paymentMethod: dto.paymentMethod,
+          notes: dto.notes,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Defaulter account for ${ticket.customer.fullName} (Ticket #${ticket.ticketNumber}) successfully settled.`,
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      customerName: ticket.customer.fullName,
+      groupCode: ticket.chitGroup.groupCode,
+      totalPaid: Number(totalPaidAmount),
+      damagesDeducted: Number(damagesAmount),
+      refundAmount: Number(refundAmount),
+      voucherNumber,
+      settledAt,
     };
   }
 }

@@ -7,10 +7,15 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -22,6 +27,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
+  ApiCreatedResponseEnvelope,
   ApiOkResponseEnvelope,
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
@@ -37,7 +43,9 @@ import {
 } from './dto/disbursement-response.dto';
 import { QueryDisbursementDto } from './dto/query-disbursement.dto';
 import { ReleasePayoutDto } from './dto/release-payout.dto';
+import { SafetyProofUrlResponseDto } from './dto/safety-proof-url-response.dto';
 import { SettleFinalMonthDto } from './dto/settle-final-month.dto';
+import { UploadSafetyProofResponseDto } from './dto/upload-safety-proof-response.dto';
 import { VerifySafetyProofDto } from './dto/verify-safety-proof.dto';
 
 @ApiTags('Prize Disbursements & Safety Proof')
@@ -95,6 +103,58 @@ export class DisbursementController {
       auctionId,
       currentUser,
     );
+  }
+
+  @Post('auction/:auctionId/upload-safety-proof')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Photo of signed agreement, signed blank cheques, or promissory note (JPG, PNG, WEBP, PDF up to 10 MB)',
+        },
+      },
+    },
+  })
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)',
+    description:
+      'Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).',
+  })
+  @ApiCreatedResponseEnvelope(UploadSafetyProofResponseDto, {
+    description: 'Safety proof collateral scan uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Missing file or invalid format/size' })
+  @ApiResponse({ status: 404, description: 'Auction or winner record not found' })
+  async uploadSafetyProof(
+    @Param('auctionId') auctionId: string,
+    @UploadedFile() file: any,
+    @CurrentUser('sub') makerUserId: string,
+  ) {
+    return this.disbursementService.uploadSafetyProof(auctionId, file, makerUserId);
+  }
+
+  @Get('auction/:auctionId/safety-proof-url')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @ApiOperation({
+    summary: 'Checker: Generate 15-minute presigned viewing URL for safety proof scan',
+    description:
+      'Returns a secure, time-limited S3 presigned URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout. Allowed: Super Admin, Branch Manager, Accountant, Auditor.',
+  })
+  @ApiOkResponseEnvelope(SafetyProofUrlResponseDto, {
+    description: 'Presigned viewing URL generated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Auction, winner, or uploaded document not found' })
+  async getSafetyProofUrl(@Param('auctionId') auctionId: string) {
+    return this.disbursementService.getSafetyProofPresignedUrl(auctionId);
   }
 
   @Post('auction/:auctionId/verify-safety-proof')

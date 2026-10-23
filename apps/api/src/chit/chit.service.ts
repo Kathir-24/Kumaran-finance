@@ -17,6 +17,7 @@ import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateChitGroupDto } from './dto/create-chit-group.dto';
 import { OnboardOngoingChitDto } from './dto/onboard-ongoing-chit.dto';
 import { QueryChitDto } from './dto/query-chit.dto';
+import { UpdateChitGroupDto } from './dto/update-chit-group.dto';
 
 @Injectable()
 export class ChitService {
@@ -536,5 +537,118 @@ export class ChitService {
         },
       },
     });
+  }
+
+  /**
+   * Modifies configuration for a chit scheme strictly while status is DRAFT.
+   * Allowed strictly: Super Admin.
+   */
+  async update(id: string, dto: UpdateChitGroupDto, adminUserId: string) {
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id },
+    });
+
+    if (!chit) {
+      throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+    }
+
+    if (chit.status !== ChitStatus.DRAFT) {
+      throw new BadRequestException(
+        `Cannot update chit scheme: Only schemes in DRAFT status can be modified (current status: ${chit.status}). Active or completed schemes are legally frozen.`,
+      );
+    }
+
+    const data: Prisma.ChitGroupUpdateInput = {};
+    if (dto.groupName !== undefined) data.groupName = dto.groupName.trim();
+    if (dto.groupNameTamil !== undefined) data.groupNameTamil = dto.groupNameTamil.trim() || null;
+    if (dto.startDate !== undefined) data.startDate = new Date(dto.startDate);
+    if (dto.endDate !== undefined) data.endDate = new Date(dto.endDate);
+    if (dto.sanctionOrderNumber !== undefined) data.sanctionOrderNumber = dto.sanctionOrderNumber.trim() || null;
+    if (dto.sanctionDate !== undefined) data.sanctionDate = dto.sanctionDate ? new Date(dto.sanctionDate) : null;
+
+    const updated = await this.prisma.chitGroup.update({
+      where: { id },
+      data,
+      include: {
+        branch: { select: { id: true, code: true, name: true } },
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: adminUserId,
+        action: 'CHIT_GROUP_DRAFT_UPDATED',
+        entityType: 'ChitGroup',
+        entityId: id,
+        newValue: dto as any,
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Unassigns a subscriber ticket from a chit group before activation.
+   * Allowed: Super Admin, Branch Manager.
+   */
+  async unassignTicket(
+    chitGroupId: string,
+    ticketNumber: number,
+    staffUserId: string,
+  ) {
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+    });
+
+    if (!chit) {
+      throw new NotFoundException(`Chit scheme with ID ${chitGroupId} not found`);
+    }
+
+    if (chit.status !== ChitStatus.DRAFT) {
+      throw new BadRequestException(
+        `Cannot unassign ticket: Tickets can only be unassigned while scheme is in DRAFT status (current: ${chit.status}). Once activated, member removals must follow the statutory 3-month arrears rule.`,
+      );
+    }
+
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: {
+        chitGroupId_ticketNumber: {
+          chitGroupId,
+          ticketNumber,
+        },
+      },
+      include: { customer: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(
+        `Ticket #${ticketNumber} is not assigned in this chit group`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscriberTicket.delete({
+        where: { id: ticket.id },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: staffUserId,
+          action: 'TICKET_UNASSIGNED_PRE_ACTIVATION',
+          entityType: 'SubscriberTicket',
+          entityId: ticket.id,
+          oldValue: {
+            ticketNumber,
+            customerId: ticket.customerId,
+            customerName: ticket.customer.fullName,
+          },
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: `Ticket #${ticketNumber} allocated to ${ticket.customer.fullName} has been unassigned successfully.`,
+    };
   }
 }

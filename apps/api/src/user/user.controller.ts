@@ -23,6 +23,7 @@ import {
 } from '../common/decorators/api-response-envelope.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
+import { ResetPasswordDto, ResetPasswordResponseDto } from './dto/reset-password.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -119,5 +120,25 @@ export class UserController {
     @CurrentUser('sub') currentUserId: string,
   ) {
     return this.userService.updateRoles(id, dto, currentUserId);
+  }
+
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Super Admin: Reset a staff user password',
+    description:
+      'Resets a staff account password to a specified or auto-generated secure temporary password and revokes active sessions. Allowed: Super Admin only.',
+  })
+  @ApiOkResponseEnvelope(ResetPasswordResponseDto, {
+    description: 'Staff password reset successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Staff user not found' })
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() dto: ResetPasswordDto,
+    @CurrentUser('sub') currentUserId: string,
+  ) {
+    return this.userService.resetPassword(id, dto, currentUserId);
   }
 }

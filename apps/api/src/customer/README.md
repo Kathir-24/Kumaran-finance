@@ -37,6 +37,7 @@ The **Customer Module** governs subscriber intake, nominee relationships, KYC ve
 | `PATCH`| `/api/v1/customers/:id/fcm-token` | Register subscriber FCM device token | Staff or Self Customer (Anti-IDOR) |
 | `POST` | `/api/v1/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo) to S3 | Staff or Self Customer |
 | `GET`  | `/api/v1/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL | Staff, Auditor, or Self Customer |
+| `DELETE`| `/api/v1/customers/:id/documents/:docId` | Delete KYC scan from S3 & DB | Staff or Self Customer |
 
 ---
 

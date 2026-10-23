@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
@@ -448,6 +449,78 @@ export class CustomerService {
     return {
       url,
       expiresInSeconds: 900,
+    };
+  }
+
+  /**
+   * Deletes a KYC document from cloud storage and removes database record.
+   * Prohibits customer or non-admin staff from deleting verified documents.
+   */
+  async deleteDocument(customerId: string, docId: string, currentUser: any) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    const document = await this.prisma.customerDocument.findFirst({
+      where: { id: docId, customerId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${docId} not found for this customer`);
+    }
+
+    // Customer persona authorization guard
+    if (
+      currentUser.roles?.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r: any) => r !== Role.CUSTOMER) &&
+      currentUser.sub !== customerId
+    ) {
+      throw new ForbiddenException('Subscribers are only permitted to manage their own KYC documents');
+    }
+
+    // Protection for verified documents: only Super Admin can delete a verified document
+    if (document.verified && !currentUser.roles?.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'Verified KYC documents cannot be deleted without Super Admin authorization',
+      );
+    }
+
+    // Delete physical file from storage driver
+    try {
+      await this.storageService.deleteFile(document.s3Key);
+    } catch {
+      // Continue even if physical object was already removed
+    }
+
+    // Delete database record
+    await this.prisma.customerDocument.delete({
+      where: { id: docId },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: currentUser.sub,
+        action: 'CUSTOMER_DOCUMENT_DELETED',
+        entityType: 'CustomerDocument',
+        entityId: docId,
+        oldValue: {
+          customerId,
+          docType: document.docType,
+          fileName: document.fileName,
+          s3Key: document.s3Key,
+          verified: document.verified,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `KYC document (${document.fileName}) successfully deleted.`,
     };
   }
 }

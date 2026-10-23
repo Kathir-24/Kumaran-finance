@@ -32,6 +32,7 @@ import {
   UserProfileResponseDto,
   VerifyOtpResponseDto,
 } from './dto/auth-response.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
@@ -137,7 +138,7 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Returns profile, roles, and branch details of authenticated user.',
+    description: 'Returns profile, roles, and branch details of authenticated user or customer.',
   })
   @ApiOkResponseEnvelope(UserProfileResponseDto, {
     description: 'Profile retrieved',
@@ -145,6 +146,27 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
   async getProfile(@CurrentUser('sub') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Self-service password update for staff user',
+    description:
+      'Allows authenticated office staff to change their web portal password by verifying their current password. Revokes active refresh token sessions.',
+  })
+  @ApiOkResponseEnvelope(ActionSuccessResponseDto, {
+    description: 'Password changed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'New password too short or invalid' })
+  @ApiResponse({ status: 401, description: 'Incorrect current password or missing Bearer token' })
+  async changePassword(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 
   @Post('totp/setup')

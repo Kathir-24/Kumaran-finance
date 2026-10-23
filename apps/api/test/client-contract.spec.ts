@@ -19,12 +19,12 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
   });
 
   describe('Section 1: OpenAPI Path and Operation Metrics', () => {
-    it('should contain exactly 97 paths matching backend controllers', () => {
+    it('should contain exactly 105 paths matching backend controllers', () => {
       const pathKeys = Object.keys(openApiSpec.paths);
-      expect(pathKeys.length).toBe(97);
+      expect(pathKeys.length).toBe(105);
     });
 
-    it('should contain exactly 102 total HTTP operations', () => {
+    it('should contain exactly 111 total HTTP operations', () => {
       let operationCount = 0;
       for (const p of Object.values(openApiSpec.paths) as any[]) {
         for (const method of ['get', 'post', 'put', 'patch', 'delete', 'options', 'head']) {
@@ -33,7 +33,7 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
           }
         }
       }
-      expect(operationCount).toBe(102);
+      expect(operationCount).toBe(111);
     });
   });
 

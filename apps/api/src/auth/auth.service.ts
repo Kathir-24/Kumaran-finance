@@ -19,6 +19,7 @@ import {
   OTP_EXPIRY_SECONDS,
   TOTP_ISSUER_NAME,
 } from '../common/constants';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
@@ -591,7 +592,7 @@ export class AuthService {
   }
 
   /**
-   * Retrieves profile of currently authenticated user
+   * Retrieves profile of currently authenticated user or customer
    */
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -599,20 +600,82 @@ export class AuthService {
       include: { branch: true },
     });
 
-    if (!user) {
+    if (user) {
+      return {
+        ...this.sanitizeUser(user),
+        branch: user.branch
+          ? {
+              id: user.branch.id,
+              code: user.branch.code,
+              name: user.branch.name,
+              nameTamil: user.branch.nameTamil,
+            }
+          : null,
+      };
+    }
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: userId },
+      include: { branch: true },
+    });
+
+    if (!customer) {
       throw new NotFoundException('User profile not found');
     }
 
     return {
-      ...this.sanitizeUser(user),
-      branch: user.branch
+      id: customer.id,
+      name: customer.fullName,
+      fullNameTamil: customer.fullNameTamil,
+      phone: customer.phone,
+      roles: [Role.CUSTOMER],
+      customerCode: customer.customerCode,
+      branchId: customer.branchId,
+      isTotpEnabled: false,
+      hasMpin: false,
+      isKycVerified: customer.isKycVerified,
+      lastLoginAt: null,
+      branch: customer.branch
         ? {
-            id: user.branch.id,
-            code: user.branch.code,
-            name: user.branch.name,
-            nameTamil: user.branch.nameTamil,
+            id: customer.branch.id,
+            code: customer.branch.code,
+            name: customer.branch.name,
+            nameTamil: customer.branch.nameTamil,
           }
         : null,
+    };
+  }
+
+  /**
+   * Self-service password change for authenticated office staff.
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Staff user not found');
+    }
+
+    const isCurrentValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Current password does not match. Please verify and try again.');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Password successfully changed. Active refresh tokens have been revoked. Please log in with your new password.',
     };
   }
 

@@ -33,7 +33,8 @@ The **Auth Module** provides multi-factor authentication, session management, an
 | `POST` | `/api/v1/auth/mobile/login-mpin`| Mobile quick unlock with 6-digit MPIN | Public |
 | `POST` | `/api/v1/auth/refresh-token` | Rotate access & refresh tokens | Public |
 | `POST` | `/api/v1/auth/logout` | Revoke session & clear `fcmToken` | Authenticated |
-| `GET`  | `/api/v1/auth/me` | Fetch authenticated profile & roles | Authenticated |
+| `GET`  | `/api/v1/auth/me` | Fetch authenticated profile & roles (Dual Staff & Customer Support) | Authenticated |
+| `POST` | `/api/v1/auth/change-password` | Self-service password change with current password verification | Authenticated Staff |
 | `PATCH`| `/api/v1/auth/fcm-token` | Register or update device FCM token | Authenticated Staff |
 | `POST` | `/api/v1/auth/totp/setup` | Generate Base32 TOTP secret & QR code | Authenticated |
 | `POST` | `/api/v1/auth/totp/enable` | Verify OTP and lock 2FA requirement | Authenticated |

@@ -4,7 +4,7 @@
 > **Base URL**: `/api/v1` (Global prefix `/api`, URI versioning `v1`)  
 > **Documentation Tool**: OpenAPI 3.0 / Swagger (`/api/docs`)  
 > **Contract Source of Truth**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) & [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)  
-> **Total Verified Scope**: **102 operations across 97 paths** (100% automated test coverage, 405/405 passing tests across 23 unit suites and 10 E2E suites).
+> **Total Verified Scope**: **111 operations across 105 paths** (100% automated test coverage, 419 passing tests across 24 unit suites and 10 E2E suites).
 
 ---
 
@@ -59,7 +59,8 @@
 | `POST` | `/auth/refresh-token` | Rotate 15-minute access token & 7-day refresh token | Public |
 | `POST` | `/auth/logout` | Revoke active session, refresh token hash & FCM token | Bearer JWT |
 | `PATCH`| `/auth/fcm-token` | Register or clear staff device Firebase FCM push token | Bearer JWT (Staff) |
-| `GET`  | `/auth/me` | Retrieve authenticated user profile, roles, and branch details | Bearer JWT |
+| `GET`  | `/auth/me` | Retrieve authenticated profile, roles, and branch details (Dual Staff & Customer Support) | Bearer JWT |
+| `POST` | `/auth/change-password` | Self-service password change with current password verification | Bearer JWT (Staff) |
 | `POST` | `/auth/totp/setup` | Generate RFC 6238 Base32 secret & QR URI for 2FA | Bearer JWT |
 | `POST` | `/auth/totp/enable` | Confirm 6-digit code and permanently lock 2FA | Bearer JWT |
 | `POST` | `/auth/totp/disable` | Disable 2FA with password confirmation | Bearer JWT |
@@ -75,6 +76,7 @@
 | `POST` | `/users` | Create new staff account with assigned RBAC roles and default credentials | `SUPER_ADMIN` |
 | `PATCH`| `/users/:id/status` | Activate or deactivate staff user account (Immediately revokes active sessions) | `SUPER_ADMIN` |
 | `PATCH`| `/users/:id/roles` | Update assigned RBAC roles for staff account (Self-revocation guard) | `SUPER_ADMIN` |
+| `POST` | `/users/:id/reset-password` | Reset staff credentials & revoke active sessions | `SUPER_ADMIN` |
 
 ### 2.3 Module 2: Customers & KYC Management (`/api/v1/customers`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -89,15 +91,18 @@
 | `PATCH`| `/customers/:id/fcm-token` | Register subscriber FCM device push token (Anti-IDOR) | Staff, Self (Customer) |
 | `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo, Signature; multipart/form-data) to private S3 | Staff, Self (Customer) |
 | `GET`  | `/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL for KYC scan (Agents blocked per ADR-15) | Staff (Excl. Agents), Self (Customer), Auditor |
+| `DELETE`| `/customers/:id/documents/:docId` | Delete KYC scan from S3 & DB (Verified docs restricted to Super Admin) | Staff, Self (Customer) |
 
 ### 2.4 Module 3: Chit Schemes & Mid-Cycle Intake (`/api/v1/chits`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `POST` | `/chits/new` | Create fresh chit group in DRAFT status | `SUPER_ADMIN` |
+| `PATCH`| `/chits/:id` | Update draft chit scheme parameters (groupName, dates, sanction details) | `SUPER_ADMIN` |
 | `POST` | `/chits/onboard-ongoing` | **Mid-Cycle Intake**: Onboard ongoing chit from physical notebook | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/chits` | List chit schemes with status & keyword filter | All Authenticated |
 | `GET`  | `/chits/:id` | View chit scheme details, duration, base dues, and rules | All Authenticated |
 | `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 unique constraint) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `DELETE`| `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/chits/:id/tickets` | View all assigned tickets and status in scheme | Staff, Member, Auditor |
 | `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 pool | `SUPER_ADMIN` |
 
@@ -120,6 +125,8 @@
 | `GET`  | `/tickets/:id/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
 | `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears | Staff, Auditor |
 | `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute removal after 3 continuous months arrears (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher | `SUPER_ADMIN`, `ACCOUNTANT` |
 | `GET`  | `/installments/group/:id/month/:m` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:id/month/:m/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 
@@ -149,6 +156,8 @@
 |---|---|---|---|
 | `GET`  | `/disbursements` | List prize disbursement records across schemes with pagination | Staff, Auditor |
 | `GET`  | `/disbursements/auction/:id` | View auction winner details & disbursement status | Staff, Member, Auditor |
+| `POST` | `/disbursements/auction/:id/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 | Staff |
+| `GET`  | `/disbursements/auction/:id/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
 | `POST` | `/disbursements/auction/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/disbursements/auction/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |

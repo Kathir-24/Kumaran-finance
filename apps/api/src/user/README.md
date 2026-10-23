@@ -25,6 +25,7 @@ The **User Module** manages internal staff accounts and RBAC role assignments:
 | `POST` | `/api/v1/users` | Create staff user with branch link & password | `SUPER_ADMIN` |
 | `PATCH`| `/api/v1/users/:id/status` | Activate/deactivate staff account | `SUPER_ADMIN` |
 | `PATCH`| `/api/v1/users/:id/roles` | Update assigned staff RBAC roles | `SUPER_ADMIN` |
+| `POST` | `/api/v1/users/:id/reset-password` | Reset staff credentials & revoke active sessions | `SUPER_ADMIN` |
 
 ---
 

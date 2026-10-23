@@ -32,6 +32,8 @@ import {
   RemoveDefaulterResponseDto,
 } from './dto/installment-response.dto';
 import { RemoveDefaulterDto } from './dto/remove-defaulter.dto';
+import { SettleRemovalDto, SettleRemovalResponseDto } from './dto/settle-removal.dto';
+import { SubstituteSubscriberDto, SubstituteSubscriberResponseDto } from './dto/substitute-subscriber.dto';
 import { InstallmentService } from './installment.service';
 
 @ApiTags('Subscriber Tickets & Passbook')
@@ -149,6 +151,57 @@ export class TicketController {
     @Body() dto: RemoveDefaulterDto,
   ) {
     return this.installmentService.removeDefaulter(
+      ticketId,
+      adminUserId,
+      dto,
+    );
+  }
+
+  @Post(':id/substitute')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Subscriber Substitution for Defaulted Ticket (ADR-13)',
+    description:
+      'Assigns a new KYC-verified customer to a ticket previously removed under REMOVED_DEF_3M. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same scheme. Restores ticket status to ACTIVE. Allowed strictly: Super Admin.',
+  })
+  @ApiOkResponseEnvelope(SubstituteSubscriberResponseDto, {
+    description: 'Subscriber successfully substituted and ticket restored to ACTIVE',
+  })
+  @ApiResponse({ status: 400, description: 'Ticket is not in REMOVED_DEF_3M status or customer not KYC verified' })
+  @ApiResponse({ status: 404, description: 'Ticket or customer not found' })
+  @ApiResponse({ status: 409, description: 'ADR-13 Violation: Customer already holds a ticket in this scheme' })
+  async substituteSubscriber(
+    @Param('id') ticketId: string,
+    @CurrentUser('sub') adminUserId: string,
+    @Body() dto: SubstituteSubscriberDto,
+  ) {
+    return this.installmentService.substituteSubscriber(
+      ticketId,
+      adminUserId,
+      dto,
+    );
+  }
+
+  @Post(':id/settle-removal')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Defaulter Account Settlement & Exit Refund Voucher',
+    description:
+      'Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.',
+  })
+  @ApiOkResponseEnvelope(SettleRemovalResponseDto, {
+    description: 'Defaulter account exit settlement executed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Ticket is not in REMOVED_DEF_3M status' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  async settleRemoval(
+    @Param('id') ticketId: string,
+    @CurrentUser('sub') adminUserId: string,
+    @Body() dto: SettleRemovalDto,
+  ) {
+    return this.installmentService.settleRemoval(
       ticketId,
       adminUserId,
       dto,

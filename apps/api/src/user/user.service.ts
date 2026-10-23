@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { BCRYPT_SALT_ROUNDS } from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
@@ -224,5 +226,36 @@ export class UserService {
     });
 
     return this.sanitizeUser(updated);
+  }
+
+  /**
+   * Resets a staff member's password to a secure temporary password.
+   * Invalidates active sessions immediately. Allowed: Super Admin only.
+   */
+  async resetPassword(id: string, dto: ResetPasswordDto, _currentUserId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Staff user with ID ${id} not found`);
+    }
+
+    const tempPassword = dto.temporaryPassword?.trim() || `Temp#${crypto.randomBytes(4).toString('hex')}!`;
+    const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Password for staff user ${user.name} has been reset successfully. Active sessions have been revoked.`,
+      temporaryPassword: tempPassword,
+    };
   }
 }

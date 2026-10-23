@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -25,6 +28,7 @@ import {
   ApiOkResponseEnvelope,
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { ActionSuccessResponseDto } from '../common/dto/action-success.dto';
 import { ChitService } from './chit.service';
 import { ActivateChitDto } from './dto/activate-chit.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
@@ -36,6 +40,7 @@ import {
 import { CreateChitGroupDto } from './dto/create-chit-group.dto';
 import { OnboardOngoingChitDto } from './dto/onboard-ongoing-chit.dto';
 import { QueryChitDto } from './dto/query-chit.dto';
+import { UpdateChitGroupDto } from './dto/update-chit-group.dto';
 
 @ApiTags('Chits')
 @ApiBearerAuth('JWT-auth')
@@ -118,6 +123,24 @@ export class ChitController {
     return this.chitService.findOne(id);
   }
 
+  @Patch(':id')
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Update draft chit scheme parameters',
+    description:
+      'Modifies group name, scheduled dates, or auction timing. Permitted strictly while status is DRAFT. Allowed strictly: Super Admin.',
+  })
+  @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit group updated successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot update chit: Scheme is not in DRAFT status' })
+  @ApiResponse({ status: 404, description: 'Chit scheme not found' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateChitGroupDto,
+    @CurrentUser('sub') adminUserId: string,
+  ) {
+    return this.chitService.update(id, dto, adminUserId);
+  }
+
   @Post(':id/tickets/assign')
   @HttpCode(HttpStatus.CREATED)
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
@@ -133,6 +156,24 @@ export class ChitController {
     @Body() dto: AssignTicketDto,
   ) {
     return this.chitService.assignTicket(chitGroupId, dto);
+  }
+
+  @Delete(':id/tickets/:ticketNumber')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Unassign a ticket before scheme activation',
+    description:
+      'Frees an allocated ticket in DRAFT status to fix misallocations. Prohibited once scheme is active. Allowed: Super Admin, Branch Manager.',
+  })
+  @ApiOkResponseEnvelope(ActionSuccessResponseDto, { description: 'Ticket unassigned successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot unassign ticket: Scheme is not in DRAFT status' })
+  @ApiResponse({ status: 404, description: 'Chit scheme or ticket not found' })
+  async unassignTicket(
+    @Param('id') chitGroupId: string,
+    @Param('ticketNumber', ParseIntPipe) ticketNumber: number,
+    @CurrentUser('sub') staffUserId: string,
+  ) {
+    return this.chitService.unassignTicket(chitGroupId, ticketNumber, staffUserId);
   }
 
   @Get(':id/tickets')

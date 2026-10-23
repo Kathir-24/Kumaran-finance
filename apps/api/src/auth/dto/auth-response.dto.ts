@@ -49,6 +49,15 @@ export class SanitizedUserDto {
 export class UserProfileResponseDto extends SanitizedUserDto {
   @ApiProperty({ type: BranchSummaryDto, nullable: true, description: 'Assigned branch details' })
   branch?: BranchSummaryDto | null;
+
+  @ApiProperty({ example: 'கே. செங்கோட்டையன்', description: 'Full name in Tamil', nullable: true, required: false })
+  fullNameTamil?: string | null;
+
+  @ApiProperty({ example: 'KC-CUST-00042', description: 'Customer unique registration code (for subscribers)', required: false })
+  customerCode?: string;
+
+  @ApiProperty({ example: true, description: 'Whether subscriber KYC is verified', required: false })
+  isKycVerified?: boolean;
 }
 
 export class AuthTokensResponseDto {

@@ -339,5 +339,30 @@ export class CustomerController {
 
     return this.customerService.getDocumentPresignedUrl(customerId, docId);
   }
+
+  @Delete(':id/documents/:docId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.CUSTOMER,
+  )
+  @ApiOperation({
+    summary: 'Delete customer KYC document',
+    description:
+      'Removes a KYC document from cloud storage and database. Verified documents can only be deleted with Super Admin authorization. Customers restricted to self.',
+  })
+  @ApiOkResponseEnvelope(ActionSuccessResponseDto, {
+    description: 'KYC document deleted successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions or cannot delete verified KYC document' })
+  @ApiResponse({ status: 404, description: 'Customer or document not found' })
+  async deleteDocument(
+    @Param('id') customerId: string,
+    @Param('docId') docId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.customerService.deleteDocument(customerId, docId, currentUser);
+  }
 }
 

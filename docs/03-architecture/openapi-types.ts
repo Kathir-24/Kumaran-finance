@@ -173,11 +173,31 @@ export interface paths {
         };
         /**
          * Get current user profile
-         * @description Returns profile, roles, and branch details of authenticated user.
+         * @description Returns profile, roles, and branch details of authenticated user or customer.
          */
         get: operations["AuthController_getProfile_v1"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Self-service password update for staff user
+         * @description Allows authenticated office staff to change their web portal password by verifying their current password. Revokes active refresh token sessions.
+         */
+        post: operations["AuthController_changePassword_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -452,6 +472,26 @@ export interface paths {
         patch: operations["UserController_updateRoles_v1"];
         trace?: never;
     };
+    "/api/v1/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Super Admin: Reset a staff user password
+         * @description Resets a staff account password to a specified or auto-generated secure temporary password and revokes active sessions. Allowed: Super Admin only.
+         */
+        post: operations["UserController_resetPassword_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -620,6 +660,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/{id}/documents/{docId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete customer KYC document
+         * @description Removes a KYC document from cloud storage and database. Verified documents can only be deleted with Super Admin authorization. Customers restricted to self.
+         */
+        delete: operations["CustomerController_deleteDocument_v1"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/storage/file/{key}": {
         parameters: {
             query?: never;
@@ -717,7 +777,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update draft chit scheme parameters
+         * @description Modifies group name, scheduled dates, or auction timing. Permitted strictly while status is DRAFT. Allowed strictly: Super Admin.
+         */
+        patch: operations["ChitController_update_v1"];
         trace?: never;
     };
     "/api/v1/chits/{id}/tickets/assign": {
@@ -735,6 +799,26 @@ export interface paths {
          */
         post: operations["ChitController_assignTicket_v1"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chits/{id}/tickets/{ticketNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unassign a ticket before scheme activation
+         * @description Frees an allocated ticket in DRAFT status to fix misallocations. Prohibited once scheme is active. Allowed: Super Admin, Branch Manager.
+         */
+        delete: operations["ChitController_unassignTicket_v1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1117,6 +1201,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{id}/substitute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscriber Substitution for Defaulted Ticket (ADR-13)
+         * @description Assigns a new KYC-verified customer to a ticket previously removed under REMOVED_DEF_3M. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same scheme. Restores ticket status to ACTIVE. Allowed strictly: Super Admin.
+         */
+        post: operations["TicketController_substituteSubscriber_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{id}/settle-removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Defaulter Account Settlement & Exit Refund Voucher
+         * @description Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.
+         */
+        post: operations["TicketController_settleRemoval_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/collections/agent-dues": {
         parameters: {
             query?: never;
@@ -1393,6 +1517,46 @@ export interface paths {
          * @description Returns winner details, safety checklist status, authorized payout mode, and release timestamps. Customers scoped strictly to self.
          */
         get: operations["DisbursementController_getWinnerDisbursement_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disbursements/auction/{auctionId}/upload-safety-proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)
+         * @description Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).
+         */
+        post: operations["DisbursementController_uploadSafetyProof_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disbursements/auction/{auctionId}/safety-proof-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Checker: Generate 15-minute presigned viewing URL for safety proof scan
+         * @description Returns a secure, time-limited S3 presigned URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout. Allowed: Super Admin, Branch Manager, Accountant, Auditor.
+         */
+        get: operations["DisbursementController_getSafetyProofUrl_v1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2171,6 +2335,33 @@ export interface components {
             lastLoginAt: Record<string, never> | null;
             /** @description Assigned branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
+            /**
+             * @description Full name in Tamil
+             * @example கே. செங்கோட்டையன்
+             */
+            fullNameTamil?: Record<string, never> | null;
+            /**
+             * @description Customer unique registration code (for subscribers)
+             * @example KC-CUST-00042
+             */
+            customerCode?: string;
+            /**
+             * @description Whether subscriber KYC is verified
+             * @example true
+             */
+            isKycVerified?: boolean;
+        };
+        ChangePasswordDto: {
+            /**
+             * @description Current active staff password
+             * @example OldPass@123
+             */
+            currentPassword: string;
+            /**
+             * @description New password (minimum 8 characters)
+             * @example NewSecurePass@2026
+             */
+            newPassword: string;
         };
         TotpSetupResponseDto: {
             /**
@@ -2504,6 +2695,30 @@ export interface components {
              *     ]
              */
             roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+        };
+        ResetPasswordResponseDto: {
+            /**
+             * @description Operation success status
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Staff password successfully reset. Active sessions revoked.
+             */
+            message: string;
+            /**
+             * @description Temporary password assigned to the staff user
+             * @example TempPass@2026
+             */
+            temporaryPassword: string;
+        };
+        ResetPasswordDto: {
+            /**
+             * @description Custom temporary password. If omitted, the system generates a secure 12-character temporary password.
+             * @example TempPass@2026
+             */
+            temporaryPassword?: string;
         };
         CustomerResponseDto: {
             /**
@@ -3444,6 +3659,38 @@ export interface components {
             /** @description Conducted or scheduled auction records */
             auctions: unknown[][];
         };
+        UpdateChitGroupDto: {
+            /**
+             * @description Chit group name in English
+             * @example ₹1 Lakh 20 Months Group A
+             */
+            groupName?: string;
+            /**
+             * @description Chit group name in Tamil
+             * @example ₹1 லட்சம் 20 மாதங்கள் குழு A
+             */
+            groupNameTamil?: string;
+            /**
+             * @description Scheduled start date (Month 1)
+             * @example 2026-11-01
+             */
+            startDate?: string;
+            /**
+             * @description Scheduled end date (Month N)
+             * @example 2028-06-01
+             */
+            endDate?: string;
+            /**
+             * @description Chit Registrar official Sanction Order Number
+             * @example SO/ERD/2026/00918
+             */
+            sanctionOrderNumber?: string;
+            /**
+             * @description Date of Chit Registrar sanction
+             * @example 2026-10-15
+             */
+            sanctionDate?: string;
+        };
         AssignTicketDto: {
             /**
              * @description Ticket number to assign (between 1 and totalTickets)
@@ -4084,6 +4331,112 @@ export interface components {
              * @example Subscriber has defaulted on 3 consecutive monthly installments (Months 4, 5, 6) despite repeated formal notices. Company removal rights exercised per ADR-07 and ADR-12.
              */
             reason: string;
+        };
+        SubstituteSubscriberResponseDto: {
+            /**
+             * @description Operation success status
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Subscriber replacement successfully executed. Ticket restored to ACTIVE status.
+             */
+            message: string;
+            /**
+             * @description Substituted ticket details
+             * @example {
+             *       "id": "ticket-uuid-001",
+             *       "ticketNumber": 5,
+             *       "status": "ACTIVE",
+             *       "previousCustomerId": "cust-uuid-001",
+             *       "newCustomerId": "cust-uuid-002",
+             *       "newCustomerName": "Ravi Kumar"
+             *     }
+             */
+            ticket: Record<string, never>;
+        };
+        SubstituteSubscriberDto: {
+            /**
+             * @description Customer UUID of verified replacement subscriber
+             * @example cust-uuid-002
+             */
+            newCustomerId: string;
+            /**
+             * @description Operational justification or notebook remarks
+             * @example Previous subscriber removed for 3-month consecutive default; substituted per company policy.
+             */
+            reason?: string;
+        };
+        SettleRemovalResponseDto: {
+            /**
+             * @description Operation success status
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Defaulter account successfully settled with exit refund voucher.
+             */
+            message: string;
+            /**
+             * @description Settled ticket ID
+             * @example ticket-uuid-001
+             */
+            ticketId: string;
+            /**
+             * @description Ticket number
+             * @example 5
+             */
+            ticketNumber: number;
+            /**
+             * @description Removed subscriber full name
+             * @example Murugan K
+             */
+            customerName: string;
+            /**
+             * @description Chit group code
+             * @example KCA-1L-20M-01
+             */
+            groupCode: string;
+            /**
+             * @description Total installments paid by removed subscriber in Rupees
+             * @example 10000
+             */
+            totalPaid: number;
+            /**
+             * @description 4% Foreman Commission damages deducted in Rupees
+             * @example 4000
+             */
+            damagesDeducted: number;
+            /**
+             * @description Net refund amount disbursed in Rupees
+             * @example 6000
+             */
+            refundAmount: number;
+            /**
+             * @description Exit settlement refund voucher number
+             * @example KC-VOU-DEF-819201
+             */
+            voucherNumber: string;
+            /**
+             * @description Settlement timestamp
+             * @example 2026-10-23T19:00:00.000Z
+             */
+            settledAt: Record<string, never>;
+        };
+        SettleRemovalDto: {
+            /**
+             * @description Payout settlement mode (CASH, BANK_TRANSFER, CHEQUE)
+             * @example CASH
+             * @enum {string}
+             */
+            paymentMethod: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description Remarks or voucher narrative
+             * @example Settled remaining refund after 4% contractual damages deduction.
+             */
+            notes?: string;
         };
         AgentDueItemResponseDto: {
             /**
@@ -4845,6 +5198,55 @@ export interface components {
             auction: Record<string, never>;
             /** @description Subscriber ticket details */
             ticket: Record<string, never>;
+        };
+        UploadSafetyProofResponseDto: {
+            /**
+             * @description Upload operation status
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Safety proof collateral document uploaded and linked successfully.
+             */
+            message: string;
+            /**
+             * @description Associated auction ID
+             * @example auction-uuid-001
+             */
+            auctionId: string;
+            /**
+             * @description Private S3 storage object key
+             * @example safety-proofs/auction-uuid-001/1729729200000_signed_cheque.jpg
+             */
+            securityDocS3Key: string;
+            /**
+             * @description Original uploaded file name
+             * @example signed_cheque.jpg
+             */
+            fileName: string;
+            /**
+             * @description Timestamp when document was uploaded
+             * @example 2026-10-23T19:00:00.000Z
+             */
+            uploadedAt: Record<string, never>;
+        };
+        SafetyProofUrlResponseDto: {
+            /**
+             * @description Time-limited S3 presigned URL for viewing the safety proof collateral scan
+             * @example https://chitflow-private-kyc.s3.ap-south-1.amazonaws.com/safety-proofs/...
+             */
+            url: string;
+            /**
+             * @description URL expiration duration in seconds (15 minutes)
+             * @example 900
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Underlying private S3 storage object key
+             * @example safety-proofs/auction-uuid-001/1729729200000_signed_cheque.jpg
+             */
+            securityDocS3Key: string;
         };
         SafetyProofVerificationResponseDto: {
             /**
@@ -5796,6 +6198,52 @@ export interface operations {
             };
         };
     };
+    AuthController_changePassword_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Password changed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description New password too short or invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incorrect current password or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AuthController_setupTotp_v1: {
         parameters: {
             query?: never;
@@ -6438,6 +6886,47 @@ export interface operations {
             };
         };
     };
+    UserController_resetPassword_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Staff password reset successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ResetPasswordResponseDto"];
+                    };
+                };
+            };
+            /** @description Staff user not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CustomerController_findAll_v1: {
         parameters: {
             query?: {
@@ -6997,6 +7486,58 @@ export interface operations {
             };
         };
     };
+    CustomerController_deleteDocument_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                docId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description KYC document deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Insufficient permissions or cannot delete verified KYC document */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Customer or document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     StorageController_streamFile_v1: {
         parameters: {
             query?: never;
@@ -7247,6 +7788,68 @@ export interface operations {
             };
         };
     };
+    ChitController_update_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChitGroupDto"];
+            };
+        };
+        responses: {
+            /** @description Chit group updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ChitGroupResponseDto"];
+                    };
+                };
+            };
+            /** @description Cannot update chit: Scheme is not in DRAFT status */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chit scheme not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ChitController_assignTicket_v1: {
         parameters: {
             query?: never;
@@ -7295,6 +7898,65 @@ export interface operations {
             };
             /** @description Customer already holds a ticket or ticket taken */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ChitController_unassignTicket_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                ticketNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ticket unassigned successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description Cannot unassign ticket: Scheme is not in DRAFT status */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chit scheme or ticket not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8270,6 +8932,137 @@ export interface operations {
             };
         };
     };
+    TicketController_substituteSubscriber_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubstituteSubscriberDto"];
+            };
+        };
+        responses: {
+            /** @description Subscriber successfully substituted and ticket restored to ACTIVE */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["SubstituteSubscriberResponseDto"];
+                    };
+                };
+            };
+            /** @description Ticket is not in REMOVED_DEF_3M status or customer not KYC verified */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ticket or customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description ADR-13 Violation: Customer already holds a ticket in this scheme */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketController_settleRemoval_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleRemovalDto"];
+            };
+        };
+        responses: {
+            /** @description Defaulter account exit settlement executed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["SettleRemovalResponseDto"];
+                    };
+                };
+            };
+            /** @description Ticket is not in REMOVED_DEF_3M status */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CollectionController_getAgentDues_v1: {
         parameters: {
             query?: never;
@@ -9081,6 +9874,125 @@ export interface operations {
                 content?: never;
             };
             /** @description Auction or winner not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_uploadSafetyProof_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auctionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description Photo of signed agreement, signed blank cheques, or promissory note (JPG, PNG, WEBP, PDF up to 10 MB)
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Safety proof collateral scan uploaded successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UploadSafetyProofResponseDto"];
+                    };
+                };
+            };
+            /** @description Missing file or invalid format/size */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Auction or winner record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_getSafetyProofUrl_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auctionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Presigned viewing URL generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["SafetyProofUrlResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Auction, winner, or uploaded document not found */
             404: {
                 headers: {
                     [name: string]: unknown;

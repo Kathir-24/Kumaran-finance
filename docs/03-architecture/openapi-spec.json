@@ -384,7 +384,7 @@
     },
     "/api/v1/auth/me": {
       "get": {
-        "description": "Returns profile, roles, and branch details of authenticated user.",
+        "description": "Returns profile, roles, and branch details of authenticated user or customer.",
         "operationId": "AuthController_getProfile_v1",
         "parameters": [],
         "responses": {
@@ -431,6 +431,73 @@
           }
         ],
         "summary": "Get current user profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "description": "Allows authenticated office staff to change their web portal password by verifying their current password. Revokes active refresh token sessions.",
+        "operationId": "AuthController_changePassword_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "New password too short or invalid"
+          },
+          "401": {
+            "description": "Incorrect current password or missing Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Self-service password update for staff user",
         "tags": [
           "Auth"
         ]
@@ -1499,6 +1566,79 @@
         ]
       }
     },
+    "/api/v1/users/{id}/reset-password": {
+      "post": {
+        "description": "Resets a staff account password to a specified or auto-generated secure temporary password and revokes active sessions. Allowed: Super Admin only.",
+        "operationId": "UserController_resetPassword_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staff password reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ResetPasswordResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Staff user not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Super Admin: Reset a staff user password",
+        "tags": [
+          "Staff Users"
+        ]
+      }
+    },
     "/api/v1/customers": {
       "post": {
         "description": "Creates a customer record with auto-generated KC-CUST-XXXXX code, bilingual names, and masked Aadhaar (last 4 digits). Allowed: Super Admin, Branch Manager, Collection Agent.",
@@ -2338,6 +2478,83 @@
         ]
       }
     },
+    "/api/v1/customers/{id}/documents/{docId}": {
+      "delete": {
+        "description": "Removes a KYC document from cloud storage and database. Verified documents can only be deleted with Super Admin authorization. Customers restricted to self.",
+        "operationId": "CustomerController_deleteDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "docId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "KYC document deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Insufficient permissions or cannot delete verified KYC document"
+          },
+          "404": {
+            "description": "Customer or document not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Delete customer KYC document",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
     "/api/v1/storage/file/{key}": {
       "get": {
         "description": "Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.",
@@ -2715,6 +2932,86 @@
         "tags": [
           "Chits"
         ]
+      },
+      "patch": {
+        "description": "Modifies group name, scheduled dates, or auction timing. Permitted strictly while status is DRAFT. Allowed strictly: Super Admin.",
+        "operationId": "ChitController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChitGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chit group updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ChitGroupResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot update chit: Scheme is not in DRAFT status"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Chit scheme not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Update draft chit scheme parameters",
+        "tags": [
+          "Chits"
+        ]
       }
     },
     "/api/v1/chits/{id}/tickets/assign": {
@@ -2791,6 +3088,86 @@
           }
         ],
         "summary": "Assign a ticket to a verified subscriber",
+        "tags": [
+          "Chits"
+        ]
+      }
+    },
+    "/api/v1/chits/{id}/tickets/{ticketNumber}": {
+      "delete": {
+        "description": "Frees an allocated ticket in DRAFT status to fix misallocations. Prohibited once scheme is active. Allowed: Super Admin, Branch Manager.",
+        "operationId": "ChitController_unassignTicket_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ticketNumber",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket unassigned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot unassign ticket: Scheme is not in DRAFT status"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Chit scheme or ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Unassign a ticket before scheme activation",
         "tags": [
           "Chits"
         ]
@@ -4273,6 +4650,173 @@
         ]
       }
     },
+    "/api/v1/tickets/{id}/substitute": {
+      "post": {
+        "description": "Assigns a new KYC-verified customer to a ticket previously removed under REMOVED_DEF_3M. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same scheme. Restores ticket status to ACTIVE. Allowed strictly: Super Admin.",
+        "operationId": "TicketController_substituteSubscriber_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubstituteSubscriberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscriber successfully substituted and ticket restored to ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SubstituteSubscriberResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ticket is not in REMOVED_DEF_3M status or customer not KYC verified"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Ticket or customer not found"
+          },
+          "409": {
+            "description": "ADR-13 Violation: Customer already holds a ticket in this scheme"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Subscriber Substitution for Defaulted Ticket (ADR-13)",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/settle-removal": {
+      "post": {
+        "description": "Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.",
+        "operationId": "TicketController_settleRemoval_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleRemovalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Defaulter account exit settlement executed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SettleRemovalResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ticket is not in REMOVED_DEF_3M status"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Defaulter Account Settlement & Exit Refund Voucher",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
     "/api/v1/collections/agent-dues": {
       "get": {
         "description": "Returns pending subscriber dues for doorstep collection with customer code, name, address, and net payable amount. Allowed: Staff and Auditor.",
@@ -5569,6 +6113,167 @@
           }
         ],
         "summary": "Get prize disbursement details for a specific auction winner",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/upload-safety-proof": {
+      "post": {
+        "description": "Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).",
+        "operationId": "DisbursementController_uploadSafetyProof_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Photo of signed agreement, signed blank cheques, or promissory note (JPG, PNG, WEBP, PDF up to 10 MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Safety proof collateral scan uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UploadSafetyProofResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file or invalid format/size"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Auction or winner record not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/safety-proof-url": {
+      "get": {
+        "description": "Returns a secure, time-limited S3 presigned URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout. Allowed: Super Admin, Branch Manager, Accountant, Auditor.",
+        "operationId": "DisbursementController_getSafetyProofUrl_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presigned viewing URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SafetyProofUrlResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Auction, winner, or uploaded document not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Generate 15-minute presigned viewing URL for safety proof scan",
         "tags": [
           "Prize Disbursements & Safety Proof"
         ]
@@ -8084,6 +8789,22 @@
                 "$ref": "#/components/schemas/BranchSummaryDto"
               }
             ]
+          },
+          "fullNameTamil": {
+            "type": "object",
+            "example": "கே. செங்கோட்டையன்",
+            "description": "Full name in Tamil",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "example": "KC-CUST-00042",
+            "description": "Customer unique registration code (for subscribers)"
+          },
+          "isKycVerified": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether subscriber KYC is verified"
           }
         },
         "required": [
@@ -8096,6 +8817,25 @@
           "hasMpin",
           "lastLoginAt",
           "branch"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "example": "OldPass@123",
+            "description": "Current active staff password"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewSecurePass@2026",
+            "description": "New password (minimum 8 characters)"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
         ]
       },
       "TotpSetupResponseDto": {
@@ -8611,6 +9351,41 @@
         "required": [
           "roles"
         ]
+      },
+      "ResetPasswordResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Operation success status"
+          },
+          "message": {
+            "type": "string",
+            "example": "Staff password successfully reset. Active sessions revoked.",
+            "description": "Status message"
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "example": "TempPass@2026",
+            "description": "Temporary password assigned to the staff user"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "temporaryPassword"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "temporaryPassword": {
+            "type": "string",
+            "example": "TempPass@2026",
+            "description": "Custom temporary password. If omitted, the system generates a secure 12-character temporary password."
+          }
+        }
       },
       "CustomerResponseDto": {
         "type": "object",
@@ -9954,6 +10729,41 @@
           "auctions"
         ]
       },
+      "UpdateChitGroupDto": {
+        "type": "object",
+        "properties": {
+          "groupName": {
+            "type": "string",
+            "example": "₹1 Lakh 20 Months Group A",
+            "description": "Chit group name in English"
+          },
+          "groupNameTamil": {
+            "type": "string",
+            "example": "₹1 லட்சம் 20 மாதங்கள் குழு A",
+            "description": "Chit group name in Tamil"
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-11-01",
+            "description": "Scheduled start date (Month 1)"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2028-06-01",
+            "description": "Scheduled end date (Month N)"
+          },
+          "sanctionOrderNumber": {
+            "type": "string",
+            "example": "SO/ERD/2026/00918",
+            "description": "Chit Registrar official Sanction Order Number"
+          },
+          "sanctionDate": {
+            "type": "string",
+            "example": "2026-10-15",
+            "description": "Date of Chit Registrar sanction"
+          }
+        }
+      },
       "AssignTicketDto": {
         "type": "object",
         "properties": {
@@ -10944,6 +11754,153 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "SubstituteSubscriberResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Operation success status"
+          },
+          "message": {
+            "type": "string",
+            "example": "Subscriber replacement successfully executed. Ticket restored to ACTIVE status.",
+            "description": "Status message"
+          },
+          "ticket": {
+            "type": "object",
+            "example": {
+              "id": "ticket-uuid-001",
+              "ticketNumber": 5,
+              "status": "ACTIVE",
+              "previousCustomerId": "cust-uuid-001",
+              "newCustomerId": "cust-uuid-002",
+              "newCustomerName": "Ravi Kumar"
+            },
+            "description": "Substituted ticket details"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "ticket"
+        ]
+      },
+      "SubstituteSubscriberDto": {
+        "type": "object",
+        "properties": {
+          "newCustomerId": {
+            "type": "string",
+            "example": "cust-uuid-002",
+            "description": "Customer UUID of verified replacement subscriber"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Previous subscriber removed for 3-month consecutive default; substituted per company policy.",
+            "description": "Operational justification or notebook remarks"
+          }
+        },
+        "required": [
+          "newCustomerId"
+        ]
+      },
+      "SettleRemovalResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Operation success status"
+          },
+          "message": {
+            "type": "string",
+            "example": "Defaulter account successfully settled with exit refund voucher.",
+            "description": "Status message"
+          },
+          "ticketId": {
+            "type": "string",
+            "example": "ticket-uuid-001",
+            "description": "Settled ticket ID"
+          },
+          "ticketNumber": {
+            "type": "number",
+            "example": 5,
+            "description": "Ticket number"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Murugan K",
+            "description": "Removed subscriber full name"
+          },
+          "groupCode": {
+            "type": "string",
+            "example": "KCA-1L-20M-01",
+            "description": "Chit group code"
+          },
+          "totalPaid": {
+            "type": "number",
+            "example": 10000,
+            "description": "Total installments paid by removed subscriber in Rupees"
+          },
+          "damagesDeducted": {
+            "type": "number",
+            "example": 4000,
+            "description": "4% Foreman Commission damages deducted in Rupees"
+          },
+          "refundAmount": {
+            "type": "number",
+            "example": 6000,
+            "description": "Net refund amount disbursed in Rupees"
+          },
+          "voucherNumber": {
+            "type": "string",
+            "example": "KC-VOU-DEF-819201",
+            "description": "Exit settlement refund voucher number"
+          },
+          "settledAt": {
+            "type": "object",
+            "example": "2026-10-23T19:00:00.000Z",
+            "description": "Settlement timestamp"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "ticketId",
+          "ticketNumber",
+          "customerName",
+          "groupCode",
+          "totalPaid",
+          "damagesDeducted",
+          "refundAmount",
+          "voucherNumber",
+          "settledAt"
+        ]
+      },
+      "SettleRemovalDto": {
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "UPI",
+              "BANK_TRANSFER",
+              "CHEQUE"
+            ],
+            "example": "CASH",
+            "description": "Payout settlement mode (CASH, BANK_TRANSFER, CHEQUE)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Settled remaining refund after 4% contractual damages deduction.",
+            "description": "Remarks or voucher narrative"
+          }
+        },
+        "required": [
+          "paymentMethod"
         ]
       },
       "AgentDueItemResponseDto": {
@@ -12117,6 +13074,74 @@
           "disbursedAt",
           "auction",
           "ticket"
+        ]
+      },
+      "UploadSafetyProofResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Upload operation status"
+          },
+          "message": {
+            "type": "string",
+            "example": "Safety proof collateral document uploaded and linked successfully.",
+            "description": "Status message"
+          },
+          "auctionId": {
+            "type": "string",
+            "example": "auction-uuid-001",
+            "description": "Associated auction ID"
+          },
+          "securityDocS3Key": {
+            "type": "string",
+            "example": "safety-proofs/auction-uuid-001/1729729200000_signed_cheque.jpg",
+            "description": "Private S3 storage object key"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "signed_cheque.jpg",
+            "description": "Original uploaded file name"
+          },
+          "uploadedAt": {
+            "type": "object",
+            "example": "2026-10-23T19:00:00.000Z",
+            "description": "Timestamp when document was uploaded"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "auctionId",
+          "securityDocS3Key",
+          "fileName",
+          "uploadedAt"
+        ]
+      },
+      "SafetyProofUrlResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://chitflow-private-kyc.s3.ap-south-1.amazonaws.com/safety-proofs/...",
+            "description": "Time-limited S3 presigned URL for viewing the safety proof collateral scan"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 900,
+            "description": "URL expiration duration in seconds (15 minutes)"
+          },
+          "securityDocS3Key": {
+            "type": "string",
+            "example": "safety-proofs/auction-uuid-001/1729729200000_signed_cheque.jpg",
+            "description": "Underlying private S3 storage object key"
+          }
+        },
+        "required": [
+          "url",
+          "expiresInSeconds",
+          "securityDocS3Key"
         ]
       },
       "SafetyProofVerificationResponseDto": {
