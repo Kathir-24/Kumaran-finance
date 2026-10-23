@@ -1,9 +1,9 @@
-# Master Live Server E2E Verification Plan (All 102 Operations across 97 Paths + SQL Proofs)
+# Master Live Server E2E Verification Plan (All 111 Operations across 105 Paths + SQL Proofs)
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Target**: Live NestJS Server (`http://localhost:3000`) + PostgreSQL 17 (`chitflow_dev` Port 5433) + Redis (`:6379`) + MinIO S3 (`:9000`)  
 > **Core Requirement**: Every endpoint tested with **Full Request Payload $\to$ Live HTTP Server $\to$ Database Persistence (Checked via SQL) $\to$ API Response Verification**.  
-> **Status**: Verified & Active (Lifecycles 1 & 2 Completed 100% with Live Proofs)
+> **Status**: Verified & Active (Lifecycles 1, 2, 3, 5 & 8 Complete with Category A Operations Verified)
 
 ---
 
@@ -58,32 +58,32 @@ Before initiating live endpoint testing, we will execute the startup sequence:
 
 ---
 
-## 3. The 11 Sequential Operational Lifecycles (All 102 Operations)
+## 3. The 11 Sequential Operational Lifecycles (All 111 Operations)
 
-To test all 102 operations realistically, we organize them into an end-to-end chronological lifecycle of Kumaran Finance. For **every single step**, we log:
+To test all 111 operations realistically, we organize them into an end-to-end chronological lifecycle of Kumaran Finance. For **every single step**, we log:
 - **Request**: Method, Endpoint, Headers, and Full JSON Body.
 - **Response**: HTTP Status Code and Full Response JSON.
 - **SQL Verification**: The exact `psql` query run against PostgreSQL showing the row and columns saved in `chitflow_dev`.
 
 ```mermaid
 flowchart LR
-    S1["1. Auth, Branches & Users\n(21 Endpoints) ✅"] --> S2["2. Customer, Nominee & KYC\n(10 Endpoints) ✅"]
-    S2 --> S3["3. Chit Scheme & Onboarding\n(7 Endpoints)"]
+    S1["1. Auth, Branches & Users\n(24 Endpoints) ✅"] --> S2["2. Customer, Nominee & KYC\n(11 Endpoints) ✅"]
+    S2 --> S3["3. Chit Scheme & Onboarding\n(9 Endpoints) ✅"]
     S3 --> S4["4. In-Office Auction & Tie-Break\n(8 Endpoints)"]
-    S4 --> S5["5. Installments & Dues\n(6 Endpoints)"]
+    S4 --> S5["5. Installments & Dues\n(9 Endpoints) ✅"]
     S5 --> S6["6. Field Collections & Handover\n(6 Endpoints)"]
     S6 --> S7["7. Payments & Reversals\n(7 Endpoints)"]
-    S7 --> S8["8. Disbursements & Safety Proof\n(6 Endpoints)"]
+    S7 --> S8["8. Disbursements & Safety Proof\n(8 Endpoints) ✅"]
     S8 --> S9["9. Cash Book & Reports\n(9 Endpoints)"]
     S9 --> S10["10. Storage & Bilingual PDFs\n(5 Endpoints)"]
-    S10 --> S11["11. Background Jobs & Queues\n(11 Endpoints)"]
+    S10 --> S11["11. Background Jobs & Queues\n(15 Endpoints)"]
 ```
 
 ---
 
-### Lifecycle 1: Authentication, 2FA, Branches & Staff User Administration (21 Endpoints) — ✅ 100% VERIFIED
+### Lifecycle 1: Authentication, 2FA, Branches & Staff User Administration (24 Endpoints) — ✅ 100% VERIFIED
 1. `POST /api/v1/auth/web/login`: Login as Super Admin (`9876543210`) $\to$ SQL: Check `lastLoginAt` updated in `User`.
-2. `GET /api/v1/auth/me`: Fetch authenticated user profile and branch details.
+2. `GET /api/v1/auth/me`: Fetch authenticated user profile, roles, and branch details (Dual Staff & Customer Support).
 3. `PATCH /api/v1/auth/fcm-token`: Register FCM device token $\to$ SQL: Verify `fcmToken` in `User`.
 4. `POST /api/v1/auth/totp/setup`: Generate Base32 TOTP secret and QR URI $\to$ SQL: Verify `totpSecret` in `User`.
 5. `POST /api/v1/auth/totp/enable`: Submit valid 6-digit TOTP code $\to$ SQL: Verify `isTotpEnabled = true`.
@@ -97,133 +97,143 @@ flowchart LR
 13. `POST /api/v1/auth/mobile/verify-otp` (Staff): Verify OTP $\to$ returns 10-minute `setupToken`.
 14. `POST /api/v1/auth/mobile/set-mpin` (Onboarding): Set MPIN with `setupToken` $\to$ SQL: Verify `mpinHash`.
 15. `POST /api/v1/auth/mobile/request-otp` & `POST /api/v1/auth/mobile/verify-otp` (Customer): Instant OTP passbook session with `Role.CUSTOMER`.
-16. `POST /api/v1/branches`: Create new company branch (ERD) with bilingual Tamil name $\to$ SQL: Verify row in `Branch`.
-17. `GET /api/v1/branches` & `GET /api/v1/branches/:id`: Filter active branches and fetch branch profile.
-18. `POST /api/v1/users`: Create staff user (Murugan R) with branch link & password $\to$ SQL: Verify `User`.
-19. `GET /api/v1/users`: Search staff directory across all 6 query filters.
-20. `GET /api/v1/users/:id`: Fetch staff user 360 profile.
-21. `PATCH /api/v1/users/:id/status` & `PATCH /api/v1/users/:id/roles`: Deactivate staff member and update RBAC roles $\to$ SQL: Verify status & session revocation.
+16. `POST /api/v1/auth/change-password`: Self-service password change with current password verification $\to$ SQL: Verify `passwordHash` updated.
+17. `POST /api/v1/branches`: Create new company branch (ERD) with bilingual Tamil name $\to$ SQL: Verify row in `Branch`.
+18. `GET /api/v1/branches` & `GET /api/v1/branches/:id`: Filter active branches and fetch branch profile.
+19. `POST /api/v1/users`: Create staff user (Murugan R) with branch link & password $\to$ SQL: Verify `User`.
+20. `GET /api/v1/users`: Search staff directory across all 6 query filters.
+21. `GET /api/v1/users/:id`: Fetch staff user 360 profile.
+22. `PATCH /api/v1/users/:id/status` & `PATCH /api/v1/users/:id/roles`: Deactivate staff member and update RBAC roles $\to$ SQL: Verify status & session revocation.
+23. `POST /api/v1/users/:id/reset-password`: Super Admin forced password reset $\to$ SQL: Verify new hash & session revocation.
+24. `GET /api/v1/auth/me` (Customer): Verify customer token resolves customer profile without 500 error.
 
 ---
 
-### Lifecycle 2: Customer Intake, Nominees & KYC Documents (10 Endpoints) — ✅ 100% VERIFIED
-22. `POST /api/v1/customers`: Register new customer with full details (Name, Tamil Name, Phone, Address, Masked Aadhaar `XXXXXXXX1234`, PAN) $\to$ SQL: Verify row created in `Customer` table with auto-generated code `KC-CUST-XXXXX`.
-23. `GET /api/v1/customers`: Search and list customers $\to$ Verify pagination and filters.
-24. `GET /api/v1/customers/:id`: Get full Customer 360 profile $\to$ Verify all fields match database.
-25. `PATCH /api/v1/customers/:id`: Update address and phone $\to$ SQL: Verify columns updated in `Customer`.
-26. `POST /api/v1/customers/:id/nominees`: Link verified nominee with relationship and Aadhaar $\to$ SQL: Verify row in `Nominee` table.
-27. `PATCH /api/v1/customers/:id/kyc-status`: Verify KYC status (`isKycVerified: true`) $\to$ SQL: Verify in database.
-28. `PATCH /api/v1/customers/:id/fcm-token`: Register customer mobile FCM token $\to$ SQL: Verify `fcmToken` saved in `Customer`.
-29. `DELETE /api/v1/customers/:id/nominees/:nomineeId`: Remove linked nominee record $\to$ SQL: Verify nominee deleted.
-30. `POST /api/v1/customers/:id/documents`: Multipart upload of KYC scan (Aadhaar front) to private S3 bucket $\to$ SQL: Verify row in `CustomerDocument` table.
-31. `GET /api/v1/customers/:id/documents/:docId/url`: Generate 15-minute S3 presigned viewing URL $\to$ Verify 900-second TTL.
+### Lifecycle 2: Customer Intake, Nominees & KYC Documents (11 Endpoints) — ✅ 100% VERIFIED
+25. `POST /api/v1/customers`: Register new customer with full details (Name, Tamil Name, Phone, Address, Masked Aadhaar `XXXXXXXX1234`, PAN) $\to$ SQL: Verify row created in `Customer` table with auto-generated code `KC-CUST-XXXXX`.
+26. `GET /api/v1/customers`: Search and list customers $\to$ Verify pagination and filters.
+27. `GET /api/v1/customers/:id`: Get full Customer 360 profile $\to$ Verify all fields match database.
+28. `PATCH /api/v1/customers/:id`: Update address and phone $\to$ SQL: Verify columns updated in `Customer`.
+29. `POST /api/v1/customers/:id/nominees`: Link verified nominee with relationship and Aadhaar $\to$ SQL: Verify row in `Nominee` table.
+30. `PATCH /api/v1/customers/:id/kyc-status`: Verify KYC status (`isKycVerified: true`) $\to$ SQL: Verify in database.
+31. `PATCH /api/v1/customers/:id/fcm-token`: Register customer mobile FCM token $\to$ SQL: Verify `fcmToken` saved in `Customer`.
+32. `DELETE /api/v1/customers/:id/nominees/:nomineeId`: Remove linked nominee record $\to$ SQL: Verify nominee deleted.
+33. `POST /api/v1/customers/:id/documents`: Multipart upload of KYC scan (Aadhaar front) to private S3 bucket $\to$ SQL: Verify row in `CustomerDocument` table.
+34. `GET /api/v1/customers/:id/documents/:docId/url`: Generate 15-minute S3 presigned viewing URL $\to$ Verify 900-second TTL.
+35. `DELETE /api/v1/customers/:id/documents/:docId`: Delete unverified KYC scan from S3 & database $\to$ SQL: Verify row deleted from `CustomerDocument`.
 
 ---
 
-### Lifecycle 3: Chit Scheme Creation, Tickets & Activation (7 Endpoints)
-20. `POST /api/v1/chits/new`: Create fresh chit scheme (Value: ₹5,00,000, 20 Months, ₹25,000/mo, 4% commission locked) $\to$ SQL: Verify row in `ChitGroup` table with `status = 'DRAFT'`.
-21. `POST /api/v1/chits/onboard-ongoing`: Test mid-cycle onboarding from physical notebook (400-cell grid) $\to$ SQL: Verify historical auctions, dues, and subscribers inserted.
-22. `GET /api/v1/chits`: List chit schemes $\to$ Verify created group appears.
-23. `GET /api/v1/chits/:id`: Fetch chit scheme details $\to$ Verify terms match.
-24. `POST /api/v1/chits/:id/tickets/assign`: Assign tickets 1..20 to registered customers $\to$ SQL: Verify 20 rows in `SubscriberTicket` table; assert ADR-13 unique constraint.
-25. `GET /api/v1/chits/:id/tickets`: List assigned tickets $\to$ Verify all 20 tickets returned.
-26. `POST /api/v1/chits/:id/activate`: Activate scheme $\to$ SQL: Verify `status = 'ACTIVE'`, commission frozen at 4.00%, Month 1 allocated to company ticket.
+### Lifecycle 3: Chit Scheme Creation, Tickets & Activation (9 Endpoints) — ✅ 100% VERIFIED
+36. `POST /api/v1/chits/new`: Create fresh chit scheme (Value: ₹5,00,000, 20 Months, ₹25,000/mo, 4% commission locked) $\to$ SQL: Verify row in `ChitGroup` table with `status = 'DRAFT'`.
+37. `PATCH /api/v1/chits/:id`: Update draft chit scheme parameters (groupName, dates, sanction details) $\to$ SQL: Verify updated columns while in DRAFT.
+38. `POST /api/v1/chits/onboard-ongoing`: Test mid-cycle onboarding from physical notebook (400-cell grid) $\to$ SQL: Verify historical auctions, dues, and subscribers inserted.
+39. `GET /api/v1/chits`: List chit schemes $\to$ Verify created group appears.
+40. `GET /api/v1/chits/:id`: Fetch chit scheme details $\to$ Verify terms match.
+41. `POST /api/v1/chits/:id/tickets/assign`: Assign tickets 1..20 to registered customers $\to$ SQL: Verify 20 rows in `SubscriberTicket` table; assert ADR-13 unique constraint.
+42. `DELETE /api/v1/chits/:id/tickets/:ticketNumber`: Unassign ticket before scheme activation $\to$ SQL: Verify ticket unassigned in DRAFT status.
+43. `GET /api/v1/chits/:id/tickets`: List assigned tickets $\to$ Verify all assigned tickets returned.
+44. `POST /api/v1/chits/:id/activate`: Activate scheme $\to$ SQL: Verify `status = 'ACTIVE'`, commission frozen at 4.00%, Month 1 allocated to company ticket.
 
 ---
 
 ### Lifecycle 4: In-Office Auctions, Bidding & Option A Tie-Break (8 Endpoints)
-27. `GET /api/v1/auctions/group/:id`: List auctions for the group $\to$ Verify Month 1 settled and Month 2 scheduled.
-28. `GET /api/v1/auctions/:id`: Fetch Month 2 auction record.
-29. `GET /api/v1/auctions/:id/eligible-bidders`: Check pre-auction eligibility $\to$ Verify active non-prized members with 0 arrears returned.
-30. `POST /api/v1/auctions/:id/record-bid`: **Maker (Partner A)** enters winning ticket and bid discount (testing 25% ceiling guard $D \le V/4$) $\to$ SQL: Verify bid recorded.
-31. `POST /api/v1/auctions/:id/tie-break`: Record physical paper token draw winner (Option A) $\to$ SQL: Verify tie-break winner logged.
-32. `POST /api/v1/auctions/:id/finalize`: **Checker (Partner B)** finalizes auction (`maker != checker`) $\to$ SQL: Verify `status = 'FINALIZED'`, winning ticket marked `isPrized = true`.
-33. `GET /api/v1/auctions/:id/minutes`: Fetch Form XVII statutory auction minutes data.
-34. `PATCH /api/v1/auctions/:id/mark-filed-with-registrar`: Record physical filing date with Chit Registrar $\to$ SQL: Verify `registrarFilingDate` updated.
+45. `GET /api/v1/auctions/group/:chitGroupId`: List auctions for the group $\to$ Verify Month 1 settled and Month 2 scheduled.
+46. `GET /api/v1/auctions/:id`: Fetch Month 2 auction record.
+47. `GET /api/v1/auctions/:id/eligible-bidders`: Check pre-auction eligibility $\to$ Verify active non-prized members with 0 arrears returned.
+48. `POST /api/v1/auctions/:id/record-bid`: **Maker (Partner A)** enters winning ticket and bid discount (testing 25% ceiling guard $D \le V/4$) $\to$ SQL: Verify bid recorded.
+49. `POST /api/v1/auctions/:id/tie-break`: Record physical paper token draw winner (Option A) $\to$ SQL: Verify tie-break winner logged.
+50. `POST /api/v1/auctions/:id/finalize`: **Checker (Partner B)** finalizes auction (`maker != checker`) $\to$ SQL: Verify `status = 'FINALIZED'`, winning ticket marked `isPrized = true`.
+51. `GET /api/v1/auctions/:id/minutes`: Fetch Form XVII statutory auction minutes data.
+52. `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`: Record physical filing date with Chit Registrar $\to$ SQL: Verify `registrarFilingDate` updated.
 
 ---
 
-### Lifecycle 5: Installment Dues & Passbook Ledger (6 Endpoints)
-35. `GET /api/v1/installments/due`: List generated installment dues for Month 2 $\to$ SQL: Verify equal dividend deduction ($I_{net} = I_{base} - Div$) stored in `InstallmentDue`.
-36. `GET /api/v1/installments/due/:id`: Fetch single installment due details.
-37. `GET /api/v1/tickets/:ticketId/passbook`: Fetch 20-month continuous digital passbook for a member $\to$ Verify running balance.
-38. `POST /api/v1/installments/pay`: Pay single discrete installment due $\to$ SQL: Verify `status = 'PAID'`.
-39. `GET /api/v1/tickets/:id`: Fetch single ticket subscription profile.
-40. `GET /api/v1/installments/defaulters`: Query 3-month consecutive defaulter report.
+### Lifecycle 5: Installment Dues & Passbook Ledger (9 Endpoints) — ✅ 100% VERIFIED
+53. `GET /api/v1/installments/group/:chitGroupId/month/:month`: List generated installment dues for Month 2 $\to$ SQL: Verify equal dividend deduction ($I_{net} = I_{base} - Div$) stored in `InstallmentDue`.
+54. `POST /api/v1/installments/group/:chitGroupId/month/:month/generate`: Explicitly regenerate monthly dues from auction dividend $\to$ SQL: Verify sync.
+55. `GET /api/v1/tickets/:ticketId/dues`: View all scheduled monthly dues for a subscriber ticket.
+56. `GET /api/v1/tickets/:ticketId/passbook`: Fetch 20-month continuous digital passbook for a member $\to$ Verify running balance.
+57. `GET /api/v1/tickets/defaulters`: List subscribers with continuous arrears.
+58. `GET /api/v1/installments/defaulters`: Query 3-month consecutive defaulter report (Alias).
+59. `POST /api/v1/tickets/:id/remove-defaulter`: Execute 3M arrears removal (`REMOVED_DEF_3M`) $\to$ SQL: Verify ticket status updated.
+60. `POST /api/v1/tickets/:id/substitute`: Substitute subscriber for defaulted ticket $\to$ SQL: Verify replacement customer linked.
+61. `POST /api/v1/tickets/:id/settle-removal`: Settle defaulter account with exit refund minus 4% damages deduction voucher.
 
 ---
 
 ### Lifecycle 6: Doorstep Field Collections & Evening Cash Handover (6 Endpoints)
-41. `POST /api/v1/collections`: Field agent records cash collection at subscriber's doorstep $\to$ SQL: Verify row in `Collection` table with `status = 'COLLECTED'`.
-42. `POST /api/v1/collections/sync-offline`: Sync batch of offline SQLite collections $\to$ SQL: Verify batch inserted without duplicate receipt collision.
-43. `GET /api/v1/collections/daily-summary`: Fetch agent daily collection tally.
-44. `POST /api/v1/collections/handover`: Field agent submits evening cash handover tally $\to$ SQL: Verify row in `CashHandover` table with `status = 'PENDING'`.
-45. `POST /api/v1/collections/handover/:id/acknowledge`: Branch Partner counts cash and acknowledges into branch vault (`collector != acknowledger`) $\to$ SQL: Verify `status = 'ACKNOWLEDGED'` and `acknowledgedByUserId` set.
-46. `GET /api/v1/collections/receipt/:id`: Download collection digital receipt.
+62. `GET /api/v1/collections/agent-dues`: List pending/overdue member dues for collection rounds.
+63. `POST /api/v1/collections/record`: Field agent records cash collection at subscriber's doorstep $\to$ SQL: Verify row in `Collection` table with `status = 'COLLECTED'`.
+64. `POST /api/v1/collections/sync-offline-queue`: Batch sync offline field collection queue with item-level failure isolation.
+65. `GET /api/v1/collections/daily-summary`: Fetch agent daily collection tally and vault cash.
+66. `POST /api/v1/collections/cash-handover/submit`: Field agent submits evening cash handover tally $\to$ SQL: Verify row in `CashHandover` table with `status = 'PENDING'`.
+67. `POST /api/v1/collections/cash-handover/acknowledge`: Branch Partner counts cash and acknowledges into branch vault (`collector != acknowledger`) $\to$ SQL: Verify `status = 'ACKNOWLEDGED'` and `acknowledgedByUserId` set.
 
 ---
 
 ### Lifecycle 7: Office Counter Payments & Reversals (7 Endpoints)
-47. `POST /api/v1/payments/office`: Record direct cash payment at office counter $\to$ SQL: Verify row in `Payment` table with receipt number `KC-REC-XXXXX`.
-48. `GET /api/v1/payments`: List payments with date and method filters.
-49. `GET /api/v1/payments/:id`: Get payment details and allocations.
-50. `GET /api/v1/payments/:id/receipt`: Download bilingual receipt JSON / metadata.
-51. `POST /api/v1/payments/:id/request-reversal`: **Maker** requests payment reversal with mandatory audit reason $\to$ SQL: Verify `reversalStatus = 'PENDING_APPROVAL'`.
-52. `POST /api/v1/payments/:id/approve-reversal`: **Checker** approves reversal (`maker != checker`) $\to$ SQL: Verify `reversalStatus = 'REVERSED'` and due reverted to `UNPAID`.
-53. `POST /api/v1/payments/:id/reject-reversal`: Reject reversal request workflow.
+68. `POST /api/v1/payments`: Record discrete payment at office counter (Exact $I_{net}$) $\to$ SQL: Verify row in `Payment` table with receipt number `KC-REC-XXXXX`.
+69. `GET /api/v1/payments`: List payments with date and method filters.
+70. `GET /api/v1/payments/:id`: Get payment details and allocations.
+71. `GET /api/v1/payments/:id/receipt`: Download bilingual receipt JSON / metadata.
+72. `POST /api/v1/payments/:id/request-reversal`: **Maker** requests payment reversal with mandatory audit reason $\to$ SQL: Verify `reversalStatus = 'PENDING_APPROVAL'`.
+73. `POST /api/v1/payments/:id/approve-reversal`: **Checker** approves reversal (`maker != checker`) $\to$ SQL: Verify `reversalStatus = 'REVERSED'` and due reverted to `UNPAID`.
+74. `POST /api/v1/payments/:id/reject-reversal`: Reject reversal request workflow.
 
 ---
 
-### Lifecycle 8: Prize Disbursements, Safety Proof & Maturity Settlement (7 Endpoints)
-54. `GET /api/v1/disbursements`: List pending prize money disbursements.
-55. `GET /api/v1/disbursements/auction/:auctionId`: Fetch single disbursement worksheet.
-56. `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`: Update Company Safety Proof checklist (signed agreement, nominee signature, 2 blank cheques, 1 promissory note) $\to$ SQL: Verify safety proof checklist fields saved in `AuctionWinner`.
-57. `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`: **Checker** authorizes net prize payout with dual control $\to$ SQL: Verify `disbursementStatus = 'AUTHORIZED_BY_CHECKER'`.
-58. `POST /api/v1/disbursements/auction/:auctionId/disburse`: Release payout and record official transaction reference $\to$ SQL: Verify `disbursementStatus = 'DISBURSED'`.
-59. `GET /api/v1/disbursements/auction/:auctionId/voucher`: Download bilingual prize disbursement voucher metadata.
-60. `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`: **Month N Maturity Settlement**: Direct payout to final subscriber without auction (Less 4% Foreman Commission; marks scheme COMPLETED) $\to$ SQL: Verify scheme status `COMPLETED`, winner status `DISBURSED`.
+### Lifecycle 8: Prize Disbursements, Safety Proof & Maturity Settlement (8 Endpoints) — ✅ 100% VERIFIED
+75. `GET /api/v1/disbursements`: List pending prize money disbursements.
+76. `GET /api/v1/disbursements/auction/:auctionId`: Fetch single disbursement worksheet.
+77. `POST /api/v1/disbursements/auction/:auctionId/upload-safety-proof`: **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 $\to$ SQL: Verify `safetyProofS3Key` in `AuctionWinner`.
+78. `GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`: **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos.
+79. `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`: Update Company Safety Proof checklist (signed agreement, nominee signature, 2 blank cheques, 1 promissory note) $\to$ SQL: Verify safety proof checklist fields saved in `AuctionWinner`.
+80. `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`: **Checker** authorizes net prize payout with dual control $\to$ SQL: Verify `disbursementStatus = 'AUTHORIZED_BY_CHECKER'`.
+81. `POST /api/v1/disbursements/auction/:auctionId/disburse`: Release payout and record official transaction reference $\to$ SQL: Verify `disbursementStatus = 'DISBURSED'`.
+82. `GET /api/v1/disbursements/auction/:auctionId/voucher`: Download bilingual prize disbursement voucher metadata.
+83. `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`: **Month N Maturity Settlement**: Direct payout to final subscriber without auction (Less 4% Foreman Commission; marks scheme COMPLETED) $\to$ SQL: Verify scheme status `COMPLETED`, winner status `DISBURSED`.
 
 ---
 
 ### Lifecycle 9: Form XXII Cash Book & Statutory Reports (9 Endpoints)
-61. `GET /api/v1/reports/form-xxii`: Form XXII Chit Cash Book $\to$ SQL: Verify:
+84. `GET /api/v1/reports/form-xxii`: Form XXII Chit Cash Book $\to$ SQL: Verify:
     $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Inflows} - \text{Outflows}$$
-62. `GET /api/v1/reports/dashboard-kpis`: Executive KPI dashboard (Total active chits, collections today, pending approvals).
-63. `GET /api/v1/reports/form-xvii/:auctionId`: Statutory auction minutes register.
-64. `GET /api/v1/reports/form-xxi/:ticketId`: Form XXI Subscriber continuous ledger.
-65. `GET /api/v1/reports/pending-approvals`: Pending Maker-Checker items count.
-66. `GET /api/v1/reports/approvals-stream`: SSE live server-sent events stream.
-67. `GET /api/v1/reports/collections-by-agent`: Collections broken down by agent.
-68. `GET /api/v1/reports/arrears-aging`: 30/60/90-day overdue arrears aging breakdown.
-69. `GET /api/v1/reports/foreman-commission-ledger`: 4% company commission earnings ledger.
+85. `GET /api/v1/reports/dashboard`: Executive KPI dashboard (Total active chits, collections today, pending approvals).
+86. `GET /api/v1/reports/form-xvii`: Form XVII statutory auction minutes register.
+87. `GET /api/v1/reports/form-xxi`: Form XXI Subscriber continuous ledger.
+88. `GET /api/v1/reports/pending-approvals`: Pending Maker-Checker items count.
+89. `GET /api/v1/reports/approvals-stream`: SSE live server-sent events stream.
+90. `GET /api/v1/reports/day-book`: Daily collection & disbursement journal.
+91. `GET /api/v1/reports/defaulters`: 30/60/90-day overdue arrears aging breakdown.
+92. `GET /api/v1/reports/audit-logs`: Immutable audit trail of dual-control actions.
 
 ---
 
 ### Lifecycle 10: Encrypted Storage & Bilingual PDF Canvas (5 Endpoints)
-70. `GET /api/v1/storage/file/:key`: Stream encrypted document from S3/MinIO driver $\to$ Verify byte stream and path traversal protection.
-71. `GET /api/v1/pdf/receipt/:paymentId`: Generate and stream bilingual digital PDF receipt with Tamil fonts.
-72. `GET /api/v1/pdf/voucher/:auctionId`: Generate and stream bilingual A5 prize payout voucher PDF.
-73. `GET /api/v1/pdf/minutes/:auctionId`: Generate Form XVII statutory minutes PDF.
-74. `GET /api/v1/pdf/passbook/:ticketId`: Generate Form XXI 20-month continuous passbook PDF.
+93. `GET /api/v1/storage/file/:key`: Stream encrypted document from S3/MinIO driver $\to$ Verify byte stream and path traversal protection.
+94. `GET /api/v1/pdf/receipt/:paymentId`: Generate and stream bilingual digital PDF receipt with Tamil fonts.
+95. `GET /api/v1/pdf/voucher/:auctionId`: Generate and stream bilingual A5 prize payout voucher PDF.
+96. `GET /api/v1/pdf/minutes/:auctionId`: Generate Form XVII statutory minutes PDF.
+97. `GET /api/v1/pdf/passbook/:ticketId`: Generate Form XXI 20-month continuous passbook PDF.
 
 ---
 
 ### Lifecycle 11: Background Jobs, Queues & Observability (15 Endpoints)
-75. `POST /api/v1/jobs/run-daily-arrears`: Trigger midnight arrears check $\to$ SQL: Verify overdue status updated.
-76. `POST /api/v1/jobs/enqueue-daily-arrears`: Enqueue arrears check on BullMQ queue.
-77. `POST /api/v1/jobs/run-reconciliation`: Trigger 06:00 AM payment settlement reconciliation.
-78. `POST /api/v1/jobs/enqueue-reconciliation`: Enqueue settlement reconciliation job.
-79. `POST /api/v1/jobs/send-auction-reminder/:chitGroupId/:month`: Broadcast upcoming auction reminder.
-80. `POST /api/v1/jobs/run-pre-auction-scan`: Trigger pre-auction scan.
-81. `GET /api/v1/jobs/repeatable-schedules`: List active BullMQ cron schedules.
-82. `GET /api/v1/jobs/queue-status`: Check Redis BullMQ queue health.
-83. `GET /api/v1/jobs/notification-audit-logs`: Inspect SMS and Push audit logs.
-84. `GET /admin/queues`: Bull Board visual dashboard UI.
-85. `GET /health`: System health probe (PostgreSQL, Redis, MinIO).
-86. `GET /health/liveness`: Kubernetes/Docker liveness probe.
-87. `GET /health/readiness`: Database & Redis readiness probe.
-88. `GET /metrics`: Prometheus telemetry metrics.
-89. `GET /`: API root metadata and version string.
+98. `POST /api/v1/jobs/run-daily-arrears`: Trigger midnight arrears check $\to$ SQL: Verify overdue status updated.
+99. `POST /api/v1/jobs/enqueue-daily-arrears`: Enqueue arrears check on BullMQ queue.
+100. `POST /api/v1/jobs/run-reconciliation`: Trigger 06:00 AM payment settlement reconciliation.
+101. `POST /api/v1/jobs/enqueue-reconciliation`: Enqueue settlement reconciliation job.
+102. `POST /api/v1/jobs/send-auction-reminder/:chitGroupId/:month`: Broadcast upcoming auction reminder.
+103. `POST /api/v1/jobs/run-pre-auction-scan`: Trigger pre-auction scan.
+104. `GET /api/v1/jobs/repeatable-schedules`: List active BullMQ cron schedules.
+105. `GET /api/v1/jobs/queue-status`: Check Redis BullMQ queue health.
+106. `GET /api/v1/jobs/notification-audit-logs`: Inspect SMS and Push audit logs.
+107. `GET /admin/queues`: Bull Board visual dashboard UI.
+108. `GET /health`: System health probe (PostgreSQL, Redis, MinIO).
+109. `GET /health/sentry-test`: Sentry crash exception verification.
+110. `GET /metrics`: Prometheus telemetry metrics.
+111. `GET /`: API root metadata and version string.
 
 ---
 
@@ -231,7 +241,7 @@ flowchart LR
 
 When approved:
 1. We will launch the live NestJS server on `http://localhost:3000`.
-2. We will run an automated live runner script that executes all 88 calls sequentially against `localhost:3000`.
+2. We will run an automated live runner script that executes all 111 calls sequentially against `localhost:3000`.
 3. For each call:
    - Output the exact JSON request.
    - Output the exact HTTP status and JSON response.

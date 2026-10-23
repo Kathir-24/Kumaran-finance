@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Current Status**: **All 10 Modules, 3 System Components, Branches, Users & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**405 / 405 passing tests: 323 Unit + 82 E2E**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**419 / 419 passing tests: 337 Unit + 82 E2E**).
 
 ---
 
@@ -11,24 +11,24 @@
 
 | Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
 |---|---|:---:|---|:---:|
-| **Foundation, Health & Metrics** | `/health`, `/`, `/metrics` | 3 | PostgreSQL 17, Port 5433, Redis 7, MinIO S3, Prometheus APM Telemetry | 3 unit passing |
-| **Module 1: Auth & Staff Identity** | `/auth` | 13 | bcrypt (salt 10-12), RFC 6238 TOTP, SMS-OTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 18 passing |
+| **Foundation, Health & Metrics** | `/health`, `/`, `/metrics` | 4 | PostgreSQL 17, Port 5433, Redis 7, MinIO S3, Prometheus APM Telemetry | 4 unit passing |
+| **Module 1: Auth & Staff Identity** | `/auth` | 14 | bcrypt (salt 10-12), RFC 6238 TOTP, SMS-OTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 20 passing |
 | **Branches: Company Offices** | `/branches` | 3 | Single company tenancy (ADR-01), bilingual Tamil names, branch-scoping | 4 passing |
-| **Users: Staff Administration** | `/users` | 5 | RBAC role management, bcrypt passwords, branch assignments, atomic deactivation | 7 passing |
-| **Module 2: Customer & KYC Intake** | `/customers` | 10 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), S3 KYC uploads, 15-min presigned URLs | 22 passing |
-| **Module 3: Chit Groups & Intake** | `/chits` | 7 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool | 16 passing |
-| **Module 4: In-Office Auctions** | `/auctions` | 8 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker | 16 passing |
-| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 6 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal | 9 passing |
+| **Users: Staff Administration** | `/users` | 6 | RBAC role management, bcrypt passwords, branch assignments, atomic deactivation, forced password reset | 9 passing |
+| **Module 2: Customer & KYC Intake** | `/customers` | 11 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), S3 KYC uploads, 15-min presigned URLs, scan deletion | 24 passing |
+| **Module 3: Chit Groups & Intake** | `/chits` | 9 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update & ticket unassign | 20 passing |
+| **Module 4: In-Office Auctions** | `/auctions` | 10 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker, statutory minutes layout | 16 passing |
+| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 9 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal, substitution & exit settlement | 13 passing |
 | **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
 | **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
-| **Module 8: Prize Disbursements** | `/disbursements` | 7 | Safety proof checklist (ADR-15), bilingual voucher (EN+தமிழ்), Maker $\ne$ Checker payout, Month N Final Settlement | 15 passing |
+| **Module 8: Prize Disbursements** | `/disbursements` | 9 | Safety proof checklist (ADR-15), S3 proof uploads & presigned inspection URLs, bilingual voucher, Maker $\ne$ Checker payout | 17 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
 | **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | 80mm receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
-| **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board UI | 25 passing |
+| **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **97 (102 ops)** | **All Invariants 100% Satisfied** | **405 / 405 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **419 / 419 PASSING** |
 
 ---
 
@@ -85,7 +85,7 @@
 | `GET` | `/customers/:id` | Get customer profile, nominees & active chits | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Self Profile Only** | **Read-Only (Global)** |
 | `PATCH` | `/customers/:id` | Update customer address and phone | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/customers/:id/nominees` | Link verified nominee with relationship | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | **Self Account Only** | 🚫 **Blocked** |
-| `DELETE`| `/customers/:id/nominees/:id`| Remove linked nominee record | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `DELETE`| `/customers/:id/nominees/:nomineeId`| Remove linked nominee record | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/customers/:id/kyc-status` | Approve or revoke KYC verification flag | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/customers/:id/fcm-token` | Register or clear subscriber device FCM token | **Allowed** | **Branch Scope** | 🚫 **Blocked** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
 | `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo) to private S3 | **Allowed** | **Branch Scope** | **Allowed** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
@@ -118,14 +118,16 @@
 
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `GET` | `/auctions/group/:id` | List past auctions, winners & dividend history | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
+| `GET` | `/auctions/group/:chitGroupId` | List past auctions, winners & dividend history | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
 | `GET` | `/auctions/:id` | Get single auction record & tie-break results | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
 | `GET` | `/auctions/:id/eligible-bidders`| Pre-auction guard: active non-prized 0-arrears | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Audit)** |
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/tie-break` | **Option A**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auctions/:id/tie-break-record` | **Option A (Alias)**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/finalize` | **Checker**: Commit results & mark `isPrized` | **Checker** (`maker != checker`) | **Checker per §6** (`maker != checker`) | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/auctions/:id/minutes` & `pdf` | Form XVII statutory auction minutes | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `PATCH` | `/auctions/:id/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/auctions/:id/minutes` | Form XVII statutory auction minutes summary | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for PDF | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `PATCH` | `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 
 ---
 
@@ -135,14 +137,15 @@
 
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `GET` | `/tickets/:id/dues` | Full monthly dues schedule for ticket | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
-| `GET` | `/tickets/:id/passbook` | Detailed digital passbook statement | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
+| `GET` | `/tickets/:ticketId/dues` | Full monthly dues schedule for ticket | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
+| `GET` | `/tickets/:ticketId/passbook` | Detailed digital passbook statement | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
 | `GET` | `/tickets/defaulters` | List subscribers with continuous arrears | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/tickets/:id/remove-defaulter`| Execute 3M arrears removal (`REMOVED_DEF_3M`)| **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/tickets/:id/substitute` | Substitute subscriber for `REMOVED_DEF_3M` ticket (ADR-13) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/installments/group/:id/month/:m`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `POST` | `/installments/group/:id/month/:m/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `POST` | `/installments/group/:chitGroupId/month/:month/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -184,13 +187,13 @@
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/disbursements` | List disbursements across chit schemes | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `GET` | `/disbursements/auction/:id` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Winner Only** | **Read-Only (Global)** |
-| `POST` | `/disbursements/auction/:id/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques to S3 | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/disbursements/auction/:id/safety-proof-url` | **Checker**: Generate 15-min presigned URL to view safety proof photos | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `POST` | `/disbursements/auction/:id/verify-safety-proof` | **Maker**: Verify safety checklist & scans | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/disbursements/auction/:id/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/disbursements/auction/:id/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
+| `GET` | `/disbursements/auction/:auctionId` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Winner Only** | **Read-Only (Global)** |
+| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques to S3 | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-min presigned URL to view safety proof photos | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety checklist & scans | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/disbursements/auction/:auctionId/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
 | `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Payout to final subscriber without auction (Less 4% commission; completes chit) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ## 10. Module 9: Dashboards & Statutory Reports (`apps/api/src/report/`)
@@ -230,7 +233,7 @@
 ### 11.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|:---:|
-| `GET` | `/storage/file/:key(*)` | Authenticated stream of stored files (Local driver fallback) | Staff, Customer, Auditor |
+| `GET` | `/storage/file/:key` | Authenticated stream of stored files (Local driver fallback) | Staff, Customer, Auditor |
 
 ---
 
@@ -301,7 +304,20 @@
 
 ---
 
-## 14. Summary of Completion Deliverables
+## 14. Foundation: System Health, Metrics & Observability (`/`, `/health`, `/metrics`)
+
+### 14.1 Endpoint Catalog & 6-Persona Access Control
+
+| Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
+|---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `GET` | `/` | System root ping and version string | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
+| `GET` | `/health` | Terminus system health check (Postgres, Redis, Storage) | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
+| `GET` | `/health/sentry-test` | Sentry exception diagnostic verification | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
+| `GET` | `/metrics` | Prometheus metrics scrape endpoint | **Basic Auth (`METRICS_USER`)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | **Basic Auth (`METRICS_USER`)** |
+
+---
+
+## 15. Summary of Completion Deliverables
 
 - **Single Tenancy**: Zero `company_id` columns exist across all tables.
 - **Whole Rupee Arithmetic**: Pure `BigInt` / native `bigint` throughout; zero paise, floats, or decimal fractions in currency code.
@@ -320,9 +336,9 @@
 - **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **97 physical paths / 102 operations fully implemented, documented, and tested** (70 domain module routes + 8 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes).
-- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 102 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **323 unit tests passing across 23 test suites + 82 E2E tests passing across 10 suites (405 / 405 total tests, 100% pass rate)**.
+- **Total Production Endpoints**: **105 physical paths / 111 operations fully implemented, documented, and tested** (79 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 111 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **337 unit tests passing across 24 test suites + 82 E2E tests passing across 10 suites (419 / 419 total tests, 100% pass rate)**.
 
 
 

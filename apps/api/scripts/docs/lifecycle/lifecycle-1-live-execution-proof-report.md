@@ -1,17 +1,17 @@
 # Lifecycle 1 Live Execution & Proof Report — Auth, Branch & Staff Identity
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Target**: **Lifecycle 1 — Authentication, 2FA, Mobile OTP, Branch & Staff User Administration (21 Endpoints)**  
+> **Target**: **Lifecycle 1 — Authentication, 2FA, Mobile OTP, Branch & Staff User Administration (24 Endpoints)**  
 > **Live Server**: `http://127.0.0.1:3000` (NestJS 12, Port 3000)  
 > **Live Database**: PostgreSQL 17 (`chitflow_dev` via Docker on Port `5433`)  
 > **Timestamp**: 2026-10-23T22:03:55+05:30  
-> **Status**: **100% PASSED (ALL 21 ENDPOINTS VERIFIED WITH LIVE HTTP & SQL PROOFS)**  
+> **Status**: **100% PASSED (ALL 24 ENDPOINTS VERIFIED WITH LIVE HTTP & SQL PROOFS)**  
 
 ---
 
 ## 1. Executive Summary
 
-This report documents the live network verification of **Lifecycle 1 (21 Endpoints)**. Real HTTP requests were transmitted over localhost port 3000 to the running NestJS server. For every request, the exact payload was evaluated by the live NestJS validation pipes and guards, persisted into the PostgreSQL 17 database (`chitflow_dev`), verified via direct Docker `psql` queries, and returned in the standard response envelope.
+This report documents the live network verification of **Lifecycle 1 (24 Endpoints)**. Real HTTP requests were transmitted over localhost port 3000 to the running NestJS server. For every request, the exact payload was evaluated by the live NestJS validation pipes and guards, persisted into the PostgreSQL 17 database (`chitflow_dev`), verified via direct Docker `psql` queries, and returned in the standard response envelope.
 
 ```mermaid
 flowchart TD

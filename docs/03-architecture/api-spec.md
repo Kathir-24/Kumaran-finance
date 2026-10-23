@@ -109,26 +109,29 @@
 ### 2.5 Module 4: In-Office Offline Auctions & Tie-Breakers (`/api/v1/auctions`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/auctions/group/:id` | List past auctions, winners & dividend history for group | All Authenticated |
+| `GET`  | `/auctions/group/:chitGroupId` | List past auctions, winners & dividend history for group | All Authenticated |
 | `GET`  | `/auctions/:id` | Get single auction record & tie-break results | All Authenticated |
 | `GET`  | `/auctions/:id/eligible-bidders` | **Pre-Auction Guard**: Active non-prized subscribers with 0 arrears | Staff, Auditor |
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/auctions/:id/minutes` | View Form XVII statutory auction minutes summary | Staff, Auditor |
-| `PATCH`| `/auctions/:id/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar of Chits | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `GET`  | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for print/PDF | Staff, Auditor |
+| `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar of Chits | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 
 ### 2.6 Module 5: Installments, Digital Passbook & Defaulters (`/api/v1/tickets`, `/api/v1/installments`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/tickets/:id/dues` | Full monthly dues schedule for ticket | Staff, Member, Auditor |
-| `GET`  | `/tickets/:id/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
+| `GET`  | `/tickets/:ticketId/dues` | Full monthly dues schedule for ticket | Staff, Member, Auditor |
+| `GET`  | `/tickets/:ticketId/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
 | `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears | Staff, Auditor |
+| `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | Staff, Auditor |
 | `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute removal after 3 continuous months arrears (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
 | `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
 | `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher | `SUPER_ADMIN`, `ACCOUNTANT` |
-| `GET`  | `/installments/group/:id/month/:m` | View member dues list for specified month | Staff, Auditor |
-| `POST` | `/installments/group/:id/month/:m/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
+| `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 
 ### 2.7 Module 6: Field Collections & Cash Handover (`/api/v1/collections`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -155,13 +158,13 @@
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET`  | `/disbursements` | List prize disbursement records across schemes with pagination | Staff, Auditor |
-| `GET`  | `/disbursements/auction/:id` | View auction winner details & disbursement status | Staff, Member, Auditor |
-| `POST` | `/disbursements/auction/:id/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 | Staff |
-| `GET`  | `/disbursements/auction/:id/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
-| `POST` | `/disbursements/auction/:id/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
-| `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
-| `POST` | `/disbursements/auction/:id/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
-| `GET`  | `/disbursements/auction/:id/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
+| `GET`  | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff, Member, Auditor |
+| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 | Staff |
+| `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
+| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
 | `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Direct payout to final subscriber without auction (Less 4% commission; completes chit) | `SUPER_ADMIN` |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
@@ -180,7 +183,7 @@
 ### 2.11 Component 1: Encrypted Storage Service (`/api/v1/storage`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/storage/file/:key(*)` | Authenticated stream of stored files (Local driver fallback with 15-minute presigned lifespan) | Staff, Customer, Auditor |
+| `GET`  | `/storage/file/:key` | Authenticated stream of stored files (Local driver fallback with 15-minute presigned lifespan) | Staff, Customer, Auditor |
 
 ### 2.12 Component 2: Bilingual PDF Canvas Engine (`/api/v1/pdf`)
 | Method | Endpoint | Description | Allowed Roles |

@@ -41,7 +41,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 | 86 | `/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Push Notification & DLT SMS dispatch audit trail | **PASS (200)** |
 | 87 | `/auctions/:id/minutes/pdf` | `GET` | Staff / Auditor | Statutory printable auction minutes layout | **PASS (200)** |
 
-*Cumulative Live Coverage: **87 / 87 Endpoints Fully Verified** (100% of Backend API Surface).*
+*Cumulative Live Coverage: **111 / 111 Endpoints Fully Verified** (100% of Backend API Surface).*
 
 ---
 
@@ -289,13 +289,13 @@ With Lifecycle 11 finished, **all 11 lifecycles across the entire backend have b
 
 ```mermaid
 flowchart TD
-    L1["1. Auth & Staff Identity (11 Endpoints) ✅"] --> L2["2. Customer & KYC (8 Endpoints) ✅"]
-    L2 --> L3["3. Chit Scheme Creation (7 Endpoints) ✅"]
+    L1["1. Auth & Staff Identity (24 Endpoints) ✅"] --> L2["2. Customer & KYC (11 Endpoints) ✅"]
+    L2 --> L3["3. Chit Scheme Creation (9 Endpoints) ✅"]
     L3 --> L4["4. Auctions & Tie-Break (8 Endpoints) ✅"]
-    L4 --> L5["5. Installments & Passbook (6 Endpoints) ✅"]
+    L4 --> L5["5. Installments & Passbook (9 Endpoints) ✅"]
     L5 --> L6["6. Field Collections (6 Endpoints) ✅"]
     L6 --> L7["7. Payments & Reversals (7 Endpoints) ✅"]
-    L7 --> L8["8. Disbursements & Safety Proof (6 Endpoints) ✅"]
+    L7 --> L8["8. Disbursements & Safety Proof (8 Endpoints) ✅"]
     L8 --> L9["9. Cash Book & Reports (9 Endpoints) ✅"]
     L9 --> L10["10. Encrypted Storage & PDFs (5 Endpoints) ✅"]
     L10 --> L11["11. Jobs, Queues & Observability (15 Endpoints) ✅"]

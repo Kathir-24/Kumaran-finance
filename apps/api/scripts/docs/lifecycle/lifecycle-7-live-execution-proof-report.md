@@ -149,12 +149,12 @@ flowchart LR
 ## 4. Status: FORCE-STOPPED Ready for User Review
 
 - **Verified Lifecycles So Far**:
-  - Lifecycle 1: Auth & Staff Identity (11 endpoints) — **PASSED** ✅
-  - Lifecycle 2: Customer Intake & KYC (8 endpoints) — **PASSED** ✅
-  - Lifecycle 3: Chit Scheme Creation & Intake (7 endpoints) — **PASSED** ✅
+  - Lifecycle 1: Auth & Staff Identity (24 endpoints) — **PASSED** ✅
+  - Lifecycle 2: Customer Intake & KYC (11 endpoints) — **PASSED** ✅
+  - Lifecycle 3: Chit Scheme Creation & Intake (9 endpoints) — **PASSED** ✅
   - Lifecycle 4: In-Office Auctions & Bidding (8 endpoints) — **PASSED** ✅
-  - Lifecycle 5: Installments & Passbook Ledger (7 endpoints) — **PASSED** ✅
+  - Lifecycle 5: Installments & Passbook Ledger (9 endpoints) — **PASSED** ✅
   - Lifecycle 6: Doorstep Collections & Handover (6 endpoints) — **PASSED** ✅
-  - Lifecycle 7: Counter Payments, Receipts & Reversals (4 endpoints) — **PASSED** ✅
-  - **Total Live Verified**: **51 / 88 Endpoints** (100% success rate)
-- **Next Target (Upon Approval)**: **Lifecycle 8 — Prize Disbursements & Company Safety Proof Checklist** (3 Endpoints).
+  - Lifecycle 7: Counter Payments, Receipts & Reversals (7 endpoints) — **PASSED** ✅
+  - **Total Live Verified**: **74 / 111 Endpoints** (100% success rate)
+- **Next Target (Upon Approval)**: **Lifecycle 8 — Prize Disbursements & Company Safety Proof Checklist** (8 Endpoints).
