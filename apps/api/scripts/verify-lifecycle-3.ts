@@ -71,6 +71,10 @@ async function run() {
   for (const gCode of cleanupGroups) {
     const existingGroup = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = '${gCode}'`);
     if (existingGroup && !existingGroup.startsWith('[DB ERROR]')) {
+      queryDb(`DELETE FROM public."PaymentAllocation" WHERE "dueId" IN (SELECT id FROM public."InstallmentDue" WHERE "chitGroupId" = '${existingGroup}')`);
+      queryDb(`DELETE FROM public."InstallmentDue" WHERE "chitGroupId" = '${existingGroup}'`);
+      queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
+      queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
       queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
       queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}'`);
       queryDb(`DELETE FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'`);
@@ -118,9 +122,38 @@ async function run() {
   console.log(`   ${dbChit}`);
 
   // --------------------------------------------------------------------------
-  // Step 2: POST /chits/:id/tickets/assign (Assign 20 tickets & assert ADR-13)
+  // Step 2: PATCH /chits/:id (Update draft chit scheme parameters - All Fields)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [2/7] POST /chits/${freshChitGroupId}/tickets/assign (Assign tickets & verify ADR-13) ---`);
+  console.log(`\n--- [2/9] PATCH /chits/${freshChitGroupId} (Update draft scheme) ---`);
+  const updatePayload = {
+    groupName: '₹1 Lakh 20 Months Test Group - Updated',
+    groupNameTamil: '₹1 லட்சம் 20 மாதங்கள் நேரலை குழு - திருத்தப்பட்டது',
+    startDate: '2026-11-15T00:00:00.000Z',
+    endDate: '2028-07-15T00:00:00.000Z',
+    sanctionOrderNumber: 'ROC/ERD/CHIT/2026/099-REV',
+    sanctionDate: '2026-10-10T00:00:00.000Z',
+  };
+  console.log(`   Payload:`, JSON.stringify(updatePayload, null, 2));
+  const updateRes = await request('PATCH', `/chits/${freshChitGroupId}`, updatePayload, token);
+  console.log(`   Status: ${updateRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(updateRes.json?.data, null, 2));
+
+  if (updateRes.status !== 200 || updateRes.json?.data?.groupName !== updatePayload.groupName) {
+    console.error('Failed to update draft chit group:', updateRes);
+    process.exit(1);
+  }
+
+  // DB Verification for PATCH
+  const dbChitAfterUpdate = queryDb(
+    `SELECT "groupName", "groupNameTamil", "sanctionOrderNumber", status FROM public."ChitGroup" WHERE id = '${freshChitGroupId}'`
+  );
+  console.log(`   [PostgreSQL DB Verification After Update]:`);
+  console.log(`   ${dbChitAfterUpdate}`);
+
+  // --------------------------------------------------------------------------
+  // Step 3: POST /chits/:id/tickets/assign (Assign tickets & assert ADR-13)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [3/9] POST /chits/${freshChitGroupId}/tickets/assign (Assign tickets & verify ADR-13) ---`);
   
   // Assign Ticket #1
   const t1Res = await request('POST', `/chits/${freshChitGroupId}/tickets/assign`, {
@@ -146,8 +179,38 @@ async function run() {
     process.exit(1);
   }
 
-  // Assign Tickets #2 through #20 to distinct customers
-  console.log(`   Assigning remaining tickets 2..20 to distinct subscribers...`);
+  // Assign Ticket #2 temporarily to customer 1 to test unassign
+  const t2Res = await request('POST', `/chits/${freshChitGroupId}/tickets/assign`, {
+    ticketNumber: 2,
+    customerId: customerIds[1],
+  }, token);
+  if (t2Res.status !== 201) {
+    console.error(`Failed to assign temporary Ticket #2:`, t2Res);
+    process.exit(1);
+  }
+
+  // --------------------------------------------------------------------------
+  // Step 4: DELETE /chits/:id/tickets/:ticketNumber (Unassign ticket in DRAFT)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [4/9] DELETE /chits/${freshChitGroupId}/tickets/2 (Unassign ticket) ---`);
+  const unassignRes = await request('DELETE', `/chits/${freshChitGroupId}/tickets/2`, undefined, token);
+  console.log(`   Status: ${unassignRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(unassignRes.json?.data, null, 2));
+
+  if (unassignRes.status !== 200 || !unassignRes.json?.data?.success) {
+    console.error('Failed to unassign ticket in DRAFT status:', unassignRes);
+    process.exit(1);
+  }
+
+  // DB Verification: Ticket #2 must no longer exist in SubscriberTicket table
+  const dbUnassignCheck = queryDb(`SELECT count(*) FROM public."SubscriberTicket" WHERE "chitGroupId" = '${freshChitGroupId}' AND "ticketNumber" = 2`);
+  console.log(`   [PostgreSQL DB Verification]: Ticket #2 count = ${dbUnassignCheck} (Expected: 0)`);
+  if (dbUnassignCheck !== '0') {
+    throw new Error(`Step 4 Failed: Ticket #2 still exists after DELETE unassign`);
+  }
+
+  // Assign Tickets #2 through #20 to distinct customers to complete the group
+  console.log(`   Assigning tickets 2..20 to distinct subscribers...`);
   for (let i = 2; i <= 20; i++) {
     const tRes = await request('POST', `/chits/${freshChitGroupId}/tickets/assign`, {
       ticketNumber: i,
@@ -165,9 +228,9 @@ async function run() {
   console.log(`   [PostgreSQL DB Verification]: Total tickets stored = ${dbTicketCount} (Expected: 20)`);
 
   // --------------------------------------------------------------------------
-  // Step 3: GET /chits/:id/tickets (View all assigned tickets)
+  // Step 5: GET /chits/:id/tickets (View all assigned tickets)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [3/7] GET /chits/${freshChitGroupId}/tickets (List all tickets) ---`);
+  console.log(`\n--- [5/9] GET /chits/${freshChitGroupId}/tickets (List all tickets) ---`);
   const ticketsRes = await request('GET', `/chits/${freshChitGroupId}/tickets`, undefined, token);
   console.log(`   Status: ${ticketsRes.status}`);
   const ticketList = ticketsRes.json?.data || [];
@@ -180,9 +243,9 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 4: POST /chits/:id/activate (Activate scheme & Month 1 Rule)
+  // Step 6: POST /chits/:id/activate (Activate scheme & Month 1 Rule)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [4/7] POST /chits/${freshChitGroupId}/activate (Activate scheme) ---`);
+  console.log(`\n--- [6/9] POST /chits/${freshChitGroupId}/activate (Activate scheme) ---`);
   const activateRes = await request('POST', `/chits/${freshChitGroupId}/activate`, {}, token);
   console.log(`   Status: ${activateRes.status}`);
   console.log(`   Activated Chit Status: ${activateRes.json?.data?.status}`);
@@ -202,9 +265,9 @@ async function run() {
   console.log(`   Month 1 Auction = ${dbMonth1Auction}`);
 
   // --------------------------------------------------------------------------
-  // Step 5: GET /chits (List chit schemes with filter)
+  // Step 7: GET /chits (List chit schemes with filter)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [5/7] GET /chits (List & search schemes) ---`);
+  console.log(`\n--- [7/9] GET /chits (List & search schemes) ---`);
   const listRes = await request('GET', `/chits?search=KC-LIVE-20M-01&page=1&limit=10`, undefined, token);
   console.log(`   Status: ${listRes.status}`);
   const chitsFound = listRes.json?.data?.data || [];
@@ -217,9 +280,9 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 6: GET /chits/:id (Chit scheme details)
+  // Step 8: GET /chits/:id (Chit scheme details)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [6/7] GET /chits/${freshChitGroupId} (Scheme details) ---`);
+  console.log(`\n--- [8/9] GET /chits/${freshChitGroupId} (Scheme details) ---`);
   const detailRes = await request('GET', `/chits/${freshChitGroupId}`, undefined, token);
   console.log(`   Status: ${detailRes.status}`);
   console.log(`   Group Code: ${detailRes.json?.data?.groupCode}`);
@@ -234,9 +297,9 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 7: POST /chits/onboard-ongoing (Mid-cycle intake from physical notebook)
+  // Step 9: POST /chits/onboard-ongoing (Mid-cycle intake from physical notebook)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [7/7] POST /chits/onboard-ongoing (Physical notebook intake) ---`);
+  console.log(`\n--- [9/9] POST /chits/onboard-ongoing (Physical notebook intake) ---`);
   const onboardPayload = {
     groupCode: 'KC-ONBOARD-20M-01',
     groupName: '₹2 Lakh 20 Months Ongoing Notebook Intake',
@@ -298,7 +361,7 @@ async function run() {
   console.log(`   Prized Tickets (From History):\n   ${dbPrizedTickets}`);
 
   console.log(`\n======================================================`);
-  console.log(`🎉 ALL 7 LIFECYCLE 3 ENDPOINTS VERIFIED SUCCESSFULLY!`);
+  console.log(`🎉 ALL 9 LIFECYCLE 3 ENDPOINTS VERIFIED SUCCESSFULLY!`);
   console.log(`   Live Server (:3000) <--> Live Postgres (:5433)`);
   console.log(`======================================================\n`);
 }

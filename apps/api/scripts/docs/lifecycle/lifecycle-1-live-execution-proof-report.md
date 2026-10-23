@@ -780,6 +780,128 @@ flowchart TD
 
 ---
 
+### Endpoint 22: `GET /api/v1/auth/me` (Customer / Subscriber Persona Profile Verification)
+- **Role Required**: `CUSTOMER`
+- **Purpose**: Retrieve authenticated profile details for a mobile chit subscriber using their JWT. Resolves critical defect where Customer tokens caused 404 because `/auth/me` previously searched only the `User` table.
+- **Live HTTP Request**:
+  ```text
+  GET http://127.0.0.1:3000/api/v1/auth/me
+  Authorization: Bearer <customerAccessToken>
+  ```
+- **Live Server Response (HTTP 200 OK)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:32.889Z",
+    "data": {
+      "id": "6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8",
+      "name": "K. Thangavel",
+      "fullNameTamil": "கே. தங்கவேல்",
+      "phone": "9842100101",
+      "roles": ["CUSTOMER"],
+      "customerCode": "KC-CUST-00101",
+      "branchId": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+      "isTotpEnabled": false,
+      "hasMpin": false,
+      "isKycVerified": true,
+      "lastLoginAt": null,
+      "branch": {
+        "id": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+        "code": "PRD",
+        "name": "Head Office - Perundurai",
+        "nameTamil": "தலைமை கிளை - பெருந்துறை"
+      }
+    }
+  }
+  ```
+- **Live Database Truth (PostgreSQL 17 `Customer` Table)**:
+  ```sql
+  SELECT id, "customerCode", "fullName", phone, "isKycVerified", "branchId" FROM public."Customer" WHERE id = '6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8';
+  ```
+  ```text
+  6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8|KC-CUST-00101|K. Thangavel|9842100101|t|07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c
+  ```
+- **Verification**: ✅ Customer token returns HTTP 200 with subscriber details, branch details, and `isKycVerified: true`.
+
+---
+
+### Endpoint 23: `POST /api/v1/auth/change-password` (Staff Self-Service Password Change)
+- **Role Required**: Any authenticated staff member (`SUPER_ADMIN`, `ACCOUNTANT`, `COLLECTION_AGENT`, etc.)
+- **Purpose**: Enables staff to change their own password by providing `currentPassword` and `newPassword`. Atomically re-hashes password with bcrypt and revokes existing refresh tokens.
+- **Live HTTP Request**:
+  ```json
+  POST http://127.0.0.1:3000/api/v1/auth/change-password
+  Authorization: Bearer <muruganAccessToken>
+  Content-Type: application/json
+
+  {
+    "currentPassword": "Agent@Kumaran2026",
+    "newPassword": "NewAgentPassword#2026"
+  }
+  ```
+- **Live Server Response (HTTP 200 OK)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:34.392Z",
+    "data": {
+      "success": true,
+      "message": "Password successfully changed. Active refresh tokens have been revoked. Please log in with your new password."
+    }
+  }
+  ```
+- **Live Database Truth & Login Verification**:
+  ```sql
+  SELECT id, name, phone, "passwordHash" IS NOT NULL AS has_password_hash FROM public."User" WHERE id = '05fc16c8-2170-4d2c-b650-557ca087f888';
+  ```
+  ```text
+  05fc16c8-2170-4d2c-b650-557ca087f888|R. Murugan|9842154321|t
+  ```
+  - Murugan successfully re-authenticated with `NewAgentPassword#2026` via `POST /api/v1/auth/web/login` $\to$ HTTP 200 OK.
+- **Verification**: ✅ Self-service password change succeeded, old tokens invalidated, and new password verified.
+
+---
+
+### Endpoint 24: `POST /api/v1/users/:id/reset-password` (Super Admin Credential Reset)
+- **Role Required**: `SUPER_ADMIN`
+- **Purpose**: Super Admin forcibly resets a staff member's password to a temporary password or custom password, wiping active sessions.
+- **Live HTTP Request**:
+  ```json
+  POST http://127.0.0.1:3000/api/v1/users/05fc16c8-2170-4d2c-b650-557ca087f888/reset-password
+  Authorization: Bearer <superAdminAccessToken>
+  Content-Type: application/json
+
+  {
+    "temporaryPassword": "AdminForcedReset@999"
+  }
+  ```
+- **Live Server Response (HTTP 200 OK)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:35.659Z",
+    "data": {
+      "success": true,
+      "message": "Password for staff user R. Murugan has been reset successfully. Active sessions have been revoked.",
+      "temporaryPassword": "AdminForcedReset@999"
+    }
+  }
+  ```
+- **Live Database Truth (PostgreSQL 17 `User` Table)**:
+  ```sql
+  SELECT id, name, "refreshTokenHash" IS NULL AS session_invalidated, "passwordHash" IS NOT NULL AS has_password_hash FROM public."User" WHERE id = '05fc16c8-2170-4d2c-b650-557ca087f888';
+  ```
+  ```text
+  05fc16c8-2170-4d2c-b650-557ca087f888|R. Murugan|t|t
+  ```
+  - Murugan successfully authenticated with `AdminForcedReset@999` via `POST /api/v1/auth/web/login` $\to$ HTTP 200 OK.
+- **Verification**: ✅ Super Admin password reset succeeded, `refreshTokenHash` set to NULL, and staff successfully logged in with temporary password.
+
+---
+
 ## 3. Discovered & Resolved Issues During Live Run
 
 1. **DTO Field Whitelisting on `POST /auth/web/login`**:
@@ -792,11 +914,15 @@ flowchart TD
    - *Observation*: Standard REST endpoints (`/totp/setup`, `/totp/enable`, `/totp/disable`, `/mobile/set-mpin`, `/branches`, `/users`) return HTTP 201 Created per HTTP RFC specifications.
 4. **Deterministic OTP Verification in Development**:
    - *Enhancement*: Added `debugOtp` field to `RequestOtpResponseDto` when `NODE_ENV !== 'production'` to ensure automated lifecycle scripts execute deterministically without flake or external telecom SMS dependency.
+5. **Customer Persona Profile Retrieval in `/auth/me`**:
+   - *Defect Fixed*: `AuthService.getProfile()` was previously querying `User` exclusively. Updated to inspect `Customer` table when `role === Role.CUSTOMER`, resolving 404 crashes and returning subscriber passbook profile data.
+6. **Strict DTO Validation on `POST /users/:id/reset-password`**:
+   - *Observation*: `ResetPasswordDto` expects `temporaryPassword` (optional 8+ chars). Validated against NestJS whitelist pipe.
 
 ---
 
 ## 4. Status: 100% Passed & Ready for Review
 
-- **Lifecycle 1 Scope**: **All 21 Endpoints Passed** ✅
+- **Lifecycle 1 Scope**: **All 24 Endpoints Passed** ✅
 - **Database Verified**: Direct PostgreSQL 17 Docker `chitflow-db` queries confirmed all schema constraints, foreign keys, and cryptographic hashes.
-- **Next Lifecycle Target**: **Lifecycle 2 — Customer Intake, Nominee Lifecycle, KYC Documents & 15-Minute S3 Presigned URLs (10 Endpoints)**!
+- **Next Lifecycle Target**: **Lifecycle 2 — Customer Intake, Nominee Lifecycle, KYC Documents & 15-Minute S3 Presigned URLs (11 Endpoints)**!

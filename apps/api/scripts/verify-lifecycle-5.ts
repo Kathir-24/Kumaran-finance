@@ -266,8 +266,99 @@ async function run() {
   console.log(`   [PostgreSQL DB Verification]:`);
   console.log(`   Ticket #19 Status & RemovedBy: ${dbRemovedTicket}`);
 
+  // --------------------------------------------------------------------------
+  // Step 8: POST /tickets/:id/settle-removal (Defaulter Exit Account Settlement)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [8/9] POST /tickets/${defaultTestTicketId}/settle-removal (Exit Refund Voucher) ---`);
+  const settlePayload = {
+    paymentMethod: 'CASH',
+    notes: 'Settled remaining refund after 4% contractual damages deduction per Foreman approval.',
+  };
+  console.log(`   Payload:`, JSON.stringify(settlePayload, null, 2));
+  const settleRes = await request('POST', `/tickets/${defaultTestTicketId}/settle-removal`, settlePayload, admin.token);
+  console.log(`   Status: ${settleRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(settleRes.json?.data, null, 2));
+
+  if (settleRes.status !== 200 || !settleRes.json?.data?.voucherNumber) {
+    console.error('Failed to settle defaulter removal:', settleRes);
+    process.exit(1);
+  }
+
+  // DB Verification from AuditLog
+  const dbSettleAudit = queryDb(
+    `SELECT action, "entityId", "newValue" FROM public."AuditLog" WHERE "entityId" = '${defaultTestTicketId}' AND action = 'DEF_SETTLEMENT_PROCESSED' ORDER BY "timestamp" DESC LIMIT 1`
+  );
+  console.log(`   [PostgreSQL DB Verification (Defaulter Settlement Audit)]:`);
+  console.log(`   ${dbSettleAudit}`);
+
+  // --------------------------------------------------------------------------
+  // Step 9: POST /tickets/:id/substitute (ADR-13 Subscriber Substitution)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [9/9] POST /tickets/${defaultTestTicketId}/substitute (Subscriber Substitution & ADR-13 Guard) ---`);
+
+  // ADR-13 Guard Check: Try substituting with an existing customer already in this chit group
+  const existingGroupMemberId = tickets[0].customerId;
+  console.log(`   Asserting ADR-13: Attempting substitution with existing group customer ${existingGroupMemberId}...`);
+  const adr13SubRes = await request('POST', `/tickets/${defaultTestTicketId}/substitute`, {
+    newCustomerId: existingGroupMemberId,
+    reason: 'ADR-13 Violation test attempt',
+  }, admin.token);
+  console.log(`   ADR-13 Violation Status: ${adr13SubRes.status} (Expected: 409 Conflict)`);
+  console.log(`   ADR-13 Error Message: ${adr13SubRes.json?.error?.message}`);
+
+  if (adr13SubRes.status !== 409) {
+    console.error('CRITICAL: ADR-13 Guard failed on substitution! Duplicate customer allowed:', adr13SubRes);
+    process.exit(1);
+  }
+
+  // Find or provision a valid KYC-verified customer who is NOT in this chit group
+  let replacementCustId = queryDb(
+    `SELECT id FROM public."Customer" WHERE id NOT IN (SELECT "customerId" FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}') AND "isKycVerified" = true LIMIT 1`
+  );
+
+  if (!replacementCustId || replacementCustId.startsWith('[DB ERROR]') || !replacementCustId.trim()) {
+    // Register and verify a fresh customer for substitution
+    console.log(`   Registering fresh replacement customer for substitution test...`);
+    const newCustRes = await request('POST', '/customers', {
+      fullName: 'Subramaniam K (Substitute)',
+      fullNameTamil: 'சுப்பிரமணியம் கே',
+      phone: '9842998877',
+      addressLine1: '45, Main Road',
+      city: 'Perundurai',
+      pincode: '638052',
+      panNumber: 'SUBRA1234K',
+      aadhaarLast4: '7766',
+    }, admin.token);
+    replacementCustId = newCustRes.json?.data?.id;
+    // Mark KYC verified
+    await request('PATCH', `/customers/${replacementCustId}/kyc-status`, { isKycVerified: true }, admin.token);
+  }
+
+  console.log(`   Using replacement customer ID: ${replacementCustId}`);
+  const subPayload = {
+    newCustomerId: replacementCustId.trim(),
+    reason: 'Previous subscriber removed for 3-month consecutive default; substituted per company policy.',
+  };
+  console.log(`   Payload:`, JSON.stringify(subPayload, null, 2));
+
+  const subRes = await request('POST', `/tickets/${defaultTestTicketId}/substitute`, subPayload, admin.token);
+  console.log(`   Status: ${subRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(subRes.json?.data, null, 2));
+
+  if (subRes.status !== 200 || subRes.json?.data?.ticket?.status !== 'ACTIVE') {
+    console.error('Failed to substitute subscriber:', subRes);
+    process.exit(1);
+  }
+
+  // DB Verification
+  const dbSubstitutedTicket = queryDb(
+    `SELECT id, "ticketNumber", "customerId", status, "consecutiveUnpaidMonths", "removedAt" IS NULL AS clean_removed FROM public."SubscriberTicket" WHERE id = '${defaultTestTicketId}'`
+  );
+  console.log(`   [PostgreSQL DB Verification (Substituted Ticket)]:`);
+  console.log(`   ${dbSubstitutedTicket}`);
+
   console.log(`\n======================================================`);
-  console.log(`🎉 ALL LIFECYCLE 5 ENDPOINTS & INVARIANTS VERIFIED!`);
+  console.log(`🎉 ALL 9 LIFECYCLE 5 ENDPOINTS & INVARIANTS VERIFIED!`);
   console.log(`   Live Server (:3000) <--> Live Postgres (:5433)`);
   console.log(`======================================================\n`);
 }

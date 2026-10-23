@@ -315,7 +315,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 10: GET /customers/:id/documents/:docId/url (Presigned viewing URL)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [10/10] GET /customers/${customerId}/documents/${documentId}/url (Presigned URL) ---`);
+  console.log(`\n--- [10/11] GET /customers/${customerId}/documents/${documentId}/url (Presigned URL) ---`);
   const presignedUrlRes = await request('GET', `/customers/${customerId}/documents/${documentId}/url`, undefined, token);
   console.log(`   Status: ${presignedUrlRes.status}`);
   console.log(`   Response Data:`, JSON.stringify(presignedUrlRes.json?.data, null, 2));
@@ -329,8 +329,29 @@ async function run() {
     process.exit(1);
   }
 
+  // --------------------------------------------------------------------------
+  // Step 11: DELETE /customers/:id/documents/:docId (Delete KYC Document)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [11/11] DELETE /customers/${customerId}/documents/${documentId} (Delete KYC Document) ---`);
+  const deleteDocRes = await request('DELETE', `/customers/${customerId}/documents/${documentId}`, undefined, token);
+  console.log(`   Status: ${deleteDocRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(deleteDocRes.json?.data, null, 2));
+
+  if (deleteDocRes.status !== 200 || !deleteDocRes.json?.data?.success) {
+    console.error('Failed to delete customer KYC document:', deleteDocRes);
+    process.exit(1);
+  }
+
+  // PostgreSQL DB Verification: CustomerDocument count must be 0
+  const dbDocDeleted = queryDb(`SELECT count(*) FROM public."CustomerDocument" WHERE id = '${documentId}'`);
+  console.log(`   [PostgreSQL DB Verification]:`);
+  console.log(`   Document count for deleted ID = ${dbDocDeleted} (Expected: 0)`);
+  if (dbDocDeleted !== '0') {
+    throw new Error(`Step 11 Failed: Customer document ${documentId} still exists in PostgreSQL truth`);
+  }
+
   console.log(`\n======================================================`);
-  console.log(`🎉 ALL 10 LIFECYCLE 2 ENDPOINTS VERIFIED SUCCESSFULLY!`);
+  console.log(`🎉 ALL 11 LIFECYCLE 2 ENDPOINTS VERIFIED SUCCESSFULLY!`);
   console.log(`   Live Server (:3000) <--> Live Postgres (:5433)`);
   console.log(`======================================================\n`);
 }

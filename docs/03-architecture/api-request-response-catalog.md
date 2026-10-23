@@ -236,6 +236,94 @@
 
 ---
 
+### 2.6 `GET /api/v1/auth/me`
+**Description**: Retrieve authenticated profile, roles, and branch details. Supports both office staff (`User` table) and subscribers (`Customer` table).  
+**Roles**: Any authenticated Bearer JWT (`SUPER_ADMIN`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`, `AUDITOR`)
+
+#### Success Response (Customer Subscriber Persona)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:37:32.889Z",
+  "data": {
+    "id": "6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8",
+    "name": "K. Thangavel",
+    "fullNameTamil": "கே. தங்கவேல்",
+    "phone": "9842100101",
+    "roles": ["CUSTOMER"],
+    "customerCode": "KC-CUST-00101",
+    "branchId": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+    "isTotpEnabled": false,
+    "hasMpin": false,
+    "isKycVerified": true,
+    "lastLoginAt": null,
+    "branch": {
+      "id": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+      "code": "PRD",
+      "name": "Head Office - Perundurai",
+      "nameTamil": "தலைமை கிளை - பெருந்துறை"
+    }
+  }
+}
+```
+
+---
+
+### 2.7 `POST /api/v1/auth/change-password`
+**Description**: Self-service password change for authenticated staff members. Validates current password, updates bcrypt hash, and invalidates active refresh tokens.  
+**Roles**: Authenticated Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`)
+
+#### Request Body
+```json
+{
+  "currentPassword": "Agent@Kumaran2026",
+  "newPassword": "NewAgentPassword#2026"
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:37:34.392Z",
+  "data": {
+    "success": true,
+    "message": "Password successfully changed. Active refresh tokens have been revoked. Please log in with your new password."
+  }
+}
+```
+
+---
+
+### 2.8 `POST /api/v1/users/:id/reset-password`
+**Description**: Super Admin forcibly resets a staff member's password and invalidates active sessions.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "temporaryPassword": "AdminForcedReset@999"
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:37:35.659Z",
+  "data": {
+    "success": true,
+    "message": "Password for staff user R. Murugan has been reset successfully. Active sessions have been revoked.",
+    "temporaryPassword": "AdminForcedReset@999"
+  }
+}
+```
+
+---
+
 ## 3. Module 2: Customers & Nominee Management (`/customers`)
 
 ### 3.1 `POST /api/v1/customers`
@@ -336,6 +424,25 @@ Content-Type: image/jpeg
   "data": {
     "url": "https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-uuid-001/AADHAAR_FRONT-xyz.jpg?X-Amz-Expires=900&X-Amz-Signature=...",
     "expiresInSeconds": 900
+  }
+}
+```
+
+---
+
+### 3.4 `DELETE /api/v1/customers/:id/documents/:docId`
+**Description**: Delete an unreadable, blurry, or mistakenly uploaded KYC document from private S3 storage and database. Verified documents can only be deleted by Super Admin.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `CUSTOMER` (Self unverified only)
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:38:59.850Z",
+  "data": {
+    "success": true,
+    "message": "KYC document (aadhaar_front_sundaram.jpg) successfully deleted."
   }
 }
 ```
@@ -563,6 +670,68 @@ Content-Type: image/jpeg
     "foremanCommissionRate": "4.00",
     "status": "DRAFT",
     "auctionDayOfMonth": 10
+  }
+}
+```
+
+---
+
+### 6.2 `PATCH /api/v1/chits/:id`
+**Description**: Modify draft chit scheme parameters (groupName, dates, sanction order). Permitted strictly while status is `DRAFT`.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "groupName": "₹1 Lakh 20 Months Test Group - Updated",
+  "groupNameTamil": "₹1 லட்சம் 20 மாதங்கள் நேரலை குழு - திருத்தப்பட்டது",
+  "startDate": "2026-11-15T00:00:00.000Z",
+  "endDate": "2028-07-15T00:00:00.000Z",
+  "sanctionOrderNumber": "ROC/ERD/CHIT/2026/099-REV",
+  "sanctionDate": "2026-10-10T00:00:00.000Z"
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:41:32.487Z",
+  "data": {
+    "id": "33717477-84ee-474c-8675-91ef7bf9a2f6",
+    "groupCode": "KC-LIVE-20M-01",
+    "groupName": "₹1 Lakh 20 Months Test Group - Updated",
+    "groupNameTamil": "₹1 லட்சம் 20 மாதங்கள் நேரலை குழு - திருத்தப்பட்டது",
+    "chitValue": 100000,
+    "durationMonths": 20,
+    "totalTickets": 20,
+    "baseInstallment": 5000,
+    "maxDiscountCeiling": 25000,
+    "status": "DRAFT",
+    "sanctionOrderNumber": "ROC/ERD/CHIT/2026/099-REV",
+    "sanctionDate": "2026-10-10T00:00:00.000Z",
+    "startDate": "2026-11-15T00:00:00.000Z",
+    "endDate": "2028-07-15T00:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 6.3 `DELETE /api/v1/chits/:id/tickets/:ticketNumber`
+**Description**: Unassign a mistakenly allocated ticket while scheme is in `DRAFT` status before Month 1 activation.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:41:32.750Z",
+  "data": {
+    "success": true,
+    "message": "Ticket #2 allocated to M. Palanisamy has been unassigned successfully."
   }
 }
 ```
@@ -813,6 +982,78 @@ Content-Type: image/jpeg
 
 ---
 
+### 6.2 `POST /api/v1/tickets/:id/settle-removal`
+**Description**: Defaulter account settlement & exit refund voucher calculation. Deducts 4.00% Foreman Commission contractual damages from total paid installments.  
+**Roles**: `SUPER_ADMIN`, `ACCOUNTANT`
+
+#### Request Body
+```json
+{
+  "paymentMethod": "CASH",
+  "notes": "Settled remaining refund after 4% contractual damages deduction per Foreman approval."
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:45:53.336Z",
+  "data": {
+    "success": true,
+    "message": "Defaulter account for R. Velumani (Ticket #19) successfully settled.",
+    "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+    "ticketNumber": 19,
+    "customerName": "R. Velumani",
+    "groupCode": "KC-LIVE-20M-01",
+    "totalPaid": 0,
+    "damagesDeducted": 4000,
+    "refundAmount": 0,
+    "voucherNumber": "KC-VOU-DEF-753336",
+    "settledAt": "2026-10-23T19:45:53.336Z"
+  }
+}
+```
+
+---
+
+### 6.3 `POST /api/v1/tickets/:id/substitute`
+**Description**: Assign a new KYC-verified customer to a ticket vacated under `REMOVED_DEF_3M`. Enforces ADR-13 to prevent duplicate tickets and restores ticket status to `ACTIVE`.  
+**Roles**: `SUPER_ADMIN`
+
+#### Request Body
+```json
+{
+  "newCustomerId": "4bea4d80-eaba-4ecd-8fb7-d3553bd31cab",
+  "reason": "Previous subscriber removed for 3-month consecutive default; substituted per company policy."
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:45:53.800Z",
+  "data": {
+    "success": true,
+    "message": "Subscriber replacement successfully executed. Ticket #19 re-assigned to A. Ravichandran and restored to ACTIVE status.",
+    "ticket": {
+      "id": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+      "ticketNumber": 19,
+      "status": "ACTIVE",
+      "previousCustomerId": "f808a42a-b2e7-4912-b2d0-54fd8c2f6601",
+      "previousCustomerName": "R. Velumani",
+      "newCustomerId": "4bea4d80-eaba-4ecd-8fb7-d3553bd31cab",
+      "newCustomerName": "A. Ravichandran"
+    }
+  }
+}
+```
+
+---
+
 ## 7. Module 6 & 7: Collections, Payments & Receipts (`/collections`, `/payments`)
 
 ### 7.1 `POST /api/v1/payments`
@@ -911,7 +1152,63 @@ Content-Type: image/jpeg
 
 ## 8. Module 8: Prize Disbursements & Safety Proof (`/disbursements`)
 
-### 8.1 `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`
+### 8.1 `POST /api/v1/disbursements/auction/:auctionId/upload-safety-proof`
+**Description**: **Maker**: Upload photo of signed agreement, signed blank cheques, or promissory notes (multipart/form-data) to private S3 cloud storage and link key to winner record.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
+
+#### Multipart Request Payload
+```text
+POST /api/v1/disbursements/auction/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/upload-safety-proof
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary...
+
+------WebKitFormBoundary...
+Content-Disposition: form-data; name="file"; filename="signed_blank_cheques_sundaram.jpg"
+Content-Type: image/jpeg
+
+<binary jpeg image data>
+------WebKitFormBoundary...--
+```
+
+#### Success Response (HTTP 201)
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-23T19:48:32.313Z",
+  "data": {
+    "success": true,
+    "message": "Safety proof collateral document uploaded and linked successfully.",
+    "auctionId": "158898f8-0b5e-4836-8c8e-5a5aa2cbad55",
+    "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg",
+    "fileName": "signed_blank_cheques_sundaram.jpg",
+    "uploadedAt": "2026-10-23T19:48:32.313Z"
+  }
+}
+```
+
+---
+
+### 8.2 `GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`
+**Description**: **Checker**: Generate a secure 15-minute S3 presigned viewing URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-23T19:48:32.618Z",
+  "data": {
+    "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Expires=900&...",
+    "expiresInSeconds": 900,
+    "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg"
+  }
+}
+```
+
+---
+
+### 8.3 `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`
 **Description**: **Maker**: Check off safety proof items (agreement, cheques, promissory notes).  
 **Roles**: `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`
 
@@ -946,7 +1243,7 @@ Content-Type: image/jpeg
 
 ---
 
-### 8.2 `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`
+### 8.4 `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`
 **Description**: **Checker**: Authorize net payout voucher (`maker != checker`).  
 **Roles**: `SUPER_ADMIN`
 
@@ -979,7 +1276,7 @@ Content-Type: image/jpeg
 
 ---
 
-### 8.3 `POST /api/v1/disbursements/auction/:auctionId/disburse`
+### 8.5 `POST /api/v1/disbursements/auction/:auctionId/disburse`
 **Description**: Record final payout release reference and timestamp.  
 **Roles**: `ACCOUNTANT`, `SUPER_ADMIN`
 
@@ -1009,7 +1306,7 @@ Content-Type: image/jpeg
 
 ---
 
-### 8.4 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`
+### 8.6 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`
 **Description**: **Month N Maturity Settlement**: Final payout to unprized subscriber without auction (deducts 4% commission; transitions chit to COMPLETED).  
 **Roles**: `SUPER_ADMIN`
 

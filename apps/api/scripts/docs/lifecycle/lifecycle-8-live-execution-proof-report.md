@@ -74,13 +74,13 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
     "statusCode": 200,
     "data": {
       "auction": {
-        "id": "a6452114-52d1-4893-a04c-9736a1bee74e",
+        "id": "158898f8-0b5e-4836-8c8e-5a5aa2cbad55",
         "installmentMonth": 2,
         "bidDiscount": 25000,
         "prizeMoney": 75000
       },
       "winner": {
-        "id": "e2a2c894-6a79-4b43-bc2d-86c496d92c97",
+        "id": "f8ad6728-8281-404a-8cbe-014c2a5e7f8d",
         "disbursementStatus": "PENDING_VERIFICATION"
       },
       "makerName": "Staff",
@@ -91,7 +91,57 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
-### Step 3: Maker Verifies Safety Proof Checklist (`POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`)
+### Step 3: Maker Uploads Blank Cheques & Agreement Safety Proof Scan (`POST /api/v1/disbursements/auction/:auctionId/upload-safety-proof`)
+- **Caller**: Desk Accountant (Maker: `5460c6e3-607f-4931-b789-d269b65f852a`)
+- **HTTP Status**: `201 Created`
+- **Multipart Form Payload**:
+  - `file`: `signed_blank_cheques_sundaram.jpg` (Binary JPEG scan of signed cheques & agreement)
+- **Response**: HTTP 201 Created
+  ```json
+  {
+    "success": true,
+    "statusCode": 201,
+    "timestamp": "2026-10-23T19:48:32.313Z",
+    "data": {
+      "success": true,
+      "message": "Safety proof collateral document uploaded and linked successfully.",
+      "auctionId": "158898f8-0b5e-4836-8c8e-5a5aa2cbad55",
+      "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg",
+      "fileName": "signed_blank_cheques_sundaram.jpg",
+      "uploadedAt": "2026-10-23T19:48:32.313Z"
+    }
+  }
+  ```
+- **Live PostgreSQL Verification (`AuctionWinner`)**:
+  ```sql
+  SELECT "securityDocS3Key" FROM public."AuctionWinner" WHERE "auctionId" = '158898f8-0b5e-4836-8c8e-5a5aa2cbad55';
+  ```
+  **Output**: `safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg`
+- **Verification**: ✅ Scan uploaded to private S3 bucket and key linked directly to `AuctionWinner` record.
+
+---
+
+### Step 4: Checker Generates 15-Minute Presigned Viewing URL (`GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`)
+- **Caller**: Super Admin (Checker: `ebf67759-bf05-4fa6-b653-577b3f144900`)
+- **HTTP Status**: `200 OK`
+- **Response**: HTTP 200 OK
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:48:32.618Z",
+    "data": {
+      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=chitflow_admin%2F20261023%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T194832Z&X-Amz-Expires=900&X-Amz-Signature=3ae4c31439db7e138098dadf2a9c2e5b8cc5337048d7fb117e0eb186a3182a1c&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "expiresInSeconds": 900,
+      "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg"
+    }
+  }
+  ```
+- **Verification**: ✅ Secure 15-minute presigned URL generated with exact 900-second TTL for Partner B to view uploaded collateral before payout authorization.
+
+---
+
+### Step 5: Maker Verifies Safety Proof Checklist (`POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`)
 - **Caller**: Desk Accountant (Maker: `5460c6e3-607f-4931-b789-d269b65f852a`)
 - **Request Payload**:
   ```json
@@ -101,7 +151,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
     "blankChequeDetails": "State Bank of India, Cheque #004512 & #004513, A/C: S. Sundaram",
     "agreementSigned": true,
     "nomineeSigned": true,
-    "securityDocS3Key": "kyc/payouts/KC-LIVE-20M-01/winner-ticket-07-cheques.pdf",
+    "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg",
     "notes": "Verified subscriber KYC, agreement signed with nominee, 2 signed blank cheques deposited in safe."
   }
   ```
@@ -113,7 +163,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
     "data": {
       "message": "Safety proof checklist verified successfully. Ready for Checker payout authorization.",
       "winner": {
-        "id": "e2a2c894-6a79-4b43-bc2d-86c496d92c97",
+        "id": "f8ad6728-8281-404a-8cbe-014c2a5e7f8d",
         "disbursementStatus": "VERIFIED_BY_MAKER",
         "verifiedByUserId": "5460c6e3-607f-4931-b789-d269b65f852a"
       }
@@ -122,16 +172,16 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
   ```
 - **Live PostgreSQL Verification (`AuctionWinner`)**:
   ```text
-  VERIFIED_BY_MAKER|t|BLANK_CHEQUE|State Bank of India, Cheque #004512 & #004513, A/C: S. Sundaram|t|t|kyc/payouts/KC-LIVE-20M-01/winner-ticket-07-cheques.pdf|5460c6e3-607f-4931-b789-d269b65f852a
+  VERIFIED_BY_MAKER|t|BLANK_CHEQUE|State Bank of India, Cheque #004512 & #004513, A/C: S. Sundaram|t|t|safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg|5460c6e3-607f-4931-b789-d269b65f852a
   ```
 - **Live PostgreSQL Verification (`AuditLog`)**:
   ```text
-  SAFETY_PROOF_VERIFIED|AuctionWinner|e2a2c894-6a79-4b43-bc2d-86c496d92c97
+  SAFETY_PROOF_VERIFIED|AuctionWinner|f8ad6728-8281-404a-8cbe-014c2a5e7f8d
   ```
 
 ---
 
-### Step 4: Security Guardian Probe: Maker Cannot Self-Authorize (Dual Control)
+### Step 6: Security Guardian Probe: Maker Cannot Self-Authorize (Dual Control)
 - **Caller**: Desk Accountant (Maker) attempts to call `POST /authorize-payout`
 - **Response**: **HTTP 403 Forbidden**
   ```json
@@ -147,6 +197,57 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 - **Invariant Proven**: Strict role and maker-checker separation enforced.
 
 ---
+
+### Step 7: Checker Authorizes Prize Payout (`POST /api/v1/disbursements/auction/:auctionId/authorize-payout`)
+- **Caller**: Super Admin (Checker: `ebf67759-bf05-4fa6-b653-577b3f144900`)
+- **Request Payload**:
+  ```json
+  {
+    "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
+    "disbursedAmount": 75000,
+    "notes": "Authorized net prize payout of ₹75,000 via Account Payee Cheque after verifying blank cheques and agreement."
+  }
+  ```
+- **Response**: HTTP 200 OK
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "data": {
+      "message": "Prize payout voucher authorized successfully. Ready for release and disbursement.",
+      "winner": {
+        "id": "f8ad6728-8281-404a-8cbe-014c2a5e7f8d",
+        "disbursementStatus": "AUTHORIZED_BY_CHECKER",
+        "authorizedByUserId": "ebf67759-bf05-4fa6-b653-577b3f144900"
+      }
+    }
+  }
+  ```
+- **Live PostgreSQL Verification (`AuctionWinner`)**:
+  ```text
+  AUTHORIZED_BY_CHECKER|ACCOUNT_PAYEE_CHEQUE|75000|ebf67759-bf05-4fa6-b653-577b3f144900
+  ```
+
+---
+
+### Step 8: Release Payout (`POST /disburse`) & Generate Form XXI Bilingual Voucher
+- **Caller**: Desk Accountant (Maker)
+- **Request Payload**:
+  ```json
+  {
+    "paymentReference": "IOB-CHQ-009182",
+    "disbursedAt": "2026-10-22T17:30:00.000Z",
+    "notes": "Handed over Account Payee Cheque #009182 to prized subscriber in person at Perundurai office counter."
+  }
+  ```
+- **Response**: HTTP 200 OK
+- **Live PostgreSQL Verification (`AuctionWinner`)**:
+  ```text
+  DISBURSED|IOB-CHQ-009182|2026-10-22 17:30:00
+  ```
+- **Voucher Verification (`GET /disbursements/auction/:auctionId/voucher`)**:
+  - `isBilingual: true`
+  - English & Tamil Form XXI prize disbursement receipt voucher generated with ₹75,000 net payout.
 
 ### Step 5: Checker Authorizes Prize Payout Voucher (`POST /api/v1/disbursements/auction/:auctionId/authorize-payout`)
 - **Caller**: Super Admin / Managing Partner (Checker: `ebf67759-bf05-4fa6-b653-577b3f144900`)

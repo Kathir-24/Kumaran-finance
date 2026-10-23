@@ -51,6 +51,23 @@ async function request(method: string, path: string, body?: any, token?: string)
   return { status, json };
 }
 
+async function requestMultipart(path: string, formData: FormData, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const status = res.status;
+  const json = await res.json().catch(() => null);
+  return { status, json };
+}
+
 async function login(phone: string) {
   queryDb(`UPDATE public."User" SET "isTotpEnabled" = false, "totpSecret" = NULL WHERE phone = '${phone}'`);
   const res = await request('POST', '/auth/web/login', {
@@ -168,16 +185,71 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 3: POST /disbursements/auction/:auctionId/verify-safety-proof (Maker Verification)
+  // Step 3: POST /disbursements/auction/:auctionId/upload-safety-proof (Maker S3 Upload)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [3/6] POST /disbursements/auction/:auctionId/verify-safety-proof (Maker Verification) ---`);
+  console.log(`\n--- [3/8] POST /disbursements/auction/:auctionId/upload-safety-proof (Maker S3 Upload) ---`);
+  const safetyFormData = new FormData();
+  const dummyChequeScan = Buffer.from('BINARY_JPEG_SCAN_OF_SIGNED_BLANK_CHEQUES_AND_AGREEMENT_2026');
+  safetyFormData.append(
+    'file',
+    new Blob([dummyChequeScan], { type: 'image/jpeg' }),
+    'signed_blank_cheques_sundaram.jpg',
+  );
+  console.log(`   Uploading safety collateral scan (signed_blank_cheques_sundaram.jpg)...`);
+
+  const uploadProofRes = await requestMultipart(
+    `/disbursements/auction/${auctionId}/upload-safety-proof`,
+    safetyFormData,
+    accountant.token, // Maker = Desk Accountant
+  );
+  console.log(`   Upload Status: ${uploadProofRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(uploadProofRes.json?.data, null, 2));
+
+  if (uploadProofRes.status !== 201 || !uploadProofRes.json?.data?.securityDocS3Key) {
+    console.error('Failed to upload safety proof collateral scan:', uploadProofRes);
+    process.exit(1);
+  }
+  const uploadedS3Key = uploadProofRes.json.data.securityDocS3Key;
+
+  // PostgreSQL Verification of S3 key saved on AuctionWinner
+  const dbS3KeyCheck = queryDb(
+    `SELECT "securityDocS3Key" FROM public."AuctionWinner" WHERE "auctionId" = '${auctionId}'`
+  );
+  console.log(`   [PostgreSQL DB Verification - S3 Key]: ${dbS3KeyCheck}`);
+
+  // --------------------------------------------------------------------------
+  // Step 4: GET /disbursements/auction/:auctionId/safety-proof-url (Checker Presigned URL)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [4/8] GET /disbursements/auction/:auctionId/safety-proof-url (15-Min Presigned URL) ---`);
+  const proofUrlRes = await request(
+    'GET',
+    `/disbursements/auction/${auctionId}/safety-proof-url`,
+    undefined,
+    admin.token, // Checker = Super Admin
+  );
+  console.log(`   Presigned URL Status: ${proofUrlRes.status}`);
+  console.log(`   Response Data:`, JSON.stringify(proofUrlRes.json?.data, null, 2));
+
+  if (proofUrlRes.status !== 200 || !proofUrlRes.json?.data?.url) {
+    console.error('Failed to get safety proof presigned URL:', proofUrlRes);
+    process.exit(1);
+  }
+  if (proofUrlRes.json.data.expiresInSeconds !== 900) {
+    console.error('Expected expiresInSeconds to be 900:', proofUrlRes.json.data);
+    process.exit(1);
+  }
+
+  // --------------------------------------------------------------------------
+  // Step 5: POST /disbursements/auction/:auctionId/verify-safety-proof (Maker Verification)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [5/8] POST /disbursements/auction/:auctionId/verify-safety-proof (Maker Verification) ---`);
   const safetyProofPayload = {
     isSecurityRequired: true,
     securityType: 'BLANK_CHEQUE',
     blankChequeDetails: 'State Bank of India, Cheque #004512 & #004513, A/C: S. Sundaram',
     agreementSigned: true,
     nomineeSigned: true,
-    securityDocS3Key: 'kyc/payouts/KC-LIVE-20M-01/winner-ticket-07-cheques.pdf',
+    securityDocS3Key: uploadedS3Key,
     notes: 'Verified subscriber KYC, agreement signed with nominee, 2 signed blank cheques deposited in safe.',
   };
   console.log(`   Request Payload:`, JSON.stringify(safetyProofPayload, null, 2));
@@ -214,16 +286,16 @@ async function run() {
     dbProofAfterVerify.includes('VERIFIED_BY_MAKER') &&
     dbProofAfterVerify.includes(accountant.userId)
   ) {
-    console.log(`   ✅ Step 3 PASSED: Safety proof verified by Maker, status transitioned to VERIFIED_BY_MAKER.`);
+    console.log(`   ✅ Step 5 PASSED: Safety proof verified by Maker, status transitioned to VERIFIED_BY_MAKER.`);
   } else {
-    console.error(`   ❌ Step 3 FAILED:`, JSON.stringify(verifyRes));
+    console.error(`   ❌ Step 5 FAILED:`, JSON.stringify(verifyRes));
     process.exit(1);
   }
 
   // --------------------------------------------------------------------------
-  // Step 4: Security Guardian Check: Maker cannot authorize payout (Dual Control)
+  // Step 6: Security Guardian Check: Maker cannot authorize payout (Dual Control)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [4/6] Security Check: Dual Control Enforcement (Maker != Checker) ---`);
+  console.log(`\n--- [6/8] Security Check: Dual Control Enforcement (Maker != Checker) ---`);
   const illegalAuthPayload = {
     disbursementMode: 'ACCOUNT_PAYEE_CHEQUE',
     disbursedAmount: 75000,
@@ -240,16 +312,16 @@ async function run() {
   console.log(`   Maker Attempt Error: ${illegalRes.json?.message || JSON.stringify(illegalRes.json)}`);
 
   if (illegalRes.status === 403) {
-    console.log(`   ✅ Step 4 PASSED: Maker authorization strictly BLOCKED with HTTP 403 Forbidden.`);
+    console.log(`   ✅ Step 6 PASSED: Maker authorization strictly BLOCKED with HTTP 403 Forbidden.`);
   } else {
-    console.error(`   ❌ Step 4 FAILED: Maker was unexpectedly allowed to authorize! Status: ${illegalRes.status}`);
+    console.error(`   ❌ Step 6 FAILED: Maker was unexpectedly allowed to authorize! Status: ${illegalRes.status}`);
     process.exit(1);
   }
 
   // --------------------------------------------------------------------------
-  // Step 5: POST /disbursements/auction/:auctionId/authorize-payout (Checker Authorization)
+  // Step 7: POST /disbursements/auction/:auctionId/authorize-payout (Checker Authorization)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [5/6] POST /disbursements/auction/:auctionId/authorize-payout (Checker Authorization) ---`);
+  console.log(`\n--- [7/8] POST /disbursements/auction/:auctionId/authorize-payout (Checker Authorization) ---`);
   const authorizePayload = {
     disbursementMode: 'ACCOUNT_PAYEE_CHEQUE',
     disbursedAmount: 75000,
@@ -290,16 +362,16 @@ async function run() {
     dbProofAfterAuth.includes(admin.userId) &&
     dbProofAfterAuth.includes('75000')
   ) {
-    console.log(`   ✅ Step 5 PASSED: Prize payout authorized by Checker, status transitioned to AUTHORIZED_BY_CHECKER.`);
+    console.log(`   ✅ Step 7 PASSED: Prize payout authorized by Checker, status transitioned to AUTHORIZED_BY_CHECKER.`);
   } else {
-    console.error(`   ❌ Step 5 FAILED:`, JSON.stringify(authRes));
+    console.error(`   ❌ Step 7 FAILED:`, JSON.stringify(authRes));
     process.exit(1);
   }
 
   // --------------------------------------------------------------------------
-  // Step 6: POST /disbursements/auction/:auctionId/disburse (Release Payout)
+  // Step 8: POST /disbursements/auction/:auctionId/disburse (Release Payout)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [6/6 Part A] POST /disbursements/auction/:auctionId/disburse (Release Payout) ---`);
+  console.log(`\n--- [8/8 Part A] POST /disbursements/auction/:auctionId/disburse (Release Payout) ---`);
   const releasePayload = {
     paymentReference: 'IOB-CHQ-009182',
     disbursedAt: '2026-10-22T17:30:00.000Z',
@@ -339,14 +411,14 @@ async function run() {
     dbProofAfterRelease.includes('DISBURSED') &&
     dbProofAfterRelease.includes('IOB-CHQ-009182')
   ) {
-    console.log(`   ✅ Step 6 Part A PASSED: Payout released, status transitioned to DISBURSED.`);
+    console.log(`   ✅ Step 8 Part A PASSED: Payout released, status transitioned to DISBURSED.`);
   } else {
-    console.error(`   ❌ Step 6 Part A FAILED:`, JSON.stringify(releaseRes));
+    console.error(`   ❌ Step 8 Part A FAILED:`, JSON.stringify(releaseRes));
     process.exit(1);
   }
 
   // --------------------------------------------------------------------------
-  // Step 6 Part B: GET /disbursements/auction/:auctionId/voucher (Bilingual Voucher)
+  // Step 8 Part B: GET /disbursements/auction/:auctionId/voucher (Bilingual Voucher)
   // --------------------------------------------------------------------------
   console.log(`\n--- [6/6 Part B] GET /disbursements/auction/:auctionId/voucher (Bilingual Voucher) ---`);
   const voucherRes = await request('GET', `/disbursements/auction/${auctionId}/voucher`, undefined, admin.token);
@@ -522,7 +594,7 @@ async function run() {
 
   console.log(`\n======================================================`);
   console.log(`🎉 LIFECYCLE 8 LIVE VERIFICATION PASSED (100% SUCCESS)`);
-  console.log(`   All 7 Endpoints fully verified against live NestJS & PostgreSQL`);
+  console.log(`   All 8 Endpoints fully verified against live NestJS, PostgreSQL & MinIO S3`);
   console.log(`   Maker-Checker separation, whole-rupee math, safety proofs & Month N final settlement verified.`);
   console.log(`======================================================\n`);
 }

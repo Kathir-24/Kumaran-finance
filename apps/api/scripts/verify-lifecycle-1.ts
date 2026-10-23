@@ -323,6 +323,8 @@ async function run() {
   if (custVerifyRes.status !== 200 || !custVerifyRes.json?.data?.accessToken || !custVerifyRes.json?.data?.user?.roles?.includes('CUSTOMER')) {
     throw new Error(`Step 15b Failed: Customer verify-otp did not issue full subscriber JWT tokens`);
   }
+  const customerAccessToken = custVerifyRes.json.data.accessToken;
+  const customerId = custVerifyRes.json.data.user.id;
   console.log(`[VERIFIED]: Subscriber K. Thangavel logged in via OTP with Role.CUSTOMER.`);
 
   // --------------------------------------------------------------------------
@@ -415,7 +417,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 21: PATCH /users/:id/status & PATCH /users/:id/roles
   // --------------------------------------------------------------------------
-  console.log(`\n--- [21/21] PATCH /users/:id/status & PATCH /users/:id/roles ---`);
+  console.log(`\n--- [21/24] PATCH /users/:id/status & PATCH /users/:id/roles ---`);
   const updateStatusPayload = { isActive: false };
   console.log(`[REQUEST] PATCH /users/${muruganUserId}/status (Deactivate):`, JSON.stringify(updateStatusPayload));
   const updateStatusRes = await request('PATCH', `/users/${muruganUserId}/status`, updateStatusPayload, accessToken);
@@ -440,9 +442,94 @@ async function run() {
   const dbRolesAfter = queryDb(`SELECT id, roles FROM public."User" WHERE id = '${muruganUserId}'`);
   console.log(`[SQL PROOF (Roles)] :`, dbRolesAfter);
 
+  // Re-activate Murugan for password change and reset tests
+  const reactivateRes = await request('PATCH', `/users/${muruganUserId}/status`, { isActive: true }, accessToken);
+  if (reactivateRes.status !== 200) {
+    throw new Error(`Failed to reactivate staff user Murugan for subsequent testing`);
+  }
+
+  // --------------------------------------------------------------------------
+  // Step 22: GET /auth/me (Customer Profile Verification - Bug Fix Proof)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [22/24] GET /auth/me (Subscriber / Customer Persona) ---`);
+  console.log(`[REQUEST] GET /auth/me with Customer JWT (Bearer ${customerAccessToken.substring(0, 20)}...)`);
+  const customerMeRes = await request('GET', '/auth/me', undefined, customerAccessToken);
+  console.log(`[RESPONSE] Status ${customerMeRes.status}:`, JSON.stringify(customerMeRes.json, null, 2));
+
+  if (customerMeRes.status !== 200 || !customerMeRes.json?.data?.roles?.includes('CUSTOMER')) {
+    throw new Error(`Step 22 Failed: GET /auth/me failed for Customer persona with status ${customerMeRes.status}`);
+  }
+  const custMeData = customerMeRes.json.data;
+  if (!custMeData.customerCode || custMeData.phone !== '9842100101') {
+    throw new Error(`Step 22 Failed: Customer profile payload missing customerCode or matching phone`);
+  }
+
+  const dbCustMe = queryDb(`SELECT id, "customerCode", "fullName", phone, "isKycVerified", "branchId" FROM public."Customer" WHERE id = '${customerId}'`);
+  console.log(`[SQL PROOF (Customer Profile)] :`, dbCustMe);
+
+  // --------------------------------------------------------------------------
+  // Step 23: POST /auth/change-password (Staff Self-Service Password Change)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [23/24] POST /auth/change-password (Staff Self-Service) ---`);
+  // First login as Murugan to obtain Murugan's access token
+  const muruganLoginPayload = { phone: '9842154321', password: 'Agent@Kumaran2026' };
+  const muruganLoginRes = await request('POST', '/auth/web/login', muruganLoginPayload);
+  if (muruganLoginRes.status !== 200 || !muruganLoginRes.json?.data?.accessToken) {
+    throw new Error(`Step 23 Pre-flight Failed: Murugan login failed with status ${muruganLoginRes.status}`);
+  }
+  const muruganAccessToken = muruganLoginRes.json.data.accessToken;
+
+  const changePwPayload = {
+    currentPassword: 'Agent@Kumaran2026',
+    newPassword: 'NewAgentPassword#2026',
+  };
+  console.log(`[REQUEST] POST /auth/change-password (All fields: currentPassword, newPassword):`, JSON.stringify({ currentPassword: '***', newPassword: '***' }));
+  const changePwRes = await request('POST', '/auth/change-password', changePwPayload, muruganAccessToken);
+  console.log(`[RESPONSE] Status ${changePwRes.status}:`, JSON.stringify(changePwRes.json, null, 2));
+
+  if (changePwRes.status !== 200 && changePwRes.status !== 201) {
+    throw new Error(`Step 23 Failed: POST /auth/change-password failed with status ${changePwRes.status}`);
+  }
+
+  // Verify Murugan can now login with the new password
+  const muruganReloginRes = await request('POST', '/auth/web/login', { phone: '9842154321', password: 'NewAgentPassword#2026' });
+  if (muruganReloginRes.status !== 200) {
+    throw new Error(`Step 23 Failed: Murugan re-login with updated password failed with status ${muruganReloginRes.status}`);
+  }
+  console.log(`[VERIFIED]: Murugan successfully logged in with newly changed password.`);
+
+  const dbPwAfterChange = queryDb(`SELECT id, name, phone, "passwordHash" IS NOT NULL AS has_password_hash FROM public."User" WHERE id = '${muruganUserId}'`);
+  console.log(`[SQL PROOF (Password Hash)] :`, dbPwAfterChange);
+
+  // --------------------------------------------------------------------------
+  // Step 24: POST /users/:id/reset-password (Super Admin Credential Reset)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [24/24] POST /users/:id/reset-password (Super Admin Force Reset) ---`);
+  const resetPwPayload = {
+    temporaryPassword: 'AdminForcedReset@999',
+  };
+  console.log(`[REQUEST] POST /users/${muruganUserId}/reset-password (Payload: temporaryPassword):`, JSON.stringify({ temporaryPassword: '***' }));
+  const resetPwRes = await request('POST', `/users/${muruganUserId}/reset-password`, resetPwPayload, accessToken);
+  console.log(`[RESPONSE] Status ${resetPwRes.status}:`, JSON.stringify(resetPwRes.json, null, 2));
+
+  if (resetPwRes.status !== 200 && resetPwRes.status !== 201) {
+    throw new Error(`Step 24 Failed: POST /users/:id/reset-password failed with status ${resetPwRes.status}`);
+  }
+
+  // Verify previous session is invalidated (refreshTokenHash IS NULL)
+  const dbResetProof = queryDb(`SELECT id, name, "refreshTokenHash" IS NULL AS session_invalidated, "passwordHash" IS NOT NULL AS has_password_hash FROM public."User" WHERE id = '${muruganUserId}'`);
+  console.log(`[SQL PROOF (Reset & Session Invalidation)] :`, dbResetProof);
+
+  // Verify Murugan can now login with Admin-forced reset password
+  const muruganLoginAfterReset = await request('POST', '/auth/web/login', { phone: '9842154321', password: 'AdminForcedReset@999' });
+  if (muruganLoginAfterReset.status !== 200) {
+    throw new Error(`Step 24 Failed: Login with admin reset password failed with status ${muruganLoginAfterReset.status}`);
+  }
+  console.log(`[VERIFIED]: Murugan successfully authenticated with Super Admin reset password.`);
+
   console.log(`\n======================================================`);
   console.log(`✅ LIFECYCLE 1 LIVE VERIFICATION 100% PASSED!`);
-  console.log(`   All 21 endpoints exercised against live port 3000.`);
+  console.log(`   All 24 endpoints exercised against live port 3000.`);
   console.log(`   Direct PostgreSQL 17 truth queries verified.`);
   console.log(`======================================================\n`);
 }

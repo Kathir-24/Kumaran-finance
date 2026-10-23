@@ -47,7 +47,8 @@
 | `POST` | `/auth/refresh-token` | Rotate 15-min access & 7-day refresh tokens | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/logout` | Revoke active session and refresh token hash | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
 | `PATCH`| `/auth/fcm-token` | Register or clear staff device FCM token | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | 🚫 **Blocked** | **Auth (Staff)** |
-| `GET` | `/auth/me` | Get authenticated user profile and roles | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
+| `GET` | `/auth/me` | Get authenticated user profile and roles (Dual Staff & Customer) | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
+| `POST` | `/auth/change-password` | Self-service password change with current password | **Allowed** | **Allowed** | **Allowed** | **Allowed** | 🚫 **Blocked (Staff Only)** | 🚫 **Blocked** |
 | `POST` | `/auth/totp/setup` | Generate Base32 TOTP secret & QR URI | **Auth** | **Auth** | **Auth** | **Auth** | 🚫 **Blocked** | **Auth** |
 | `POST` | `/auth/totp/enable` | Verify 6-digit code and lock 2FA | **Auth** | **Auth** | **Auth** | **Auth** | 🚫 **Blocked** | **Auth** |
 | `POST` | `/auth/totp/disable` | Disable 2FA with password confirmation | **Auth** | **Auth** | **Auth** | **Auth** | 🚫 **Blocked** | **Auth** |
@@ -69,6 +70,7 @@
 | `POST` | `/users` | Create staff user with branch & initial password | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/users/:id/status` | Activate or deactivate staff user (revokes sessions) | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/users/:id/roles` | Update assigned staff RBAC role personas | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/users/:id/reset-password` | Super Admin forced credential reset & session invalidation | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -88,6 +90,7 @@
 | `PATCH` | `/customers/:id/fcm-token` | Register or clear subscriber device FCM token | **Allowed** | **Branch Scope** | 🚫 **Blocked** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
 | `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo) to private S3 | **Allowed** | **Branch Scope** | **Allowed** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
 | `GET` | `/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked (Exempt)** | **Self Only (Anti-IDOR)** | **Read-Only** |
+| `DELETE` | `/customers/:id/documents/:docId` | Delete KYC scan from S3 & database | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | **Self Only (Unverified)** | 🚫 **Blocked** |
 
 ---
 
@@ -98,10 +101,12 @@
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `POST` | `/chits/new` | Create fresh chit group in DRAFT status | **Allowed (Exclusive)** | 🚫 **Review Only** | 🚫 **Review Only** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `PATCH` | `/chits/:id` | Update draft chit scheme parameters (names, dates, sanctions) | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/chits/onboard-ongoing` | Mid-Cycle Intake from physical paper notebook | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/chits` | List chit schemes with status & keyword filter | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Active Chits** | **Read-Only (Global)** |
 | `GET` | `/chits/:id` | View chit scheme details, duration & rules | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Chit Info** | **Read-Only (Global)** |
 | `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 limit) | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `DELETE` | `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/chits/:id/tickets` | View all ticket assignments in scheme | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Ticket Info**| **Read-Only (Global)** |
 | `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
@@ -134,6 +139,8 @@
 | `GET` | `/tickets/:id/passbook` | Detailed digital passbook statement | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
 | `GET` | `/tickets/defaulters` | List subscribers with continuous arrears | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/tickets/:id/remove-defaulter`| Execute 3M arrears removal (`REMOVED_DEF_3M`)| **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/substitute` | Substitute subscriber for `REMOVED_DEF_3M` ticket (ADR-13) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/installments/group/:id/month/:m`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/installments/group/:id/month/:m/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
@@ -178,6 +185,8 @@
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/disbursements` | List disbursements across chit schemes | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/disbursements/auction/:id` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Winner Only** | **Read-Only (Global)** |
+| `POST` | `/disbursements/auction/:id/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques to S3 | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/disbursements/auction/:id/safety-proof-url` | **Checker**: Generate 15-min presigned URL to view safety proof photos | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/disbursements/auction/:id/verify-safety-proof` | **Maker**: Verify safety checklist & scans | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/auction/:id/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/auction/:id/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
