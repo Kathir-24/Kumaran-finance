@@ -4,17 +4,18 @@
 > **Environment**: Live NestJS 12 Backend (`http://127.0.0.1:3000`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Verification Script**: [`apps/api/scripts/verify-lifecycle-8.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-8.ts)  
-> **Execution Status**: **100% Passed (6 / 6 Endpoints Verified Live)**
+> **Execution Status**: **100% Passed (7 / 7 Endpoints Verified Live)**
 
 ---
 
 ## 1. Executive Summary
 
-Lifecycle 8 executes the prize money disbursement and safety proof verification workflow for auction winners. It models the core operational realities of Kumaran Finance:
+Lifecycle 8 executes the prize money disbursement and safety proof verification workflow for auction winners as well as the final Month $N$ maturity settlement. It models the core operational realities of Kumaran Finance:
 1. **Company Safety Proof Checklist (ADR-15)**: Eliminating property documents, staff verify signed agreements with the winner and nominee, along with signed blank cheques and promissory notes.
 2. **Dual Control / Maker-Checker (ADR-08 / Invariant 10)**: Staff/Accountant acts as the **Maker** verifying physical security. Only Super Admin (Partners) possess financial authority to act as **Checker** and authorize prize payouts. The system strictly forbids `maker_user_id == checker_user_id`.
-3. **Whole-Rupee Integer Payouts**: 64-bit integer values (`BigInt`) calculate and disburse prize money without fractional paise.
-4. **Bilingual Payout Vouchers**: Generates structured metadata and monospace layouts in both English and தமிழ் for office counter records.
+3. **Month $N$ Final Maturity Settlement (Section 16 Chit Rules / Invariant 5)**: In the final month, the sole remaining unprized subscriber receives the gross chit pool minus 4.00% Foreman Commission directly without auction. Marks the ticket `isPrized = true` and the scheme status as `COMPLETED`.
+4. **Whole-Rupee Integer Payouts**: 64-bit integer values (`BigInt`) calculate and disburse prize money without fractional paise.
+5. **Bilingual Payout Vouchers**: Generates structured metadata and monospace layouts in both English and தமிழ் for office counter records.
 
 ---
 
@@ -29,8 +30,9 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 | 56 | `/api/v1/disbursements/auction/:auctionId/authorize-payout` | `POST` | Super Admin (Checker) | Authorize prize payout mode & amount | **PASS (200)** |
 | 57 | `/api/v1/disbursements/auction/:auctionId/disburse` | `POST` | Accountant / Super Admin | Release prize money & record reference | **PASS (200)** |
 | 58 | `/api/v1/disbursements/auction/:auctionId/voucher` | `GET` | Staff / Customer | Generate bilingual payout voucher | **PASS (200)** |
+| 59 | `/api/v1/disbursements/group/:chitGroupId/final-settlement` | `POST` | Super Admin strictly | Month N Final Maturity Settlement without auction | **PASS (200)** |
 
-*Cumulative Live Coverage: **57 / 88 Endpoints** (64.8%).*
+*Cumulative Live Coverage: **58 / 89 Endpoints** (65.2%).*
 
 ---
 
@@ -247,6 +249,97 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
+### Step 8: Month $N$ Final Maturity Settlement (`POST /api/v1/disbursements/group/:chitGroupId/final-settlement`)
+
+- **Regulatory Basis**: Section 16 Chit Funds Act & Architectural Invariant 5.
+- **Rules Verified**:
+  - No auction is conducted in Month $N$.
+  - 4.00% Foreman Commission is deducted from the gross chit value.
+  - Exclusively the single remaining unprized subscriber is settled.
+  - Subscriber ticket is marked `isPrized = true`.
+  - Chit scheme status transitions to `COMPLETED`.
+  - Strictly restricted to Super Admin (Partners).
+
+#### Guard Test A: RBAC Rejection for Non-Super Admin
+- **Caller**: Desk Accountant (`5460c6e3-607f-4931-b789-d269b65f852a`)
+- **Response**: HTTP 403 Forbidden
+  ```json
+  {
+    "success": false,
+    "statusCode": 403,
+    "error": {
+      "code": "FORBIDDEN",
+      "message": "Access denied: required role(s) [SUPER_ADMIN] not held by current user"
+    }
+  }
+  ```
+
+#### Guard Test B: Premature Settlement with Multiple Unprized Tickets
+- **Caller**: Super Admin (`ebf67759-bf05-4fa6-b653-577b3f144900`)
+- **Target**: Active group with 18 unprized tickets remaining
+- **Response**: HTTP 400 Bad Request
+  ```json
+  {
+    "success": false,
+    "statusCode": 400,
+    "error": {
+      "code": "BAD_REQUEST",
+      "message": "Cannot execute final settlement: There are still 18 unprized tickets. Final settlement is exclusively for the single remaining subscriber in Month 20"
+    }
+  }
+  ```
+
+#### Valid Final Maturity Settlement Execution
+- **Caller**: Super Admin (`ebf67759-bf05-4fa6-b653-577b3f144900`)
+- **Target**: Mature Group (`KC-TEST-MATURE-2M`, Chit Value: ₹1,00,000, 2 Months, Ticket #2 unprized)
+- **Request Payload**:
+  ```json
+  {
+    "ticketId": "finalTicketId",
+    "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
+    "paymentReference": "IOB-CHQ-FINAL-998811",
+    "notes": "Month 2 Final maturity settlement without auction per Section 16 Chit Rules",
+    "disbursedAt": "2024-03-01T00:00:00.000Z"
+  }
+  ```
+- **Response**: HTTP 200 OK
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "data": {
+      "message": "Final Month 2 maturity settlement successfully executed for Ticket #2 (N. Subramaniam). Scheme marked as COMPLETED.",
+      "settlement": {
+        "chitGroupId": "matureGroupId",
+        "installmentMonth": 2,
+        "ticketNumber": 2,
+        "customerName": "N. Subramaniam",
+        "grossPrize": 100000,
+        "foremanCommission": 4000,
+        "netPrizeMoney": 96000,
+        "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
+        "paymentReference": "IOB-CHQ-FINAL-998811",
+        "disbursedAt": "2024-03-01T00:00:00.000Z",
+        "auctionId": "settlementAuctionId"
+      }
+    }
+  }
+  ```
+- **Live PostgreSQL Verification (`ChitGroup`)**:
+  ```text
+  status = COMPLETED
+  ```
+- **Live PostgreSQL Verification (`SubscriberTicket`)**:
+  ```text
+  isPrized = t
+  ```
+- **Live PostgreSQL Verification (`AuctionWinner`)**:
+  ```text
+  DISBURSED|96000|IOB-CHQ-FINAL-998811
+  ```
+
+---
+
 ## 4. Invariants Confirmed
 
 1. **ADR-15 Company Safety Proof Checklist**:
@@ -256,15 +349,19 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
    - Verification conducted by Maker (`verifiedByUserId`).
    - Authorization strictly reserved for Checker Super Admin (`authorizedByUserId`).
    - Maker blocked from self-authorization with HTTP 403.
-3. **Statutory & Audit Log Traceability**:
-   - 3 separate `AuditLog` rows created: `SAFETY_PROOF_VERIFIED`, `PRIZE_PAYOUT_AUTHORIZED`, `PRIZE_PAYOUT_DISBURSED`.
-4. **Whole-Rupee Math**:
-   - ₹1,00,000 Chit Value $-$ ₹25,000 Bid Discount $=$ ₹75,000 Net Prize Money ($0$ paise, $0$ floating points).
+3. **Month $N$ Final Maturity Settlement (Invariant 5 & Section 16)**:
+   - Direct payout to final subscriber without auction.
+   - 4.00% Foreman Commission deducted with whole-rupee precision: ₹1,00,000 $-$ ₹4,000 $=$ ₹96,000 payout.
+   - Chit group marked `COMPLETED` and ticket marked `isPrized = true`.
+4. **Statutory & Audit Log Traceability**:
+   - `AuditLog` records created for safety proof, authorization, disbursement, and final month settlement.
+5. **Whole-Rupee Math**:
+   - Stored and processed exclusively in 64-bit integer Rupees (`BigInt`). Zero paise and zero floats.
 
 ---
 
 ## 5. Next Steps
 
-- **Current Progress**: Lifecycles 1 through 8 completed (**57 / 88 Endpoints Verified**).
+- **Current Progress**: Lifecycles 1 through 8 completed (**58 / 89 Endpoints Verified**, 65.2%).
 - **Next Lifecycle in Plan**: **Lifecycle 9: Form XXII Cash Book & Statutory Reports (9 Endpoints)**.
 - **Strict Protocol Enforcement**: **FORCE STOPPED** for user review and approval before proceeding.

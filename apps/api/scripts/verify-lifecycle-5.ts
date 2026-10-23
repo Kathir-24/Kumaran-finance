@@ -84,20 +84,25 @@ async function run() {
   console.log(`   Loaded ${tickets.length} tickets from PostgreSQL.`);
 
   // --------------------------------------------------------------------------
-  // Step 1: POST /installments/group/:chitGroupId/month/2/generate (Month 2 Dues)
+  // Step 1: POST /installments/group/:chitGroupId/month/2/generate (Month 2 Dues with Cycle Windows)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [1/7] POST /installments/group/${chitGroupId}/month/2/generate ---`);
-  const genMonth2Res = await request('POST', `/installments/group/${chitGroupId}/month/2/generate`, {
-    dueDate: '2026-12-10T00:00:00.000Z',
-  }, admin.token);
+  console.log(`\n--- [1/7] POST /installments/group/${chitGroupId}/month/2/generate (with optional cycle windows) ---`);
+  const genMonth2Payload = {
+    cycleStartDate: '2026-12-10T00:00:00.000Z',
+    cycleEndDate: '2027-01-10T00:00:00.000Z',
+    dueDate: '2027-01-10T00:00:00.000Z',
+  };
+  const genMonth2Res = await request('POST', `/installments/group/${chitGroupId}/month/2/generate`, genMonth2Payload, admin.token);
   console.log(`   Status: ${genMonth2Res.status}`);
   console.log(`   Month 2 Gross: ₹${genMonth2Res.json?.data?.grossAmount}`);
-  console.log(`   Month 2 Dividend: ₹${genMonth2Res.json?.data?.dividendDeduction} (Expected: 0)`);
+  console.log(`   Month 2 Dividend: ₹${genMonth2Res.json?.data?.dividendDeduction}`);
   console.log(`   Month 2 Net Payable: ₹${genMonth2Res.json?.data?.netPayableAmount}`);
+  console.log(`   Month 2 Cycle Start: ${genMonth2Res.json?.data?.cycleStartDate}`);
+  console.log(`   Month 2 Cycle End: ${genMonth2Res.json?.data?.cycleEndDate}`);
   console.log(`   Total Dues Scheduled: ${genMonth2Res.json?.data?.totalDuesScheduled}`);
 
-  if (genMonth2Res.status !== 200 || genMonth2Res.json?.data?.totalDuesScheduled !== 20) {
-    console.error('Failed to generate Month 2 dues:', genMonth2Res);
+  if (genMonth2Res.status !== 200 || genMonth2Res.json?.data?.totalDuesScheduled !== 20 || !genMonth2Res.json?.data?.cycleStartDate) {
+    console.error('Failed to generate Month 2 dues with cycle windows:', genMonth2Res);
     process.exit(1);
   }
 
@@ -105,13 +110,18 @@ async function run() {
   // Step 2: POST /installments/group/:chitGroupId/month/3/generate (Month 3 Universal Dividends)
   // --------------------------------------------------------------------------
   console.log(`\n--- [2/7] POST /installments/group/${chitGroupId}/month/3/generate ---`);
-  const genMonth3Res = await request('POST', `/installments/group/${chitGroupId}/month/3/generate`, {
-    dueDate: '2027-01-10T00:00:00.000Z',
-  }, admin.token);
+  const genMonth3Payload = {
+    cycleStartDate: '2027-01-10T00:00:00.000Z',
+    cycleEndDate: '2027-02-10T00:00:00.000Z',
+    dueDate: '2027-02-10T00:00:00.000Z',
+  };
+  const genMonth3Res = await request('POST', `/installments/group/${chitGroupId}/month/3/generate`, genMonth3Payload, admin.token);
   console.log(`   Status: ${genMonth3Res.status}`);
   console.log(`   Month 3 Gross: ₹${genMonth3Res.json?.data?.grossAmount}`);
   console.log(`   Month 3 Dividend Deduction: ₹${genMonth3Res.json?.data?.dividendDeduction} (Expected: 1050)`);
   console.log(`   Month 3 Net Payable: ₹${genMonth3Res.json?.data?.netPayableAmount} (Expected: 3950)`);
+  console.log(`   Month 3 Cycle Start: ${genMonth3Res.json?.data?.cycleStartDate}`);
+  console.log(`   Month 3 Cycle End: ${genMonth3Res.json?.data?.cycleEndDate}`);
   console.log(`   Total Dues Scheduled: ${genMonth3Res.json?.data?.totalDuesScheduled}`);
 
   if (genMonth3Res.status !== 200 || genMonth3Res.json?.data?.dividendDeduction !== 1050 || genMonth3Res.json?.data?.netPayableAmount !== 3950) {
@@ -119,14 +129,14 @@ async function run() {
     process.exit(1);
   }
 
-  // DB Verification
+  // DB Verification: Assert cycle window columns in PostgreSQL
   const dbDuesCount = queryDb(`SELECT count(*) FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3`);
   const dbSampleDue = queryDb(
-    `SELECT "grossAmount", "dividendDeduction", "netPayableAmount", status FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3 LIMIT 1`
+    `SELECT "grossAmount", "dividendDeduction", "netPayableAmount", status, "cycleStartDate", "cycleEndDate" FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3 LIMIT 1`
   );
   console.log(`   [PostgreSQL DB Verification]:`);
   console.log(`   Month 3 Dues Count = ${dbDuesCount} (Expected: 20)`);
-  console.log(`   Sample Due Row = ${dbSampleDue} (Expected: 5000|1050|3950|UNPAID)`);
+  console.log(`   Sample Due Row with Cycle Windows = ${dbSampleDue}`);
 
   // --------------------------------------------------------------------------
   // Step 3: GET /installments/group/:chitGroupId/month/3 (List month dues)
@@ -175,8 +185,25 @@ async function run() {
   console.log(`   Net Payable: ₹${pbData?.summary?.totalNetDue}`);
   console.log(`   Outstanding Balance: ₹${pbData?.summary?.outstandingBalance}`);
   console.log(`   Entries Count: ${pbData?.ledgerEntries?.length}`);
+  console.log(`   [6-Column Physical Passbook Verification]:`);
+  for (const entry of pbData?.ledgerEntries || []) {
+    console.log(
+      `     Month ${entry.month}: Payment Date: ${entry.paymentDate?.split('T')[0]} | Paid Date: ${entry.paidDate?.split('T')[0] || 'PENDING'} | Paid: ₹${entry.amountPaid} | Div: ₹${entry.dividend} | Net: ₹${entry.netPayableAmount} | Total: ₹${entry.total} (Status: ${entry.status})`
+    );
+    if (entry.status === 'PAID') {
+      if (BigInt(entry.amountPaid) + BigInt(entry.dividend) !== BigInt(entry.total)) {
+        console.error(`Passbook paid row invariant failed on month ${entry.month}: amountPaid + dividend != total`);
+        process.exit(1);
+      }
+    } else {
+      if (BigInt(entry.netPayableAmount) + BigInt(entry.dividend) !== BigInt(entry.total)) {
+        console.error(`Passbook scheduled due invariant failed on month ${entry.month}: netPayable + dividend != total`);
+        process.exit(1);
+      }
+    }
+  }
 
-  if (passbookRes.status !== 200 || !pbData?.summary) {
+  if (passbookRes.status !== 200 || !pbData?.summary || (pbData?.ledgerEntries?.length || 0) < 1) {
     console.error('Failed to get passbook statement:', passbookRes);
     process.exit(1);
   }

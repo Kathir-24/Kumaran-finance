@@ -73,3 +73,49 @@ export class BilingualVoucherResponseDto {
   @ApiProperty({ description: 'A4 / A5 monospace formatted voucher layout' })
   formattedText: string;
 }
+
+export class FinalSettlementDataDto {
+  @ApiProperty({ example: '37051c9a-9d53-46e2-b292-719bc05f373e' })
+  chitGroupId: string;
+
+  @ApiProperty({ example: 20 })
+  installmentMonth: number;
+
+  @ApiProperty({ example: 20 })
+  ticketNumber: number;
+
+  @ApiProperty({ example: 'N. Subramaniam' })
+  customerName: string;
+
+  @ApiProperty({ example: 100000 })
+  grossPrize: number;
+
+  @ApiProperty({ example: 4000 })
+  foremanCommission: number;
+
+  @ApiProperty({ example: 96000 })
+  netPrizeMoney: number;
+
+  @ApiProperty({ example: 'ACCOUNT_PAYEE_CHEQUE' })
+  disbursementMode: string;
+
+  @ApiProperty({ example: 'IOB-CHQ-FINAL-998811', required: false, nullable: true })
+  paymentReference?: string;
+
+  @ApiProperty({ example: '2025-08-22T00:00:00.000Z' })
+  disbursedAt: Date | string;
+
+  @ApiProperty({ example: 'a6452114-52d1-4893-a04c-9736a1bee74e' })
+  auctionId: string;
+}
+
+export class FinalSettlementResponseDto {
+  @ApiProperty({
+    example:
+      'Final Month 20 maturity settlement successfully executed for Ticket #20 (N. Subramaniam). Scheme marked as COMPLETED.',
+  })
+  message: string;
+
+  @ApiProperty({ type: FinalSettlementDataDto })
+  settlement: FinalSettlementDataDto;
+}

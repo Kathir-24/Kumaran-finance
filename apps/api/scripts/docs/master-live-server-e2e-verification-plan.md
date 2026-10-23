@@ -1,4 +1,4 @@
-# Master Live Server E2E Verification Plan (All 88 Endpoints + SQL Proofs)
+# Master Live Server E2E Verification Plan (All 89 Endpoints + SQL Proofs)
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Target**: Live NestJS Server (`http://localhost:3000`) + PostgreSQL 17 (`chitflow_dev` Port 5433) + Redis (`:6379`) + MinIO S3 (`:9000`)  
@@ -162,55 +162,56 @@ flowchart LR
 
 ---
 
-### Lifecycle 8: Prize Disbursements & Company Safety Proof (6 Endpoints)
+### Lifecycle 8: Prize Disbursements, Safety Proof & Maturity Settlement (7 Endpoints)
 54. `GET /api/v1/disbursements`: List pending prize money disbursements.
-55. `GET /api/v1/disbursements/:auctionId`: Fetch single disbursement worksheet.
-56. `PATCH /api/v1/disbursements/:auctionId/safety-proof`: Update Company Safety Proof checklist (signed agreement, nominee signature, 2 blank cheques, 1 promissory note) $\to$ SQL: Verify safety proof checklist fields saved in `PrizeDisbursement`.
-57. `POST /api/v1/disbursements/payout/:auctionId`: **Checker** authorizes net prize payout with dual control $\to$ SQL: Verify `status = 'DISBURSED'`, voucher number `KC-VOUCH-XXXXX` assigned.
-58. `GET /api/v1/disbursements/:auctionId/voucher`: Download prize disbursement voucher metadata.
-59. `GET /api/v1/disbursements/:auctionId/audit-trail`: Audit trail of verification and authorization signatures.
+55. `GET /api/v1/disbursements/auction/:auctionId`: Fetch single disbursement worksheet.
+56. `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`: Update Company Safety Proof checklist (signed agreement, nominee signature, 2 blank cheques, 1 promissory note) $\to$ SQL: Verify safety proof checklist fields saved in `AuctionWinner`.
+57. `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`: **Checker** authorizes net prize payout with dual control $\to$ SQL: Verify `disbursementStatus = 'AUTHORIZED_BY_CHECKER'`.
+58. `POST /api/v1/disbursements/auction/:auctionId/disburse`: Release payout and record official transaction reference $\to$ SQL: Verify `disbursementStatus = 'DISBURSED'`.
+59. `GET /api/v1/disbursements/auction/:auctionId/voucher`: Download bilingual prize disbursement voucher metadata.
+60. `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`: **Month N Maturity Settlement**: Direct payout to final subscriber without auction (Less 4% Foreman Commission; marks scheme COMPLETED) $\to$ SQL: Verify scheme status `COMPLETED`, winner status `DISBURSED`.
 
 ---
 
 ### Lifecycle 9: Form XXII Cash Book & Statutory Reports (9 Endpoints)
-60. `GET /api/v1/reports/form-xxii`: Form XXII Chit Cash Book $\to$ SQL: Verify:
+61. `GET /api/v1/reports/form-xxii`: Form XXII Chit Cash Book $\to$ SQL: Verify:
     $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Inflows} - \text{Outflows}$$
-61. `GET /api/v1/reports/dashboard-kpis`: Executive KPI dashboard (Total active chits, collections today, pending approvals).
-62. `GET /api/v1/reports/form-xvii/:auctionId`: Statutory auction minutes register.
-63. `GET /api/v1/reports/form-xxi/:ticketId`: Form XXI Subscriber continuous ledger.
-64. `GET /api/v1/reports/pending-approvals`: Pending Maker-Checker items count.
-65. `GET /api/v1/reports/approvals-stream`: SSE live server-sent events stream.
-66. `GET /api/v1/reports/collections-by-agent`: Collections broken down by agent.
-67. `GET /api/v1/reports/arrears-aging`: 30/60/90-day overdue arrears aging breakdown.
-68. `GET /api/v1/reports/foreman-commission-ledger`: 4% company commission earnings ledger.
+62. `GET /api/v1/reports/dashboard-kpis`: Executive KPI dashboard (Total active chits, collections today, pending approvals).
+63. `GET /api/v1/reports/form-xvii/:auctionId`: Statutory auction minutes register.
+64. `GET /api/v1/reports/form-xxi/:ticketId`: Form XXI Subscriber continuous ledger.
+65. `GET /api/v1/reports/pending-approvals`: Pending Maker-Checker items count.
+66. `GET /api/v1/reports/approvals-stream`: SSE live server-sent events stream.
+67. `GET /api/v1/reports/collections-by-agent`: Collections broken down by agent.
+68. `GET /api/v1/reports/arrears-aging`: 30/60/90-day overdue arrears aging breakdown.
+69. `GET /api/v1/reports/foreman-commission-ledger`: 4% company commission earnings ledger.
 
 ---
 
 ### Lifecycle 10: Encrypted Storage & Bilingual PDF Canvas (5 Endpoints)
-69. `GET /api/v1/storage/file/:key`: Stream encrypted document from S3/MinIO driver $\to$ Verify byte stream and path traversal protection.
-70. `GET /api/v1/pdf/receipt/:paymentId`: Generate and stream bilingual 80mm thermal receipt PDF with Tamil fonts.
-71. `GET /api/v1/pdf/voucher/:auctionId`: Generate and stream bilingual A5 prize payout voucher PDF.
-72. `GET /api/v1/pdf/minutes/:auctionId`: Generate Form XVII statutory minutes PDF.
-73. `GET /api/v1/pdf/passbook/:ticketId`: Generate Form XXI 20-month continuous passbook PDF.
+70. `GET /api/v1/storage/file/:key`: Stream encrypted document from S3/MinIO driver $\to$ Verify byte stream and path traversal protection.
+71. `GET /api/v1/pdf/receipt/:paymentId`: Generate and stream bilingual digital PDF receipt with Tamil fonts.
+72. `GET /api/v1/pdf/voucher/:auctionId`: Generate and stream bilingual A5 prize payout voucher PDF.
+73. `GET /api/v1/pdf/minutes/:auctionId`: Generate Form XVII statutory minutes PDF.
+74. `GET /api/v1/pdf/passbook/:ticketId`: Generate Form XXI 20-month continuous passbook PDF.
 
 ---
 
 ### Lifecycle 11: Background Jobs, Queues & Observability (15 Endpoints)
-74. `POST /api/v1/jobs/run-daily-arrears`: Trigger midnight arrears check $\to$ SQL: Verify overdue status updated.
-75. `POST /api/v1/jobs/enqueue-daily-arrears`: Enqueue arrears check on BullMQ queue.
-76. `POST /api/v1/jobs/run-reconciliation`: Trigger 06:00 AM payment settlement reconciliation.
-77. `POST /api/v1/jobs/enqueue-reconciliation`: Enqueue settlement reconciliation job.
-78. `POST /api/v1/jobs/send-auction-reminder/:chitGroupId/:month`: Broadcast upcoming auction reminder.
-79. `POST /api/v1/jobs/run-pre-auction-scan`: Trigger pre-auction scan.
-80. `GET /api/v1/jobs/repeatable-schedules`: List active BullMQ cron schedules.
-81. `GET /api/v1/jobs/queue-status`: Check Redis BullMQ queue health.
-82. `GET /api/v1/jobs/notification-audit-logs`: Inspect SMS and Push audit logs.
-83. `GET /admin/queues`: Bull Board visual dashboard UI.
-84. `GET /health`: System health probe (PostgreSQL, Redis, MinIO).
-85. `GET /health/liveness`: Kubernetes/Docker liveness probe.
-86. `GET /health/readiness`: Database & Redis readiness probe.
-87. `GET /metrics`: Prometheus telemetry metrics.
-88. `GET /`: API root metadata and version string.
+75. `POST /api/v1/jobs/run-daily-arrears`: Trigger midnight arrears check $\to$ SQL: Verify overdue status updated.
+76. `POST /api/v1/jobs/enqueue-daily-arrears`: Enqueue arrears check on BullMQ queue.
+77. `POST /api/v1/jobs/run-reconciliation`: Trigger 06:00 AM payment settlement reconciliation.
+78. `POST /api/v1/jobs/enqueue-reconciliation`: Enqueue settlement reconciliation job.
+79. `POST /api/v1/jobs/send-auction-reminder/:chitGroupId/:month`: Broadcast upcoming auction reminder.
+80. `POST /api/v1/jobs/run-pre-auction-scan`: Trigger pre-auction scan.
+81. `GET /api/v1/jobs/repeatable-schedules`: List active BullMQ cron schedules.
+82. `GET /api/v1/jobs/queue-status`: Check Redis BullMQ queue health.
+83. `GET /api/v1/jobs/notification-audit-logs`: Inspect SMS and Push audit logs.
+84. `GET /admin/queues`: Bull Board visual dashboard UI.
+85. `GET /health`: System health probe (PostgreSQL, Redis, MinIO).
+86. `GET /health/liveness`: Kubernetes/Docker liveness probe.
+87. `GET /health/readiness`: Database & Redis readiness probe.
+88. `GET /metrics`: Prometheus telemetry metrics.
+89. `GET /`: API root metadata and version string.
 
 ---
 

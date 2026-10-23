@@ -4458,6 +4458,35 @@ export interface components {
             /** @description A4 / A5 monospace formatted voucher layout */
             formattedText: string;
         };
+        FinalSettlementDataDto: {
+            /** @example 37051c9a-9d53-46e2-b292-719bc05f373e */
+            chitGroupId: string;
+            /** @example 20 */
+            installmentMonth: number;
+            /** @example 20 */
+            ticketNumber: number;
+            /** @example N. Subramaniam */
+            customerName: string;
+            /** @example 100000 */
+            grossPrize: number;
+            /** @example 4000 */
+            foremanCommission: number;
+            /** @example 96000 */
+            netPrizeMoney: number;
+            /** @example ACCOUNT_PAYEE_CHEQUE */
+            disbursementMode: string;
+            /** @example IOB-CHQ-FINAL-998811 */
+            paymentReference?: string | null;
+            /** @example 2025-08-22T00:00:00.000Z */
+            disbursedAt: Record<string, never>;
+            /** @example a6452114-52d1-4893-a04c-9736a1bee74e */
+            auctionId: string;
+        };
+        FinalSettlementResponseDto: {
+            /** @example Final Month 20 maturity settlement successfully executed for Ticket #20 (N. Subramaniam). Scheme marked as COMPLETED. */
+            message: string;
+            settlement: components["schemas"]["FinalSettlementDataDto"];
+        };
         SettleFinalMonthDto: {
             /**
              * @description Ticket ID of the single remaining unprized subscriber for Month N settlement
@@ -8216,7 +8245,17 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["FinalSettlementResponseDto"];
+                    };
+                };
             };
             /** @description Invalid settlement request or more than 1 unprized ticket exists */
             400: {

@@ -19,6 +19,19 @@ function queryDb(sql: string): string {
   }
 }
 
+function queryDbJson<T = any>(sql: string): T {
+  try {
+    const raw = execFileSync(
+      'docker',
+      ['exec', 'chitflow-db', 'psql', '-U', 'chitflow', '-d', 'chitflow_dev', '-t', '-A', '-c', `SELECT json_agg(t) FROM (${sql}) t;`],
+      { encoding: 'utf-8' }
+    ).trim();
+    return raw ? JSON.parse(raw) : ([] as any);
+  } catch (err: any) {
+    return [] as any;
+  }
+}
+
 async function request(method: string, path: string, body?: any, token?: string) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -354,10 +367,163 @@ async function run() {
     process.exit(1);
   }
 
+  // --------------------------------------------------------------------------
+  // Step 7: POST /disbursements/group/:chitGroupId/final-settlement (Month N Final Maturity Settlement)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [7/7] POST /disbursements/group/:chitGroupId/final-settlement (Month N Settlement) ---`);
+
+  const branchId = queryDb(`SELECT "branchId" FROM public."ChitGroup" WHERE id = '${chitGroupId}'`);
+  const existingTicketIds = queryDb(
+    `SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}' ORDER BY "ticketNumber" ASC LIMIT 2`
+  )
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const sampleTicketId1 = existingTicketIds[0] || '00000000-0000-0000-0000-000000000000';
+  const sampleTicketId2 = existingTicketIds[1] || sampleTicketId1;
+
+  // Guard Test A: Non-super-admin (Accountant) attempts final settlement authorization
+  console.log(`   Guard Test: Non-super-admin (Accountant) attempts final settlement authorization...`);
+  const rbacFailRes = await request(
+    'POST',
+    `/disbursements/group/${chitGroupId}/final-settlement`,
+    {
+      ticketId: sampleTicketId1,
+      disbursementMode: 'ACCOUNT_PAYEE_CHEQUE',
+    },
+    accountant.token
+  );
+  console.log(`   RBAC Rejection Status: ${rbacFailRes.status} (Expected: 403 Forbidden)`);
+  if (rbacFailRes.status !== 403) {
+    console.error('CRITICAL: Super Admin exclusivity guard failed on final settlement!');
+    process.exit(1);
+  }
+
+  // Guard Test B: Attempt final settlement when multiple unprized tickets remain in group
+  console.log(`   Guard Test: Attempt final settlement when multiple unprized tickets remain in group...`);
+  const prematureSettlementRes = await request(
+    'POST',
+    `/disbursements/group/${chitGroupId}/final-settlement`,
+    {
+      ticketId: sampleTicketId2,
+      disbursementMode: 'ACCOUNT_PAYEE_CHEQUE',
+      paymentReference: 'IOB-CHQ-PREMATURE',
+    },
+    admin.token
+  );
+  console.log(`   Premature Rejection Status: ${prematureSettlementRes.status} (Expected: 400 Bad Request)`);
+  console.log(`   Premature Rejection Message: ${prematureSettlementRes.json?.error?.message}`);
+  if (prematureSettlementRes.status !== 400) {
+    console.error('CRITICAL: Premature final settlement guard failed!');
+    process.exit(1);
+  }
+
+  // Valid Final Settlement Execution: Create dedicated mature test group with 1 remaining unprized subscriber
+  console.log(`   Setting up a dedicated mature chit group (KC-TEST-MATURE-2M) in PostgreSQL for final settlement...`);
+  queryDb(`DELETE FROM public."AuditLog" WHERE "entityType" = 'ChitGroup' AND "entityId" IN (SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-TEST-MATURE-2M')`);
+  queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" IN (SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-TEST-MATURE-2M'))`);
+  queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" IN (SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-TEST-MATURE-2M')`);
+  queryDb(`DELETE FROM public."SubscriberTicket" WHERE "chitGroupId" IN (SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-TEST-MATURE-2M')`);
+  queryDb(`DELETE FROM public."ChitGroup" WHERE "groupCode" = 'KC-TEST-MATURE-2M'`);
+
+  const matureGroupRaw = queryDb(`
+    INSERT INTO public."ChitGroup" (
+      id, "branchId", "groupCode", "groupName", "chitValue", "durationMonths",
+      "totalTickets", "baseInstallment", "foremanCommissionRate", "maxDiscountCeiling",
+      "initMode", "onboardedAtMonth", status, "startDate", "endDate", "updatedAt"
+    ) VALUES (
+      gen_random_uuid(), '${branchId}', 'KC-TEST-MATURE-2M', 'Mature Test Group 2M',
+      100000, 2, 2, 50000, 4.00, 25000, 'NEW_GROUP', 1, 'ACTIVE', '2024-01-01', '2024-03-01', NOW()
+    ) RETURNING id;
+  `);
+  const matureGroupId = (matureGroupRaw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0];
+
+  if (!matureGroupId) {
+    throw new Error(`Failed to create mature test chit group: ${matureGroupRaw}`);
+  }
+
+  const distinctCustomerIds = queryDb(`SELECT DISTINCT "customerId" FROM public."SubscriberTicket" LIMIT 2`)
+    .split('\n')
+    .map((s) => (s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0])
+    .filter((id): id is string => Boolean(id));
+
+  if (distinctCustomerIds.length < 2) {
+    throw new Error('Need at least 2 distinct customers in DB to set up mature group');
+  }
+
+  // Insert Ticket #1 (already prized in Month 1)
+  queryDb(`
+    INSERT INTO public."SubscriberTicket" (
+      id, "chitGroupId", "customerId", "ticketNumber", "isPrized", status
+    ) VALUES (
+      gen_random_uuid(), '${matureGroupId}', '${distinctCustomerIds[0]}', 1, true, 'ACTIVE'
+    );
+  `);
+
+  // Insert Ticket #2 (final remaining unprized subscriber for Month 2)
+  const finalTicketRaw = queryDb(`
+    INSERT INTO public."SubscriberTicket" (
+      id, "chitGroupId", "customerId", "ticketNumber", "isPrized", status
+    ) VALUES (
+      gen_random_uuid(), '${matureGroupId}', '${distinctCustomerIds[1]}', 2, false, 'ACTIVE'
+    ) RETURNING id;
+  `);
+  const finalTicketId = (finalTicketRaw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0];
+
+  if (!finalTicketId) {
+    throw new Error(`Failed to create final subscriber ticket: ${finalTicketRaw}`);
+  }
+
+  console.log(`   Executing valid final Month 2 settlement for Ticket #2...`);
+  const finalSettlementPayload = {
+    ticketId: finalTicketId,
+    disbursementMode: 'ACCOUNT_PAYEE_CHEQUE',
+    paymentReference: 'IOB-CHQ-FINAL-998811',
+    notes: 'Month 2 Final maturity settlement without auction per Section 16 Chit Rules',
+    disbursedAt: '2024-03-01T00:00:00.000Z',
+  };
+  const settlementRes = await request(
+    'POST',
+    `/disbursements/group/${matureGroupId}/final-settlement`,
+    finalSettlementPayload,
+    admin.token
+  );
+  console.log(`   Status: ${settlementRes.status}`);
+  console.log(`   Message: ${settlementRes.json?.data?.message}`);
+  const sData = settlementRes.json?.data?.settlement;
+  console.log(`   Gross Chit Value: ₹${sData?.grossPrize}`);
+  console.log(`   Foreman Commission (4%): ₹${sData?.foremanCommission}`);
+  console.log(`   Net Settlement Payout: ₹${sData?.netPrizeMoney}`);
+  console.log(`   Final Month: Month ${sData?.installmentMonth}`);
+
+  // DB Verification
+  const dbChitStatus = queryDb(`SELECT status FROM public."ChitGroup" WHERE id = '${matureGroupId}'`);
+  const dbTicketPrized = queryDb(`SELECT "isPrized" FROM public."SubscriberTicket" WHERE id = '${finalTicketId}'`);
+  const dbWinnerDisbursed = queryDb(`SELECT "disbursementStatus", "disbursedAmount", "paymentReference" FROM public."AuctionWinner" WHERE "auctionId" = '${sData?.auctionId}'`);
+  console.log(`   [PostgreSQL DB Verification]:`);
+  console.log(`   Chit Group Status = ${dbChitStatus} (Expected: COMPLETED)`);
+  console.log(`   Ticket #2 isPrized = ${dbTicketPrized} (Expected: t)`);
+  console.log(`   AuctionWinner Row = ${dbWinnerDisbursed}`);
+
+  if (
+    settlementRes.status === 200 &&
+    sData?.grossPrize === 100000 &&
+    sData?.foremanCommission === 4000 &&
+    sData?.netPrizeMoney === 96000 &&
+    dbChitStatus === 'COMPLETED' &&
+    dbTicketPrized === 't'
+  ) {
+    console.log(`   ✅ Step 7 PASSED: Month N Final maturity settlement executed successfully.`);
+  } else {
+    console.error('CRITICAL: Month N final settlement verification failed:', settlementRes);
+    process.exit(1);
+  }
+
   console.log(`\n======================================================`);
   console.log(`🎉 LIFECYCLE 8 LIVE VERIFICATION PASSED (100% SUCCESS)`);
-  console.log(`   All 6 Endpoints fully verified against live NestJS & PostgreSQL`);
-  console.log(`   Maker-Checker separation, whole-rupee math & safety proofs verified.`);
+  console.log(`   All 7 Endpoints fully verified against live NestJS & PostgreSQL`);
+  console.log(`   Maker-Checker separation, whole-rupee math, safety proofs & Month N final settlement verified.`);
   console.log(`======================================================\n`);
 }
 

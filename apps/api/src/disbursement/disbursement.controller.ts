@@ -31,6 +31,7 @@ import {
   BilingualVoucherResponseDto,
   DisbursementAuthorizationResponseDto,
   DisbursementReleaseResponseDto,
+  FinalSettlementResponseDto,
   SafetyProofVerificationResponseDto,
   WinnerDisbursementItemDto,
 } from './dto/disbursement-response.dto';
@@ -198,7 +199,7 @@ export class DisbursementController {
     description:
       'Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.',
   })
-  @ApiResponse({ status: 200, description: 'Final month settlement successfully executed' })
+  @ApiOkResponseEnvelope(FinalSettlementResponseDto, { description: 'Final month settlement successfully executed' })
   @ApiResponse({ status: 400, description: 'Invalid settlement request or more than 1 unprized ticket exists' })
   @ApiResponse({ status: 403, description: 'Forbidden: Super Admin exclusivity' })
   @ApiResponse({ status: 404, description: 'Chit group or ticket not found' })
