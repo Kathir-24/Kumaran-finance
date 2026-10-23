@@ -214,7 +214,306 @@
 
 ---
 
-## 3. Related Architecture & Contract Documents
+## 3. Detailed Specifications for Category A Operational & Maintenance Endpoints
+
+This section provides granular contract specifications (request bodies, response schemas, status codes, and architectural invariants) for the 10 Category A endpoints.
+
+### 3.1 `GET /api/v1/auth/me` (Dual Staff & Customer Persona Profile)
+- **HTTP Method**: `GET`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`, `AUDITOR`
+- **Description**: Returns authenticated profile metadata. Dynamically queries `User` table for staff or `Customer` table for subscribers with role `CUSTOMER`, eliminating 404 crashes for mobile subscribers.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:32.889Z",
+    "data": {
+      "id": "6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8",
+      "name": "K. Thangavel",
+      "fullNameTamil": "கே. தங்கவேல்",
+      "phone": "9842100101",
+      "roles": ["CUSTOMER"],
+      "customerCode": "KC-CUST-00101",
+      "branchId": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+      "isTotpEnabled": false,
+      "hasMpin": false,
+      "isKycVerified": true,
+      "lastLoginAt": null,
+      "branch": {
+        "id": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
+        "code": "PRD",
+        "name": "Head Office - Perundurai",
+        "nameTamil": "தலைமை கிளை - பெருந்துறை"
+      }
+    }
+  }
+  ```
+- **Error Codes**: `401 Unauthorized` (Invalid/expired token), `404 Not Found` (Profile deleted).
+
+---
+
+### 3.2 `POST /api/v1/auth/change-password` (Staff Self-Service Password Change)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (Staff)
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`
+- **Description**: Enables authenticated staff to update their login password. Validates existing password against stored bcrypt hash, re-hashes new password (cost factor 12), and revokes active refresh tokens to prevent session hijacking.
+- **Request Body (`ChangePasswordDto`)**:
+  ```json
+  {
+    "currentPassword": "Agent@Kumaran2026",
+    "newPassword": "NewAgentPassword#2026"
+  }
+  ```
+- **Validation Rules**: `currentPassword` required; `newPassword` minimum 8 characters.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:34.392Z",
+    "data": {
+      "success": true,
+      "message": "Password successfully changed. Active refresh tokens have been revoked. Please log in with your new password."
+    }
+  }
+  ```
+- **Error Codes**: `400 Bad Request` (Validation failure / password complexity), `401 Unauthorized` (Invalid current password).
+
+---
+
+### 3.3 `POST /api/v1/users/:id/reset-password` (Super Admin Forced Credential Reset)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Path Parameter**: `id` — Staff user UUID
+- **Description**: Super Admin forcibly resets a staff account password to a specified or auto-generated secure temporary password and revokes all active sessions (`refreshTokenHash = NULL`).
+- **Request Body (`ResetPasswordDto`)**:
+  ```json
+  {
+    "temporaryPassword": "AdminForcedReset@999"
+  }
+  ```
+- **Validation Rules**: `temporaryPassword` optional (if omitted, system auto-generates a 12-character high-entropy secret; if provided, minimum 8 characters).
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:37:35.659Z",
+    "data": {
+      "success": true,
+      "message": "Password for staff user R. Murugan has been reset successfully. Active sessions have been revoked.",
+      "temporaryPassword": "AdminForcedReset@999"
+    }
+  }
+  ```
+- **Error Codes**: `403 Forbidden` (Non-Super Admin caller), `404 Not Found` (Staff user not found).
+
+---
+
+### 3.4 `DELETE /api/v1/customers/:id/documents/:docId` (Delete KYC Document Scan)
+- **HTTP Method**: `DELETE`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `CUSTOMER` (Self unverified only)
+- **Path Parameters**:
+  - `id` — Customer UUID
+  - `docId` — CustomerDocument UUID
+- **Description**: Permanently deletes an unreadable, blurry, or mistakenly uploaded KYC document from private S3 cloud storage (`kumaran-chits-private`) and deletes the record from PostgreSQL `CustomerDocument` table.
+- **Architectural Guard**: Once a document is marked `verified = true`, deletion strictly requires `Role.SUPER_ADMIN` authorization. Subscribers can only delete unverified documents for their own profile.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:38:59.850Z",
+    "data": {
+      "success": true,
+      "message": "KYC document (aadhaar_front_sundaram.jpg) successfully deleted."
+    }
+  }
+  ```
+- **Error Codes**: `403 Forbidden` (Anti-IDOR violation or attempting to delete verified document without Super Admin role), `404 Not Found` (Customer or document not found).
+
+---
+
+### 3.5 `PATCH /api/v1/chits/:id` (Update Draft Chit Scheme Parameters)
+- **HTTP Method**: `PATCH`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Path Parameter**: `id` — Chit Group UUID
+- **Description**: Modifies chit group name (English & Tamil), scheduled start/end dates, or statutory Chit Registrar sanction order metadata.
+- **Architectural Guard**: Strictly permitted exclusively while scheme status is `DRAFT`. Returns `HTTP 400 Bad Request` once the scheme has been activated or entered Month 1.
+- **Request Body (`UpdateChitGroupDto`)**:
+  ```json
+  {
+    "groupName": "₹1 Lakh 20 Months Test Group - Updated",
+    "groupNameTamil": "₹1 லட்சம் 20 மாதங்கள் நேரலை குழு - திருத்தப்பட்டது",
+    "startDate": "2026-11-15T00:00:00.000Z",
+    "endDate": "2028-07-15T00:00:00.000Z",
+    "sanctionOrderNumber": "ROC/ERD/CHIT/2026/099-REV",
+    "sanctionDate": "2026-10-10T00:00:00.000Z"
+  }
+  ```
+- **Success Response (`HTTP 200 OK`)**: Returns updated `ChitGroupResponseDto` with status `DRAFT`.
+- **Error Codes**: `400 Bad Request` (Scheme is not in `DRAFT` status), `403 Forbidden` (Caller is not Super Admin), `404 Not Found` (Chit scheme not found).
+
+---
+
+### 3.6 `DELETE /api/v1/chits/:id/tickets/:ticketNumber` (Unassign Ticket in DRAFT Status)
+- **HTTP Method**: `DELETE`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`
+- **Path Parameters**:
+  - `id` — Chit Group UUID
+  - `ticketNumber` — Ticket Number integer ($1 \le \text{ticketNumber} \le N$)
+- **Description**: Frees a mistakenly allocated ticket while scheme is in `DRAFT` status before Month 1 activation, enabling re-allocation to the correct subscriber.
+- **Architectural Guard**: Prohibited once scheme status transitions to `ACTIVE`.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:41:32.750Z",
+    "data": {
+      "success": true,
+      "message": "Ticket #2 allocated to M. Palanisamy has been unassigned successfully."
+    }
+  }
+  ```
+- **Error Codes**: `400 Bad Request` (Scheme is not in `DRAFT` status), `404 Not Found` (Ticket number or chit group not found).
+
+---
+
+### 3.7 `POST /api/v1/tickets/:id/settle-removal` (Defaulter Exit Account Settlement)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `ACCOUNTANT`
+- **Path Parameter**: `id` — Subscriber Ticket UUID
+- **Description**: Calculates cumulative installments paid by a subscriber removed under 3-month consecutive default (`REMOVED_DEF_3M`), deducts 4.00% Foreman Commission damages ($V \times 0.04$), issues an exit settlement refund voucher, and records an immutable audit log.
+- **Formula**:
+  $$\text{Refund Amount} = \max(0, \text{Total Paid} - (V \times 0.04))$$
+- **Request Body (`SettleRemovalDto`)**:
+  ```json
+  {
+    "paymentMethod": "CASH",
+    "notes": "Settled remaining refund after 4% contractual damages deduction per Foreman approval."
+  }
+  ```
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:45:53.336Z",
+    "data": {
+      "success": true,
+      "message": "Defaulter account for R. Velumani (Ticket #19) successfully settled.",
+      "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+      "ticketNumber": 19,
+      "customerName": "R. Velumani",
+      "groupCode": "KC-LIVE-20M-01",
+      "totalPaid": 0,
+      "damagesDeducted": 4000,
+      "refundAmount": 0,
+      "voucherNumber": "KC-VOU-DEF-753336",
+      "settledAt": "2026-10-23T19:45:53.336Z"
+    }
+  }
+  ```
+- **Error Codes**: `400 Bad Request` (Ticket status is not `REMOVED_DEF_3M`), `404 Not Found` (Subscriber ticket not found).
+
+---
+
+### 3.8 `POST /api/v1/tickets/:id/substitute` (ADR-13 Subscriber Substitution)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Path Parameter**: `id` — Subscriber Ticket UUID
+- **Description**: Assigns a new KYC-verified customer to a ticket vacated under `REMOVED_DEF_3M`. Restores ticket status to `ACTIVE`, resets `consecutiveUnpaidMonths = 0`, clears removal timestamps, and logs an audit trail.
+- **Architectural Guard (ADR-13)**: Strictly enforces that the replacement customer does NOT already hold another ticket in the same chit group (`@@unique([chitGroupId, customerId])`). Returns `HTTP 409 Conflict` on duplicate attempt.
+- **Request Body (`SubstituteSubscriberDto`)**:
+  ```json
+  {
+    "newCustomerId": "4bea4d80-eaba-4ecd-8fb7-d3553bd31cab",
+    "reason": "Previous subscriber removed for 3-month consecutive default; substituted per company policy."
+  }
+  ```
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:45:53.800Z",
+    "data": {
+      "success": true,
+      "message": "Subscriber replacement successfully executed. Ticket #19 re-assigned to A. Ravichandran and restored to ACTIVE status.",
+      "ticket": {
+        "id": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+        "ticketNumber": 19,
+        "status": "ACTIVE",
+        "previousCustomerId": "f808a42a-b2e7-4912-b2d0-54fd8c2f6601",
+        "previousCustomerName": "R. Velumani",
+        "newCustomerId": "4bea4d80-eaba-4ecd-8fb7-d3553bd31cab",
+        "newCustomerName": "A. Ravichandran"
+      }
+    }
+  }
+  ```
+- **Error Codes**: `400 Bad Request` (Ticket not in `REMOVED_DEF_3M` status or replacement customer KYC unverified), `404 Not Found` (Ticket or customer profile not found), `409 Conflict` (ADR-13 violation: customer already holds a ticket in this group).
+
+---
+
+### 3.9 `POST /api/v1/disbursements/auction/:id/upload-safety-proof` (Maker S3 Collateral Upload)
+- **HTTP Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` (Desk Maker)
+- **Path Parameter**: `id` — Auction UUID
+- **Description**: Uploads photos of signed blank cheques, promissory notes, or signed subscriber/nominee agreement into private S3 cloud storage (`safety-proofs/{auctionId}/...`) and links the S3 key directly to the `AuctionWinner` record.
+- **Multipart Form Payload**: `file` — Binary JPEG/PNG/PDF stream (up to 10 MB).
+- **Success Response (`HTTP 201 Created`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 201,
+    "timestamp": "2026-10-23T19:48:32.313Z",
+    "data": {
+      "success": true,
+      "message": "Safety proof collateral document uploaded and linked successfully.",
+      "auctionId": "158898f8-0b5e-4836-8c8e-5a5aa2cbad55",
+      "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg",
+      "fileName": "signed_blank_cheques_sundaram.jpg",
+      "uploadedAt": "2026-10-23T19:48:32.313Z"
+    }
+  }
+  ```
+- **Error Codes**: `400 Bad Request` (Missing file or unsupported file format), `404 Not Found` (Auction or auction winner record not found).
+
+---
+
+### 3.10 `GET /api/v1/disbursements/auction/:id/safety-proof-url` (Checker 15-Minute Presigned Viewing URL)
+- **HTTP Method**: `GET`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` (Checker Inspection)
+- **Path Parameter**: `id` — Auction UUID
+- **Description**: Generates an AWS S3 / MinIO time-limited presigned viewing URL (strictly 15 minutes / 900 seconds TTL) for Partner B (Checker) or Auditor to visually inspect uploaded blank cheques and agreements before clicking Authorize Payout.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "timestamp": "2026-10-23T19:48:32.618Z",
+    "data": {
+      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=900&...",
+      "expiresInSeconds": 900,
+      "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg"
+    }
+  }
+  ```
+- **Error Codes**: `404 Not Found` (Auction, winner, or uploaded document key not found).
+
+---
+
+## 4. Related Architecture & Contract Documents
 
 - **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json)
 - **TypeScript Client SDK Types**: [`docs/03-architecture/openapi-types.ts`](openapi-types.ts)
