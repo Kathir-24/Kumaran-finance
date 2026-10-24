@@ -327,12 +327,16 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
    - `[6/6] Self-Acknowledgment Guard`: Field agent attempted self-acknowledgment $\to$ **Rejected with HTTP 403 Forbidden** (`DUAL_CONTROL_VIOLATION`).
    - `[6/6] Partner Vault Deposit`: Super Admin acknowledged physical cash $\to$ **Committed into branch vault** (`HTTP 200 OK`).
 
-2. **Lifecycle 7 Verification Output**:
-   - `[1/4] POST /payments`: Recorded counter payment ₹3,950 $\to$ **Installment status updated to `PAID`** (`HTTP 201 Created`).
-   - `[2/4] GET /payments/:id/receipt`: Retrieved bilingual receipt formatted in English and தமிழ் (`HTTP 200 OK`).
-   - `[3/4] POST /payments/:id/request-reversal`: Maker submitted reversal with reason code $\to$ **Status set to `REQUESTED`** (`HTTP 200 OK`).
-   - `[4/4] Self-Approval Guard`: Maker attempted self-approval $\to$ **Rejected with HTTP 403 Forbidden** (`MAKER_CHECKER_VIOLATION`).
-   - `[4/4] Partner Approval`: Independent Super Admin approved reversal $\to$ **Payment marked `REVERSED`, Installment restored strictly to `UNPAID`** (`HTTP 200 OK`).
+2. **Lifecycle 7 Verification Output (Full 8-Step Verification)**:
+   - `[1/8] POST /payments (CASH)`: Recorded counter cash payment with full fields (`idempotencyKey`, `notes`, `collectedAt`) $\to$ **`cashHandoverStatus: PENDING_HANDOVER`**, sequential receipt `KC-REC-PRD-2026-00014`, InstallmentDue updated to `PAID`, BullMQ receipt notification enqueued (`HTTP 201 Created`).
+   - `[2/8] POST /payments (UPI)`: Recorded electronic UPI payment with `transactionRef: UPI-REF-998877661122` $\to$ **`cashHandoverStatus: ACKNOWLEDGED`** (direct bank credit bypasses drawer handover), InstallmentDue updated to `PAID` (`HTTP 201 Created`).
+   - `[3/8] GET /payments (Paginated & Filtered)`: Filtered collections by `ticketId` and `paymentMethod=CASH` (`HTTP 200 OK`). Verified automatic customer scoping for mobile subscribers.
+   - `[4/8] GET /payments/:id (Deep Relations & OWASP BOLA)`: Verified full relation graph (`customer`, `branch`, `recordedBy`, `allocations`, `receipt`). OWASP BOLA attack simulation (Customer 5 querying Customer 6 payment) **strictly blocked with HTTP 403 Forbidden**.
+   - `[5/8] GET /payments/:id/receipt`: Retrieved bilingual receipt formatted in English and தமிழ் monospace layout for instant passbook display (`HTTP 200 OK`).
+   - `[6/8] GET /pdf/receipt/:paymentId (A5 PDF Canvas & S3)`: Verified direct binary stream (`application/pdf`, `%PDF-`, 26,931 bytes, ISO A5 portrait) and 15-minute presigned S3 download URL (`HTTP 200 OK`).
+   - `[7/8] POST /payments/:id/reject-reversal (Reversal Rejection Branch)`: Maker requested reversal on Payment B. Maker self-rejection blocked with HTTP 403 Forbidden. Checker (Partner) rejected reversal $\to$ **Payment remains `SUCCESS`, InstallmentDue remains `PAID`, `AuditLog` entry `PAYMENT_REVERSAL_REJECTED` recorded** (`HTTP 200 OK`).
+
+   - `[8/8] POST /payments/:id/approve-reversal (Reversal Approval Branch)`: Maker requested reversal on Payment A. Maker self-approval blocked with HTTP 403 Forbidden. Checker (Partner) approved reversal $\to$ **Payment marked `REVERSED`, InstallmentDue atomically restored to `0|UNPAID`, `AuditLog` entry `PAYMENT_REVERSED` recorded** (`HTTP 200 OK`).
 
 ---
 
