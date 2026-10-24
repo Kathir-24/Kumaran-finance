@@ -71,12 +71,34 @@ async function run() {
   for (const gCode of cleanupGroups) {
     const existingGroup = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = '${gCode}'`);
     if (existingGroup && !existingGroup.startsWith('[DB ERROR]')) {
-      queryDb(`DELETE FROM public."PaymentAllocation" WHERE "dueId" IN (SELECT id FROM public."InstallmentDue" WHERE "chitGroupId" = '${existingGroup}')`);
-      queryDb(`DELETE FROM public."InstallmentDue" WHERE "chitGroupId" = '${existingGroup}'`);
+      // 1. Delete Reversals & Receipts for payments on tickets in this group
+      queryDb(`DELETE FROM public."PaymentReversal" WHERE "paymentId" IN (SELECT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'))`);
+      queryDb(`DELETE FROM public."Receipt" WHERE "paymentId" IN (SELECT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'))`);
+
+      // 2. Delete Allocations and Payments
+      const paymentIds = queryDb(`SELECT DISTINCT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);
+      queryDb(`DELETE FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);
+      if (paymentIds && !paymentIds.startsWith('[DB ERROR]') && paymentIds.trim().length > 0) {
+        const idList = paymentIds.split('\n').map((id) => `'${id.trim()}'`).filter((s) => s.length > 2).join(',');
+        if (idList) {
+          queryDb(`DELETE FROM public."Payment" WHERE id IN (${idList})`);
+        }
+      }
+
+      // 3. Delete Prize Disbursements & Proofs
+      queryDb(`DELETE FROM public."DisbursementProof" WHERE "disbursementId" IN (SELECT id FROM public."PrizeDisbursement" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'))`);
+      queryDb(`DELETE FROM public."PrizeDisbursement" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);
+
+      // 4. Delete Dues
+      queryDb(`DELETE FROM public."InstallmentDue" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);
+
+      // 5. Delete Auctions
       queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
       queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
       queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}')`);
       queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${existingGroup}'`);
+
+      // 6. Delete Tickets & ChitGroup
       queryDb(`DELETE FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'`);
       queryDb(`DELETE FROM public."ChitGroup" WHERE id = '${existingGroup}'`);
       console.log(`   Cleaned up pre-existing chit group ${gCode} (${existingGroup})`);
