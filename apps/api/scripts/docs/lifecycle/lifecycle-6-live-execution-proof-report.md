@@ -36,45 +36,48 @@ flowchart TD
 ### [2/6] `POST /api/v1/collections/record` (Doorstep Cash Collection & ADR-07 Guard)
 - **Role Required**: `COLLECTION_AGENT`, Staff
 - **Step 2A (Guard Test: Partial Payment Rejection)**:
-  - Agent attempted to record partial collection of ₹2,000 against a net due of ₹5,000 for Ticket #2.
+  - Agent attempted to record partial collection of ₹2,000 against a net due of ₹3,950 for Ticket #2.
   - Server rejected with **`HTTP 400 Bad Request`**:  
-    `"PARTIAL_PAYMENTS_NOT_ALLOWED: Payment must exactly match the net installment due of ₹5000 (received: ₹2000)"`.
+    `"PARTIAL_PAYMENTS_NOT_ALLOWED: Payment must exactly match the net installment due of ₹3950 (received: ₹2000)"`.
 - **Step 2B (Valid Doorstep Cash Collection)**:
-  - Agent recorded exact net amount of ₹5,000 in `CASH`.
+  - Agent recorded exact net amount of ₹3,950 in `CASH`.
   - Server responded with **`HTTP 201 Created`**:
-    - `paymentId`: `"0d898108-840f-43c6-8e4c-f2d0170d679d"`
-    - `receiptNumber`: `"KC-REC-PRD-2026-00015"`
-    - `amount`: `5000`
+    - `paymentId`: `"98e6ebd6-e4cd-4db0-8b40-5d829b736e27"`
+    - `receiptNumber`: `"KC-REC-PRD-2026-00014"`
+    - `amount`: `3950`
     - `cashHandoverStatus`: `"PENDING_HANDOVER"`
 - **PostgreSQL 17 Database Proof (`public."Payment"` & `public."InstallmentDue"`)**:
   ```sql
   SELECT id, amount, "paymentMethod", "paymentStatus", "cashHandoverStatus" 
-  FROM public."Payment" WHERE id = '0d898108...';
+  FROM public."Payment" WHERE id = '98e6ebd6...';
   ```
-  **Output**: `0d898108...|5000|CASH|SUCCESS|PENDING_HANDOVER`
+  **Output**: `98e6ebd6...|3950|CASH|SUCCESS|PENDING_HANDOVER`
   ```sql
   SELECT "paidAmount", status FROM public."InstallmentDue" 
   WHERE "ticketId" = '<Ticket 2 UUID>' AND "installmentMonth" = 2;
   ```
-  **Output**: `5000|PAID`
+  **Output**: `3950|PAID`
+- **BullMQ Async Receipt Notification Proof**:
+  - Immediately post-commit, a non-blocking `JOB_DISPATCH_PAYMENT_RECEIPT` was fired to `notification-queue`.
+  - Redis verification confirms key `bull:notification-queue:completed` registered job completion.
 
 ---
 
-### [3/6] `POST /api/v1/collections/sync-offline-queue` (Offline Batch Sync & Deduplication)
+### [3/6] `POST /api/v1/collections/sync-offline-queue` (Offline Batch Sync, Optional Fields & Deduplication)
 - **Role Required**: `COLLECTION_AGENT`, Staff
 - **HTTP Status**: `200 OK`
-- **Scenario**: Mobile device operated offline in a rural dead zone, queuing a collection for Ticket #3 (₹5,000). The app submitted a batch containing 1 valid collection and 1 duplicate transmission with the identical `idempotencyKey`.
+- **Scenario**: Mobile device operated offline in a rural dead zone, queuing a collection for Ticket #3 (₹3,950) with optional `transactionRef: 'UPI-IND-778899'`. The app submitted a batch containing 1 valid collection and 1 duplicate transmission with the identical `idempotencyKey`.
 - **API Response**:
   - `totalSubmitted`: `2`
   - `successCount`: `2`
-  - Item 1: `isDuplicate = false` (New payment recorded)
+  - Item 1: `isDuplicate = false` (New payment recorded with transaction reference)
   - Item 2: `isDuplicate = true` (Deduplicated; existing payment returned)
 - **PostgreSQL 17 Database Proof (`public."InstallmentDue"`)**:
   ```sql
   SELECT "paidAmount", status FROM public."InstallmentDue" 
   WHERE "ticketId" = '<Ticket 3 UUID>' AND "installmentMonth" = 2;
   ```
-  **Output**: `5000|PAID`
+  **Output**: `3950|PAID`
 
 ---
 
@@ -83,9 +86,9 @@ flowchart TD
 - **HTTP Status**: `200 OK`
 - **API Response**:
   - `totalPaymentsCount`: `2`
-  - `totals.totalCollected`: `₹10,000`
-  - `totals.cashCollected`: `₹10,000`
-  - `totals.cashPendingHandover`: `₹10,000`
+  - `totals.totalCollected`: `₹7,900`
+  - `totals.cashCollected`: `₹7,900`
+  - `totals.cashPendingHandover`: `₹7,900`
 
 ---
 
@@ -94,9 +97,9 @@ flowchart TD
 - **HTTP Status**: `200 OK`
 - **API Response**:
   - `collectorUserId`: Field Agent UUID
-  - `totalPendingAmount`: `₹10,000`
+  - `totalPendingAmount`: `₹7,900`
   - `paymentsCount`: `2`
-  - `paymentIds`: `["0d898108...", "3ddf9ded..."]`
+  - `paymentIds`: `["98e6ebd6...", "55393abc..."]`
 
 ---
 
@@ -106,19 +109,19 @@ flowchart TD
   - Field Agent attempted to acknowledge their own cash into the branch vault.
   - Server rejected with **`HTTP 403 Forbidden`** (enforcing `collector_user_id != acknowledger_user_id`).
 - **Step 6B (Valid Vault Acknowledgment by Partner)**:
-  - Super Admin physically counted 20 notes of ₹500 (`₹10,000`) and signed off into the vault.
+  - Super Admin physically counted currency notes (`₹7,900`) and signed off into the vault.
   - Server responded with **`HTTP 200 OK`**:
     - `totalPaymentsAcknowledged`: `2`
-    - `acknowledgedAmount`: `₹10,000`
+    - `acknowledgedAmount`: `₹7,900`
 - **PostgreSQL 17 Database Proof (`public."Payment"`)**:
   ```sql
   SELECT id, "cashHandoverStatus", "cashHandoverAcknowledgedByUserId" 
-  FROM public."Payment" WHERE id IN ('0d898108...', '3ddf9ded...');
+  FROM public."Payment" WHERE id IN ('98e6ebd6...', '55393abc...');
   ```
   **Output**:
   ```
-  0d898108...|ACKNOWLEDGED|ebf67759-bf05-4fa6-b653-577b3f144900
-  3ddf9ded...|ACKNOWLEDGED|ebf67759-bf05-4fa6-b653-577b3f144900
+  98e6ebd6...|ACKNOWLEDGED|ebf67759-bf05-4fa6-b653-577b3f144900
+  55393abc...|ACKNOWLEDGED|ebf67759-bf05-4fa6-b653-577b3f144900
   ```
   *(Both payments transitioned to `ACKNOWLEDGED` with Super Admin audit trail)*.
 
@@ -128,10 +131,11 @@ flowchart TD
 
 | Invariant | Result | Verification Notes |
 |---|---|---|
-| **Zero Partial Payments (ADR-07)** | ✅ 100% Verified | Attempt to collect ₹2,000 on a ₹5,000 installment due was rejected with `HTTP 400 Bad Request`. |
+| **Zero Partial Payments (ADR-07)** | ✅ 100% Verified | Attempt to collect ₹2,000 on a ₹3,950 installment due was rejected with `HTTP 400 Bad Request`. |
 | **Maker $\ne$ Checker Vault Control (Guardrail #10)** | ✅ 100% Verified | Field agent who collected cash was strictly blocked from self-acknowledgment (`HTTP 403 Forbidden`). Only distinct checker (Partner) could sign cash into the safe. |
+| **BullMQ Async Receipt Queueing** | ✅ 100% Verified | Post-commit `JOB_DISPATCH_PAYMENT_RECEIPT` job fired to `notification-queue` without blocking the collection response. |
 | **Offline Idempotency & Deduplication** | ✅ 100% Verified | Duplicate offline submission with identical `idempotencyKey` was safely deduplicated without creating duplicate payments or corrupting balances. |
-| **Sequential Bilingual Receipts** | ✅ 100% Verified | Each collection generated a unique, sequential bilingual receipt code (`KC-REC-PRD-2026-00015`). |
+| **Sequential Bilingual Receipts** | ✅ 100% Verified | Each collection generated a unique, sequential bilingual receipt code (`KC-REC-PRD-2026-00014`). |
 | **Vault Handover Audit Trail** | ✅ 100% Verified | Every cash payment maintains `recordedByUserId` (collector) and `cashHandoverAcknowledgedByUserId` (vault checker) in PostgreSQL. |
 
 ---

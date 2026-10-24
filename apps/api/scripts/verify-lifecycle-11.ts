@@ -342,6 +342,11 @@ async function run() {
     queues.forEach((q: any) => {
       console.log(`     - Queue: ${q.queueName} (Waiting: ${q.waiting}, Active: ${q.active}, Completed: ${q.completed}, Failed: ${q.failed})`);
     });
+    const notifQueue = queues.find((q: any) => q.queueName === 'notification-queue');
+    if (!notifQueue) {
+      throw new Error(`Step 13 Failed: notification-queue missing from queue status report`);
+    }
+    console.log(`     -> [VERIFIED] notification-queue is online (Waiting: ${notifQueue.waiting}, Completed: ${notifQueue.completed})`);
     console.log(`   ✅ Step 13 PASSED: BullMQ queue health and depth metrics reported.`);
   } else {
     console.error(`   ❌ Step 13 FAILED:`, statusRes);

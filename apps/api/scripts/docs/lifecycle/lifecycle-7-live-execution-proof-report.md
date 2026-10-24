@@ -32,31 +32,34 @@ flowchart LR
   {
     "ticketId": "<Ticket 5 UUID>",
     "installmentMonth": 2,
-    "amount": 5000,
+    "amount": 3950,
     "paymentMethod": "CASH"
   }
   ```
 - **API Response**:
-  - `payment.id`: `"6270e6dc-994b-43f8-9ab4-62b773b7146b"`
-  - `payment.amount`: `5000`
+  - `payment.id`: `"3563fa33-9af0-41b6-976f-0df95b59bb45"`
+  - `payment.amount`: `3950`
   - `payment.paymentStatus`: `"SUCCESS"`
-  - `receipt.receiptNumber`: `"KC-REC-PRD-2026-00017"`
+  - `receipt.receiptNumber`: `"KC-REC-PRD-2026-00016"`
   - `receipt.isBilingual`: `true`
   - `dueStatus`: `"PAID"`
 - **PostgreSQL 17 Database Proof (`public."Payment"`, `public."Receipt"`, `public."InstallmentDue"`)**:
   ```sql
-  SELECT id, amount, "paymentMethod", "paymentStatus" FROM public."Payment" WHERE id = '6270e6dc...';
+  SELECT id, amount, "paymentMethod", "paymentStatus" FROM public."Payment" WHERE id = '3563fa33...';
   ```
-  **Output**: `6270e6dc...|5000|CASH|SUCCESS`
+  **Output**: `3563fa33...|3950|CASH|SUCCESS`
   ```sql
-  SELECT "receiptNumber", "isBilingual" FROM public."Receipt" WHERE "paymentId" = '6270e6dc...';
+  SELECT "receiptNumber", "isBilingual" FROM public."Receipt" WHERE "paymentId" = '3563fa33...';
   ```
-  **Output**: `KC-REC-PRD-2026-00017|t` (`isBilingual = true`)
+  **Output**: `KC-REC-PRD-2026-00016|t` (`isBilingual = true`)
   ```sql
   SELECT "paidAmount", status FROM public."InstallmentDue" 
   WHERE "ticketId" = '<Ticket 5 UUID>' AND "installmentMonth" = 2;
   ```
-  **Output**: `5000|PAID`
+  **Output**: `3950|PAID`
+- **BullMQ Receipt Queueing Proof**:
+  - `JOB_DISPATCH_PAYMENT_RECEIPT` dispatched post-commit to `notification-queue`.
+  - Redis key `bull:notification-queue:completed` registered job execution.
 
 ---
 
@@ -64,13 +67,13 @@ flowchart LR
 - **Role Required**: Authenticated Staff, Member (Self)
 - **HTTP Status**: `200 OK`
 - **Extracted Bilingual Receipt Data**:
-  - `receiptNumber`: `"KC-REC-PRD-2026-00017"`
+  - `receiptNumber`: `"KC-REC-PRD-2026-00016"`
   - `subscriberName`: `"G. Arumugam"`
   - `subscriberTamilName`: `"ஜி. ஆறுமுகம்"`
   - `schemeCode`: `"KC-LIVE-20M-01"`
   - `ticketNumber`: `5`
   - `installmentMonth`: `2`
-  - `amountPaid`: `₹5,000`
+  - `amountPaid`: `₹3,950`
 - **Formatted Bilingual Text Layout (Sample)**:
   ```
   ================================================================================

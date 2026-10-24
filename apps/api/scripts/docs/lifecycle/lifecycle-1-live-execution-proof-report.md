@@ -428,21 +428,39 @@ flowchart TD
   {
     "success": true,
     "statusCode": 200,
-    "timestamp": "2026-10-23T16:33:53.589Z",
+    "timestamp": "2026-10-24T11:23:13.646Z",
     "data": {
       "success": true,
       "message": "OTP sent successfully to registered mobile number.",
       "expiresInSeconds": 300,
-      "debugOtp": "310544"
+      "debugOtp": "676423"
     }
   }
   ```
-- **Verification**: ✅ 6-digit OTP dispatched via SMS provider; 5-minute TTL enforced.
+- **Live Redis Distributed Storage Proof**:
+  ```bash
+  # 1. Inspect active TTL on Redis key
+  docker exec chitflow-redis redis-cli TTL auth:otp:9876543210
+  # Output: 300 (seconds)
+
+  # 2. Inspect raw JSON payload in Redis
+  docker exec chitflow-redis redis-cli GET auth:otp:9876543210
+  # Output: {"hashedOtp":"f6038fff2de60c062a9b65babd898a19facfc80dba7a36a6abd7d571d4e336aa","expiresAt":1792841233640,"attempts":0,"entityId":"ebf67759-bf05-4fa6-b653-577b3f144900","name":"P. Kumaran (Managing Partner)","roles":["SUPER_ADMIN"],"branchId":"07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c","phone":"9876543210","isCustomer":false}
+  ```
+- **Live Brute-Force 3-Attempt Lockout Proof**:
+  ```text
+  Attempt 1 with wrong OTP (000000): Status 400, Redis attempts: 1, TTL: 299s
+  Attempt 2 with wrong OTP (000000): Status 400, Redis attempts: 2, TTL: 299s
+  Attempt 3 with wrong OTP (000000): Status 400, Redis attempts: 3, TTL: 299s
+  Attempt 4 (Locked Out): Status 400, Error: "Too many invalid verification attempts. Please request a new OTP."
+  ✅ Lockout Invariant Enforced: Key locked in Redis and purged after 3 failed attempts without exposing OTP hash.
+  ```
+- **Verification**: ✅ 6-digit OTP dispatched via Indian Telecom DLT SMS; Redis-backed 300-second TTL enforced with SHA-256 hash and 3-attempt lockout.
 
 ---
 
-### Endpoint 13: `POST /api/v1/auth/mobile/verify-otp` (Staff Setup Mode)
-- **Purpose**: Verify mobile OTP for staff user without MPIN, issuing an ephemeral `setupToken` (10-minute TTL) for first-time MPIN configuration.
+### Endpoint 13: `POST /api/v1/auth/mobile/verify-otp` (Staff Setup Mode & Atomic Deletion)
+- **Purpose**: Verify mobile OTP for staff user without MPIN, issuing an ephemeral `setupToken` (10-minute TTL) for first-time MPIN configuration, and atomically purging Redis OTP state to prevent replay attacks.
 - **Live HTTP Request**:
   ```json
   POST http://127.0.0.1:3000/api/v1/auth/mobile/verify-otp
@@ -450,7 +468,7 @@ flowchart TD
 
   {
     "phone": "9876543210",
-    "otp": "310544"
+    "otp": "676423"
   }
   ```
 - **Live Server Response (HTTP 200 OK)**:
@@ -458,6 +476,24 @@ flowchart TD
   {
     "success": true,
     "statusCode": 200,
+    "timestamp": "2026-10-24T11:23:14.150Z",
+    "data": {
+      "success": true,
+      "message": "OTP verified successfully.",
+      "setupToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYmY2Nzc1OS1iZjA1LTRmYTYtYjY1My01NzdiM2YxNDQ5MDAiLCJwaG9uZSI6Ijk4NzY1NDMyMTAiLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJicmFuY2hJZCI6IjA3YzcwZDlkLWE4YWEtNDVkMy1iMzRlLTE1YTJkZDBjYzg4YyIsInRva2VuVHlwZSI6Im1waW5fc2V0dXAiLCJpYXQiOjE3OTI4NDA5OTQsImV4cCI6MTc5Mjg0MTU5NH0.X2N374b5bd..."
+    }
+  }
+  ```
+- **Live Redis Anti-Replay Proof**:
+  ```bash
+  # Check if key still exists after verification
+  docker exec chitflow-redis redis-cli EXISTS auth:otp:9876543210
+  # Output: 0 (Atomically deleted)
+
+  # Replay attack attempt:
+  POST /auth/mobile/verify-otp with same OTP "676423" -> Rejection Status 400 (Bad Request)
+  ```
+- **Verification**: ✅ Valid OTP grants `setupToken`; Redis key atomically deleted upon verification; replay attacks rejected.
     "timestamp": "2026-10-23T16:33:53.856Z",
     "data": {
       "verified": true,

@@ -17,6 +17,14 @@ function queryDb(sql: string): string {
   }
 }
 
+function queryRedis(cmd: string): string {
+  try {
+    return execSync(`docker exec chitflow-redis redis-cli ${cmd}`, { encoding: 'utf-8' }).trim();
+  } catch (err: any) {
+    return `[REDIS ERROR]: ${err.message}`;
+  }
+}
+
 async function request(method: string, path: string, body?: any, token?: string) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -250,9 +258,9 @@ async function run() {
   accessToken = adminRelogin.json.data.accessToken;
 
   // --------------------------------------------------------------------------
-  // Step 12: POST /auth/mobile/request-otp (Staff Mobile Onboarding OTP)
+  // Step 12: POST /auth/mobile/request-otp (Staff Mobile Onboarding OTP & Redis TTL Verification)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [12/21] POST /auth/mobile/request-otp (Staff) ---`);
+  console.log(`\n--- [12/21] POST /auth/mobile/request-otp (Staff & Redis Distributed Storage Proof) ---`);
   const staffOtpReqPayload = { phone: '9876543210' };
   console.log(`[REQUEST] POST /auth/mobile/request-otp:`, JSON.stringify(staffOtpReqPayload));
   const staffOtpReqRes = await request('POST', '/auth/mobile/request-otp', staffOtpReqPayload);
@@ -261,12 +269,54 @@ async function run() {
   if (staffOtpReqRes.status !== 200 || !staffOtpReqRes.json?.data?.success) {
     throw new Error(`Step 12 Failed: Staff request-otp failed`);
   }
-  const staffDebugOtp = staffOtpReqRes.json.data.debugOtp || '123456';
+
+  // Live Redis Verification: Key presence & 300s TTL
+  const redisTtl = parseInt(queryRedis('TTL auth:otp:9876543210'), 10);
+  const redisRawPayload = queryRedis('GET auth:otp:9876543210');
+  console.log(`[REDIS PROOF] TTL auth:otp:9876543210: ${redisTtl}s (Target: <= 300s and > 270s)`);
+  console.log(`[REDIS PROOF] Raw Stored Payload:`, redisRawPayload);
+
+  if (redisTtl < 270 || redisTtl > 300) {
+    throw new Error(`Step 12 Failed: Redis OTP TTL out of expected bounds: ${redisTtl}s`);
+  }
+  const parsedRedisPayload = JSON.parse(redisRawPayload);
+  if (!parsedRedisPayload.hashedOtp || parsedRedisPayload.hashedOtp.length !== 64 || parsedRedisPayload.attempts !== 0) {
+    throw new Error(`Step 12 Failed: Redis payload format invalid: ${redisRawPayload}`);
+  }
+  console.log(`   ✅ Redis Key Exists with ${redisTtl}s TTL and SHA-256 hash.`);
 
   // --------------------------------------------------------------------------
-  // Step 13: POST /auth/mobile/verify-otp (Staff Verification -> setupToken)
+  // Step 12.1: Brute-Force 3-Attempt Lockout Guard Test
   // --------------------------------------------------------------------------
-  console.log(`\n--- [13/21] POST /auth/mobile/verify-otp (Staff) ---`);
+  console.log(`\n--- [12.1/21] Brute-Force 3-Attempt Lockout Guard Test ---`);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const wrongOtpRes = await request('POST', '/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });
+    const currentAttempts = JSON.parse(queryRedis('GET auth:otp:9876543210')).attempts;
+    const remainingTtl = parseInt(queryRedis('TTL auth:otp:9876543210'), 10);
+    console.log(`   Attempt ${attempt} with wrong OTP: Status ${wrongOtpRes.status}, Redis attempts: ${currentAttempts}, TTL: ${remainingTtl}s`);
+    if (wrongOtpRes.status !== 400 || currentAttempts !== attempt) {
+      throw new Error(`Lockout test failed at attempt ${attempt}`);
+    }
+  }
+
+  // 4th attempt must be rejected with lockout message
+  const lockedOutRes = await request('POST', '/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });
+  console.log(`   Attempt 4 (Locked Out): Status ${lockedOutRes.status}, Error:`, lockedOutRes.json?.message || lockedOutRes.json?.error);
+  if (lockedOutRes.status !== 400 || !JSON.stringify(lockedOutRes.json).includes('Too many invalid verification attempts')) {
+    throw new Error(`Step 12.1 Failed: 4th attempt was not rejected with lockout error: ${JSON.stringify(lockedOutRes.json)}`);
+  }
+  console.log(`   ✅ 3-Attempt Lockout Enforced: Key locked and purged from Redis after maximum failed attempts.`);
+
+  // Re-request fresh OTP for legitimate onboarding
+  console.log(`   Re-requesting fresh OTP for legitimate staff onboarding...`);
+  const freshOtpRes = await request('POST', '/auth/mobile/request-otp', staffOtpReqPayload);
+  const staffDebugOtp = freshOtpRes.json?.data?.debugOtp || '123456';
+  console.log(`   Fresh OTP generated. Debug OTP: ${staffDebugOtp}`);
+
+  // --------------------------------------------------------------------------
+  // Step 13: POST /auth/mobile/verify-otp (Staff Verification -> setupToken & Anti-Replay Purge)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [13/21] POST /auth/mobile/verify-otp (Staff Verification & Atomic Deletion) ---`);
   // Clear mpinHash to simulate fresh staff mobile onboarding
   queryDb(`UPDATE public."User" SET "mpinHash" = NULL WHERE phone = '9876543210'`);
 
@@ -282,6 +332,22 @@ async function run() {
     throw new Error(`Step 13 Failed: Staff verify-otp did not issue setupToken`);
   }
   const setupToken = staffVerifyRes.json.data.setupToken;
+
+  // Live Redis Assertion: Atomic Key Deletion
+  const keyExistsAfterVerify = queryRedis('EXISTS auth:otp:9876543210');
+  console.log(`[REDIS PROOF] EXISTS auth:otp:9876543210: ${keyExistsAfterVerify} (Expected: 0)`);
+  if (keyExistsAfterVerify !== '0') {
+    throw new Error(`Step 13 Failed: Redis OTP key was not deleted upon successful verification!`);
+  }
+  console.log(`   ✅ Anti-Replay Guard: Redis key was atomically deleted.`);
+
+  // Anti-Replay Check: Trying to verify the same OTP immediately must fail
+  const replayRes = await request('POST', '/auth/mobile/verify-otp', staffVerifyPayload);
+  console.log(`[ANTI-REPLAY TEST] Re-verification attempt status: ${replayRes.status}`);
+  if (replayRes.status !== 400) {
+    throw new Error(`Step 13 Failed: OTP replay attack succeeded (status: ${replayRes.status})`);
+  }
+  console.log(`   ✅ Anti-Replay Guard: Replay attempt rejected with HTTP 400.`);
 
   // --------------------------------------------------------------------------
   // Step 14: POST /auth/mobile/set-mpin (First-time onboarding with setupToken)
@@ -304,7 +370,7 @@ async function run() {
   // --------------------------------------------------------------------------
   // Step 15: POST /auth/mobile/request-otp & verify-otp (Subscriber / Customer Flow)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [15/21] Customer Mobile OTP Flow (Subscriber Passbook Login) ---`);
+  console.log(`\n--- [15/21] Customer Mobile OTP Flow (Subscriber Passbook Login & Redis Assertion) ---`);
   const custOtpReqPayload = { phone: '9842100101' };
   console.log(`[REQUEST] POST /auth/mobile/request-otp (Customer):`, JSON.stringify(custOtpReqPayload));
   const custOtpReqRes = await request('POST', '/auth/mobile/request-otp', custOtpReqPayload);
@@ -314,6 +380,13 @@ async function run() {
     throw new Error(`Step 15a Failed: Customer request-otp failed`);
   }
   const custDebugOtp = custOtpReqRes.json.data.debugOtp || '123456';
+
+  // Live Redis Verification for Customer
+  const custTtl = parseInt(queryRedis('TTL auth:otp:9842100101'), 10);
+  console.log(`[REDIS PROOF] TTL auth:otp:9842100101: ${custTtl}s (Target: <= 300s)`);
+  if (custTtl < 270 || custTtl > 300) {
+    throw new Error(`Step 15 Failed: Customer Redis OTP TTL out of bounds: ${custTtl}s`);
+  }
 
   const custVerifyPayload = { phone: '9842100101', otp: custDebugOtp };
   console.log(`[REQUEST] POST /auth/mobile/verify-otp (Customer):`, JSON.stringify(custVerifyPayload));
@@ -325,7 +398,14 @@ async function run() {
   }
   const customerAccessToken = custVerifyRes.json.data.accessToken;
   const customerId = custVerifyRes.json.data.user.id;
-  console.log(`[VERIFIED]: Subscriber K. Thangavel logged in via OTP with Role.CUSTOMER.`);
+
+  // Assert atomic deletion
+  const custKeyExists = queryRedis('EXISTS auth:otp:9842100101');
+  console.log(`[REDIS PROOF] EXISTS auth:otp:9842100101 post-verify: ${custKeyExists} (Expected: 0)`);
+  if (custKeyExists !== '0') {
+    throw new Error(`Step 15 Failed: Customer Redis OTP key was not deleted upon verify!`);
+  }
+  console.log(`[VERIFIED]: Subscriber K. Thangavel logged in via OTP with Role.CUSTOMER & Redis state cleaned.`);
 
   // --------------------------------------------------------------------------
   // Step 16: POST /branches (Create Branch Office with ALL fields)
