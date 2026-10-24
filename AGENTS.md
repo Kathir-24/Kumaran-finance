@@ -98,6 +98,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Troubleshooting & Diagnostics (N-Modes)**| [`docs/04-engineering/troubleshooting-guide.md`](docs/04-engineering/troubleshooting-guide.md) |
 | **Redis Architecture & Distributed OTP** | [`docs/03-architecture/redis-architecture.md`](docs/03-architecture/redis-architecture.md) |
 | **BullMQ Jobs & Background Queues** | [`docs/03-architecture/bullmq-architecture.md`](docs/03-architecture/bullmq-architecture.md) |
+| **Offline Sync & Resilience Architecture** | [`docs/03-architecture/offline-architecture.md`](docs/03-architecture/offline-architecture.md) |
 | **Prometheus Metrics & APM Telemetry**    | [`apps/api/src/metrics/README.md`](apps/api/src/metrics/README.md) |
 | **Daily Operations, Cash Handover & Reversals**| [`docs/07-operations/operations-sop.md`](docs/07-operations/operations-sop.md) |
 | **Web Admin Portal Operations** | [`docs/07-operations/user-manuals/admin-foreman-manual.md`](docs/07-operations/user-manuals/admin-foreman-manual.md) |
