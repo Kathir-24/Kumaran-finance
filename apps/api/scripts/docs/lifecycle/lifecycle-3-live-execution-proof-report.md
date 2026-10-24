@@ -2,10 +2,10 @@
 
 > **Product**: Kumaran Chits (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Lifecycle**: **Lifecycle 3 — Chit Scheme Creation, Tickets, Mid-Cycle Intake & Activation**  
-> **Execution Date**: October 22, 2026  
+> **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
 > **Test Script**: [`apps/api/scripts/verify-lifecycle-3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-3.ts)  
-> **Result**: **7 / 7 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+> **Result**: **9 / 9 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
 
 ---
 
@@ -221,11 +221,13 @@ flowchart TD
 | **Mid-Cycle Notebook Intake** | ✅ 100% Verified | Full 400-cell grid ingestion creates historical auctions and flags historical winners as prized subscribers. |
 | **Whole Rupee Invariant** | ✅ 100% Verified | All monetary columns in PostgreSQL are integer `bigint` (zero decimals, zero floats). |
 | **Draft Scheme Maintenance** | ✅ 100% Verified | Parameter updating and ticket unassigning verified with state-machine safety guards. |
+| **Idempotent Cascade Teardown** | ✅ 100% Verified | 6-stage reverse foreign-key cleanup ensures repeated test runs reset target groups without foreign-key violations. |
 
 ---
 
 ## 4. Status: 100% Passed & Ready for Review
 
-- **Lifecycle 3 Scope**: **All 9 Endpoints Passed** ✅
+- **Lifecycle 3 Scope**: **All 9 Endpoints Passed (100%)** ✅
 - **Database Verified**: Direct PostgreSQL 17 Docker `chitflow-db` queries confirmed all schema constraints, foreign keys, and cryptographic hashes.
-- **Next Lifecycle Target**: **Lifecycle 5 — Installment Dues, Defaulters, Subscriber Substitution & Exit Settlement**!
+- **Idempotency**: 6-stage cascade cleanup guarantees zero leftover state across repeated test executions.
+- **Next Lifecycle Target**: **Lifecycle 4 — In-Office Auctions, Bidding & Option A Tie-Break**!

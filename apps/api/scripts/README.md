@@ -148,19 +148,19 @@ Under repeated automated E2E test runs, test suites transition `UNPAID` installm
 
 A collection of 11 live-server end-to-end verification runners designed to execute full end-to-end user journeys against a running NestJS instance and verify responses, invariant calculations, and audit logs:
 
-| Runner Script | Lifecycle Focus | Verification Scope |
-|---|---|---|
-| [`verify-lifecycle-1.ts`](verify-lifecycle-1.ts) | Lifecycle 1: Auth, Branches & Users | Web login, TOTP 2FA, Redis SMS OTP (300s TTL, 3-attempt lockout, anti-replay purge), MPIN, Branch CRUD, Staff User administration (24 steps) ✅ |
-| [`verify-lifecycle-2.ts`](verify-lifecycle-2.ts) | Lifecycle 2: Customer Intake & KYC | Lightweight intake, masked Aadhaar, Nominees, S3 KYC scans, 15-min presigned URLs (10 steps) ✅ |
-| [`verify-lifecycle-3.ts`](verify-lifecycle-3.ts) | Lifecycle 3: Chit Scheme Lifecycle | Scheme creation, activation, Month 1 pool, ongoing onboarding |
-| [`verify-lifecycle-4.ts`](verify-lifecycle-4.ts) | Lifecycle 4: In-Office Auctions | Offline bidding, 1/4 ceiling, Option A tie-break draw, Maker $\ne$ Checker |
-| [`verify-lifecycle-5.ts`](verify-lifecycle-5.ts) | Lifecycle 5: Installments & Passbook | Universal dividends, cycle start/end dates, 6-col passbook ledger |
-| [`verify-lifecycle-6.ts`](verify-lifecycle-6.ts) | Lifecycle 6: Doorstep Collections | Doorstep collection (exact Inet matching), BullMQ receipt queueing, offline batch sync, dual-control cash handover ✅ |
-| [`verify-lifecycle-7.ts`](verify-lifecycle-7.ts) | Lifecycle 7: Cash Handover & Reversals | Counter payment, BullMQ receipt queueing, bilingual receipt, Maker $\ne$ Checker payment reversals ✅ |
-| [`verify-lifecycle-8.ts`](verify-lifecycle-8.ts) | Lifecycle 8: Prize Disbursements | Safety proof checklist, A5 voucher, Month N maturity payout |
-| [`verify-lifecycle-9.ts`](verify-lifecycle-9.ts) | Lifecycle 9: Statutory Registers | Form XXII Cash Book, Form XXI Passbook, Form XVII Minutes |
-| [`verify-lifecycle-10.ts`](verify-lifecycle-10.ts) | Lifecycle 10: Storage & PDF Canvas | Presigned URLs, S3 KMS encryption, bilingual font rendering |
-| [`verify-lifecycle-11.ts`](verify-lifecycle-11.ts) | Lifecycle 11: Background Jobs & Ops | 00:01 AM arrears, 3M default tagging, BullMQ queue status, DLT SMS/Push audit logs, Prometheus metrics & Bull Board (15 steps) ✅ |
+| Runner Script | Lifecycle Focus | Verification Scope | Status |
+|---|---|---|:---:|
+| [`verify-lifecycle-1.ts`](verify-lifecycle-1.ts) | Lifecycle 1: Auth, Branches & Users | Web login, TOTP 2FA, Redis SMS OTP (300s TTL, 3-attempt lockout, anti-replay purge), MPIN, Branch CRUD, Staff User administration (24 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-2.ts`](verify-lifecycle-2.ts) | Lifecycle 2: Customer Intake & KYC | Lightweight intake, masked Aadhaar (`XXXXXXXX1234`), Nominees, S3 KYC scans, 15-min presigned URLs (11 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-3.ts`](verify-lifecycle-3.ts) | Lifecycle 3: Chit Scheme Lifecycle | Scheme creation, 4% commission lock, ADR-13 ticket limit constraint, Month 1 pool, mid-cycle intake (9 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-4.ts`](verify-lifecycle-4.ts) | Lifecycle 4: In-Office Auctions | Offline bidding, 1/4 ceiling guard, Option A physical token tie-break, Maker $\ne$ Checker (8 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-5.ts`](verify-lifecycle-5.ts) | Lifecycle 5: Installments & Passbook | Universal dividends ($I_{net} = I_{base} - Div$), 6-col passbook ledger, 3M arrears removal guard (9 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-6.ts`](verify-lifecycle-6.ts) | Lifecycle 6: Doorstep Collections | Doorstep collection (exact $I_{net}$ matching), BullMQ receipt queueing, offline batch sync, dual-control cash handover (6 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-7.ts`](verify-lifecycle-7.ts) | Lifecycle 7: Cash Handover & Reversals | Counter payment, BullMQ receipt queueing, bilingual text receipt (English/Tamil), Maker $\ne$ Checker payment reversals (4 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-8.ts`](verify-lifecycle-8.ts) | Lifecycle 8: Prize Disbursements | Safety proof checklist, S3 presigned inspection, Maker-Checker authorization, Month N maturity payout (8 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-9.ts`](verify-lifecycle-9.ts) | Lifecycle 9: Statutory Registers | Form XXII Cash Book equation ($Closing = Opening + In - Out$), Form XVII Minutes, Form XXI Passbook, SSE stream (9 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-10.ts`](verify-lifecycle-10.ts) | Lifecycle 10: Storage & PDF Canvas | Bilingual PDFKit thermal receipt, prize voucher, Form XVII, Form XXI, anti-traversal security defense (5 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-11.ts`](verify-lifecycle-11.ts) | Lifecycle 11: Background Jobs & Ops | Midnight arrears scan, 3M tagging, BullMQ queue status, DLT SMS/Push audit logs, Prometheus metrics & Bull Board (15 steps) | ✅ **100% Passed** |
 
 Execution proof reports and the master verification plan are archived in [`scripts/docs/`](docs/).
 

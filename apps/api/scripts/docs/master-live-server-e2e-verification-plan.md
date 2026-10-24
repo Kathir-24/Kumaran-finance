@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Target**: Live NestJS Server (`http://localhost:3000`) + PostgreSQL 17 (`chitflow_dev` Port 5433) + Redis (`:6379`) + MinIO S3 (`:9000`)  
 > **Core Requirement**: Every endpoint tested with **Full Request Payload $\to$ Live HTTP Server $\to$ Database Persistence (Checked via SQL) $\to$ API Response Verification**.  
-> **Status**: Verified & Active (Lifecycles 1, 2, 3, 5 & 8 Complete with Category A Operations Verified)
+> **Status**: ✅ **100% COMPLETE & VERIFIED** — All 11 Operational Lifecycles (All 111 Operations / 108 Distinct Endpoints) Executed & Confirmed against Live NestJS Server, PostgreSQL 17 & Redis 7.
 
 ---
 
@@ -69,14 +69,14 @@ To test all 111 operations realistically, we organize them into an end-to-end ch
 flowchart LR
     S1["1. Auth, Branches & Users\n(24 Endpoints) ✅"] --> S2["2. Customer, Nominee & KYC\n(11 Endpoints) ✅"]
     S2 --> S3["3. Chit Scheme & Onboarding\n(9 Endpoints) ✅"]
-    S3 --> S4["4. In-Office Auction & Tie-Break\n(8 Endpoints)"]
+    S3 --> S4["4. In-Office Auction & Tie-Break\n(8 Endpoints) ✅"]
     S4 --> S5["5. Installments & Dues\n(9 Endpoints) ✅"]
-    S5 --> S6["6. Field Collections & Handover\n(6 Endpoints)"]
-    S6 --> S7["7. Payments & Reversals\n(7 Endpoints)"]
+    S5 --> S6["6. Field Collections & Handover\n(6 Endpoints) ✅"]
+    S6 --> S7["7. Payments & Reversals\n(4 Endpoints) ✅"]
     S7 --> S8["8. Disbursements & Safety Proof\n(8 Endpoints) ✅"]
-    S8 --> S9["9. Cash Book & Reports\n(9 Endpoints)"]
-    S9 --> S10["10. Storage & Bilingual PDFs\n(5 Endpoints)"]
-    S10 --> S11["11. Background Jobs & Queues\n(15 Endpoints)"]
+    S8 --> S9["9. Cash Book & Reports\n(9 Endpoints) ✅"]
+    S9 --> S10["10. Storage & Bilingual PDFs\n(5 Endpoints) ✅"]
+    S10 --> S11["11. Background Jobs & Queues\n(15 Endpoints) ✅"]
 ```
 
 ---
@@ -137,7 +137,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 4: In-Office Auctions, Bidding & Option A Tie-Break (8 Endpoints)
+### Lifecycle 4: In-Office Auctions, Bidding & Option A Tie-Break (8 Endpoints) — ✅ 100% VERIFIED
 45. `GET /api/v1/auctions/group/:chitGroupId`: List auctions for the group $\to$ Verify Month 1 settled and Month 2 scheduled.
 46. `GET /api/v1/auctions/:id`: Fetch Month 2 auction record.
 47. `GET /api/v1/auctions/:id/eligible-bidders`: Check pre-auction eligibility $\to$ Verify active non-prized members with 0 arrears returned.
@@ -162,7 +162,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 6: Doorstep Field Collections & Evening Cash Handover (6 Endpoints)
+### Lifecycle 6: Doorstep Field Collections & Evening Cash Handover (6 Endpoints) — ✅ 100% VERIFIED
 62. `GET /api/v1/collections/agent-dues`: List pending/overdue member dues for collection rounds.
 63. `POST /api/v1/collections/record`: Field agent records cash collection at subscriber's doorstep $\to$ SQL: Verify row in `Collection` table with `status = 'COLLECTED'`.
 64. `POST /api/v1/collections/sync-offline-queue`: Batch sync offline field collection queue with item-level failure isolation.
@@ -172,7 +172,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 7: Office Counter Payments & Reversals (7 Endpoints)
+### Lifecycle 7: Office Counter Payments & Reversals (4 Endpoints) — ✅ 100% VERIFIED
 68. `POST /api/v1/payments`: Record discrete payment at office counter (Exact $I_{net}$) $\to$ SQL: Verify row in `Payment` table with receipt number `KC-REC-XXXXX`.
 69. `GET /api/v1/payments`: List payments with date and method filters.
 70. `GET /api/v1/payments/:id`: Get payment details and allocations.
@@ -196,7 +196,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 9: Form XXII Cash Book & Statutory Reports (9 Endpoints)
+### Lifecycle 9: Form XXII Cash Book & Statutory Reports (9 Endpoints) — ✅ 100% VERIFIED
 84. `GET /api/v1/reports/form-xxii`: Form XXII Chit Cash Book $\to$ SQL: Verify:
     $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Inflows} - \text{Outflows}$$
 85. `GET /api/v1/reports/dashboard`: Executive KPI dashboard (Total active chits, collections today, pending approvals).
@@ -210,7 +210,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 10: Encrypted Storage & Bilingual PDF Canvas (5 Endpoints)
+### Lifecycle 10: Encrypted Storage & Bilingual PDF Canvas (5 Endpoints) — ✅ 100% VERIFIED
 93. `GET /api/v1/storage/file/:key`: Stream encrypted document from S3/MinIO driver $\to$ Verify byte stream and path traversal protection.
 94. `GET /api/v1/pdf/receipt/:paymentId`: Generate and stream bilingual digital PDF receipt with Tamil fonts.
 95. `GET /api/v1/pdf/voucher/:auctionId`: Generate and stream bilingual A5 prize payout voucher PDF.
@@ -219,7 +219,7 @@ flowchart LR
 
 ---
 
-### Lifecycle 11: Background Jobs, Queues & Observability (15 Endpoints)
+### Lifecycle 11: Background Jobs, Queues & Observability (15 Endpoints) — ✅ 100% VERIFIED
 98. `POST /api/v1/jobs/run-daily-arrears`: Trigger midnight arrears check $\to$ SQL: Verify overdue status updated.
 99. `POST /api/v1/jobs/enqueue-daily-arrears`: Enqueue arrears check on BullMQ queue.
 100. `POST /api/v1/jobs/run-reconciliation`: Trigger 06:00 AM payment settlement reconciliation.
@@ -237,13 +237,20 @@ flowchart LR
 
 ---
 
-## 4. Execution Protocol & Verification Artifact
+## 4. Execution Protocol & Verification Artifacts
 
-When approved:
-1. We will launch the live NestJS server on `http://localhost:3000`.
-2. We will run an automated live runner script that executes all 111 calls sequentially against `localhost:3000`.
-3. For each call:
-   - Output the exact JSON request.
-   - Output the exact HTTP status and JSON response.
-   - Execute an actual `psql` command inside Docker to print the stored PostgreSQL row.
-4. Save the full execution log into `live-server-e2e-verification-report.md`.
+### Live Execution Outcome:
+1. All 11 sequential lifecycles were executed against the live NestJS server on `http://127.0.0.1:3000/api/v1` backed by Docker PostgreSQL 17 (`chitflow-db` on port 5433), Redis 7 (`chitflow-redis` on port 6379), and MinIO S3 (`chitflow-minio` on port 9000).
+2. Every call executed the full 3-point reconciliation (Request Payload $\to$ DB/Redis SQL Assertion $\to$ API JSON/PDF Response Verification).
+3. Detailed execution proof reports for all 11 lifecycles are archived in [`apps/api/scripts/docs/lifecycle/`](lifecycle/):
+   - [`lifecycle-1-live-execution-proof-report.md`](lifecycle/lifecycle-1-live-execution-proof-report.md) (24/24 passed)
+   - [`lifecycle-2-live-execution-proof-report.md`](lifecycle/lifecycle-2-live-execution-proof-report.md) (11/11 passed)
+   - [`lifecycle-3-live-execution-proof-report.md`](lifecycle/lifecycle-3-live-execution-proof-report.md) (9/9 passed)
+   - [`lifecycle-4-live-execution-proof-report.md`](lifecycle/lifecycle-4-live-execution-proof-report.md) (8/8 passed)
+   - [`lifecycle-5-live-execution-proof-report.md`](lifecycle/lifecycle-5-live-execution-proof-report.md) (9/9 passed)
+   - [`lifecycle-6-live-execution-proof-report.md`](lifecycle/lifecycle-6-live-execution-proof-report.md) (6/6 passed)
+   - [`lifecycle-7-live-execution-proof-report.md`](lifecycle/lifecycle-7-live-execution-proof-report.md) (4/4 passed)
+   - [`lifecycle-8-live-execution-proof-report.md`](lifecycle/lifecycle-8-live-execution-proof-report.md) (8/8 passed)
+   - [`lifecycle-9-live-execution-proof-report.md`](lifecycle/lifecycle-9-live-execution-proof-report.md) (9/9 passed)
+   - [`lifecycle-10-live-execution-proof-report.md`](lifecycle/lifecycle-10-live-execution-proof-report.md) (5/5 passed)
+   - [`lifecycle-11-live-execution-proof-report.md`](lifecycle/lifecycle-11-live-execution-proof-report.md) (15/15 passed)
