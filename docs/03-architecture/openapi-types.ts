@@ -344,6 +344,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/run-daily-arrears": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually trigger daily midnight arrears recalculation & default tagging
+         * @description Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.
+         */
+        post: operations["JobsController_runDailyArrears_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/enqueue-daily-arrears": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue daily arrears job to BullMQ queue
+         * @description Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.
+         */
+        post: operations["JobsController_enqueueDailyArrears_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/run-reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger payment settlement reconciliation
+         * @description Reconciles payment records against gateway provider settlement data to resolve ghost drops.
+         */
+        post: operations["JobsController_runReconciliation_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/enqueue-reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue reconciliation job to BullMQ queue
+         * @description Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.
+         */
+        post: operations["JobsController_enqueueReconciliation_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Broadcast bilingual auction reminder to chit subscribers
+         * @description Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.
+         */
+        post: operations["JobsController_sendAuctionReminder_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/queue-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get BullMQ queue health and job counts */
+        get: operations["JobsController_getQueueStatus_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/notification-audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get audit logs of dispatched Push Notifications and DLT SMS messages */
+        get: operations["JobsController_getNotificationLogs_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/run-pre-auction-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually trigger pre-auction reminders scan (default 3 days ahead)
+         * @description Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.
+         */
+        post: operations["JobsController_runPreAuctionScan_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/repeatable-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active BullMQ repeatable cron jobs and next execution timestamps */
+        get: operations["JobsController_getRepeatableSchedules_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/branches": {
         parameters: {
             query?: never;
@@ -1853,8 +2024,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Generate and stream bilingual 80mm subscription receipt PDF
-         * @description Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.
+         * Generate and stream bilingual subscription receipt PDF
+         * @description Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.
          */
         get: operations["PdfController_getReceiptPdf_v1"];
         put?: never;
@@ -1917,177 +2088,6 @@ export interface paths {
          * @description Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.
          */
         get: operations["PdfController_getPassbookPdf_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-daily-arrears": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Manually trigger daily midnight arrears recalculation & default tagging
-         * @description Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.
-         */
-        post: operations["JobsController_runDailyArrears_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/enqueue-daily-arrears": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enqueue daily arrears job to BullMQ queue
-         * @description Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.
-         */
-        post: operations["JobsController_enqueueDailyArrears_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-reconciliation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Trigger payment settlement reconciliation
-         * @description Reconciles payment records against gateway provider settlement data to resolve ghost drops.
-         */
-        post: operations["JobsController_runReconciliation_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/enqueue-reconciliation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enqueue reconciliation job to BullMQ queue
-         * @description Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.
-         */
-        post: operations["JobsController_enqueueReconciliation_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Broadcast bilingual auction reminder to chit subscribers
-         * @description Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.
-         */
-        post: operations["JobsController_sendAuctionReminder_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/queue-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get BullMQ queue health and job counts */
-        get: operations["JobsController_getQueueStatus_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/notification-audit-logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get audit logs of dispatched Push Notifications and DLT SMS messages */
-        get: operations["JobsController_getNotificationLogs_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-pre-auction-scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Manually trigger pre-auction reminders scan (default 3 days ahead)
-         * @description Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.
-         */
-        post: operations["JobsController_runPreAuctionScan_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/repeatable-schedules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List active BullMQ repeatable cron jobs and next execution timestamps */
-        get: operations["JobsController_getRepeatableSchedules_v1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2514,6 +2514,281 @@ export interface components {
              * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
              */
             setupToken?: string;
+        };
+        DailyArrearsExecutionResultDto: {
+            /**
+             * @description Total installment dues checked
+             * @example 40
+             */
+            totalDuesChecked: number;
+            /**
+             * @description Total overdue dues count
+             * @example 5
+             */
+            overdueCount: number;
+            /**
+             * @description Dues that turned overdue today
+             * @example 2
+             */
+            newlyOverdueCount: number;
+            /**
+             * @description Subscribers reaching 3-month default
+             * @example 1
+             */
+            defaults3MonthsCount: number;
+            /**
+             * @description Active arrears count
+             * @example 3
+             */
+            arrearsCount: number;
+            /**
+             * @description Execution duration in milliseconds
+             * @example 125
+             */
+            executionTimeMs: number;
+        };
+        EnqueuedJobResponseDto: {
+            /**
+             * @description Whether the job was successfully enqueued
+             * @example true
+             */
+            enqueued: boolean;
+            /**
+             * @description BullMQ Job ID
+             * @example job-uuid-001
+             */
+            jobId: string;
+            /**
+             * @description BullMQ queue name
+             * @example daily-maintenance-queue
+             */
+            queue: string;
+            /**
+             * @description Job name
+             * @example process-daily-arrears
+             */
+            name: string;
+        };
+        ReconciliationResultDto: {
+            /**
+             * @description Count of matched settlements
+             * @example 10
+             */
+            matchedCount: number;
+            /**
+             * @description Count of resolved ghost drop transactions
+             * @example 1
+             */
+            ghostDropsResolvedCount: number;
+            /**
+             * @description Count of settlement discrepancies
+             * @example 0
+             */
+            exceptionsCount: number;
+            /** @description Matched orders details */
+            matchedOrders: unknown[][];
+            /** @description Ghost drop orders details */
+            ghostDropOrders: unknown[][];
+            /** @description Discrepancy orders details */
+            exceptionOrders: unknown[][];
+        };
+        SettlementRecordDto: {
+            /**
+             * @description Payment gateway order / reference ID (transactionRef)
+             * @example ORD_20261021_001
+             */
+            gatewayOrderId: string;
+            /**
+             * @description External gateway payment transaction ID
+             * @example pay_1234567890
+             */
+            gatewayPaymentId: string;
+            /**
+             * @description Settlement amount in whole integer Rupees
+             * @example 3750
+             */
+            amount: number;
+            /**
+             * @description Gateway settlement transaction status
+             * @example SUCCESS
+             * @enum {string}
+             */
+            status: "SUCCESS" | "FAILED" | "REFUNDED";
+            /**
+             * @description Gateway settlement timestamp
+             * @example 2026-10-21T10:00:00.000Z
+             */
+            settledAt: string;
+        };
+        ReconcileSettlementDto: {
+            /** @description List of external gateway settlement records to reconcile against internal payments */
+            records: components["schemas"]["SettlementRecordDto"][];
+        };
+        ReminderSubscriberItemDto: {
+            /**
+             * @description Subscriber full name
+             * @example S. Sundaram
+             */
+            name: string;
+            /**
+             * @description 10-digit primary mobile phone number
+             * @example 9842712345
+             */
+            phone: string;
+            /**
+             * @description Optional FCM device token for mobile passbook push notification
+             * @example fcm_token_sample_abc123
+             */
+            fcmToken?: string;
+        };
+        SendAuctionReminderDto: {
+            /**
+             * @description Unique chit group code
+             * @example KCA-1L-20M-01
+             */
+            chitCode: string;
+            /**
+             * @description Scheduled auction date
+             * @example 2026-11-15
+             */
+            auctionDate: string;
+            /**
+             * @description Scheduled auction time
+             * @example 10:30 AM
+             */
+            auctionTime: string;
+            /**
+             * @description Branch name where auction is physically conducted
+             * @example Head Office - Perundurai
+             */
+            branchName: string;
+            /**
+             * @description Branch physical address
+             * @example 14/2, Gandhi Nagar, Perundurai
+             */
+            branchAddress: string;
+            /**
+             * @description Branch contact telephone number
+             * @example 04294-220123
+             */
+            branchPhone: string;
+            /** @description List of chit subscribers to receive bilingual auction reminder */
+            subscribers: components["schemas"]["ReminderSubscriberItemDto"][];
+        };
+        QueueStatusReportDto: {
+            /**
+             * @description Queue identifier
+             * @example daily-maintenance-queue
+             */
+            queueName: string;
+            /**
+             * @description Whether Redis/BullMQ is operational
+             * @example true
+             */
+            isAvailable: boolean;
+            /**
+             * @description Active running jobs
+             * @example 0
+             */
+            active: number;
+            /**
+             * @description Waiting queued jobs
+             * @example 0
+             */
+            waiting: number;
+            /**
+             * @description Completed jobs count
+             * @example 15
+             */
+            completed: number;
+            /**
+             * @description Failed jobs count
+             * @example 0
+             */
+            failed: number;
+            /**
+             * @description Delayed jobs count
+             * @example 0
+             */
+            delayed: number;
+            /**
+             * @description Whether queue is paused
+             * @example false
+             */
+            paused: boolean;
+        };
+        NotificationLogItemDto: {
+            /**
+             * @description Log unique ID
+             * @example notif-uuid-001
+             */
+            id: string;
+            /**
+             * @description Delivery channel (PUSH or SMS)
+             * @example PUSH
+             */
+            type: string;
+            /**
+             * @description Recipient phone or FCM token
+             * @example 9842100001
+             */
+            recipient: string;
+            /**
+             * @description Notification title
+             * @example Payment Received
+             */
+            title: string;
+            /**
+             * @description Notification body
+             * @example Receipt KC-RCPT-202610-00001 issued
+             */
+            body: string;
+            /**
+             * @description Delivery state
+             * @example SENT
+             */
+            status: string;
+            /**
+             * @description Dispatched timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            sentAt: Record<string, never>;
+        };
+        PreAuctionScanResultDto: {
+            /**
+             * @description Upcoming auctions identified
+             * @example 1
+             */
+            auctionsFound: number;
+            /**
+             * @description Reminders dispatched to subscribers
+             * @example 20
+             */
+            totalRemindersBroadcasted: number;
+            /** @description Auction notification breakdown */
+            details: unknown[][];
+        };
+        RepeatableScheduleDto: {
+            /**
+             * @description Repeatable schedule key
+             * @example daily-midnight-arrears
+             */
+            key: string;
+            /**
+             * @description Schedule name
+             * @example daily-arrears-job
+             */
+            name: string;
+            /**
+             * @description Cron expression
+             * @example 0 0 * * *
+             */
+            cron: string;
+            /**
+             * @description Next scheduled timestamp
+             * @example 1729641600000
+             */
+            next: Record<string, never> | null;
         };
         BranchResponseDto: {
             /**
@@ -5050,7 +5325,7 @@ export interface components {
             isReversed: boolean;
             /** @description Structured bilingual digital receipt fields and metadata */
             data: Record<string, never>;
-            /** @description Formatted bilingual 80mm monospace text receipt layout */
+            /** @description Formatted bilingual monospace text receipt layout for digital passbook */
             formattedText: string;
         };
         ReversalRecordDto: {
@@ -5608,281 +5883,6 @@ export interface components {
             pagination: Record<string, never>;
             /** @description Append-only audit trail logs */
             logs: unknown[][];
-        };
-        DailyArrearsExecutionResultDto: {
-            /**
-             * @description Total installment dues checked
-             * @example 40
-             */
-            totalDuesChecked: number;
-            /**
-             * @description Total overdue dues count
-             * @example 5
-             */
-            overdueCount: number;
-            /**
-             * @description Dues that turned overdue today
-             * @example 2
-             */
-            newlyOverdueCount: number;
-            /**
-             * @description Subscribers reaching 3-month default
-             * @example 1
-             */
-            defaults3MonthsCount: number;
-            /**
-             * @description Active arrears count
-             * @example 3
-             */
-            arrearsCount: number;
-            /**
-             * @description Execution duration in milliseconds
-             * @example 125
-             */
-            executionTimeMs: number;
-        };
-        EnqueuedJobResponseDto: {
-            /**
-             * @description Whether the job was successfully enqueued
-             * @example true
-             */
-            enqueued: boolean;
-            /**
-             * @description BullMQ Job ID
-             * @example job-uuid-001
-             */
-            jobId: string;
-            /**
-             * @description BullMQ queue name
-             * @example daily-maintenance-queue
-             */
-            queue: string;
-            /**
-             * @description Job name
-             * @example process-daily-arrears
-             */
-            name: string;
-        };
-        ReconciliationResultDto: {
-            /**
-             * @description Count of matched settlements
-             * @example 10
-             */
-            matchedCount: number;
-            /**
-             * @description Count of resolved ghost drop transactions
-             * @example 1
-             */
-            ghostDropsResolvedCount: number;
-            /**
-             * @description Count of settlement discrepancies
-             * @example 0
-             */
-            exceptionsCount: number;
-            /** @description Matched orders details */
-            matchedOrders: unknown[][];
-            /** @description Ghost drop orders details */
-            ghostDropOrders: unknown[][];
-            /** @description Discrepancy orders details */
-            exceptionOrders: unknown[][];
-        };
-        SettlementRecordDto: {
-            /**
-             * @description Payment gateway order / reference ID (transactionRef)
-             * @example ORD_20261021_001
-             */
-            gatewayOrderId: string;
-            /**
-             * @description External gateway payment transaction ID
-             * @example pay_1234567890
-             */
-            gatewayPaymentId: string;
-            /**
-             * @description Settlement amount in whole integer Rupees
-             * @example 3750
-             */
-            amount: number;
-            /**
-             * @description Gateway settlement transaction status
-             * @example SUCCESS
-             * @enum {string}
-             */
-            status: "SUCCESS" | "FAILED" | "REFUNDED";
-            /**
-             * @description Gateway settlement timestamp
-             * @example 2026-10-21T10:00:00.000Z
-             */
-            settledAt: string;
-        };
-        ReconcileSettlementDto: {
-            /** @description List of external gateway settlement records to reconcile against internal payments */
-            records: components["schemas"]["SettlementRecordDto"][];
-        };
-        ReminderSubscriberItemDto: {
-            /**
-             * @description Subscriber full name
-             * @example S. Sundaram
-             */
-            name: string;
-            /**
-             * @description 10-digit primary mobile phone number
-             * @example 9842712345
-             */
-            phone: string;
-            /**
-             * @description Optional FCM device token for mobile passbook push notification
-             * @example fcm_token_sample_abc123
-             */
-            fcmToken?: string;
-        };
-        SendAuctionReminderDto: {
-            /**
-             * @description Unique chit group code
-             * @example KCA-1L-20M-01
-             */
-            chitCode: string;
-            /**
-             * @description Scheduled auction date
-             * @example 2026-11-15
-             */
-            auctionDate: string;
-            /**
-             * @description Scheduled auction time
-             * @example 10:30 AM
-             */
-            auctionTime: string;
-            /**
-             * @description Branch name where auction is physically conducted
-             * @example Head Office - Perundurai
-             */
-            branchName: string;
-            /**
-             * @description Branch physical address
-             * @example 14/2, Gandhi Nagar, Perundurai
-             */
-            branchAddress: string;
-            /**
-             * @description Branch contact telephone number
-             * @example 04294-220123
-             */
-            branchPhone: string;
-            /** @description List of chit subscribers to receive bilingual auction reminder */
-            subscribers: components["schemas"]["ReminderSubscriberItemDto"][];
-        };
-        QueueStatusReportDto: {
-            /**
-             * @description Queue identifier
-             * @example daily-maintenance-queue
-             */
-            queueName: string;
-            /**
-             * @description Whether Redis/BullMQ is operational
-             * @example true
-             */
-            isAvailable: boolean;
-            /**
-             * @description Active running jobs
-             * @example 0
-             */
-            active: number;
-            /**
-             * @description Waiting queued jobs
-             * @example 0
-             */
-            waiting: number;
-            /**
-             * @description Completed jobs count
-             * @example 15
-             */
-            completed: number;
-            /**
-             * @description Failed jobs count
-             * @example 0
-             */
-            failed: number;
-            /**
-             * @description Delayed jobs count
-             * @example 0
-             */
-            delayed: number;
-            /**
-             * @description Whether queue is paused
-             * @example false
-             */
-            paused: boolean;
-        };
-        NotificationLogItemDto: {
-            /**
-             * @description Log unique ID
-             * @example notif-uuid-001
-             */
-            id: string;
-            /**
-             * @description Delivery channel (PUSH or SMS)
-             * @example PUSH
-             */
-            type: string;
-            /**
-             * @description Recipient phone or FCM token
-             * @example 9842100001
-             */
-            recipient: string;
-            /**
-             * @description Notification title
-             * @example Payment Received
-             */
-            title: string;
-            /**
-             * @description Notification body
-             * @example Receipt KC-RCPT-202610-00001 issued
-             */
-            body: string;
-            /**
-             * @description Delivery state
-             * @example SENT
-             */
-            status: string;
-            /**
-             * @description Dispatched timestamp
-             * @example 2026-10-22T07:28:14.000Z
-             */
-            sentAt: Record<string, never>;
-        };
-        PreAuctionScanResultDto: {
-            /**
-             * @description Upcoming auctions identified
-             * @example 1
-             */
-            auctionsFound: number;
-            /**
-             * @description Reminders dispatched to subscribers
-             * @example 20
-             */
-            totalRemindersBroadcasted: number;
-            /** @description Auction notification breakdown */
-            details: unknown[][];
-        };
-        RepeatableScheduleDto: {
-            /**
-             * @description Repeatable schedule key
-             * @example daily-midnight-arrears
-             */
-            key: string;
-            /**
-             * @description Schedule name
-             * @example daily-arrears-job
-             */
-            name: string;
-            /**
-             * @description Cron expression
-             * @example 0 0 * * *
-             */
-            cron: string;
-            /**
-             * @description Next scheduled timestamp
-             * @example 1729641600000
-             */
-            next: Record<string, never> | null;
         };
     };
     responses: never;
@@ -6543,6 +6543,411 @@ export interface operations {
             };
             /** @description Unauthorized — missing or invalid setup token / Bearer token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_runDailyArrears_v1: {
+        parameters: {
+            query?: {
+                /** @description ISO date string to test past or future due dates */
+                cutoffDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily arrears execution summary returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["DailyArrearsExecutionResultDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_enqueueDailyArrears_v1: {
+        parameters: {
+            query?: {
+                /** @description ISO date string to test past or future due dates */
+                cutoffDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily arrears job enqueued to BullMQ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["EnqueuedJobResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_runReconciliation_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileSettlementDto"];
+            };
+        };
+        responses: {
+            /** @description Reconciliation summary returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ReconciliationResultDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_enqueueReconciliation_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileSettlementDto"];
+            };
+        };
+        responses: {
+            /** @description Reconciliation job enqueued to BullMQ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["EnqueuedJobResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_sendAuctionReminder_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chitGroupId: string;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendAuctionReminderDto"];
+            };
+        };
+        responses: {
+            /** @description Auction reminder broadcast job enqueued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["EnqueuedJobResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_getQueueStatus_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description BullMQ queue health reports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["QueueStatusReportDto"][];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_getNotificationLogs_v1: {
+        parameters: {
+            query?: {
+                /** @description Number of recent notification logs to retrieve (defaults to 50) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification audit logs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["NotificationLogItemDto"][];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_runPreAuctionScan_v1: {
+        parameters: {
+            query?: {
+                /** @description ISO date string to test a specific auction date */
+                targetDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pre-auction scan completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["PreAuctionScanResultDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JobsController_getRepeatableSchedules_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active repeatable schedules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RepeatableScheduleDto"][];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10907,411 +11312,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Forbidden access to passbook */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_runDailyArrears_v1: {
-        parameters: {
-            query?: {
-                /** @description ISO date string to test past or future due dates */
-                cutoffDate?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Daily arrears execution summary returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["DailyArrearsExecutionResultDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_enqueueDailyArrears_v1: {
-        parameters: {
-            query?: {
-                /** @description ISO date string to test past or future due dates */
-                cutoffDate?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Daily arrears job enqueued to BullMQ */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["EnqueuedJobResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_runReconciliation_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReconcileSettlementDto"];
-            };
-        };
-        responses: {
-            /** @description Reconciliation summary returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["ReconciliationResultDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_enqueueReconciliation_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReconcileSettlementDto"];
-            };
-        };
-        responses: {
-            /** @description Reconciliation job enqueued to BullMQ */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["EnqueuedJobResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_sendAuctionReminder_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                chitGroupId: string;
-                month: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendAuctionReminderDto"];
-            };
-        };
-        responses: {
-            /** @description Auction reminder broadcast job enqueued */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["EnqueuedJobResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_getQueueStatus_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description BullMQ queue health reports */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["QueueStatusReportDto"][];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_getNotificationLogs_v1: {
-        parameters: {
-            query?: {
-                /** @description Number of recent notification logs to retrieve (defaults to 50) */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Notification audit logs */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["NotificationLogItemDto"][];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_runPreAuctionScan_v1: {
-        parameters: {
-            query?: {
-                /** @description ISO date string to test a specific auction date */
-                targetDate?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Pre-auction scan completed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["PreAuctionScanResultDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JobsController_getRepeatableSchedules_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Active repeatable schedules */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["RepeatableScheduleDto"][];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
             403: {
                 headers: {
                     [name: string]: unknown;

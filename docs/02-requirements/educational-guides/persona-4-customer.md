@@ -218,7 +218,7 @@ Mani decides to pay online from his textile shop without waiting for the agent:
      > **தேதி / Date**: `21-Oct-2026 10:05 AM`
 6. **Download Receipt**:
    - Mani taps **"ரசீதை பதிவிறக்குக / Download PDF Receipt"**.
-   - A clean bilingual 80mm PDF receipt is saved to his phone's Downloads folder.
+   - A clean bilingual A5 PDF receipt is saved to his phone's Downloads folder.
    - Mani's due status changes immediately from `UNPAID` to **`PAID (செலுத்தப்பட்டது)`**.
 
 ---

@@ -40,9 +40,9 @@ export class PdfController {
     Role.AUDITOR,
   )
   @ApiOperation({
-    summary: 'Generate and stream bilingual 80mm subscription receipt PDF',
+    summary: 'Generate and stream bilingual subscription receipt PDF',
     description:
-      'Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.',
+      'Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.',
   })
   @ApiQuery({
     name: 'download',

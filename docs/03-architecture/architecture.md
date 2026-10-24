@@ -98,7 +98,7 @@ apps/api/src/
 ├── metrics/              # Prometheus HTTP, BullMQ & business telemetry
 ├── notification/         # Pluggable SMS (MSG91/Mock) & Mobile Push (FCM/Mock)
 ├── payment/              # Payments, allocations, bilingual receipts, reversals
-├── pdf/                  # Bilingual PDF canvas engine (80mm receipts, vouchers, Form XVII/XXI)
+├── pdf/                  # Bilingual PDF canvas engine (A5 receipts, vouchers, Form XVII/XXI)
 ├── prisma/               # Prisma database service & transactions
 ├── report/               # Day book, cash book (Form XXII), statutory registers
 ├── storage/              # Encrypted private S3 & local storage driver

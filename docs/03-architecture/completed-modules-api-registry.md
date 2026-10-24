@@ -24,7 +24,7 @@
 | **Module 8: Prize Disbursements** | `/disbursements` | 9 | Safety proof checklist (ADR-15), S3 proof uploads & presigned inspection URLs, bilingual voucher, Maker $\ne$ Checker payout | 17 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
-| **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | 80mm receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
+| **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | A5 digital receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
@@ -258,7 +258,7 @@
 ### 12.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|:---:|
-| `GET` | `/pdf/receipt/:paymentId` | Stream or download bilingual 80mm subscription receipt PDF (Ownership-guarded) | Staff, Customer, Auditor |
+| `GET` | `/pdf/receipt/:paymentId` | Stream or download bilingual A5 subscription receipt PDF (Ownership-guarded) | Staff, Customer, Auditor |
 | `GET` | `/pdf/voucher/:auctionId` | Stream or download bilingual prize payout voucher PDF (Ownership-guarded) | Staff, Customer, Auditor |
 | `GET` | `/pdf/minutes/:auctionId` | Stream or download Form XVII statutory auction minutes PDF (Branch-guarded) | Staff, Auditor |
 | `GET` | `/pdf/passbook/:ticketId` | Stream or download Form XXI 20-month passbook statement PDF (Ownership-guarded) | Staff, Customer, Auditor |
@@ -333,7 +333,7 @@
   $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Cash Inflows} - \text{Cash Outflows}$$
   Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
 - **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
-- **Bilingual PDF Canvas Engine**: 80mm digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
+- **Bilingual PDF Canvas Engine**: A5 digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
 - **Total Production Endpoints**: **105 physical paths / 111 operations fully implemented, documented, and tested** (79 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).

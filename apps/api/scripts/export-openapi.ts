@@ -61,7 +61,7 @@ async function exportOpenApi() {
     .addTag('Prize Disbursements & Safety Proof', 'Prize settlement, safety proof checklist, and bilingual payout vouchers')
     .addTag('Dashboards & Statutory Reports', 'Form XXII, Form XVII, Form XXI, and executive dashboards')
     .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
-    .addTag('Bilingual PDF Documents', 'On-demand 80mm receipts, A5 vouchers, minutes, and passbooks')
+    .addTag('Bilingual PDF Documents', 'On-demand A5 digital receipts, vouchers, Form XVII minutes, and Form XXI passbooks')
     .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
     .addTag('Observability & Metrics', 'Prometheus metrics, latency histograms, and system telemetry')
     .build();

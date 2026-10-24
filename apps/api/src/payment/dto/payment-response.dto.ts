@@ -95,7 +95,7 @@ export class BilingualReceiptResponseDto {
   @ApiProperty({ description: 'Structured bilingual digital receipt fields and metadata' })
   data: any;
 
-  @ApiProperty({ description: 'Formatted bilingual 80mm monospace text receipt layout' })
+  @ApiProperty({ description: 'Formatted bilingual monospace text receipt layout for digital passbook' })
   formattedText: string;
 }
 

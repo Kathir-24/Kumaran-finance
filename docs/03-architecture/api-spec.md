@@ -188,7 +188,7 @@
 ### 2.12 Component 2: Bilingual PDF Canvas Engine (`/api/v1/pdf`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/pdf/receipt/:paymentId` | Stream or download bilingual 80mm subscription receipt PDF (Ownership-guarded) | Staff, Customer, Auditor |
+| `GET`  | `/pdf/receipt/:paymentId` | Stream or download bilingual A5 subscription receipt PDF (Ownership-guarded) | Staff, Customer, Auditor |
 | `GET`  | `/pdf/voucher/:auctionId` | Stream or download bilingual prize payout voucher PDF (Ownership-guarded) | Staff, Customer, Auditor |
 | `GET`  | `/pdf/minutes/:auctionId` | Stream or download Form XVII statutory auction minutes PDF (Branch-guarded) | Staff, Auditor |
 | `GET`  | `/pdf/passbook/:ticketId` | Stream or download Form XXI 20-month passbook statement PDF (Ownership-guarded) | Staff, Customer, Auditor |

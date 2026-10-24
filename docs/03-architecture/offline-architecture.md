@@ -265,7 +265,7 @@ flowchart TD
 - **Local Storage**: `drift` / `sqflite` (Encrypted SQLite database for offline caching).
 - **Network Awareness**: `connectivity_plus` (Monitors cellular/Wi-Fi transitions).
 - **Background Sync**: `workmanager` (Triggers periodic synchronization when charging/connected).
-- **Bluetooth Printing**: `esc_pos_utils` / `blue_thermal_printer` (Bilingual 58mm/80mm thermal receipts at doorstep).
+- **Signed Paper Passbook (ADR-11)**: Physical proof signed directly in subscriber's paper passbook with pen; loose receipt thermal printers are completely eliminated.
 
 ---
 

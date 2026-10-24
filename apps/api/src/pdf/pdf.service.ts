@@ -28,7 +28,7 @@ export class PdfService {
   ) {}
 
   /**
-   * Generates a bilingual 80mm subscription receipt PDF, uploads to storage, and updates receipt.
+   * Generates a bilingual subscription receipt PDF (A5 document), uploads to storage, and updates receipt.
    */
   async generateReceiptPdf(
     paymentId: string,

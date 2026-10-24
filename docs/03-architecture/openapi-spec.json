@@ -945,6 +945,613 @@
         ]
       }
     },
+    "/api/v1/jobs/run-daily-arrears": {
+      "post": {
+        "description": "Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.",
+        "operationId": "JobsController_runDailyArrears_v1",
+        "parameters": [
+          {
+            "name": "cutoffDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date string to test past or future due dates",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily arrears execution summary returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DailyArrearsExecutionResultDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Manually trigger daily midnight arrears recalculation & default tagging",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/enqueue-daily-arrears": {
+      "post": {
+        "description": "Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.",
+        "operationId": "JobsController_enqueueDailyArrears_v1",
+        "parameters": [
+          {
+            "name": "cutoffDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date string to test past or future due dates",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily arrears job enqueued to BullMQ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Enqueue daily arrears job to BullMQ queue",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/run-reconciliation": {
+      "post": {
+        "description": "Reconciles payment records against gateway provider settlement data to resolve ghost drops.",
+        "operationId": "JobsController_runReconciliation_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileSettlementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation summary returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReconciliationResultDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Trigger payment settlement reconciliation",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/enqueue-reconciliation": {
+      "post": {
+        "description": "Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.",
+        "operationId": "JobsController_enqueueReconciliation_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileSettlementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation job enqueued to BullMQ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Enqueue reconciliation job to BullMQ queue",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
+      "post": {
+        "description": "Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.",
+        "operationId": "JobsController_sendAuctionReminder_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendAuctionReminderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auction reminder broadcast job enqueued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Broadcast bilingual auction reminder to chit subscribers",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/queue-status": {
+      "get": {
+        "operationId": "JobsController_getQueueStatus_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "BullMQ queue health reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/QueueStatusReportDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get BullMQ queue health and job counts",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/notification-audit-logs": {
+      "get": {
+        "operationId": "JobsController_getNotificationLogs_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of recent notification logs to retrieve (defaults to 50)",
+            "schema": {
+              "example": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification audit logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NotificationLogItemDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get audit logs of dispatched Push Notifications and DLT SMS messages",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/run-pre-auction-scan": {
+      "post": {
+        "description": "Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.",
+        "operationId": "JobsController_runPreAuctionScan_v1",
+        "parameters": [
+          {
+            "name": "targetDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date string to test a specific auction date",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pre-auction scan completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PreAuctionScanResultDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Manually trigger pre-auction reminders scan (default 3 days ahead)",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/jobs/repeatable-schedules": {
+      "get": {
+        "operationId": "JobsController_getRepeatableSchedules_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Active repeatable schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RepeatableScheduleDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List active BullMQ repeatable cron jobs and next execution timestamps",
+        "tags": [
+          "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
     "/api/v1/branches": {
       "get": {
         "description": "Returns all registered physical branch offices of Kumaran Finance. Allowed: Staff, Auditor.",
@@ -7422,7 +8029,7 @@
     },
     "/api/v1/pdf/receipt/{paymentId}": {
       "get": {
-        "description": "Generates pixel-accurate 80mm bilingual (English + தமிழ்) subscription receipt slip and saves to private storage.",
+        "description": "Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.",
         "operationId": "PdfController_getReceiptPdf_v1",
         "parameters": [
           {
@@ -7487,7 +8094,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Generate and stream bilingual 80mm subscription receipt PDF",
+        "summary": "Generate and stream bilingual subscription receipt PDF",
         "tags": [
           "Bilingual PDF Documents"
         ]
@@ -7712,613 +8319,6 @@
         ]
       }
     },
-    "/api/v1/jobs/run-daily-arrears": {
-      "post": {
-        "description": "Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.",
-        "operationId": "JobsController_runDailyArrears_v1",
-        "parameters": [
-          {
-            "name": "cutoffDate",
-            "required": false,
-            "in": "query",
-            "description": "ISO date string to test past or future due dates",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily arrears execution summary returned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/DailyArrearsExecutionResultDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Manually trigger daily midnight arrears recalculation & default tagging",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/enqueue-daily-arrears": {
-      "post": {
-        "description": "Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.",
-        "operationId": "JobsController_enqueueDailyArrears_v1",
-        "parameters": [
-          {
-            "name": "cutoffDate",
-            "required": false,
-            "in": "query",
-            "description": "ISO date string to test past or future due dates",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily arrears job enqueued to BullMQ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Enqueue daily arrears job to BullMQ queue",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/run-reconciliation": {
-      "post": {
-        "description": "Reconciles payment records against gateway provider settlement data to resolve ghost drops.",
-        "operationId": "JobsController_runReconciliation_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReconcileSettlementDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Reconciliation summary returned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ReconciliationResultDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Trigger payment settlement reconciliation",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/enqueue-reconciliation": {
-      "post": {
-        "description": "Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.",
-        "operationId": "JobsController_enqueueReconciliation_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReconcileSettlementDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Reconciliation job enqueued to BullMQ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Enqueue reconciliation job to BullMQ queue",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
-      "post": {
-        "description": "Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.",
-        "operationId": "JobsController_sendAuctionReminder_v1",
-        "parameters": [
-          {
-            "name": "chitGroupId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "month",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendAuctionReminderDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Auction reminder broadcast job enqueued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/EnqueuedJobResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Broadcast bilingual auction reminder to chit subscribers",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/queue-status": {
-      "get": {
-        "operationId": "JobsController_getQueueStatus_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "BullMQ queue health reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/QueueStatusReportDto"
-                      }
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Get BullMQ queue health and job counts",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/notification-audit-logs": {
-      "get": {
-        "operationId": "JobsController_getNotificationLogs_v1",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Number of recent notification logs to retrieve (defaults to 50)",
-            "schema": {
-              "example": 50,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Notification audit logs",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/NotificationLogItemDto"
-                      }
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Get audit logs of dispatched Push Notifications and DLT SMS messages",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/run-pre-auction-scan": {
-      "post": {
-        "description": "Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.",
-        "operationId": "JobsController_runPreAuctionScan_v1",
-        "parameters": [
-          {
-            "name": "targetDate",
-            "required": false,
-            "in": "query",
-            "description": "ISO date string to test a specific auction date",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Pre-auction scan completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/PreAuctionScanResultDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Manually trigger pre-auction reminders scan (default 3 days ahead)",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
-    "/api/v1/jobs/repeatable-schedules": {
-      "get": {
-        "operationId": "JobsController_getRepeatableSchedules_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Active repeatable schedules",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/RepeatableScheduleDto"
-                      }
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "List active BullMQ repeatable cron jobs and next execution timestamps",
-        "tags": [
-          "Background Jobs & Daily Maintenance"
-        ]
-      }
-    },
     "/metrics": {
       "get": {
         "description": "Exposes runtime HTTP latencies, process memory, BullMQ queue depths, and real-time chit fund financial KPIs in standard Prometheus format. Strictly protected by HTTP Basic Auth.",
@@ -8417,7 +8417,7 @@
     },
     {
       "name": "Bilingual PDF Documents",
-      "description": "On-demand 80mm receipts, A5 vouchers, minutes, and passbooks"
+      "description": "On-demand A5 digital receipts, vouchers, Form XVII minutes, and Form XXI passbooks"
     },
     {
       "name": "Background Jobs & Daily Maintenance",
@@ -9065,6 +9065,424 @@
         },
         "required": [
           "mpin"
+        ]
+      },
+      "DailyArrearsExecutionResultDto": {
+        "type": "object",
+        "properties": {
+          "totalDuesChecked": {
+            "type": "number",
+            "example": 40,
+            "description": "Total installment dues checked"
+          },
+          "overdueCount": {
+            "type": "number",
+            "example": 5,
+            "description": "Total overdue dues count"
+          },
+          "newlyOverdueCount": {
+            "type": "number",
+            "example": 2,
+            "description": "Dues that turned overdue today"
+          },
+          "defaults3MonthsCount": {
+            "type": "number",
+            "example": 1,
+            "description": "Subscribers reaching 3-month default"
+          },
+          "arrearsCount": {
+            "type": "number",
+            "example": 3,
+            "description": "Active arrears count"
+          },
+          "executionTimeMs": {
+            "type": "number",
+            "example": 125,
+            "description": "Execution duration in milliseconds"
+          }
+        },
+        "required": [
+          "totalDuesChecked",
+          "overdueCount",
+          "newlyOverdueCount",
+          "defaults3MonthsCount",
+          "arrearsCount",
+          "executionTimeMs"
+        ]
+      },
+      "EnqueuedJobResponseDto": {
+        "type": "object",
+        "properties": {
+          "enqueued": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the job was successfully enqueued"
+          },
+          "jobId": {
+            "type": "string",
+            "example": "job-uuid-001",
+            "description": "BullMQ Job ID"
+          },
+          "queue": {
+            "type": "string",
+            "example": "daily-maintenance-queue",
+            "description": "BullMQ queue name"
+          },
+          "name": {
+            "type": "string",
+            "example": "process-daily-arrears",
+            "description": "Job name"
+          }
+        },
+        "required": [
+          "enqueued",
+          "jobId",
+          "queue",
+          "name"
+        ]
+      },
+      "ReconciliationResultDto": {
+        "type": "object",
+        "properties": {
+          "matchedCount": {
+            "type": "number",
+            "example": 10,
+            "description": "Count of matched settlements"
+          },
+          "ghostDropsResolvedCount": {
+            "type": "number",
+            "example": 1,
+            "description": "Count of resolved ghost drop transactions"
+          },
+          "exceptionsCount": {
+            "type": "number",
+            "example": 0,
+            "description": "Count of settlement discrepancies"
+          },
+          "matchedOrders": {
+            "description": "Matched orders details",
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "ghostDropOrders": {
+            "description": "Ghost drop orders details",
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "exceptionOrders": {
+            "description": "Discrepancy orders details",
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          }
+        },
+        "required": [
+          "matchedCount",
+          "ghostDropsResolvedCount",
+          "exceptionsCount",
+          "matchedOrders",
+          "ghostDropOrders",
+          "exceptionOrders"
+        ]
+      },
+      "SettlementRecordDto": {
+        "type": "object",
+        "properties": {
+          "gatewayOrderId": {
+            "type": "string",
+            "example": "ORD_20261021_001",
+            "description": "Payment gateway order / reference ID (transactionRef)"
+          },
+          "gatewayPaymentId": {
+            "type": "string",
+            "example": "pay_1234567890",
+            "description": "External gateway payment transaction ID"
+          },
+          "amount": {
+            "type": "number",
+            "example": 3750,
+            "description": "Settlement amount in whole integer Rupees"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "REFUNDED"
+            ],
+            "example": "SUCCESS",
+            "description": "Gateway settlement transaction status"
+          },
+          "settledAt": {
+            "type": "string",
+            "example": "2026-10-21T10:00:00.000Z",
+            "description": "Gateway settlement timestamp"
+          }
+        },
+        "required": [
+          "gatewayOrderId",
+          "gatewayPaymentId",
+          "amount",
+          "status",
+          "settledAt"
+        ]
+      },
+      "ReconcileSettlementDto": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "description": "List of external gateway settlement records to reconcile against internal payments",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementRecordDto"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "ReminderSubscriberItemDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "S. Sundaram",
+            "description": "Subscriber full name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842712345",
+            "description": "10-digit primary mobile phone number"
+          },
+          "fcmToken": {
+            "type": "string",
+            "example": "fcm_token_sample_abc123",
+            "description": "Optional FCM device token for mobile passbook push notification"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "SendAuctionReminderDto": {
+        "type": "object",
+        "properties": {
+          "chitCode": {
+            "type": "string",
+            "example": "KCA-1L-20M-01",
+            "description": "Unique chit group code"
+          },
+          "auctionDate": {
+            "type": "string",
+            "example": "2026-11-15",
+            "description": "Scheduled auction date"
+          },
+          "auctionTime": {
+            "type": "string",
+            "example": "10:30 AM",
+            "description": "Scheduled auction time"
+          },
+          "branchName": {
+            "type": "string",
+            "example": "Head Office - Perundurai",
+            "description": "Branch name where auction is physically conducted"
+          },
+          "branchAddress": {
+            "type": "string",
+            "example": "14/2, Gandhi Nagar, Perundurai",
+            "description": "Branch physical address"
+          },
+          "branchPhone": {
+            "type": "string",
+            "example": "04294-220123",
+            "description": "Branch contact telephone number"
+          },
+          "subscribers": {
+            "description": "List of chit subscribers to receive bilingual auction reminder",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReminderSubscriberItemDto"
+            }
+          }
+        },
+        "required": [
+          "chitCode",
+          "auctionDate",
+          "auctionTime",
+          "branchName",
+          "branchAddress",
+          "branchPhone",
+          "subscribers"
+        ]
+      },
+      "QueueStatusReportDto": {
+        "type": "object",
+        "properties": {
+          "queueName": {
+            "type": "string",
+            "example": "daily-maintenance-queue",
+            "description": "Queue identifier"
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether Redis/BullMQ is operational"
+          },
+          "active": {
+            "type": "number",
+            "example": 0,
+            "description": "Active running jobs"
+          },
+          "waiting": {
+            "type": "number",
+            "example": 0,
+            "description": "Waiting queued jobs"
+          },
+          "completed": {
+            "type": "number",
+            "example": 15,
+            "description": "Completed jobs count"
+          },
+          "failed": {
+            "type": "number",
+            "example": 0,
+            "description": "Failed jobs count"
+          },
+          "delayed": {
+            "type": "number",
+            "example": 0,
+            "description": "Delayed jobs count"
+          },
+          "paused": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether queue is paused"
+          }
+        },
+        "required": [
+          "queueName",
+          "isAvailable",
+          "active",
+          "waiting",
+          "completed",
+          "failed",
+          "delayed",
+          "paused"
+        ]
+      },
+      "NotificationLogItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "notif-uuid-001",
+            "description": "Log unique ID"
+          },
+          "type": {
+            "type": "string",
+            "example": "PUSH",
+            "description": "Delivery channel (PUSH or SMS)"
+          },
+          "recipient": {
+            "type": "string",
+            "example": "9842100001",
+            "description": "Recipient phone or FCM token"
+          },
+          "title": {
+            "type": "string",
+            "example": "Payment Received",
+            "description": "Notification title"
+          },
+          "body": {
+            "type": "string",
+            "example": "Receipt KC-RCPT-202610-00001 issued",
+            "description": "Notification body"
+          },
+          "status": {
+            "type": "string",
+            "example": "SENT",
+            "description": "Delivery state"
+          },
+          "sentAt": {
+            "type": "object",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Dispatched timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "recipient",
+          "title",
+          "body",
+          "status",
+          "sentAt"
+        ]
+      },
+      "PreAuctionScanResultDto": {
+        "type": "object",
+        "properties": {
+          "auctionsFound": {
+            "type": "number",
+            "example": 1,
+            "description": "Upcoming auctions identified"
+          },
+          "totalRemindersBroadcasted": {
+            "type": "number",
+            "example": 20,
+            "description": "Reminders dispatched to subscribers"
+          },
+          "details": {
+            "description": "Auction notification breakdown",
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          }
+        },
+        "required": [
+          "auctionsFound",
+          "totalRemindersBroadcasted",
+          "details"
+        ]
+      },
+      "RepeatableScheduleDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "daily-midnight-arrears",
+            "description": "Repeatable schedule key"
+          },
+          "name": {
+            "type": "string",
+            "example": "daily-arrears-job",
+            "description": "Schedule name"
+          },
+          "cron": {
+            "type": "string",
+            "example": "0 0 * * *",
+            "description": "Cron expression"
+          },
+          "next": {
+            "type": "object",
+            "example": 1729641600000,
+            "description": "Next scheduled timestamp",
+            "nullable": true
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "cron",
+          "next"
         ]
       },
       "BranchResponseDto": {
@@ -12832,7 +13250,7 @@
           },
           "formattedText": {
             "type": "string",
-            "description": "Formatted bilingual 80mm monospace text receipt layout"
+            "description": "Formatted bilingual monospace text receipt layout for digital passbook"
           }
         },
         "required": [
@@ -13816,424 +14234,6 @@
         "required": [
           "pagination",
           "logs"
-        ]
-      },
-      "DailyArrearsExecutionResultDto": {
-        "type": "object",
-        "properties": {
-          "totalDuesChecked": {
-            "type": "number",
-            "example": 40,
-            "description": "Total installment dues checked"
-          },
-          "overdueCount": {
-            "type": "number",
-            "example": 5,
-            "description": "Total overdue dues count"
-          },
-          "newlyOverdueCount": {
-            "type": "number",
-            "example": 2,
-            "description": "Dues that turned overdue today"
-          },
-          "defaults3MonthsCount": {
-            "type": "number",
-            "example": 1,
-            "description": "Subscribers reaching 3-month default"
-          },
-          "arrearsCount": {
-            "type": "number",
-            "example": 3,
-            "description": "Active arrears count"
-          },
-          "executionTimeMs": {
-            "type": "number",
-            "example": 125,
-            "description": "Execution duration in milliseconds"
-          }
-        },
-        "required": [
-          "totalDuesChecked",
-          "overdueCount",
-          "newlyOverdueCount",
-          "defaults3MonthsCount",
-          "arrearsCount",
-          "executionTimeMs"
-        ]
-      },
-      "EnqueuedJobResponseDto": {
-        "type": "object",
-        "properties": {
-          "enqueued": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the job was successfully enqueued"
-          },
-          "jobId": {
-            "type": "string",
-            "example": "job-uuid-001",
-            "description": "BullMQ Job ID"
-          },
-          "queue": {
-            "type": "string",
-            "example": "daily-maintenance-queue",
-            "description": "BullMQ queue name"
-          },
-          "name": {
-            "type": "string",
-            "example": "process-daily-arrears",
-            "description": "Job name"
-          }
-        },
-        "required": [
-          "enqueued",
-          "jobId",
-          "queue",
-          "name"
-        ]
-      },
-      "ReconciliationResultDto": {
-        "type": "object",
-        "properties": {
-          "matchedCount": {
-            "type": "number",
-            "example": 10,
-            "description": "Count of matched settlements"
-          },
-          "ghostDropsResolvedCount": {
-            "type": "number",
-            "example": 1,
-            "description": "Count of resolved ghost drop transactions"
-          },
-          "exceptionsCount": {
-            "type": "number",
-            "example": 0,
-            "description": "Count of settlement discrepancies"
-          },
-          "matchedOrders": {
-            "description": "Matched orders details",
-            "type": "array",
-            "items": {
-              "type": "array"
-            }
-          },
-          "ghostDropOrders": {
-            "description": "Ghost drop orders details",
-            "type": "array",
-            "items": {
-              "type": "array"
-            }
-          },
-          "exceptionOrders": {
-            "description": "Discrepancy orders details",
-            "type": "array",
-            "items": {
-              "type": "array"
-            }
-          }
-        },
-        "required": [
-          "matchedCount",
-          "ghostDropsResolvedCount",
-          "exceptionsCount",
-          "matchedOrders",
-          "ghostDropOrders",
-          "exceptionOrders"
-        ]
-      },
-      "SettlementRecordDto": {
-        "type": "object",
-        "properties": {
-          "gatewayOrderId": {
-            "type": "string",
-            "example": "ORD_20261021_001",
-            "description": "Payment gateway order / reference ID (transactionRef)"
-          },
-          "gatewayPaymentId": {
-            "type": "string",
-            "example": "pay_1234567890",
-            "description": "External gateway payment transaction ID"
-          },
-          "amount": {
-            "type": "number",
-            "example": 3750,
-            "description": "Settlement amount in whole integer Rupees"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "SUCCESS",
-              "FAILED",
-              "REFUNDED"
-            ],
-            "example": "SUCCESS",
-            "description": "Gateway settlement transaction status"
-          },
-          "settledAt": {
-            "type": "string",
-            "example": "2026-10-21T10:00:00.000Z",
-            "description": "Gateway settlement timestamp"
-          }
-        },
-        "required": [
-          "gatewayOrderId",
-          "gatewayPaymentId",
-          "amount",
-          "status",
-          "settledAt"
-        ]
-      },
-      "ReconcileSettlementDto": {
-        "type": "object",
-        "properties": {
-          "records": {
-            "description": "List of external gateway settlement records to reconcile against internal payments",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SettlementRecordDto"
-            }
-          }
-        },
-        "required": [
-          "records"
-        ]
-      },
-      "ReminderSubscriberItemDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "S. Sundaram",
-            "description": "Subscriber full name"
-          },
-          "phone": {
-            "type": "string",
-            "example": "9842712345",
-            "description": "10-digit primary mobile phone number"
-          },
-          "fcmToken": {
-            "type": "string",
-            "example": "fcm_token_sample_abc123",
-            "description": "Optional FCM device token for mobile passbook push notification"
-          }
-        },
-        "required": [
-          "name",
-          "phone"
-        ]
-      },
-      "SendAuctionReminderDto": {
-        "type": "object",
-        "properties": {
-          "chitCode": {
-            "type": "string",
-            "example": "KCA-1L-20M-01",
-            "description": "Unique chit group code"
-          },
-          "auctionDate": {
-            "type": "string",
-            "example": "2026-11-15",
-            "description": "Scheduled auction date"
-          },
-          "auctionTime": {
-            "type": "string",
-            "example": "10:30 AM",
-            "description": "Scheduled auction time"
-          },
-          "branchName": {
-            "type": "string",
-            "example": "Head Office - Perundurai",
-            "description": "Branch name where auction is physically conducted"
-          },
-          "branchAddress": {
-            "type": "string",
-            "example": "14/2, Gandhi Nagar, Perundurai",
-            "description": "Branch physical address"
-          },
-          "branchPhone": {
-            "type": "string",
-            "example": "04294-220123",
-            "description": "Branch contact telephone number"
-          },
-          "subscribers": {
-            "description": "List of chit subscribers to receive bilingual auction reminder",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReminderSubscriberItemDto"
-            }
-          }
-        },
-        "required": [
-          "chitCode",
-          "auctionDate",
-          "auctionTime",
-          "branchName",
-          "branchAddress",
-          "branchPhone",
-          "subscribers"
-        ]
-      },
-      "QueueStatusReportDto": {
-        "type": "object",
-        "properties": {
-          "queueName": {
-            "type": "string",
-            "example": "daily-maintenance-queue",
-            "description": "Queue identifier"
-          },
-          "isAvailable": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether Redis/BullMQ is operational"
-          },
-          "active": {
-            "type": "number",
-            "example": 0,
-            "description": "Active running jobs"
-          },
-          "waiting": {
-            "type": "number",
-            "example": 0,
-            "description": "Waiting queued jobs"
-          },
-          "completed": {
-            "type": "number",
-            "example": 15,
-            "description": "Completed jobs count"
-          },
-          "failed": {
-            "type": "number",
-            "example": 0,
-            "description": "Failed jobs count"
-          },
-          "delayed": {
-            "type": "number",
-            "example": 0,
-            "description": "Delayed jobs count"
-          },
-          "paused": {
-            "type": "boolean",
-            "example": false,
-            "description": "Whether queue is paused"
-          }
-        },
-        "required": [
-          "queueName",
-          "isAvailable",
-          "active",
-          "waiting",
-          "completed",
-          "failed",
-          "delayed",
-          "paused"
-        ]
-      },
-      "NotificationLogItemDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "notif-uuid-001",
-            "description": "Log unique ID"
-          },
-          "type": {
-            "type": "string",
-            "example": "PUSH",
-            "description": "Delivery channel (PUSH or SMS)"
-          },
-          "recipient": {
-            "type": "string",
-            "example": "9842100001",
-            "description": "Recipient phone or FCM token"
-          },
-          "title": {
-            "type": "string",
-            "example": "Payment Received",
-            "description": "Notification title"
-          },
-          "body": {
-            "type": "string",
-            "example": "Receipt KC-RCPT-202610-00001 issued",
-            "description": "Notification body"
-          },
-          "status": {
-            "type": "string",
-            "example": "SENT",
-            "description": "Delivery state"
-          },
-          "sentAt": {
-            "type": "object",
-            "example": "2026-10-22T07:28:14.000Z",
-            "description": "Dispatched timestamp"
-          }
-        },
-        "required": [
-          "id",
-          "type",
-          "recipient",
-          "title",
-          "body",
-          "status",
-          "sentAt"
-        ]
-      },
-      "PreAuctionScanResultDto": {
-        "type": "object",
-        "properties": {
-          "auctionsFound": {
-            "type": "number",
-            "example": 1,
-            "description": "Upcoming auctions identified"
-          },
-          "totalRemindersBroadcasted": {
-            "type": "number",
-            "example": 20,
-            "description": "Reminders dispatched to subscribers"
-          },
-          "details": {
-            "description": "Auction notification breakdown",
-            "type": "array",
-            "items": {
-              "type": "array"
-            }
-          }
-        },
-        "required": [
-          "auctionsFound",
-          "totalRemindersBroadcasted",
-          "details"
-        ]
-      },
-      "RepeatableScheduleDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "daily-midnight-arrears",
-            "description": "Repeatable schedule key"
-          },
-          "name": {
-            "type": "string",
-            "example": "daily-arrears-job",
-            "description": "Schedule name"
-          },
-          "cron": {
-            "type": "string",
-            "example": "0 0 * * *",
-            "description": "Cron expression"
-          },
-          "next": {
-            "type": "object",
-            "example": 1729641600000,
-            "description": "Next scheduled timestamp",
-            "nullable": true
-          }
-        },
-        "required": [
-          "key",
-          "name",
-          "cron",
-          "next"
         ]
       }
     }

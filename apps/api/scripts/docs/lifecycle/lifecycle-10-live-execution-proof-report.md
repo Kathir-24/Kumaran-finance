@@ -12,7 +12,7 @@
 ## 1. Executive Summary
 
 Lifecycle 10 validates the document generation and storage architecture of Kumaran Finance:
-1. **Bilingual Thermal Receipts (80mm Canvas)**: Generates 80mm compact bilingual receipt slips with Tamil fonts (`NotoSansTamil-Bold`, `NotoSansTamil-Regular`) for office counter thermal printers and field agents.
+1. **Bilingual Subscription Receipts (A5 Digital Canvas)**: Generates clean, official bilingual receipt documents with Tamil fonts (`NotoSansTamil-Bold`, `NotoSansTamil-Regular`) for digital passbook exports and cloud auditing. Zero thermal printers are used in operations (ADR-11).
 2. **Prize Disbursement Vouchers (A5 Canvas)**: Produces bilingual prize payout vouchers formatted with safety proof checklist stamps, payee account numbers, and dual-control sign-off blocks.
 3. **Statutory Form XVII Minutes & Form XXI Passbooks**: Formats statutory registers into court-admissible PDF documents.
 4. **Encrypted Private Object Storage (MinIO S3)**: Documents are encrypted and uploaded to the private bucket with 15-minute time-limited presigned URLs (`PRESIGNED_URL_EXPIRES_IN_SECONDS = 900`).
@@ -24,7 +24,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
 
 | # | Endpoint | Method | Persona / Role | Output Mode / Invariant Verified | Result |
 |---|---|:---:|---|---|:---:|
-| 68 | `/pdf/receipt/:paymentId` | `GET` | Staff / Customer | **Dual Mode**: Direct 80mm PDF Stream (`%PDF-`) + Presigned S3 URL JSON | **PASS (200)** |
+| 68 | `/pdf/receipt/:paymentId` | `GET` | Staff / Customer | **Dual Mode**: Direct A5 PDF Stream (`%PDF-`) + Presigned S3 URL JSON | **PASS (200)** |
 | 69 | `/pdf/voucher/:auctionId` | `GET` | Staff / Customer | **Dual Mode**: Direct Payout Voucher PDF Stream + Presigned S3 URL JSON | **PASS (200)** |
 | 70 | `/pdf/minutes/:auctionId` | `GET` | Staff / Auditor | **Dual Mode**: Form XVII Statutory Minutes PDF Stream + Presigned S3 URL JSON | **PASS (200)** |
 | 71 | `/pdf/passbook/:ticketId` | `GET` | Staff / Customer | **Dual Mode**: Form XXI 20-Month Passbook PDF Stream + Presigned S3 URL JSON | **PASS (200)** |
@@ -36,7 +36,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
 
 ## 3. Detailed Step-by-Step Execution Proofs
 
-### Step 1: Bilingual 80mm Thermal Subscription Receipt (`GET /pdf/receipt/:paymentId`)
+### Step 1: Bilingual A5 Subscription Receipt (`GET /pdf/receipt/:paymentId`)
 - **Target Payment ID**: `782c1ae7-290a-4af5-931d-877816b0c4a3`
 - **1A: Direct Binary PDF Stream**:
   - Request: `GET /pdf/receipt/782c1ae7-290a-4af5-931d-877816b0c4a3`
