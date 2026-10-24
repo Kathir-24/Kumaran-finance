@@ -87,6 +87,7 @@ flowchart TD
 | **2. Upcoming Auction Reminder** | **Push**: `மாதம் {#month#} ஏல அறிவிப்பு: {#date#} {#time#} ({#branch#}).` (Deep-links to `/auctions/{#id}`) | **SMS**: `Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}` |
 | **3. Auction Result & Dividend** | **Push**: `மாதம் {#month#} ஏல முடிவு: லாபப்பங்கு ரூ. {#div#}. அடுத்த மாத தவணை: ரூ. {#payable#}.` | **SMS**: `Kumaran Chits: Chit {#var#} Month {#var#} Auction won at Rs.{#discount#}. Dividend: Rs.{#div#}. Next month: Rs.{#payable#}.` |
 | **4. 3-Month Defaulter Warning** | **Push**: `எச்சரிக்கை: டிக்கெட் #{#tkt#} ({#chit#}) தொடர்ந்து {#m#} மாதங்கள் நிலுவையில் உள்ளது (ரூ. {#amt#}).` (Urgent Red Banner) | **SMS**: `Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid cancellation. Contact: {#var#}` |
+| **5. Maker-Checker Partner Approval Alerts** | **High-Priority Push**: `பரிசு தொகை / ரத்து ஒப்புதல் தேவை / Approval Required` (Deep-links to `/approvals` with biometrics) | N/A (Internal administrative alert delivered strictly to registered Partner/Manager smartphones, excluding maker) |
 
 ---
 
@@ -204,8 +205,10 @@ All push payloads configure high importance (`kumaran_high_importance`) to displ
 |---|:---:|---|---|---|---|
 | **Payment Receipt** | Default | `குமரன் பைனான்ஸ்` | `மாத தவணை தொகை ரூ. {#amount#} பெறப்பட்டது! ரசீது: {#receiptNumber#}` | `{ type: "RECEIPT", passbookUrl: "...", receiptNumber: "..." }` | `/passbook` |
 | **Auction Reminder** | Default | `குமரன் பைனான்ஸ்` | `மாதம் {#month#} ஏல அறிவிப்பு: {#date#} {#time#}` | `{ type: "AUCTION_REMINDER", chitCode: "...", month: "..." }` | `/auctions` |
+| **Auction Result** | Default | `குமரன் பைனான்ஸ்` | `மாதம் {#month#} ஏல முடிவு: வெற்றி கழிவு ரூ. {#discount#}. லாபப்பங்கு ரூ. {#dividend#}.` | `{ type: "AUCTION_RESULT", chitCode: "...", installmentMonth: "..." }` | `/passbook` |
 | **Default Warning** | Alert | `எச்சரிக்கை அறிவிப்பு` | `டிக்கெட் #{#ticket#} தொடர்ந்து 3 மாத தவணைகள் நிலுவையில் உள்ளது.` | `{ type: "DEFAULT_WARNING", ticketId: "..." }` | `/dues` |
-| **Maker-Checker Approval** | Alert | `ஒப்புதல் தேவை` | `பரிசு தொகை பட்டுவாடா சரிபார்ப்பு / Prize payout authorization required` | `{ type: "DISBURSEMENT_APPROVAL", winnerId: "..." }` | `/approvals` |
+| **Disbursement Approval** | Alert | `பரிசு தொகை ஒப்புதல் தேவை` | `குழு {#chitCode#} டிக்கெட் #{#ticket#} பரிசு தொகை ரூ. {#amount#} சரிபார்க்கப்பட்டது.` | `{ approvalType: "DISBURSEMENT_APPROVAL", auctionId: "..." }` | `/approvals` |
+| **Reversal Approval** | Alert | `திருப்புதல் ஒப்புதல் தேவை` | `ரூ. {#amount#} கட்டண திருப்புதல் ஒப்புதலுக்கு காத்திருக்கிறது. காரணம்: {#reason#}.` | `{ approvalType: "REVERSAL_APPROVAL", paymentId: "..." }` | `/approvals` |
 
 ### 7.3 Stale Device Token Pruning
 If a smartphone uninstalls the app or rotates device tokens, FCM responds with `messaging/registration-token-not-registered`. The backend automatically clears `fcmToken = null` on the subscriber record in PostgreSQL. Future alerts immediately fall back to **TRAI DLT SMS** without message loss.

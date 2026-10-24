@@ -19,6 +19,7 @@ If you need to quickly recall what BullMQ does in Kumaran Chits:
 | **`notification-queue`** | `scan-pre-auction-reminders` | [`AuctionReminderSchedulerService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/auction-reminder-scheduler.service.ts) | Automated `09:00 AM IST` Cron | Scans upcoming auctions (3 days ahead) and enqueues broadcast reminder jobs. |
 | **`notification-queue`** | `dispatch-auction-reminder` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered by pre-auction scan or Admin API | Dispatches bilingual date, time, and ceiling reminders to eligible subscribers. |
 | **`notification-queue`** | `dispatch-auction-result` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered upon auction finalization | Broadcasts winning discount, dividend per ticket, and next month's net due ($I_{net}$) to all members. |
+| **`notification-queue`** | `dispatch-approval-alert` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Post-commit from Payment Reversal & Safety Proof Verification | Dispatches high-priority **FCM Push Alerts** to active Partners (`SUPER_ADMIN` / `BRANCH_MANAGER`), strictly excluding `maker_user_id`. |
 | **`notification-queue`** | `dispatch-default-warning` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered by arrears scan | Dispatches arrears warnings when a subscriber falls into overdue status. |
 
 ---
@@ -31,6 +32,8 @@ flowchart TD
         Cron["Repeatable IST Schedulers\n• 00:01 AM (Arrears)\n• 06:00 AM (Reconciliation)\n• 09:00 AM (Auctions)"]
         CounterPay["PaymentService.recordPayment\n(Office Counter Cash/UPI)"]
         FieldPay["CollectionService.recordCollection\n(Doorstep Field Collections)"]
+        AuctionFinalize["AuctionService.finalizeAuction\n(Auction Results & Dividends)"]
+        Approvals["PaymentService & DisbursementService\n(Reversal & Safety Proof Requests)"]
         AdminAPI["JobsController\n(Manual Super Admin Triggers)"]
     end
 
@@ -48,7 +51,7 @@ flowchart TD
 
     subgraph CHANNELS ["Notification Delivery Layer"]
         direction TB
-        FCM["Primary (₹0 Cost):\nFirebase Cloud Messaging (FCM)\nPush to Android App (Deep-link to /passbook)"]
+        FCM["Primary (₹0 Cost):\nFirebase Cloud Messaging (FCM)\nPush to Android App (Deep-link to /passbook or /approvals)"]
         SMS["Pluggable Fallback:\nIndian DLT-Compliant SMS\n(Strictly for non-smartphone / keypad users)"]
         WA["Pluggable Commercial:\nWhatsApp Cloud API\n(Bilingual text template)"]
     end
@@ -62,6 +65,10 @@ flowchart TD
     CounterPay -.->|2. Fire-and-Forget Job| Q3
     FieldPay -->|1. ACID Commit| PG
     FieldPay -.->|2. Fire-and-Forget Job| Q3
+    AuctionFinalize -->|1. ACID Commit| PG
+    AuctionFinalize -.->|2. Fire-and-Forget Job| Q3
+    Approvals -->|1. ACID Commit| PG
+    Approvals -.->|2. Fire-and-Forget Alert| Q3
     AdminAPI -->|Manual Enqueue| REDIS_BROKER
 
     Q1 -->|Pull Job| W1
@@ -244,4 +251,18 @@ Payload: {
 $ curl -I -u "admin:chitflow_secret" http://127.0.0.1:3000/admin/queues
 HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
+```
+
+### Proof 5: Live Auction Results Broadcast Dispatch (Lifecycle 4)
+```text
+[AuctionService] Enqueued auction result notification for group KC-LIVE-20M-01 Month 2 (20 subscribers)
+[NotificationService] Broadcasted auction results to 20 subscribers (0 Push, 20 SMS) for Chit KC-LIVE-20M-01 Month 2
+[BullMQ Queue Status]: Completed job 'dispatch-auction-result' successfully on 'notification-queue'.
+```
+
+### Proof 6: Maker-Checker High-Priority Approval Push Alerts (Lifecycle 7 & 8)
+```text
+[PaymentService] Enqueued reversal approval alert for Payment ddbd39b6-ae0a-4751-9075-84dccf108028
+[DisbursementService] Enqueued disbursement approval alert for Auction 9adf153f-a30f-44de-bc54-39bb3c952822
+[NotificationService] Dispatched high-priority approval push alerts to active partner(s) (maker excluded)
 ```

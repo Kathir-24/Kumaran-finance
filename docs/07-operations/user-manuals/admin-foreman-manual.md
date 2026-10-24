@@ -138,7 +138,7 @@ For operational visibility over asynchronous background workers, partners can op
   - Tracks daily arrears calculation running at 02:00 AM IST.
   - Verifies automated 3-month continuous defaulter tagging (ADR-07).
 - **`notification-queue`**:
-  - Monitors bilingual payment receipt dispatches, pre-auction reminders, and default warning notices.
+  - Monitors bilingual payment receipt dispatches, pre-auction reminders, post-auction dividend results broadcasts, default warning notices, and dual-control Maker-Checker approval alerts (payment reversals & prize disbursements).
   - Verifies Push notification delivery and DLT SMS fallback queues for keypad phones.
   - Displays any delivery failures caused by telecom timeouts with 1-click DLQ retry.
 - **`reconciliation-queue`**:
