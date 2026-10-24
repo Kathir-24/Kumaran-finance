@@ -1,7 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { PushService } from '../../notification/services/push.service';
 import { SmsService } from '../../notification/services/sms.service';
 import type {
+  ApprovalAlertJobPayload,
   AuctionReminderJobPayload,
   AuctionResultNotificationJobPayload,
   DefaultWarningJobPayload,
@@ -12,7 +15,14 @@ export interface SentNotificationRecord {
   id: string;
   channel: 'SMS_DLT' | 'WHATSAPP' | 'PUSH_NOTIFICATION';
   recipientPhone: string;
-  templateType: 'RECEIPT' | 'AUCTION_REMINDER' | 'AUCTION_RESULT' | 'DEFAULT_WARNING' | 'OTP';
+  templateType:
+    | 'RECEIPT'
+    | 'AUCTION_REMINDER'
+    | 'AUCTION_RESULT'
+    | 'DEFAULT_WARNING'
+    | 'OTP'
+    | 'DISBURSEMENT_APPROVAL'
+    | 'REVERSAL_APPROVAL';
   messageText: string;
   variables: Record<string, any>;
   sentAt: Date;
@@ -27,6 +37,7 @@ export class NotificationService {
   constructor(
     @Optional() private readonly smsService?: SmsService,
     @Optional() private readonly pushService?: PushService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   /**
@@ -395,6 +406,81 @@ ${payload.passbookAppUrl}
       `Broadcasted auction results to ${count} subscribers (${pushCount} Push, ${smsCount} SMS) for Chit ${payload.chitCode} Month ${payload.installmentMonth}`,
     );
     return { dispatchedCount: count, pushCount, smsCount };
+  }
+
+  /**
+   * Broadcasts high-priority push notifications to active Partners/Admins for Maker-Checker approvals:
+   * - Triggered on: DISBURSEMENT_APPROVAL (pending safety proof verification) or REVERSAL_APPROVAL.
+   * - Excludes: Maker user (`excludeUserId`) so maker never receives an approval request for their own action.
+   * - Audience: Active users with Role.SUPER_ADMIN or Role.BRANCH_MANAGER and registered `fcmToken`.
+   */
+  async dispatchApprovalAlert(
+    payload: ApprovalAlertJobPayload,
+  ): Promise<{ dispatchedCount: number; partnerCount: number }> {
+    if (!this.prisma) {
+      this.logger.warn('PrismaService not available; skipping dispatchApprovalAlert');
+      return { dispatchedCount: 0, partnerCount: 0 };
+    }
+
+    const partners = await this.prisma.user.findMany({
+      where: {
+        roles: { hasSome: [Role.SUPER_ADMIN, Role.BRANCH_MANAGER] },
+        isActive: true,
+        fcmToken: { not: null },
+        ...(payload.excludeUserId ? { id: { not: payload.excludeUserId } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        fcmToken: true,
+      },
+    });
+
+    let count = 0;
+    for (const partner of partners) {
+      if (!partner.fcmToken) continue;
+
+      let pushId = `push-alert-${Date.now()}-${count}`;
+      if (this.pushService) {
+        const pushRes = await this.pushService.sendPushNotification(
+          {
+            recipientToken: partner.fcmToken,
+            title: payload.title,
+            body: payload.body,
+            data: {
+              ...payload.data,
+              approvalType: payload.approvalType,
+              entityId: payload.entityId,
+              ...(payload.amount ? { amount: payload.amount } : {}),
+            },
+            priority: 'high',
+          },
+          { userId: partner.id },
+        );
+        if (pushRes.messageId) {
+          pushId = pushRes.messageId;
+        }
+      }
+
+      this.sentLog.push({
+        id: pushId,
+        channel: 'PUSH_NOTIFICATION',
+        recipientPhone: partner.phone,
+        templateType: payload.approvalType,
+        messageText: `${payload.title}: ${payload.body}`,
+        variables: { ...payload, partnerName: partner.name },
+        sentAt: new Date(),
+        status: 'DELIVERED',
+      });
+      count++;
+    }
+
+    this.logger.log(
+      `Dispatched high-priority approval push alerts to ${count}/${partners.length} active partner(s) for ${payload.approvalType} (Entity: ${payload.entityId})`,
+    );
+
+    return { dispatchedCount: count, partnerCount: partners.length };
   }
 
   /**

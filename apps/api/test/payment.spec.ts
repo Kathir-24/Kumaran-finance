@@ -752,5 +752,57 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       expect(result.receipt.receiptNumber).toBe('KC-REC-PRD-2026-00412');
       expect(result.dueStatus).toBe(DueStatus.PAID);
     });
+
+    it('should enqueue reversal approval alert to notification-queue when reversal is requested', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-rev-alert', status: 'ENQUEUED' }),
+      };
+
+      const queuedPaymentService = new PaymentService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.payment.findUnique.mockResolvedValue({
+        id: mockPaymentId,
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.SUCCESS,
+        reversal: null,
+      });
+
+      prismaMock.paymentReversal.create.mockResolvedValue({
+        id: 'rev-01',
+        paymentId: mockPaymentId,
+        reason: 'Duplicate entry at office counter',
+        status: 'REQUESTED',
+        initiatedByUserId: mockMakerId,
+      });
+      prismaMock.auditLog.create.mockResolvedValue({});
+
+      const result = await queuedPaymentService.requestReversal(
+        mockPaymentId,
+        { reason: 'Duplicate entry at office counter' },
+        mockMakerId,
+      );
+
+      expect(result.message).toContain('Payment reversal requested successfully');
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-approval-alert',
+        expect.objectContaining({
+          approvalType: 'REVERSAL_APPROVAL',
+          entityId: mockPaymentId,
+          amount: '3750',
+          excludeUserId: mockMakerId,
+          data: expect.objectContaining({
+            paymentId: mockPaymentId,
+            reason: 'Duplicate entry at office counter',
+            reversalId: 'rev-01',
+          }),
+        }),
+      );
+    });
   });
 });

@@ -455,6 +455,128 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         }),
       );
     });
+
+    it('should enqueue auction result broadcast to notification-queue upon finalization', async () => {
+      const mockQueue = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-auc-res', status: 'ENQUEUED' }),
+      };
+      const queuedAuctionService = new AuctionService(
+        prismaMock as unknown as PrismaService,
+        mockQueue as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        bidDiscount: 20000n,
+        foremanCommissionAmount: 4000n,
+        totalDividend: 16000n,
+        dividendPerTicket: 800n,
+        prizeMoney: 80000n,
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        chitGroup: { groupName: 'Group A', groupCode: 'KCA-1L-20M-01', baseInstallment: 5000n },
+        winner: {
+          ticketId: mockTicketId1,
+          ticket: {
+            ticketNumber: 3,
+            customer: { fullName: 'Ramasamy K', customerCode: 'KC-CUST-00003' },
+          },
+        },
+      });
+
+      prismaMock.auction.update.mockResolvedValue({
+        id: mockAuctionId,
+        status: AuctionStatus.COMPLETED,
+        finalizedByUserId: mockCheckerId,
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+      prismaMock.auctionMinutes.upsert.mockResolvedValue({});
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          customer: {
+            fullName: 'Muthusamy K',
+            phone: '9842100002',
+            fcmToken: 'fcm-muthu-token',
+          },
+        },
+      ]);
+
+      const finalized = await queuedAuctionService.finalizeAuction(
+        mockAuctionId,
+        mockCheckerId,
+      );
+
+      expect(finalized).toBeDefined();
+      expect(mockQueue.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-auction-result',
+        expect.objectContaining({
+          chitGroupId: mockChitGroupId,
+          chitCode: 'KCA-1L-20M-01',
+          installmentMonth: 2,
+          winningTicketNumber: 3,
+          winningDiscountAmount: '20000',
+          dividendPerTicket: '800',
+          nextMonthNetPayable: '4200', // 5000 - 800
+          subscribers: [
+            {
+              name: 'Muthusamy K',
+              phone: '9842100002',
+              fcmToken: 'fcm-muthu-token',
+            },
+          ],
+        }),
+      );
+    });
+
+    it('should not fail auction finalization if queueProvider.addJob throws an error (fire-and-forget resilience)', async () => {
+      const mockQueue = {
+        addJob: jest.fn().mockRejectedValue(new Error('Redis broker offline')),
+      };
+      const queuedAuctionService = new AuctionService(
+        prismaMock as unknown as PrismaService,
+        mockQueue as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        bidDiscount: 20000n,
+        dividendPerTicket: 800n,
+        prizeMoney: 80000n,
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        chitGroup: { groupName: 'Group A', groupCode: 'KCA-1L-20M-01', baseInstallment: 5000n },
+        winner: {
+          ticketId: mockTicketId1,
+          ticket: {
+            ticketNumber: 3,
+            customer: { fullName: 'Ramasamy K', customerCode: 'KC-CUST-00003' },
+          },
+        },
+      });
+
+      prismaMock.auction.update.mockResolvedValue({
+        id: mockAuctionId,
+        status: AuctionStatus.COMPLETED,
+        finalizedByUserId: mockCheckerId,
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+      prismaMock.auctionMinutes.upsert.mockResolvedValue({});
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([]);
+
+      const finalized = await queuedAuctionService.finalizeAuction(
+        mockAuctionId,
+        mockCheckerId,
+      );
+
+      expect(finalized).toBeDefined();
+    });
   });
 
   describe('5. Statutory Auction Minutes & Scheme History', () => {

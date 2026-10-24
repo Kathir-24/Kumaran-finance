@@ -11,9 +11,11 @@ import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import {
+  JOB_DISPATCH_APPROVAL_ALERT,
   JOB_DISPATCH_PAYMENT_RECEIPT,
   NOTIFICATION_QUEUE,
 } from '../jobs/constants/queue-names.constant';
+import type { ApprovalAlertJobPayload } from '../jobs/dto/job-payloads.dto';
 import {
   formatBilingualReceiptText,
   ReceiptDataInput,
@@ -523,7 +525,7 @@ export class PaymentService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       let reversal;
       if (payment.reversal) {
         reversal = await tx.paymentReversal.update({
@@ -565,6 +567,38 @@ export class PaymentService {
         reversal,
       };
     });
+
+    // Post-commit: Alert Super Admins/Partners for Checker Approval (Non-blocking)
+    const queue = this.queueProvider;
+    if (queue && payment) {
+      try {
+        const formattedAmount = payment.amount.toLocaleString('en-IN');
+        const payload: ApprovalAlertJobPayload = {
+          approvalType: 'REVERSAL_APPROVAL',
+          title: 'திருப்புதல் ஒப்புதல் தேவை / Reversal Approval Required',
+          body: `ரூ. ${formattedAmount} கட்டண திருப்புதல் ஒப்புதலுக்கு காத்திருக்கிறது. காரணம்: ${dto.reason}. / Payment reversal of Rs. ${formattedAmount} pending checker approval. Reason: ${dto.reason}.`,
+          entityId: paymentId,
+          amount: payment.amount.toString(),
+          excludeUserId: makerUserId,
+          data: {
+            paymentId,
+            reason: dto.reason,
+            reversalId: result.reversal.id,
+          },
+        };
+
+        await queue.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_APPROVAL_ALERT,
+          payload,
+        );
+        this.logger.log(`Enqueued reversal approval alert for Payment ${paymentId}`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to enqueue reversal approval alert: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**

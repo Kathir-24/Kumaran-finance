@@ -184,6 +184,59 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       expect(result.winner.disbursementStatus).toBe('VERIFIED_BY_MAKER');
     });
 
+    it('should enqueue disbursement approval alert to notification-queue upon safety proof verification', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-disb-alert', status: 'ENQUEUED' }),
+      };
+      const mockStorage = {
+        uploadFile: jest.fn(),
+      };
+
+      const queuedDisbursementService = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        mockStorage as any,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockAuction,
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+      prismaMock.auctionWinner.update.mockResolvedValue({
+        ...mockWinner,
+        disbursementStatus: 'VERIFIED_BY_MAKER',
+      });
+      prismaMock.auditLog.create.mockResolvedValue({});
+
+      const result = await queuedDisbursementService.verifySafetyProof(
+        mockAuctionId,
+        {
+          isSecurityRequired: false,
+          agreementSigned: true,
+          nomineeSigned: true,
+        },
+        mockMakerId,
+      );
+
+      expect(result.message).toContain('Safety proof checklist verified successfully');
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-approval-alert',
+        expect.objectContaining({
+          approvalType: 'DISBURSEMENT_APPROVAL',
+          entityId: mockAuctionId,
+          amount: '75000',
+          excludeUserId: mockMakerId,
+          data: expect.objectContaining({
+            auctionId: mockAuctionId,
+            ticketNumber: '7',
+            customerName: 'S. Sundaram',
+            chitCode: 'KCA-1L-20M-01',
+          }),
+        }),
+      );
+    });
+
     it('should reject verification if auction is still in SCHEDULED status', async () => {
       prismaMock.auction.findUnique.mockResolvedValue({
         ...mockAuction,

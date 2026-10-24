@@ -110,46 +110,49 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
 
 ### 3.3 Maker-Checker Prize Disbursement Approval
 - **Target Persona**: The 4 Equal Partners (`SUPER_ADMIN`, `BRANCH_MANAGER`)
-- **Trigger**: Desk Accountant enters safety proof checklist and requests payout authorization.
-- **Title**: `ஒப்புதல் தேவை / Approval Needed`
-- **Body**: `சீட்டு {chitCode} பரிசு தொகை ரூ. {netPrize} வழங்க ஒப்புதல் தேவை. / Payout authorization required.`
+- **Trigger**: Safety proof checklist verified by Maker ([`DisbursementService.verifySafetyProof()`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
+- **Title**: `பரிசு தொகை ஒப்புதல் தேவை / Prize Disbursement Approval Required`
+- **Body**: `குழு {chitCode} டிக்கெட் #{ticketNo} ({customerName}) பரிசு தொகை ரூ. {amount} பாதுகாப்பு சான்றிதழ் சரிபார்க்கப்பட்டது. இறுதி ஒப்புதல் தேவை. / Prize money verified. Checker authorization required.`
 - **Data Payload**:
   ```json
   {
-    "type": "DISBURSEMENT_APPROVAL",
+    "approvalType": "DISBURSEMENT_APPROVAL",
     "auctionId": "a7ba8f15-8e46-4282-ad38-b9a13ef7bcd9",
-    "winnerId": "782c1ae7-...",
-    "netPrize": "75000"
+    "ticketNumber": "7",
+    "customerName": "S. Sundaram",
+    "chitCode": "KCA-1L-20M-01",
+    "amount": "75000"
   }
   ```
 - **App Behavior**: Opens Partner Executive Authorization view with cheque photos and 1-second fingerprint unlock.
 
 ### 3.4 Payment Reversal Approval
-- **Target Persona**: The 4 Equal Partners
-- **Trigger**: Desk Accountant submits payment cancellation request.
-- **Title**: `ரத்து ஒப்புதல் / Reversal Approval`
-- **Body**: `ரசீது {receiptNumber} தொகை ரூ. {amount} ரத்து செய்ய ஒப்புதல் தேவை.`
+- **Target Persona**: The 4 Equal Partners (`SUPER_ADMIN`, `BRANCH_MANAGER`)
+- **Trigger**: Payment reversal requested by Maker ([`PaymentService.requestReversal()`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
+- **Title**: `திருப்புதல் ஒப்புதல் தேவை / Reversal Approval Required`
+- **Body**: `ரூ. {amount} கட்டண திருப்புதல் ஒப்புதலுக்கு காத்திருக்கிறது. காரணம்: {reason}. / Payment reversal pending checker approval.`
 - **Data Payload**:
   ```json
   {
-    "type": "REVERSAL_APPROVAL",
+    "approvalType": "REVERSAL_APPROVAL",
+    "paymentId": "pay-uuid-001",
     "reversalId": "rev-8899-...",
-    "receiptNumber": "KC-REC-PRD-2026-00016",
-    "amount": "3950"
+    "reason": "Duplicate entry at office counter",
+    "amount": "3750"
   }
   ```
 - **App Behavior**: Opens Dual-Control Reversal review screen.
 
 ### 3.5 Auction Results Broadcast
 - **Target Persona**: All Chit Subscribers in the chit group
-- **Trigger**: Auction finalized by Checker ([`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts)).
+- **Trigger**: Auction finalized by Checker ([`AuctionService.finalizeAuction()`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts)); enqueues [`JOB_DISPATCH_AUCTION_RESULT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit.
 - **Title**: `குமரன் பைனான்ஸ் / Kumaran Finance`
-- **Body**: `மாதம் {month} ஏல முடிவு: வெற்றி கழிவு ரூ. {discount}. லாபப்பங்கு ரூ. {dividend}. அடுத்த மாத தவணை: ரூ. {netPayable}.`
+- **Body**: `மாதம் {month} ஏல முடிவு: வெற்றி கழிவு ரூ. {discount}. லாபப்பங்கு ரூ. {dividend}. அடுத்த மாத தவணை: ரூ. {netPayable}. / Dividend credit: Rs.{dividend}. Next month: Rs.{netPayable}.`
 - **Data Payload**:
   ```json
   {
     "type": "AUCTION_RESULT",
-    "chitCode": "KC-LIVE-20M-01",
+    "chitCode": "KCA-1L-20M-01",
     "installmentMonth": "2"
   }
   ```
@@ -321,6 +324,22 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
   ✓ Customer Device FCM Push Token: should allow customer to update their own FCM token
   ✓ Customer Device FCM Push Token: should allow staff to update customer FCM token
   ✓ Customer Device FCM Push Token: should reject customer attempting to update another customer's FCM token (HTTP 403)
+  ```
+- **BullMQ Background Notification & Approval Alerts** ([`apps/api/test/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/jobs.spec.ts)):
+  ```text
+  ✓ NotificationService: should broadcast auction result and dividend credit to subscribers via Push and SMS fallback
+  ✓ NotificationService: should dispatch high-priority approval push alerts to active partners and exclude maker user
+  ✓ BullMqQueueProvider: should execute JOB_DISPATCH_AUCTION_RESULT and JOB_DISPATCH_APPROVAL_ALERT directly in fallback mode
+  ```
+- **Auction Results Post-Commit Enqueue** ([`apps/api/test/auction.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/auction.spec.ts)):
+  ```text
+  ✓ Maker-Checker Duties: should enqueue auction result broadcast to notification-queue upon finalization
+  ✓ Maker-Checker Duties: should not fail auction finalization if queueProvider.addJob throws an error (fire-and-forget resilience)
+  ```
+- **Maker-Checker Approval Alert Enqueues** ([`apps/api/test/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/payment.spec.ts) & [`apps/api/test/disbursement.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/disbursement.spec.ts)):
+  ```text
+  ✓ PaymentService: should enqueue reversal approval alert to notification-queue when reversal is requested
+  ✓ DisbursementService: should enqueue disbursement approval alert to notification-queue upon safety proof verification
   ```
 
 ### 7.2 Live Server Lifecycle Proofs

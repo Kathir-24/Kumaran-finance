@@ -2,12 +2,20 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import {
+  JOB_DISPATCH_APPROVAL_ALERT,
+  NOTIFICATION_QUEUE,
+} from '../jobs/constants/queue-names.constant';
+import type { ApprovalAlertJobPayload } from '../jobs/dto/job-payloads.dto';
 import {
   formatBilingualVoucherText,
   VoucherDataInput,
@@ -28,9 +36,12 @@ const ALLOWED_SAFETY_PROOF_MIME_TYPES = [
 
 @Injectable()
 export class DisbursementService {
+  private readonly logger = new Logger(DisbursementService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    @Optional() private readonly queueProvider?: BullMqQueueProvider,
   ) {}
 
   /**
@@ -211,7 +222,16 @@ export class DisbursementService {
   ) {
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
-      include: { winner: true },
+      include: {
+        winner: {
+          include: {
+            ticket: {
+              include: { customer: true },
+            },
+          },
+        },
+        chitGroup: true,
+      },
     });
 
     if (!auction) {
@@ -234,7 +254,7 @@ export class DisbursementService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.auctionWinner.update({
         where: { id: auction.winner!.id },
         data: {
@@ -270,6 +290,43 @@ export class DisbursementService {
         winner: updated,
       };
     });
+
+    // Post-commit: Alert Super Admins/Partners for Checker Approval (Non-blocking)
+    const queue = this.queueProvider;
+    if (queue) {
+      try {
+        const formattedAmount = (auction.prizeMoney ?? BigInt(0)).toLocaleString('en-IN');
+        const customerName = auction.winner?.ticket?.customer?.fullName || 'Subscriber';
+        const ticketNo = auction.winner?.ticket?.ticketNumber || 0;
+        const groupCode = auction.chitGroup?.groupCode || '';
+
+        const payload: ApprovalAlertJobPayload = {
+          approvalType: 'DISBURSEMENT_APPROVAL',
+          title: 'பரிசு தொகை ஒப்புதல் தேவை / Prize Disbursement Approval Required',
+          body: `குழு ${groupCode} டிக்கெட் #${ticketNo} (${customerName}) பரிசு தொகை ரூ. ${formattedAmount} பாதுகாப்பு சான்றிதழ் சரிபார்க்கப்பட்டது. இறுதி ஒப்புதல் தேவை. / Prize money of Rs. ${formattedAmount} for Ticket #${ticketNo} (${customerName}) verified. Checker authorization required.`,
+          entityId: auctionId,
+          amount: (auction.prizeMoney ?? BigInt(0)).toString(),
+          excludeUserId: makerUserId,
+          data: {
+            auctionId,
+            ticketNumber: String(ticketNo),
+            customerName,
+            chitCode: groupCode,
+          },
+        };
+
+        await queue.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_APPROVAL_ALERT,
+          payload,
+        );
+        this.logger.log(`Enqueued disbursement approval alert for Auction ${auctionId}`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to enqueue disbursement approval alert: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**

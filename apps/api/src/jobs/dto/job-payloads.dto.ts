@@ -56,6 +56,16 @@ export interface DefaultWarningJobPayload {
   fcmToken?: string;
 }
 
+export interface ApprovalAlertJobPayload {
+  approvalType: 'DISBURSEMENT_APPROVAL' | 'REVERSAL_APPROVAL';
+  title: string;
+  body: string;
+  entityId: string;
+  amount?: string;
+  excludeUserId?: string; // Maker user ID to prevent alerting maker
+  data: Record<string, string>;
+}
+
 export interface DailyArrearsExecutionResult {
   executionTimestamp: string;
   cutoffDate: string;

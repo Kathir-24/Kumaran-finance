@@ -105,10 +105,16 @@ Handles all outgoing subscriber communications without blocking HTTP request thr
 2. **Pre-Auction Broadcasts (`JOB_SCAN_PRE_AUCTION_REMINDERS` & `JOB_DISPATCH_AUCTION_REMINDER`)**:
    - Scans auctions scheduled 3 days ahead.
    - Broadcasts auction date, start time, branch venue, and ceiling discount to non-prized members.
-3. **Auction Results Broadcast (`dispatchAuctionResult`)**:
-   - Triggered upon auction finalization by Checker.
-   - Broadcasts the winning ticket number, bid discount, dividend credit per ticket, and next month's net installment ($I_{net} = I_{base} - Div$) to all subscribers in the group.
-4. **Arrears & Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)**:
+3. **Auction Results Broadcast (`JOB_DISPATCH_AUCTION_RESULT`)**:
+   - Enqueued immediately after transaction commits in [`AuctionService.finalizeAuction()`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts).
+   - Broadcasts the winning ticket number, bid discount, dividend credit per ticket, and next month's net installment ($I_{net} = I_{base} - Div$) to all subscribers in the group via free FCM push (primary) or DLT SMS (keypad fallback).
+4. **Maker-Checker High-Priority Partner Push Alerts (`JOB_DISPATCH_APPROVAL_ALERT`)**:
+   - Enqueued immediately after transaction commits in:
+     - [`PaymentService.requestReversal()`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts) (`approvalType: 'REVERSAL_APPROVAL'`)
+     - [`DisbursementService.verifySafetyProof()`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`approvalType: 'DISBURSEMENT_APPROVAL'`)
+   - Queries active Partners (`SUPER_ADMIN` / `BRANCH_MANAGER`) with registered `fcmToken`, strictly excluding the Maker (`id != payload.excludeUserId`) so maker never receives an approval request for their own action.
+   - Dispatches priority push notification with deep-link payload for immediate mobile biometric approval.
+5. **Arrears & Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)**:
    - Dispatches statutory reminder notices when a member enters arrears.
 
 ---

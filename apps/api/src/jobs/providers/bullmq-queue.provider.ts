@@ -12,7 +12,9 @@ import {
 } from '../constants/cron-schedules.constant';
 import {
   DAILY_MAINTENANCE_QUEUE,
+  JOB_DISPATCH_APPROVAL_ALERT,
   JOB_DISPATCH_AUCTION_REMINDER,
+  JOB_DISPATCH_AUCTION_RESULT,
   JOB_DISPATCH_DEFAULT_WARNING,
   JOB_DISPATCH_PAYMENT_RECEIPT,
   JOB_PROCESS_DAILY_ARREARS,
@@ -99,6 +101,12 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
           }
           if (job.name === JOB_DISPATCH_DEFAULT_WARNING) {
             return await this.notificationService.dispatchDefaultWarning(job.data);
+          }
+          if (job.name === JOB_DISPATCH_AUCTION_RESULT) {
+            return await this.notificationService.dispatchAuctionResult(job.data);
+          }
+          if (job.name === JOB_DISPATCH_APPROVAL_ALERT) {
+            return await this.notificationService.dispatchApprovalAlert(job.data);
           }
           if (job.name === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {
             return await this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(
@@ -247,6 +255,10 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
       await this.notificationService.dispatchAuctionReminder(data);
     } else if (jobName === JOB_DISPATCH_DEFAULT_WARNING) {
       await this.notificationService.dispatchDefaultWarning(data);
+    } else if (jobName === JOB_DISPATCH_AUCTION_RESULT) {
+      await this.notificationService.dispatchAuctionResult(data);
+    } else if (jobName === JOB_DISPATCH_APPROVAL_ALERT) {
+      await this.notificationService.dispatchApprovalAlert(data);
     } else if (jobName === JOB_RUN_DAILY_RECONCILIATION) {
       await this.reconciliationService.reconcileSettlement(data?.records || []);
     } else if (jobName === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {

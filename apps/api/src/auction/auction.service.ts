@@ -2,10 +2,18 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { AuctionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import {
+  JOB_DISPATCH_AUCTION_RESULT,
+  NOTIFICATION_QUEUE,
+} from '../jobs/constants/queue-names.constant';
+import type { AuctionResultNotificationJobPayload } from '../jobs/dto/job-payloads.dto';
 import {
   FIRST_AUCTION_MONTH,
   FOREMAN_COMMISSION_NUMERATOR,
@@ -19,7 +27,12 @@ import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 
 @Injectable()
 export class AuctionService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AuctionService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly queueProvider?: BullMqQueueProvider,
+  ) {}
 
   /**
    * Helper: calculates whole-rupee auction math invariants
@@ -385,7 +398,7 @@ export class AuctionService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Commit Auction
       const finalized = await tx.auction.update({
         where: { id: auctionId },
@@ -451,6 +464,59 @@ export class AuctionService {
         },
       });
     });
+
+    // Post-commit: Broadcast auction results to chit group subscribers (Non-blocking)
+    const queue = this.queueProvider;
+    if (queue && auction && auction.chitGroup) {
+      try {
+        const tickets = await this.prisma.subscriberTicket.findMany({
+          where: {
+            chitGroupId: auction.chitGroupId,
+            status: 'ACTIVE',
+          },
+          include: {
+            customer: {
+              select: {
+                fullName: true,
+                phone: true,
+                fcmToken: true,
+              },
+            },
+          },
+        });
+
+        const dividendPerTicket = auction.dividendPerTicket ?? BigInt(0);
+        const nextMonthNetPayable = (auction.chitGroup.baseInstallment - dividendPerTicket).toString();
+
+        const payload: AuctionResultNotificationJobPayload = {
+          chitGroupId: auction.chitGroupId,
+          chitCode: auction.chitGroup.groupCode,
+          installmentMonth: auction.installmentMonth,
+          winningTicketNumber: auction.winner!.ticket.ticketNumber,
+          winningDiscountAmount: (auction.bidDiscount ?? BigInt(0)).toString(),
+          dividendPerTicket: dividendPerTicket.toString(),
+          nextMonthNetPayable,
+          subscribers: tickets.map((t) => ({
+            name: t.customer.fullName,
+            phone: t.customer.phone,
+            fcmToken: t.customer.fcmToken || undefined,
+          })),
+        };
+
+        await queue.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_AUCTION_RESULT,
+          payload,
+        );
+        this.logger.log(
+          `Enqueued auction result notification for group ${auction.chitGroup.groupCode} Month ${auction.installmentMonth} (${tickets.length} subscribers)`,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Failed to enqueue auction result notification: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**

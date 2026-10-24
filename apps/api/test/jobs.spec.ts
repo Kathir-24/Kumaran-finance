@@ -1,4 +1,4 @@
-import { DueStatus, PaymentStatus } from '@prisma/client';
+import { DueStatus, PaymentStatus, Role } from '@prisma/client';
 import { JobsController } from '../src/jobs/jobs.controller';
 import { BullMqQueueProvider } from '../src/jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../src/jobs/providers/redis-connection.provider';
@@ -19,9 +19,6 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
   let jobsController: JobsController;
 
   beforeEach(() => {
-    notificationService = new NotificationService();
-    notificationService.clearLog();
-
     prismaMock = {
       installmentDue: {
         findMany: jest.fn(),
@@ -38,7 +35,21 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       auction: {
         findMany: jest.fn(),
       },
+      user: {
+        findMany: jest.fn(),
+      },
     };
+
+    const pushServiceMock = {
+      sendPushNotification: jest.fn().mockResolvedValue({ messageId: 'push-partner-msg-01' }),
+    };
+
+    notificationService = new NotificationService(
+      undefined,
+      pushServiceMock as any,
+      prismaMock as unknown as PrismaService,
+    );
+    notificationService.clearLog();
 
     dailyArrearsService = new DailyArrearsService(
       prismaMock as unknown as PrismaService,
@@ -374,6 +385,53 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(smsNotif?.channel).toBe('SMS_DLT');
       expect(smsNotif?.messageText).toContain('Dividend credit: Rs.1,050');
     });
+
+    it('should dispatch high-priority approval push alerts to active partners and exclude maker user', async () => {
+      notificationService.clearLog();
+
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'partner-02',
+          name: 'Partner B (Checker)',
+          phone: '9842199881',
+          fcmToken: 'fcm-partner-b-token',
+        },
+      ]);
+
+      const res = await notificationService.dispatchApprovalAlert({
+        approvalType: 'REVERSAL_APPROVAL',
+        title: 'திருப்புதல் ஒப்புதல் தேவை / Reversal Approval Required',
+        body: 'Payment reversal of Rs. 3,750 pending checker approval.',
+        entityId: 'pay-001',
+        amount: '3750',
+        excludeUserId: 'partner-01', // Maker is Partner A
+        data: { paymentId: 'pay-001' },
+      });
+
+      expect(res.dispatchedCount).toBe(1);
+      expect(res.partnerCount).toBe(1);
+
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+        where: {
+          roles: { hasSome: [Role.SUPER_ADMIN, Role.BRANCH_MANAGER] },
+          isActive: true,
+          fcmToken: { not: null },
+          id: { not: 'partner-01' },
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          fcmToken: true,
+        },
+      });
+
+      const logs = notificationService.getSentNotificationLog();
+      expect(logs).toHaveLength(1);
+      expect(logs[0].templateType).toBe('REVERSAL_APPROVAL');
+      expect(logs[0].recipientPhone).toBe('9842199881');
+      expect(logs[0].channel).toBe('PUSH_NOTIFICATION');
+    });
   });
 
   describe('3. ReconciliationService (06:00 AM Payment Settlement)', () => {
@@ -475,6 +533,49 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
         'notification-queue',
         'reconciliation-queue',
       ]);
+    });
+
+    it('should execute JOB_DISPATCH_AUCTION_RESULT and JOB_DISPATCH_APPROVAL_ALERT directly in fallback mode', async () => {
+      const auctionRes = await queueProvider.addJob(
+        'notification-queue',
+        'dispatch-auction-result',
+        {
+          chitGroupId: 'group-001',
+          chitCode: 'KCA-1L-20M-01',
+          installmentMonth: 4,
+          winningTicketNumber: 7,
+          winningDiscountAmount: '25000',
+          dividendPerTicket: '1050',
+          nextMonthNetPayable: '3950',
+          subscribers: [
+            { name: 'S. Sundaram', phone: '9842143210', fcmToken: 'fcm-sundaram' },
+          ],
+        },
+      );
+      expect(auctionRes.status).toBe('EXECUTED_DIRECT');
+
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'partner-02',
+          name: 'Partner B',
+          phone: '9842199881',
+          fcmToken: 'fcm-token-b',
+        },
+      ]);
+
+      const alertRes = await queueProvider.addJob(
+        'notification-queue',
+        'dispatch-approval-alert',
+        {
+          approvalType: 'DISBURSEMENT_APPROVAL',
+          title: 'பரிசு தொகை ஒப்புதல் தேவை',
+          body: 'Prize money pending authorization',
+          entityId: 'auction-01',
+          excludeUserId: 'maker-user-01',
+          data: { auctionId: 'auction-01' },
+        },
+      );
+      expect(alertRes.status).toBe('EXECUTED_DIRECT');
     });
 
     it('should allow JobsController to run daily arrears check and return summary', async () => {
