@@ -31,6 +31,16 @@ Kumaran Chits utilizes **BullMQ Repeatable Jobs** configured to Indian Standard 
 
 ---
 
+## 2.1 Dynamic Event-Driven Queue Jobs Catalog
+
+In addition to scheduled cron runs, BullMQ queues handle real-time transactional background events:
+
+| Job Name | Triggering Module | Queue | Target Service | Business Action |
+|---|---|---|---|---|
+| `JOB_DISPATCH_PAYMENT_RECEIPT` | [`PaymentService`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts) | `notification-queue` | `NotificationService` | Asynchronously dispatches bilingual payment receipt notification upon commit (FCM Push primary for app users; Telecom DLT SMS fallback for keypad phones). Decouples customer response time from SMS gateway latencies. |
+
+---
+
 ## 3. Monitoring & Visual Dashboard
 
 ### A. Bull Board Web UI

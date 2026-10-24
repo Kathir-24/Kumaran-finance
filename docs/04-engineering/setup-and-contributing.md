@@ -78,10 +78,10 @@ pnpm run prisma:seed
 # Run Oxlint linter (0 errors, 0 warnings expected)
 pnpm run lint
 
-# Run all 23 unit test suites (323 / 323 passing tests, 100% pass expected)
+# Run all 24 unit test suites (343 / 343 passing tests, 100% pass expected)
 pnpm test
 
-# Run all 10 end-to-end integration test suites (82 / 82 passing tests)
+# Run all 10 end-to-end integration test suites (82 / 82 passing tests, total 425 / 425 passing tests)
 pnpm run test:e2e:fresh
 
 # Run NestJS in development watch mode

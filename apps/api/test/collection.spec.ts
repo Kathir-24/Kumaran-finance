@@ -604,4 +604,107 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       expect(result.failed[1].errorCode).toBe('PARTIAL_PAYMENTS_NOT_ALLOWED');
     });
   });
+
+  describe('6. BullMQ Notification Queue Hookup', () => {
+    it('should enqueue collection receipt job to notification-queue upon successful doorstep collection', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-coll-123', status: 'ENQUEUED' }),
+      };
+
+      const queuedCollectionService = new CollectionService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.payment.findUnique.mockResolvedValue(null);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(10);
+
+      const createdPayment = {
+        id: 'pmt-coll-01',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-21T09:30:00.000Z'),
+      };
+      prismaMock.payment.create.mockResolvedValue(createdPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-coll-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        receiptNumber: 'KC-REC-PRD-2026-00011',
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.count.mockResolvedValue(0);
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      const result = await queuedCollectionService.recordCollection(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3950,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(result.receiptNumber).toBe('KC-REC-PRD-2026-00011');
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-payment-receipt',
+        expect.objectContaining({
+          recipientPhone: mockTicket.customer.phone,
+          receiptNumber: 'KC-REC-PRD-2026-00011',
+          amountPaid: '3950',
+          ticketNumber: mockTicket.ticketNumber,
+        }),
+      );
+    });
+
+    it('should not fail doorstep collection if queueProvider.addJob throws an error (fire-and-forget resilience)', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockRejectedValue(new Error('Queue timeout')),
+      };
+
+      const queuedCollectionService = new CollectionService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.payment.findUnique.mockResolvedValue(null);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(10);
+
+      const createdPayment = {
+        id: 'pmt-coll-01',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-21T09:30:00.000Z'),
+      };
+      prismaMock.payment.create.mockResolvedValue(createdPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-coll-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        receiptNumber: 'KC-REC-PRD-2026-00011',
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.count.mockResolvedValue(0);
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      const result = await queuedCollectionService.recordCollection(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3950,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(result.receiptNumber).toBe('KC-REC-PRD-2026-00011');
+      expect(result.paymentId).toBe('pmt-coll-01');
+    });
+  });
 });

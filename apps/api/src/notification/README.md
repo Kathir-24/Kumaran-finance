@@ -118,7 +118,18 @@ export class MyService {
 
 ---
 
-## 5. Verification & Testing
+## 5. Smart Multi-Channel Strategy & Cost Optimization
+
+To minimize telecom expenses while providing 100% reach:
+1. **Device OTP**: Always dispatched via Indian Telecom DLT SMS (`1407169823412093847`).
+2. **Payment Receipts & Auction Alerts**:
+   - **Smartphones with App**: Dispatched via Google Firebase Cloud Messaging (FCM HTTP v1) at **₹0 marginal cost**.
+   - **Keypad / Basic Phones**: When subscriber has no active `fcmToken`, automatically falls back to Indian Telecom DLT SMS (`Msg91SmsDriver` / `MockSmsDriver`) ensuring universal delivery across rural Tamil Nadu.
+3. **Queue Processing**: Payment receipts enqueued asynchronously via BullMQ's `notification-queue` (`JOB_DISPATCH_PAYMENT_RECEIPT`), completely decoupling user response times from external gateway latencies.
+
+---
+
+## 6. Verification & Testing
 
 Run unit tests verifying phone parsing, PII masking, DLT template interpolation, mock sandboxing, MSG91 HTTP flow formatting, and retry logic:
 
@@ -126,6 +137,6 @@ Run unit tests verifying phone parsing, PII masking, DLT template interpolation,
 # Run SMS test suite
 pnpm --filter api test -- test/sms.spec.ts
 
-# Run all API tests (18 suites, 233 tests)
+# Run all API tests (24 suites, 343 unit tests)
 pnpm --filter api test
 ```

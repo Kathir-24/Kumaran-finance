@@ -2,11 +2,18 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import {
+  JOB_DISPATCH_PAYMENT_RECEIPT,
+  NOTIFICATION_QUEUE,
+} from '../jobs/constants/queue-names.constant';
 import {
   formatBilingualReceiptText,
   ReceiptDataInput,
@@ -19,7 +26,12 @@ import { RequestReversalDto } from './dto/request-reversal.dto';
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PaymentService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly queueProvider?: BullMqQueueProvider,
+  ) {}
 
   /**
    * Helper to resolve customer ID for a authenticated user by phone.
@@ -135,7 +147,7 @@ export class PaymentService {
 
     const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create Payment
       const payment = await tx.payment.create({
         data: {
@@ -221,6 +233,31 @@ export class PaymentService {
         netPayableAmount: due.netPayableAmount,
       };
     });
+
+    if (this.queueProvider) {
+      try {
+        await this.queueProvider.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_PAYMENT_RECEIPT,
+          {
+            recipientPhone: ticket.customer.phone,
+            fcmToken: ticket.customer.fcmToken || undefined,
+            amountPaid: paymentAmount.toString(),
+            chitCode: ticket.chitGroup.groupCode,
+            ticketNumber: ticket.ticketNumber,
+            receiptNumber: result.receipt.receiptNumber,
+            transactionTimestamp: paymentDate.toISOString(),
+            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+          },
+        );
+      } catch (queueErr: any) {
+        this.logger.warn(
+          `Failed to enqueue payment receipt job for receipt ${result.receipt.receiptNumber}: ${queueErr.message}`,
+        );
+      }
+    }
+
+    return result;
   }
 
   /**

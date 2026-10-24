@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Current Status**: **All 10 Modules, 3 System Components, Branches, Users & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**419 / 419 passing tests: 337 Unit + 82 E2E**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**425 / 425 passing tests: 343 Unit + 82 E2E**).
 
 ---
 
@@ -12,15 +12,15 @@
 | Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
 |---|---|:---:|---|:---:|
 | **Foundation, Health & Metrics** | `/health`, `/`, `/metrics` | 4 | PostgreSQL 17, Port 5433, Redis 7, MinIO S3, Prometheus APM Telemetry | 4 unit passing |
-| **Module 1: Auth & Staff Identity** | `/auth` | 14 | bcrypt (salt 10-12), RFC 6238 TOTP, SMS-OTP, 6-digit MPIN, token revocation (`/logout`), FCM device push | 20 passing |
+| **Module 1: Auth & Staff Identity** | `/auth` | 14 | bcrypt (salt 10-12), RFC 6238 TOTP, Redis SMS-OTP (300s TTL, 3 attempts), 6-digit MPIN, token revocation (`/logout`), FCM push | 25 passing |
 | **Branches: Company Offices** | `/branches` | 3 | Single company tenancy (ADR-01), bilingual Tamil names, branch-scoping | 4 passing |
 | **Users: Staff Administration** | `/users` | 6 | RBAC role management, bcrypt passwords, branch assignments, atomic deactivation, forced password reset | 9 passing |
 | **Module 2: Customer & KYC Intake** | `/customers` | 11 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), S3 KYC uploads, 15-min presigned URLs, scan deletion | 24 passing |
 | **Module 3: Chit Groups & Intake** | `/chits` | 9 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update & ticket unassign | 20 passing |
 | **Module 4: In-Office Auctions** | `/auctions` | 10 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker, statutory minutes layout | 16 passing |
 | **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 9 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal, substitution & exit settlement | 13 passing |
-| **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`) | 14 passing |
-| **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`) | 16 passing |
+| **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`), BullMQ receipt queue | 16 passing |
+| **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`), BullMQ receipt queue | 19 passing |
 | **Module 8: Prize Disbursements** | `/disbursements` | 9 | Safety proof checklist (ADR-15), S3 proof uploads & presigned inspection URLs, bilingual voucher, Maker $\ne$ Checker payout | 17 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
@@ -28,7 +28,7 @@
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **419 / 419 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **425 / 425 PASSING** |
 
 ---
 
@@ -338,7 +338,7 @@
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
 - **Total Production Endpoints**: **105 physical paths / 111 operations fully implemented, documented, and tested** (79 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).
 - **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 111 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **337 unit tests passing across 24 test suites + 82 E2E tests passing across 10 suites (419 / 419 total tests, 100% pass rate)**.
+- **Automated Test Coverage**: **343 unit tests passing across 24 test suites + 82 E2E tests passing across 10 suites (425 / 425 total tests, 100% pass rate)**.
 
 
 

@@ -167,6 +167,24 @@ flowchart TD
     - Default Password: `BULL_BOARD_PASSWORD=chitflow_secret`
   - Enter credentials in browser Basic Auth modal.
 
+### D.3. Inspecting Active Redis OTP Sessions & Background Queues
+- **Symptoms**: Need to debug or audit active 6-digit SMS OTP sessions or check if receipt jobs are enqueued.
+- **Diagnostic Commands via Redis CLI**:
+  ```powershell
+  # 1. Inspect all active OTP sessions in Redis (300s TTL)
+  docker exec -it chitflow-redis redis-cli keys "auth:otp:*"
+
+  # 2. View specific OTP payload (hashedOtp and failed attempt counter)
+  docker exec -it chitflow-redis redis-cli get "auth:otp:9842100101"
+
+  # 3. Check remaining TTL (seconds until automatic expiration)
+  docker exec -it chitflow-redis redis-cli ttl "auth:otp:9842100101"
+
+  # 4. View BullMQ notification-queue jobs
+  docker exec -it chitflow-redis redis-cli keys "bull:notification-queue:*"
+  ```
+- **Web UI Alternative**: Open [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) to inspect, pause, or retry jobs in real time.
+
 ---
 
 ## Category E: Financial Invariants & Domain Guardrail Rejections

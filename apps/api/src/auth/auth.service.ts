@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +13,7 @@ import * as crypto from 'crypto';
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notification/services/sms.service';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
@@ -42,28 +44,28 @@ export interface SanitizedUser {
   lastLoginAt: Date | null;
 }
 
+export interface OtpSessionRecord {
+  hashedOtp: string;
+  expiresAt: number;
+  attempts: number;
+  entityId: string;
+  name: string;
+  roles: Role[];
+  branchId: string | null;
+  phone: string;
+  isCustomer: boolean;
+}
+
 @Injectable()
 export class AuthService {
-  private readonly otpStore = new Map<
-    string,
-    {
-      hashedOtp: string;
-      expiresAt: number;
-      attempts: number;
-      entityId: string;
-      name: string;
-      roles: Role[];
-      branchId: string | null;
-      phone: string;
-      isCustomer: boolean;
-    }
-  >();
+  private readonly otpStore = new Map<string, OtpSessionRecord>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly smsService: SmsService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
 
   /**
@@ -323,7 +325,7 @@ export class AuthService {
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const hashedOtp = crypto.createHash('sha256').update(otpCode).digest('hex');
 
-    this.otpStore.set(trimmedPhone, {
+    const otpRecord: OtpSessionRecord = {
       hashedOtp,
       expiresAt: Date.now() + OTP_EXPIRY_SECONDS * 1000,
       attempts: 0,
@@ -333,7 +335,19 @@ export class AuthService {
       branchId,
       phone: trimmedPhone,
       isCustomer,
-    });
+    };
+
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      await redis.set(
+        `auth:otp:${trimmedPhone}`,
+        JSON.stringify(otpRecord),
+        'EX',
+        OTP_EXPIRY_SECONDS,
+      );
+    } else {
+      this.otpStore.set(trimmedPhone, otpRecord);
+    }
 
     await this.smsService.sendOtpSms(trimmedPhone, otpCode);
 
@@ -350,7 +364,22 @@ export class AuthService {
    */
   async verifyOtp(dto: VerifyOtpDto) {
     const trimmedPhone = dto.phone.trim();
-    const record = this.otpStore.get(trimmedPhone);
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    let record: OtpSessionRecord | undefined;
+
+    if (useRedis && redis) {
+      const raw = await redis.get(`auth:otp:${trimmedPhone}`);
+      if (raw) {
+        try {
+          record = JSON.parse(raw);
+        } catch {
+          record = undefined;
+        }
+      }
+    } else {
+      record = this.otpStore.get(trimmedPhone);
+    }
 
     if (!record || Date.now() > record.expiresAt) {
       throw new BadRequestException('OTP has expired or was not requested. Please request a new OTP.');
@@ -358,16 +387,30 @@ export class AuthService {
 
     record.attempts += 1;
     if (record.attempts > 3) {
-      this.otpStore.delete(trimmedPhone);
+      if (useRedis && redis) {
+        await redis.del(`auth:otp:${trimmedPhone}`);
+      } else {
+        this.otpStore.delete(trimmedPhone);
+      }
       throw new BadRequestException('Too many invalid verification attempts. Please request a new OTP.');
     }
 
     const candidateHash = crypto.createHash('sha256').update(dto.otp.trim()).digest('hex');
     if (candidateHash !== record.hashedOtp) {
+      if (useRedis && redis) {
+        const ttl = await redis.ttl(`auth:otp:${trimmedPhone}`);
+        if (ttl > 0) {
+          await redis.set(`auth:otp:${trimmedPhone}`, JSON.stringify(record), 'EX', ttl);
+        }
+      }
       throw new BadRequestException('Invalid OTP code. Please enter the correct 6-digit code.');
     }
 
-    this.otpStore.delete(trimmedPhone);
+    if (useRedis && redis) {
+      await redis.del(`auth:otp:${trimmedPhone}`);
+    } else {
+      this.otpStore.delete(trimmedPhone);
+    }
 
     if (record.isCustomer) {
       return this.generateCustomerAuthTokens({

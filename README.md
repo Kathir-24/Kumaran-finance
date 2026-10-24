@@ -157,11 +157,11 @@ Run the automated test suite verifying all 10 non-negotiable financial invariant
 # Run Oxlint linter (0 warnings, 0 errors expected)
 pnpm run lint
 
-# Run all 21 unit test suites (289 / 289 passing tests, 100% pass rate)
+# Run all 24 unit test suites (343 / 343 passing tests, 100% pass rate)
 pnpm test
 
-# Run all 10 end-to-end integration test suites (82 / 82 passing tests)
-pnpm test:e2e
+# Run all 10 end-to-end integration test suites (82 / 82 passing tests, total 425 / 425 passing tests)
+pnpm test:e2e:fresh
 
 # Run production compilation check
 pnpm run build

@@ -4,7 +4,7 @@
 > **Base URL**: `/api/v1` (Global prefix `/api`, URI versioning `v1`)  
 > **Documentation Tool**: OpenAPI 3.0 / Swagger (`/api/docs`)  
 > **Contract Source of Truth**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) & [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)  
-> **Total Verified Scope**: **111 operations across 105 paths** (100% automated test coverage, 419 passing tests across 24 unit suites and 10 E2E suites).
+> **Total Verified Scope**: **111 operations across 105 paths** (100% automated test coverage, 425 passing tests across 24 unit suites [343 unit] and 10 E2E suites [82 E2E]).
 
 ---
 
@@ -52,8 +52,8 @@
 |---|---|---|---|
 | `POST` | `/auth/web/login` | Office staff credentials login (10-digit Phone + Password) | Public |
 | `POST` | `/auth/web/verify-totp` | Verify Microsoft Authenticator 6-digit TOTP code | Session Token |
-| `POST` | `/auth/mobile/request-otp` | Request 6-digit SMS OTP for mobile device registration or login (DLT Template 1407169823412093847) | Public (Throttled) |
-| `POST` | `/auth/mobile/verify-otp` | Verify 6-digit SMS OTP; returns `setupToken` for staff or full session tokens for customers | Public (Throttled) |
+| `POST` | `/auth/mobile/request-otp` | Request 6-digit SMS OTP (DLT Template 1407169823412093847); stored in Redis (`auth:otp:<phone>`) with 300s TTL | Public (Throttled) |
+| `POST` | `/auth/mobile/verify-otp` | Verify 6-digit SMS OTP against Redis with 3-attempt lockout; returns `setupToken` for staff or full session tokens for customers | Public (Throttled) |
 | `POST` | `/auth/mobile/set-mpin` | Establish or update 6-digit MPIN bcrypt hash (Accepts `setupToken` or Bearer JWT) | Setup Token / Bearer JWT |
 | `POST` | `/auth/mobile/login-mpin` | Mobile quick unlock with 10-digit Phone + 6-digit MPIN (Biometric unlock on mobile calls this) | Public (Throttled) |
 | `POST` | `/auth/refresh-token` | Rotate 15-minute access token & 7-day refresh token | Public |
@@ -137,8 +137,8 @@
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET`  | `/collections/agent-dues` | View dues assigned for field collection rounds | `COLLECTION_AGENT`, `ACCOUNTANT`, `SUPER_ADMIN` |
-| `POST` | `/collections/record` | Record doorstep cash collection (Exact $I_{net}$; throws 400 on partial) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
-| `POST` | `/collections/sync-offline-queue` | Batch sync offline field collection queue (1 to 100 items with item-level failure isolation & idempotency) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `POST` | `/collections/record` | Record doorstep cash collection (Exact $I_{net}$; throws 400 on partial); enqueues background receipt dispatch to BullMQ `notification-queue` (Push primary, Keypad SMS fallback) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `POST` | `/collections/sync-offline-queue` | Batch sync offline field collection queue (1 to 100 items with item-level failure isolation, idempotency & asynchronous BullMQ receipt dispatch) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
 | `GET`  | `/collections/daily-summary` | View today's collection register & vault cash | Staff, Auditor |
 | `POST` | `/collections/cash-handover/submit` | Field agent submits daily cash handover batch | `COLLECTION_AGENT`, `SUPER_ADMIN` |
 | `POST` | `/collections/cash-handover/acknowledge` | Partner acknowledges cash into vault (**Enforces** `collector_user_id != acknowledger_user_id`) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
@@ -146,7 +146,7 @@
 ### 2.8 Module 7: Payments, Bilingual Receipts & Reversals (`/api/v1/payments`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `POST` | `/payments` | Record discrete payment (Requires exact $I_{net}$; throws 400 on partial or duplicate) | Staff |
+| `POST` | `/payments` | Record discrete payment (Requires exact $I_{net}$; throws 400 on partial or duplicate); enqueues background receipt dispatch to BullMQ `notification-queue` (Push primary, Keypad SMS fallback) | Staff |
 | `GET`  | `/payments` | Query & filter payments list with pagination | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id` | Get single payment details & transaction history | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id/receipt` | Generate bilingual PDF receipt (English + Tamil) | Staff, Customer, Auditor |

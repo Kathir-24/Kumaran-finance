@@ -84,12 +84,12 @@
   $$\text{Month \#} \mid \text{Payment Date (Cycle Start)} \mid \text{Paid Date (Doorstep)} \mid \text{Amount Paid } (I_{net}) \mid \text{Dividend } (Div) \mid \text{Total } (I_{base})$$
   Invariant: $\text{Amount Paid} + \text{Dividend} = \text{Total Base Installment}$ on every row.
 - **Software Role**: Every transaction generates a sequential receipt number (`KC-REC-...`) solely for company ledger integrity (Form XXII Cash Book), evening handover reconciliation, and dispute backup.
-- **Delivery**: Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt.
+- **Delivery & Asynchronous Queueing**: Counter payments (`POST /payments`) and field collections (`POST /collections/record`) immediately commit financial records to PostgreSQL and asynchronously enqueue a background receipt dispatch to BullMQ (`notification-queue` / `JOB_DISPATCH_PAYMENT_RECEIPT`). Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt fallback.
 
 ---
 
 ### ADR-12: Smart Notification Hierarchy, OTP via SMS & Direct Phone Support (`CONFIRMED-BY-DEVELOPER`)
-- **Authentication**: All user login OTPs (Partners, Staff, Customers) strictly use **Telecom DLT SMS** (Header: `KMRCHT`, Template `1407169823412093847`).
+- **Authentication**: All user login OTPs (Partners, Staff, Customers) strictly use **Telecom DLT SMS** (Header: `KMRCHT`, Template `1407169823412093847`). OTP sessions are stored in **Redis** (`auth:otp:<phone>`) with a strict **300-second (5-minute) TTL**, SHA-256 hash security, and a 3-attempt brute-force lockout.
 - **Operational Alerts**: Payments, upcoming auction reminders, post-auction dividend credits, and 3-month default warnings follow a unified smart hierarchy:
   - **Smartphone Users**: Free Mobile App Push Notifications (FCM, ₹0 cost).
   - **Keypad Phone Users**: Telecom DLT SMS fallback.

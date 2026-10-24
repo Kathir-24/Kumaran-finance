@@ -125,6 +125,6 @@ Run the automated test suite verifying bypass, PII scrubbing, BigInt compatibili
 # Run Sentry unit tests (14 passing tests)
 pnpm --filter api test -- test/sentry.spec.ts
 
-# Run all API tests (19 suites, 248 passing tests)
+# Run all API tests (24 suites, 343 passing unit tests)
 pnpm --filter api test
 ```

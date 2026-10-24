@@ -599,5 +599,91 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         }),
       );
     });
+
+    it('should store OTP in Redis with 300s TTL and delete upon successful verification when Redis is connected', async () => {
+      const mockRedisClient = {
+        set: jest.fn().mockResolvedValue('OK'),
+        get: jest.fn(),
+        del: jest.fn().mockResolvedValue(1),
+        ttl: jest.fn().mockResolvedValue(295),
+      };
+      const mockRedisProvider = {
+        getClient: jest.fn().mockReturnValue(mockRedisClient),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+
+      const redisAuthService = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        mockRedisProvider as any,
+      );
+
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      await redisAuthService.requestOtp({ phone: staffPhone });
+
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        `auth:otp:${staffPhone}`,
+        expect.any(String),
+        'EX',
+        300,
+      );
+
+      const savedPayload = JSON.parse(mockRedisClient.set.mock.calls[0][1]);
+      const sentOtp = smsServiceMock.sendOtpSms.mock.calls[smsServiceMock.sendOtpSms.mock.calls.length - 1][1];
+
+      mockRedisClient.get.mockResolvedValue(JSON.stringify(savedPayload));
+
+      const verifyRes = await redisAuthService.verifyOtp({
+        phone: staffPhone,
+        otp: sentOtp,
+      });
+
+      expect(verifyRes.verified).toBe(true);
+      expect(mockRedisClient.del).toHaveBeenCalledWith(`auth:otp:${staffPhone}`);
+    });
+
+    it('should increment attempts in Redis on mismatch and lockout after 3 failed attempts', async () => {
+      const mockRedisClient = {
+        set: jest.fn().mockResolvedValue('OK'),
+        get: jest.fn(),
+        del: jest.fn().mockResolvedValue(1),
+        ttl: jest.fn().mockResolvedValue(280),
+      };
+      const mockRedisProvider = {
+        getClient: jest.fn().mockReturnValue(mockRedisClient),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+
+      const redisAuthService = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        mockRedisProvider as any,
+      );
+
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      await redisAuthService.requestOtp({ phone: staffPhone });
+
+      const savedPayload = JSON.parse(mockRedisClient.set.mock.calls[0][1]);
+      mockRedisClient.get.mockResolvedValue(JSON.stringify(savedPayload));
+
+      // Attempt 1: wrong OTP
+      await expect(
+        redisAuthService.verifyOtp({ phone: staffPhone, otp: '000000' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRedisClient.set).toHaveBeenCalledTimes(2); // Initial save + update attempts
+
+      // Attempt 4: lockout
+      savedPayload.attempts = 3;
+      mockRedisClient.get.mockResolvedValue(JSON.stringify(savedPayload));
+
+      await expect(
+        redisAuthService.verifyOtp({ phone: staffPhone, otp: '000000' }),
+      ).rejects.toThrow('Too many invalid verification attempts');
+      expect(mockRedisClient.del).toHaveBeenCalledWith(`auth:otp:${staffPhone}`);
+    });
   });
 });

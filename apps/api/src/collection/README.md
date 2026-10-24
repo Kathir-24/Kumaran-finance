@@ -14,6 +14,7 @@ The **Collection & Cash Handover** module handles doorstep field collections and
 | **Zero Float / Whole Rupee Math** | All currency stored in integer rupees | Native TypeScript `bigint` & Prisma `BigInt` |
 | **Idempotency Deduplication** | Safe retry without duplicate receipts | Unique `idempotencyKey` UUID per transaction |
 | **Dual-Control Vault Handover** | Agent cannot acknowledge their own cash | Strict validation: `collectorUserId != acknowledgerUserId` |
+| **Async Receipt Notification** | Non-blocking BullMQ queue dispatch | Dispatches `JOB_DISPATCH_PAYMENT_RECEIPT` to `notification-queue` post-commit with fire-and-forget safety |
 
 ---
 
@@ -41,6 +42,7 @@ sequenceDiagram
     participant API as CollectionController
     participant Service as CollectionService
     participant DB as PostgreSQL 17
+    participant Queue as BullMQ (notification-queue)
 
     FieldAgent->>Mobile: Collect Cash door-to-door (No Internet)
     Mobile->>Mobile: Generate local UUID idempotencyKey & record collectedAt
@@ -54,6 +56,7 @@ sequenceDiagram
             Service-->>API: Mark as isDuplicate = true (return original receipt)
         else Validation passed (due unpaid, exact Inet)
             Service->>DB: Record Payment, create Receipt, mark Due as PAID
+            Service--)Queue: Fire-and-forget: addJob(JOB_DISPATCH_PAYMENT_RECEIPT)
             Service-->>API: Item status = SUCCESS
         else Validation failed (already paid, partial mismatch)
             Service-->>API: Item status = FAILED (errorCode, errorMessage)
@@ -122,11 +125,11 @@ sequenceDiagram
 
 ---
 
-## 5. Sequential Bilingual Receipt Numbering
+## 5. Sequential Bilingual Receipt Numbering & Async Dispatch
 Receipts follow the mandated format:
 $$\text{KC-REC-}\{\text{BranchCode}\}\text{-}\{\text{YYYY}\}\text{-}\{\text{Sequence: 5 digits}\}$$
 Example: `KC-REC-PRD-2026-00045`.
-Every collection immediately issues a receipt record linked to the discrete `Payment` and `PaymentAllocation`.
+Every collection immediately issues a receipt record linked to the discrete `Payment` and `PaymentAllocation`. Upon database commit, a `JOB_DISPATCH_PAYMENT_RECEIPT` job is enqueued onto BullMQ's `notification-queue` (fire-and-forget, with Redis offline safety) to notify the subscriber via Mobile Push (free) or Indian Telecom DLT SMS fallback for keypad phones.
 
 ---
 
@@ -139,3 +142,13 @@ Every collection immediately issues a receipt record linked to the discrete `Pay
    - Strictly validates `collectorUserId != acknowledgerUserId`.
    - Verifies counted amount matches the exact sum of payments.
    - Status transitions from `PENDING_HANDOVER` to `ACKNOWLEDGED`.
+
+---
+
+## 7. Testing & Verification
+
+Automated test suite (`test/collection.spec.ts` — 16 passing tests) verifying offline queue idempotency, exact $I_{net}$ matching, partial failure isolation, dual-control cash handover, BullMQ receipt queueing, and offline fallback resilience:
+
+```bash
+pnpm --filter api test -- test/collection.spec.ts
+```

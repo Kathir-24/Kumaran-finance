@@ -30,6 +30,7 @@ sequenceDiagram
     Backend->>Backend: Checks Idempotency (Has event ID been processed?)
     alt Signature Valid & Not Processed
         Backend->>Backend: Database Transaction: Mark SUCCESS, Allocate Due, Issue Bilingual Receipt
+        Backend->>Backend: Fire-and-forget: Enqueue Receipt Job to BullMQ (notification-queue)
         Backend-->>PG: HTTP 200 OK
     else Duplicate Event
         Backend-->>PG: HTTP 200 OK (Idempotent ignore)

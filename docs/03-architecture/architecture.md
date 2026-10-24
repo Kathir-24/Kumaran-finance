@@ -25,14 +25,14 @@ flowchart TD
 
     subgraph DataTier["Data & Storage Tier"]
         Postgres[("PostgreSQL 17\n(Authoritative Financial State)\nNumeric Math | Row Locking | Audit Logs")]
-        Redis[("Redis 7 + BullMQ\n(Non-Authoritative Jobs Queue)\nReminders | Webhook Retries | Reconciliations")]
+        Redis[("Redis 7 + BullMQ\n(Non-Authoritative Jobs Queue & OTP Cache)\nReceipt Dispatches | Arrears | Reconciliations | OTP State")]
         S3["AWS S3 Private Object Storage\n(Encrypted KYC Docs & PDF Receipts)\nPresigned URLs Only"]
     end
 
     subgraph External["External Services"]
         FCM["Firebase Cloud Messaging (FCM)\nPush Notifications"]
         PG["Approved Payment Gateway\n(UPI / Netbanking in Sandbox)"]
-        SMS["Indian Telecom DLT SMS Gateway\n(Initial Device Registration OTP Only)"]
+        SMS["Indian Telecom DLT SMS Gateway\n(Device OTP + Keypad Phone Fallback)"]
     end
 
     Mobile -->|HTTPS / REST API| Nginx
@@ -54,7 +54,7 @@ flowchart TD
 ### 2.1 Mobile App Authentication (Partners, Collection Agents & Customers)
 1. **Initial Device Registration (One-Time Only)**:
    - User enters registered mobile phone number.
-   - Backend sends a one-time OTP via registered Indian SMS (DLT route).
+   - Backend generates a 6-digit cryptographic OTP, stored in Redis under `auth:otp:<phone>` (300s TTL, 3-attempt lockout), and dispatches via registered Indian SMS (DLT route).
    - Upon verification, the Flutter app creates a cryptographic device key pair using **Android Keystore** via `flutter_secure_storage`.
    - The user establishes a **6-digit MPIN** and optionally enables **Biometrics** (Fingerprint / Face Unlock).
 2. **Routine Daily App Usage (Zero SMS Cost, 1-Second Unlock)**:

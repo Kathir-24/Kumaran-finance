@@ -138,8 +138,9 @@ For operational visibility over asynchronous background workers, partners can op
   - Tracks daily arrears calculation running at 02:00 AM IST.
   - Verifies automated 3-month continuous defaulter tagging (ADR-07).
 - **`notification-queue`**:
-  - Monitors Push notification delivery batches and DLT SMS fallback queues.
-  - Displays any delivery failures caused by telecom timeouts.
+  - Monitors bilingual payment receipt dispatches, pre-auction reminders, and default warning notices.
+  - Verifies Push notification delivery and DLT SMS fallback queues for keypad phones.
+  - Displays any delivery failures caused by telecom timeouts with 1-click DLQ retry.
 - **`reconciliation-queue`**:
   - Tracks the 06:00 AM IST payment gateway settlement audit.
   - Shows auto-resolved ghost drops and gateway mismatch alerts.

@@ -2,10 +2,17 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import {
+  JOB_DISPATCH_PAYMENT_RECEIPT,
+  NOTIFICATION_QUEUE,
+} from '../jobs/constants/queue-names.constant';
 import { AcknowledgeHandoverDto } from './dto/acknowledge-handover.dto';
 import { QueryCollectionDto } from './dto/query-collection.dto';
 import { RecordCollectionDto } from './dto/record-collection.dto';
@@ -41,7 +48,12 @@ export interface SyncOfflineQueueResponse {
 
 @Injectable()
 export class CollectionService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(CollectionService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly queueProvider?: BullMqQueueProvider,
+  ) {}
 
   /**
    * Doorstep field collection recording.
@@ -148,7 +160,7 @@ export class CollectionService {
 
     const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create Payment
       const payment = await tx.payment.create({
         data: {
@@ -231,6 +243,31 @@ export class CollectionService {
         collectedAt: payment.createdAt,
       };
     });
+
+    if (this.queueProvider) {
+      try {
+        await this.queueProvider.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_PAYMENT_RECEIPT,
+          {
+            recipientPhone: ticket.customer.phone,
+            fcmToken: ticket.customer.fcmToken || undefined,
+            amountPaid: collectionAmount.toString(),
+            chitCode: ticket.chitGroup.groupCode,
+            ticketNumber: ticket.ticketNumber,
+            receiptNumber: result.receiptNumber,
+            transactionTimestamp: paymentDate.toISOString(),
+            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+          },
+        );
+      } catch (queueErr: any) {
+        this.logger.warn(
+          `Failed to enqueue collection receipt notification for ${result.receiptNumber}: ${queueErr.message}`,
+        );
+      }
+    }
+
+    return result;
   }
 
   /**

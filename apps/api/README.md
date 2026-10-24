@@ -80,8 +80,8 @@ Environment variables are validated fail-fast at server startup via [`src/config
 | `S3_SECRET_ACCESS_KEY`| `string` | If S3 | `undefined` | S3 secret access key. |
 | `S3_ENDPOINT` | `string` | Optional | `undefined` | Custom S3 endpoint (e.g. `http://127.0.0.1:9000` for MinIO). |
 | `S3_FORCE_PATH_STYLE` | `boolean`| Optional | `false` | Required true for local MinIO compatibility. |
-| `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ scheduled jobs. |
-| `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues. |
+| `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ background queues and distributed OTP storage. |
+| `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues and distributed OTP storage. |
 | `BULL_BOARD_USER` | `string` | Optional | `admin` | HTTP Basic Auth user for Bull Board at `/admin/queues`. |
 | `BULL_BOARD_PASSWORD` | `string` | Optional | `chitflow_secret` | HTTP Basic Auth password for Bull Board. |
 | `SMS_DRIVER` | `string` | Optional | `mock` | SMS gateway driver (`mock` for dev/test, `msg91` for production DLT). |
@@ -128,19 +128,19 @@ Every engineer and AI assistant contributing to `apps/api/` must strictly uphold
 
 ```text
 apps/api/src/
-├── auth/            # 6-persona identity, SMS OTP, MPIN, 2FA TOTP, JWT, RBAC guards
+├── auth/            # 6-persona identity, Redis SMS OTP (300s TTL), MPIN, 2FA TOTP, JWT, RBAC guards
 ├── branch/          # Branch office administration (PRD, ERD) & bilingual Tamil names
 ├── user/            # Staff user administration, RBAC role assignment & status toggle
 ├── customer/        # Customer intake, S3 KYC scans, directory & nominees
 ├── chit/            # Chit schemes, groups, lifecycle & mid-cycle onboarding
 ├── auction/         # In-office auctions, Option A physical token tie-break, Registrar filing
 ├── installment/     # Universal dividend dues generation, digital passbook, defaulters
-├── collection/      # Field cash collection & evening vault cash handover
-├── payment/         # Discrete payments, bilingual receipts, maker-checker reversals
+├── collection/      # Field cash collection, BullMQ receipt queueing, evening vault cash handover
+├── payment/         # Discrete payments, BullMQ receipt queueing, maker-checker reversals
 ├── disbursement/    # Prize payouts (Cash/Bank) & company safety proof checklist
 ├── report/          # Form XVII statutory registers & partner audit registers
 ├── storage/         # Local & Private S3 driver with presigned URLs
 ├── pdf/             # Bilingual PDF canvas engine (EN + தமிழ்)
-├── jobs/            # BullMQ background workers (daily arrears, reconciliation, notifications)
+├── jobs/            # BullMQ background workers (daily arrears, reconciliation, receipt dispatches)
 └── common/          # Interceptors (BigInt, Response envelope), filters, guards, decorators
 ```

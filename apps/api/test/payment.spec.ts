@@ -642,4 +642,115 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('5. BullMQ Notification Queue Hookup', () => {
+    it('should enqueue payment receipt job to notification-queue upon successful payment', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-123', status: 'ENQUEUED' }),
+      };
+
+      const queuedPaymentService = new PaymentService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(411);
+
+      const createdPayment = {
+        id: mockPaymentId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-18T10:45:00.000Z'),
+      };
+      prismaMock.payment.create.mockResolvedValue(createdPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-01',
+        receiptNumber: 'KC-REC-PRD-2026-00412',
+        isBilingual: true,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({
+        ...mockDue,
+        status: DueStatus.PAID,
+        paidAmount: 3750n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+
+      const result = await queuedPaymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockMakerId,
+      );
+
+      expect(result.receipt.receiptNumber).toBe('KC-REC-PRD-2026-00412');
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-payment-receipt',
+        expect.objectContaining({
+          recipientPhone: mockTicket.customer.phone,
+          receiptNumber: 'KC-REC-PRD-2026-00412',
+          amountPaid: '3750',
+          ticketNumber: mockTicket.ticketNumber,
+        }),
+      );
+    });
+
+    it('should not fail payment recording if queueProvider.addJob throws an error (fire-and-forget resilience)', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockRejectedValue(new Error('Redis connection refused')),
+      };
+
+      const queuedPaymentService = new PaymentService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as any,
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.count.mockResolvedValue(411);
+
+      const createdPayment = {
+        id: mockPaymentId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-18T10:45:00.000Z'),
+      };
+      prismaMock.payment.create.mockResolvedValue(createdPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-01',
+        receiptNumber: 'KC-REC-PRD-2026-00412',
+        isBilingual: true,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({
+        ...mockDue,
+        status: DueStatus.PAID,
+        paidAmount: 3750n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+
+      const result = await queuedPaymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockMakerId,
+      );
+
+      expect(result.receipt.receiptNumber).toBe('KC-REC-PRD-2026-00412');
+      expect(result.dueStatus).toBe(DueStatus.PAID);
+    });
+  });
 });
