@@ -18,6 +18,7 @@ If you need to quickly recall what BullMQ does in Kumaran Chits:
 | **`notification-queue`** | `dispatch-payment-receipt` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Post-commit from Counter & Doorstep collections | Dispatches bilingual payment receipt alerts via **Mobile Push (FCM)** with fallback to **Keypad SMS**. |
 | **`notification-queue`** | `scan-pre-auction-reminders` | [`AuctionReminderSchedulerService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/auction-reminder-scheduler.service.ts) | Automated `09:00 AM IST` Cron | Scans upcoming auctions (3 days ahead) and enqueues broadcast reminder jobs. |
 | **`notification-queue`** | `dispatch-auction-reminder` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered by pre-auction scan or Admin API | Dispatches bilingual date, time, and ceiling reminders to eligible subscribers. |
+| **`notification-queue`** | `dispatch-auction-result` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered upon auction finalization | Broadcasts winning discount, dividend per ticket, and next month's net due ($I_{net}$) to all members. |
 | **`notification-queue`** | `dispatch-default-warning` | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | Triggered by arrears scan | Dispatches arrears warnings when a subscriber falls into overdue status. |
 
 ---
@@ -103,8 +104,11 @@ Handles all outgoing subscriber communications without blocking HTTP request thr
    - Payload includes: `recipientPhone`, `fcmToken`, `amountPaid`, `chitCode`, `ticketNumber`, `receiptNumber`, `transactionTimestamp`, and `passbookAppUrl`.
 2. **Pre-Auction Broadcasts (`JOB_SCAN_PRE_AUCTION_REMINDERS` & `JOB_DISPATCH_AUCTION_REMINDER`)**:
    - Scans auctions scheduled 3 days ahead.
-   - Broadcats auction date, start time, branch venue, and ceiling discount to non-prized members.
-3. **Arrears & Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)**:
+   - Broadcasts auction date, start time, branch venue, and ceiling discount to non-prized members.
+3. **Auction Results Broadcast (`dispatchAuctionResult`)**:
+   - Triggered upon auction finalization by Checker.
+   - Broadcasts the winning ticket number, bid discount, dividend credit per ticket, and next month's net installment ($I_{net} = I_{base} - Div$) to all subscribers in the group.
+4. **Arrears & Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)**:
    - Dispatches statutory reminder notices when a member enters arrears.
 
 ---

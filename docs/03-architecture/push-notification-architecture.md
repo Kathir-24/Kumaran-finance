@@ -16,6 +16,8 @@ If you need to quickly recall how push notifications work in Kumaran Chits:
 |---|---|---|---|---|
 | **Payment Receipts** | Dispatched post-transaction via BullMQ | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | `RECEIPT`<br>Deep-links to `/passbook` | Falls back to DLT SMS if `fcmToken` is missing or invalid. |
 | **Auction Reminders** | 09:00 AM automated scan (3 days prior) | [`AuctionReminderSchedulerService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/auction-reminder-scheduler.service.ts) | `AUCTION_REMINDER`<br>Deep-links to `/auctions` | Falls back to DLT SMS for keypad phones. |
+| **Auction Results** | Dispatched upon auction finalization | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | `AUCTION_RESULT`<br>Deep-links to `/passbook` | Falls back to DLT SMS with dividend & net due info. |
+| **Defaulter Warnings** | Dispatched upon arrears scan | [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts) | `DEFAULT_WARNING`<br>Overdue notice | Falls back to statutory DLT SMS notice. |
 | **Maker-Checker Payouts** | High-priority push to 4 Partners | [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) | `DISBURSEMENT_APPROVAL`<br>Opens fingerprint sign-off | Fallback to SMS alert + Web dashboard queue. |
 | **Payment Reversals** | High-priority push to 4 Partners | [`PaymentService`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts) | `REVERSAL_APPROVAL`<br>Opens reversal review | Fallback to SMS alert + Web dashboard queue. |
 | **Staff Token Registration** | `PATCH /api/v1/auth/fcm-token` | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Saves token in `public."User"."fcmToken"` | Cleared on `POST /auth/logout` (`fcmToken = null`). |
@@ -137,6 +139,36 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
   }
   ```
 - **App Behavior**: Opens Dual-Control Reversal review screen.
+
+### 3.5 Auction Results Broadcast
+- **Target Persona**: All Chit Subscribers in the chit group
+- **Trigger**: Auction finalized by Checker ([`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts)).
+- **Title**: `குமரன் பைனான்ஸ் / Kumaran Finance`
+- **Body**: `மாதம் {month} ஏல முடிவு: வெற்றி கழிவு ரூ. {discount}. லாபப்பங்கு ரூ. {dividend}. அடுத்த மாத தவணை: ரூ. {netPayable}.`
+- **Data Payload**:
+  ```json
+  {
+    "type": "AUCTION_RESULT",
+    "chitCode": "KC-LIVE-20M-01",
+    "installmentMonth": "2"
+  }
+  ```
+- **App Behavior**: Opens passbook statement showing the newly credited dividend and adjusted net payable installment ($I_{net} = I_{base} - Div$).
+
+### 3.6 Defaulter & Arrears Warning
+- **Target Persona**: Subscribers entering overdue arrears status
+- **Trigger**: Midnight arrears scan ([`DailyArrearsService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/daily-arrears.service.ts)).
+- **Title**: `நிலுவை எச்சரிக்கை / Arrears Notice`
+- **Body**: `சீட்டு {chitCode} மாத தவணை நிலுவையில் உள்ளது. அபராதத்தை தவிர்க்க உடனே செலுத்தவும்.`
+- **Data Payload**:
+  ```json
+  {
+    "type": "DEFAULT_WARNING",
+    "ticketId": "ed087ad5-ee76-481b-bc65-6de55ba61db0",
+    "consecutiveMonths": "2"
+  }
+  ```
+- **App Behavior**: Opens pending dues payment screen.
 
 ---
 
