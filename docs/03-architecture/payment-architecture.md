@@ -229,11 +229,18 @@ All endpoints are protected by [`JwtAuthGuard`](file:///u:/Kumaran-finance/apps/
 | `POST /collections/cash-handover/submit` | Collection Agent, Super Admin | Submits unhanded cash collections as an evening batch for office vault deposit. |
 | `POST /collections/cash-handover/acknowledge` | **Super Admin, Branch Manager, Accountant** | Physically verifies notes and signs cash into branch vault. **Enforces `collector != acknowledger`**. |
 
-### 5.3 Bilingual 80mm PDF Slip Canvas ([`PdfController`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts))
+### 5.3 Receipt Delivery Endpoints & Distinction (JSON vs. PDF)
 
-| HTTP Method & Path | Primary Role | Description & Invariant Guards |
-|---|---|---|
-| `GET /pdf/receipt/:paymentId` | All Staff, Customer | Generates pixel-accurate 80mm thermal bilingual receipt PDF slip with Tamil typography and returns binary stream or presigned S3 download URL. |
+Kumaran Chits provides two distinct endpoints for receipts, each serving a specific technical purpose:
+
+| Endpoint | Content-Type | Response Body | Intended Usage & Device Experience |
+|---|---|---|---|
+| [`GET /payments/:id/receipt`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L134) | `application/json` | Structured JSON with calculation metadata + pre-formatted monospace bilingual text string | **Primary Digital Display**: Consumed by the Flutter Mobile App and Web Admin to render the receipt card instantly inside the customer's digital passbook view without PDF rendering overhead. |
+| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary PDF document compiled via `pdfkit` or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private AWS S3 / MinIO storage. |
+
+> [!IMPORTANT]
+> **Zero Thermal Printers Rule (ADR-11)**:  
+> Field collection agents and office accountants **do not carry or use portable thermal printers**. In Kumaran Finance operations, the customer's physical paper passbook (சீட்டு பாஸ்புக்) is their primary physical proof of installment payment. The agent/cashier enters the date, amount, and signs with a pen. Loose thermal paper slips are completely eliminated. The digital PDF generator exists solely for cloud archival and on-demand customer smartphone downloads.
 
 ---
 
@@ -334,9 +341,9 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 | Monorepo Layer | Current Status | State in Repository | Gap Details |
 |---|:---:|---|---|
 | **Backend API Engine (`apps/api`)** | **100% DONE** | Production-ready | All controllers, services, database transactions, invariant guards, and tests are complete. |
-| **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | 80mm thermal receipt PDF canvas with Noto Sans Tamil fonts verified. |
+| **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | On-demand compact bilingual PDF receipt generator with Noto Sans Tamil fonts verified. |
 | **BullMQ Receipt & Alert Queues** | **100% DONE** | Production-ready | `JOB_DISPATCH_PAYMENT_RECEIPT` and `JOB_DISPATCH_APPROVAL_ALERT` wired and running. |
-| **Web Admin Portal (`apps/web`)** | **0% PENDING** | Empty (`.gitkeep`) | React/Next.js screens for cashier counter entry, receipt printing, and handover approval remain to be built. |
+| **Web Admin Portal (`apps/web`)** | **0% PENDING** | Empty (`.gitkeep`) | React/Next.js screens for cashier counter entry, receipt viewing, and handover approval remain to be built. |
 | **Mobile Flutter App (`apps/mobile`)** | **0% PENDING** | Empty (`.gitkeep`) | Android screens for field agent collections, offline SQLite queue, and customer passbook remain to be built. |
 | **Payment Gateway (Razorpay/PG)** | **ARCH ONLY** | Documented in `payment-integration.md` | Sandbox architecture planned for future phase; no live gateway code in API (counter & field cash are current business truth). |
 | **Cheque Clearance Endpoint** | **BY WORKFLOW** | Handled via Reversal | Dedicated `PATCH /cheque-status` endpoint not created; bounced cheques are handled via `POST /payments/:id/request-reversal` with reason `CHEQUE_BOUNCE`. |
@@ -349,7 +356,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 1. **Subscriber Arrives**: Look up subscriber ticket using phone number or chit group code.
 2. **Collect Exact Amount**: Collect exact whole-rupee amount shown as `netPayableAmount` ($I_{net}$). Never accept partial amounts or round-offs.
 3. **Record in System**: Submit `POST /payments` with payment method and transaction reference (if UPI/Cheque).
-4. **Issue Receipt**: System returns `KC-REC-PRD-YYYY-XXXXX`. Print 80mm thermal slip or sign physical paper passbook with receipt number and date.
+4. **Issue Receipt**: System returns `KC-REC-PRD-YYYY-XXXXX`. Sign customer's physical paper passbook with receipt number and date. (No thermal printer).
 
 ### For Field Collection Agent
 1. **Morning Briefing**: Fetch assigned dues list (`GET /collections/agent-dues`) on mobile app.
