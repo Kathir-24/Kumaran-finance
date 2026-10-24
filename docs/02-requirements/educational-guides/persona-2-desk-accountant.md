@@ -250,7 +250,7 @@ flowchart TD
    - The accountant clicks **`"Acknowledge & Transfer to Vault"`**.
    - *System Check*: The backend asserts `collector_user_id (Selvam) !== acknowledger_user_id (Selvi)`. It passes!
    - System commits the transfer. Selvam's mobile cash-in-hand drops to ₹0, and the Head Office safe vault balance increments by ₹38,900.
-   - A handover receipt slip prints automatically. Selvam signs one copy for the office ledger and keeps one copy.
+   - A digital handover acknowledgment record is generated instantly. Selvam's mobile app confirms status `CONFIRMED`, relieving him of cash liability before heading home.
 
 ---
 

@@ -159,7 +159,7 @@ A collection of 11 live-server end-to-end verification runners designed to execu
 | [`verify-lifecycle-7.ts`](verify-lifecycle-7.ts) | Lifecycle 7: Cash Handover & Reversals | Counter payment, BullMQ receipt queueing, bilingual text receipt (English/Tamil), Maker $\ne$ Checker payment reversals (4 steps) | ✅ **100% Passed** |
 | [`verify-lifecycle-8.ts`](verify-lifecycle-8.ts) | Lifecycle 8: Prize Disbursements | Safety proof checklist, S3 presigned inspection, Maker-Checker authorization, Month N maturity payout (8 steps) | ✅ **100% Passed** |
 | [`verify-lifecycle-9.ts`](verify-lifecycle-9.ts) | Lifecycle 9: Statutory Registers | Form XXII Cash Book equation ($Closing = Opening + In - Out$), Form XVII Minutes, Form XXI Passbook, SSE stream (9 steps) | ✅ **100% Passed** |
-| [`verify-lifecycle-10.ts`](verify-lifecycle-10.ts) | Lifecycle 10: Storage & PDF Canvas | Bilingual PDFKit thermal receipt, prize voucher, Form XVII, Form XXI, anti-traversal security defense (5 steps) | ✅ **100% Passed** |
+| [`verify-lifecycle-10.ts`](verify-lifecycle-10.ts) | Lifecycle 10: Storage & PDF Canvas | Bilingual PDFKit A5 digital receipt, prize voucher, Form XVII, Form XXI, anti-traversal security defense (5 steps) | ✅ **100% Passed** |
 | [`verify-lifecycle-11.ts`](verify-lifecycle-11.ts) | Lifecycle 11: Background Jobs & Ops | Midnight arrears scan, 3M tagging, BullMQ queue status, DLT SMS/Push audit logs, Prometheus metrics & Bull Board (15 steps) | ✅ **100% Passed** |
 
 Execution proof reports and the master verification plan are archived in [`scripts/docs/`](docs/).

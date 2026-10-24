@@ -148,7 +148,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
 ## 4. Invariants Confirmed
 
 1. **Pixel-Accurate Bilingual PDF Generation**:
-   - Thermal receipts render both English and Tamil typography seamlessly using `NotoSansTamil` TrueType fonts.
+   - Digital receipts render both English and Tamil typography seamlessly using `NotoSansTamil` TrueType fonts. Zero thermal printers deployed in operations (ADR-11).
 2. **Private S3 Storage & 15-Minute Presigned Security**:
    - Zero public bucket access. All documents upload to `kumaran-chits-private` and generate secure expiring URLs (`900s`).
 3. **Dual Operating Modes Supported**:

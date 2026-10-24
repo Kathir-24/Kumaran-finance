@@ -236,7 +236,7 @@ Kumaran Chits provides two distinct endpoints for receipts, each serving a speci
 | Endpoint | Content-Type | Response Body | Intended Usage & Device Experience |
 |---|---|---|---|
 | [`GET /payments/:id/receipt`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L134) | `application/json` | Structured JSON with calculation metadata + pre-formatted monospace bilingual text string | **Primary Digital Display**: Consumed by the Flutter Mobile App and Web Admin to render the receipt card instantly inside the customer's digital passbook view without PDF rendering overhead. |
-| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary PDF document compiled via `pdfkit` or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private AWS S3 / MinIO storage. |
+| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary A5 PDF document compiled via `pdfkit` (419.53 x 595.28 pt) or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private AWS S3 / MinIO storage. |
 
 > [!IMPORTANT]
 > **Zero Thermal Printers Rule (ADR-11)**:  
@@ -341,7 +341,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 | Monorepo Layer | Current Status | State in Repository | Gap Details |
 |---|:---:|---|---|
 | **Backend API Engine (`apps/api`)** | **100% DONE** | Production-ready | All controllers, services, database transactions, invariant guards, and tests are complete. |
-| **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | On-demand compact bilingual PDF receipt generator with Noto Sans Tamil fonts verified. |
+| **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | On-demand A5 bilingual PDF receipt document generator with Noto Sans Tamil fonts verified. |
 | **BullMQ Receipt & Alert Queues** | **100% DONE** | Production-ready | `JOB_DISPATCH_PAYMENT_RECEIPT` and `JOB_DISPATCH_APPROVAL_ALERT` wired and running. |
 | **Web Admin Portal (`apps/web`)** | **0% PENDING** | Empty (`.gitkeep`) | React/Next.js screens for cashier counter entry, receipt viewing, and handover approval remain to be built. |
 | **Mobile Flutter App (`apps/mobile`)** | **0% PENDING** | Empty (`.gitkeep`) | Android screens for field agent collections, offline SQLite queue, and customer passbook remain to be built. |
