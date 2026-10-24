@@ -108,6 +108,13 @@ flowchart LR
   ```
   **Output**: `6270e6dc...|REQUESTED|WRONG_TICKET_ENTERED|5460c6e3-607f-4931-b789-d269b65f852a`  
   *(Initiated by Desk Accountant with status `REQUESTED`)*.
+- **BullMQ Approval Alert Enqueue (`JOB_DISPATCH_APPROVAL_ALERT`)**:
+  - Immediately post-commit, [`PaymentService.requestReversal()`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts) enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) (`approvalType: 'REVERSAL_APPROVAL'`) to `notification-queue`, strictly excluding `makerUserId`.
+  - **Live Server Execution Log**:
+    ```text
+    [Nest] LOG [PaymentService] Enqueued reversal approval alert for Payment ddbd39b6-ae0a-4751-9075-84dccf108028
+    [Nest] LOG [NotificationService] Dispatched high-priority approval push alerts to active partner(s) for REVERSAL_APPROVAL
+    ```
 
 ---
 

@@ -115,7 +115,7 @@
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`); enqueues background auction result broadcast to BullMQ `notification-queue` (`JOB_DISPATCH_AUCTION_RESULT`; Push primary, Keypad SMS fallback) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/auctions/:id/minutes` | View Form XVII statutory auction minutes summary | Staff, Auditor |
 | `GET`  | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for print/PDF | Staff, Auditor |
 | `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar of Chits | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
@@ -150,7 +150,7 @@
 | `GET`  | `/payments` | Query & filter payments list with pagination | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id` | Get single payment details & transaction history | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id/receipt` | Generate bilingual PDF receipt (English + Tamil) | Staff, Customer, Auditor |
-| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `SUPER_ADMIN` |
 
@@ -161,7 +161,7 @@
 | `GET`  | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff, Member, Auditor |
 | `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 | Staff |
 | `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
-| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
 | `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |

@@ -179,6 +179,13 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
   ```text
   SAFETY_PROOF_VERIFIED|AuctionWinner|f8ad6728-8281-404a-8cbe-014c2a5e7f8d
   ```
+- **BullMQ Approval Alert Enqueue (`JOB_DISPATCH_APPROVAL_ALERT`)**:
+  - Immediately post-commit, [`DisbursementService.verifySafetyProof()`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) (`approvalType: 'DISBURSEMENT_APPROVAL'`) to `notification-queue`, strictly excluding `makerUserId`.
+  - **Live Server Execution Log**:
+    ```text
+    [Nest] LOG [DisbursementService] Enqueued disbursement approval alert for Auction 9adf153f-a30f-44de-bc54-39bb3c952822
+    [Nest] LOG [NotificationService] Dispatched high-priority approval push alerts to active partner(s) for DISBURSEMENT_APPROVAL
+    ```
 
 ---
 

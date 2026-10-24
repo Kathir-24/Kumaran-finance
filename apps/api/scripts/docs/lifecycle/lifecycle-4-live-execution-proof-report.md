@@ -119,6 +119,15 @@ flowchart TD
   SELECT "isPrized" FROM public."SubscriberTicket" WHERE id = '<Ticket 4 UUID>';
   ```
   **Output**: `t` (Winning subscriber ticket marked as prized).
+- **Step 6C (BullMQ Notification Broadcast Proof)**:
+  - Immediately post-commit, [`AuctionService.finalizeAuction()`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) enqueues [`JOB_DISPATCH_AUCTION_RESULT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) to `notification-queue`.
+  - **Live Server Execution Log**:
+    ```text
+    [Nest] LOG [AuctionService] Enqueued auction result notification for group KC-LIVE-20M-01 Month 2 (20 subscribers)
+    [Nest] LOG [NotificationService] Broadcasted auction results to 20 subscribers (0 Push, 20 SMS) for Chit KC-LIVE-20M-01 Month 2
+    ```
+  - **Audit Log Verification (`GET /api/v1/jobs/notification-audit-logs`)**:
+    - Dispatched `templateType: 'AUCTION_RESULT'` records persisted in `NotificationService.sentLog`.
 
 ---
 
