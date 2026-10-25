@@ -48,6 +48,7 @@ To prevent cross-branch data leaks, the Kumaran Chits platform enforces strict *
 | **§8** | Verifying Prize Winner Safety Proof Checklist | Maker Role | Web Portal (`POST /disbursements/...`) |
 | **§9** | Statutory Form XVII Minutes Signing & Registrar Filing | Operational Lead | Web Portal (`PATCH /auctions/.../mark-filed...`) |
 | **§10** | Branch Form XXII Cash Book & Vault Count | Daily Closing | Web Portal (`GET /reports/form-xxii`) |
+| **§11** | Staff Route Supervision & Defaulter Recovery Escalation | Supervisory | Web Portal |
 
 ---
 
@@ -235,3 +236,24 @@ flowchart TD
 3. Count all physical currency bundles inside the heavy branch safe vault.
 4. Verify that the physical cash matches the system closing balance to the last rupee.
 5. Print the Form XXII sheet, sign your initials alongside the Cashier and Partner, apply the dual-key lock to the vault, and set the night alarm.
+
+---
+
+## 11. Staff Route Supervision & Defaulter Recovery Escalation
+
+```mermaid
+flowchart TD
+    Midday["1:00 PM: Midday Operational Inspection"] --> LiveDash["Open Branch Live Collections Monitor:\n• Murugan: ₹24,000 collected (6/12 customers)\n• Selvam: ₹18,500 collected (5/10 customers)"]
+    LiveDash --> CheckDefaulters["Review 3-Month Arrears Alert Queue"]
+    CheckDefaulters --> Escalation{"Is subscriber in 3M Arrears?"}
+    Escalation -- "Yes (Murugesan - Ticket #14)" --> IssueNotice["1. Issue Formal Form XXIV Default Notice by Registered Post\n2. Dispatch agent with physical legal clearance copy\n3. Inform Partners for substitution approval"]
+    Escalation -- "No" --> Routine["Continue Routine Route Monitoring"]
+```
+
+### Step-by-Step Instructions:
+1. Open **Collections $\to$ Live Branch Supervisor Dashboard** at 1:00 PM to view the real-time progress of all motorcycle agents on the road.
+2. If an agent’s collections appear delayed, check their connectivity status and battery indicator.
+3. **Defaulter Legal Escalation**:
+   - Filter tickets flagged with **`hasDefaulterNotice: true`** (subscribers with 3 consecutive unpaid installments).
+   - Prepare the formal 14-day statutory notice in accordance with Section 30 of the Chit Funds Act, 1982.
+   - If payment is not cleared within 14 days, forward the file to the Partners to execute formal ticket substitution (`POST /tickets/:id/substitute`).

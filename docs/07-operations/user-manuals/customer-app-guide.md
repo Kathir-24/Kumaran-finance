@@ -41,6 +41,7 @@ flowchart TD
 | **§8** | Prize Winner Claim & Company Safety Proof | English & தமிழ் | Payout Status Screen |
 | **§9** | Managing Nominee Details & Profile Updates | English & தமிழ் | Profile Settings |
 | **§10** | Branch Office Direct Phone Contact & Support | English & தமிழ் | Help Desk |
+| **§11** | Member FAQs, WhatsApp Sharing & Troubleshooting | English & தமிழ் | Member Self-Service |
 
 ---
 
@@ -208,3 +209,32 @@ flowchart TD
 - **Phone**: Tap the call icon to dial our Perundurai Head Office directly at `0424-2223333`.
 - **Address**: Kumaran Finance, Main Road, Perundurai, Erode District, Tamil Nadu.
 - **Operating Hours**: Monday through Saturday, 9:00 AM to 6:00 PM.
+
+---
+
+## 11. Member FAQs, WhatsApp Sharing & Troubleshooting
+
+```mermaid
+flowchart TD
+    MemberQ["Common Member Questions"] --> AnsType{"Select Topic"}
+    AnsType -- "Bank debited but app pending?" --> Recon["1. UPI Webhook Delay:\nMoney is safe in escrow; auto-reconciles at 06:00 AM IST\nOr tap 'Check Payment Status' for instant refresh"]
+    AnsType -- "Need loan statement proof?" --> SharePDF["2. Export Passbook PDF:\nTap 'Share Passbook' -> Sends certified PDF statement\ndirectly via WhatsApp to bank officer"]
+    AnsType -- "Can I join with 2 tickets in same chit?" --> LimitRule["3. Single Ticket Limit:\nMax 1 ticket per customer in same group (Risk Protection)\nYou are welcome to join a second ticket in a different group"]
+    AnsType -- "How do I watch the auction tie-break?" --> AttendLot["4. Live Paper Token Draw:\nVisit Perundurai branch office at 4:00 PM on 15th\nForeman folds paper tokens & a member draws live!"]
+```
+
+### Frequently Asked Questions:
+1. **My bank account was debited via Google Pay, but the app still says "UNPAID"?**
+   - Don't worry, your money is completely safe. Occasionally, Indian UPI bank servers experience 30-to-60 second delays in notifying our system.
+   - Tap **"Refresh Payment Status"** on your due screen. The system queries the payment gateway directly.
+   - If a temporary network drop occurred, our automated background reconciler at **06:00 AM IST** matches bank settlement credits and issues your receipt automatically.
+2. **How can I share my 20-month payment record for a bank loan or visa application?**
+   - Open **"My Chits" $\to$ "Form XXI Passbook"**.
+   - Tap **"Export PDF"** or the WhatsApp share icon.
+   - The app generates an official digitally signed PDF passbook that you can share with your bank manager or accountant.
+3. **Can I buy two tickets in the same ₹1,00,000 group?**
+   - No. Under Kumaran Finance's risk-management rules, a subscriber can hold a maximum of 1 ticket in any single group (`@@unique([chitGroupId, customerId])`).
+   - If you want to save more, our staff can enroll you in a second chit group running on a different monthly cycle.
+4. **If two people bid the ₹25,000 ceiling, how do you decide who wins?**
+   - We do not use computer algorithms or software lotteries.
+   - The Foreman conducts a transparent **Option A Physical Paper Token Draw** live in the Perundurai branch room. The competing ticket numbers are written on paper slips, placed into a steel bowl, and an attendee or child draws the winning token in front of everyone.

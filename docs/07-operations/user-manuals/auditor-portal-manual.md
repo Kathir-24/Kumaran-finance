@@ -45,6 +45,7 @@ flowchart TD
 | **§7** | Inspecting Immutable Audit Trail for Reversals | Dual Control | Web Portal (`GET /reports/audit-trail`) |
 | **§8** | Exporting Statutory Filing Packets for Chit Registrar | Compliance Packets | Web Portal (`GET /reports/form-xvii`) |
 | **§9** | Auditing BullMQ Background Cron Schedules & Logs | Operational Resilience | Web Portal (`GET /jobs/...`) |
+| **§10** | Statutory Audit Certification & DPDP Act Checklist | Compliance Sign-off | Web Portal |
 
 ---
 
@@ -207,3 +208,30 @@ flowchart TD
    - Review push notification delivery success rates.
    - Verify that fallback SMS was dispatched for keypad-phone subscribers.
 4. Issue the formal statutory audit sign-off for Kumaran Finance.
+
+---
+
+## 10. Statutory Audit Certification & DPDP Act Checklist
+
+```mermaid
+flowchart TD
+    AuditComplete["Forensic Scrutiny Complete"] --> Checklist["CA Signs 10-Point Statutory Audit Certificate:"]
+    Checklist --> C1["1. Single Company Tenancy: 0 external company_id columns"]
+    Checklist --> C2["2. Whole Rupee Precision: 0 floating-point or paise drift"]
+    Checklist --> C3["3. Commission Freeze: All active chits locked at 4.00%"]
+    Checklist --> C4["4. Universal Dividends: All members received equal deductions"]
+    Checklist --> C5["5. 25% Ceiling: 0 auction bids exceeded V / 4"]
+    Checklist --> C6["6. Option A Tie-Break: Physical lot draws verified"]
+    Checklist --> C7["7. Ticket Limit: 0 duplicate tickets held in same group"]
+    Checklist --> C8["8. Binary Dues: Dues are UNPAID or PAID (0 partial dues)"]
+    Checklist --> C9["9. Safety Proofs: Scans of agreements & blank cheques verified"]
+    Checklist --> C10["10. Dual Control: Asserted maker_user_id != checker_user_id"]
+    C10 --> DPDP["DPDP Act Verification: Aadhaar masked to last 4 digits (XXXXXXXX1234)"]
+    DPDP --> SignCert["Certify Audit Report for Chit Registrar & Partners"]
+```
+
+### Statutory Auditor Formal Sign-Off:
+1. **Mathematical Conservation Invariant**: Confirmed $D = C_f + Div_{total}$ across all completed auctions without a single rupee variance.
+2. **Whole Rupee Arithmetic (`BigInt`)**: Confirmed all ledger values in the database are 64-bit integer Rupees (`BigInt`).
+3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private AWS S3 storage with 15-minute presigned access.
+4. **Dual-Control Enforcement**: Certified that all high-risk mutations (reversals, activations, payouts, handovers) enforced non-identical Maker and Checker signatures.

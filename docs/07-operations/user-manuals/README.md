@@ -34,7 +34,7 @@ flowchart TD
 | **4** | **Customer / Chit Subscriber** | `CUSTOMER` | Android Mobile App (Bilingual English & தமிழ்) | [`customer-app-guide.md`](./customer-app-guide.md) | **10 Flow Diagrams** |
 | **5** | **Branch Manager (Operational Lead)** | `BRANCH_MANAGER` | Web Portal (Branch-Scoped Facility) | [`branch-manager-manual.md`](./branch-manager-manual.md) | **10 Flow Diagrams** |
 | **6** | **Independent Auditor (CA)** | `AUDITOR` | Web Portal (Global Read-Only Console) | [`auditor-portal-manual.md`](./auditor-portal-manual.md) | **9 Flow Diagrams** |
-| **Total** | **All 6 Personas** | | | | **62 Action Flow Diagrams** |
+| **Total** | **All 6 Personas** | | | | **62 Action Flow Diagrams (+1 Suite Overview = 63 Total)** |
 
 ---
 

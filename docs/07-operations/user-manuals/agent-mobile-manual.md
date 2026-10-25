@@ -38,6 +38,7 @@ flowchart TD
 | **§7** | On-the-Road Customer Lead Registration | Online / Offline | Mobile App (`POST /customers`) |
 | **§8** | 3-Month Arrears Notice Delivery & Clearance Slips | Online / Offline | Mobile App |
 | **§9** | End-of-Day Cash Handover at Head Office Counter | Online (Branch Office) | Mobile App (`POST /collections/cash-handover/submit`) |
+| **§10** | Field Troubleshooting, Dynamic UPI & Traps | Operational Guide | Mobile App & Physical Road |
 
 ---
 
@@ -201,3 +202,28 @@ flowchart TD
 7. **The Anti-Self-Acknowledgment Guard**: If you also hold accountant permissions, you cannot acknowledge your own cash. A Partner must sign off (`collector_user_id != acknowledger_user_id`).
 8. Your mobile app screen turns green: **`Handover Cleared — Status: CONFIRMED`**.
 9. **Strict Company Rule**: Never take company cash home overnight.
+
+---
+
+## 10. Field Troubleshooting, Dynamic UPI & Operational Traps
+
+```mermaid
+flowchart TD
+    Issue["Field Challenge on Road"] --> Type{"What Happened?"}
+    Type -- "Customer wants to pay UPI on road" --> QR["1. Tap 'Show Dynamic UPI QR' on App\nDisplays QR with exact net due (₹3,700)\nCustomer scans via GPay/PhonePe -> Confirmed instantly"]
+    Type -- "Phone battery critically low (3%)" --> Bat["2. SQLite commits atomically before rendering receipt\nPlug into bike 12V USB charger; zero data loss"]
+    Type -- "Customer paid yesterday at office" --> Conflict["3. Conflict isolated: INSTALLMENT_ALREADY_PAID\nDo NOT collect cash; inspect customer stamped passbook"]
+    Type -- "Subscriber hands torn / tape-joined note" --> Note["4. Politely refuse torn note; ask for clean replacement\n(Office note-sorting machine will reject it)"]
+```
+
+### Practical Field Guidance:
+1. **Dynamic On-the-Road UPI QR**:
+   - If a subscriber says, *"I don't have currency notes today, can I scan your phone?"*
+   - Tap **"Collect via UPI QR"**. The app renders a dynamic Bharat UPI QR code embedded with the exact net installment (`₹3,700`) and ticket number.
+   - The subscriber scans it using Google Pay or PhonePe. The app receives the payment webhook within 3 seconds, displays green confirmation, and issues the digital receipt.
+2. **Battery & Device Resilience**:
+   - The app uses an atomic local SQLite database. Even if the phone powers off mid-collection, all stored offline collections remain safely saved.
+3. **Double-Payment Defense**:
+   - If a subscriber claims they already cleared their due at the office counter yesterday, check their paper passbook. If stamped with the branch seal, do not collect cash. When you batch sync, the server automatically updates their ticket status to `PAID`.
+4. **Torn Note Protocol**:
+   - Never accept torn, taped, or counterfeit notes from subscribers. The Head Office currency counter machine will reject them, making you personally responsible for replacing the note.

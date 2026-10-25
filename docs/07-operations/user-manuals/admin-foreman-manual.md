@@ -46,6 +46,7 @@ The following table summarizes all 10 core partner actions, each documented with
 | **§12** | 3-Month Arrears Tagging & Defaulter Removal | Single / Maker | Web Portal |
 | **§13** | Staff Role Provisioning & Security Resets | Single Actor | Web Portal |
 | **§14** | Bull Board Asynchronous Queue Monitoring | Operational View | Web Portal (`/admin/queues`) |
+| **§15** | Form XXII Daily Vault Cash Book Sign-Off | Reconciliation | Web Portal & Safe Vault |
 
 ---
 
@@ -353,3 +354,25 @@ flowchart TD
    - **`notification-queue`**: Dispatches push notifications and fallback DLT SMS messages.
    - **`reconciliation-queue`**: Verifies morning bank gateway settlements.
 4. **Retry Failed Jobs**: If an external telecom SMS timeout causes a job to fail, open the **"Failed"** tab, review the error, and click **"Retry"** to re-dispatch the job instantly without restarting the server.
+
+---
+
+## 15. Form XXII Daily Vault Cash Book Sign-Off Procedure
+
+```mermaid
+flowchart TD
+    CloseOffice["6:00 PM: Daily Branch Office Closure"] --> ReviewLedger["Partner reviews Form XXII Daily Cash Register on Web Portal"]
+    ReviewLedger --> PhysicalCount["Partner & Cashier count physical safe vault notes:\n(₹500, ₹200, ₹100, ₹50 bundles)"]
+    PhysicalCount --> Compare{"Does Physical Vault Cash match\nForm XXII Closing Balance exactly?"}
+    Compare -- "Discrepancy" --> Investigate["Audit unposted walk-in cash or voucher error"]
+    Compare -- "Exact Match" --> SignReg["Partner & Cashier sign printed physical register\nApply dual-key combination to Safe Vault"]
+```
+
+### Step-by-Step Instructions:
+1. At 6:00 PM, join the Desk Accountant at the office safe vault.
+2. Open **Reports $\to$ Form XXII Daily Cash Book** on the Web Portal.
+3. Physically count all currency bundles inside the safe vault.
+4. Verify that:
+   $$\text{Opening Vault Cash} + \text{Today's Total Receipts} - \text{Total Disbursements} = \text{Closing Vault Cash}$$
+   matches to the exact rupee without discrepancies.
+5. Sign the physical register alongside the Desk Accountant, apply the dual-key lock to the vault, and set facility alarms.

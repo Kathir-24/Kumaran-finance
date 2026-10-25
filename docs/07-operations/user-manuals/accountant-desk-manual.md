@@ -47,8 +47,10 @@ In our local operating reality, staff members frequently collect cash in the fie
 | **§6** | High-Density Paper Notebook Transcription | Maker Role | Web Portal (`POST /chits/onboard-ongoing`) |
 | **§7** | Preparing Prize Payout Vouchers & Safety Proof | Maker Role | Web Portal (`POST /disbursements/...`) |
 | **§8** | Releasing Authorized Disbursement Funds | Fund Release | Web Portal (`POST /disbursements/.../disburse`) |
-| **§9** | Requesting Payment Reversals with Justification | Maker Role | Web Portal (`POST /payments/.../request-reversal`) |
-| **§10** | Daily Form XXII Balancing & 6:00 PM Closure | Reconciliation | Web Portal (`GET /reports/form-xxii`) |
+| **§9** | Receiving & Acknowledging Agent Cash Handovers | Checker Role | Web Portal (`POST /collections/.../acknowledge`) |
+| **§10** | Requesting Payment Reversals with Justification | Maker Role | Web Portal (`POST /payments/.../request-reversal`) |
+| **§11** | Daily Form XXII Balancing & 6:00 PM Closure | Reconciliation | Web Portal (`GET /reports/form-xxii`) |
+| **§12** | Cashier Counter Error Handling & Traps | Operational Guide | Web Portal |
 
 ---
 
@@ -194,7 +196,33 @@ flowchart TD
 
 ---
 
-## 9. Requesting Payment Reversals with Written Justification (Maker Role)
+## 9. Receiving & Acknowledging Agent Cash Handovers (Checker Role)
+
+```mermaid
+flowchart TD
+    AgentReturn["5:00 PM: Field Agent Murugan returns with cash collection bag"] --> HandoverSubmit["Murugan submits batch on phone: ₹42,500 (10 collections)"]
+    HandoverSubmit --> MachineVerify["Desk Accountant runs notes through counter note-sorting machine:\n42 x ₹1,000 + 1 x ₹500 = ₹42,500"]
+    MachineVerify --> OpenQueue["Open: Collections -> Pending Handovers -> Select Batch"]
+    OpenQueue --> DualRoleCheck{"Anti-Self-Acknowledgment Assertion:\nDid Desk Accountant personally collect this cash?"}
+    DualRoleCheck -- "Yes (Accountant collected)" --> Block["BLOCKED! collector_user_id != acknowledger_user_id\nMust be counted & acknowledged by a Partner"]
+    DualRoleCheck -- "No (Murugan collected)" --> ConfirmAck["Click 'Acknowledge Cash Received'\n(POST /collections/cash-handover/acknowledge)\n• Cash transferred into counter custody\n• Agent liability drops to ₹0\n• Prints Handover Clearance Slip #HO-YYYY-XXXXX"]
+```
+
+### Step-by-Step Instructions:
+1. At 5:00 PM, motorcyclist field agents return to the Head Office.
+2. The agent taps **"Submit Cash Handover"** on their mobile app and places the cash bag on your counter.
+3. Place the currency notes through the counter note-sorting machine to verify the physical count against counterfeits and note quality.
+4. Navigate to **Collections $\to$ Pending Handovers** on the Web Portal.
+5. Verify that the machine count matches the submitted mobile batch total (e.g., `₹42,500`).
+6. **The Anti-Self-Acknowledgment Guard (`CONFIRMED-BY-DEVELOPER`)**:
+   - If **you (the accountant)** collected this cash during morning rounds, the system **blocks you** from clicking Acknowledge (`collector_user_id != acknowledger_user_id`). A Partner or Branch Manager must acknowledge your handover.
+   - If **Field Agent Murugan** collected the cash, you are fully authorized to acknowledge his batch.
+7. Click **"Acknowledge Cash Received"** (`POST /collections/cash-handover/acknowledge`).
+8. The cash is formally transferred into counter custody, Agent Murugan's mobile liability is cleared to `₹0`, and a printed Clearance Slip `#HO-YYYY-XXXXX` is issued to the agent.
+
+---
+
+## 10. Requesting Payment Reversals with Written Justification (Maker Role)
 
 ```mermaid
 flowchart TD
@@ -213,12 +241,12 @@ flowchart TD
 
 ---
 
-## 10. Daily Form XXII Balancing & 6:00 PM Office Closure
+## 11. Daily Form XXII Balancing & 6:00 PM Office Closure
 
 ```mermaid
 flowchart TD
     CloseTime["5:45 PM: End-of-Day Balancing"] --> PhysicalTally["1. Count Physical Cash in Counter Drawer"]
-    PhysicalTally --> PartnerHandover["2. Receive Field Agent Cash from Partner Vault Sign-Off"]
+    PhysicalTally --> PartnerHandover["2. Ensure all Field Agent Handovers are Acknowledged"]
     PartnerHandover --> OpenForm["3. Open: Reports -> Form XXII Daily Cash Book"]
     OpenForm --> Compare{"Does System Closing Cash Balance Match\nPhysical Safe Vault Cash to the Rupee?"}
     Compare -- No --> Audit["Inspect Day Book for unrecorded cash or typos"]
@@ -227,9 +255,20 @@ flowchart TD
 
 ### Step-by-Step Instructions:
 1. At 5:45 PM, count all physical cash inside the counter drawer.
-2. Ensure all evening field collection batches have been acknowledged by a Partner into the vault.
+2. Ensure all evening field collection batches have been acknowledged into counter/vault custody.
 3. Open **Reports $\to$ Form XXII Daily Cash Book**.
 4. Review the 12-Column Cash Balance:
    - **Opening Cash** + **Total Receipts** (Walk-in cash + Agent handovers) - **Total Disbursements** (Prize payouts + Expenses) = **Closing Cash Balance**.
 5. Confirm that the physical notes inside the safe match the software balance to the exact rupee.
 6. Click **"Export PDF"**, print the daily cash sheet, sign your initials alongside the Partner's signature, and lock the vault.
+
+---
+
+## 12. Cashier Counter Error Handling & Operational Traps
+
+| Common Trap / Mistake | Software Behavior | Proper Resolution by Cashier |
+|---|---|---|
+| **Member insists on paying ₹2,000 partial installment** | Input rejected; system enforces discrete binary amount ($I_{net} = \text{₹}3,700$). | Politely explain: *"Under company policy, full monthly installment must be paid at once."* Hold physical cash in customer envelope until full balance is ready. |
+| **Cashier tries to approve their own reversal request** | Software throws `HTTP 403 Forbidden: Maker cannot be Checker`. | Request Partner B or C to log in and approve the pending reversal. |
+| **Member brings soiled / counterfeit currency note** | Note-sorting machine rejects note. | Hand note back to subscriber immediately; request clean replacement note before issuing receipt. |
+| **Customer forgot physical paper passbook** | Digital receipt prints normally and push alert is sent. | Issue printed paper slip; inform member to bring passbook next month for pen endorsement. |
