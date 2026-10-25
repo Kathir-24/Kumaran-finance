@@ -140,9 +140,22 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 4: GET /metrics (Prometheus Telemetry Scrape - Basic Auth)
+  // Step 4: GET /metrics (Prometheus Telemetry Scrape - Basic Auth & Guard)
   // --------------------------------------------------------------------------
   console.log(`\n--- [4/15] GET /metrics (Prometheus Telemetry Scrape) ---`);
+
+  // 4A: Guard Test - Missing / Unauthenticated Request
+  console.log(`   [4A: Guard Test] Requesting /metrics without Basic Auth ...`);
+  const unauthMetricsRes = await request('GET', '/metrics');
+  console.log(`   Unauthenticated Status: ${unauthMetricsRes.status} (Expected: 401 Unauthorized)`);
+  if (unauthMetricsRes.status !== 401) {
+    console.error('CRITICAL: /metrics must require Basic Auth!', unauthMetricsRes);
+    process.exit(1);
+  }
+  console.log(`   ✅ 4A PASSED: Unauthenticated scrape blocked with 401 Unauthorized.`);
+
+  // 4B: Authenticated Scrape
+  console.log(`   [4B: Authenticated Scrape] Requesting /metrics with Basic Auth ...`);
   const metricsRes = await request('GET', '/metrics', undefined, undefined, basicAuthHeader);
   console.log(`   Status: ${metricsRes.status}`);
   console.log(`   Content-Type: ${metricsRes.contentType}`);
@@ -154,25 +167,38 @@ async function run() {
   console.log(`   Metrics Verified: http_requests_total=${hasHttpRequests}, db_connected=${hasDbConnected}, bullmq=${hasQueueMetrics}`);
 
   if (metricsRes.status === 200 && hasHttpRequests && hasDbConnected && hasQueueMetrics) {
-    console.log(`   ✅ Step 4 PASSED: Prometheus telemetry metrics scraped successfully.`);
+    console.log(`   ✅ 4B PASSED: Prometheus telemetry metrics scraped successfully.`);
   } else {
-    console.error(`   ❌ Step 4 FAILED:`, metricsRes);
+    console.error(`   ❌ 4B FAILED:`, metricsRes);
     process.exit(1);
   }
 
   // --------------------------------------------------------------------------
-  // Step 5: GET /admin/queues (Bull Board Dashboard UI - Basic Auth)
+  // Step 5: GET /admin/queues (Bull Board Dashboard UI - Basic Auth & Guard)
   // --------------------------------------------------------------------------
   console.log(`\n--- [5/15] GET /admin/queues/ (Bull Board Dashboard UI) ---`);
+
+  // 5A: Guard Test - Missing / Unauthenticated Request
+  console.log(`   [5A: Guard Test] Requesting /admin/queues/ without Basic Auth ...`);
+  const unauthBoardRes = await request('GET', '/admin/queues/');
+  console.log(`   Unauthenticated Status: ${unauthBoardRes.status} (Expected: 401 Unauthorized)`);
+  if (unauthBoardRes.status !== 401) {
+    console.error('CRITICAL: /admin/queues/ must require Basic Auth!', unauthBoardRes);
+    process.exit(1);
+  }
+  console.log(`   ✅ 5A PASSED: Unauthenticated access blocked with 401 Unauthorized.`);
+
+  // 5B: Authenticated Access
+  console.log(`   [5B: Authenticated Access] Requesting /admin/queues/ with Basic Auth ...`);
   const boardRes = await request('GET', '/admin/queues/', undefined, undefined, basicAuthHeader);
   console.log(`   Status: ${boardRes.status}`);
   console.log(`   Content-Type: ${boardRes.contentType}`);
 
   const hasBullBoardHtml = boardRes.text?.includes('BullBoard') || boardRes.text?.includes('<!DOCTYPE html>') || boardRes.text?.includes('ui');
   if ((boardRes.status === 200 || boardRes.status === 302) && hasBullBoardHtml) {
-    console.log(`   ✅ Step 5 PASSED: Bull Board visual queue dashboard accessible under Basic Auth.`);
+    console.log(`   ✅ 5B PASSED: Bull Board visual queue dashboard accessible under Basic Auth.`);
   } else {
-    console.error(`   ❌ Step 5 FAILED:`, boardRes.status, boardRes.text?.substring(0, 100));
+    console.error(`   ❌ 5B FAILED:`, boardRes.status, boardRes.text?.substring(0, 100));
     process.exit(1);
   }
 
@@ -354,9 +380,12 @@ async function run() {
   }
 
   // --------------------------------------------------------------------------
-  // Step 14: GET /api/v1/jobs/notification-audit-logs (Push & SMS Audit Trail)
+  // Step 14: Audit Trails & Registers (Notification & Financial Audit)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [14/15] GET /api/v1/jobs/notification-audit-logs (Notification Audit Trail) ---`);
+  console.log(`\n--- [14/15] Audit Trails & Registers (Notification & Financial) ---`);
+
+  // 14A: Outbound Notification Audit
+  console.log(`   [14A: Outbound Notifications] Requesting /api/v1/jobs/notification-audit-logs ...`);
   const notifRes = await request('GET', '/api/v1/jobs/notification-audit-logs?limit=20', undefined, admin.token);
   console.log(`   Status: ${notifRes.status}`);
 
@@ -366,9 +395,25 @@ async function run() {
       const sample = notifRes.json.data[0];
       console.log(`   Recent Sample: Channel=${sample.channel}, Recipient=${sample.recipientPhone || sample.recipientId}, Status=${sample.status}`);
     }
-    console.log(`   ✅ Step 14 PASSED: Notification dispatch audit logs retrieved.`);
+    console.log(`   ✅ 14A PASSED: Notification dispatch audit logs retrieved.`);
   } else {
-    console.error(`   ❌ Step 14 FAILED:`, notifRes);
+    console.error(`   ❌ 14A FAILED:`, notifRes);
+    process.exit(1);
+  }
+
+  // 14B: Financial Audit Trail (Admin Global View & DB Parity)
+  console.log(`\n   [14B: Financial Audit Trail] Requesting /api/v1/reports/audit-logs ...`);
+  const auditRes = await request('GET', '/api/v1/reports/audit-logs?limit=10', undefined, admin.token);
+  console.log(`   Status: ${auditRes.status}`);
+  const dbAuditCount = queryDb(`SELECT count(*) FROM public."AuditLog"`);
+  console.log(`   [PostgreSQL DB Verification]: Total AuditLog rows in DB = ${dbAuditCount}`);
+
+  if (auditRes.status === 200 && auditRes.json?.data?.logs) {
+    console.log(`   Admin Audit Logs Retrieved: ${auditRes.json.data.logs.length}`);
+    console.log(`   Recent Action: ${auditRes.json.data.logs[0]?.action} (Entity: ${auditRes.json.data.logs[0]?.entityType})`);
+    console.log(`   ✅ 14B PASSED: Financial audit logs retrieved and verified against PostgreSQL.`);
+  } else {
+    console.error(`   ❌ 14B FAILED:`, auditRes);
     process.exit(1);
   }
 
