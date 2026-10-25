@@ -1,0 +1,209 @@
+# Kumaran Chits — Independent Auditor Portal Manual
+
+> **Product**: **Kumaran Chits**  
+> **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
+> **Target Persona**: **Independent Statutory Auditor / Chartered Accountant (CA)** (`AUDITOR`)  
+> **Primary Platform**: **Web Portal (`apps/web/`)** (Strictly Read-Only Forensic Console)  
+> **Statutory Framework**: **Chit Funds Act, 1982** & **Tamil Nadu Chit Funds Rules, 1984**  
+> **Security Guard**: **Global Read-Only Isolation**; all state mutations (`POST`, `PUT`, `PATCH`, `DELETE`) are permanently blocked with `HTTP 403 Forbidden`.
+
+---
+
+## 1. Operating Reality & Professional Mandate
+
+The **Independent Auditor** is a licensed **Chartered Accountant (CA)** appointed to conduct quarterly, annual, and statutory compliance audits for Kumaran Finance:
+- Reviewing financial integrity on behalf of the company partners and the **Chit Registrar** (Government of Tamil Nadu).
+- Operating under a professional mindset of **Forensic Professional Skepticism**: verifying mathematical proofs, physical vouchers, and tamper-evident digital records.
+- Verifying the 4 Core Invariants:
+  1. Did the Foreman take more than 4.00% commission?
+  2. Did any auction bid exceed the 25% (1/4) statutory ceiling?
+  3. Were dividends shared equally among all members (including auction winners)?
+  4. Was Maker-Checker segregation enforced on all sensitive actions without self-approval?
+
+```mermaid
+flowchart TD
+    subgraph AUDITOR_CONSOLE ["Independent Auditor Forensic Workspace (Strictly Read-Only)"]
+        CA["Chartered Accountant (CA)\nAssigned Role: AUDITOR"]
+        CA --> T1["1. Mathematical Invariant Verification\n(D = Cf + Div_total to the exact rupee)"]
+        CA --> T2["2. Statutory Registers\n(Form XVII Minutes, Form XXI Passbooks, Form XXII Cash Book)"]
+        CA --> T3["3. Maker-Checker Segregation Audit\n(Asserts maker_user_id != checker_user_id)"]
+        CA --> T4["4. Document Scrutiny via Presigned S3\n(Inspects signed agreements & blank cheques)"]
+        CA --> T5["5. Background Job & Cron Verification\n(BullMQ schedules & notification audit logs)"]
+    end
+```
+
+---
+
+## 2. Audit Workflow Index & Action Diagrams
+
+| Section | Audit Procedure | Statutory Scope | Primary Interface |
+|---|---|:---:|:---:|
+| **§3** | Auditor 2FA Web Login & Workspace Orientation | Access Control | Web Portal (`POST /auth/web/login`) |
+| **§4** | Forensic Verification of the Conservation Invariant | Chit Math Invariant | Web Portal (`GET /auctions/:id`) |
+| **§5** | Form XXII Daily Cash Book Audit Against Bank Statements | Cash & Banking | Web Portal (`GET /reports/form-xxii`) |
+| **§6** | Sampling Prize Disbursements & Presigned S3 Cheques | Safety Proofs | Web Portal (`GET /disbursements/...`) |
+| **§7** | Inspecting Immutable Audit Trail for Reversals | Dual Control | Web Portal (`GET /reports/audit-trail`) |
+| **§8** | Exporting Statutory Filing Packets for Chit Registrar | Compliance Packets | Web Portal (`GET /reports/form-xvii`) |
+| **§9** | Auditing BullMQ Background Cron Schedules & Logs | Operational Resilience | Web Portal (`GET /jobs/...`) |
+
+---
+
+## 3. Auditor 2FA Web Login & Workspace Orientation
+
+```mermaid
+flowchart TD
+    Visit["Open Web Portal: https://admin.kumaranfinance.com"] --> Creds["Enter Assigned CA Credentials & Password"]
+    Creds --> TOTP["Enter Microsoft Authenticator 6-digit TOTP Code"]
+    TOTP --> Console["Access Global Read-Only Forensic Console"]
+    Console --> Sandboxed["Sandboxed Security Guard:\n• Full read visibility across all groups, ledgers & vouchers\n• Any mutation attempt (POST/PUT/PATCH/DELETE) yields HTTP 403 Forbidden"]
+```
+
+### Step-by-Step Instructions:
+1. Open Chrome/Edge and navigate to `https://admin.kumaranfinance.com`.
+2. Enter your assigned statutory auditor credentials and password.
+3. Complete 2-Factor Authentication using Microsoft Authenticator.
+4. **Strict Read-Only Enforcement**:
+   - The auditor account is completely sandboxed.
+   - You have global read access across all chit groups, customer folders, ledgers, and cash books.
+   - If you attempt to trigger any state change, the backend immediately returns **`HTTP 403 Forbidden: Read-Only Auditor Access`**. Company financial truth cannot be modified.
+
+---
+
+## 4. Forensic Verification of the Conservation Invariant
+
+```mermaid
+flowchart TD
+    SelectScheme["Open: Chit Schemes -> Group KCA-1L-20M-01 -> Auctions"] --> OpenMonth["Select Month 4 Auction"]
+    OpenMonth --> PullData["Extract Key Parameters from Screen:\n• Chit Value (V) = ₹1,00,000\n• Winning Bid Discount (D) = ₹22,000\n• Foreman Commission (Cf) = ₹4,000 (4.00% locked)\n• Member Dividend (Div_total) = ₹18,000\n• Tickets (M) = 20\n• Per-Ticket Dividend (Div_ticket) = ₹900"]
+    PullData --> FormulaCheck{"Audit Formula Check:\nDoes D == Cf + Div_total\n(₹22,000 == ₹4,000 + ₹18,000)?"}
+    FormulaCheck -- No --> FlagLeak["CRITICAL AUDIT LEAK DETECTED!"]
+    FormulaCheck -- Yes --> CeilingCheck{"Ceiling Check:\nIs D <= V / 4 (₹22,000 <= ₹25,000)?"}
+    CeilingCheck -- Yes --> Pass["INVARIANT CERTIFIED: Zero Accounting Drift"]
+```
+
+### Step-by-Step Instructions:
+1. Navigate to **Chit Schemes $\to$ Group KCA-1L-20M-01 $\to$ Auctions $\to$ Month 4**.
+2. Scrutinize the mathematical breakdown:
+   - Winning Bid Discount ($D$): `₹22,000`
+   - Foreman Commission ($C_f$): `₹4,000` (locked permanently at 4.00% of $V$)
+   - Total Member Dividend ($Div_{total}$): `₹18,000` (`₹22,000 - ₹4,000`)
+   - Net Installment Payable ($I_{net}$): `₹4,100` (`₹5,000 - ₹900`) across all 20 tickets.
+3. **The Conservation Invariant Check**: Verify that:
+   $$D = C_f + Div_{total}$$
+   If there is a mismatch by even a single rupee, flag an accounting leak.
+4. **Whole-Rupee Math (`BigInt`) Verification**: Verify that all figures are discrete integers without decimal fractions (`.00`), floating-point drift, or paise.
+
+---
+
+## 5. Form XXII Daily Cash Book Audit Against Bank Statements
+
+```mermaid
+flowchart TD
+    SelectDate["Navigate: Reports -> Form XXII Daily Cash Book"] --> PickDate["Select Date for Audit (e.g. 15-May-2026)"]
+    PickDate --> Display12["Screen Renders Official 12-Column Statutory Cash Register:\n• Col 1-6: Receipts (Opening Cash, Walk-ins, Agent Handovers)\n• Col 7-12: Disbursements (Prize Payouts, Petty Cash, Closing Cash)"]
+    Display12 --> CompareBank["Compare Bank Remittance Column with Official Bank Statement"]
+    CompareBank --> CompareVault["Compare Safe Vault Column with Physical Vault Register"]
+    CompareVault --> Reconciled["Verify: Opening + Receipts - Disbursements == Closing\nPrint Form XXII with CA Auditor Stamp"]
+```
+
+### Step-by-Step Instructions:
+1. Navigate to **Reports $\to$ Form XXII Daily Cash Book**.
+2. Select the audit date range (e.g., Month of May 2026).
+3. The screen renders the statutory 12-column cash book mandated by the Tamil Nadu Chit Funds Rules:
+   - **Receipt Columns**: Opening cash, subscriber monthly installments, field agent batch handovers, bank withdrawals.
+   - **Disbursement Columns**: Prize payouts, foreman commission withdrawals, bank cash deposits, closing cash.
+4. Compare bank inward/outward entries against the corporate current account bank statement.
+5. Confirm that the physical safe vault balance reconciles to the last rupee without discrepancies.
+
+---
+
+## 6. Sampling Prize Disbursements & Presigned S3 Cheques
+
+```mermaid
+flowchart TD
+    OpenDisb["Navigate: Disbursements -> Completed Payouts"] --> Sample["Select Sample Payout: Ticket #5 (M. Kandasamy - ₹75,000)"]
+    Sample --> ReviewVoucher["1. Verify Net Payout Math: V (₹1L) - D (₹25,000) = ₹75,000"]
+    ReviewVoucher --> InspectSafety["2. Inspect Company Safety Proof Checklist (ADR-15):\n• Winner Agreement signed with nominee?\n• Blank bank cheques collected?"]
+    InspectSafety --> ViewS3["3. Click 'Inspect Scanned Documents'\nSystem generates temporary 15-minute presigned S3 URL"]
+    ViewS3 --> VerifyScans["4. Auditor visually verifies scanned cheque & agreement\nConfirms Canara Bank Cheque #004128 on file"]
+```
+
+### Step-by-Step Instructions:
+1. Open **Disbursements $\to$ Completed Payouts**.
+2. Pull a random sample of disbursed prize vouchers (e.g., Ticket #5, Kandasamy, ₹75,000).
+3. Verify the net prize calculation: $V - D = \text{₹}1,00,000 - \text{₹}25,000 = \text{₹}75,000$.
+4. Review the attached **Company Safety Proof Checklist (ADR-15)**.
+5. Click **"Inspect Scanned Documents"** (`GET /disbursements/auction/:auctionId/safety-proof-url`).
+   - The portal generates an encrypted, 15-minute presigned S3 URL.
+   - Visually inspect the high-resolution scanned copy of the winner's agreement, nominee signature, and signed blank cheque.
+   - Confirm that bank details match disbursement records.
+
+---
+
+## 7. Inspecting Immutable Audit Trail for Reversals
+
+```mermaid
+flowchart TD
+    OpenAudit["Navigate: Reports -> Forensic Audit Trail"] --> Filter["Filter Actions: 'PAYMENT_REVERSAL'"]
+    Filter --> Locate["Locate Reversal Event: Receipt #KC-REC-PRD-2026-00412"]
+    Locate --> InspectDual["Examine Dual-Control Signatures:\n• maker_user_id: usr-partner-001 (Partner A)\n• checker_user_id: usr-partner-002 (Partner B)\n• Timestamp: 2026-05-15T16:30:12Z\n• Reason: 'Cashier error: Member Mani paid cash...'"]
+    InspectDual --> AssertDual{"Maker != Checker Assertion:\nIs maker_user_id !== checker_user_id?"}
+    AssertDual -- No --> Violation["CRITICAL COMPLIANCE VIOLATION:\nSelf-Approval Detected!"]
+    AssertDual -- Yes --> Certified["Dual-Control Compliance Verified"]
+```
+
+### Step-by-Step Instructions:
+1. Navigate to **Reports $\to$ Forensic Audit Trail**.
+2. Filter the log for high-risk mutations: `PAYMENT_REVERSAL`, `AUCTION_FINALIZATION`, and `PRIZE_DISBURSEMENT`.
+3. Open a sample payment reversal event.
+4. **The Maker-Checker Dual-Control Verification (`CONFIRMED-BY-DEVELOPER`)**:
+   - Verify that `maker_user_id` and `checker_user_id` are two distinct, non-identical users.
+   - Verify that a mandatory written justification is documented.
+   - Verify that the reversal created an offsetting balancing entry in the Form XXII Cash Book.
+
+---
+
+## 8. Exporting Statutory Filing Packets for Chit Registrar
+
+```mermaid
+flowchart TD
+    NavStatutory["Navigate: Reports -> Statutory Registers"] --> SelectScheme["Select Scheme: KCA-1L-20M-01"]
+    SelectScheme --> Packets["Select Statutory Filing Packet:"]
+    Packets --> Form17["1. Form XVII (Auction Minutes & Attendance)\nFiling with Registrar within statutory period"]
+    Packets --> Form21["2. Form XXI (Subscriber 20-Month Ledger)\nAnnual ledger filing"]
+    Packets --> Form22["3. Form XXII (Daily Cash Book Balance Sheet)"]
+    Form17 --> ExportPDF["Click 'Export Certified PDF / Excel'\nSystem compiles certified statutory filing packet with digital hash"]
+    Form21 --> ExportPDF
+    Form22 --> ExportPDF
+```
+
+### Step-by-Step Instructions:
+1. Open **Reports $\to$ Statutory Registers**.
+2. Select the chit group and export the required statutory forms:
+   - **Form XVII**: Auction Minutes including attendee roll, winning bid, and Foreman signature.
+   - **Form XXI**: 20-Month Subscriber Passbook Ledger.
+   - **Form XXII**: Daily Cash Book register.
+3. Click **"Export Certified PDF"** (`GET /reports/form-xvii`). The generated PDF contains official formatting ready for submission to the Chit Registrar.
+
+---
+
+## 9. Auditing BullMQ Background Cron Schedules & Logs
+
+```mermaid
+flowchart TD
+    NavJobs["Navigate: System -> Background Jobs & Schedules"] --> InspectSchedules["Inspect Repeatable Cron Schedules:"]
+    InspectSchedules --> DailyArrears["1. CRON_DAILY_ARREARS = '1 0 * * *' (00:01 AM IST)\nVerifies nightly recalculation of member dues & 3M defaulter tagging"]
+    InspectSchedules --> Recon["2. CRON_DAILY_RECONCILIATION = '0 6 * * *' (06:00 AM IST)\nVerifies automated morning payment gateway audit"]
+    InspectSchedules --> Notifications["3. Notification Queue Audit Logs\nInspect bilingual receipt deliveries, push success rate & DLT SMS fallback"]
+    Notifications --> CompleteAudit["Sign off Annual Statutory Audit Certificate"]
+```
+
+### Step-by-Step Instructions:
+1. Open **System $\to$ Background Jobs & Schedules** (`GET /jobs/repeatable-schedules`).
+2. Verify active cron schedules:
+   - **Daily Arrears Calculation**: Stamped at **00:01 AM IST (`1 0 * * *`)** to prevent arrears accumulation errors.
+   - **Payment Gateway Reconciliation**: Stamped at **06:00 AM IST (`0 6 * * *`)**.
+3. Open **Notification Delivery Audit Logs** (`GET /jobs/notification-audit-logs`):
+   - Review push notification delivery success rates.
+   - Verify that fallback SMS was dispatched for keypad-phone subscribers.
+4. Issue the formal statutory audit sign-off for Kumaran Finance.

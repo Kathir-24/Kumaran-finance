@@ -55,9 +55,12 @@ Database migrations & seeding       -->   docs/04-engineering/database-migration
 Quality gate checklist before merge  -->   docs/04-engineering/definition-of-done.md
 Ongoing notebook intake wizard      -->   docs/07-operations/manual-onboarding-sop.md
 Cash handovers & field collections  -->   docs/07-operations/operations-sop.md
-Web Admin Dashboard screens         -->   docs/07-operations/user-manuals/admin-foreman-manual.md
-Android Agent mobile app screens    -->   docs/07-operations/user-manuals/agent-mobile-manual.md
-Customer mobile app screens         -->   docs/07-operations/user-manuals/customer-app-guide.md
+Web Admin & Partner operations      -->   docs/07-operations/user-manuals/admin-foreman-manual.md
+Desk Accountant & Cashier operations -->   docs/07-operations/user-manuals/accountant-desk-manual.md
+Android Agent mobile app operations  -->   docs/07-operations/user-manuals/agent-mobile-manual.md
+Customer mobile app operations       -->   docs/07-operations/user-manuals/customer-app-guide.md
+Branch Manager facility operations   -->   docs/07-operations/user-manuals/branch-manager-manual.md
+Independent CA Auditor portal        -->   docs/07-operations/user-manuals/auditor-portal-manual.md
 ```
 
 ---
