@@ -10,6 +10,7 @@
 
 | Script | Purpose | Execution Command | S3 Storage Path |
 |---|---|---|---|
+| [`audit-persona-enforcement.ts`](audit-persona-enforcement.ts) | **Automated AST Persona Enforcement Audit Tool**<br>Parses all 18 NestJS controllers using TypeScript Compiler API; audits 111 operations and verifies 600 persona decisions. Detailed guide: [`docs/audit-persona-enforcement.md`](docs/audit-persona-enforcement.md). | `pnpm --filter api exec ts-node scripts/audit-persona-enforcement.ts` | `scripts/endpoint-audit-report.json` |
 | [`drp-drill.ts`](drp-drill.ts) | **Automated Disaster Recovery (DRP) Drill Engine**<br>Simulates full disaster restore in an isolated sandbox and asserts 5 financial invariants. | `pnpm db:drp:drill` | `backups/db/YYYY/MM/*.dump` |
 | [`backup-to-s3.ts`](backup-to-s3.ts) | **Off-Site Database Backup & Retention Pruner**<br>Dumps PostgreSQL 17 in binary format (`pg_dump -F c`) and prunes dumps > 30 days. | `pnpm db:backup:s3` | `backups/db/YYYY/MM/*.dump` |
 | [`restore-from-s3.ts`](restore-from-s3.ts) | **S3 Snapshot Restore & Listing CLI**<br>Lists S3 snapshots and executes `pg_restore --clean --if-exists`. | `pnpm db:restore:s3`<br>`pnpm db:backups:list` | Reads from `backups/db/` |
