@@ -89,11 +89,11 @@ export class AuctionController {
   }
 
   @Get(':id/eligible-bidders')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.AUDITOR)
   @ApiOperation({
     summary: 'Pre-Auction Defaulter Guard: List eligible non-prized subscribers',
     description:
-      'ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.',
+      'ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager, Auditor.',
   })
   @ApiQuery({
     name: 'month',

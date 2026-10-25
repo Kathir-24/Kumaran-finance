@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ChitStatus, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from '../src/auth/auth.service';
@@ -8,7 +8,7 @@ import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { InstallmentService } from '../src/installment/installment.service';
 import { UserService } from '../src/user/user.service';
 
-describe('Category A Endpoints & Operational Lifecycles', () => {
+describe('Operational Lifecycles & Maintenance Workflows', () => {
   let authService: AuthService;
   let userService: UserService;
   let disbursementService: DisbursementService;

@@ -127,7 +127,7 @@
 | `POST` | `/auctions/:id/finalize` | **Checker**: Commit results & mark `isPrized` | **Checker** (`maker != checker`) | **Checker per §6** (`maker != checker`) | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/auctions/:id/minutes` | Form XVII statutory auction minutes summary | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for PDF | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `PATCH` | `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `PATCH` | `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -139,12 +139,12 @@
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/tickets/:ticketId/dues` | Full monthly dues schedule for ticket | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
 | `GET` | `/tickets/:ticketId/passbook` | Detailed digital passbook statement | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
-| `GET` | `/tickets/defaulters` | List subscribers with continuous arrears | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `GET` | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/tickets/defaulters` | List subscribers with continuous arrears | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/tickets/:id/remove-defaulter`| Execute 3M arrears removal (`REMOVED_DEF_3M`)| **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/tickets/:id/substitute` | Substitute subscriber for `REMOVED_DEF_3M` ticket (ADR-13) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---

@@ -26,6 +26,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -62,6 +72,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
         run: pnpm test
+
+      - name: Run Multi-Role E2E Integration Tests (82 Tests)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
+          TEST_DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
+          STORAGE_DRIVER: local
+        run: pnpm run test:e2e
 
       - name: Compile NestJS Application
         run: pnpm --filter api run build

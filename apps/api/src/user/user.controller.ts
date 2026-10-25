@@ -37,11 +37,11 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.AUDITOR)
   @ApiOperation({
     summary: 'Search & list staff users with pagination',
     description:
-      'Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager.',
+      'Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager, Auditor.',
   })
   @ApiPaginatedResponseEnvelope(UserResponseDto, {
     description: 'Staff user list retrieved successfully',
@@ -51,11 +51,11 @@ export class UserController {
   }
 
   @Get(':id')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.AUDITOR)
   @ApiOperation({
     summary: 'Get staff user profile by ID',
     description:
-      'Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager.',
+      'Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager, Auditor.',
   })
   @ApiOkResponseEnvelope(UserResponseDto, {
     description: 'Staff user retrieved successfully',
