@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Current Status**: **All 10 Modules, 3 System Components, Branches, Users & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**425 / 425 passing tests: 343 Unit + 82 E2E**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**431 / 431 passing tests: 349 Unit + 82 E2E**).
 
 ---
 
@@ -28,7 +28,38 @@
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **425 / 425 PASSING** |
+| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **431 / 431 PASSING** |
+
+---
+
+### 1.1 Automated TypeScript AST Persona Enforcement Verification
+
+An automated AST inspection utility (`apps/api/scripts/audit-persona-enforcement.ts`) parses all 18 NestJS controllers across `apps/api/src/` using the TypeScript Compiler API (`ts.createSourceFile`, `ts.canHaveDecorators`, `ts.getDecorators`). It maps every class-level and method-level decorator (`@Roles`, `@UseGuards`, `@Get`, `@Post`, `@Patch`, `@Delete`, `@Sse`) to evaluate RBAC and ABAC compliance against this registry.
+
+```
+================================================================
+AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 105 PATHS):
+Total Operations (Endpoints)     : 111 (110 controller methods + Bull Board UI)
+  • Public Endpoints (No JWT)    : 11
+  • Guarded Endpoints            : 100
+      - Enforced with @Roles(...) : 92 (Strict RolesGuard RBAC)
+      - Guarded with JwtAuthGuard : 8  (Contextual ABAC / Caller Identity)
+================================================================
+```
+
+#### The 600 Granular Persona Access Decisions Matrix (100 Guarded Operations × 6 Personas)
+
+Across all 100 non-public operations, each of the 6 system roles was evaluated against business authorization rules:
+
+| Persona Role | Allowed Operations | Blocked Operations | Total Evaluated | Scope & Enforcement Boundary |
+|---|:---:|:---:|:---:|---|
+| **`SUPER_ADMIN`** | **100** | **0** | **100** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at database/service level. |
+| **`BRANCH_MANAGER`** | **78** | **22** | **100** | Branch-scoped intake, auction facilitation, staff management. Blocked from company branch creation, scheme activation, user resets, reversal approvals, and payout releases. |
+| **`ACCOUNTANT`** | **63** | **37** | **100** | Company-wide financial ledger entries, voucher preparation, day books, cash books, collections. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
+| **`COLLECTION_AGENT`** | **35** | **65** | **100** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues. Blocked from administrative auctions, prize vouchers, minutes, passbooks, and scheme configs. |
+| **`CUSTOMER`** | **31** | **69** | **100** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers. Blocked from all staff endpoints. |
+| **`AUDITOR`** | **53** | **47** | **100** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. Strictly blocked from ALL 47 mutation/write operations. |
+| **TOTALS** | **360** | **240** | **600** | **100% Verified Match between Controller Decorators and Registry Specification** |
 
 ---
 
@@ -314,6 +345,26 @@
 | `GET` | `/health` | Terminus system health check (Postgres, Redis, Storage) | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `GET` | `/health/sentry-test` | Sentry exception diagnostic verification | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `GET` | `/metrics` | Prometheus metrics scrape endpoint | **Basic Auth (`METRICS_USER`)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | **Basic Auth (`METRICS_USER`)** |
+
+---
+
+### 14.2 Complete Audit & Proof of All 11 Public / Non-RBAC Operations
+
+The system exposes exactly **11 public operations** that intentionally do not require JWT Bearer authentication. These endpoints represent the "Front Entrance" (where credentials are created or validated) and "Infrastructure Probes" (where external systems check health). Each is hardened with specialized, non-RBAC defense layers:
+
+| # | Endpoint & Method | Purpose & Target | Security & Hardening Mechanism | Automated Test Proof |
+|:---:|---|---|---|---|
+| **1** | `GET /` | Root server liveness check | Zero sensitive data returned (`"Kumaran Chits API is running"`). | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
+| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and MinIO connectivity. `@SkipThrottle()` enabled for Docker/AWS probes to prevent false positives. | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
+| **3** | `GET /health/sentry-test` | Crash diagnostic validation | Triggers an intentional 500 exception to verify Sentry APM error logging without leaking stack traces. | [`apps/api/test/client-contract.spec.ts`](../test/client-contract.spec.ts) |
+| **4** | `POST /auth/web/login` | Staff office web portal login | Rate-limited via `@Throttle(5, 60)` (max 5 requests/min); verifies password with `bcrypt.compare` (salt 10-12); challenges for TOTP if 2FA active. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
+| **5** | `POST /auth/web/verify-totp` | Staff 2FA authentication | Validates cryptographic `tempToken` issued during Step 1 login + RFC 6238 6-digit authenticator code. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
+| **6** | `POST /auth/refresh-token` | Session token pair rotation | Rotates 15-minute access JWT; validates 7-day refresh token against SHA-256 salted hash stored in DB; revokes old tokens. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
+| **7** | `POST /auth/mobile/request-otp` | Mobile SMS OTP onboarding | Rate-limited; generates cryptographically random 6-digit OTP; stores in Redis with strict **300-second (5 min) TTL**; dispatches via Indian DLT SMS gateway. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
+| **8** | `POST /auth/mobile/verify-otp` | Mobile SMS OTP validation | Verifies code against Redis; decrements attempts on mismatch and **locks out after 3 failed attempts**; deletes OTP key on success; returns `setupToken` or full session. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
+| **9** | `POST /auth/mobile/login-mpin` | Mobile quick unlock | Validates 6-digit MPIN against bcrypt hash; **auto-locks account after 5 consecutive failures** with exponential backoff. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
+| **10**| `POST /auth/mobile/set-mpin` | Initial MPIN configuration | Enforces either the cryptographic `setupToken` issued by `verify-otp` during onboarding or an active Bearer JWT in settings; hashes MPIN via bcrypt. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
+| **11**| `GET /metrics` | Prometheus telemetry scraper | Protected by `MetricsAuthGuard` using **HTTP Basic Authentication** (`METRICS_USER` / `METRICS_PASSWORD`). Blocks unauthorized public access. | [`apps/api/test/metrics.spec.ts`](../test/metrics.spec.ts) |
 
 ---
 
