@@ -123,14 +123,15 @@ sequenceDiagram
 
     Note over C,APP: Morning 10:00 AM: Mani opens app
     C->>APP: Enters 6-digit MPIN or Touches Fingerprint (0.5s)
-    APP->>API: GET /customer/my-chits
+    APP->>API: GET /customers/:id & GET /tickets/:ticketId/dues
     API-->>APP: Returns Ticket #9 (KCA-1L-20M-01) | Net Due: ₹4,100
     C->>APP: Taps "Pay Due / பணம் செலுத்துக (₹4,100)"
     APP->>APP: Launches Native Android Intent (upi://pay)
     APP->>UPI: Opens Google Pay with pre-filled amount ₹4,100
     C->>UPI: Enters UPI PIN and confirms payment
-    UPI-->>API: Bank Webhook confirms payment success (Order ID)
-    API-->>APP: Pushes instant payment confirmation
+    UPI-->>APP: Returns UPI Ref ID (e.g. 4291880192)
+    APP->>API: POST /payments (mode: 'UPI', amount: 4100, reference: '4291880192')
+    API-->>APP: Commits BigInt ₹4,100 -> Receipt #KC-REC-PRD-2026-00412
     APP-->>C: Green Screen: "Payment Successful! Receipt #KC-REC-00412"
     APP-->>C: Sends instant free Mobile Push Notification & updates Digital Passbook
 ```

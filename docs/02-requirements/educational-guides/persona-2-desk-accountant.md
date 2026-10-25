@@ -279,6 +279,10 @@ Subscriber Kandasamy won the Month 4 auction (`₹1,00,000` chit, discount `₹2
 5. **The Hard Authorization Block**:
    - The voucher is now in state **`PENDING_AUTHORIZATION`**.
    - If the accountant looks for an "Authorize" button, it does **not exist** on their screen. Only a Super Admin (Partner) can authorize money release.
+6. **Executing Fund Release Once Authorized**:
+   - Once Partner B inspects the cheques on their mobile phone and clicks Authorize (`POST /disbursements/auction/:auctionId/authorize-payout`), the voucher status updates to **`AUTHORIZED_BY_CHECKER`**.
+   - The Desk Accountant opens the authorized voucher, hands the physical account payee cheque to Kandasamy, and clicks **`"Release Disbursement"`** (`POST /disbursements/auction/:auctionId/disburse`) entering reference `CHQ-904122`.
+   - The status updates to **`DISBURSED`**, the company bank journal reflects the outflow, and a bilingual payout receipt is generated and handed to the winner.
 
 ---
 

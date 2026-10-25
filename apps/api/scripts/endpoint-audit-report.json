@@ -714,11 +714,13 @@
     "classRoles": [],
     "methodRoles": [
       "SUPER_ADMIN",
-      "BRANCH_MANAGER"
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
     ],
     "effectiveRoles": [
       "SUPER_ADMIN",
-      "BRANCH_MANAGER"
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
     ],
     "isPublic": false,
     "notes": [

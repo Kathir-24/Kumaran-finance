@@ -70,11 +70,11 @@ export class ChitController {
 
   @Post('onboard-ongoing')
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
-    summary: 'Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook',
+    summary: 'Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook (Maker)',
     description:
-      'Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager.',
+      'Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager, Accountant (Maker). Requires Checker activation by Super Admin.',
   })
   @ApiCreatedResponseEnvelope(ChitGroupResponseDto, { description: 'Ongoing chit onboarded successfully' })
   async onboardOngoing(

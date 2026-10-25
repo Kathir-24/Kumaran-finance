@@ -84,12 +84,15 @@
    - **Signed blank cheque(s) with details submitted?** [Yes / No, enter bank & cheque numbers]
    - **Promissory note / personal guarantee submitted?** [Yes / No]
    - Upload scanned copies of the signed papers / cheques to secure storage.
-3. Prepare the Payout Voucher:
+3. Prepare the Payout Voucher (Maker):
    - Select payment mode: **Account Payee Cheque**, **Bank Transfer (NEFT/RTGS/IMPS)**, or **Cash**.
-   - Enter cheque number or bank reference details.
+   - Click **"Submit Payout Voucher"** (`POST /disbursements/auction/:auctionId/verify-safety-proof`). Status transitions to `VERIFIED_BY_MAKER`.
 4. **Checker Authorization**:
-   - Partner B (Super Admin) reviews the voucher and checklist, then clicks **"Authorize & Disburse Prize Money"** (`maker_user_id != checker_user_id`).
-   - Software records disbursement timestamp and generates a bilingual payout receipt.
+   - Partner B (Super Admin) reviews the voucher, checks the attached cheque scans via presigned URL, and clicks **"Authorize Payout Voucher"** (`POST /disbursements/auction/:auctionId/authorize-payout`).
+   - Software enforces `maker_user_id != checker_user_id` and sets status to `AUTHORIZED_BY_CHECKER`.
+5. **Release Disbursement**:
+   - Accountant or Partner enters cheque number or bank reference details (UTR) and clicks **"Release Disbursement"** (`POST /disbursements/auction/:auctionId/disburse`).
+   - Software records disbursement timestamp, transitions status to `DISBURSED`, and generates a bilingual payout receipt.
 
 ---
 
@@ -135,7 +138,7 @@ For operational visibility over asynchronous background workers, partners can op
 
 ### 6.2 Monitored Background Queues
 - **`daily-maintenance-queue`**:
-  - Tracks daily arrears calculation running at 02:00 AM IST.
+  - Tracks daily arrears calculation running at 00:01 AM IST (`1 0 * * *`).
   - Verifies automated 3-month continuous defaulter tagging (ADR-07).
 - **`notification-queue`**:
   - Monitors bilingual payment receipt dispatches, pre-auction reminders, post-auction dividend results broadcasts, default warning notices, and dual-control Maker-Checker approval alerts (payment reversals & prize disbursements).

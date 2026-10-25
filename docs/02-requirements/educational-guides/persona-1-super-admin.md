@@ -258,13 +258,17 @@ Kandasamy (Ticket `#5`) comes to the office 3 days later to collect his prize mo
 3. **Step 3: Prepare Payout Voucher (Maker)**:
    - Payout Amount: `₹75,000` (Whole integer Rupees).
    - Payment Mode: Select **`Cheque`** (or `Cash` / `NEFT`).
-   - Partner A enters Cheque No: `904121`, drawn on Kumaran Finance's current account.
-   - Click **"Submit Payout Voucher"** (Maker: Partner A).
-4. **Step 4: Authorize Prize Payout (Checker)**:
-   - Partner C (or Partner B/D) opens the approval queue on their mobile phone.
-   - They inspect the attached cheque scan and signed agreement.
-   - Partner C clicks **"Authorize & Disburse Prize Money"**.
-   - The status changes to **`DISBURSED`**.
+   - Click **"Submit Payout Voucher"** (Maker: Partner A). Status updates to `PENDING_AUTHORIZATION`.
+4. **Step 4: Authorize Prize Payout Voucher (Checker)**:
+   - Partner C (or Partner B/D) opens the approval queue on their mobile phone or PC.
+   - They inspect the attached cheque scan and signed agreement via 15-minute presigned URL (`GET /disbursements/auction/:auctionId/safety-proof-url`).
+   - Partner C clicks **"Authorize Payout Voucher"** (`POST /disbursements/auction/:auctionId/authorize-payout`).
+   - System asserts `verifiedByUserId != checkerUserId` and sets status to **`AUTHORIZED_BY_CHECKER`**.
+5. **Step 5: Release Prize Money Disbursement**:
+   - Partner A or Desk Accountant opens the authorized voucher.
+   - Enters the final payment release details: Cheque No `904121` (or Bank UTR), drawn on Kumaran Finance Current Account.
+   - Clicks **"Release Disbursement"** (`POST /disbursements/auction/:auctionId/disburse`).
+   - The status updates to **`DISBURSED`**.
    - A bilingual Tamil/English payout voucher and SMS receipt are dispatched to Kandasamy.
 
 ---
@@ -324,6 +328,41 @@ Suppose an accountant accidentally recorded a cash payment of ₹4,100 to Ticket
      - An offsetting entry is recorded in the Form XXII Cash Book.
      - An audit log entry is written with both `maker_user_id` (Partner A) and `checker_user_id` (Partner B).
    - Partner A can now record the correct payment against Ticket `#9`.
+
+---
+
+### Journey 7: Executing Month 1 Company Pool & Month $N$ Final Member Settlement
+
+The standard statutory chit lifecycle requires specialized handling for the first and final months where auctions do not occur:
+
+#### 1. Month 1 Company Pool Execution:
+- Upon chit scheme activation (`POST /chits/:id/activate`), Ticket #1 is permanently allocated to the company representative.
+- The Month 1 gross pool (`₹1,00,000`) is collected and taken by the company customer ticket.
+- **Strict Rule**: There is **NO auction** in Month 1, and the dividend is **₹0**. All members pay the base installment ($I_{base} = \text{₹}5,000$) for Month 1.
+
+#### 2. Month $N$ (Final Month 20) Direct Settlement:
+- When the chit group reaches Month 20, there is only 1 non-prized subscriber remaining (e.g. Ticket #18, Marimuthu).
+- There is **NO auction** in Month 20.
+- Partner B navigates to **Disbursements $\to$ Group KCA-1L-20M-01 $\to$ "Month 20 Final Settlement"**.
+- Partner B clicks **"Execute Final Settlement"** (`POST /disbursements/group/:chitGroupId/final-settlement`):
+  - Company retains 4.00% foreman commission (`₹4,000`) and the final month's payable installment (`₹5,000`).
+  - Net prize money (`₹91,000`) is settled directly to Marimuthu with a formal payout voucher.
+  - The chit scheme transitions automatically to `COMPLETED`.
+
+---
+
+### Journey 8: Staff Multi-Role Provisioning & Security Credential Reset
+
+When provisioning a field agent to assist with office counter duties during the afternoon:
+
+1. **Staff Profile Lookup**: Partner opens **Settings $\to$ Staff Directory $\to$ Murugan (`usr-murugan`)**.
+2. **Assign Dual Roles**:
+   - Murugan currently holds `roles: ['COLLECTION_AGENT']`.
+   - Partner checks the box for **`ACCOUNTANT`** and clicks **"Update Roles"** (`PATCH /users/:id/roles`).
+   - The backend validates the role array: `roles: ['COLLECTION_AGENT', 'ACCOUNTANT']`. Murugan can now access counter payment screens while preserving the anti-self-acknowledgment guard (`collector != acknowledger`).
+3. **Emergency Credential Reset**:
+   - If an employee forgets their password, Partner opens their profile and clicks **"Reset Password"** (`POST /users/:id/reset-password`).
+   - System generates a secure temporary password, terminates all active sessions, and forces a password change upon the employee's next login.
 
 ---
 

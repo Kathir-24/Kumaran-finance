@@ -124,7 +124,7 @@ sequenceDiagram
     Note over A,UI: Morning 9:30 AM: Auditor opens Compliance Console
     A->>UI: Logs in with 2FA -> Navigates to "Statutory Audit Workspace"
     A->>UI: Selects Scheme KCA-1L-20M-01 -> Month 4 Auction
-    UI->>API: GET /report/audit/auction/KCA-1L/4
+    UI->>API: GET /reports/form-xvii?chitGroupId=KCA-1L-20M-01&month=4
     API->>DB: Fetches Bid ₹25,000, Commission ₹4,000, Dividend ₹21,000
     DB-->>UI: Returns Whole-Rupee Financial Breakdown
     Note over A: Verifies Conservation Law: ₹25,000 = ₹4,000 + ₹21,000 (Passes!)
@@ -269,6 +269,22 @@ To complete the statutory audit report:
 5. Click **`"Export Full Audit Bundle (ZIP)"`**.
    - The system packages the Form XVII minutes, Form XXI ledgers, Form XXII cash book, bank reconciliations, and auditor sign-off sheets into an encrypted ZIP bundle.
 6. The Chartered Accountant attaches their digital signature and certifies Kumaran Finance's books as **100% compliant with the Chit Funds Act, 1982**.
+
+---
+
+### Journey 7: Auditing BullMQ Background Cron Schedules & Notification Audit Logs
+
+To verify that automated background jobs execute according to statutory rules without missing runs:
+
+1. **Inspect Repeatable Schedulers**:
+   - Navigate to **System Audit $\to$ Background Schedulers** (`GET /jobs/repeatable-schedules`).
+   - The auditor verifies the registered cron jobs and next execution timestamps:
+     - `CRON_DAILY_ARREARS` (`1 0 * * *`): Runs at **00:01 AM IST** every midnight, marking unpaid items overdue and tagging 3M defaults.
+     - `CRON_SETTLEMENT_RECONCILIATION` (`0 6 * * *`): Runs at **06:00 AM IST** daily, matching gateway payouts to bank receipts.
+     - `CRON_PRE_AUCTION_REMINDERS` (`0 9 * * *`): Runs at **09:00 AM IST**, dispatching push and SMS reminders 3 days ahead of auctions.
+2. **Inspect Dispatched Notification History**:
+   - Navigate to **System Audit $\to$ Notification Delivery Registry** (`GET /jobs/notification-audit-logs`).
+   - The auditor inspects dispatched bilingual SMS and Push alerts, verifying that payment receipts, auction results, and 3-month statutory arrears warnings were delivered promptly to subscriber phone numbers.
 
 ---
 

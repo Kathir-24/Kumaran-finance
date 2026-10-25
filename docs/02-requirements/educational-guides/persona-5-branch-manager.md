@@ -237,6 +237,9 @@ flowchart TD
    - Tie-Breaker Mode: Select **`Physical Paper Token Draw`**.
    - Click **`"Submit Auction Results for Partner Finalization"`** (Maker: Branch Manager).
    - Status changes to `PENDING_VERIFICATION`. The Branch Manager **cannot finalize the auction**; Partner B will finalize it from their phone or desk.
+6. **Record Physical Filing with Registrar**:
+   - Once Partner B finalizes the auction, the Branch Manager prints Form XVII minutes, collects Foreman and subscriber signatures, and submits the hard copy to the Registrar of Chits office in Erode.
+   - The Branch Manager navigates to the auction record and clicks **"Mark Filed with Registrar"** (`PATCH /auctions/:auctionId/mark-filed-with-registrar`), recording the filing date and reference order. The auction transitions to status **`MINUTES_FILED`**.
 
 ---
 

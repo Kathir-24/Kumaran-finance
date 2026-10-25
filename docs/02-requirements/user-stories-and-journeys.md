@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Scope**: 100% complete coverage across all 10 functional modules, 28 features, and all 6 standardized personas.  
+> **Scope**: 100% complete coverage across all 10 functional modules, 28 features, and all 6 standardized personas (63 exhaustive user stories & 6 multi-actor journey maps).  
 > **Status**: Authoritative Product Specification (`CONFIRMED-BY-DEVELOPER`)  
 > **Zero Hallucination Guarantee**: Derived strictly from confirmed business decisions (ADR-01 through ADR-18), [`financial-rules.md`](../01-business/financial-rules.md), [`permissions-matrix.md`](../01-business/permissions-matrix.md), [`completed-modules-api-registry.md`](../03-architecture/completed-modules-api-registry.md), and verified NestJS controller implementations.
 
@@ -95,51 +95,71 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 
 ```mermaid
 flowchart TD
-    subgraph J1["Journey 1: Super Admin / Partner Lifecycle"]
-        SA_Start["Morning 2FA Login & KPI Dashboard"] --> SA_Sch["Activate Fresh / Mid-Cycle Schemes"]
-        SA_Sch --> SA_Auc["Conduct Monthly Auction & Option A Paper Draw"]
-        SA_Auc --> SA_Chk["Checker Approval: Payouts, Reversals, Finalize"]
-        SA_Chk --> SA_Vault["Evening Vault Reconciliation & Day Book Sign-off"]
+    subgraph J1["Journey 1: Super Admin / Partner Lifecycle (Dual Parity)"]
+        SA_Start["Morning 2FA Web/Mobile Login & Executive Dashboard"] --> SA_Staff["Staff Provisioning & Role Assignments (/users/:id/roles)"]
+        SA_Staff --> SA_Sch["Activate Fresh / Ongoing Scheme (/chits/new & /activate)"]
+        SA_Sch --> SA_M1["Month 1: Company Ticket takes Full Pool (₹0 Div, No Auction)"]
+        SA_M1 --> SA_Auc["Partner A (Maker): Conduct Auction & Option A Paper Lot Draw (/auctions/:id/record-bid)"]
+        SA_Auc --> SA_Chk["Partner B (Checker): Push Alert Review & Finalize (/auctions/:id/finalize)"]
+        SA_Chk --> SA_Def["Defaulter 3M Removal & Subscriber Substitution (/tickets/:id/remove-defaulter)"]
+        SA_Def --> SA_Disb["Dual Control: Partner B Authorizes Payout -> Funds Released (/authorize-payout -> /disburse)"]
+        SA_Disb --> SA_MN["Month N: Final Subscriber Direct Settlement (4% Comm, No Auction)"]
+        SA_MN --> SA_Hand["Evening Safe Vault Cash Acknowledgment (collector != acknowledger)"]
+        SA_Hand --> SA_Close["Balance Day Book & Sign Form XXII Cash Book"]
     end
 
     subgraph J2["Journey 2: Field Collection Agent Route"]
-        CA_Start["1-Sec Biometric / MPIN Unlock"] --> CA_Dues["Load Assigned Route Dues (/collections/dues)"]
-        CA_Dues --> CA_Pay["Doorstep Round: Exact Inet Cash + Passbook Sign"]
-        CA_Pay --> CA_Off["Rural Offline Queuing (UUID Idempotency)"]
-        CA_Off --> CA_Sync["Auto-Sync Batch upon Cellular Recovery"]
-        CA_Sync --> CA_Hand["Evening Vault Cash Handover Submit (Maker)"]
+        CA_Start["1-Sec Biometric / 6-Digit MPIN Quick Unlock"] --> CA_Dues["Load Assigned Route Dues (/collections/agent-dues)"]
+        CA_Dues --> CA_Pay["Doorstep Round: Collect Exact Inet Cash + Sign Passbook (/collections/record)"]
+        CA_Pay --> CA_Off["Rural Offline Dead-Zone Queuing (Encrypted SQLite + UUID Idempotency)"]
+        CA_Off --> CA_Sync["Auto-Sync Batch upon Cellular Recovery (/collections/sync-offline-queue)"]
+        CA_Sync --> CA_Lead["On-the-Road Customer Lead Intake (/customers)"]
+        CA_Lead --> CA_Warn["Deliver Arrears Verbal / Written Warnings on Route"]
+        CA_Warn --> CA_Hand["Evening Cash Handover Batch Submit (/collections/cash-handover/submit)"]
+        CA_Hand --> CA_Clear["Receive Digital Handover Slip (#HO Slip: Status CONFIRMED, ₹0 Liability)"]
     end
 
     subgraph J3["Journey 3: Desk Accountant Day"]
-        ACC_Start["2FA Login & Day Book Opening Cash Check"] --> ACC_Ctr["Counter Walk-in Cash Collection & Receipt"]
-        ACC_Ctr --> ACC_Intake["Transcribe Ongoing Paper Notebook Chits"]
-        ACC_Intake --> ACC_Count["Count & Acknowledge Field Agent Cash (Checker)"]
-        ACC_Count --> ACC_Vouch["Verify Safety Proof & Prep Voucher (Maker)"]
-        ACC_Vouch --> ACC_Close["Balance Day Book & Form XXII Cash Book"]
+        ACC_Start["2FA Login & Verify Opening Vault Cash Balance (/reports/day-book)"] --> ACC_Ctr["Counter Walk-in Cash Collection & Instant Bilingual Receipt (/payments)"]
+        ACC_Ctr --> ACC_Intake["Transcribe Ongoing Paper Notebook Chits as Maker (/chits/onboard-ongoing)"]
+        ACC_Intake --> ACC_KYC["Review & Verify Masked Aadhaar / PAN KYC Documents (/customers/:id/kyc-status)"]
+        ACC_KYC --> ACC_Count["Count & Acknowledge Field Agent Cash into Vault as Checker (/cash-handover/acknowledge)"]
+        ACC_Count --> ACC_Vouch["Verify Safety Proof Checklist & Prep Voucher as Maker (/verify-safety-proof)"]
+        ACC_Vouch --> ACC_Rel["Release Authorized Prize Disbursement with Cheque/UTR (/disburse)"]
+        ACC_Rel --> ACC_Rev["Initiate Payment Reversal Request with Mandatory Justification (/request-reversal)"]
+        ACC_Rev --> ACC_Close["Balance Day Book & Reconcile Form XXII Cash Book at 6:00 PM"]
     end
 
-    subgraph J4["Journey 4: Customer Subscriber Lifecycle"]
-        CUST_Start["SMS OTP Onboarding & 6-Digit MPIN Setup"] --> CUST_Pass["View Digital Passbook & Dividend Savings"]
-        CUST_Pass --> CUST_Pay["Pay Agent at Doorstep & Receive Instant SMS/Push"]
-        CUST_Pay --> CUST_Auc["Attend Branch Auction & Witness Tie-Break"]
-        CUST_Auc --> CUST_Win["Win Auction: Submit Safety Proof Checklist"]
-        CUST_Win --> CUST_Disb["Receive Prize Money via Bank Transfer / Cheque"]
+    subgraph J4["Journey 4: Customer / Subscriber Lifecycle"]
+        CUST_Start["SMS OTP Mobile Onboarding & 6-Digit MPIN / Biometric Setup"] --> CUST_Pass["View Bilingual Profile, Linked Nominee & 20-Month Passbook"]
+        CUST_Pass --> CUST_Div["Track Monthly Universal Dividend Deductions (Inet = Ibase - Div)"]
+        CUST_Div --> CUST_Pay["Pay Installment: 1-Tap UPI (GPay/PhonePe) or Doorstep Cash to Agent"]
+        CUST_Pay --> CUST_Notif["Receive Instant Free Push Notification Confirmation (or DLT SMS)"]
+        CUST_Notif --> CUST_Auc["Attend Branch In-Person Auction & Witness Option A Paper Draw"]
+        CUST_Auc --> CUST_Win["Win Auction: Submit Safety Proof (Sign Agreement, Nominee, Blank Cheques)"]
+        CUST_Win --> CUST_Disb["Receive Prize Money via Bank Transfer / Cheque / Cash & Download Receipt"]
     end
 
     subgraph J5["Journey 5: Branch Manager Facility Operations"]
-        BM_Start["Web Login & Branch Dashboard"] --> BM_Intake["Register Customer (KC-CUST-XXXXX) & Aadhaar Last 4"]
-        BM_Intake --> BM_Alloc["Allocate Ticket (ADR-13: 1 Ticket per Customer)"]
-        BM_Alloc --> BM_Pre["Verify Zero-Arrears Bidders (Sec 16(1))"]
-        BM_Pre --> BM_Bid["Record Winning Bid up to 1/4 Ceiling (Maker)"]
-        BM_Bid --> BM_Rep["Monitor Branch Defaulters Aging & Collections"]
+        BM_Start["Web Login with 2FA & Branch-Scope Initializer (PRD)"] --> BM_Intake["Register Customer Profile (KC-CUST-XXXXX) & Masked Aadhaar Last 4"]
+        BM_Intake --> BM_Alloc["Allocate Ticket 1..N (Enforcing ADR-13: Strictly 1 Ticket per Customer)"]
+        BM_Alloc --> BM_Pre["Pre-Auction Ineligibility Guard: Verify Zero Arrears (Section 16(1))"]
+        BM_Pre --> BM_Bid["Conduct In-Office Auction & Record Bid up to 1/4 Ceiling as Maker (/record-bid)"]
+        BM_Bid --> BM_Draw["Record Physical Paper Token Tie-Break Winner (Option A: /tie-break)"]
+        BM_Draw --> BM_Vouch["Verify Safety Proof Checklist & Documents as Maker (/verify-safety-proof)"]
+        BM_Vouch --> BM_Hand["Acknowledge Evening Field Agent Cash into Branch Safe as Checker"]
+        BM_Hand --> BM_Min["Sign & Record Form XVII Minutes Filing with Registrar (/mark-filed-with-registrar)"]
+        BM_Min --> BM_Rep["Monitor Branch Defaulters Aging & Route Collections (/reports/defaulters)"]
     end
 
     subgraph J6["Journey 6: Independent Auditor Forensic Audit"]
-        AUD_Start["2FA Login & Read-Only Dashboard"] --> AUD_Logs["Inspect Immutable AuditLog Table & Diffs"]
-        AUD_Logs --> AUD_XXII["Audit Form XXII Cash Book vs. Safe Cash"]
-        AUD_Logs --> AUD_XVII["Audit Form XVII Minutes & Pre-Auction Eligibility"]
-        AUD_XVII --> AUD_XXI["Audit Form XXI 20-Month Continuous Ledgers"]
-        AUD_XXI --> AUD_Sign["Statutory Audit Verification Sign-off"]
+        AUD_Start["2FA Login & Global Read-Only Forensic Console (47 Mutation Routes Blocked)"] --> AUD_Logs["Inspect Immutable AuditLog Table & Full Before-and-After JSON Diffs"]
+        AUD_Logs --> AUD_XXII["Audit Form XXII Cash Book Equation vs Physical Vault Balance"]
+        AUD_Logs --> AUD_XVII["Audit Form XVII Minutes & Pre-Auction 0-Arrears Bidder Eligibility"]
+        AUD_XVII --> AUD_XXI["Audit Form XXI 20-Month Continuous Member Ledgers (Math Conservation Laws)"]
+        AUD_XXI --> AUD_Jobs["Inspect BullMQ Repeatable Cron Schedules & Notification Audit Logs (/jobs)"]
+        AUD_Jobs --> AUD_Docs["Inspect Presigned S3 Scans of Blank Cheques, Notes & KYC Documents"]
+        AUD_Docs --> AUD_Sign["Statutory Audit Verification Sign-off for Registrar Filing"]
     end
 ```
 
@@ -210,8 +230,8 @@ flowchart TD
 - **I want to**: Authorize the prize payout voucher prepared by Accountant / Partner A (Maker) after inspecting safety proof scans
 - **So that**: Company money leaves the bank account only with verified dual authorization.
 - **Acceptance Criteria**:
-  - **Given** safety proof checklist is verified by Maker on `POST /disbursements/:id/verify-safety-proof`,
-  - **When** Partner B inspects 15-minute presigned document URLs and calls `POST /disbursements/:id/authorize-payout`,
+  - **Given** safety proof checklist is verified by Maker on `POST /disbursements/auction/:auctionId/verify-safety-proof`,
+  - **When** Partner B inspects 15-minute presigned document URLs on `GET /disbursements/auction/:auctionId/safety-proof-url` and calls `POST /disbursements/auction/:auctionId/authorize-payout`,
   - **Then** system marks status `AUTHORIZED_BY_CHECKER` and asserts `verifiedByUserId != checkerUserId`;
   - **Error Case**: System throws `403 Forbidden` if a Branch Manager attempts to authorize payout.
 
@@ -220,9 +240,64 @@ flowchart TD
 - **I want to**: Approve a payment reversal request initiated by Accountant or Partner A (Maker)
 - **So that**: Accounting ledger corrections are strictly verified by an independent partner.
 - **Acceptance Criteria**:
-  - **Given** reversal was requested with reason code on `POST /payments/:id/reversal` by Maker,
-  - **When** Partner B calls `POST /payments/:id/reversal/approve`,
+  - **Given** reversal was requested with reason code on `POST /payments/:id/request-reversal` by Maker,
+  - **When** Partner B calls `POST /payments/:id/approve-reversal`,
   - **Then** system sets payment status to `REVERSED`, reverts installment due back to `UNPAID`, recalculates arrears, and asserts `initiatedByUserId != checkerUserId`.
+
+#### US-SA-9: Month 1 Company Pool & Month $N$ Final Member Settlement
+- **As a**: Super Admin (Partner)
+- **I want to**: Execute the Month 1 company pool intake and Month $N$ final subscriber settlement without auctions
+- **So that**: Standard chit-fund legal rules (foreman ticket in Month 1 and last subscriber settlement in Month $N$) are executed flawlessly.
+- **Acceptance Criteria**:
+  - **Given** scheme is activated, Month 1 pool of ₹1,00,000 is assigned to company customer ticket with ₹0 dividend;
+  - **Given** chit reaches Month $N$ (e.g. Month 20 of 20),
+  - **When** Partner calls `POST /disbursements/group/:chitGroupId/final-settlement`,
+  - **Then** system verifies all prior auctions 1 to $N-1$ are settled, retains 4% commission (₹4,000) and final installment, disburses remaining prize money to the final non-prized subscriber with voucher, and transitions chit group status to `COMPLETED`.
+
+#### US-SA-10: Prize Disbursement Fund Release Execution
+- **As a**: Super Admin / Partner (or Desk Accountant)
+- **I want to**: Record the financial release reference (Cheque number, Bank UTR, or Cash voucher) once payout is authorized
+- **So that**: The payout voucher status transitions to `DISBURSED` with permanent transaction references.
+- **Acceptance Criteria**:
+  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status,
+  - **When** calling `POST /disbursements/auction/:auctionId/disburse` with `disbursementMode: 'CHEQUE'`, `referenceNumber: 'CHQ-904121'`, and `notes: 'Drawn on Canara Bank'`,
+  - **Then** status updates to `DISBURSED`, records `disbursedAt` timestamp and `disbursedByUserId`, and dispatches bilingual SMS/Push receipt.
+
+#### US-SA-11: Evening Safe Vault Cash Reconciliation & Form XXII Sign-off
+- **As a**: Super Admin (Partner)
+- **I want to**: Inspect the Form XXII Daily Cash Book equation at 6:00 PM and sign off on physical safe vault cash
+- **So that**: Physical cash in the office safe matches mathematical ledger equations to the exact Rupee.
+- **Acceptance Criteria**:
+  - **Given** Opening Cash ₹1,00,000, collections ₹60,000, disbursements ₹20,000,
+  - **When** calling `GET /reports/form-xxii`,
+  - **Then** system computes $\text{Closing Cash} = \text{₹}1,00,000 + \text{₹}60,000 - \text{₹}20,000 = \text{₹}1,40,000$, matching physical notes counted in the safe drawer with zero variance.
+
+#### US-SA-12: Conducting In-Office Auction & Recording Winning Bid as Maker
+- **As a**: Super Admin / Partner A (Operational Maker)
+- **I want to**: Conduct the physical in-branch auction in front of subscribers and record the winning ticket and bid discount ($D \le V/4$)
+- **So that**: The auction outcome is recorded and queued for Partner B Checker finalization.
+- **Acceptance Criteria**:
+  - **Given** active auction in Month 4,
+  - **When** Partner A calls `POST /auctions/:id/record-bid` with winning ticket #5 and discount ₹25,000,
+  - **Then** status updates to `SCHEDULED` with `conductedByUserId = partnerA_Id`, and pushes real-time approval alert to other partners.
+
+#### US-SA-13: Evening Cash Handover Acknowledgment as Checker into Vault
+- **As a**: Super Admin / Partner B (Checker)
+- **I want to**: Count currency notes handed over by Field Agents or Partner A and acknowledge the batch into the company vault
+- **So that**: Custody of cash transfers to the branch safe under strict dual control (`collector_user_id != acknowledger_user_id`).
+- **Acceptance Criteria**:
+  - **Given** Field Agent or Partner A collected ₹42,500 across 10 cash receipts,
+  - **When** Partner B counts physical notes and calls `POST /collections/cash-handover/acknowledge`,
+  - **Then** payments transition to `ACKNOWLEDGED`, vault safe balance increases by ₹42,500, and system strictly asserts `dto.collectorUserId !== acknowledgerUserId`.
+
+#### US-SA-14: Atomic Staff Account Deactivation & Session Revocation
+- **As a**: Super Admin (Managing Partner)
+- **I want to**: Deactivate a departing or compromised staff user account and immediately invalidate all active JWT sessions
+- **So that**: Former employees cannot access financial ledgers or field collection queues.
+- **Acceptance Criteria**:
+  - **Given** active staff account `usr-murugan`,
+  - **When** calling `PATCH /users/:id/status` with `isActive: false`,
+  - **Then** user record is marked inactive, refresh token hash is wiped, and all subsequent API calls with their tokens are rejected with `401 Unauthorized`.
 
 ---
 
@@ -243,7 +318,7 @@ flowchart TD
 - **So that**: The scheme fills its capacity while enforcing the single-ticket policy.
 - **Acceptance Criteria**:
   - **Given** Chit Group `KCA-1L-20M-01` in `DRAFT` status,
-  - **When** I submit `ticketNumber: 5` and `customerId: cust-123` to `POST /chits/:id/tickets`,
+  - **When** I submit `ticketNumber: 5` and `customerId: cust-123` to `POST /chits/:id/tickets/assign`,
   - **Then** ticket is allocated successfully;
   - **Error Case**: If customer already holds Ticket #2 in the same group, system rejects with `409 Conflict: Customer already holds a ticket in this chit group` (`@@unique([chitGroupId, customerId])`).
 
@@ -275,6 +350,61 @@ flowchart TD
 - **Acceptance Criteria**:
   - **Given** I call `GET /reports/defaulters` or `GET /installments/group/:id/month/:m`,
   - **Then** the result is automatically scoped to `where: { branchId: user.branchId }`, displaying total overdue amount and consecutive missed months.
+
+#### US-BM-6: Web Login with 2FA & Branch Scoping Initializer
+- **As a**: Branch Manager
+- **I want to**: Log in via the Web Portal using phone, password, and Microsoft Authenticator TOTP with automated branch scoping
+- **So that**: My operational workspace is strictly isolated to my assigned branch office (`PRD`).
+- **Acceptance Criteria**:
+  - **Given** valid staff credentials on `POST /auth/web/login` and valid TOTP on `POST /auth/web/verify-totp`,
+  - **Then** JWT claims include `branchId: 'branch-prd-uuid'`;
+  - **Anti-BOLA**: All queries (`/customers`, `/collections`, `/tickets`, `/reports`) automatically inject `where: { branchId: user.branchId }`.
+
+#### US-BM-7: Evening Cash Handover Acknowledgment as Checker into Branch Vault
+- **As a**: Branch Manager (Operational Checker)
+- **I want to**: Physically count currency notes brought in by Field Collection Agents and acknowledge the batch into the branch vault
+- **So that**: Field staff cash liabilities are cleared while maintaining dual control (`collector_user_id != acknowledger_user_id`).
+- **Acceptance Criteria**:
+  - **Given** Field Agent submitted a handover batch of ₹38,900 across 9 cash collections,
+  - **When** Branch Manager verifies physical notes and calls `POST /collections/cash-handover/acknowledge` with `acknowledgedAmount: 38900`,
+  - **Then** payments transition to `ACKNOWLEDGED`, branch vault safe balance increases by ₹38,900, and system strictly asserts `collectorUserId !== acknowledgerUserId`.
+
+#### US-BM-8: Company Safety Proof Checklist Verification as Maker
+- **As a**: Branch Manager (Disbursement Maker)
+- **I want to**: Inspect the physical safety proof documents (winner agreement, nominee signature, blank cheques, promissory notes) and upload scans to S3
+- **So that**: The prize payout voucher is prepared with documented proof for Super Admin Checker authorization.
+- **Acceptance Criteria**:
+  - **Given** an auction winner claiming prize pool ₹75,000,
+  - **When** Branch Manager uploads scanned cheques via `POST /disbursements/auction/:auctionId/upload-safety-proof` and submits checklist on `POST /disbursements/auction/:auctionId/verify-safety-proof`,
+  - **Then** status transitions to `VERIFIED_BY_MAKER`, records `verifiedByUserId = branchManagerId`, and triggers push notification to Partners.
+
+#### US-BM-9: Nominee Relationship Registration & Verification
+- **As a**: Branch Manager
+- **I want to**: Register a customer's designated nominee with full legal name, phone, relationship, and masked Aadhaar
+- **So that**: Nominee details are officially linked to the subscriber profile for emergency settlement and prize claims.
+- **Acceptance Criteria**:
+  - **Given** verified subscriber profile `KC-CUST-00105`,
+  - **When** calling `POST /customers/:id/nominees` with nominee name, relationship `Wife`, and phone `9842177442`,
+  - **Then** nominee record is saved and linked;
+  - **Branch Guard**: BM is blocked from adding nominees to customers outside their assigned branch.
+
+#### US-BM-10: Form XVII Minutes Physical Filing with Registrar Recording
+- **As a**: Branch Manager
+- **I want to**: Record the physical filing order number and dispatch date of Form XVII auction minutes with the Chit Registrar
+- **So that**: Company statutory compliance status transitions from `COMPLETED` to `MINUTES_FILED`.
+- **Acceptance Criteria**:
+  - **Given** auction is finalized and signed physical minutes are submitted to the Registrar of Chits (Erode),
+  - **When** calling `PATCH /auctions/:auctionId/mark-filed-with-registrar` with `filingDate` and `filingReferenceNumber`,
+  - **Then** auction status updates to `MINUTES_FILED` and logs the filing timestamp.
+
+#### US-BM-11: Branch-Scoped Form XXII Cash Book & Day Book Inspection
+- **As a**: Branch Manager
+- **I want to**: Inspect the 12-column daily cash register and collection journal scoped to my branch at 6:00 PM
+- **So that**: Today's branch cash inflows, counter collections, and safe vault balances balance to the exact Rupee.
+- **Acceptance Criteria**:
+  - **Given** transactions occurred at Perundurai branch,
+  - **When** calling `GET /reports/form-xxii`,
+  - **Then** response returns ledger entries strictly matching `branchId === user.branchId`, asserting closing vault cash equation.
 
 ---
 
@@ -322,7 +452,7 @@ flowchart TD
 - **So that**: Cash in hand matches app receipts to the exact Rupee.
 - **Acceptance Criteria**:
   - **Given** Field Agent submitted a handover batch of ₹45,000 across 12 cash receipts,
-  - **When** I count the notes and call `POST /collections/acknowledge-handover` with `acknowledgedAmount: 45000`,
+  - **When** I count the notes and call `POST /collections/cash-handover/acknowledge` with `acknowledgedAmount: 45000`,
   - **Then** payments transition to `ACKNOWLEDGED`, vault safe cash increases by ₹45,000, and system strictly enforces `collectorUserId != acknowledgerUserId`.
 
 #### US-ACC-6: Safety Proof Checklist Verification & Voucher Preparation (Maker)
@@ -331,7 +461,7 @@ flowchart TD
 - **So that**: Payout vouchers are documented with zero property paperwork (ADR-15).
 - **Acceptance Criteria**:
   - **Given** an auction winner claiming prize pool ₹75,000,
-  - **When** I verify checklist on `POST /disbursements/:id/verify-safety-proof` and upload scanned agreement to S3,
+  - **When** I verify checklist on `POST /disbursements/auction/:auctionId/verify-safety-proof` and upload scanned agreement to S3,
   - **Then** status updates to `VERIFIED_BY_MAKER`, tags `verifiedByUserId`, and enqueues push notification alert to Super Admins for Checker authorization.
 
 #### US-ACC-7: Payment Reversal Request Initiation (Maker)
@@ -340,7 +470,7 @@ flowchart TD
 - **So that**: Reversal requests are documented with justification notes before ledger changes take effect.
 - **Acceptance Criteria**:
   - **Given** Payment `pay-123` recorded in error,
-  - **When** I call `POST /payments/:id/reversal` with reason `WRONG_TICKET_NUMBER` and explanation notes,
+  - **When** I call `POST /payments/:id/request-reversal` with reason `WRONG_TICKET_NUMBER` and explanation notes,
   - **Then** reversal record is created in `REQUESTED` status, payment remains `SUCCESS` until approved, and system enqueues alert to Super Admins for Checker authorization.
 
 #### US-ACC-8: Evening Day Book & Form XXII Cash Book Balancing
@@ -350,7 +480,26 @@ flowchart TD
 - **Acceptance Criteria**:
   - **Given** opening cash ₹1,00,000, counter collections ₹15,000, field handover ₹45,000, petty expenses ₹2,000,
   - **When** I view `GET /reports/form-xxii`,
-  - **Then** Closing Cash = $\text{₹}1,00,000 + \text{₹}60,000 - \text{₹}2,000 = \text{₹}1,58,000$, matching physical currency in the branch safe to the exact Rupee.
+  - **Then** Closing Cash = $\text{₹}1,00,000 + \text{₹}60,000 - \text{₹}2,00,000 = \text{₹}1,58,000$, matching physical currency in the branch safe to the exact Rupee.
+
+#### US-ACC-9: Prize Disbursement Fund Release Execution (Voucher Clearance)
+- **As a**: Desk Accountant
+- **I want to**: Release the authorized prize money to the subscriber by entering the cheque or bank transfer reference number
+- **So that**: The payout voucher status updates to `DISBURSED` and company cash/bank books reflect the outflow.
+- **Acceptance Criteria**:
+  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status,
+  - **When** I call `POST /disbursements/auction/:auctionId/disburse` with payment mode `CHEQUE`, cheque number `904122`, and issuing bank,
+  - **Then** system commits voucher to `DISBURSED`, logs `disbursedByUserId = accountantId`, and issues bilingual receipt.
+
+#### US-ACC-10: Staff Session Logout & Automated Inactivity Lock
+- **As a**: Desk Accountant
+- **I want to**: Log out securely or have the portal lock automatically after 15 minutes of inactivity
+- **So that**: Walk-in subscribers cannot see company books or trigger entries if I step away from the counter.
+- **Acceptance Criteria**:
+  - **Given** active staff session,
+  - **When** I click logout calling `POST /auth/logout`,
+  - **Then** server wipes refresh token hash, invalidates access token, and redirects to login;
+  - **When** browser is idle for 15 minutes, local session locks automatically, requiring password or TOTP re-entry.
 
 ---
 
@@ -366,13 +515,13 @@ flowchart TD
   - **Then** system validates bcrypt hash and issues access session;
   - **Error Case**: 5 consecutive failed MPIN attempts auto-locks the account.
 
-#### US-CA-2: Morning Route Dues Inspection (`/collections/dues`)
+#### US-CA-2: Morning Route Dues Inspection (`/collections/agent-dues`)
 - **As a**: Field Collection Agent
 - **I want to**: View all pending and overdue installments assigned to my route before heading into the field
 - **So that**: I know the exact subscriber names, phone numbers, addresses, and net amounts payable today.
 - **Acceptance Criteria**:
   - **Given** I open the mobile app at 9:00 AM,
-  - **When** calling `GET /collections/dues`,
+  - **When** calling `GET /collections/agent-dues`,
   - **Then** system returns all `UNPAID` and `OVERDUE` dues for active tickets, sorted by due date and customer name.
 
 #### US-CA-3: Doorstep Collection & Customer Paper Passbook Sign-off (< 30s)
@@ -381,7 +530,7 @@ flowchart TD
 - **So that**: Doorstep rounds are fast, respectful of customer time, and follow traditional notebook customs.
 - **Acceptance Criteria**:
   - **Given** customer owes Month 4 net installment ₹3,950,
-  - **When** I submit `POST /collections` with `amount: 3950` and `paymentMethod: CASH`,
+  - **When** I submit `POST /collections/record` with `amount: 3950` and `paymentMethod: CASH`,
   - **Then** app confirms payment in < 300ms, assigns receipt `KC-REC-PRD-2026-XXXXX`, agent writes date/amount/signature in customer's physical paper passbook, and triggers instant push notification (or SMS).
 
 #### US-CA-4: Single Discrete Payment Enforcement (Zero Partials / Zero Advances)
@@ -409,7 +558,7 @@ flowchart TD
 - **So that**: All collected payments are committed to the central database with zero manual re-entry and zero duplicate payments.
 - **Acceptance Criteria**:
   - **Given** 8 collections queued offline,
-  - **When** cellular connection returns, app calls `POST /collections/sync-offline`,
+  - **When** cellular connection returns, app calls `POST /collections/sync-offline-queue`,
   - **Then** server processes batch with item-level isolation, deduplicates via `idempotencyKey`, generates sequential receipts, and returns sync summary (`successCount: 8, failureCount: 0`).
 
 #### US-CA-7: Daily Collections Summary Review
@@ -426,9 +575,28 @@ flowchart TD
 - **So that**: Cash custody transitions formally to the branch vault.
 - **Acceptance Criteria**:
   - **Given** ₹45,000 collected across 12 customers in `PENDING_HANDOVER` state,
-  - **When** I submit on `POST /collections/submit-handover`,
+  - **When** I submit on `POST /collections/cash-handover/submit`,
   - **Then** system aggregates payment IDs and displays summary for Desk Accountant / Partner B;
   - **Hard Guard**: Agent cannot acknowledge their own handover (`collectorUserId != acknowledgerUserId`).
+
+#### US-CA-9: On-the-Road Customer Lead Registration
+- **As a**: Field Collection Agent
+- **I want to**: Capture prospective subscriber leads (Full Name in English & Tamil, Phone, Village) while on my collection route
+- **So that**: Village contacts interested in new chit groups are logged directly into the system for Partner follow-up.
+- **Acceptance Criteria**:
+  - **Given** I meet a prospective customer on route,
+  - **When** I submit basic details on `POST /customers`,
+  - **Then** system generates customer profile `KC-CUST-XXXXX` tagged with intake notes, without demanding identity documents;
+  - **Guard**: Field Agent is blocked from ticket allocation or scheme activation.
+
+#### US-CA-10: 3-Month Arrears Field Notice Delivery & Electronic Clearance Slip
+- **As a**: Field Collection Agent
+- **I want to**: View consecutive arrears flags (1M, 2M, 3M) on my route dues and receive an electronic clearance slip upon handover
+- **So that**: Chronic defaulters receive timely verbal warnings and my personal cash liability drops to ₹0 every evening.
+- **Acceptance Criteria**:
+  - **Given** route dues list, subscribers with `consecutiveUnpaidMonths >= 3` display prominent amber/red badges for statutory notice delivery;
+  - **When** Desk Accountant / Partner acknowledges my cash batch on `POST /collections/cash-handover/acknowledge`,
+  - **Then** mobile app displays clearance slip `#HO-2026-XXXXX` with `cashLiability: 0` and status `CONFIRMED`.
 
 ---
 
@@ -511,6 +679,26 @@ flowchart TD
   - **Then** server streams bilingual PDF with embedded Noto Sans Tamil fonts;
   - **Anti-IDOR**: Server asserts `user.phone === ticket.customer.phone` before streaming.
 
+#### US-CUST-9: 1-Tap Online Installment Payment via UPI (Google Pay / PhonePe)
+- **As a**: Customer (Subscriber)
+- **I want to**: Pay my net installment due directly from the mobile app via Google Pay, PhonePe, or Paytm
+- **So that**: I can pay immediately without waiting for the field agent or visiting the branch office.
+- **Acceptance Criteria**:
+  - **Given** net due ₹3,950 on active ticket,
+  - **When** I tap "Pay Due" and complete transaction on Google Pay,
+  - **When** app submits payment record on `POST /payments` with `paymentMethod: 'UPI'`, `amount: 3950`, and UPI transaction reference,
+  - **Then** server marks installment `PAID`, generates sequential receipt `KC-REC-PRD-2026-XXXXX`, and triggers instant Push notification confirmation.
+
+#### US-CUST-10: Upcoming Auction Push Reminders & 3-Month Arrears Warning Alerts
+- **As a**: Customer (Subscriber)
+- **I want to**: Receive automated push notification reminders 3 days before upcoming auctions and timely alerts if my installment is overdue
+- **So that**: I stay informed of auction dates, dividend opportunities, and avoid defaulting.
+- **Acceptance Criteria**:
+  - **Given** upcoming auction in 3 days,
+  - **When** BullMQ scheduler triggers reminder broadcast,
+  - **Then** customer smartphone receives bilingual push notification with date, time, and eligibility status;
+  - **Default Alert**: If installment remains unpaid for 3 consecutive months, app displays warning notice explaining company removal rights under ADR-07.
+
 ---
 
 ### 4.6 Independent Auditor (Chartered Accountant) User Stories
@@ -575,6 +763,26 @@ flowchart TD
   - **Given** an authenticated user with `AUDITOR` role,
   - **When** attempting any `@Post`, `@Patch`, or `@Delete` endpoint across all 18 controllers,
   - **Then** `RolesGuard` immediately rejects the request with `403 Forbidden: Insufficient role permissions`.
+
+#### US-AUD-7: BullMQ Repeatable Background Cron Schedules & Notification Audit Logs
+- **As a**: Independent Auditor
+- **I want to**: Inspect active BullMQ background workers, cron execution patterns, and dispatched notification audit history
+- **So that**: Automated 00:01 AM arrears recalculations, 06:00 AM settlement reconciliations, and DLT SMS logs can be verified for statutory integrity.
+- **Acceptance Criteria**:
+  - **Given** I am logged in with `AUDITOR` role,
+  - **When** calling `GET /jobs/repeatable-schedules` and `GET /jobs/queue-status`,
+  - **Then** system returns active cron patterns (`CRON_DAILY_ARREARS`, `CRON_SETTLEMENT_RECONCILIATION`) and queue health metrics;
+  - **When** calling `GET /jobs/notification-audit-logs`, system returns dispatched Push and DLT SMS audit history.
+
+#### US-AUD-8: Presigned S3 Document Inspection for Safety Proof Cheques & KYC Scans
+- **As a**: Independent Auditor
+- **I want to**: Inspect uploaded photos of signed blank cheques, promissory notes, and customer KYC scans via temporary presigned URLs
+- **So that**: Physical collateral documentation for high-value prize payouts can be audited without downloading raw server storage.
+- **Acceptance Criteria**:
+  - **Given** prize disbursement for Month 4 winner,
+  - **When** calling `GET /disbursements/auction/:auctionId/safety-proof-url`,
+  - **Then** system generates a 15-minute presigned S3 URL allowing read-only inspection of uploaded cheques and agreements;
+  - **When** calling `GET /customers/:id/documents/:docId/url`, system returns presigned URL for KYC scan inspection.
 
 ---
 

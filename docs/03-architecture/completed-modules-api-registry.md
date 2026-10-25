@@ -55,7 +55,7 @@ Across all 100 non-public operations, each of the 6 system roles was evaluated a
 |---|:---:|:---:|:---:|---|
 | **`SUPER_ADMIN`** | **100** | **0** | **100** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at database/service level. |
 | **`BRANCH_MANAGER`** | **78** | **22** | **100** | Branch-scoped intake, auction facilitation, staff management. Blocked from company branch creation, scheme activation, user resets, reversal approvals, and payout releases. |
-| **`ACCOUNTANT`** | **63** | **37** | **100** | Company-wide financial ledger entries, voucher preparation, day books, cash books, collections. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
+| **`ACCOUNTANT`** | **64** | **36** | **100** | Company-wide financial ledger entries, notebook transcription (Maker), voucher preparation, day books, cash books, collections. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
 | **`COLLECTION_AGENT`** | **35** | **65** | **100** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues. Blocked from administrative auctions, prize vouchers, minutes, passbooks, and scheme configs. |
 | **`CUSTOMER`** | **31** | **69** | **100** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers. Blocked from all staff endpoints. |
 | **`AUDITOR`** | **53** | **47** | **100** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. Strictly blocked from ALL 47 mutation/write operations. |
@@ -133,7 +133,7 @@ Across all 100 non-public operations, each of the 6 system roles was evaluated a
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `POST` | `/chits/new` | Create fresh chit group in DRAFT status | **Allowed (Exclusive)** | 🚫 **Review Only** | 🚫 **Review Only** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/chits/:id` | Update draft chit scheme parameters (names, dates, sanctions) | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/chits/onboard-ongoing` | Mid-Cycle Intake from physical paper notebook | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits/onboard-ongoing` | Mid-Cycle Intake from physical paper notebook | **Allowed** | **Branch Scope** | **Allowed (Maker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/chits` | List chit schemes with status & keyword filter | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Active Chits** | **Read-Only (Global)** |
 | `GET` | `/chits/:id` | View chit scheme details, duration & rules | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Chit Info** | **Read-Only (Global)** |
 | `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 limit) | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |

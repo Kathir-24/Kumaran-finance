@@ -103,7 +103,7 @@ sequenceDiagram
 
     Note over A,APP: Morning 9:00 AM at Branch
     A->>APP: Fingerprint touch (0.5s) -> Syncs assigned route dues
-    APP->>API: GET /collections/assigned-dues
+    APP->>API: GET /collections/agent-dues
     API-->>APP: Downloads 15 customer dues for Thingalur route
 
     Note over A,C: 11:30 AM: Doorstep at Mani's Textile Shop
@@ -113,7 +113,7 @@ sequenceDiagram
     A->>A: Counts notes & inspects security threads
     A->>APP: Taps "Collect Cash" -> Clicks "Confirm & Issue Receipt"
     APP->>DB: Stores locally (Status: CACHED_OFFLINE)
-    APP->>API: POST /payments (Live sync)
+    APP->>API: POST /collections/record (Live sync)
     API-->>APP: 200 OK -> Generates Receipt #KC-REC-PRD-2026-00412
     APP-->>C: Sends instant free Mobile Push Notification to Mani's phone (App updates to PAID)
     A->>C: Writes date, ₹4,100, receipt #, and signs Mani's physical passbook booklet
@@ -205,7 +205,7 @@ At 1:30 PM, Murugan visits farmer Ramasamy whose farm is in a hollow with zero c
 5. **Automatic Reconnection Sync (2:15 PM)**:
    - Murugan rides 3 kilometers out to the Thingalur junction. His phone reconnects to 4G LTE.
    - The app detects internet connectivity in the background and silently triggers the sync queue.
-   - An HTTP POST with the unique `idempotencyKey` uploads Ramasamy's collection to the server.
+   - An HTTP POST to `POST /collections/sync-offline-queue` with the unique `idempotencyKey` uploads Ramasamy's collection to the server.
    - The server converts the offline record into permanent official receipt `KC-REC-PRD-2026-00413`.
    - Ramasamy's phone immediately receives the in-app push notification (or fallback SMS if non-smartphone).
    - Murugan's app shows: *"1 offline transaction successfully synchronized with Head Office!"*
