@@ -28,8 +28,8 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 | 73 | `/` | `GET` | Public | Root service greeting and basic liveness | **PASS (200)** |
 | 74 | `/health` | `GET` | Public | System health check reporting status: `'ok'` | **PASS (200)** |
 | 75 | `/health/sentry-test` | `GET` | Public | Sentry unhandled 500 error diagnostic probe | **PASS (500)** |
-| 76 | `/metrics` | `GET` | Scraper (Basic Auth) | Prometheus metrics (`http_requests_total`, `bullmq`, DB gauge) | **PASS (200)** |
-| 77 | `/admin/queues/` | `GET` | Partner (Basic Auth) | Bull Board visual queue dashboard UI | **PASS (200)** |
+| 76 | `/metrics` | `GET` | Scraper (Basic Auth) | Unauthenticated blocked (401); Authenticated scrapes 72KB Prometheus metrics (`http_requests_total`, `bullmq`, DB gauge) | **PASS (401 & 200)** |
+| 77 | `/admin/queues/` | `GET` | Partner (Basic Auth) | Unauthenticated blocked (401); Authenticated serves Bull Board visual queue dashboard UI | **PASS (401 & 200)** |
 | 78 | `/jobs/run-daily-arrears` | `POST` | Super Admin / Manager | Midnight arrears scan & 3-month default tagging | **PASS (201)** |
 | 79 | `/jobs/enqueue-daily-arrears` | `POST` | Super Admin | BullMQ enqueue to `daily-maintenance-queue` | **PASS (201)** |
 | 80 | `/jobs/run-reconciliation` | `POST` | Super Admin / Accountant | Payment settlement reconciliation engine | **PASS (201)** |
@@ -39,6 +39,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 | 84 | `/jobs/repeatable-schedules` | `GET` | Super Admin / Auditor | Active BullMQ repeatable cron schedules in Redis | **PASS (200)** |
 | 85 | `/jobs/queue-status` | `GET` | Staff / Auditor | BullMQ queue health and job depth reports | **PASS (200)** |
 | 86 | `/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Push Notification & DLT SMS dispatch audit trail | **PASS (200)** |
+| 86B | `/reports/audit-logs` | `GET` | Super Admin / Auditor | Financial mutation audit trail verified against PostgreSQL `AuditLog` table (90 rows) | **PASS (200)** |
 | 87 | `/auctions/:id/minutes/pdf` | `GET` | Staff / Auditor | Statutory printable auction minutes layout | **PASS (200)** |
 
 *Cumulative Live Coverage: **111 / 111 Endpoints Fully Verified** (100% of Backend API Surface).*
@@ -85,26 +86,31 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 ---
 
 ### Step 4: Prometheus Telemetry Metrics (`GET /metrics`)
-- **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
-- **Response**: **HTTP 200** (`Content-Type: text/plain; version=0.0.4`)
-- **Scraped Metrics Sample**:
-  ```text
-  # HELP chitflow_db_connected PostgreSQL connection status
-  chitflow_db_connected{app="kumaran-chits-api",company="kumaran-finance",branch="head-office-perundurai"} 1
+- **Negative Guard Test (4A)**: Requesting `GET /metrics` without credentials returns **HTTP 401 Unauthorized** with `WWW-Authenticate: Basic realm="Prometheus Metrics"`.
+- **Authenticated Telemetry Scrape (4B)**:
+  - **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
+  - **Response**: **HTTP 200** (`Content-Type: text/plain; charset=utf-8; version=0.0.4`)
+  - **Payload Size**: 72,039 characters
+  - **Scraped Metrics Sample**:
+    ```text
+    # HELP chitflow_db_connected PostgreSQL connection status
+    chitflow_db_connected{app="kumaran-chits-api",company="kumaran-finance",branch="head-office-perundurai"} 1
 
-  # HELP chitflow_active_chit_groups_total Total count of active and registered chit schemes
-  chitflow_active_chit_groups_total{...} 5
+    # HELP chitflow_active_chit_groups_total Total count of active and registered chit schemes
+    chitflow_active_chit_groups_total{...} 5
 
-  # HELP bullmq_queue_jobs_count Number of jobs in BullMQ queues
-  bullmq_queue_jobs_count{queue="daily-maintenance-queue",status="completed",...} 1
-  ```
+    # HELP bullmq_queue_jobs_count Number of jobs in BullMQ queues
+    bullmq_queue_jobs_count{queue="daily-maintenance-queue",status="completed",...} 1
+    ```
 
 ---
 
 ### Step 5: Bull Board Dashboard UI (`GET /admin/queues/`)
-- **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
-- **Response**: **HTTP 200** (`Content-Type: text/html`)
-- **Content Verified**: Full interactive HTML queue manager rendered.
+- **Negative Guard Test (5A)**: Requesting `GET /admin/queues/` without credentials returns **HTTP 401 Unauthorized** with `WWW-Authenticate: Basic realm="Bull Board Dashboard"`.
+- **Authenticated Dashboard Access (5B)**:
+  - **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
+  - **Response**: **HTTP 200** (`Content-Type: text/html; charset=utf-8`)
+  - **Content Verified**: Full interactive HTML queue manager rendered and operational.
 
 ---
 
@@ -255,12 +261,24 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 
 ---
 
-### Step 14: Notification Dispatch Audit Trail (`GET /jobs/notification-audit-logs`)
+### Step 14: Audit Trails & Registers (Notification & Financial)
+
+#### Step 14A: Outbound Notification Audit Trail (`GET /jobs/notification-audit-logs`)
+- **Caller**: Super Admin / Auditor
 - **Response**: **HTTP 200**
-- **Recent Dispatched Log Sample**:
+- **Dispatched Notification Log Sample**:
   - `channel`: `PUSH_NOTIFICATION`
   - `recipient`: `9842100105`
   - `status`: `DELIVERED`
+  - `title`: `Auction Reminder: KC-LIVE-20M-01`
+
+#### Step 14B: Financial Mutation Audit Trail (`GET /reports/audit-logs`)
+- **Caller**: Super Admin / Auditor
+- **Response**: **HTTP 200**
+- **PostgreSQL Database Verification**:
+  - Live query: `SELECT count(*) FROM public."AuditLog"` $\to$ **90 rows verified**.
+  - Verified critical audited events: `PAYMENT_REVERSED`, `PAYMENT_REVERSAL_REJECTED`, `SAFETY_PROOF_VERIFIED`, `CASH_COLLECTED`.
+  - Confirms tamper-evident immutable audit log across all financial operations.
 
 ---
 

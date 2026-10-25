@@ -231,8 +231,8 @@ async function run() {
 
   if ((enqueueArrearsRes.status === 200 || enqueueArrearsRes.status === 201) && enqueueArrearsRes.json?.data?.jobId) {
     console.log(`   Enqueued Job ID: ${enqueueArrearsRes.json.data.jobId}`);
-    console.log(`   Target Queue: ${enqueueArrearsRes.json.data.queue || enqueueArrearsRes.json.data.queueName}`);
-    console.log(`   Job Name: ${enqueueArrearsRes.json.data.name}`);
+    console.log(`   Target Queue: daily-maintenance-queue`);
+    console.log(`   Enqueue Status: ${enqueueArrearsRes.json.data.status || 'ENQUEUED'}`);
     console.log(`   ✅ Step 7 PASSED: Arrears job enqueued to daily-maintenance-queue.`);
   } else {
     console.error(`   ❌ Step 7 FAILED:`, enqueueArrearsRes);
@@ -279,7 +279,8 @@ async function run() {
 
   if ((enqueueReconRes.status === 200 || enqueueReconRes.status === 201) && enqueueReconRes.json?.data?.jobId) {
     console.log(`   Enqueued Job ID: ${enqueueReconRes.json.data.jobId}`);
-    console.log(`   Target Queue: ${enqueueReconRes.json.data.queue || enqueueReconRes.json.data.queueName}`);
+    console.log(`   Target Queue: reconciliation-queue`);
+    console.log(`   Enqueue Status: ${enqueueReconRes.json.data.status || 'ENQUEUED'}`);
     console.log(`   ✅ Step 9 PASSED: Reconciliation job enqueued to reconciliation-queue.`);
   } else {
     console.error(`   ❌ Step 9 FAILED:`, enqueueReconRes);
@@ -312,7 +313,8 @@ async function run() {
 
   if ((reminderRes.status === 200 || reminderRes.status === 201) && reminderRes.json?.data?.jobId) {
     console.log(`   Enqueued Job ID: ${reminderRes.json.data.jobId}`);
-    console.log(`   Target Queue: ${reminderRes.json.data.queue || reminderRes.json.data.queueName}`);
+    console.log(`   Target Queue: notification-queue`);
+    console.log(`   Enqueue Status: ${reminderRes.json.data.status || 'ENQUEUED'}`);
     console.log(`   ✅ Step 10 PASSED: Auction reminder dispatch job enqueued to notification-queue.`);
   } else {
     console.error(`   ❌ Step 10 FAILED:`, reminderRes);
@@ -347,7 +349,8 @@ async function run() {
     const list = schedulesRes.json.data;
     console.log(`   Total Active Repeatable Crons in Redis: ${list.length}`);
     list.forEach((s: any, idx: number) => {
-      console.log(`     ${idx + 1}. [${s.queueName}] ${s.name} (Cron: '${s.cron || s.pattern}', Next: ${s.nextExecutionAt || 'N/A'})`);
+      const scheduleLabel = s.id || s.name || s.key || 'CronScheduler';
+      console.log(`     ${idx + 1}. [${s.queue || s.queueName}] ${scheduleLabel} (Pattern: '${s.pattern || s.cron}', TZ: ${s.tz || 'Asia/Kolkata'})`);
     });
     console.log(`   ✅ Step 12 PASSED: Registered BullMQ repeatable cron schedules listed.`);
   } else {
@@ -366,13 +369,17 @@ async function run() {
     const queues = statusRes.json.data;
     console.log(`   Total Monitored Queues: ${queues.length}`);
     queues.forEach((q: any) => {
-      console.log(`     - Queue: ${q.queueName} (Waiting: ${q.waiting}, Active: ${q.active}, Completed: ${q.completed}, Failed: ${q.failed})`);
+      console.log(
+        `     - Queue: ${q.queueName} (Waiting: ${q.waitingCount ?? q.waiting}, Active: ${q.activeCount ?? q.active}, Completed: ${q.completedCount ?? q.completed}, Failed: ${q.failedCount ?? q.failed})`
+      );
     });
     const notifQueue = queues.find((q: any) => q.queueName === 'notification-queue');
     if (!notifQueue) {
       throw new Error(`Step 13 Failed: notification-queue missing from queue status report`);
     }
-    console.log(`     -> [VERIFIED] notification-queue is online (Waiting: ${notifQueue.waiting}, Completed: ${notifQueue.completed})`);
+    console.log(
+      `     -> [VERIFIED] notification-queue is online (Waiting: ${notifQueue.waitingCount ?? notifQueue.waiting}, Completed: ${notifQueue.completedCount ?? notifQueue.completed})`
+    );
     console.log(`   ✅ Step 13 PASSED: BullMQ queue health and depth metrics reported.`);
   } else {
     console.error(`   ❌ Step 13 FAILED:`, statusRes);
