@@ -68,6 +68,31 @@ For a vibe coder or beginner, think of your backend server like a car driving on
 Managed by [`MetricsModule`](file:///u:/Kumaran-finance/apps/api/src/metrics/metrics.module.ts) using the official `prom-client` library.
 
 ### 2.1 Architecture & Cardinality Protection
+
+```mermaid
+flowchart LR
+    subgraph SOURCES["1. Telemetry Sources"]
+        REQ["Incoming HTTP Requests\n(Web & Mobile Ingress)"] --> INT["HttpMetricsInterceptor\n(Route Normalization /:id)"]
+        DB["PostgreSQL 17\n(Query Health & Domain KPIs)"] --> COL["DomainMetricsCollector\n(Active Chits, Defaulters, Cash)"]
+        REDIS["Redis 7 Queues\n(Waiting, Active, Completed)"] --> COL
+    end
+
+    subgraph REGISTRY["2. In-Memory Registry (prom-client)"]
+        INT --> REG["MetricsService Registry\n• http_requests_total\n• http_request_duration_seconds\n• chitflow_db_connected\n• bullmq_queue_jobs_count\n• chitflow_daily_collected_amount_rupees"]
+        COL --> REG
+    end
+
+    subgraph EXPOSURE["3. Secure Scrape & Dashboards"]
+        GUARD["MetricsAuthGuard\n(Basic Auth: admin / chitflow_secret)"]
+        ENDPOINT["GET /metrics\n(72KB OpenMetrics Stream)"]
+        GRAFANA["Prometheus Server & Grafana Dashboards\n(15s Scrape Interval)"]
+
+        GUARD --> ENDPOINT
+        REG --> ENDPOINT
+        ENDPOINT --> GRAFANA
+    end
+```
+
 * **Endpoint**: `GET /metrics` (Exempt from response wrapper via `@BypassEnvelope()`).
 * **Security**: Strictly protected by HTTP Basic Authentication via [`MetricsAuthGuard`](file:///u:/Kumaran-finance/apps/api/src/metrics/guards/metrics-auth.guard.ts). Unauthenticated scrapes return `401 Unauthorized` with `WWW-Authenticate: Basic realm="Prometheus Metrics"`.
 * **URL Route Normalization ([`HttpMetricsInterceptor`](file:///u:/Kumaran-finance/apps/api/src/metrics/interceptors/http-metrics.interceptor.ts))**:
@@ -142,7 +167,36 @@ scrape_configs:
 
 Configured in [`apps/api/src/common/sentry/sentry.config.ts`](file:///u:/Kumaran-finance/apps/api/src/common/sentry/sentry.config.ts) and wired into [`GlobalExceptionFilter`](file:///u:/Kumaran-finance/apps/api/src/common/filters/global-exception.filter.ts).
 
-### 3.1 Architectural Guarantees
+### 3.1 Architectural Guarantees & Exception Pipeline
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Web / Mobile Client
+    participant Controller as NestJS Controller
+    participant Filter as GlobalExceptionFilter
+    participant SentryCfg as SentryConfig (scrubPii)
+    participant SentrySDK as @sentry/nestjs SDK
+    participant SentryCloud as Sentry Cloud APM
+
+    Client->>Controller: HTTP Request (e.g., POST /payments)
+    Controller-->>Filter: Unhandled Exception (5xx Server Crash)
+    Note over Filter: Status >= 500 detected
+    Filter->>SentryCfg: isSentryActive()
+    alt SENTRY_DSN is NOT set (Local / CI Safe-Bypass)
+        SentryCfg-->>Filter: false
+        Filter->>Filter: Log to local NestJS console with stack trace
+    else SENTRY_DSN is configured (Staging / Production)
+        SentryCfg-->>Filter: true
+        Filter->>Filter: Enrich Sentry Scope (userId, roles, branchId, requestId)
+        Filter->>SentryCfg: beforeSend(event) -> scrubPii()
+        Note over SentryCfg: 1. Redact credentials to [FILTERED]<br/>2. Mask phone numbers (+91******3210)<br/>3. Stringify native BigInt primitives
+        SentryCfg->>SentrySDK: Cleaned Event Envelope
+        SentrySDK->>SentryCloud: Async Non-Blocking Telemetry Ingestion
+    end
+    Filter-->>Client: Standardized Error JSON (success: false, statusCode: 500)
+```
+
 1. **Safe-Bypass Mode (Zero Cost in Dev & CI)**:
    - When `SENTRY_DSN` is empty or omitted, Sentry initialization exits immediately (`initSentry() === false`).
    - The application runs with **0 external network requests, 0 latency overhead, and 0 crashes**.
@@ -168,12 +222,41 @@ Configured in [`apps/api/src/common/sentry/sentry.config.ts`](file:///u:/Kumaran
 Managed by [`BullBoardService`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/bull-board.service.ts) using `@bull-board/api` and `@bull-board/express`.
 
 ```mermaid
-flowchart LR
-    Admin["Partner / Admin Browser"] -->|Basic Auth Credentials| Middleware["BullBoardAuthMiddleware\n(BULL_BOARD_USER / BULL_BOARD_PASSWORD)"]
-    Middleware --> UI["Bull Board Express Adapter\n(/admin/queues)"]
-    UI --> Q1["daily-maintenance-queue\n(Midnight Arrears, 3M Defaults)"]
-    UI --> Q2["notification-queue\n(Receipts, Auction Reminders, DLT SMS)"]
-    UI --> Q3["reconciliation-queue\n(Cash Book & Bank Recon)"]
+flowchart TD
+    subgraph PRODUCERS["1. Schedulers & Event Triggers"]
+        C1["Repeatable Cron: 00:01 IST\n(CRON_DAILY_ARREARS)"]
+        C2["Repeatable Cron: 06:00 IST\n(CRON_SETTLEMENT_RECONCILIATION)"]
+        C3["Repeatable Cron: 09:00 IST\n(CRON_PRE_AUCTION_REMINDERS)"]
+        API["JobsController / Domain Services\n(Payments, Auctions, Disbursements)"]
+    end
+
+    subgraph REDIS["2. Redis 7 Broker (Port 6379, BullMQ Engine)"]
+        Q1[("daily-maintenance-queue\n• process-daily-arrears\n• 3-month default tagging")]
+        Q2[("notification-queue\n• dispatch-payment-receipt\n• dispatch-auction-reminder")]
+        Q3[("reconciliation-queue\n• run-daily-reconciliation\n• ghost drop resolution")]
+    end
+
+    subgraph WORKERS["3. Asynchronous Worker Execution Pool"]
+        W1["Maintenance Worker\n(Attempts: 3, Backoff: 1s Exp)"]
+        W2["Notification Worker\n(Attempts: 3, FCM Push + DLT SMS Fallback)"]
+        W3["Reconciliation Worker\n(Attempts: 3, Gateway Reconciliation)"]
+    end
+
+    subgraph UI["4. Pillar 3: Visual Observability & Management"]
+        AUTH["BullBoardAuthMiddleware\n(HTTP Basic Auth Protected)"]
+        BOARD["Bull Board UI (/admin/queues)\n• Live Job Counts (Waiting/Active/Completed/Failed)\n• Stack Trace Viewer\n• 1-Click Retry / Clean"]
+    end
+
+    C1 & API --> Q1
+    C2 & API --> Q3
+    C3 & API --> Q2
+
+    Q1 --> W1
+    Q2 --> W2
+    Q3 --> W3
+
+    Q1 & Q2 & Q3 <--> BOARD
+    AUTH --> BOARD
 ```
 
 ### 4.1 Dashboard Capabilities
@@ -194,6 +277,37 @@ flowchart LR
 ## 5. Pillar 4: Regulatory & Financial Audit Logging
 
 Operating records in Kumaran Chits are permanently tracked for compliance with the Tamil Nadu Chit Funds Act and statutory auditing guidelines.
+
+```mermaid
+flowchart TD
+    subgraph MUTATION["1. Financial Transaction (Maker-Checker / Payout / Reversal)"]
+        REQ["Staff Action\n(e.g., POST /payments/:id/reversal)"]
+        SVC["Domain Service\n(PaymentService, DisbursementService)"]
+        TX["PostgreSQL ACID Transaction ($transaction)"]
+        DOM["Business Mutation\n(Update Payment, Due Status)"]
+        AUD["tx.auditLog.create()\n(userId, action, oldValue, newValue, IP)"]
+    end
+
+    subgraph STORAGE["2. Immutable PostgreSQL Storage (Port 5433)"]
+        TABLE[("public.'AuditLog' Table\nCompound Indexes:\n• [entityType, entityId]\n• [timestamp]\n• [userId], [action]")]
+    end
+
+    subgraph QUERY["3. Audit Query & Compliance Verification"]
+        GET["GET /api/v1/reports/audit-logs"]
+        AUTH["Role & Scope Guardian"]
+        ADMIN["Super Admin / Auditor:\nCompany-Wide Audit Trail (90+ records)"]
+        CUST["Subscriber Customer:\nHard Isolation (where.userId = customer.id)"]
+    end
+
+    REQ --> SVC --> TX
+    TX --> DOM
+    TX --> AUD
+    AUD --> TABLE
+    TABLE --> GET
+    GET --> AUTH
+    AUTH -->|Role.SUPER_ADMIN / AUDITOR| ADMIN
+    AUTH -->|Role.CUSTOMER| CUST
+```
 
 ### 5.1 Database Schema (`public."AuditLog"`)
 ```prisma
@@ -241,6 +355,16 @@ Every critical mutation in the codebase automatically writes an append-only entr
 * **`GET /api/v1/jobs/notification-audit-logs`**:
   - Detailed audit trail of all outbound FCM Push Notifications and DLT SMS messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`).
 
+### 5.4 Storage Lifecycle & Retention Guarantees
+* **Financial & Regulatory Audit Trail (`AuditLog`)**:
+  - **Storage Engine**: PostgreSQL 17 ACID Table (`chitflow_dev`, Port 5433).
+  - **Permanence**: 100% immutable and append-only. Zero `DELETE` or `UPDATE` operations exist in the codebase.
+  - **Survivability**: Survives all server restarts, deployments, and Docker restarts. Meets the 5-year statutory recordkeeping mandate under the Tamil Nadu Chit Funds Act.
+* **Outbound Notification Dispatch Logs (`sentLog`)**:
+  - **Storage Engine**: In-memory ring buffer inside [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts).
+  - **Purpose**: Real-time delivery verification, E2E test assertions, and diagnostic queue inspection.
+  - **Statutory Dispute Path**: Can be linked to an append-only `NotificationLog` table in PostgreSQL if long-term multi-year SMS delivery proofs are required by legal counsel.
+
 ---
 
 ## 6. System Probes & Real-Time SSE Streams
@@ -281,13 +405,23 @@ Time:        3.642 s
 
 ### 7.2 Live Server End-to-End Proofs (Live Postgres, Redis 7 & NestJS)
 
-#### Proof 1: Observability Probes & Scrapes ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts))
-* **Step 2 (`GET /health`)**: Status `200 OK`, response `{ status: 'ok' }`.
-* **Step 3 (`GET /health/sentry-test`)**: Status `500 Internal Server Error`, intentional diagnostic crash captured cleanly.
-* **Step 4 (`GET /metrics`)**: Scraped with Basic Auth (`admin:chitflow_secret`); verified `http_requests_total`, `chitflow_db_connected`, and `bullmq_queue_jobs_count`.
-* **Step 5 (`GET /admin/queues/`)**: Status `200 OK`, returned Bull Board HTML dashboard UI.
-* **Step 13 (`GET /jobs/queue-status`)**: Confirmed queue health report across all 3 queues.
-* **Step 14 (`GET /jobs/notification-audit-logs`)**: Retrieved recent SMS and Push delivery logs.
+#### Proof 1: Observability Probes, Guards & Scrapes ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts))
+* **Step 2 (`GET /health`)**: Status `200 OK`, response `{ status: 'ok', service: 'chitflow-api', sentryActive: false }`.
+* **Step 3 (`GET /health/sentry-test`)**: Status `500 Internal Server Error`, intentional diagnostic crash captured cleanly by `GlobalExceptionFilter` with sanitized envelope (`code: 'INTERNAL_SERVER_ERROR'`).
+* **Step 4A & 4B (`GET /metrics`)**:
+  - `4A (Negative Guard)`: Request without Basic Auth blocked with `401 Unauthorized` (`WWW-Authenticate: Basic realm="Prometheus Metrics"`).
+  - `4B (Authenticated Scrape)`: With Basic Auth (`admin:chitflow_secret`) returns `200 OK` (72,039 characters). Verified gauges: `http_requests_total`, `chitflow_db_connected 1`, `bullmq_queue_jobs_count`, `chitflow_daily_collected_amount_rupees`.
+* **Step 5A & 5B (`GET /admin/queues/`)**:
+  - `5A (Negative Guard)`: Request without Basic Auth blocked with `401 Unauthorized` (`WWW-Authenticate: Basic realm="Bull Board Dashboard"`).
+  - `5B (Authenticated Dashboard)`: With Basic Auth returns `200 OK` (`text/html; charset=utf-8`) rendering Bull Board management UI.
+* **Step 12 (`GET /api/v1/jobs/repeatable-schedules`)**: Confirmed 3 active BullMQ cron schedules in Redis (`1 0 * * *`, `0 6 * * *`, `0 9 * * *` with Asia/Kolkata timezone).
+* **Step 13 (`GET /api/v1/jobs/queue-status`)**: Confirmed health and job depth counts across all 3 queues (`daily-maintenance-queue`, `notification-queue`, `reconciliation-queue`).
+* **Step 14A (`GET /api/v1/jobs/notification-audit-logs`)**: Retrieved outbound Push (`FCM`) and DLT SMS dispatch logs.
+* **Step 14B (`GET /api/v1/reports/audit-logs`)**: Retrieved financial audit logs; validated against live PostgreSQL database count query:
+  ```sql
+  SELECT count(*) FROM public."AuditLog";
+  -- Output: 90 rows verified
+  ```
 
 #### Proof 2: Live Financial Audit Trail ([`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts))
 * **Reversal Rejection Audit**:
