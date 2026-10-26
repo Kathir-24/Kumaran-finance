@@ -65,20 +65,29 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      // 1. Initialize BullMQ Queues with Redis connection
+      // 1. Initialize BullMQ Queues with Redis connection & error guardians
       this.dailyMaintenanceQueue = new Queue(DAILY_MAINTENANCE_QUEUE, {
         connection: client as any,
+      });
+      this.dailyMaintenanceQueue.on('error', (err) => {
+        this.logger.warn(`Daily maintenance queue connection error: ${err.message}`);
       });
 
       this.notificationQueue = new Queue(NOTIFICATION_QUEUE, {
         connection: client as any,
       });
+      this.notificationQueue.on('error', (err) => {
+        this.logger.warn(`Notification queue connection error: ${err.message}`);
+      });
 
       this.reconciliationQueue = new Queue(RECONCILIATION_QUEUE, {
         connection: client as any,
       });
+      this.reconciliationQueue.on('error', (err) => {
+        this.logger.warn(`Reconciliation queue connection error: ${err.message}`);
+      });
 
-      // 2. Initialize Workers
+      // 2. Initialize Workers with error guardians
       this.maintenanceWorker = new Worker(
         DAILY_MAINTENANCE_QUEUE,
         async (job) => {
@@ -89,6 +98,9 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
         },
         { connection: client as any },
       );
+      this.maintenanceWorker.on('error', (err) => {
+        this.logger.warn(`Maintenance worker connection error: ${err.message}`);
+      });
 
       this.notificationWorker = new Worker(
         NOTIFICATION_QUEUE,
@@ -116,6 +128,9 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
         },
         { connection: client as any },
       );
+      this.notificationWorker.on('error', (err) => {
+        this.logger.warn(`Notification worker connection error: ${err.message}`);
+      });
 
       this.reconciliationWorker = new Worker(
         RECONCILIATION_QUEUE,
@@ -126,6 +141,9 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
         },
         { connection: client as any },
       );
+      this.reconciliationWorker.on('error', (err) => {
+        this.logger.warn(`Reconciliation worker connection error: ${err.message}`);
+      });
 
       // 3. Register Automated Repeatable Cron Jobs (Asia/Kolkata timezone)
       await this.registerRepeatableJobs();

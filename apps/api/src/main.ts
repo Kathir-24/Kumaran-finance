@@ -16,11 +16,27 @@ import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middleware';
 import { BullBoardService } from './jobs/bull-board/bull-board.service';
-import { initSentry } from './common/sentry/sentry.config';
+import { captureSentryException, initSentry, isSentryActive } from './common/sentry/sentry.config';
 
 async function bootstrap() {
   // 0. Initialize Sentry APM & Crash Monitoring (Safe bypass if SENTRY_DSN is unset)
   initSentry();
+
+  // Node.js Process Crash Guardians: intercept unhandled rejections and exceptions outside HTTP contexts
+  process.on('unhandledRejection', (reason: unknown) => {
+    const errorMsg = reason instanceof Error ? reason.stack || reason.message : String(reason);
+    console.error(`[ProcessCrashGuard] Unhandled Promise Rejection intercepted: ${errorMsg}`);
+    if (isSentryActive()) {
+      captureSentryException(reason instanceof Error ? reason : new Error(String(reason)));
+    }
+  });
+
+  process.on('uncaughtException', (err: Error) => {
+    console.error(`[ProcessCrashGuard] Uncaught Exception intercepted: ${err.stack || err.message}`);
+    if (isSentryActive()) {
+      captureSentryException(err);
+    }
+  });
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
 
