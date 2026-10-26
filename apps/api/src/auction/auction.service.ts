@@ -399,6 +399,17 @@ export class AuctionService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate finalization
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedAuctions = await tx.$queryRaw<Array<{ id: string; status: AuctionStatus }>>`
+          SELECT id, status FROM "Auction" WHERE id = ${auctionId} FOR UPDATE
+        `;
+        const lockedAuction = lockedAuctions && lockedAuctions[0];
+        if (lockedAuction && lockedAuction.status === AuctionStatus.COMPLETED) {
+          throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
+        }
+      }
+
       // 1. Commit Auction
       const finalized = await tx.auction.update({
         where: { id: auctionId },

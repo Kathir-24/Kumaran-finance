@@ -28,7 +28,8 @@
     "openapi:export": "ts-node scripts/export-openapi.ts",
     "db:backup:s3": "ts-node scripts/backup-to-s3.ts",
     "db:restore:s3": "ts-node scripts/restore-from-s3.ts",
-    "db:drp-drill": "ts-node scripts/drp-drill.ts"
+    "db:drp-drill": "ts-node scripts/drp-drill.ts",
+    "test:stress": "ts-node scripts/verify-concurrency-stress.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

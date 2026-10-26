@@ -161,6 +161,19 @@ export class CollectionService {
     const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
+          SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
+        `;
+        const lockedDue = lockedDues && lockedDues[0];
+        if (lockedDue && lockedDue.status === DueStatus.PAID) {
+          throw new BadRequestException(
+            `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
+          );
+        }
+      }
+
       // 1. Create Payment
       const payment = await tx.payment.create({
         data: {
@@ -187,12 +200,23 @@ export class CollectionService {
         },
       });
 
-      // 3. Create Bilingual Receipt
+      // 3. Create Bilingual Receipt (with concurrent sequence retry check)
+      let finalReceiptNumber = receiptNumber;
+      if (typeof tx.receipt?.findUnique === 'function') {
+        const existingReceipt = await tx.receipt.findUnique({
+          where: { receiptNumber: finalReceiptNumber },
+        });
+        if (existingReceipt) {
+          const currentCount = await tx.receipt.count({ where: { branchId } });
+          finalReceiptNumber = `KC-REC-${branchCode}-${year}-${String(currentCount + 1).padStart(5, '0')}`;
+        }
+      }
+
       const receipt = await tx.receipt.create({
         data: {
           branchId,
           paymentId: payment.id,
-          receiptNumber,
+          receiptNumber: finalReceiptNumber,
           isBilingual: true,
           issuedAt: paymentDate,
         },

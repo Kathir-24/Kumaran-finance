@@ -483,6 +483,22 @@ export class DisbursementService {
       : auction.prizeMoney || 0n;
 
     return this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate authorization
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
+          SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${auction.winner!.id} FOR UPDATE
+        `;
+        const lockedWinner = lockedWinners && lockedWinners[0];
+        if (
+          lockedWinner &&
+          (lockedWinner.disbursementStatus !== 'VERIFIED_BY_MAKER')
+        ) {
+          throw new BadRequestException(
+            'PRIZE_ALREADY_AUTHORIZED: Prize payout has already been authorized or status has changed',
+          );
+        }
+      }
+
       const updated = await tx.auctionWinner.update({
         where: { id: auction.winner!.id },
         data: {
@@ -545,6 +561,23 @@ export class DisbursementService {
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
     return this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate disbursement release
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
+          SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${auction.winner!.id} FOR UPDATE
+        `;
+        const lockedWinner = lockedWinners && lockedWinners[0];
+        if (
+          lockedWinner &&
+          (lockedWinner.disbursementStatus === 'DISBURSED' ||
+            lockedWinner.disbursementStatus !== 'AUTHORIZED_BY_CHECKER')
+        ) {
+          throw new BadRequestException(
+            'PRIZE_ALREADY_DISBURSED: Prize payout has already been released or status has changed',
+          );
+        }
+      }
+
       const updated = await tx.auctionWinner.update({
         where: { id: auction.winner!.id },
         data: {
