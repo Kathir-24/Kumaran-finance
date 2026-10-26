@@ -1,0 +1,35 @@
+{
+  "name": "@kumaran/api-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Strongly-typed Client API SDK for Kumaran Chits operations (Next.js Web & Node.js)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/generated/api-types.d.ts",
+      "import": "./dist/generated/api-types.js",
+      "default": "./dist/generated/api-types.js"
+    }
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../docs/03-architecture/openapi-spec.json -o src/generated/api-types.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/client.spec.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1742,7 +1742,7 @@
     },
     "/api/v1/users": {
       "get": {
-        "description": "Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager.",
+        "description": "Returns paginated list of staff members filtered by branch, role, or active status. Allowed: Super Admin, Branch Manager, Auditor.",
         "operationId": "UserController_findAll_v1",
         "parameters": [
           {
@@ -1960,7 +1960,7 @@
     },
     "/api/v1/users/{id}": {
       "get": {
-        "description": "Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager.",
+        "description": "Returns details of a staff user account including roles and branch assignment. Allowed: Super Admin, Branch Manager, Auditor.",
         "operationId": "UserController_findOne_v1",
         "parameters": [
           {
@@ -3272,7 +3272,7 @@
     },
     "/api/v1/chits/onboard-ongoing": {
       "post": {
-        "description": "Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager.",
+        "description": "Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager, Accountant (Maker). Requires Checker activation by Super Admin.",
         "operationId": "ChitController_onboardOngoing_v1",
         "parameters": [],
         "requestBody": {
@@ -3331,7 +3331,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook",
+        "summary": "Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook (Maker)",
         "tags": [
           "Chits"
         ]
@@ -4068,7 +4068,7 @@
     },
     "/api/v1/auctions/{id}/eligible-bidders": {
       "get": {
-        "description": "ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.",
+        "description": "ADR-07 Enforcement: Returns only active subscribers with zero arrears who have not previously won an auction. ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager, Auditor.",
         "operationId": "AuctionController_getEligibleBidders_v1",
         "parameters": [
           {

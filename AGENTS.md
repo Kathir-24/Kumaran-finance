@@ -21,6 +21,7 @@
   - **Database**: PostgreSQL 17 + Prisma ORM (Port `5433` via Docker)
   - **Web Dashboard**: React / Next.js 15 (Admin, Accountant, Partners, Auditor) in `apps/web/`
   - **Mobile App**: Flutter + Dart (Android-first: 100% full feature parity for Partners/Super Admin + Field Agents & Customers) in `apps/mobile/`
+  - **Shared Client SDK**: Typed Client API SDK in `packages/api-client/` (`@kumaran/api-client`) + Dart Models in `apps/mobile/lib/core/api/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
   - **Object Storage**: Private AWS S3 (Encrypted KYC scans & PDF receipts with 15-minute presigned URLs)
 
@@ -86,6 +87,7 @@ Before starting any task, read the exact corresponding specification document in
 | **User Stories & 6-Persona Journey Maps** | [`docs/02-requirements/user-stories-and-journeys.md`](docs/02-requirements/user-stories-and-journeys.md) |
 | **API Endpoints, DTOs & HTTP Methods** | [`docs/03-architecture/api-spec.md`](docs/03-architecture/api-spec.md) |
 | **Frontend Architecture & Cross-Platform** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
+| **Client API SDK & Contract Generator** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |
 | **Non-Functional Standards (NFR)** | [`docs/02-requirements/non-functional-requirements.md`](docs/02-requirements/non-functional-requirements.md) |
 | **Bilingual Receipts & Notification Templates**| [`docs/02-requirements/notification-and-receipt-templates.md`](docs/02-requirements/notification-and-receipt-templates.md) |

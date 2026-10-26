@@ -83,3 +83,14 @@ jobs:
 
       - name: Compile NestJS Application
         run: pnpm --filter api run build
+
+      - name: Build & Test Shared Client API SDK (@kumaran/api-client)
+        run: |
+          pnpm --filter @kumaran/api-client build
+          pnpm --filter @kumaran/api-client test
+
+      - name: Verify Client SDK Contract Drift Prevention
+        run: |
+          pnpm run codegen:ts
+          pnpm run codegen:dart
+          git diff --exit-code packages/api-client/src/generated/ apps/mobile/lib/core/api/models/

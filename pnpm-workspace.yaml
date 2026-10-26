@@ -1,5 +1,6 @@
 packages:
   - 'apps/*'
+  - 'packages/*'
 
 minimumReleaseAgeExclude:
   - bullmq@6.3.17

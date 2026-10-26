@@ -4,7 +4,8 @@
   "private": true,
   "description": "Monorepo for Kumaran Chits operations platform (Kumaran Finance, Perundurai)",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "start:dev": "pnpm --filter api run start:dev",
@@ -25,6 +26,10 @@
     "db:restore:s3": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts",
     "db:backups:list": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts --list",
     "db:drp:drill": "pnpm --filter api exec ts-node scripts/drp-drill.ts",
+    "codegen:spec": "pnpm --filter api run openapi:export",
+    "codegen:ts": "pnpm --filter @kumaran/api-client generate && pnpm --filter @kumaran/api-client build",
+    "codegen:dart": "node --experimental-strip-types scripts/generate-dart-api.ts",
+    "codegen:all": "pnpm codegen:spec && pnpm codegen:ts && pnpm codegen:dart",
     "codegen:types": "openapi-typescript docs/03-architecture/openapi-spec.json -o docs/03-architecture/openapi-types.ts"
   },
   "keywords": [
