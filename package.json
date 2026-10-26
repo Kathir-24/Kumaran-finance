@@ -27,6 +27,7 @@
     "db:backups:list": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts --list",
     "db:drp:drill": "pnpm --filter api exec ts-node scripts/drp-drill.ts",
     "test:stress": "pnpm --filter api exec ts-node scripts/verify-concurrency-stress.ts",
+    "test:ingress": "pnpm --filter api exec ts-node scripts/verify-docker-nginx.ts",
     "codegen:spec": "pnpm --filter api run openapi:export",
     "codegen:ts": "pnpm --filter @kumaran/api-client generate && pnpm --filter @kumaran/api-client build",
     "codegen:dart": "node --experimental-strip-types scripts/generate-dart-api.ts",
