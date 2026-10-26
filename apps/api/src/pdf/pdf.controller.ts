@@ -84,11 +84,12 @@ export class PdfController {
     const result = await this.pdfService.generateReceiptPdf(paymentId, currentUser);
 
     if (String(download) === 'true') {
-      return res.json({
+      res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -153,11 +154,12 @@ export class PdfController {
     const result = await this.pdfService.generatePayoutVoucherPdf(auctionId, currentUser);
 
     if (String(download) === 'true') {
-      return res.json({
+      res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -221,11 +223,12 @@ export class PdfController {
     const result = await this.pdfService.generateAuctionMinutesPdf(auctionId, currentUser);
 
     if (String(download) === 'true') {
-      return res.json({
+      res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -290,11 +293,12 @@ export class PdfController {
     const result = await this.pdfService.generatePassbookPdf(ticketId, currentUser);
 
     if (String(download) === 'true') {
-      return res.json({
+      res.json({
         key: result.key,
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
     }
 
     res.setHeader('Content-Type', 'application/pdf');
