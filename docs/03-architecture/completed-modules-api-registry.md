@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Current Status**: **All 10 Modules, 3 System Components, Branches, Users & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**431 / 431 passing tests: 349 Unit + 82 E2E**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**455 / 455 passing tests: 367 Unit + 88 E2E**).
 
 ---
 
@@ -38,28 +38,28 @@ An automated AST inspection utility (`apps/api/scripts/audit-persona-enforcement
 
 ```
 ================================================================
-AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 105 PATHS):
-Total Operations (Endpoints)     : 111 (110 controller methods + Bull Board UI)
+AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 109 PATHS):
+Total Operations (Endpoints)     : 115
   • Public Endpoints (No JWT)    : 11
-  • Guarded Endpoints            : 100
-      - Enforced with @Roles(...) : 92 (Strict RolesGuard RBAC)
-      - Guarded with JwtAuthGuard : 8  (Contextual ABAC / Caller Identity)
+  • Guarded Endpoints (JWT/Basic): 104
+      - Enforced with Specific Roles : 96 (Strict RolesGuard RBAC)
+      - Guarded with JwtAuthGuard    : 8  (Contextual ABAC / Caller Identity)
 ================================================================
 ```
 
-#### The 600 Granular Persona Access Decisions Matrix (100 Guarded Operations × 6 Personas)
+#### The 624 Granular Persona Access Decisions Matrix (104 Guarded Operations × 6 Personas)
 
-Across all 100 non-public operations, each of the 6 system roles was evaluated against business authorization rules:
+Across all 104 non-public operations, each of the 6 system roles was evaluated against business authorization rules:
 
 | Persona Role | Allowed Operations | Blocked Operations | Total Evaluated | Scope & Enforcement Boundary |
 |---|:---:|:---:|:---:|---|
-| **`SUPER_ADMIN`** | **100** | **0** | **100** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at database/service level. |
-| **`BRANCH_MANAGER`** | **78** | **22** | **100** | Branch-scoped intake, auction facilitation, staff management. Blocked from company branch creation, scheme activation, user resets, reversal approvals, and payout releases. |
-| **`ACCOUNTANT`** | **64** | **36** | **100** | Company-wide financial ledger entries, notebook transcription (Maker), voucher preparation, day books, cash books, collections. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
-| **`COLLECTION_AGENT`** | **35** | **65** | **100** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues. Blocked from administrative auctions, prize vouchers, minutes, passbooks, and scheme configs. |
-| **`CUSTOMER`** | **31** | **69** | **100** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers. Blocked from all staff endpoints. |
-| **`AUDITOR`** | **53** | **47** | **100** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. Strictly blocked from ALL 47 mutation/write operations. |
-| **TOTALS** | **360** | **240** | **600** | **100% Verified Match between Controller Decorators and Registry Specification** |
+| **`SUPER_ADMIN`** | **104** | **0** | **104** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at database/service level. |
+| **`BRANCH_MANAGER`** | **82** | **22** | **104** | Branch-scoped intake, auction facilitation, staff management. Blocked from company branch creation, scheme activation, user resets, reversal approvals, and payout releases. |
+| **`ACCOUNTANT`** | **68** | **36** | **104** | Company-wide financial ledger entries, notebook transcription (Maker), voucher preparation, day books, cash books, collections, UPI claims verification. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
+| **`COLLECTION_AGENT`** | **36** | **68** | **104** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues, generating customer UPI intent. Blocked from administrative auctions, prize vouchers, minutes, passbooks, and scheme configs. |
+| **`CUSTOMER`** | **33** | **71** | **104** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers, 1-tap UPI deep-linking, self-reported UPI claims. Blocked from all staff endpoints. |
+| **`AUDITOR`** | **53** | **51** | **104** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. Strictly blocked from ALL 51 mutation/write operations. |
+| **TOTALS** | **376** | **248** | **624** | **100% Verified Match between Controller Decorators and Registry Specification** |
 
 ---
 
@@ -391,9 +391,9 @@ The system exposes exactly **11 public operations** that intentionally do not re
 - **Bilingual PDF Canvas Engine**: A5 digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **105 physical paths / 111 operations fully implemented, documented, and tested** (79 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).
-- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 111 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **343 unit tests passing across 24 test suites + 82 E2E tests passing across 10 suites (425 / 425 total tests, 100% pass rate)**.
+- **Total Production Endpoints**: **109 physical paths / 115 operations fully implemented, documented, and tested** (83 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 115 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **367 unit tests passing across 26 test suites + 88 E2E tests passing across 11 suites (455 / 455 total tests, 100% pass rate)**.
 
 
 

@@ -4,7 +4,7 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Scope**: 100% complete coverage across all 10 functional modules, 28 features, and all 6 standardized personas (63 exhaustive user stories & 6 multi-actor journey maps).  
 > **Status**: Authoritative Product Specification (`CONFIRMED-BY-DEVELOPER`)  
-> **Zero Hallucination Guarantee**: Derived strictly from confirmed business decisions (ADR-01 through ADR-18), [`financial-rules.md`](../01-business/financial-rules.md), [`permissions-matrix.md`](../01-business/permissions-matrix.md), [`completed-modules-api-registry.md`](../03-architecture/completed-modules-api-registry.md), and verified NestJS controller implementations.
+> **Zero Hallucination Guarantee**: Derived strictly from confirmed business decisions (ADR-01 through ADR-19), [`financial-rules.md`](../01-business/financial-rules.md), [`permissions-matrix.md`](../01-business/permissions-matrix.md), [`completed-modules-api-registry.md`](../03-architecture/completed-modules-api-registry.md), and verified NestJS controller implementations.
 
 ---
 

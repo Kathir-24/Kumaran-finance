@@ -78,10 +78,10 @@ pnpm run prisma:seed
 # Run Oxlint linter (0 errors, 0 warnings expected)
 pnpm run lint
 
-# Run all 24 unit test suites (343 / 343 passing tests, 100% pass expected)
+# Run all 26 unit test suites (367 / 367 passing tests, 100% pass expected)
 pnpm test
 
-# Run all 10 end-to-end integration test suites (82 / 82 passing tests, total 425 / 425 passing tests)
+# Run all 11 end-to-end integration test suites (88 / 88 passing tests, total 455 / 455 passing tests)
 pnpm run test:e2e:fresh
 
 # Run NestJS in development watch mode
@@ -96,7 +96,7 @@ Open your browser to test the built-in administrative & observability portals:
 
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 105 physical paths (111 operations). |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 109 physical paths (115 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
 | **MinIO S3 Storage Console** | [http://localhost:9001](http://localhost:9001) | User: `chitflow_admin`<br>Pass: `chitflow_storage_secret` | Web file browser showing the `kumaran-chits-private` bucket. |

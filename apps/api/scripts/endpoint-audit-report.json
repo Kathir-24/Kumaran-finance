@@ -1898,6 +1898,41 @@
     ]
   },
   {
+    "file": "src\\installment\\installment.controller.ts",
+    "controller": "InstallmentController",
+    "methodName": "getUpiIntent",
+    "httpMethod": "GET",
+    "route": "/installments/:dueId/upi-intent",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "CUSTOMER",
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT",
+      "COLLECTION_AGENT"
+    ],
+    "effectiveRoles": [
+      "CUSTOMER",
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT",
+      "COLLECTION_AGENT"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
     "file": "src\\installment\\ticket.controller.ts",
     "controller": "TicketController",
     "methodName": "getDefaulters",
@@ -2573,6 +2608,101 @@
     ],
     "effectiveRoles": [
       "SUPER_ADMIN"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
+    "file": "src\\payment\\payment.controller.ts",
+    "controller": "PaymentController",
+    "methodName": "submitUpiClaim",
+    "httpMethod": "POST",
+    "route": "/payments/upi-claim",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "CUSTOMER",
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "effectiveRoles": [
+      "CUSTOMER",
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
+    "file": "src\\payment\\payment.controller.ts",
+    "controller": "PaymentController",
+    "methodName": "getPendingUpiClaims",
+    "httpMethod": "GET",
+    "route": "/payments/pending-upi-claims",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "effectiveRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
+    "file": "src\\payment\\payment.controller.ts",
+    "controller": "PaymentController",
+    "methodName": "verifyUpiClaim",
+    "httpMethod": "POST",
+    "route": "/payments/:id/verify-upi-claim",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "effectiveRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
     ],
     "isPublic": false,
     "notes": [
