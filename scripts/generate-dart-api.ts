@@ -45,6 +45,9 @@ function resolveTypeName(prop: SchemaProperty, propName: string): { dartType: st
 
   if (prop.type === 'array') {
     if (prop.items) {
+      if (prop.items.type === 'array' && !prop.items.items && !prop.items.$ref) {
+        return { dartType: 'List<dynamic>', isComplex: false };
+      }
       const inner = resolveTypeName(prop.items, propName);
       return { dartType: `List<${inner.dartType}>`, isComplex: inner.isComplex };
     }
@@ -73,8 +76,11 @@ function resolveTypeName(prop: SchemaProperty, propName: string): { dartType: st
 
 function sanitizeDartFieldName(name: string): { fieldName: string; jsonKey: string } {
   let field = name;
-  if (DART_RESERVED_WORDS.has(field)) {
-    field = `${field}_`;
+  if (field.startsWith('_')) {
+    field = field.replace(/^_+/, '');
+  }
+  if (DART_RESERVED_WORDS.has(field) || field === '') {
+    field = `${field || 'field'}_`;
   }
   // Convert kebab-case or snake_case if necessary, or preserve camelCase
   return { fieldName: field, jsonKey: name };
@@ -148,25 +154,32 @@ function generateDartClass(className: string, schema: SchemaDefinition): string 
     const key = f.jsonKey;
     const isNullable = f.isNullable || f.dartType === 'dynamic';
 
-    if (f.isList && f.innerType && f.innerType !== 'dynamic') {
-      if (['int', 'double', 'String', 'bool'].includes(f.innerType)) {
+    if (f.isList) {
+      if (f.innerType && ['int', 'double', 'String', 'bool'].includes(f.innerType)) {
         if (f.innerType === 'int') {
           const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList()`;
           lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
         } else if (f.innerType === 'double') {
           const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList()`;
           lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
+        } else if (f.innerType === 'String') {
+          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => e.toString()).toList()`;
+          lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
         } else {
-          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => e as ${f.innerType}).toList()`;
+          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => e as bool).toList()`;
           lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
         }
-      } else {
+      } else if (f.isComplex && f.innerType && f.innerType !== 'dynamic') {
         const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => ${f.innerType}.fromJson(e as Map<String, dynamic>)).toList()`;
+        lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
+      } else {
+        const mapper = `json['${key}'] as List<dynamic>?`;
         lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
       }
     } else if (f.isComplex && f.dartType !== 'dynamic') {
+      const mapper = `json['${key}'] != null ? ${f.dartType}.fromJson(json['${key}'] as Map<String, dynamic>) : null`;
       lines.push(
-        `      ${f.fieldName}: json['${key}'] != null ? ${f.dartType}.fromJson(json['${key}'] as Map<String, dynamic>) : null,`,
+        `      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? ${f.dartType}.fromJson(const {})`},`,
       );
     } else if (f.dartType === 'int') {
       const val = `json['${key}'] != null ? (json['${key}'] as num).toInt() : null`;
@@ -191,16 +204,30 @@ function generateDartClass(className: string, schema: SchemaDefinition): string 
   lines.push('    final Map<String, dynamic> data = <String, dynamic>{};');
   for (const f of fields) {
     const key = f.jsonKey;
-    if (f.isList && f.innerType && !['int', 'double', 'String', 'bool', 'dynamic'].includes(f.innerType)) {
-      lines.push(
-        `    if (${f.fieldName} != null) { data['${key}'] = ${f.fieldName}!.map((v) => v.toJson()).toList(); }`,
-      );
-    } else if (f.isComplex && f.dartType !== 'dynamic') {
-      lines.push(
-        `    if (${f.fieldName} != null) { data['${key}'] = ${f.fieldName}!.toJson(); }`,
-      );
+    if (f.isNullable) {
+      if (f.isList && f.isComplex) {
+        lines.push(
+          `    if (${f.fieldName} != null) { data['${key}'] = ${f.fieldName}!.map((v) => v.toJson()).toList(); }`,
+        );
+      } else if (f.isComplex && f.dartType !== 'dynamic') {
+        lines.push(
+          `    if (${f.fieldName} != null) { data['${key}'] = ${f.fieldName}!.toJson(); }`,
+        );
+      } else {
+        lines.push(`    data['${key}'] = ${f.fieldName};`);
+      }
     } else {
-      lines.push(`    data['${key}'] = ${f.fieldName};`);
+      if (f.isList && f.isComplex) {
+        lines.push(
+          `    data['${key}'] = ${f.fieldName}.map((v) => v.toJson()).toList();`,
+        );
+      } else if (f.isComplex && f.dartType !== 'dynamic') {
+        lines.push(
+          `    data['${key}'] = ${f.fieldName}.toJson();`,
+        );
+      } else {
+        lines.push(`    data['${key}'] = ${f.fieldName};`);
+      }
     }
   }
   lines.push('    return data;');
@@ -238,7 +265,7 @@ export function runGenerator() {
     '// DO NOT EDIT MANUALLY. Generated by scripts/generate-dart-api.ts',
     '// ==============================================================================',
     '',
-    '// ignore_for_file: unused_import, non_constant_identifier_names',
+    '// ignore_for_file: unused_import, non_constant_identifier_names, unnecessary_null_comparison, unnecessary_non_null_assertion',
     '',
   ];
 
