@@ -1576,6 +1576,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/pending-upi-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pending UPI payment claims awaiting bank statement verification
+         * @description Returns all claims in INITIATED status with customer and due details for Accounting Desk action.
+         */
+        get: operations["PaymentController_getPendingUpiClaims_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/{id}": {
         parameters: {
             query?: never;
@@ -1690,26 +1710,6 @@ export interface paths {
          * @description Records bank UTR reference from deep-link payment in INITIATED status. Desk Accountant verifies bank credit before receipt is issued.
          */
         post: operations["PaymentController_submitUpiClaim_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/payments/pending-upi-claims": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List pending UPI payment claims awaiting bank statement verification
-         * @description Returns all claims in INITIATED status with customer and due details for Accounting Desk action.
-         */
-        get: operations["PaymentController_getPendingUpiClaims_v1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5369,6 +5369,26 @@ export interface components {
              */
             collectedAt?: string;
         };
+        PendingUpiClaimItemDto: {
+            /** @example claim-uuid-001 */
+            claimId: string;
+            /** @example 3950 */
+            amount: number;
+            /** @example 429188123456 */
+            utrNumber: string;
+            /** @example Paid via PhonePe */
+            notes: string;
+            /** @example 2026-10-27T10:00:00.000Z */
+            createdAt: Record<string, never>;
+            /** @description Submitting user */
+            submittedByUser: Record<string, never>;
+            /** @description Customer details */
+            customer: Record<string, never>;
+            /** @description Subscriber ticket details */
+            ticket: Record<string, never>;
+            /** @description Installment due details */
+            due: Record<string, never>;
+        };
         PaymentDetailResponseDto: {
             /**
              * @description Payment record ID
@@ -5601,26 +5621,6 @@ export interface components {
              * @example Paid via GPay to KVB account
              */
             notes?: string;
-        };
-        PendingUpiClaimItemDto: {
-            /** @example claim-uuid-001 */
-            claimId: string;
-            /** @example 3950 */
-            amount: number;
-            /** @example 429188123456 */
-            utrNumber: string;
-            /** @example Paid via PhonePe */
-            notes: string;
-            /** @example 2026-10-27T10:00:00.000Z */
-            createdAt: Record<string, never>;
-            /** @description Submitting user */
-            submittedByUser: Record<string, never>;
-            /** @description Customer details */
-            customer: Record<string, never>;
-            /** @description Subscriber ticket details */
-            ticket: Record<string, never>;
-            /** @description Installment due details */
-            due: Record<string, never>;
         };
         VerifyUpiClaimResponseDto: {
             /** @example true */
@@ -10142,6 +10142,50 @@ export interface operations {
             };
         };
     };
+    PaymentController_getPendingUpiClaims_v1: {
+        parameters: {
+            query: {
+                branchId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending UPI claims retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["PendingUpiClaimItemDto"][];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PaymentController_getPaymentById_v1: {
         parameters: {
             query?: never;
@@ -10483,48 +10527,6 @@ export interface operations {
             };
             /** @description Bank UTR already submitted or active pending claim exists */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PaymentController_getPendingUpiClaims_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Pending UPI claims retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["PendingUpiClaimItemDto"][];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

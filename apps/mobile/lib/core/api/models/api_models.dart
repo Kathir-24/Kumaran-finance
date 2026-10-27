@@ -4810,6 +4810,62 @@ class CreatePaymentDto {
   }
 }
 
+class PendingUpiClaimItemDto {
+  final String claimId;
+  final double amount;
+  final String utrNumber;
+  final String notes;
+  final dynamic createdAt;
+  /// Submitting user
+  final dynamic submittedByUser;
+  /// Customer details
+  final dynamic customer;
+  /// Subscriber ticket details
+  final dynamic ticket;
+  /// Installment due details
+  final dynamic due;
+
+  const PendingUpiClaimItemDto({
+    required this.claimId,
+    required this.amount,
+    required this.utrNumber,
+    required this.notes,
+    this.createdAt,
+    this.submittedByUser,
+    this.customer,
+    this.ticket,
+    this.due,
+  });
+
+  factory PendingUpiClaimItemDto.fromJson(Map<String, dynamic> json) {
+    return PendingUpiClaimItemDto(
+      claimId: json['claimId']?.toString() ?? '',
+      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      utrNumber: json['utrNumber']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+      createdAt: json['createdAt'],
+      submittedByUser: json['submittedByUser'],
+      customer: json['customer'],
+      ticket: json['ticket'],
+      due: json['due'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['claimId'] = claimId;
+    data['amount'] = amount;
+    data['utrNumber'] = utrNumber;
+    data['notes'] = notes;
+    data['createdAt'] = createdAt;
+    data['submittedByUser'] = submittedByUser;
+    data['customer'] = customer;
+    data['ticket'] = ticket;
+    data['due'] = due;
+    return data;
+  }
+}
+
 class PaymentDetailResponseDto {
   /// Payment record ID
   final String id;
@@ -5203,62 +5259,6 @@ class SubmitUpiClaimDto {
     data['dueId'] = dueId;
     data['utrNumber'] = utrNumber;
     data['notes'] = notes;
-    return data;
-  }
-}
-
-class PendingUpiClaimItemDto {
-  final String claimId;
-  final double amount;
-  final String utrNumber;
-  final String notes;
-  final dynamic createdAt;
-  /// Submitting user
-  final dynamic submittedByUser;
-  /// Customer details
-  final dynamic customer;
-  /// Subscriber ticket details
-  final dynamic ticket;
-  /// Installment due details
-  final dynamic due;
-
-  const PendingUpiClaimItemDto({
-    required this.claimId,
-    required this.amount,
-    required this.utrNumber,
-    required this.notes,
-    this.createdAt,
-    this.submittedByUser,
-    this.customer,
-    this.ticket,
-    this.due,
-  });
-
-  factory PendingUpiClaimItemDto.fromJson(Map<String, dynamic> json) {
-    return PendingUpiClaimItemDto(
-      claimId: json['claimId']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
-      utrNumber: json['utrNumber']?.toString() ?? '',
-      notes: json['notes']?.toString() ?? '',
-      createdAt: json['createdAt'],
-      submittedByUser: json['submittedByUser'],
-      customer: json['customer'],
-      ticket: json['ticket'],
-      due: json['due'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['claimId'] = claimId;
-    data['amount'] = amount;
-    data['utrNumber'] = utrNumber;
-    data['notes'] = notes;
-    data['createdAt'] = createdAt;
-    data['submittedByUser'] = submittedByUser;
-    data['customer'] = customer;
-    data['ticket'] = ticket;
-    data['due'] = due;
     return data;
   }
 }

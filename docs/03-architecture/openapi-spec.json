@@ -6171,6 +6171,75 @@
         ]
       }
     },
+    "/api/v1/payments/pending-upi-claims": {
+      "get": {
+        "description": "Returns all claims in INITIATED status with customer and due details for Accounting Desk action.",
+        "operationId": "PaymentController_getPendingUpiClaims_v1",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending UPI claims retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PendingUpiClaimItemDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List pending UPI payment claims awaiting bank statement verification",
+        "tags": [
+          "Payments, Receipts & Reversals"
+        ]
+      }
+    },
     "/api/v1/payments/{id}": {
       "get": {
         "description": "Retrieves single payment details including allocation, installment due, receipt, and reversal status. Customers scoped strictly to self.",
@@ -6623,66 +6692,6 @@
           }
         ],
         "summary": "Submit customer UPI payment claim (Bank UTR self-report)",
-        "tags": [
-          "Payments, Receipts & Reversals"
-        ]
-      }
-    },
-    "/api/v1/payments/pending-upi-claims": {
-      "get": {
-        "description": "Returns all claims in INITIATED status with customer and due details for Accounting Desk action.",
-        "operationId": "PaymentController_getPendingUpiClaims_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Pending UPI claims retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PendingUpiClaimItemDto"
-                      }
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — Invalid or missing Bearer token"
-          },
-          "403": {
-            "description": "Forbidden — Insufficient role permissions or BOLA violation"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "List pending UPI payment claims awaiting bank statement verification",
         "tags": [
           "Payments, Receipts & Reversals"
         ]
@@ -13457,6 +13466,58 @@
           "paymentMethod"
         ]
       },
+      "PendingUpiClaimItemDto": {
+        "type": "object",
+        "properties": {
+          "claimId": {
+            "type": "string",
+            "example": "claim-uuid-001"
+          },
+          "amount": {
+            "type": "number",
+            "example": 3950
+          },
+          "utrNumber": {
+            "type": "string",
+            "example": "429188123456"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Paid via PhonePe"
+          },
+          "createdAt": {
+            "type": "object",
+            "example": "2026-10-27T10:00:00.000Z"
+          },
+          "submittedByUser": {
+            "type": "object",
+            "description": "Submitting user"
+          },
+          "customer": {
+            "type": "object",
+            "description": "Customer details"
+          },
+          "ticket": {
+            "type": "object",
+            "description": "Subscriber ticket details"
+          },
+          "due": {
+            "type": "object",
+            "description": "Installment due details"
+          }
+        },
+        "required": [
+          "claimId",
+          "amount",
+          "utrNumber",
+          "notes",
+          "createdAt",
+          "submittedByUser",
+          "customer",
+          "ticket",
+          "due"
+        ]
+      },
       "PaymentDetailResponseDto": {
         "type": "object",
         "properties": {
@@ -13852,58 +13913,6 @@
         "required": [
           "dueId",
           "utrNumber"
-        ]
-      },
-      "PendingUpiClaimItemDto": {
-        "type": "object",
-        "properties": {
-          "claimId": {
-            "type": "string",
-            "example": "claim-uuid-001"
-          },
-          "amount": {
-            "type": "number",
-            "example": 3950
-          },
-          "utrNumber": {
-            "type": "string",
-            "example": "429188123456"
-          },
-          "notes": {
-            "type": "string",
-            "example": "Paid via PhonePe"
-          },
-          "createdAt": {
-            "type": "object",
-            "example": "2026-10-27T10:00:00.000Z"
-          },
-          "submittedByUser": {
-            "type": "object",
-            "description": "Submitting user"
-          },
-          "customer": {
-            "type": "object",
-            "description": "Customer details"
-          },
-          "ticket": {
-            "type": "object",
-            "description": "Subscriber ticket details"
-          },
-          "due": {
-            "type": "object",
-            "description": "Installment due details"
-          }
-        },
-        "required": [
-          "claimId",
-          "amount",
-          "utrNumber",
-          "notes",
-          "createdAt",
-          "submittedByUser",
-          "customer",
-          "ticket",
-          "due"
         ]
       },
       "VerifyUpiClaimResponseDto": {
