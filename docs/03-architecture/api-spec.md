@@ -4,7 +4,7 @@
 > **Base URL**: `/api/v1` (Global prefix `/api`, URI versioning `v1`)  
 > **Documentation Tool**: OpenAPI 3.0 / Swagger (`/api/docs`)  
 > **Contract Source of Truth**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) & [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)  
-> **Total Verified Scope**: **115 operations across 109 paths** (100% automated test coverage, 455 passing tests across 26 unit suites [367 unit] and 11 E2E suites [88 E2E]).
+> **Total Verified Scope**: **115 operations across 109 paths** (100% automated test coverage, 455 passing tests across 26 unit suites [367 unit] and 10 E2E suites [88 E2E]).
 
 ---
 

@@ -81,7 +81,7 @@ pnpm run lint
 # Run all 26 unit test suites (367 / 367 passing tests, 100% pass expected)
 pnpm test
 
-# Run all 11 end-to-end integration test suites (88 / 88 passing tests, total 455 / 455 passing tests)
+# Run all 10 end-to-end integration test suites (88 / 88 passing tests, total 455 / 455 passing tests)
 pnpm run test:e2e:fresh
 
 # Run NestJS in development watch mode

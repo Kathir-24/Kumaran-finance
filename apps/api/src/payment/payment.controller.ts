@@ -108,6 +108,25 @@ export class PaymentController {
     return this.paymentService.queryPayments(query, currentUser);
   }
 
+  @Get('pending-upi-claims')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'List pending UPI payment claims awaiting bank statement verification',
+    description: 'Returns all claims in INITIATED status with customer and due details for Accounting Desk action.',
+  })
+  @ApiOkResponseEnvelope(PendingUpiClaimItemDto, {
+    isArray: true,
+    description: 'Pending UPI claims retrieved successfully',
+  })
+  async getPendingUpiClaims(
+    @CurrentUser() currentUser: JwtPayload,
+    @Query('branchId') branchIdQuery?: string,
+  ) {
+    const isSuperAdmin = currentUser.roles.includes(Role.SUPER_ADMIN);
+    const branchId = isSuperAdmin ? branchIdQuery : (currentUser.branchId || undefined);
+    return this.paymentService.getPendingUpiClaims(branchId);
+  }
+
   @Get(':id')
   @Roles(
     Role.SUPER_ADMIN,
@@ -268,22 +287,6 @@ export class PaymentController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.paymentService.submitUpiClaim(dto, currentUser);
-  }
-
-  @Get('pending-upi-claims')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
-  @ApiOperation({
-    summary: 'List pending UPI payment claims awaiting bank statement verification',
-    description: 'Returns all claims in INITIATED status with customer and due details for Accounting Desk action.',
-  })
-  @ApiOkResponseEnvelope(PendingUpiClaimItemDto, {
-    isArray: true,
-    description: 'Pending UPI claims retrieved successfully',
-  })
-  async getPendingUpiClaims(
-    @CurrentUser('branchId') branchId?: string | null,
-  ) {
-    return this.paymentService.getPendingUpiClaims(branchId || undefined);
   }
 
   @Post(':id/verify-upi-claim')

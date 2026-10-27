@@ -17,6 +17,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
   let superAdminToken: string;
   let checkerToken: string;
   let branchManagerToken: string;
+  let accountantToken: string;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -76,6 +77,12 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543212', password: 'Admin@Kumaran2026' });
     branchManagerToken = bmLogin.body.data.accessToken;
+
+    // Login Desk Accountant (Maker/Verifier)
+    const accLogin = await request(app.getHttpServer())
+      .post('/api/v1/auth/web/login')
+      .send({ phone: '9876543213', password: 'Admin@Kumaran2026' });
+    accountantToken = accLogin.body.data.accessToken;
   }, 30000);
 
   afterAll(async () => {
@@ -90,7 +97,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
   describe('Category 1 & 10: Happy Path & DEF-03 Notes Persistence', () => {
     it('TC-HP-01 & TC-REG-03: Records discrete counter payment with cashier notes persisted to PostgreSQL', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
-        where: { status: 'UNPAID' },
+        where: { status: { in: ['UNPAID', 'OVERDUE'] } },
       });
       expect(unpaidDue).toBeDefined();
 
@@ -183,7 +190,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
   describe('Category 7: Business Rules & ADR-07 Math Invariants', () => {
     it('TC-BIZ-01: ADR-07 Partial Payment Rejection - Rejects partial payment amount strictly', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
-        where: { status: 'UNPAID' },
+        where: { status: { in: ['UNPAID', 'OVERDUE'] } },
       });
       expect(unpaidDue).toBeDefined();
 
@@ -233,7 +240,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
   describe('Category 5 & 7: Maker != Checker Reversals (ADR-10)', () => {
     it('TC-BIZ-03: Dual Control - Maker cannot approve own payment reversal (403 Forbidden)', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
-        where: { status: 'UNPAID' },
+        where: { status: { in: ['UNPAID', 'OVERDUE'] } },
       });
 
       if (!unpaidDue) return;
@@ -300,7 +307,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
   describe('Category 9: Reliability & Idempotency Key Handling', () => {
     it('TC-REL-01: Idempotency Key prevents duplicate payment creation on network retry', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
-        where: { status: 'UNPAID' },
+        where: { status: { in: ['UNPAID', 'OVERDUE'] } },
       });
 
       if (!unpaidDue) return;
@@ -332,6 +339,162 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
       expect(retryRes.status).toBe(201);
       expect(retryRes.body.data.payment.id).toBe(firstPaymentId);
       expect(retryRes.body.data.duplicateIgnored).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // 6. ADR-19: NATIVE ZERO-FEE UPI INTENT, BANK UTR UNIQUENESS & DUAL-CONTROL CLAIM VERIFICATION
+  // ===========================================================================
+  describe('Category 11: ADR-19 Native UPI Intent, UTR Anti-Duplication & Claim Verification', () => {
+    let upiDue: any;
+    let upiUtr: string;
+    let createdClaimId: string;
+
+    beforeAll(async () => {
+      const headBranch = await prisma.branch.findFirst({
+        where: { code: 'PRD' },
+      });
+
+      upiDue = await prisma.installmentDue.findFirst({
+        where: {
+          status: { in: ['UNPAID', 'OVERDUE'] },
+          ticket: {
+            chitGroup: { branchId: headBranch?.id, status: 'ACTIVE' },
+          },
+        },
+        include: {
+          ticket: {
+            include: { customer: true, chitGroup: true },
+          },
+        },
+      });
+      upiUtr = `UTR${Date.now().toString().slice(-9)}`;
+    });
+
+    it('TC-UPI-01: Generates valid NPCI upi://pay intent with whole-rupee amount and KVB VPA', async () => {
+      if (!upiDue) return;
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/installments/${upiDue.id}/upi-intent`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.payeeVpa).toBe('kumaranfinance@kvb');
+      expect(res.body.data.upiUri).toContain('upi://pay?');
+      expect(res.body.data.upiUri).toContain('pa=kumaranfinance%40kvb');
+      expect(res.body.data.upiUri).toContain(`am=${upiDue.netPayableAmount}`);
+    });
+
+    it('TC-UPI-02: Submits customer UPI claim and registers Payment in INITIATED status', async () => {
+      if (!upiDue) return;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/payments/upi-claim')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          dueId: upiDue.id,
+          utrNumber: upiUtr,
+          notes: 'Customer transferred via Google Pay directly to KVB account',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('INITIATED');
+      expect(res.body.data.utrNumber).toBe(upiUtr);
+      expect(res.body.data.claimId).toBeDefined();
+
+      createdClaimId = res.body.data.claimId;
+
+      // Assert due remains unchanged until verified
+      const checkDue = await prisma.installmentDue.findUnique({
+        where: { id: upiDue.id },
+      });
+      expect(checkDue?.status).toBe(upiDue.status);
+    });
+
+    it('TC-UPI-03: Blocks duplicate Bank UTR claims under PostgreSQL 17 unique constraint', async () => {
+      if (!upiDue) return;
+
+      // Another due
+      const otherDue = await prisma.installmentDue.findFirst({
+        where: {
+          id: { not: upiDue.id },
+          status: { in: ['UNPAID', 'OVERDUE'] },
+          ticket: { chitGroup: { status: 'ACTIVE' } },
+        },
+      });
+
+      if (!otherDue) return;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/payments/upi-claim')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          dueId: otherDue.id,
+          utrNumber: upiUtr, // Reusing identical UTR
+          notes: 'Attempting to reuse already claimed UTR',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toContain('DUPLICATE_TRANSACTION_REF');
+    });
+
+    it('TC-UPI-04: Lists pending UPI claims for Accounting Desk verification', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/payments/pending-upi-claims')
+        .set('Authorization', `Bearer ${accountantToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      const claim = res.body.data.find((c: any) => c.claimId === createdClaimId);
+      expect(claim).toBeDefined();
+      expect(claim.utrNumber).toBe(upiUtr);
+    });
+
+    it('TC-UPI-05: Enforces Maker != Checker hard guard on UPI claim verification', async () => {
+      if (!createdClaimId) return;
+
+      // superAdminToken submitted the claim (Maker)
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/payments/${createdClaimId}/verify-upi-claim`)
+        .set('Authorization', `Bearer ${superAdminToken}`) // Same as maker
+        .send({
+          verificationNotes: 'Self-approval attempt',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toContain('MAKER_CHECKER_VIOLATION');
+    });
+
+    it('TC-UPI-06: Checker verifies UPI claim, transitions to SUCCESS, marks due PAID and generates receipt', async () => {
+      if (!createdClaimId) return;
+
+      // checkerToken verifies the claim (Checker)
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/payments/${createdClaimId}/verify-upi-claim`)
+        .set('Authorization', `Bearer ${checkerToken}`) // Independent partner
+        .send({
+          verificationNotes: 'Verified ₹ credit in Karur Vysya Bank current account',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.payment.paymentStatus).toBe('SUCCESS');
+      expect(res.body.data.dueStatus).toBe('PAID');
+      expect(res.body.data.receipt.receiptNumber).toMatch(/^KC-REC-/);
+
+      // Verify database state
+      const verifiedPayment = await prisma.payment.findUnique({
+        where: { id: createdClaimId },
+      });
+      expect(verifiedPayment?.paymentStatus).toBe('SUCCESS');
+
+      const verifiedDue = await prisma.installmentDue.findUnique({
+        where: { id: upiDue.id },
+      });
+      expect(verifiedDue?.status).toBe('PAID');
     });
   });
 });
