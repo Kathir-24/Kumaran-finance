@@ -407,6 +407,24 @@ export class CollectionService {
       },
     });
 
+    // 5. Immutable Audit Trail for Vault Deposit
+    await this.prisma.auditLog.create({
+      data: {
+        userId: acknowledgerUserId,
+        action: 'CASH_HANDOVER_ACKNOWLEDGED',
+        entityType: 'Payment',
+        entityId: dto.collectorUserId,
+        newValue: {
+          collectorUserId: dto.collectorUserId,
+          acknowledgedByUserId: acknowledgerUserId,
+          acknowledgedAmount: countedAmount.toString(),
+          totalPaymentsAcknowledged: payments.length,
+          paymentIds: dto.paymentIds,
+          notes: dto.notes || null,
+        },
+      },
+    });
+
     return {
       success: true,
       message: `Cash handover of ₹${countedAmount.toString()} successfully verified and deposited into branch vault.`,

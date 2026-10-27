@@ -75,6 +75,9 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
         update: jest.fn(),
         count: jest.fn(),
       },
+      auditLog: {
+        create: jest.fn(),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 

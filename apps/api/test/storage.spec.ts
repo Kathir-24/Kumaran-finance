@@ -262,5 +262,55 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       const service = new StorageService(configMock);
       expect(service.getActiveDriverName()).toBe('local');
     });
+
+    it('should cache generated presigned URLs in Redis and serve them without driver calls', async () => {
+      const configMock = {
+        get: jest.fn((key: string) => {
+          if (key === 'LOCAL_STORAGE_PATH') return testStorageDir;
+          return null;
+        }),
+      } as unknown as ConfigService;
+
+      const redisClientMock = {
+        get: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce('/api/v1/storage/file/cached-doc.pdf'),
+        set: jest.fn().mockResolvedValue('OK'),
+        mget: jest.fn().mockResolvedValue(['/api/v1/storage/file/cached-doc.pdf', null]),
+        del: jest.fn().mockResolvedValue(1),
+      };
+
+      const redisProviderMock = {
+        getClient: jest.fn().mockReturnValue(redisClientMock),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+
+      const service = new StorageService(configMock, redisProviderMock as any);
+
+      // Upload dummy test files so LocalStorageDriver can find them
+      await service.uploadFile('doc-1.pdf', Buffer.from('test doc 1'), 'application/pdf');
+      await service.uploadFile('doc-2.pdf', Buffer.from('test doc 2'), 'application/pdf');
+
+      // Call 1: Cache Miss -> calls driver, sets Redis cache
+      const url1 = await service.getPresignedUrl('doc-1.pdf', 900);
+      expect(url1).toBe('/api/v1/storage/file/doc-1.pdf');
+      expect(redisClientMock.set).toHaveBeenCalledWith(
+        'url:presigned:doc-1.pdf',
+        '/api/v1/storage/file/doc-1.pdf',
+        'EX',
+        600,
+      );
+
+      // Call 2: Cache Hit -> returns from Redis immediately
+      const url2 = await service.getPresignedUrl('doc-1.pdf', 900);
+      expect(url2).toBe('/api/v1/storage/file/cached-doc.pdf');
+
+      // Call 3: Batch retrieval with partial cache hit
+      const batchMap = await service.getBatchPresignedUrls(['doc-1.pdf', 'doc-2.pdf']);
+      expect(batchMap.get('doc-1.pdf')).toBe('/api/v1/storage/file/cached-doc.pdf');
+      expect(batchMap.get('doc-2.pdf')).toBe('/api/v1/storage/file/doc-2.pdf');
+
+      // Call 4: deleteFile purges cache
+      await service.deleteFile('doc-1.pdf');
+      expect(redisClientMock.del).toHaveBeenCalledWith('url:presigned:doc-1.pdf');
+    });
   });
 });

@@ -192,19 +192,24 @@ export class ChitService {
         },
       });
 
-      // 2. Map ticketNumber to Ticket record
-      const ticketMap = new Map<number, string>();
-      for (const alloc of dto.memberAllocations) {
-        const ticket = await tx.subscriberTicket.create({
-          data: {
-            chitGroupId: chit.id,
-            customerId: alloc.customerId,
-            ticketNumber: alloc.ticketNumber,
-            openingBalance: BigInt(alloc.openingBalance || 0),
-          },
-        });
-        ticketMap.set(alloc.ticketNumber, ticket.id);
-      }
+      // 2. Batch insert member allocations (reduces 20 DB trips to 1)
+      await tx.subscriberTicket.createMany({
+        data: dto.memberAllocations.map((alloc) => ({
+          chitGroupId: chit.id,
+          customerId: alloc.customerId,
+          ticketNumber: alloc.ticketNumber,
+          openingBalance: BigInt(alloc.openingBalance || 0),
+        })),
+      });
+
+      // Retrieve created tickets in a single indexed query to map ticketNumber -> id
+      const createdTickets = await tx.subscriberTicket.findMany({
+        where: { chitGroupId: chit.id },
+        select: { id: true, ticketNumber: true },
+      });
+      const ticketMap = new Map<number, string>(
+        createdTickets.map((t) => [t.ticketNumber, t.id]),
+      );
 
       // 3. Record historical auctions (Months 2 to onboardedAtMonth - 1)
       for (const hw of dto.historicalWinners) {

@@ -21,7 +21,7 @@ class IdempotencyHelper {
   /// Checks if a request path involves financial state mutations that require Idempotency-Key
   static bool requiresIdempotency(String method, String path) {
     final m = method.toUpperCase();
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(m)) {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].contains(m)) {
       return false;
     }
     return path.contains('/payments') ||

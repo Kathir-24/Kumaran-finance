@@ -341,6 +341,21 @@ export class AuctionService {
         },
       });
 
+      // 4. Immutable Audit Trail for Physical Paper Token Draw
+      await tx.auditLog.create({
+        data: {
+          userId: makerUserId,
+          action: 'AUCTION_TIE_BREAK_DRAWN',
+          entityType: 'Auction',
+          entityId: auction.id,
+          newValue: {
+            winningTicketId: dto.winningTicketId,
+            tiedTicketCount: dto.tiedTickets.length,
+            conductedByUserId: makerUserId,
+          },
+        },
+      });
+
       return tx.auction.findUnique({
         where: { id: auction.id },
         include: {
@@ -458,6 +473,25 @@ export class AuctionService {
           subscribersPresent: dto?.subscribersPresent || 1,
           minutesText,
           signedByForeman: dto?.signedByForeman ?? true,
+        },
+      });
+
+      // 4. Immutable Audit Trail
+      await tx.auditLog.create({
+        data: {
+          userId: checkerUserId,
+          action: 'AUCTION_FINALIZED',
+          entityType: 'Auction',
+          entityId: auctionId,
+          newValue: {
+            installmentMonth: auction.installmentMonth,
+            winnerTicketId: auction.winner!.ticketId,
+            winnerTicketNumber: ticketNo,
+            bidDiscount: discount,
+            dividendPerTicket: dividend,
+            prizeMoney: auction.prizeMoney?.toString() || '0',
+            finalizedByUserId: checkerUserId,
+          },
         },
       });
 

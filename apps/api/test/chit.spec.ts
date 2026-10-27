@@ -27,6 +27,7 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
+        createMany: jest.fn(),
         update: jest.fn(),
       },
       customer: {
@@ -214,6 +215,14 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       };
 
       prismaMock.chitGroup.create.mockResolvedValue(ongoingChit);
+      prismaMock.subscriberTicket.createMany.mockResolvedValue({ count: 20 });
+      prismaMock.subscriberTicket.findMany.mockImplementation((args: any) => {
+        // Return 20 mock tickets with id and ticketNumber
+        return Array.from({ length: 20 }, (_, i) => ({
+          id: `ticket-${i + 1}`,
+          ticketNumber: i + 1,
+        }));
+      });
       prismaMock.subscriberTicket.create.mockImplementation((args: any) => ({
         id: `ticket-${args.data.ticketNumber}`,
         ...args.data,

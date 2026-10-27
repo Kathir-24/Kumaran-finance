@@ -8,6 +8,7 @@ import { BullMqQueueProvider } from './providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from './providers/redis-connection.provider';
 import { AuctionReminderSchedulerService } from './services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from './services/daily-arrears.service';
+import { DistributedLockService } from './services/distributed-lock.service';
 import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
 
@@ -16,6 +17,7 @@ import { ReconciliationService } from './services/reconciliation.service';
   controllers: [JobsController],
   providers: [
     RedisConnectionProvider,
+    DistributedLockService,
     NotificationService,
     DailyArrearsService,
     ReconciliationService,
@@ -26,6 +28,7 @@ import { ReconciliationService } from './services/reconciliation.service';
   ],
   exports: [
     RedisConnectionProvider,
+    DistributedLockService,
     NotificationService,
     DailyArrearsService,
     ReconciliationService,
