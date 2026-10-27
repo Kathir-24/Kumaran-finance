@@ -149,3 +149,39 @@ export class RemoveDefaulterResponseDto {
   @ApiProperty({ description: 'Updated subscriber ticket details' })
   ticket: any;
 }
+
+export class UpiIntentResponseDto {
+  @ApiProperty({ example: '6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8', description: 'Installment due unique ID' })
+  dueId: string;
+
+  @ApiProperty({ example: 'ticket-uuid-001', description: 'Subscriber ticket unique ID' })
+  ticketId: string;
+
+  @ApiProperty({ example: 'KCA-1L-20M-01', description: 'Chit group code' })
+  groupCode: string;
+
+  @ApiProperty({ example: 4, description: 'Ticket number in chit group' })
+  ticketNumber: number;
+
+  @ApiProperty({ example: 2, description: 'Installment month 1..N' })
+  installmentMonth: number;
+
+  @ApiProperty({ example: 3950, description: 'Net payable amount in whole Rupees (Inet)' })
+  netPayableAmount: number;
+
+  @ApiProperty({ example: 'kumaranfinance@kvb', description: 'Company payee UPI VPA' })
+  payeeVpa: string;
+
+  @ApiProperty({ example: 'Kumaran Finance', description: 'Company payee legal entity name' })
+  payeeName: string;
+
+  @ApiProperty({ example: 'KCA-1L-20M-01 Ticket #4 Month 2', description: 'Payment transaction note' })
+  transactionNote: string;
+
+  @ApiProperty({
+    example: 'upi://pay?pa=kumaranfinance@kvb&pn=Kumaran%20Finance&am=3950&cu=INR&tn=KCA-1L-20M-01%20Ticket%20%234%20Month%202&tr=6cb8a9e8',
+    description: 'Full NPCI-compliant UPI Intent URI for zero-fee deep-linking',
+  })
+  upiUri: string;
+}
+

@@ -54,6 +54,8 @@ export interface EnvironmentVariables {
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
   SENTRY_TRACES_SAMPLE_RATE?: number;
+  COMPANY_UPI_VPA?: string;
+  COMPANY_UPI_NAME?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -181,5 +183,7 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     SENTRY_DSN: config.SENTRY_DSN as string | undefined,
     SENTRY_ENVIRONMENT: (config.SENTRY_ENVIRONMENT as string) ?? nodeEnv,
     SENTRY_TRACES_SAMPLE_RATE: tracesRate,
+    COMPANY_UPI_VPA: (config.COMPANY_UPI_VPA as string) ?? 'kumaranfinance@kvb',
+    COMPANY_UPI_NAME: (config.COMPANY_UPI_NAME as string) ?? 'Kumaran Finance',
   };
 }

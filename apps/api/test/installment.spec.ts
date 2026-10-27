@@ -54,6 +54,9 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       user: {
         findUnique: jest.fn(),
       },
+      customer: {
+        findUnique: jest.fn(),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
@@ -469,6 +472,71 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
           }),
         }),
       );
+    });
+  });
+
+  describe('5. Native One-Tap UPI Intent URI Generator (NPCI Specification)', () => {
+    const mockDueForUpi = {
+      id: 'due-uuid-upi-001',
+      ticketId: mockTicketId1,
+      installmentMonth: 2,
+      grossAmount: 5000n,
+      dividendDeduction: 1050n,
+      netPayableAmount: 3950n,
+      paidAmount: 0n,
+      status: DueStatus.UNPAID,
+      ticket: {
+        id: mockTicketId1,
+        ticketNumber: 4,
+        customerId: 'customer-uuid-001',
+        customer: { id: 'customer-uuid-001', fullName: 'K. Kathirvel', phone: '9842100001' },
+        chitGroup: { groupCode: 'KC-LIVE-20M-01', branchId: 'branch-001' },
+      },
+    };
+
+    it('should generate a valid NPCI UPI Intent URI locking exact Inet amount and payee VPA', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForUpi);
+
+      const result = await installmentService.getUpiIntent('due-uuid-upi-001');
+
+      expect(result.dueId).toBe('due-uuid-upi-001');
+      expect(result.netPayableAmount).toBe(3950);
+      expect(result.payeeVpa).toBe('kumaranfinance@kvb');
+      expect(result.payeeName).toBe('Kumaran Finance');
+      expect(result.transactionNote).toBe('KC-LIVE-20M-01 Ticket #4 Month 2');
+      expect(result.upiUri).toContain('upi://pay?');
+      expect(result.upiUri).toContain('pa=kumaranfinance%40kvb');
+      expect(result.upiUri).toContain('am=3950');
+      expect(result.upiUri).toContain('cu=INR');
+    });
+
+    it('should reject UPI intent generation if installment is already paid', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue({
+        ...mockDueForUpi,
+        status: DueStatus.PAID,
+      });
+
+      await expect(
+        installmentService.getUpiIntent('due-uuid-upi-001'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should enforce Anti-BOLA: reject if Customer attempts to generate intent for another customer ticket', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForUpi);
+      prismaMock.customer.findUnique = jest.fn().mockResolvedValue({
+        id: 'customer-other-uuid',
+      });
+
+      const customerUser = {
+        sub: 'user-cust-002',
+        phone: '9842199999',
+        roles: [Role.CUSTOMER],
+        branchId: null,
+      };
+
+      await expect(
+        installmentService.getUpiIntent('due-uuid-upi-001', customerUser as any),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

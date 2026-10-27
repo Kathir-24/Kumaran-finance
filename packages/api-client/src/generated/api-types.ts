@@ -1292,6 +1292,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/installments/{dueId}/upi-intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate NPCI-compliant UPI Intent URI for zero-fee mobile payment
+         * @description Builds standard upi://pay URI locking the exact whole-rupee Inet amount, company payee VPA, and ticket note for direct settlement to Kumaran Finance KVB current account.
+         */
+        get: operations["InstallmentController_getUpiIntent_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/defaulters": {
         parameters: {
             query?: never;
@@ -1650,6 +1670,66 @@ export interface paths {
          * @description Rejects reversal request and retains payment in SUCCESS status. Strictly enforces Maker != Checker.
          */
         post: operations["PaymentController_rejectReversal_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/upi-claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit customer UPI payment claim (Bank UTR self-report)
+         * @description Records bank UTR reference from deep-link payment in INITIATED status. Desk Accountant verifies bank credit before receipt is issued.
+         */
+        post: operations["PaymentController_submitUpiClaim_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/pending-upi-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pending UPI payment claims awaiting bank statement verification
+         * @description Returns all claims in INITIATED status with customer and due details for Accounting Desk action.
+         */
+        get: operations["PaymentController_getPendingUpiClaims_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{id}/verify-upi-claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify customer UPI claim against bank statement & issue receipt
+         * @description Staff confirms bank credit for UTR. Transitions payment to SUCCESS, issues sequential bilingual receipt, and marks due PAID. Strictly enforces Maker != Checker.
+         */
+        post: operations["PaymentController_verifyUpiClaim_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4526,6 +4606,58 @@ export interface components {
             /** @description Chit group details */
             chitGroup: Record<string, never>;
         };
+        UpiIntentResponseDto: {
+            /**
+             * @description Installment due unique ID
+             * @example 6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8
+             */
+            dueId: string;
+            /**
+             * @description Subscriber ticket unique ID
+             * @example ticket-uuid-001
+             */
+            ticketId: string;
+            /**
+             * @description Chit group code
+             * @example KCA-1L-20M-01
+             */
+            groupCode: string;
+            /**
+             * @description Ticket number in chit group
+             * @example 4
+             */
+            ticketNumber: number;
+            /**
+             * @description Installment month 1..N
+             * @example 2
+             */
+            installmentMonth: number;
+            /**
+             * @description Net payable amount in whole Rupees (Inet)
+             * @example 3950
+             */
+            netPayableAmount: number;
+            /**
+             * @description Company payee UPI VPA
+             * @example kumaranfinance@kvb
+             */
+            payeeVpa: string;
+            /**
+             * @description Company payee legal entity name
+             * @example Kumaran Finance
+             */
+            payeeName: string;
+            /**
+             * @description Payment transaction note
+             * @example KCA-1L-20M-01 Ticket #4 Month 2
+             */
+            transactionNote: string;
+            /**
+             * @description Full NPCI-compliant UPI Intent URI for zero-fee deep-linking
+             * @example upi://pay?pa=kumaranfinance@kvb&pn=Kumaran%20Finance&am=3950&cu=INR&tn=KCA-1L-20M-01%20Ticket%20%234%20Month%202&tr=6cb8a9e8
+             */
+            upiUri: string;
+        };
         PassbookEntryDto: {
             /**
              * @description Installment month
@@ -5426,6 +5558,91 @@ export interface components {
              * @example Bank statement confirmed that cheque cleared successfully on 18-Oct-2026
              */
             rejectionReason: string;
+        };
+        SubmitUpiClaimResponseDto: {
+            /** @example true */
+            success: boolean;
+            /** @example UPI payment claim submitted successfully. */
+            message: string;
+            /** @example claim-uuid-001 */
+            claimId: string;
+            /** @example due-uuid-001 */
+            dueId: string;
+            /** @example ticket-uuid-001 */
+            ticketId: string;
+            /** @example KCA-1L-20M-01 */
+            groupCode: string;
+            /** @example 4 */
+            ticketNumber: number;
+            /** @example 2 */
+            installmentMonth: number;
+            /** @example 429188123456 */
+            utrNumber: string;
+            /** @example 3950 */
+            amount: number;
+            /** @example INITIATED */
+            status: string;
+            /** @example 2026-10-27T10:00:00.000Z */
+            submittedAt: Record<string, never>;
+        };
+        SubmitUpiClaimDto: {
+            /**
+             * @description UUID of the installment due being claimed
+             * @example 6cb8a9e8-e371-42c8-bf3e-c3b72216bfb8
+             */
+            dueId: string;
+            /**
+             * @description Bank UTR / Transaction Reference Number from UPI App (GPay/PhonePe/Paytm/BHIM)
+             * @example 429188123456
+             */
+            utrNumber: string;
+            /**
+             * @description Optional remarks or UPI handle note
+             * @example Paid via GPay to KVB account
+             */
+            notes?: string;
+        };
+        PendingUpiClaimItemDto: {
+            /** @example claim-uuid-001 */
+            claimId: string;
+            /** @example 3950 */
+            amount: number;
+            /** @example 429188123456 */
+            utrNumber: string;
+            /** @example Paid via PhonePe */
+            notes: string;
+            /** @example 2026-10-27T10:00:00.000Z */
+            createdAt: Record<string, never>;
+            /** @description Submitting user */
+            submittedByUser: Record<string, never>;
+            /** @description Customer details */
+            customer: Record<string, never>;
+            /** @description Subscriber ticket details */
+            ticket: Record<string, never>;
+            /** @description Installment due details */
+            due: Record<string, never>;
+        };
+        VerifyUpiClaimResponseDto: {
+            /** @example true */
+            success: boolean;
+            /** @example UPI payment claim verified successfully. Official receipt generated and sent to customer. */
+            message: string;
+            /** @description Verified payment record */
+            payment: Record<string, never>;
+            /** @description Sequential bilingual receipt */
+            receipt: Record<string, never>;
+            /**
+             * @example PAID
+             * @enum {string}
+             */
+            dueStatus: "UNPAID" | "PAID" | "OVERDUE";
+        };
+        VerifyUpiClaimDto: {
+            /**
+             * @description Optional staff verification notes
+             * @example Verified in KVB NetBanking at 15:30
+             */
+            verificationNotes?: string;
         };
         WinnerDisbursementItemDto: {
             /**
@@ -9128,6 +9345,50 @@ export interface operations {
             };
         };
     };
+    InstallmentController_getUpiIntent_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description UPI Intent URI generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UpiIntentResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TicketController_getDefaulters_v1: {
         parameters: {
             query?: {
@@ -10162,6 +10423,163 @@ export interface operations {
             };
             /** @description Payment not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_submitUpiClaim_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitUpiClaimDto"];
+            };
+        };
+        responses: {
+            /** @description UPI claim recorded pending bank statement verification */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["SubmitUpiClaimResponseDto"];
+                    };
+                };
+            };
+            /** @description Installment already paid or invalid scheme state */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bank UTR already submitted or active pending claim exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_getPendingUpiClaims_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending UPI claims retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["PendingUpiClaimItemDto"][];
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentController_verifyUpiClaim_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyUpiClaimDto"];
+            };
+        };
+        responses: {
+            /** @description UPI claim verified, receipt issued, due settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["VerifyUpiClaimResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid claim state or already paid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Maker != Checker violation or insufficient role */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

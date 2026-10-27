@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -25,6 +26,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { QueryPaymentDto } from './dto/query-payment.dto';
 import { RejectReversalDto } from './dto/reject-reversal.dto';
 import { RequestReversalDto } from './dto/request-reversal.dto';
+import { SubmitUpiClaimDto, VerifyUpiClaimDto } from './dto/submit-upi-claim.dto';
 
 @Injectable()
 export class PaymentService {
@@ -273,21 +275,29 @@ export class PaymentService {
       };
     });
     } catch (err: any) {
-      if (dto.idempotencyKey && err.code === 'P2002' && String(err.meta?.target).includes('idempotencyKey')) {
-        const existing = await this.prisma.payment.findUnique({
-          where: { idempotencyKey: dto.idempotencyKey },
-          include: {
-            allocations: { include: { due: true, ticket: true } },
-            receipt: true,
-            reversal: true,
-          },
-        });
-        if (existing) {
-          return {
-            duplicateIgnored: true,
-            message: 'Payment already recorded with this idempotency key',
-            payment: existing,
-          };
+      if (err.code === 'P2002') {
+        const targetStr = String(err.meta?.target || '');
+        if (targetStr.includes('transactionRef')) {
+          throw new ConflictException(
+            `DUPLICATE_TRANSACTION_REF: The bank UTR / transaction reference "${dto.transactionRef}" has already been recorded in another payment.`,
+          );
+        }
+        if (dto.idempotencyKey && targetStr.includes('idempotencyKey')) {
+          const existing = await this.prisma.payment.findUnique({
+            where: { idempotencyKey: dto.idempotencyKey },
+            include: {
+              allocations: { include: { due: true, ticket: true } },
+              receipt: true,
+              reversal: true,
+            },
+          });
+          if (existing) {
+            return {
+              duplicateIgnored: true,
+              message: 'Payment already recorded with this idempotency key',
+              payment: existing,
+            };
+          }
         }
       }
       throw err;
@@ -844,6 +854,437 @@ export class PaymentService {
         message:
           'Payment reversal request rejected successfully. Payment remains in SUCCESS status.',
         reversal,
+      };
+    });
+  }
+
+  /**
+   * Customer submits bank UTR after making UPI payment via deep-link.
+   * Records payment in INITIATED status pending staff verification against bank statement.
+   * Does NOT issue receipt or mark due PAID until staff approves.
+   */
+  async submitUpiClaim(dto: SubmitUpiClaimDto, requestingUser: JwtPayload) {
+    const due = await this.prisma.installmentDue.findUnique({
+      where: { id: dto.dueId },
+      include: {
+        ticket: {
+          include: {
+            customer: true,
+            chitGroup: { include: { branch: true } },
+          },
+        },
+      },
+    });
+
+    if (!due) {
+      throw new NotFoundException(`Installment due with ID ${dto.dueId} not found`);
+    }
+
+    if (due.status === DueStatus.PAID) {
+      throw new BadRequestException(
+        `INSTALLMENT_ALREADY_PAID: Month ${due.installmentMonth} installment has already been settled`,
+      );
+    }
+
+    if (due.ticket.chitGroup.status !== 'ACTIVE') {
+      throw new BadRequestException('Chit scheme is not active');
+    }
+
+    if (due.ticket.status === 'REMOVED_DEF_3M') {
+      throw new BadRequestException('Subscriber ticket has been removed from this chit scheme');
+    }
+
+    // Role-based authorization & Anti-BOLA guard:
+    // If requesting user is CUSTOMER, ensure it's their ticket
+    if (requestingUser.roles.includes(Role.CUSTOMER)) {
+      const isPrivilegedStaff = requestingUser.roles.some((r) =>
+        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+      );
+      if (!isPrivilegedStaff) {
+        const customer = await this.prisma.customer.findUnique({
+          where: { phone: requestingUser.phone },
+          select: { id: true },
+        });
+        if (!customer || customer.id !== due.ticket.customerId) {
+          throw new ForbiddenException(
+            'BOLA_VIOLATION: You are not authorized to claim payments for another customer ticket',
+          );
+        }
+      }
+    }
+
+    const cleanUtr = dto.utrNumber.trim();
+
+    // Check if this UTR already exists in Payment table
+    const existingPaymentWithUtr = await this.prisma.payment.findFirst({
+      where: { transactionRef: cleanUtr },
+    });
+    if (existingPaymentWithUtr) {
+      throw new ConflictException(
+        `DUPLICATE_TRANSACTION_REF: The bank UTR / transaction reference "${cleanUtr}" has already been recorded in another payment.`,
+      );
+    }
+
+    // Check if there is already an active pending claim for this exact due
+    const existingClaim = await this.prisma.paymentAllocation.findFirst({
+      where: {
+        installmentDueId: due.id,
+        payment: {
+          paymentStatus: PaymentStatus.INITIATED,
+          paymentMethod: PaymentMethod.UPI,
+        },
+      },
+      include: { payment: true },
+    });
+
+    if (existingClaim) {
+      throw new ConflictException(
+        `CLAIM_ALREADY_PENDING: A UPI payment claim is already pending verification for Month ${due.installmentMonth} (UTR: ${existingClaim.payment.transactionRef})`,
+      );
+    }
+
+    const branchId = due.ticket.chitGroup.branchId;
+    const paymentAmount = due.netPayableAmount;
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.create({
+          data: {
+            branchId,
+            recordedByUserId: requestingUser.sub,
+            customerId: due.ticket.customerId,
+            amount: paymentAmount,
+            paymentMethod: PaymentMethod.UPI,
+            paymentStatus: PaymentStatus.INITIATED,
+            transactionRef: cleanUtr,
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            notes: dto.notes ? `Customer UPI Claim: ${dto.notes.trim()}` : 'Customer UPI Claim (Self-Reported)',
+          },
+        });
+
+        const allocation = await tx.paymentAllocation.create({
+          data: {
+            paymentId: payment.id,
+            ticketId: due.ticketId,
+            installmentDueId: due.id,
+            amountAllocated: paymentAmount,
+          },
+        });
+
+        return { payment, allocation };
+      });
+
+      return {
+        success: true,
+        message:
+          'UPI payment claim submitted successfully. The accounting desk will verify your bank credit and issue the official receipt.',
+        claimId: result.payment.id,
+        dueId: due.id,
+        ticketId: due.ticketId,
+        groupCode: due.ticket.chitGroup.groupCode,
+        ticketNumber: due.ticket.ticketNumber,
+        installmentMonth: due.installmentMonth,
+        utrNumber: cleanUtr,
+        amount: Number(paymentAmount),
+        status: PaymentStatus.INITIATED,
+        submittedAt: result.payment.createdAt,
+      };
+    } catch (err: any) {
+      if (err.code === 'P2002' && String(err.meta?.target).includes('transactionRef')) {
+        throw new ConflictException(
+          `DUPLICATE_TRANSACTION_REF: The bank UTR / transaction reference "${cleanUtr}" has already been recorded in another payment.`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Desk Accountant or Partner verifies the customer's UPI credit in bank statement.
+   * Enforces Maker != Checker: The user who submitted the claim cannot verify it.
+   * Transitions payment INITIATED -> SUCCESS, issues official sequential receipt, marks due PAID.
+   */
+  async verifyUpiClaim(
+    paymentId: string,
+    checkerUserId: string,
+    checkerRoles: Role[],
+    dto?: VerifyUpiClaimDto,
+  ) {
+    if (
+      !checkerRoles.some((r) =>
+        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+      )
+    ) {
+      throw new ForbiddenException(
+        'CLAIM_VERIFY_FORBIDDEN: Only Accounting Desk and Partners possess authority to verify UPI claims',
+      );
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        allocations: {
+          include: {
+            due: true,
+            ticket: {
+              include: {
+                customer: true,
+                chitGroup: { include: { branch: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment claim record not found');
+    }
+
+    if (payment.paymentStatus !== PaymentStatus.INITIATED || payment.paymentMethod !== PaymentMethod.UPI) {
+      throw new BadRequestException(
+        `INVALID_CLAIM_STATE: Payment ${paymentId} is not a pending UPI claim (current status: ${payment.paymentStatus})`,
+      );
+    }
+
+    // Maker != Checker: The person who submitted the claim cannot self-verify/approve it
+    if (payment.recordedByUserId === checkerUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: The user who submitted the UPI claim cannot verify it. A separate staff member must verify bank credit.',
+      );
+    }
+
+    const allocation = payment.allocations[0];
+    if (!allocation) {
+      throw new BadRequestException('Payment claim has no associated installment allocation');
+    }
+
+    const due = allocation.due;
+    const ticket = allocation.ticket;
+
+    if (due.status === DueStatus.PAID) {
+      throw new BadRequestException('Installment due has already been settled by another payment');
+    }
+
+    const branchId = ticket.chitGroup.branchId;
+    const branchCode = ticket.chitGroup.branch?.code || 'PRD';
+    const year = new Date().getFullYear();
+
+    const prefix = `KC-REC-${branchCode}-${year}-`;
+    const lastReceipt = await this.prisma.receipt.findFirst({
+      where: {
+        branchId,
+        receiptNumber: { startsWith: prefix },
+      },
+      orderBy: { receiptNumber: 'desc' },
+      select: { receiptNumber: true },
+    });
+
+    let nextSeq = 1;
+    if (lastReceipt?.receiptNumber) {
+      const parts = lastReceipt.receiptNumber.split('-');
+      const lastNumStr = parts[parts.length - 1];
+      const parsed = parseInt(lastNumStr, 10);
+      if (!isNaN(parsed)) {
+        nextSeq = parsed + 1;
+      }
+    }
+
+    const verificationDate = new Date();
+    const updatedNotes = dto?.verificationNotes
+      ? `${payment.notes || ''} | Verified by ${checkerUserId}: ${dto.verificationNotes.trim()}`
+      : `${payment.notes || ''} | Verified by ${checkerUserId}`;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Update Payment to SUCCESS
+      const updatedPayment = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          paymentStatus: PaymentStatus.SUCCESS,
+          notes: updatedNotes,
+        },
+      });
+
+      // 2. Generate Collision-Proof Sequential Bilingual Receipt
+      let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+      if (typeof tx.receipt?.findUnique === 'function') {
+        while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
+          nextSeq++;
+          finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+        }
+      }
+
+      const receipt = await tx.receipt.create({
+        data: {
+          branchId,
+          paymentId: payment.id,
+          receiptNumber: finalReceiptNumber,
+          isBilingual: true,
+          issuedAt: verificationDate,
+        },
+      });
+
+      // 3. Mark Installment Due as PAID
+      await tx.installmentDue.update({
+        where: { id: due.id },
+        data: {
+          status: DueStatus.PAID,
+          paidAmount: payment.amount,
+        },
+      });
+
+      // 4. Recalculate Consecutive Arrears
+      const allDues = await tx.installmentDue.findMany({
+        where: {
+          ticketId: ticket.id,
+          installmentMonth: { lte: due.installmentMonth },
+        },
+        orderBy: { installmentMonth: 'desc' },
+      });
+
+      let consecutiveUnpaid = 0;
+      for (const d of allDues) {
+        if (d.id === due.id) {
+          break;
+        }
+        if (d.status !== DueStatus.PAID) {
+          consecutiveUnpaid++;
+        } else {
+          break;
+        }
+      }
+
+      await tx.subscriberTicket.update({
+        where: { id: ticket.id },
+        data: {
+          consecutiveUnpaidMonths: consecutiveUnpaid,
+          status: consecutiveUnpaid >= 3 ? 'DEFAULT_3_MONTHS' : 'ACTIVE',
+        },
+      });
+
+      // 5. Audit Log
+      await tx.auditLog.create({
+        data: {
+          userId: checkerUserId,
+          action: 'UPI_CLAIM_VERIFIED',
+          entityType: 'Payment',
+          entityId: payment.id,
+          newValue: {
+            receiptNumber: finalReceiptNumber,
+            utrNumber: payment.transactionRef,
+            amount: payment.amount.toString(),
+            verifiedByUserId: checkerUserId,
+            dueId: due.id,
+          },
+        },
+      });
+
+      return {
+        payment: updatedPayment,
+        receipt,
+        dueStatus: DueStatus.PAID,
+        paidAmount: payment.amount,
+        netPayableAmount: due.netPayableAmount,
+      };
+    });
+
+    if (this.queueProvider) {
+      try {
+        await this.queueProvider.addJob(
+          NOTIFICATION_QUEUE,
+          JOB_DISPATCH_PAYMENT_RECEIPT,
+          {
+            recipientPhone: ticket.customer.phone,
+            fcmToken: ticket.customer.fcmToken || undefined,
+            amountPaid: payment.amount.toString(),
+            chitCode: ticket.chitGroup.groupCode,
+            ticketNumber: ticket.ticketNumber,
+            receiptNumber: result.receipt.receiptNumber,
+            transactionTimestamp: verificationDate.toISOString(),
+            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+          },
+        );
+      } catch (queueErr: any) {
+        this.logger.warn(
+          `Failed to enqueue receipt job for verified UPI claim ${result.receipt.receiptNumber}: ${queueErr.message}`,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      message: 'UPI payment claim verified successfully. Official receipt generated and sent to customer.',
+      payment: result.payment,
+      receipt: result.receipt,
+      dueStatus: result.dueStatus,
+    };
+  }
+
+  /**
+   * Retrieves pending UPI claims for Accounting Desk verification.
+   */
+  async getPendingUpiClaims(branchId?: string) {
+    const where: any = {
+      paymentMethod: PaymentMethod.UPI,
+      paymentStatus: PaymentStatus.INITIATED,
+    };
+    if (branchId) {
+      where.branchId = branchId;
+    }
+
+    const claims = await this.prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        recordedByUser: {
+          select: { id: true, name: true, phone: true, roles: true },
+        },
+        allocations: {
+          include: {
+            due: true,
+            ticket: {
+              include: {
+                customer: true,
+                chitGroup: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return claims.map((c) => {
+      const alloc = c.allocations[0];
+      return {
+        claimId: c.id,
+        amount: Number(c.amount),
+        utrNumber: c.transactionRef,
+        notes: c.notes,
+        createdAt: c.createdAt,
+        submittedByUser: c.recordedByUser,
+        customer: alloc?.ticket?.customer
+          ? {
+              id: alloc.ticket.customer.id,
+              customerCode: alloc.ticket.customer.customerCode,
+              fullName: alloc.ticket.customer.fullName,
+              phone: alloc.ticket.customer.phone,
+            }
+          : null,
+        ticket: alloc?.ticket
+          ? {
+              id: alloc.ticket.id,
+              ticketNumber: alloc.ticket.ticketNumber,
+              groupCode: alloc.ticket.chitGroup.groupCode,
+            }
+          : null,
+        due: alloc?.due
+          ? {
+              id: alloc.due.id,
+              installmentMonth: alloc.due.installmentMonth,
+              netPayableAmount: Number(alloc.due.netPayableAmount),
+              status: alloc.due.status,
+            }
+          : null,
       };
     });
   }

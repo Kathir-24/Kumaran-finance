@@ -33,11 +33,15 @@ import {
   PaymentDetailResponseDto,
   PaymentRecordDto,
   PaymentReversalResponseDto,
+  PendingUpiClaimItemDto,
   RecordPaymentResponseDto,
+  SubmitUpiClaimResponseDto,
+  VerifyUpiClaimResponseDto,
 } from './dto/payment-response.dto';
 import { QueryPaymentDto } from './dto/query-payment.dto';
 import { RejectReversalDto } from './dto/reject-reversal.dto';
 import { RequestReversalDto } from './dto/request-reversal.dto';
+import { SubmitUpiClaimDto, VerifyUpiClaimDto } from './dto/submit-upi-claim.dto';
 import { PaymentService } from './payment.service';
 
 @ApiTags('Payments, Receipts & Reversals')
@@ -243,6 +247,68 @@ export class PaymentController {
       dto,
       currentUser.sub,
       currentUser.roles,
+    );
+  }
+
+  @Post('upi-claim')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(Role.CUSTOMER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Submit customer UPI payment claim (Bank UTR self-report)',
+    description:
+      'Records bank UTR reference from deep-link payment in INITIATED status. Desk Accountant verifies bank credit before receipt is issued.',
+  })
+  @ApiCreatedResponseEnvelope(SubmitUpiClaimResponseDto, {
+    description: 'UPI claim recorded pending bank statement verification',
+  })
+  @ApiResponse({ status: 400, description: 'Installment already paid or invalid scheme state' })
+  @ApiResponse({ status: 409, description: 'Bank UTR already submitted or active pending claim exists' })
+  async submitUpiClaim(
+    @Body() dto: SubmitUpiClaimDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.paymentService.submitUpiClaim(dto, currentUser);
+  }
+
+  @Get('pending-upi-claims')
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'List pending UPI payment claims awaiting bank statement verification',
+    description: 'Returns all claims in INITIATED status with customer and due details for Accounting Desk action.',
+  })
+  @ApiOkResponseEnvelope(PendingUpiClaimItemDto, {
+    isArray: true,
+    description: 'Pending UPI claims retrieved successfully',
+  })
+  async getPendingUpiClaims(
+    @CurrentUser('branchId') branchId?: string | null,
+  ) {
+    return this.paymentService.getPendingUpiClaims(branchId || undefined);
+  }
+
+  @Post(':id/verify-upi-claim')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Verify customer UPI claim against bank statement & issue receipt',
+    description:
+      'Staff confirms bank credit for UTR. Transitions payment to SUCCESS, issues sequential bilingual receipt, and marks due PAID. Strictly enforces Maker != Checker.',
+  })
+  @ApiOkResponseEnvelope(VerifyUpiClaimResponseDto, {
+    description: 'UPI claim verified, receipt issued, due settled',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid claim state or already paid' })
+  @ApiResponse({ status: 403, description: 'Maker != Checker violation or insufficient role' })
+  async verifyUpiClaim(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() dto?: VerifyUpiClaimDto,
+  ) {
+    return this.paymentService.verifyUpiClaim(
+      id,
+      currentUser.sub,
+      currentUser.roles,
+      dto,
     );
   }
 }

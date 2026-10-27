@@ -10,6 +10,7 @@ import {
   COMPANY_POOL_MONTH,
   CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
 } from '../common/constants';
+import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
@@ -752,6 +753,85 @@ export class InstallmentService {
       refundAmount: Number(refundAmount),
       voucherNumber,
       settledAt,
+    };
+  }
+
+  /**
+   * Generates a zero-fee NPCI-compliant UPI Intent URI for mobile app deep-linking.
+   * Direct settlement to Kumaran Finance KVB current account.
+   */
+  async getUpiIntent(dueId: string, requestingUser?: JwtPayload) {
+    const due = await this.prisma.installmentDue.findUnique({
+      where: { id: dueId },
+      include: {
+        ticket: {
+          include: {
+            customer: true,
+            chitGroup: true,
+          },
+        },
+      },
+    });
+
+    if (!due) {
+      throw new NotFoundException(`Installment due with ID ${dueId} not found`);
+    }
+
+    // Role-based authorization & Anti-BOLA guard:
+    // If requesting user is CUSTOMER, they can only request intent for their own ticket
+    if (requestingUser && requestingUser.roles.includes(Role.CUSTOMER)) {
+      const isPrivilegedStaff = requestingUser.roles.some((r) =>
+        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT] as Role[]).includes(r),
+      );
+      if (!isPrivilegedStaff) {
+        const customer = await this.prisma.customer.findUnique({
+          where: { phone: requestingUser.phone },
+          select: { id: true },
+        });
+        if (!customer || customer.id !== due.ticket.customerId) {
+          throw new ForbiddenException(
+            'BOLA_VIOLATION: You are not authorized to access UPI payment details for another customer ticket',
+          );
+        }
+      }
+    }
+
+    if (due.status === DueStatus.PAID) {
+      throw new BadRequestException(
+        `INSTALLMENT_ALREADY_PAID: Month ${due.installmentMonth} installment has already been paid in full`,
+      );
+    }
+
+    const vpa = process.env.COMPANY_UPI_VPA || 'kumaranfinance@kvb';
+    const payeeName = process.env.COMPANY_UPI_NAME || 'Kumaran Finance';
+    const netPayable = Number(due.netPayableAmount);
+    const groupCode = due.ticket.chitGroup.groupCode;
+    const ticketNumber = due.ticket.ticketNumber;
+    const month = due.installmentMonth;
+    const transactionNote = `${groupCode} Ticket #${ticketNumber} Month ${month}`;
+    const trackingRef = due.id.replace(/-/g, '').slice(0, 30);
+
+    const params = new URLSearchParams({
+      pa: vpa,
+      pn: payeeName,
+      am: due.netPayableAmount.toString(),
+      cu: 'INR',
+      tn: transactionNote,
+      tr: trackingRef,
+    });
+    const upiUri = `upi://pay?${params.toString()}`;
+
+    return {
+      dueId: due.id,
+      ticketId: due.ticketId,
+      groupCode,
+      ticketNumber,
+      installmentMonth: month,
+      netPayableAmount: netPayable,
+      payeeVpa: vpa,
+      payeeName,
+      transactionNote,
+      upiUri,
     };
   }
 }

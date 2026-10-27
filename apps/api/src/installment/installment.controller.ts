@@ -22,6 +22,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
@@ -30,6 +31,7 @@ import {
   DefaulterItemResponseDto,
   GenerateDuesResultResponseDto,
   InstallmentDueResponseDto,
+  UpiIntentResponseDto,
 } from './dto/installment-response.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
 import { InstallmentService } from './installment.service';
@@ -114,6 +116,29 @@ export class InstallmentController {
       branchId || undefined,
       minMonths,
     );
+  }
+
+  @Get(':dueId/upi-intent')
+  @Roles(
+    Role.CUSTOMER,
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+  )
+  @ApiOperation({
+    summary: 'Generate NPCI-compliant UPI Intent URI for zero-fee mobile payment',
+    description:
+      'Builds standard upi://pay URI locking the exact whole-rupee Inet amount, company payee VPA, and ticket note for direct settlement to Kumaran Finance KVB current account.',
+  })
+  @ApiOkResponseEnvelope(UpiIntentResponseDto, {
+    description: 'UPI Intent URI generated successfully',
+  })
+  async getUpiIntent(
+    @Param('dueId') dueId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.installmentService.getUpiIntent(dueId, user);
   }
 }
 

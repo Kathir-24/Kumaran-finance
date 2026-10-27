@@ -3643,6 +3643,72 @@ class DefaulterItemResponseDto {
   }
 }
 
+class UpiIntentResponseDto {
+  /// Installment due unique ID
+  final String dueId;
+  /// Subscriber ticket unique ID
+  final String ticketId;
+  /// Chit group code
+  final String groupCode;
+  /// Ticket number in chit group
+  final double ticketNumber;
+  /// Installment month 1..N
+  final double installmentMonth;
+  /// Net payable amount in whole Rupees (Inet)
+  final double netPayableAmount;
+  /// Company payee UPI VPA
+  final String payeeVpa;
+  /// Company payee legal entity name
+  final String payeeName;
+  /// Payment transaction note
+  final String transactionNote;
+  /// Full NPCI-compliant UPI Intent URI for zero-fee deep-linking
+  final String upiUri;
+
+  const UpiIntentResponseDto({
+    required this.dueId,
+    required this.ticketId,
+    required this.groupCode,
+    required this.ticketNumber,
+    required this.installmentMonth,
+    required this.netPayableAmount,
+    required this.payeeVpa,
+    required this.payeeName,
+    required this.transactionNote,
+    required this.upiUri,
+  });
+
+  factory UpiIntentResponseDto.fromJson(Map<String, dynamic> json) {
+    return UpiIntentResponseDto(
+      dueId: json['dueId']?.toString() ?? '',
+      ticketId: json['ticketId']?.toString() ?? '',
+      groupCode: json['groupCode']?.toString() ?? '',
+      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
+      payeeVpa: json['payeeVpa']?.toString() ?? '',
+      payeeName: json['payeeName']?.toString() ?? '',
+      transactionNote: json['transactionNote']?.toString() ?? '',
+      upiUri: json['upiUri']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['dueId'] = dueId;
+    data['ticketId'] = ticketId;
+    data['groupCode'] = groupCode;
+    data['ticketNumber'] = ticketNumber;
+    data['installmentMonth'] = installmentMonth;
+    data['netPayableAmount'] = netPayableAmount;
+    data['payeeVpa'] = payeeVpa;
+    data['payeeName'] = payeeName;
+    data['transactionNote'] = transactionNote;
+    data['upiUri'] = upiUri;
+    return data;
+  }
+}
+
 class PassbookEntryDto {
   /// Installment month
   final double installmentMonth;
@@ -5042,6 +5108,216 @@ class RejectReversalDto {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['rejectionReason'] = rejectionReason;
+    return data;
+  }
+}
+
+class SubmitUpiClaimResponseDto {
+  final bool success;
+  final String message;
+  final String claimId;
+  final String dueId;
+  final String ticketId;
+  final String groupCode;
+  final double ticketNumber;
+  final double installmentMonth;
+  final String utrNumber;
+  final double amount;
+  final String status;
+  final dynamic submittedAt;
+
+  const SubmitUpiClaimResponseDto({
+    required this.success,
+    required this.message,
+    required this.claimId,
+    required this.dueId,
+    required this.ticketId,
+    required this.groupCode,
+    required this.ticketNumber,
+    required this.installmentMonth,
+    required this.utrNumber,
+    required this.amount,
+    required this.status,
+    this.submittedAt,
+  });
+
+  factory SubmitUpiClaimResponseDto.fromJson(Map<String, dynamic> json) {
+    return SubmitUpiClaimResponseDto(
+      success: json['success'] as bool? ?? false,
+      message: json['message']?.toString() ?? '',
+      claimId: json['claimId']?.toString() ?? '',
+      dueId: json['dueId']?.toString() ?? '',
+      ticketId: json['ticketId']?.toString() ?? '',
+      groupCode: json['groupCode']?.toString() ?? '',
+      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      utrNumber: json['utrNumber']?.toString() ?? '',
+      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      status: json['status']?.toString() ?? '',
+      submittedAt: json['submittedAt'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['success'] = success;
+    data['message'] = message;
+    data['claimId'] = claimId;
+    data['dueId'] = dueId;
+    data['ticketId'] = ticketId;
+    data['groupCode'] = groupCode;
+    data['ticketNumber'] = ticketNumber;
+    data['installmentMonth'] = installmentMonth;
+    data['utrNumber'] = utrNumber;
+    data['amount'] = amount;
+    data['status'] = status;
+    data['submittedAt'] = submittedAt;
+    return data;
+  }
+}
+
+class SubmitUpiClaimDto {
+  /// UUID of the installment due being claimed
+  final String dueId;
+  /// Bank UTR / Transaction Reference Number from UPI App (GPay/PhonePe/Paytm/BHIM)
+  final String utrNumber;
+  /// Optional remarks or UPI handle note
+  final String? notes;
+
+  const SubmitUpiClaimDto({
+    required this.dueId,
+    required this.utrNumber,
+    this.notes,
+  });
+
+  factory SubmitUpiClaimDto.fromJson(Map<String, dynamic> json) {
+    return SubmitUpiClaimDto(
+      dueId: json['dueId']?.toString() ?? '',
+      utrNumber: json['utrNumber']?.toString() ?? '',
+      notes: json['notes']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['dueId'] = dueId;
+    data['utrNumber'] = utrNumber;
+    data['notes'] = notes;
+    return data;
+  }
+}
+
+class PendingUpiClaimItemDto {
+  final String claimId;
+  final double amount;
+  final String utrNumber;
+  final String notes;
+  final dynamic createdAt;
+  /// Submitting user
+  final dynamic submittedByUser;
+  /// Customer details
+  final dynamic customer;
+  /// Subscriber ticket details
+  final dynamic ticket;
+  /// Installment due details
+  final dynamic due;
+
+  const PendingUpiClaimItemDto({
+    required this.claimId,
+    required this.amount,
+    required this.utrNumber,
+    required this.notes,
+    this.createdAt,
+    this.submittedByUser,
+    this.customer,
+    this.ticket,
+    this.due,
+  });
+
+  factory PendingUpiClaimItemDto.fromJson(Map<String, dynamic> json) {
+    return PendingUpiClaimItemDto(
+      claimId: json['claimId']?.toString() ?? '',
+      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      utrNumber: json['utrNumber']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+      createdAt: json['createdAt'],
+      submittedByUser: json['submittedByUser'],
+      customer: json['customer'],
+      ticket: json['ticket'],
+      due: json['due'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['claimId'] = claimId;
+    data['amount'] = amount;
+    data['utrNumber'] = utrNumber;
+    data['notes'] = notes;
+    data['createdAt'] = createdAt;
+    data['submittedByUser'] = submittedByUser;
+    data['customer'] = customer;
+    data['ticket'] = ticket;
+    data['due'] = due;
+    return data;
+  }
+}
+
+class VerifyUpiClaimResponseDto {
+  final bool success;
+  final String message;
+  /// Verified payment record
+  final dynamic payment;
+  /// Sequential bilingual receipt
+  final dynamic receipt;
+  final String dueStatus;
+
+  const VerifyUpiClaimResponseDto({
+    required this.success,
+    required this.message,
+    this.payment,
+    this.receipt,
+    required this.dueStatus,
+  });
+
+  factory VerifyUpiClaimResponseDto.fromJson(Map<String, dynamic> json) {
+    return VerifyUpiClaimResponseDto(
+      success: json['success'] as bool? ?? false,
+      message: json['message']?.toString() ?? '',
+      payment: json['payment'],
+      receipt: json['receipt'],
+      dueStatus: json['dueStatus']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['success'] = success;
+    data['message'] = message;
+    data['payment'] = payment;
+    data['receipt'] = receipt;
+    data['dueStatus'] = dueStatus;
+    return data;
+  }
+}
+
+class VerifyUpiClaimDto {
+  /// Optional staff verification notes
+  final String? verificationNotes;
+
+  const VerifyUpiClaimDto({
+    this.verificationNotes,
+  });
+
+  factory VerifyUpiClaimDto.fromJson(Map<String, dynamic> json) {
+    return VerifyUpiClaimDto(
+      verificationNotes: json['verificationNotes']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['verificationNotes'] = verificationNotes;
     return data;
   }
 }

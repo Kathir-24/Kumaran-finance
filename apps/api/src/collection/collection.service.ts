@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -281,24 +282,32 @@ export class CollectionService {
       };
     });
     } catch (err: any) {
-      if (dto.idempotencyKey && err.code === 'P2002' && String(err.meta?.target).includes('idempotencyKey')) {
-        const existing = await this.prisma.payment.findUnique({
-          where: { idempotencyKey: dto.idempotencyKey },
-          include: {
-            allocations: { include: { due: true, ticket: true } },
-            receipt: true,
-          },
-        });
-        if (existing) {
-          return {
-            duplicateIgnored: true,
-            message: 'Payment already recorded with this idempotency key',
-            payment: existing,
-            paymentId: existing.id,
-            receiptNumber: existing.receipt?.receiptNumber || '',
-            amount: existing.amount,
-            collectedAt: existing.createdAt,
-          };
+      if (err.code === 'P2002') {
+        const targetStr = String(err.meta?.target || '');
+        if (targetStr.includes('transactionRef')) {
+          throw new ConflictException(
+            `DUPLICATE_TRANSACTION_REF: The bank UTR / transaction reference "${dto.transactionRef}" has already been recorded in another payment.`,
+          );
+        }
+        if (dto.idempotencyKey && targetStr.includes('idempotencyKey')) {
+          const existing = await this.prisma.payment.findUnique({
+            where: { idempotencyKey: dto.idempotencyKey },
+            include: {
+              allocations: { include: { due: true, ticket: true } },
+              receipt: true,
+            },
+          });
+          if (existing) {
+            return {
+              duplicateIgnored: true,
+              message: 'Payment already recorded with this idempotency key',
+              payment: existing,
+              paymentId: existing.id,
+              receiptNumber: existing.receipt?.receiptNumber || '',
+              amount: existing.amount,
+              collectedAt: existing.createdAt,
+            };
+          }
         }
       }
       throw err;

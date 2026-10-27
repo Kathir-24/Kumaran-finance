@@ -144,3 +144,88 @@ export class PaymentReversalResponseDto {
   @ApiProperty({ enum: DueStatus, example: DueStatus.UNPAID, description: 'Restored installment due status', required: false })
   dueStatus?: DueStatus;
 }
+
+export class SubmitUpiClaimResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ example: 'UPI payment claim submitted successfully.' })
+  message: string;
+
+  @ApiProperty({ example: 'claim-uuid-001' })
+  claimId: string;
+
+  @ApiProperty({ example: 'due-uuid-001' })
+  dueId: string;
+
+  @ApiProperty({ example: 'ticket-uuid-001' })
+  ticketId: string;
+
+  @ApiProperty({ example: 'KCA-1L-20M-01' })
+  groupCode: string;
+
+  @ApiProperty({ example: 4 })
+  ticketNumber: number;
+
+  @ApiProperty({ example: 2 })
+  installmentMonth: number;
+
+  @ApiProperty({ example: '429188123456' })
+  utrNumber: string;
+
+  @ApiProperty({ example: 3950 })
+  amount: number;
+
+  @ApiProperty({ example: 'INITIATED' })
+  status: string;
+
+  @ApiProperty({ example: '2026-10-27T10:00:00.000Z' })
+  submittedAt: Date | string;
+}
+
+export class PendingUpiClaimItemDto {
+  @ApiProperty({ example: 'claim-uuid-001' })
+  claimId: string;
+
+  @ApiProperty({ example: 3950 })
+  amount: number;
+
+  @ApiProperty({ example: '429188123456' })
+  utrNumber: string;
+
+  @ApiProperty({ example: 'Paid via PhonePe' })
+  notes?: string;
+
+  @ApiProperty({ example: '2026-10-27T10:00:00.000Z' })
+  createdAt: Date | string;
+
+  @ApiProperty({ description: 'Submitting user' })
+  submittedByUser?: any;
+
+  @ApiProperty({ description: 'Customer details' })
+  customer?: any;
+
+  @ApiProperty({ description: 'Subscriber ticket details' })
+  ticket?: any;
+
+  @ApiProperty({ description: 'Installment due details' })
+  due?: any;
+}
+
+export class VerifyUpiClaimResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ example: 'UPI payment claim verified successfully. Official receipt generated and sent to customer.' })
+  message: string;
+
+  @ApiProperty({ description: 'Verified payment record' })
+  payment: any;
+
+  @ApiProperty({ description: 'Sequential bilingual receipt' })
+  receipt: any;
+
+  @ApiProperty({ enum: DueStatus, example: DueStatus.PAID })
+  dueStatus: DueStatus;
+}
+

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
@@ -67,6 +68,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
     prismaMock = {
       payment: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
@@ -805,6 +807,226 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           }),
         }),
       );
+    });
+  });
+
+  describe('6. Bank UTR Anti-Duplication Constraint & Rejection', () => {
+    it('should throw ConflictException if duplicate transactionRef (UTR) is submitted', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.findFirst.mockResolvedValue(null);
+
+      const p2002Error: any = new Error('Unique constraint failed on the fields: (transactionRef)');
+      p2002Error.code = 'P2002';
+      p2002Error.meta = { target: ['transactionRef'] };
+
+      prismaMock.payment.create.mockRejectedValue(p2002Error);
+
+      await expect(
+        paymentService.recordPayment(
+          {
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3750,
+            paymentMethod: PaymentMethod.UPI,
+            transactionRef: 'DUPLICATE-UTR-999',
+          },
+          mockMakerId,
+          mockBranchId,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('7. Customer UPI Claim Submission & Staff Verification Workflow', () => {
+    const mockDueForClaim = {
+      id: 'due-claim-001',
+      ticketId: mockTicketId,
+      installmentMonth: 4,
+      grossAmount: 5000n,
+      dividendDeduction: 1250n,
+      netPayableAmount: 3750n,
+      paidAmount: 0n,
+      status: DueStatus.UNPAID,
+      ticket: mockTicket,
+    };
+
+    const mockCustomerUser: JwtPayload = {
+      sub: 'user-cust-001',
+      phone: '9842143210',
+      roles: [Role.CUSTOMER],
+      branchId: null,
+    };
+
+    const mockAccountantUser: JwtPayload = {
+      sub: 'user-acct-001',
+      phone: '9842100000',
+      roles: [Role.ACCOUNTANT],
+      branchId: mockBranchId,
+    };
+
+    it('should allow customer to submit a UPI claim in INITIATED status with valid UTR', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForClaim);
+      prismaMock.customer.findUnique = jest.fn().mockResolvedValue({ id: mockCustomerId });
+      prismaMock.payment.findFirst.mockResolvedValue(null);
+      prismaMock.paymentAllocation.findFirst = jest.fn().mockResolvedValue(null);
+
+      const createdClaimPayment = {
+        id: 'claim-payment-001',
+        branchId: mockBranchId,
+        recordedByUserId: mockCustomerUser.sub,
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        cashHandoverStatus: 'ACKNOWLEDGED',
+        notes: 'Customer UPI Claim (Self-Reported)',
+        createdAt: new Date(),
+      };
+
+      prismaMock.payment.create.mockResolvedValue(createdClaimPayment);
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-claim-001' });
+
+      const result = await paymentService.submitUpiClaim(
+        {
+          dueId: 'due-claim-001',
+          utrNumber: 'UTR-123456789012',
+        },
+        mockCustomerUser,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.claimId).toBe('claim-payment-001');
+      expect(result.status).toBe(PaymentStatus.INITIATED);
+      expect(result.utrNumber).toBe('UTR-123456789012');
+      expect(result.amount).toBe(3750);
+      expect(prismaMock.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentStatus: PaymentStatus.INITIATED,
+            paymentMethod: PaymentMethod.UPI,
+            transactionRef: 'UTR-123456789012',
+          }),
+        }),
+      );
+    });
+
+    it('should reject UPI claim if UTR has already been used in database', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForClaim);
+      prismaMock.customer.findUnique = jest.fn().mockResolvedValue({ id: mockCustomerId });
+      prismaMock.payment.findFirst.mockResolvedValue({
+        id: 'existing-payment-id',
+        transactionRef: 'UTR-ALREADY-USED',
+      });
+
+      await expect(
+        paymentService.submitUpiClaim(
+          {
+            dueId: 'due-claim-001',
+            utrNumber: 'UTR-ALREADY-USED',
+          },
+          mockCustomerUser,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should reject UPI claim if another claim is already pending for that due', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForClaim);
+      prismaMock.customer.findUnique = jest.fn().mockResolvedValue({ id: mockCustomerId });
+      prismaMock.payment.findFirst.mockResolvedValue(null);
+      prismaMock.paymentAllocation.findFirst = jest.fn().mockResolvedValue({
+        id: 'alloc-existing',
+        payment: { transactionRef: 'UTR-PREVIOUS-PENDING' },
+      });
+
+      await expect(
+        paymentService.submitUpiClaim(
+          {
+            dueId: 'due-claim-001',
+            utrNumber: 'UTR-NEW-ONE',
+          },
+          mockCustomerUser,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should verify pending UPI claim and issue sequential bilingual receipt (Maker != Checker)', async () => {
+      const pendingClaim = {
+        id: 'claim-payment-001',
+        branchId: mockBranchId,
+        recordedByUserId: mockCustomerUser.sub, // Submitter is customer
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        notes: 'Customer UPI Claim',
+        allocations: [
+          {
+            id: 'alloc-claim-001',
+            due: mockDueForClaim,
+            ticket: mockTicket,
+          },
+        ],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(pendingClaim);
+      prismaMock.receipt.findFirst.mockResolvedValue(null);
+      prismaMock.payment.update.mockResolvedValue({
+        ...pendingClaim,
+        paymentStatus: PaymentStatus.SUCCESS,
+      });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-claim-001',
+        receiptNumber: 'KC-REC-PRD-2026-00001',
+        isBilingual: true,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({
+        ...mockDueForClaim,
+        status: DueStatus.PAID,
+        paidAmount: 3750n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDueForClaim]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+      prismaMock.auditLog.create.mockResolvedValue({});
+
+      const result = await paymentService.verifyUpiClaim(
+        'claim-payment-001',
+        mockAccountantUser.sub, // Checker is accountant != customer
+        mockAccountantUser.roles,
+        { verificationNotes: 'KVB Bank Statement matched' },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.dueStatus).toBe(DueStatus.PAID);
+      expect(result.receipt.receiptNumber).toBe('KC-REC-PRD-2026-00001');
+      expect(prismaMock.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'claim-payment-001' },
+          data: expect.objectContaining({ paymentStatus: PaymentStatus.SUCCESS }),
+        }),
+      );
+    });
+
+    it('should strictly reject self-verification (Maker != Checker constraint)', async () => {
+      const pendingClaim = {
+        id: 'claim-payment-001',
+        recordedByUserId: 'user-submitter-001',
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        allocations: [{ due: mockDueForClaim, ticket: mockTicket }],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(pendingClaim);
+
+      await expect(
+        paymentService.verifyUpiClaim(
+          'claim-payment-001',
+          'user-submitter-001', // Same user attempting to verify own claim
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

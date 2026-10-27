@@ -186,7 +186,7 @@ async function main() {
         installmentMonth: secondUnpaidDue.installmentMonth,
         amount: Number(secondUnpaidDue.netPayableAmount),
         paymentMethod: 'UPI',
-        transactionRef: 'UPI-CONCURRENT-REF-100',
+        transactionRef: `UPI-CONCURRENT-REF-${Date.now()}`,
         idempotencyKey: identicalKey,
         notes: `Idempotency stampede thread #${idx + 1}`,
       }),
