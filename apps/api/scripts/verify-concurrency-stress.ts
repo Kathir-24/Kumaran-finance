@@ -135,9 +135,12 @@ async function main() {
   const rejectedResults = raceResults.filter((r) => r.status === 400 || r.status === 409);
   const internalErrors = raceResults.filter((r) => r.status >= 500);
 
-  // Database verification
+  // Database verification: count active SUCCESS allocations (ignoring historical reversed audit records)
   const totalAllocations = await prisma.paymentAllocation.count({
-    where: { installmentDueId: unpaidDue.id },
+    where: {
+      installmentDueId: unpaidDue.id,
+      payment: { paymentStatus: 'SUCCESS' },
+    },
   });
   const updatedDue = await prisma.installmentDue.findUnique({
     where: { id: unpaidDue.id },

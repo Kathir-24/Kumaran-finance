@@ -2457,6 +2457,37 @@
   {
     "file": "src\\payment\\payment.controller.ts",
     "controller": "PaymentController",
+    "methodName": "getPendingUpiClaims",
+    "httpMethod": "GET",
+    "route": "/payments/pending-upi-claims",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "effectiveRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
+    "file": "src\\payment\\payment.controller.ts",
+    "controller": "PaymentController",
     "methodName": "getPaymentById",
     "httpMethod": "GET",
     "route": "/payments/:id",
@@ -2638,37 +2669,6 @@
     ],
     "effectiveRoles": [
       "CUSTOMER",
-      "SUPER_ADMIN",
-      "BRANCH_MANAGER",
-      "ACCOUNTANT"
-    ],
-    "isPublic": false,
-    "notes": [
-      "CurrentUser injected"
-    ]
-  },
-  {
-    "file": "src\\payment\\payment.controller.ts",
-    "controller": "PaymentController",
-    "methodName": "getPendingUpiClaims",
-    "httpMethod": "GET",
-    "route": "/payments/pending-upi-claims",
-    "classGuards": [
-      "JwtAuthGuard",
-      "RolesGuard"
-    ],
-    "methodGuards": [],
-    "effectiveGuards": [
-      "JwtAuthGuard",
-      "RolesGuard"
-    ],
-    "classRoles": [],
-    "methodRoles": [
-      "SUPER_ADMIN",
-      "BRANCH_MANAGER",
-      "ACCOUNTANT"
-    ],
-    "effectiveRoles": [
       "SUPER_ADMIN",
       "BRANCH_MANAGER",
       "ACCOUNTANT"

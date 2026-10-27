@@ -148,8 +148,9 @@ async function main() {
     notes: 'Duplicate UTR collision attempt',
   }, admin.token);
 
+  const dupErrMsg = dupPayRes.json?.error?.message || dupPayRes.json?.message;
   console.log(`   Duplicate Payment Status: ${dupPayRes.status} (Expected: 409 Conflict)`);
-  console.log(`   Error Message: ${dupPayRes.json?.message}`);
+  console.log(`   Error Message: ${dupErrMsg}`);
   if (dupPayRes.status !== 409) {
     throw new Error(`Expected HTTP 409 Conflict for duplicate UTR, got ${dupPayRes.status}`);
   }
@@ -175,8 +176,9 @@ async function main() {
   console.log(`   ✅ UPI Claim recorded in INITIATED status!`);
 
   // Check pending claims list
-  const pendingRes = await request('GET', '/payments/pending-upi-claims', undefined, accountant.token);
-  console.log(`   Pending Claims Count: ${pendingRes.json?.data?.length ?? pendingRes.json?.length}`);
+  const pendingRes = await request('GET', '/payments/pending-upi-claims', undefined, admin.token);
+  const pendingCount = pendingRes.json?.data?.length ?? (Array.isArray(pendingRes.json) ? pendingRes.json.length : 0);
+  console.log(`   Pending Claims Count: ${pendingCount}`);
 
   // 6. Test Staff Verification of UPI Claim (Enforcing Maker != Checker)
   console.log(`\n--- [6/6] Testing Staff Verification of UPI Claim & Receipt Issuance ---`);
@@ -187,8 +189,9 @@ async function main() {
     verificationNotes: 'Self verification attempt',
   }, admin.token);
 
+  const selfMsg = selfVerifyRes.json?.error?.message || selfVerifyRes.json?.message;
   console.log(`   Self-Verify Status: ${selfVerifyRes.status} (Expected: 403 Forbidden)`);
-  console.log(`   Message: ${selfVerifyRes.json?.message}`);
+  console.log(`   Message: ${selfMsg}`);
   if (selfVerifyRes.status !== 403) {
     throw new Error(`Expected HTTP 403 Forbidden for self-verification, got ${selfVerifyRes.status}`);
   }
