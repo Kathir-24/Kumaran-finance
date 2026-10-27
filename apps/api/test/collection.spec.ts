@@ -64,6 +64,8 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       receipt: {
         count: jest.fn(),
         create: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
       subscriberTicket: {
         findUnique: jest.fn(),
@@ -90,7 +92,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
     it('should record exact net installment collection and issue sequential bilingual receipt', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(44);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00044' } as any);
 
       const createdPayment = {
         id: mockPaymentId1,
@@ -437,7 +439,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       prismaMock.payment.findUnique.mockResolvedValue(null);
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(10);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00010' } as any);
 
       const createdPayment = {
         id: 'pmt-sync-01',
@@ -540,7 +542,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
         .mockResolvedValueOnce(mockDue) // Item 1: Valid
         .mockResolvedValueOnce(alreadyPaidDue) // Item 2: Already Paid
         .mockResolvedValueOnce(mockDue); // Item 3: Partial mismatch
-      prismaMock.receipt.count.mockResolvedValue(50);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00050' } as any);
       prismaMock.payment.create.mockResolvedValue({
         id: 'pmt-item-1',
         amount: 3950n,
@@ -622,7 +624,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       prismaMock.payment.findUnique.mockResolvedValue(null);
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(10);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00010' } as any);
 
       const createdPayment = {
         id: 'pmt-coll-01',
@@ -677,7 +679,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       prismaMock.payment.findUnique.mockResolvedValue(null);
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(10);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00010' } as any);
 
       const createdPayment = {
         id: 'pmt-coll-01',

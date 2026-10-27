@@ -255,6 +255,9 @@ async function run() {
 
   // Re-login to obtain fresh admin accessToken for subsequent administrative tests
   const adminRelogin = await request('POST', '/auth/web/login', loginPayload);
+  if (adminRelogin.status !== 200 || !adminRelogin.json?.data?.accessToken) {
+    throw new Error(`Step 11c Failed: Admin re-login failed (status: ${adminRelogin.status}, body: ${JSON.stringify(adminRelogin.json)})`);
+  }
   accessToken = adminRelogin.json.data.accessToken;
 
   // --------------------------------------------------------------------------
@@ -310,7 +313,16 @@ async function run() {
   // Re-request fresh OTP for legitimate onboarding
   console.log(`   Re-requesting fresh OTP for legitimate staff onboarding...`);
   const freshOtpRes = await request('POST', '/auth/mobile/request-otp', staffOtpReqPayload);
-  const staffDebugOtp = freshOtpRes.json?.data?.debugOtp || '123456';
+  let staffDebugOtp = freshOtpRes.json?.data?.debugOtp;
+  if (!staffDebugOtp) {
+    try {
+      const logs = execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
+      const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
+      if (matches.length > 0) staffDebugOtp = matches[matches.length - 1][1];
+    } catch {
+      staffDebugOtp = '123456';
+    }
+  }
   console.log(`   Fresh OTP generated. Debug OTP: ${staffDebugOtp}`);
 
   // --------------------------------------------------------------------------
@@ -379,7 +391,16 @@ async function run() {
   if (custOtpReqRes.status !== 200) {
     throw new Error(`Step 15a Failed: Customer request-otp failed`);
   }
-  const custDebugOtp = custOtpReqRes.json.data.debugOtp || '123456';
+  let custDebugOtp = custOtpReqRes.json?.data?.debugOtp;
+  if (!custDebugOtp) {
+    try {
+      const logs = execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
+      const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
+      if (matches.length > 0) custDebugOtp = matches[matches.length - 1][1];
+    } catch {
+      custDebugOtp = '123456';
+    }
+  }
 
   // Live Redis Verification for Customer
   const custTtl = parseInt(queryRedis('TTL auth:otp:9842100101'), 10);

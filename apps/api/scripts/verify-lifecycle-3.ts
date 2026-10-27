@@ -85,9 +85,6 @@ async function run() {
         }
       }
 
-      // 3. Delete Prize Disbursements & Proofs
-      queryDb(`DELETE FROM public."DisbursementProof" WHERE "disbursementId" IN (SELECT id FROM public."PrizeDisbursement" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}'))`);
-      queryDb(`DELETE FROM public."PrizeDisbursement" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);
 
       // 4. Delete Dues
       queryDb(`DELETE FROM public."InstallmentDue" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${existingGroup}')`);

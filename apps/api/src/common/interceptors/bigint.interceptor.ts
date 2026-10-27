@@ -7,13 +7,20 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+// Bank-Grade Safety Guard: globally patch BigInt.prototype.toJSON so JSON.stringify never throws on BigInt
+if (typeof (BigInt.prototype as any).toJSON !== 'function') {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 @Injectable()
 export class BigIntInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next.handle().pipe(map((data) => this.transform(data, new WeakSet())));
+    return next.handle().pipe(map((data) => this.transform(data, new WeakMap())));
   }
 
-  private transform(value: any, seen: WeakSet<object> = new WeakSet()): any {
+  private transform(value: any, seen: WeakMap<object, any> = new WeakMap()): any {
     if (value === null || value === undefined) {
       return value;
     }
@@ -26,14 +33,20 @@ export class BigIntInterceptor implements NestInterceptor {
     }
     if (typeof value === 'object') {
       if (seen.has(value)) {
-        return value;
+        return seen.get(value);
       }
-      seen.add(value);
 
       if (Array.isArray(value)) {
-        return value.map((item) => this.transform(item, seen));
+        const transformedArr: any[] = [];
+        seen.set(value, transformedArr);
+        for (const item of value) {
+          transformedArr.push(this.transform(item, seen));
+        }
+        return transformedArr;
       }
+
       const transformed: Record<string, any> = {};
+      seen.set(value, transformed);
       for (const [key, val] of Object.entries(value)) {
         transformed[key] = this.transform(val, seen);
       }

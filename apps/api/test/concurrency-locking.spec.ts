@@ -41,6 +41,7 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
           id: 'rec-uuid-101',
           ...args.data,
         })),
+        findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn().mockResolvedValue(null),
       },
       subscriberTicket: {

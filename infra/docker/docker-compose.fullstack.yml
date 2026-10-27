@@ -61,7 +61,7 @@ services:
       minio:
         condition: service_started
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       API_PREFIX: api/v1
       DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public

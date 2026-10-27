@@ -68,7 +68,18 @@ async function loginStaff(phone: string) {
 
 async function loginCustomer(phone: string) {
   const reqRes = await request('POST', '/auth/mobile/request-otp', { phone });
-  const otp = reqRes.json?.data?.debugOtp || '123456';
+  let otp = reqRes.json?.data?.debugOtp;
+  if (!otp) {
+    try {
+      const logs = execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
+      const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
+      if (matches.length > 0) {
+        otp = matches[matches.length - 1][1];
+      }
+    } catch {
+      otp = '123456';
+    }
+  }
   const verifyRes = await request('POST', '/auth/mobile/verify-otp', { phone, otp });
   if (verifyRes.status !== 200 || !verifyRes.json?.data?.accessToken) {
     throw new Error(`Customer OTP login failed for ${phone}: ${JSON.stringify(verifyRes)}`);

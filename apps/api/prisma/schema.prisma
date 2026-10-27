@@ -94,6 +94,8 @@ model Customer {
   nominees      Nominee[]
   documents     CustomerDocument[]
   tickets       SubscriberTicket[]
+
+  @@index([branchId])
 }
 
 model Nominee {
@@ -363,6 +365,11 @@ model Payment {
   allocations                      PaymentAllocation[]
   receipt                          Receipt?
   reversal                         PaymentReversal?
+
+  @@index([createdAt])
+  @@index([recordedByUserId, cashHandoverStatus])
+  @@index([branchId, createdAt])
+  @@index([paymentStatus])
 }
 
 model PaymentAllocation {
@@ -386,6 +393,9 @@ model Receipt {
   issuedAt      DateTime @default(now())
   isBilingual   Boolean  @default(true) // Generates English + Tamil receipt
   pdfS3Key      String?
+
+  @@index([issuedAt])
+  @@index([branchId, issuedAt])
 }
 
 model PaymentReversal {

@@ -78,6 +78,8 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       receipt: {
         count: jest.fn(),
         create: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
       paymentReversal: {
         create: jest.fn(),
@@ -109,7 +111,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
     it('should record exact net installment payment and generate sequential bilingual receipt', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(411);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00411' } as any);
 
       const createdPayment = {
         id: mockPaymentId,
@@ -656,7 +658,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
 
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(411);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00411' } as any);
 
       const createdPayment = {
         id: mockPaymentId,
@@ -715,7 +717,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
 
       prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
       prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
-      prismaMock.receipt.count.mockResolvedValue(411);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00411' } as any);
 
       const createdPayment = {
         id: mockPaymentId,

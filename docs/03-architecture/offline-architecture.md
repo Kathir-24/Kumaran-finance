@@ -250,7 +250,7 @@ flowchart TD
         Home --> LocalCache[("SQLite / Drift Database\n• cached_assigned_dues\n• offline_collections_queue")]
         
         Doorstep["Doorstep Record\n(No Internet)"] --> SaveLocal["1. Generate UUID idempotencyKey\n2. INSERT into offline_collections_queue\n3. Mark local due as PAID_OFFLINE"]
-        SaveLocal --> PrintBT["Print Offline Receipt via Bluetooth ESC/POS\nor show QR/Text on screen"]
+        SaveLocal --> ShowReceipt["Sign physical paper passbook with pen\nand display digital receipt / QR on mobile screen"]
 
         NetWatcher["connectivity_plus Listener"] -->|Detects Wi-Fi / 4G| AutoSync["Sync Manager Worker\n(SELECT * FROM offline_collections_queue)"]
         ManualSync["Manual 'Sync Now' Button"] --> AutoSync

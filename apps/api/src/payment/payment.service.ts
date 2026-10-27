@@ -136,11 +136,25 @@ export class PaymentService {
     const year = new Date().getFullYear();
 
     // 6. Generate Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
-    const receiptCount = await this.prisma.receipt.count({
-      where: { branchId },
+    const prefix = `KC-REC-${branchCode}-${year}-`;
+    const lastReceipt = await this.prisma.receipt.findFirst({
+      where: {
+        branchId,
+        receiptNumber: { startsWith: prefix },
+      },
+      orderBy: { receiptNumber: 'desc' },
+      select: { receiptNumber: true },
     });
-    const sequence = String(receiptCount + 1).padStart(5, '0');
-    const receiptNumber = `KC-REC-${branchCode}-${year}-${sequence}`;
+
+    let nextSeq = 1;
+    if (lastReceipt?.receiptNumber) {
+      const parts = lastReceipt.receiptNumber.split('-');
+      const lastNumStr = parts[parts.length - 1];
+      const parsed = parseInt(lastNumStr, 10);
+      if (!isNaN(parsed)) {
+        nextSeq = parsed + 1;
+      }
+    }
 
     const cashHandoverStatus =
       dto.paymentMethod === PaymentMethod.CASH
@@ -149,77 +163,76 @@ export class PaymentService {
 
     const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
-      if (typeof tx.$queryRaw === 'function') {
-        const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
-          SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
-        `;
-        const lockedDue = lockedDues && lockedDues[0];
-        if (lockedDue && lockedDue.status === DueStatus.PAID) {
-          throw new BadRequestException(
-            `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
-          );
+    let result: any;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
+        if (typeof tx.$queryRaw === 'function') {
+          const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
+            SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
+          `;
+          const lockedDue = lockedDues && lockedDues[0];
+          if (lockedDue && lockedDue.status === DueStatus.PAID) {
+            throw new BadRequestException(
+              `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
+            );
+          }
         }
-      }
 
-      // 1. Create Payment
-      const payment = await tx.payment.create({
-        data: {
-          branchId,
-          recordedByUserId,
-          customerId: ticket.customerId,
-          amount: paymentAmount,
-          paymentMethod: dto.paymentMethod,
-          paymentStatus: PaymentStatus.SUCCESS,
-          idempotencyKey: dto.idempotencyKey || null,
-          transactionRef: dto.transactionRef || null,
-          cashHandoverStatus,
-          notes: dto.notes?.trim() || null,
-          createdAt: paymentDate,
-        },
-      });
-
-      // 2. Create PaymentAllocation (Maps Payment to discrete InstallmentDue)
-      const allocation = await tx.paymentAllocation.create({
-        data: {
-          paymentId: payment.id,
-          ticketId: ticket.id,
-          installmentDueId: due.id,
-          amountAllocated: paymentAmount,
-        },
-      });
-
-      // 3. Create Bilingual Receipt (with concurrent sequence retry check)
-      let finalReceiptNumber = receiptNumber;
-      if (typeof tx.receipt?.findUnique === 'function') {
-        const existingReceipt = await tx.receipt.findUnique({
-          where: { receiptNumber: finalReceiptNumber },
+        // 1. Create Payment
+        const payment = await tx.payment.create({
+          data: {
+            branchId,
+            recordedByUserId,
+            customerId: ticket.customerId,
+            amount: paymentAmount,
+            paymentMethod: dto.paymentMethod,
+            paymentStatus: PaymentStatus.SUCCESS,
+            idempotencyKey: dto.idempotencyKey || null,
+            transactionRef: dto.transactionRef || null,
+            cashHandoverStatus,
+            notes: dto.notes?.trim() || null,
+            createdAt: paymentDate,
+          },
         });
-        if (existingReceipt) {
-          const currentCount = await tx.receipt.count({ where: { branchId } });
-          finalReceiptNumber = `KC-REC-${branchCode}-${year}-${String(currentCount + 1).padStart(5, '0')}`;
+
+        // 2. Create PaymentAllocation (Maps Payment to discrete InstallmentDue)
+        const allocation = await tx.paymentAllocation.create({
+          data: {
+            paymentId: payment.id,
+            ticketId: ticket.id,
+            installmentDueId: due.id,
+            amountAllocated: paymentAmount,
+          },
+        });
+
+        // 3. Create Bilingual Receipt (with collision-proof sequence guarantee)
+        let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+        if (typeof tx.receipt?.findUnique === 'function') {
+          while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
+            nextSeq++;
+            finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+          }
         }
-      }
 
-      const receipt = await tx.receipt.create({
-        data: {
-          branchId,
-          paymentId: payment.id,
-          receiptNumber: finalReceiptNumber,
-          isBilingual: true,
-          issuedAt: paymentDate,
-        },
-      });
+        const receipt = await tx.receipt.create({
+          data: {
+            branchId,
+            paymentId: payment.id,
+            receiptNumber: finalReceiptNumber,
+            isBilingual: true,
+            issuedAt: paymentDate,
+          },
+        });
 
-      // 4. Update InstallmentDue to PAID
-      await tx.installmentDue.update({
-        where: { id: due.id },
-        data: {
-          status: DueStatus.PAID,
-          paidAmount: paymentAmount,
-        },
-      });
+        // 4. Update InstallmentDue to PAID
+        await tx.installmentDue.update({
+          where: { id: due.id },
+          data: {
+            status: DueStatus.PAID,
+            paidAmount: paymentAmount,
+          },
+        });
 
       // 5. Recalculate Consecutive Arrears
       const allDues = await tx.installmentDue.findMany({
@@ -259,6 +272,26 @@ export class PaymentService {
         netPayableAmount: due.netPayableAmount,
       };
     });
+    } catch (err: any) {
+      if (dto.idempotencyKey && err.code === 'P2002' && String(err.meta?.target).includes('idempotencyKey')) {
+        const existing = await this.prisma.payment.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: {
+            allocations: { include: { due: true, ticket: true } },
+            receipt: true,
+            reversal: true,
+          },
+        });
+        if (existing) {
+          return {
+            duplicateIgnored: true,
+            message: 'Payment already recorded with this idempotency key',
+            payment: existing,
+          };
+        }
+      }
+      throw err;
+    }
 
     if (this.queueProvider) {
       try {
