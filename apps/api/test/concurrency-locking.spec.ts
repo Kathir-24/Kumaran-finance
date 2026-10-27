@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { AuctionStatus, DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
+import { AuctionStatus, DueStatus, PaymentMethod } from '@prisma/client';
 import { AuctionService } from '../src/auction/auction.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { PaymentService } from '../src/payment/payment.service';

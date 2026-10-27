@@ -216,7 +216,7 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
 
       prismaMock.chitGroup.create.mockResolvedValue(ongoingChit);
       prismaMock.subscriberTicket.createMany.mockResolvedValue({ count: 20 });
-      prismaMock.subscriberTicket.findMany.mockImplementation((args: any) => {
+      prismaMock.subscriberTicket.findMany.mockImplementation(() => {
         // Return 20 mock tickets with id and ticketNumber
         return Array.from({ length: 20 }, (_, i) => ({
           id: `ticket-${i + 1}`,
