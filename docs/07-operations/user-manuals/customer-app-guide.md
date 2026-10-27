@@ -90,31 +90,35 @@ flowchart TD
 
 ---
 
-## 5. 1-Tap Online Installment Payment via UPI (GPay / PhonePe)
+## 5. 1-Tap Online Installment Payment via UPI (GPay / PhonePe / Paytm)
 
 ```mermaid
 flowchart TD
     StartPay["1. Tap 'Pay Due / பணம் செலுத்துக'"] --> VerifyAmount["2. Verify Net Amount: ₹3,700 (Strictly Discrete)"]
     VerifyAmount --> TapUPI["3. Tap 'Pay with UPI'"]
     TapUPI --> SelectApp{"4. Select Preferred UPI App on Phone"}
-    SelectApp -- "Google Pay" --> GPay["Google Pay Launches with Pre-Filled Amount"]
-    SelectApp -- "PhonePe" --> PhonePe["PhonePe Launches with Pre-Filled Amount"]
-    SelectApp -- "Paytm / BHIM" --> Paytm["Paytm Launches with Pre-Filled Amount"]
+    SelectApp -- "Google Pay" --> GPay["Google Pay Launches with Amount Locked"]
+    SelectApp -- "PhonePe" --> PhonePe["PhonePe Launches with Amount Locked"]
+    SelectApp -- "Paytm / BHIM" --> Paytm["Paytm Launches with Amount Locked"]
     GPay --> EnterPIN["5. Enter UPI PIN in Payment App"]
     PhonePe --> EnterPIN
     Paytm --> EnterPIN
-    EnterPIN --> Callback["6. Return to Kumaran Chits App:\n• Payment Confirmed Instantly\n• Digital Receipt Issued Immediately\n• Status updates to PAID"]
+    EnterPIN --> ReturnApp["6. Return to Kumaran Chits App:\nEnter 12-Digit Bank UTR Reference Number"]
+    ReturnApp --> SubmitClaim["7. Tap 'Submit Claim':\nStatus shows 'PENDING VERIFICATION'\nReceipt issued upon 1-click accounting check"]
 ```
 
 ### Step-by-Step Instructions:
 1. Tap **"Pay Due / பணம் செலுத்துக"** on the home screen.
 2. Review the payment details:
-   - **Net Payable Amount**: `₹3,700` (Whole integer Rupees).
+   - **Net Payable Amount**: `₹3,700` (Whole integer Rupees, after universal dividend deduction).
    - *(Note: Single discrete payments only; partial payments and advance balances are not permitted).*
-3. Tap **"Pay with UPI"**.
-4. The app opens your preferred payment application: **Google Pay**, **PhonePe**, **Paytm**, or **BHIM**.
-5. Authorize the transaction using your secret UPI PIN.
-6. The app instantly confirms your payment, updates your ticket due status to **`PAID`**, and issues an official digital receipt.
+3. Tap **"Pay with UPI"**. The app automatically builds an official NPCI deep-link locking our Karur Vysya Bank payee details (`kumaranfinance@kvb`).
+4. Select your preferred UPI payment application: **Google Pay**, **PhonePe**, **Paytm**, or **BHIM**.
+5. The UPI app opens with the exact amount (`₹3,700`) and transaction note locked. Authorize the payment using your secret UPI PIN.
+6. Copy the **12-digit Bank UTR / Reference Number** (e.g., `429188123456`) displayed on your payment confirmation screen.
+7. Return to the **Kumaran Chits** app, paste the UTR number, and tap **"Submit Claim"**.
+8. Your payment claim is recorded instantly (`INITIATED`). As soon as the office accountant verifies the credit in the bank statement, your due is marked **`PAID`**, and your official bilingual receipt (`KC-REC-PRD-YYYY-XXXXX`) is delivered via instant Push Notification to your passbook!
+
 
 ---
 

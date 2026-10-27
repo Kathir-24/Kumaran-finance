@@ -42,6 +42,7 @@ The following table summarizes all 10 core partner actions, each documented with
 | **§8** | Authorizing Prize Payout Vouchers (2-Step Payout) | Checker (Partner B/C) | Web & Mobile |
 | **§9** | Evening Field Cash Handover Sign-Off into Vault | Checker (Partner A/B) | Web & Mobile |
 | **§10** | Approving Erroneous Payment Reversals | Checker (Partner B) | Web & Mobile |
+| **§10B** | Verifying Customer UPI Claims (ADR-19) | Checker (Partner B/C) | Web & Mobile |
 | **§11** | Month 1 Company Pool & Month $N$ Final Settlement | Single / Checker | Web Portal |
 | **§12** | 3-Month Arrears Tagging & Defaulter Removal | Single / Maker | Web Portal |
 | **§13** | Staff Role Provisioning & Security Resets | Single Actor | Web Portal |
@@ -263,6 +264,30 @@ flowchart TD
    - The ticket due reverts to `UNPAID`.
    - An offsetting reversal line is stamped into the Form XXII Daily Cash Book.
    - An immutable audit trail entry is permanently recorded.
+
+---
+
+## 10B. Verifying Customer Online UPI Claims against Bank Statement (Checker Role)
+
+Subscribers paying online via the Android Mobile App utilize NPCI 1-Tap UPI Intent deep-linking directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **₹0 gateway fees** (ADR-19). Subscribers self-report their 12-digit Bank UTR reference, entering the approvals queue:
+
+```mermaid
+flowchart TD
+    Cust["Customer Submits UPI Claim with 12-digit UTR\nStatus = INITIATED"] --> Queue["Partner opens 'Pending Approvals -> UPI Claims'\n(GET /payments/pending-upi-claims)"]
+    Queue --> KVB["Partner checks Karur Vysya Bank (KVB) Current Account Portal"]
+    KVB --> Match{"Does Bank Statement show credit\nmatching UTR & exact whole-rupee amount?"}
+    Match -- No --> Reject["Leave pending or flag discrepancy to customer"]
+    Match -- Yes --> DualGuard{"maker_user_id != checker_user_id?"}
+    DualGuard -- No --> Deny["HTTP 403 Forbidden: Staff who entered claim cannot verify!"]
+    DualGuard -- Yes --> Approve["Partner clicks 'Verify Credit & Issue Receipt'\n• Payment status = SUCCESS\n• Installment marked PAID\n• Bilingual receipt generated\n• Free Push Notification sent to customer"]
+```
+
+### Step-by-Step Instructions:
+1. In the Web Portal or Mobile App, navigate to **Pending Approvals $\to$ UPI Claims**.
+2. View the pending list: Subscriber Name, Chit Group Code, Ticket Number, Net Amount ($I_{net}$), and 12-digit UTR.
+3. Cross-reference the UTR against the incoming credits on the KVB corporate net banking statement.
+4. Click **"Verify Credit & Issue Receipt"** (`POST /payments/:id/verify-upi-claim`).
+5. **Maker != Checker Enforcement**: If a partner recorded the claim on behalf of a walk-in or phone customer, another partner or accountant must verify it.
 
 ---
 

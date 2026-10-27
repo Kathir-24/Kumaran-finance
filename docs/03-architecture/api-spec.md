@@ -4,7 +4,7 @@
 > **Base URL**: `/api/v1` (Global prefix `/api`, URI versioning `v1`)  
 > **Documentation Tool**: OpenAPI 3.0 / Swagger (`/api/docs`)  
 > **Contract Source of Truth**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) & [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)  
-> **Total Verified Scope**: **111 operations across 105 paths** (100% automated test coverage, 425 passing tests across 24 unit suites [343 unit] and 10 E2E suites [82 E2E]).
+> **Total Verified Scope**: **115 operations across 109 paths** (100% automated test coverage, 455 passing tests across 26 unit suites [367 unit] and 11 E2E suites [88 E2E]).
 
 ---
 
@@ -132,6 +132,7 @@
 | `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher | `SUPER_ADMIN`, `ACCOUNTANT` |
 | `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `GET`  | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` |
 
 ### 2.7 Module 6: Field Collections & Cash Handover (`/api/v1/collections`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -150,6 +151,9 @@
 | `GET`  | `/payments` | Query & filter payments list with pagination | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id` | Get single payment details & transaction history | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id/receipt` | Generate bilingual PDF receipt (English + Tamil) | Staff, Customer, Auditor |
+| `POST` | `/payments/upi-claim` | **Customer UPI Claim**: Self-report 12-digit bank UTR reference; validates uniqueness and records payment in `INITIATED` status | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `GET`  | `/payments/pending-upi-claims` | **Claims Queue**: List pending UPI claims awaiting bank credit statement verification | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify bank credit, transition to `SUCCESS`, issue bilingual receipt & mark due `PAID` (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `SUPER_ADMIN` |

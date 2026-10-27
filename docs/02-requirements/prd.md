@@ -104,6 +104,12 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 
 ### Module 8: Payments, Reversals, & Bilingual Receipts (`CONFIRMED-BY-DEVELOPER`)
 - **Payment Modes**: Cash, UPI, Bank Transfer (NEFT/RTGS/IMPS), and Cheque.
+- **Zero-Fee Native 1-Tap UPI Intent & UTR Verification Protocol (ADR-19)**:
+  - **Direct Bank Settlement**: Settle directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **strictly ₹0 third-party gateway fees** (No Razorpay/Cashfree/2% MDR fee).
+  - **1-Tap Deep-Linking**: Mobile app launches native UPI apps (GPay, PhonePe, Paytm, BHIM, Cred) via standard `upi://pay?pa=...` intent containing exact BigInt installment amount, customer name, and unique chit scheme note.
+  - **Customer Bank UTR Claim Submission**: Customer enters their 12-digit bank UTR reference (`POST /payments/upi-claim`), creating a `Payment` record in `INITIATED` status.
+  - **Bank UTR Anti-Duplication Constraint**: PostgreSQL 17 `@unique` index on `transactionRef` strictly blocks duplicate claims or reuse of the same bank UTR.
+  - **Maker-Checker Dual Control Claim Verification**: Desk Accountant or Partner reviews the pending UPI claim (`GET /payments/pending-upi-claims`), cross-checks the physical KVB bank statement, and approves (`POST /payments/:id/verify-upi-claim`), transitioning status to `SUCCESS` and marking the installment `PAID`. Strictly enforces `maker_user_id != checker_user_id`.
 - **Bilingual Receipts & Unified Notification Hierarchy (V1 Scope)**:
   - Formatted in both English and Tamil with sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
   - Hand-written and signed directly in customer's physical paper passbook booklet; confirmed digitally via free mobile app push notification; downloadable digital PDFs available on-demand.

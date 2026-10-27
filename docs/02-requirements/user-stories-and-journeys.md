@@ -679,14 +679,16 @@ flowchart TD
   - **Then** server streams bilingual PDF with embedded Noto Sans Tamil fonts;
   - **Anti-IDOR**: Server asserts `user.phone === ticket.customer.phone` before streaming.
 
-#### US-CUST-9: 1-Tap Online Installment Payment via UPI (Google Pay / PhonePe)
+#### US-CUST-9: 1-Tap Online Installment Payment via Native UPI Intent (ADR-19)
 - **As a**: Customer (Subscriber)
-- **I want to**: Pay my net installment due directly from the mobile app via Google Pay, PhonePe, or Paytm
-- **So that**: I can pay immediately without waiting for the field agent or visiting the branch office.
+- **I want to**: Pay my net installment due directly from the mobile app via Google Pay, PhonePe, or Paytm with zero gateway fees
+- **So that**: I can pay immediately into Kumaran Finance's KVB bank account without waiting for the field agent or visiting the branch office.
 - **Acceptance Criteria**:
   - **Given** net due ₹3,950 on active ticket,
-  - **When** I tap "Pay Due" and complete transaction on Google Pay,
-  - **When** app submits payment record on `POST /payments` with `paymentMethod: 'UPI'`, `amount: 3950`, and UPI transaction reference,
+  - **When** I tap "Pay Due", app fetches native intent via `GET /installments/:dueId/upi-intent` and launches native Android UPI chooser (`upi://pay?pa=kumaranfinance@kvb&am=3950...`),
+  - **When** direct bank transfer completes and customer submits the 12-digit UTR on `POST /payments/upi-claim`,
+  - **Then** payment is recorded in `INITIATED` status with unique `transactionRef` (duplicate claims rejected),
+  - **When** Desk Accountant or Partner verifies credit against Karur Vysya Bank statement (`POST /payments/:id/verify-upi-claim`, Maker != Checker enforced),
   - **Then** server marks installment `PAID`, generates sequential receipt `KC-REC-PRD-2026-XXXXX`, and triggers instant Push notification confirmation.
 
 #### US-CUST-10: Upcoming Auction Push Reminders & 3-Month Arrears Warning Alerts

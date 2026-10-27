@@ -88,6 +88,7 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
 * **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and trigger an automated free mobile app push notification (with fallback SMS for non-app users), *so that* the customer walks away with verified proof of payment without telecom billing waste.
 * **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Desk Accountant*, if I accidentally post cash to the wrong customer's ticket, I want to submit a reversal request with a mandatory reason and receipt scan, *so that* a Partner can review and approve the correction.
+* **US-8.3 (Verifying Customer UPI Payment Claims — Checker)**: *As a Desk Accountant*, I want to inspect the queue of customer self-reported UPI claims (`GET /payments/pending-upi-claims`), cross-check the 12-digit UTR against our Karur Vysya Bank current account statement, and approve (`POST /payments/:id/verify-upi-claim`), *so that* verified online collections are officially receipted with ₹0 payment gateway fees under Maker != Checker dual control.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
 * **US-9.1 (Preparing Prize Payout Voucher — Maker)**: *As a Desk Accountant*, I want to verify the winner's safety proof checklist (signed agreements, nominee signatures, blank cheques, promissory notes), upload document scans, and prepare the payout voucher for Partner authorization, *so that* prize money is prepared securely.
@@ -218,6 +219,33 @@ At 11:30 AM, customer Velusamy walks up to the counter to pay his monthly chit i
      - Writes receipt number: `KC-REC-00415`
      - Signs her initials with pen in the passbook column.
    - The accountant hands the physical passbook back to Velusamy. (Optional: A digital PDF receipt is accessible on screen for downloading if requested).
+
+---
+
+### Journey 3B: Verifying Customer UPI Payment Claims against Bank Statement (Checker Role)
+
+Throughout the day, subscribers who pay via 1-tap UPI (GPay, PhonePe, Paytm, BHIM) submit their 12-digit Bank UTR claim from the mobile app. The Desk Accountant verifies these credits against Karur Vysya Bank:
+
+1. **Navigate to Pending UPI Claims**:
+   - On the web portal, click **Payments $\to$ Pending UPI Claims** (`GET /api/v1/payments/pending-upi-claims`).
+   - The screen lists claims in `INITIATED` status with Subscriber Name, Scheme Code, Ticket Number, Net Amount ($I_{net}$), and Customer-entered 12-digit UTR.
+2. **Open Karur Vysya Bank Corporate NetBanking**:
+   - In a second browser tab, log in to Kumaran Finance's KVB Current Account portal.
+   - Filter transactions for the current date.
+3. **Cross-Check the 12-Digit Bank UTR**:
+   - Find the matching credit entry in the KVB statement.
+   - Verify that:
+     - The UTR in KVB matches the customer's claimed UTR (e.g., `429812345678`).
+     - The amount received exactly matches the net installment (e.g., ₹4,100).
+4. **Approve & Issue Official Bilingual Receipt**:
+   - On the portal, click **"Verify Credit & Issue Receipt"** (`POST /api/v1/payments/:id/verify-upi-claim`).
+   - Enter optional verification note: `"Confirmed credit in KVB current account statement on 27/10/2026."`
+   - **Maker != Checker Hard Guard**: If the logged-in staff member personally created or submitted the claim, the backend immediately blocks approval (`HTTP 403 Forbidden`).
+5. **System Updates**:
+   - Payment status transitions from `INITIATED` $\to$ `SUCCESS`.
+   - Installment due status transitions from `UNPAID` $\to$ `PAID`.
+   - Sequential bilingual receipt `#KC-REC-PRD-2026-XXXXX` is issued.
+   - An asynchronous BullMQ notification job dispatches a free push notification to the customer's mobile app.
 
 ---
 

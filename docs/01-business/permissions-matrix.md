@@ -52,6 +52,9 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | | Activate Chit Scheme | Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Enrollment & Tickets**| Assign Ticket to Subscriber | Yes | Yes (Branch) | No | No | Request only | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Collections** | Record Field Cash Collection | Yes | Yes (Branch) | Yes | Assigned only | Online payment | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Generate UPI Intent Deep-Link | Yes | Yes | Yes | Yes | Own ticket only | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Submit UPI Claim (Bank UTR) | Yes | Yes | Yes | No | Own ticket only | No | `CONFIRMED-BY-DEVELOPER` |
+| | Verify UPI Claim & Issue Receipt | Yes (Checker)| Yes (Branch) | Yes (Checker)| No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Submit Cash Handover | Yes (Agent role)| No | No | Yes (Assigned) | No | No | `CONFIRMED-BY-DEVELOPER` |
 | | Acknowledge Cash Handover | Yes | Yes (Branch) | Yes | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Payment Adjustments**| Request Payment Reversal (Maker)| Yes | Yes (Branch) | Yes | No | No | No | `CONFIRMED-BY-DEVELOPER` |
@@ -94,7 +97,12 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 - **Acknowledger (Accept Handover)**: Partner (Super Admin) physically counts cash and signs off / acknowledges handover into branch vault.
 - **Hard Guard**: `collector_user_id != acknowledger_user_id`. Even though a collection agent also performs accountant desk duties, **they can NEVER acknowledge or sign off on their own collected cash**. An independent Partner must accept and verify the physical cash.
 
-### 5. Audit Log Integrity:
+### 5. Customer UPI Claim Verification:
+- **Maker (Submit Claim)**: Customer or collecting staff submits 12-digit bank UTR reference (`POST /payments/upi-claim`) in `INITIATED` status.
+- **Checker (Verify & Issue Receipt)**: Desk Accountant or Partner inspects KVB NetBanking credit and verifies (`POST /payments/:id/verify-upi-claim`).
+- **Hard Guard**: `maker_user_id != checker_user_id`. The user who submitted the claim cannot verify it or self-issue receipts.
+
+### 6. Audit Log Integrity:
 - Every high-risk modification, reversal, auction finalization, and payout approval is recorded in an **append-only, immutable audit log** (`CONFIRMED-BY-DEVELOPER`).
 
 ---

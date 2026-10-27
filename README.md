@@ -22,7 +22,7 @@ The entire project blueprint, architecture, compliance, and operational manual s
 ```text
 u:\Kumaran-finance\docs\
 ├── 01-business/
-│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-18)
+│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-19)
 │   ├── financial-rules.md                    # Confirmed financial math (whole-rupee mandate, 4% commission, dividends)
 │   ├── permissions-matrix.md                 # RBAC + maker-checker dual controls (4 partners & field agents)
 │   ├── compliance-checklist.md               # Regulatory items, data minimization, & statutory review

@@ -223,6 +223,7 @@ To enforce Invariant Guardrail #10 (Maker $\ne$ Checker) without administrative 
   2. **Prize Disbursements**: Verified auction winner safety proofs awaiting Checker payout release authorization.
   3. **Payment Reversals**: Reversal requests awaiting Partner sign-off (`makerUserId != checkerUserId`).
   4. **Safety Proof Verifications**: Auction winners awaiting desk verification of signed agreement, blank cheques, and promissory notes.
+  5. **Customer UPI Claims (ADR-19)**: Pending customer 12-digit Bank UTR claims awaiting Desk Accountant / Partner verification against Karur Vysya Bank statement (`GET /payments/pending-upi-claims`, `POST /payments/:id/verify-upi-claim`, `makerUserId != checkerUserId`).
 - **Branch Scoping**:
   - `BRANCH_MANAGER` view is restricted strictly to their branch.
   - `SUPER_ADMIN` view encompasses all branches.

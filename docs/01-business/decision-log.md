@@ -31,6 +31,8 @@
 | **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | 2026-10-17 | **Y** |
 | **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
 | **ADR-17** | Dual-Platform Full Parity for Partners | 100% full feature parity on BOTH Web (`apps/web`) and Mobile (`apps/mobile`) for the 4 Partners across both Maker and Checker roles (`maker_user_id != checker_user_id` enforced regardless of device). Desk roles on Web; field/customers on Mobile. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-20 | **Y** |
+| **ADR-18** | Phone-Only Identity & Email Elimination | Single non-nullable unique `phone` across users and customers; `email` column permanently dropped. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-22 | **Y** |
+| **ADR-19** | Zero-Fee Native UPI Intent & Bank UTR Uniqueness | Zero third-party gateway fees (No Razorpay/Cashfree/2% MDR). NPCI native `upi://pay` deep-linking to KVB current account. `Payment.transactionRef @unique` prevents duplicate bank UTR claims. Customer claims verified by Desk Accountant under Maker != Checker. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-27 | **Y** |
 
 ---
 
@@ -167,3 +169,27 @@
   1. **Sole Communication & Login Handle**: `phone` is the single, non-nullable, unique identity across both staff (`User`) and subscribers (`Customer`).
   2. **Total Elimination of Email**: The `email` column is dropped entirely from the database schema (`User` table), JWT token payloads, API request DTOs (`LoginDto`), and user profile responses.
   3. **Strict Phone Validation**: Authentication endpoints (`POST /auth/web/login`, `POST /auth/mobile/login-mpin`) enforce 10-digit Indian mobile regex matching (`REGEX_INDIAN_PHONE`). Ambiguous `identifier` fields accepting email are permanently eliminated.
+
+---
+
+### ADR-19: Zero-Fee Native NPCI UPI Intent & Bank UTR Anti-Duplication Protocol (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: Third-party payment gateways (Razorpay, Cashfree, PayU) levy 1.5% to 2.0% + GST on every transaction. In a 20-month chit fund collecting ₹1,00,000 to ₹50,00,000 monthly, gateway MDR charges would bleed ₹20,000 to ₹1,00,000+ per month in unnecessary administrative leakage. Furthermore, Kumaran Finance settles transactions directly into its Karur Vysya Bank (KVB) current account in Perundurai.
+- **Architectural Decision**:
+  1. **Strict Rejection of Third-Party Gateways**: Zero gateway SDKs, zero aggregator merchant fees, zero 2% MDR costs.
+  2. **NPCI Native 1-Tap UPI Intent (`upi://pay`)**:
+     - Dynamic server helper `GET /installments/:dueId/upi-intent` generates the official NPCI URI:
+       ```
+       upi://pay?pa=kumaranfinance@kvb&pn=Kumaran+Finance&am=<Inet>&cu=INR&tn=<Group-Ticket-Month>&tr=<dueId>
+       ```
+     - Locking the exact whole-rupee net payable installment amount ($I_{net} = I_{base} - Div$) prevents subscribers from entering arbitrary amounts.
+     - Deep-links directly to GPay, PhonePe, Paytm, or BHIM on Android with 1-tap.
+  3. **PostgreSQL Bank UTR Anti-Duplication Guard**:
+     - `Payment.transactionRef` is marked `@unique` in Prisma (`Payment_transactionRef_key` in PostgreSQL 17).
+     - Allows infinite `NULL` values for cash payments, while mathematically blocking any non-null bank UTR or cheque reference string from ever being submitted or claimed more than once.
+     - Collision attempts return `HTTP 409 Conflict` (`DUPLICATE_TRANSACTION_REF`).
+  4. **Customer Claim & Desk Accountant Verification (Maker != Checker)**:
+     - Subscribers submit their 12-digit bank UTR reference via `POST /payments/upi-claim` (`paymentStatus: INITIATED`).
+     - Desk Accountant inspects the KVB NetBanking / mobile banking statement for the credit and verifies via `POST /payments/:id/verify-upi-claim`.
+     - Maker != Checker is enforced: the user who submitted the claim cannot verify it.
+     - Verification transitions payment to `SUCCESS`, generates sequential bilingual receipt (`KC-REC-PRD-YYYY-XXXXX`), marks due `PAID`, and dispatches push receipt to the subscriber.
+

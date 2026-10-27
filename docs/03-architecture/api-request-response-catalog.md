@@ -1054,6 +1054,33 @@ Content-Type: image/jpeg
 
 ---
 
+### 6.4 `GET /api/v1/installments/:dueId/upi-intent`
+**Description**: Generates an NPCI UPI 2.0 native payment intent URI (`upi://pay?pa=...`) for the exact discounted net installment ($I_{net}$) due. Direct-to-bank settlement to Kumaran Finance Karur Vysya Bank (KVB) current account with ₹0 gateway fees (ADR-19).  
+**Roles**: `CUSTOMER` (Anti-BOLA ownership verified), Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`)
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-27T10:00:00.000Z",
+  "data": {
+    "dueId": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
+    "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+    "groupCode": "KCA-1L-20M-01",
+    "ticketNumber": 4,
+    "installmentMonth": 4,
+    "netPayableAmount": 3950,
+    "payeeVpa": "kumaranfinance@kvb",
+    "payeeName": "Kumaran Finance",
+    "transactionNote": "KCA-1L-20M-01 Ticket #4 Month 4",
+    "upiUri": "upi://pay?pa=kumaranfinance%40kvb&pn=Kumaran+Finance&am=3950&cu=INR&tn=KCA-1L-20M-01+Ticket+%234+Month+4&tr=c5f590bb85bb4a588be48a4db2bfdbf1"
+  }
+}
+```
+
+---
+
 ## 7. Module 6 & 7: Collections, Payments & Receipts (`/collections`, `/payments`)
 
 ### 7.1 `POST /api/v1/payments`
@@ -1144,6 +1171,149 @@ Content-Type: image/jpeg
     "checkerUserId": "partner-uuid-002",
     "reversedAt": "2026-10-19T14:30:00.000Z",
     "message": "Payment reversed and installment due restored to UNPAID."
+  }
+}
+```
+
+---
+
+### 7.4 `POST /api/v1/payments/upi-claim`
+**Description**: Customer registers their self-reported UPI transaction after 1-tap app payment, recording bank UTR reference. Creates `Payment` record in `INITIATED` status. Enforces PostgreSQL 17 `@unique` index on `transactionRef` to prevent duplicate claims.  
+**Roles**: `CUSTOMER` (Anti-BOLA ticket ownership verified), Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`)
+
+#### Request Body
+```json
+{
+  "dueId": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
+  "utrNumber": "429812345678",
+  "notes": "Paid via Google Pay to kumaranfinance@kvb"
+}
+```
+
+#### Success Response (HTTP 201)
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-10-27T10:05:00.000Z",
+  "data": {
+    "success": true,
+    "message": "UPI payment claim submitted successfully. The accounting desk will verify your bank credit and issue the official receipt.",
+    "claimId": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
+    "dueId": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
+    "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+    "groupCode": "KCA-1L-20M-01",
+    "ticketNumber": 4,
+    "installmentMonth": 4,
+    "utrNumber": "429812345678",
+    "amount": 3950,
+    "status": "INITIATED",
+    "submittedAt": "2026-10-27T10:05:00.000Z"
+  }
+}
+```
+
+---
+
+### 7.5 `GET /api/v1/payments/pending-upi-claims`
+**Description**: Fetches pending customer UPI claims (`paymentStatus: INITIATED`, `paymentMethod: UPI`) for Accounting Desk verification against Karur Vysya Bank physical statements.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
+
+#### Query Parameters
+- `branchId` *(optional, UUID)*: Filter claims by operating branch.
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-27T10:10:00.000Z",
+  "data": [
+    {
+      "id": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
+      "amount": "3950",
+      "paymentMethod": "UPI",
+      "paymentStatus": "INITIATED",
+      "transactionRef": "429812345678",
+      "notes": "Customer UPI Claim: Paid via Google Pay to kumaranfinance@kvb",
+      "createdAt": "2026-10-27T10:05:00.000Z",
+      "recordedByUser": {
+        "id": "user-cust-001",
+        "name": "Sundaram S",
+        "phone": "+919876543210",
+        "roles": ["CUSTOMER"]
+      },
+      "allocations": [
+        {
+          "id": "alloc-uuid-001",
+          "amountAllocated": "3950",
+          "due": {
+            "id": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
+            "installmentMonth": 4,
+            "netPayableAmount": "3950",
+            "status": "UNPAID"
+          },
+          "ticket": {
+            "id": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+            "ticketNumber": 4,
+            "customer": {
+              "id": "cust-uuid-001",
+              "fullName": "Sundaram S",
+              "phone": "+919876543210"
+            },
+            "chitGroup": {
+              "id": "group-uuid-001",
+              "groupCode": "KCA-1L-20M-01",
+              "branchId": "branch-uuid-001"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 7.6 `POST /api/v1/payments/:id/verify-upi-claim`
+**Description**: **Checker**: Desk Accountant or Partner verifies the customer's UPI credit in Karur Vysya Bank statement. Strictly enforces Maker != Checker (`payment.recordedByUserId !== checkerUserId`). Transitions payment `INITIATED` $\to$ `SUCCESS`, generates collision-proof sequential bilingual receipt, and marks installment `PAID`.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
+
+#### Request Body
+```json
+{
+  "verificationNotes": "Verified credit in Karur Vysya Bank Statement on 27/10/2026 with UTR 429812345678."
+}
+```
+
+#### Success Response (HTTP 200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "timestamp": "2026-10-27T10:15:00.000Z",
+  "data": {
+    "success": true,
+    "message": "UPI payment claim verified successfully. Official receipt generated and sent to customer.",
+    "payment": {
+      "id": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
+      "amount": "3950",
+      "paymentMethod": "UPI",
+      "paymentStatus": "SUCCESS",
+      "transactionRef": "429812345678",
+      "notes": "Customer UPI Claim: Paid via Google Pay to kumaranfinance@kvb | Verified by user-accountant-002: Verified credit in Karur Vysya Bank Statement on 27/10/2026 with UTR 429812345678.",
+      "updatedAt": "2026-10-27T10:15:00.000Z"
+    },
+    "receipt": {
+      "id": "rec-uuid-001",
+      "branchId": "branch-uuid-001",
+      "paymentId": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
+      "receiptNumber": "KC-REC-PRD-2026-00415",
+      "isBilingual": true,
+      "issuedAt": "2026-10-27T10:15:00.000Z"
+    },
+    "dueStatus": "PAID"
   }
 }
 ```

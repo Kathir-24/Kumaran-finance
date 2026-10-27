@@ -99,21 +99,31 @@ stateDiagram-v2
 ## 4. Payment & Cash Handover State Machine (`CONFIRMED-BY-DEVELOPER`)
 
 > [!NOTE]
-> **Database Column Mapping**: In PostgreSQL, `Payment.paymentStatus` is an enum (`INITIATED`, `SUCCESS`, `FAILED`, `REVERSED`), while cash custody during field collections is tracked via `Payment.cashHandoverStatus` (`PENDING_HANDOVER` $\to$ `ACKNOWLEDGED`). When an agent records doorstep cash, `paymentStatus` is immediately `SUCCESS` (crediting the subscriber's passbook and satisfying the monthly due), and `cashHandoverStatus` remains `PENDING_HANDOVER` until acknowledged by a Partner into the vault.
+> **Database Column Mapping**: In PostgreSQL, `Payment.paymentStatus` is an enum (`INITIATED`, `SUCCESS`, `FAILED`, `REVERSED`), while cash custody during field collections is tracked via `Payment.cashHandoverStatus` (`PENDING_HANDOVER` $\to$ `ACKNOWLEDGED`).
+> - **Doorstep & Counter Cash**: When an agent or cashier records cash, `paymentStatus` is immediately `SUCCESS` (crediting the subscriber's passbook and satisfying the monthly due), and `cashHandoverStatus` remains `PENDING_HANDOVER` until acknowledged by a Partner into the vault.
+> - **Native 1-Tap UPI Intent Claims (ADR-19)**: When a customer launches UPI, transfers directly to KVB, and submits their 12-digit Bank UTR claim (`POST /payments/upi-claim`), a `Payment` record is created in `INITIATED` status with unique `transactionRef`. Upon Desk Accountant verification against the KVB bank statement (`POST /payments/:id/verify-upi-claim`), `paymentStatus` transitions to `SUCCESS` under strict Maker != Checker dual control.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> INITIATED : Agent/Cashier Records Payment
-    INITIATED --> PENDING_HANDOVER : Cash Payment Recorded in Field
-    PENDING_HANDOVER --> SUCCESS : Partner Acknowledges Cash at Branch (Collector != Acknowledger)
-    INITIATED --> SUCCESS : Online UPI / Bank Cleared
-    SUCCESS --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
+    [*] --> SUCCESS_CASH : Agent/Cashier Records Doorstep or Counter Cash
+    [*] --> INITIATED : Customer Submits UPI Bank UTR Claim (ADR-19)
+    INITIATED --> SUCCESS_ONLINE : Desk Accountant Verifies Bank Statement (Maker != Checker)
+    INITIATED --> FAILED : Bank Statement Mismatch / Bounced
+    SUCCESS_CASH --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
+    SUCCESS_ONLINE --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
     REVERSAL_REQUESTED --> REVERSED : Partner Approves Reversal (Checker, Maker != Checker)
-    INITIATED --> FAILED : Gateway Error / Cheque Bounced
 ```
 
 ### Transition Guards:
-- **`INITIATED` $\to$ `PENDING_HANDOVER` $\to$ `SUCCESS` (Field Cash Handover Guard)**:
+- **`[*] ` $\to$ `INITIATED` (Customer 1-Tap UPI Claim)**:
+  - Customer completes payment on external UPI app (GPay/PhonePe/Paytm/Cred) and submits the 12-digit UTR reference (`POST /payments/upi-claim`).
+  - Unique constraint on `transactionRef` strictly blocks duplicate claims.
+  - Installment remains `UNPAID` until verification.
+- **`INITIATED` $\to$ `SUCCESS` (Accountant Bank Statement Verification Guard)**:
+  - Desk Accountant or Partner inspects the pending queue (`GET /payments/pending-upi-claims`), confirms credit in Karur Vysya Bank current account, and verifies (`POST /payments/:id/verify-upi-claim`).
+  - Enforces `maker_user_id != checker_user_id` (a staff member who submitted a claim cannot verify it).
+  - Automatically transitions installment due to `PAID` and triggers bilingual receipt.
+- **`[*] ` $\to$ `PENDING_HANDOVER` $\to$ `ACKNOWLEDGED` (Field Cash Handover Guard)**:
   - Agent records physical cash collected in the field, creating a payment batch in `PENDING_HANDOVER`.
   - At end-of-day, the agent submits cash to the branch.
   - **Dual-Role Cash Handover Guard**: Since field agents also perform desk accounting duties, the software strictly enforces:

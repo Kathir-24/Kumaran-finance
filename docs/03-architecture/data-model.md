@@ -10,6 +10,7 @@
 > 5. **Company Safety Proof Recordkeeping**: Flexible security checklist (signed agreements, nominee signatures, blank cheques, promissory notes) on prize winners. Property documents eliminated; collateral is non-mandatory.
 > 6. **Fixed 1/4 Discount Ceiling & Physical Tie-Breaks**: Maximum auction discount fixed at strictly 1/4 (25%) of total chit value with support for in-branch physical paper token tie-breaks.
 > 7. **Single Discrete Payments & Zero Advance Balance**: Each installment month accepts strictly one payment; zero double payments and zero advance balance concept.
+> 8. **Bank UTR Anti-Duplication Constraint (ADR-19)**: Database-level unique constraint on `Payment.transactionRef` (`@unique`) prevents any bank UTR or cheque reference from being submitted or credited twice. Nullable to allow infinite cash payments.
 
 ---
 
@@ -396,7 +397,7 @@ model Payment {
   paymentMethod      PaymentMethod
   paymentStatus      PaymentStatus       @default(INITIATED)
   idempotencyKey     String?             @unique
-  transactionRef     String?             // UPI Ref, Cheque number, Bank UTR
+  transactionRef     String?             @unique // UPI Ref, Cheque number, Bank UTR (Unique per bank credit)
   chequeStatus                     String?             // PENDING, CLEARED, BOUNCED
   cashHandoverStatus               String?             // PENDING_HANDOVER, ACKNOWLEDGED
   cashHandoverAcknowledgedByUserId String?             // Partner / Cashier who counted and verified physical cash

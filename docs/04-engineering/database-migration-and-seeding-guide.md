@@ -94,6 +94,8 @@ Opens in your browser at `http://localhost:5555`.
 | `20261021170132_add_payment_notes` | 2026-10-21 | Added optional `notes` column to `Payment` for cashier remarks and collection logs. | **Applied & Verified** |
 | `20261022205000_remove_user_email` | 2026-10-22 | Dropped `email` column from `User` table to enforce strict phone-only identity (ADR-18). | **Applied & Verified** |
 | `20261023095606_add_cycle_date_windows` | 2026-10-23 | Added `cycleStartDate` and `cycleEndDate` to `InstallmentDue` for physical 6-column passbook ledger alignment. | **Applied & Verified** (`289/289` unit tests, `82/82` E2E tests passing) |
+| `20261027065614_add_financial_reporting_indexes` | 2026-10-27 | Added compound B-tree indexes on `Payment`, `Receipt`, and `Customer` for sub-millisecond Day Book & Form XXII Cash Book queries. | **Applied & Verified** |
+| `20261027094809_add_transaction_ref_unique_constraint` | 2026-10-27 | Added `CREATE UNIQUE INDEX "Payment_transactionRef_key"` to enforce bank UTR and cheque reference uniqueness (ADR-19). | **Applied & Verified** (`367/367` unit tests, `88/88` E2E tests passing) |
 
 ---
 

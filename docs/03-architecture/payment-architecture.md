@@ -27,12 +27,13 @@ In physical chit-fund operations across Perundurai and rural Erode, Tamil Nadu:
   1. **Office Counter Payments**: Walk-in subscribers paying cash, presenting cheques, or scanning the branch UPI QR code.
   2. **Doorstep Field Collections**: Agents collecting cash or cheque instruments during daily motorcycle collection rounds.
   3. **Direct Bank Transfers**: Subscribers transferring via NEFT/RTGS/IMPS with transaction UTR references recorded by staff.
+  4. **Native One-Tap UPI Intent Payments (ADR-19)**: Direct-to-bank settlement to Kumaran Finance KVB current account via NPCI deep-link (`upi://pay`) with **₹0 gateway fees**, unique bank UTR tracking, and Maker != Checker staff verification.
 
 ---
 
-## 2. The 5 Core Invariant Guardrails (CONFIRMED-BY-DEVELOPER)
+## 2. The 6 Core Invariant Guardrails (CONFIRMED-BY-DEVELOPER)
 
-All payment operations in Kumaran Chits are mathematically and architecturally bound to 5 strict invariants:
+All payment operations in Kumaran Chits are mathematically and architecturally bound to 6 strict invariants:
 
 ```mermaid
 flowchart LR
@@ -40,6 +41,7 @@ flowchart LR
     I2 --> I3["3. Whole Rupee Math\nBigInt only; Zero paise/floats"]
     I3 --> I4["4. Dual Control Handover\ncollector != acknowledger"]
     I4 --> I5["5. Dual Control Reversal\nmaker != checker (Super Admin)"]
+    I5 --> I6["6. Bank UTR Uniqueness\nZero duplicate UTRs/claims"]
 ```
 
 1. **Exact Net Installment ($I_{net}$) Invariant (ADR-07)**:
@@ -59,6 +61,11 @@ flowchart LR
    - If an error occurs (cheque bounce, wrong ticket, duplicate bank entry), a Maker initiates a reversal request (`POST /payments/:id/request-reversal`).
    - A separate Partner (Super Admin) acts as Checker (`POST /payments/:id/approve-reversal`).
    - The application strictly enforces `maker_user_id != checker_user_id`. The user who requested the reversal cannot approve or reject it.
+6. **Bank UTR Anti-Duplication Invariant (ADR-19)**:
+   - Every non-null bank UTR or cheque reference string (`transactionRef`) is strictly unique across the entire database (`Payment_transactionRef_key`).
+   - Reusing a bank UTR throws `ConflictException` (HTTP 409 `DUPLICATE_TRANSACTION_REF`).
+   - Nulls are permitted infinitely for cash transactions.
+
 
 ---
 
@@ -132,6 +139,44 @@ sequenceDiagram
     API-->>Partner: HTTP 200 OK (Cash deposited into branch vault)
 ```
 
+### 3.3 Customer Native One-Tap UPI & Verification Lifecycle (Lifecycle 7B / ADR-19)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as Subscriber (Mobile App)
+    participant UPIApp as GPay / PhonePe / Paytm / BHIM
+    participant API as PaymentService (NestJS)
+    participant DB as PostgreSQL 17 (chitflow_dev)
+    actor Accountant as Desk Staff / Cashier (Checker)
+    participant Queue as BullMQ (notification-queue)
+
+    Customer->>API: GET /installments/:dueId/upi-intent
+    API->>DB: Validate due is UNPAID & verify caller identity (Anti-BOLA)
+    API-->>Customer: HTTP 200 OK (NPCI URI: upi://pay?pa=kumaranfinance@kvb&am=Inet&tn=...)
+    Customer->>UPIApp: 1-Tap Deep-Link launches UPI app with locked ₹ amount
+    Customer->>UPIApp: Enters secret UPI PIN
+    UPIApp-->>Customer: Payment Successful (Direct credit to KVB Account; 12-digit Bank UTR)
+    Customer->>API: POST /payments/upi-claim (dueId, utrNumber, notes)
+    API->>DB: Check UTR uniqueness in Payment.transactionRef & verify no duplicate claim
+    API->>DB: Transaction: Create Payment (status = INITIATED), Create Allocation
+    DB-->>API: Commit Successful
+    API-->>Customer: HTTP 201 Created ("Claim recorded pending bank verification")
+
+    Note over Accountant,DB: Accounting Desk Verification (Maker != Checker)
+
+    Accountant->>API: GET /payments/pending-upi-claims
+    API-->>Accountant: Returns pending claims with customer name, due amount & UTR
+    Accountant->>Accountant: Opens KVB NetBanking / Mobile App; checks ₹ credit matching UTR
+    Accountant->>API: POST /payments/:id/verify-upi-claim (verificationNotes)
+    API->>API: Enforce Maker != Checker (Submitter != Accountant)
+    API->>DB: Transaction: Payment -> SUCCESS, Issue Sequential Receipt, Mark Due -> PAID
+    DB-->>API: Commit Successful
+    API->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (Push/SMS)
+    API-->>Accountant: HTTP 200 OK (Receipt KC-REC-PRD-YYYY-XXXXX issued)
+    Queue-->>Customer: Instant Push Notification & Digital Passbook updated to PAID!
+```
+
 ---
 
 ## 4. Database Models & Schema Proofs
@@ -149,7 +194,7 @@ model Payment {
   paymentMethod                    PaymentMethod       // CASH, UPI, CHEQUE, BANK_TRANSFER
   paymentStatus                    PaymentStatus       @default(INITIATED) // INITIATED, SUCCESS, REVERSED, FAILED
   idempotencyKey                   String?             @unique
-  transactionRef                   String?             // UPI Ref, Cheque number, Bank UTR
+  transactionRef                   String?             @unique // UPI Ref, Cheque number, Bank UTR (Unique per bank credit)
   chequeStatus                     String?             // PENDING, CLEARED, BOUNCED
   cashHandoverStatus               String?             // PENDING_HANDOVER, ACKNOWLEDGED
   cashHandoverAcknowledgedByUserId String?             // Partner who verified physical notes
@@ -214,6 +259,10 @@ All endpoints are protected by [`JwtAuthGuard`](file:///u:/Kumaran-finance/apps/
 | `GET /payments` | All Staff, Auditor, Customer | Lists payments. Customers are strictly scoped to self (`customerId == ownId`). |
 | `GET /payments/:id` | All Staff, Auditor, Customer | Retrieves detailed payment with allocations, receipt, and reversal metadata. |
 | `GET /payments/:id/receipt` | All Staff, Auditor, Customer | Generates formatted bilingual receipt text layout (English + தமிழ்). |
+| `GET /installments/:dueId/upi-intent` | Customer, All Staff | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
+| `POST /payments/upi-claim` | Customer, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
+| `GET /payments/pending-upi-claims` | Accountant, Branch Manager, Super Admin | Lists all pending UPI claims for Accounting Desk statement matching. |
+| `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
 | `POST /payments/:id/request-reversal` | Accountant, Branch Manager, Super Admin | Maker creates reversal request with mandatory reason code. Enqueues partner push alert. |
 | `POST /payments/:id/approve-reversal` | **Super Admin Strictly** | Checker approves reversal. Enforces `maker_user_id != checker_user_id`. Restores due to `UNPAID`. |
 | `POST /payments/:id/reject-reversal` | **Super Admin Strictly** | Checker rejects reversal. Enforces `maker_user_id != checker_user_id`. Retains `SUCCESS`. |
@@ -349,7 +398,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 | **BullMQ Receipt & Alert Queues** | **100% DONE** | Production-ready | `JOB_DISPATCH_PAYMENT_RECEIPT` and `JOB_DISPATCH_APPROVAL_ALERT` wired and running. |
 | **Web Admin Portal (`apps/web`)** | **0% PENDING** | Empty (`.gitkeep`) | React/Next.js screens for cashier counter entry, receipt viewing, and handover approval remain to be built. |
 | **Mobile Flutter App (`apps/mobile`)** | **0% PENDING** | Empty (`.gitkeep`) | Android screens for field agent collections, offline SQLite queue, and customer passbook remain to be built. |
-| **Payment Gateway (Razorpay/PG)** | **ARCH ONLY** | Documented in `payment-integration.md` | Sandbox architecture planned for future phase; no live gateway code in API (counter & field cash are current business truth). |
+| **Native Zero-Fee UPI Intent (ADR-19)**| **100% DONE** | Production-ready & Verified | NPCI native deep-linking (`upi://pay`), Bank UTR `@unique` constraint, customer claims & Maker != Checker verification complete. Third-party gateways strictly eliminated (₹0 MDR fee). |
 | **Cheque Clearance Endpoint** | **BY WORKFLOW** | Handled via Reversal | Dedicated `PATCH /cheque-status` endpoint not created; bounced cheques are handled via `POST /payments/:id/request-reversal` with reason `CHEQUE_BOUNCE`. |
 
 ---

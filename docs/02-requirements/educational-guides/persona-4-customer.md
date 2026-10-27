@@ -126,13 +126,17 @@ sequenceDiagram
     APP->>API: GET /customers/:id & GET /tickets/:ticketId/dues
     API-->>APP: Returns Ticket #9 (KCA-1L-20M-01) | Net Due: ₹4,100
     C->>APP: Taps "Pay Due / பணம் செலுத்துக (₹4,100)"
-    APP->>APP: Launches Native Android Intent (upi://pay)
-    APP->>UPI: Opens Google Pay with pre-filled amount ₹4,100
-    C->>UPI: Enters UPI PIN and confirms payment
-    UPI-->>APP: Returns UPI Ref ID (e.g. 4291880192)
-    APP->>API: POST /payments (mode: 'UPI', amount: 4100, reference: '4291880192')
-    API-->>APP: Commits BigInt ₹4,100 -> Receipt #KC-REC-PRD-2026-00412
-    APP-->>C: Green Screen: "Payment Successful! Receipt #KC-REC-00412"
+    APP->>API: GET /installments/:dueId/upi-intent
+    API-->>APP: Returns Native NPCI Intent (upi://pay?pa=kumaranfinance@kvb&am=4100...)
+    APP->>APP: Launches Native Android UPI Chooser
+    APP->>UPI: Opens Google Pay / PhonePe with pre-filled amount ₹4,100
+    C->>UPI: Enters UPI PIN and confirms direct bank transfer to KVB
+    UPI-->>APP: Returns with Bank UTR (e.g. 429812345678)
+    APP->>API: POST /payments/upi-claim (dueId, utrNumber: "429812345678")
+    API-->>APP: Registered in INITIATED status (Bank UTR Anti-Duplication Protected)
+    Note over API: Desk Accountant verifies credit on KVB Bank Statement (Maker != Checker)
+    API-->>APP: Verified -> Receipt #KC-REC-PRD-2026-00412 Issued -> Status: PAID
+    APP-->>C: Green Screen: "Payment Verified! Receipt #KC-REC-00412"
     APP-->>C: Sends instant free Mobile Push Notification & updates Digital Passbook
 ```
 
@@ -203,24 +207,26 @@ Mani decides to pay online from his textile shop without waiting for the agent:
      - *Note*: Amount cannot be edited. Partial payments are disallowed.
    - Mani taps **"Pay with UPI (GPay / PhonePe / Paytm)"**.
 3. **Android App Chooser**:
-   - The phone opens the native Android Intent sheet showing installed UPI apps: **Google Pay**, **PhonePe**, **Paytm**.
+   - The app fetches the NPCI intent URI (`GET /installments/:dueId/upi-intent`) and opens the native Android Intent sheet showing installed UPI apps: **Google Pay**, **PhonePe**, **Paytm**, **BHIM**, **Cred**.
    - Mani taps **Google Pay**.
 4. **Authorize in Google Pay**:
-   - Google Pay opens with pre-filled payee `Kumaran Finance` and exact amount `₹4,100`.
+   - Google Pay opens with pre-filled payee `Kumaran Finance` (`kumaranfinance@kvb`), exact amount `₹4,100`, and transaction note.
    - Mani enters his 4-digit UPI bank PIN.
-   - Google Pay displays: *"Paid ₹4,100 to Kumaran Finance - UPI Ref: 4291880192"*.
-5. **Instant App Confirmation & Receipt**:
-   - Mani is returned to the Kumaran Chits app.
-   - The screen shows a festive green checkmark animation:
-     > ✅ **பணம் வெற்றிகரமாக செலுத்தப்பட்டது! / Payment Successful!**  
+   - Google Pay displays: *"Paid ₹4,100 to Kumaran Finance - UPI Ref: 429812345678"*.
+5. **Instant Bank UTR Claim Submission & Verification**:
+   - Mani returns to the Kumaran Chits app where his 12-digit Bank UTR (`429812345678`) is auto-filled (or manually confirmed).
+   - Mani taps **"Submit Payment Claim"** (`POST /payments/upi-claim`). The claim is instantly recorded in `INITIATED` status (with PostgreSQL 17 uniqueness protecting against duplicate claims).
+   - The Desk Accountant cross-checks the bank statement and verifies the credit (`POST /payments/:id/verify-upi-claim`), updating the status to `PAID` under Maker != Checker dual control.
+   - The screen updates with the official sequential receipt:
+     > ✅ **பணம் வெற்றிகரமாக சரிபார்க்கப்பட்டது! / Payment Verified!**  
      > **ரசீது எண் / Receipt No**: `KC-REC-PRD-2026-00412`  
      > **செலுத்திய தொகை / Amount Paid**: `₹4,100`  
-     > **செலுத்திய முறை / Mode**: `UPI (Google Pay)`  
+     > **செலுத்திய முறை / Mode**: `UPI (Google Pay - UTR 429812345678)`  
      > **தேதி / Date**: `21-Oct-2026 10:05 AM`
 6. **Download Receipt**:
    - Mani taps **"ரசீதை பதிவிறக்குக / Download PDF Receipt"**.
    - A clean bilingual A5 PDF receipt is saved to his phone's Downloads folder.
-   - Mani's due status changes immediately from `UNPAID` to **`PAID (செலுத்தப்பட்டது)`**.
+   - Mani's due status changes from `UNPAID` to **`PAID (செலுத்தப்பட்டது)`**.
 
 ---
 
@@ -295,7 +301,7 @@ To claim his ₹76,000 prize money, Mani visits the branch desk 3 days later:
 | Potential Trap / Mistake | What Happens in the Software | How the Customer Resolves It |
 |---|---|---|
 | **Customer tries to pay ₹2,000 online via UPI instead of ₹4,100** | App locks the payment field to the exact net due (₹4,100). The amount is non-editable. | Chit funds do not allow partial installments. Pay the full ₹4,100 to keep the ticket active and eligible for auctions. |
-| **Bank debited ₹4,100 on GPay, but internet died before returning to app** | The backend's automated payment reconciliation worker detects the gateway webhook and credits the account. | Re-open the app when internet resumes. The status will show `PAID`. If not, tap **"Contact Branch"** and share your UPI 12-digit UTR number. |
+| **Bank debited ₹4,100 on GPay, but internet died before returning to app** | The payment settles directly into Kumaran Finance's KVB bank account. | Re-open the app when internet resumes, tap **"Claim UPI Payment"**, and enter your 12-digit Bank UTR reference. The Desk Accountant will verify against the bank statement and issue the receipt. |
 | **Subscriber fails to pay for 3 continuous months** | Warning modal appears: `3 மாத நிலுவை எச்சரிக்கை / 3-Month Arrears Warning`. | Visit the branch office immediately, clear all pending dues with the partners to prevent ticket cancellation and legal default action (`REMOVED_DEF_3M`). |
 | **Subscriber thinks dividend stops after winning the prize money** | It does NOT stop. Kumaran Finance uses Universal Equal Dividends. | Check your app next month! You will see the exact same dividend deducted from your base installment as non-prized members. |
 | **Subscriber forgets their 6-digit MPIN** | Cannot log in with old PIN. | Tap **"Forgot MPIN / பின் மறந்துவிட்டதா?"**. Enter mobile number, verify with SMS OTP, and set a new 6-digit MPIN in 30 seconds. |

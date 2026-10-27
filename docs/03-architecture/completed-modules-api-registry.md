@@ -18,17 +18,17 @@
 | **Module 2: Customer & KYC Intake** | `/customers` | 11 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), S3 KYC uploads, 15-min presigned URLs, scan deletion | 24 passing |
 | **Module 3: Chit Groups & Intake** | `/chits` | 9 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update & ticket unassign | 20 passing |
 | **Module 4: In-Office Auctions** | `/auctions` | 10 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker, statutory minutes layout | 16 passing |
-| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 9 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal, substitution & exit settlement | 13 passing |
+| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 10 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal, substitution & exit settlement, NPCI UPI Intent URI helper | 16 passing |
 | **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`), BullMQ receipt queue | 16 passing |
-| **Module 7: Payments & Reversals** | `/payments` | 7 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal (`maker != checker`), BullMQ receipt queue | 19 passing |
+| **Module 7: Payments & Reversals** | `/payments` | 10 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal, Bank UTR unique constraint, Customer UPI claims & Desk verification | 23 passing |
 | **Module 8: Prize Disbursements** | `/disbursements` | 9 | Safety proof checklist (ADR-15), S3 proof uploads & presigned inspection URLs, bilingual voucher, Maker $\ne$ Checker payout | 17 passing |
 | **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
 | **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
 | **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | A5 digital receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
-| **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 82 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **105 (111 ops + UI)**| **All Invariants 100% Satisfied** | **431 / 431 PASSING** |
+| **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 11 suites | 88 E2E passing |
+| **TOTAL VERIFIED SCOPE** | — | **109 (115 ops + UI)**| **All Invariants 100% Satisfied** | **455 / 455 PASSING (367 Unit + 88 E2E)** |
 
 ---
 
@@ -177,6 +177,7 @@ Across all 100 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact $I_{net}$ | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
 
 ---
 
@@ -205,6 +206,9 @@ Across all 100 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/payments` | Query & filter payments list | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payments Only** | **Read-Only (Global)** |
 | `GET` | `/payments/:id` | Get single payment details & history | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payment Only** | **Read-Only (Global)** |
 | `GET` | `/payments/:id/receipt` | Generate bilingual receipt (EN + தமிழ்) | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Receipt Only** | **Read-Only (Global)** |
+| `POST` | `/payments/upi-claim` | Customer self-submits bank UTR claim (`INITIATED`) | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Ticket Only** | 🚫 **Blocked** |
+| `GET` | `/payments/pending-upi-claims` | List pending UPI claims for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify UTR credit & issue receipt (`maker != checker`) | **Allowed (Checker)** | **Allowed (Branch)** | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Commit reversal (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |

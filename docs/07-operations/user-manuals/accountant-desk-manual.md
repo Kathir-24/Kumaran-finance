@@ -43,6 +43,7 @@ In our local operating reality, staff members frequently collect cash in the fie
 |---|---|:---:|:---:|
 | **§3** | Morning Cash Desk Setup & Note-Sorter Check | Single Actor | Physical Desk & Web Portal |
 | **§4** | Walk-in Cash Collection & Bilingual Receipt | Single Actor | Web Portal (`POST /payments`) |
+| **§4B** | Verifying Customer UPI Claims against KVB Bank | Checker Role | Web Portal (`POST /payments/:id/verify-upi-claim`) |
 | **§5** | Physical Paper Passbook Pen Endorsement | Physical Action | Subscriber Booklet |
 | **§6** | High-Density Paper Notebook Transcription | Maker Role | Web Portal (`POST /chits/onboard-ongoing`) |
 | **§7** | Preparing Prize Payout Vouchers & Safety Proof | Maker Role | Web Portal (`POST /disbursements/...`) |
@@ -100,6 +101,40 @@ flowchart TD
 6. Select Payment Mode: **`CASH`** (or `UPI` if scanned via office counter QR).
 7. Click **"Submit & Issue Receipt"** (`POST /payments`).
 8. The system instantly generates the official sequential receipt number (e.g., `KC-REC-PRD-2026-00124`) and sends a free push notification to the customer's mobile app.
+
+---
+
+## 4B. Verifying Customer UPI Payment Claims against Bank Statement
+
+When subscribers pay online via deep-link from the mobile app (GPay / PhonePe / Paytm), they submit their 12-digit Bank UTR reference number. These claims sit in `INITIATED` status awaiting accounting verification.
+
+```mermaid
+flowchart TD
+    Queue["1. Open Web Portal: 'Payments -> Pending UPI Claims'"] --> List["2. Table displays pending subscriber claims:\n• Subscriber: K. Kathirvel\n• Scheme: KCA-1L-20M-01 (Ticket #4)\n• Installment Month: 3\n• Expected Net Due: ₹3,950\n• Claimed Bank UTR: 429188123456"]
+    List --> CheckBank["3. Open Karur Vysya Bank (KVB) NetBanking:\nVerify ₹3,950 credit received with UTR #429188123456"]
+    CheckBank --> Decision{"Did the money arrive in KVB account?"}
+    Decision -- "YES" --> Verify["4. Click 'Verify & Issue Receipt'\n• Enforces Maker != Checker\n• Payment marked SUCCESS\n• Generates Sequential Bilingual Receipt\n• Due updated to PAID\n• Push alert sent to subscriber"]
+    Decision -- "NO / Incorrect" --> Hold["Hold claim, contact subscriber, or flag invalid"]
+```
+
+### Step-by-Step Instructions:
+1. In the Web Portal navigation menu, click **Payments $\to$ Pending UPI Claims** (`GET /payments/pending-upi-claims`).
+2. Review the pending claim details:
+   - **Subscriber**: `K. Kathirvel (9842100001)`
+   - **Scheme / Ticket**: `KCA-1L-20M-01, Ticket #4`
+   - **Installment Month**: `Month 3`
+   - **Net Amount**: `₹3,950`
+   - **Bank UTR Number**: `429188123456`
+3. On your desk computer, open Karur Vysya Bank (KVB) NetBanking or mobile banking app.
+4. Verify that the exact whole-rupee amount (`₹3,950`) has credited to Kumaran Finance's current account under UTR `429188123456`.
+5. In the Web Portal, click **"Verify & Issue Receipt"** (`POST /payments/:id/verify-upi-claim`). Enter optional verification notes (e.g., `"Verified in KVB NetBanking at 15:30"`).
+6. **Dual-Control Safety Invariant (`maker_user_id != checker_user_id`)**:
+   - If you submitted the claim on the customer's behalf, you **cannot** verify it. An independent Partner or colleague must confirm the bank credit.
+7. Upon clicking verify:
+   - The payment transitions from `INITIATED` $\to$ **`SUCCESS`**.
+   - The official bilingual receipt (`KC-REC-PRD-2026-XXXXX`) is generated immediately.
+   - The customer's due status updates to **`PAID`**.
+   - An instant mobile Push Notification is delivered to the subscriber's phone with the receipt number.
 
 ---
 

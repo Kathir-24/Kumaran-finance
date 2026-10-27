@@ -1,76 +1,97 @@
-# Kumaran Chits — Payment Integration & Reconciliation Test Plan
+# Kumaran Chits — Native Zero-Fee UPI & Bank Reconciliation Specification
 
-> **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Mandate**: No real-money payment integration may go live until provider merchant approvals, webhook cryptographic verification, and automated settlement reconciliation tests have passed in sandbox mode.
+> **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
+> **Mandate (`CONFIRMED-BY-DEVELOPER` / ADR-19)**: **Strictly ZERO third-party payment gateways (No Razorpay, Cashfree, PayU, or 2% MDR fees)**. All online payments settle directly into Kumaran Finance's Karur Vysya Bank (KVB) Current Account in Perundurai using NPCI's Native UPI Intent Protocol.
 
 ---
 
-## 1. Online Payment Workflow (UPI & Netbanking)
+## 1. Native One-Tap UPI Architecture & Lifecycles
+
+In place of costly aggregator gateways that charge 1.5%–2% + GST per transaction, Kumaran Chits leverages the **NPCI UPI 2.0 Intent Protocol**:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Customer as Subscriber (Mobile App)
-    participant Backend as NestJS API
-    participant PG as Payment Gateway (Cashfree / Razorpay Sandbox)
-    participant Bank as Customer's Bank / UPI App
+    actor Customer as Subscriber (Flutter Android App)
+    participant UPIApp as GPay / PhonePe / Paytm / BHIM
+    participant Backend as NestJS API (apps/api)
+    participant DB as PostgreSQL 17 (chitflow_dev)
+    actor Accountant as Desk Accountant / Cashier (Checker)
+    participant KVB as Karur Vysya Bank (KVB) NetBanking
+    participant Queue as BullMQ (notification-queue)
 
-    Customer->>Backend: POST /payments/online/initiate (Chit Ticket, Installment Month)
-    Backend->>Backend: Validates due status & creates pending Payment record
-    Backend->>PG: Creates Order / Payment Intent (Server-to-Server API)
-    PG-->>Backend: Returns Gateway Order ID & SDK Token
-    Backend-->>Customer: Returns Gateway Session Details
-    Customer->>Bank: Completes payment in UPI App (GPay / PhonePe / Paytm)
-    Bank-->>PG: Payment Captured Successfully
+    Customer->>Backend: GET /installments/:dueId/upi-intent
+    Backend->>DB: Validates due is UNPAID & caller owns ticket (Anti-BOLA)
+    Backend-->>Customer: Returns NPCI URI (upi://pay?pa=kumaranfinance@kvb&am=Inet&tn=...)
+    Customer->>UPIApp: 1-Tap Deep-Link launches UPI app with amount LOCKED
+    Customer->>UPIApp: Enters secret UPI PIN
+    UPIApp->>KVB: Immediate IMPS credit to Kumaran Finance KVB Current Account
+    UPIApp-->>Customer: Payment Successful (Displays 12-digit Bank UTR)
+    Customer->>Backend: POST /payments/upi-claim { dueId, utrNumber, notes }
+    Backend->>DB: Asserts Bank UTR uniqueness (Payment.transactionRef @unique)
+    Backend->>DB: Transaction: Create Payment (status = INITIATED), Create Allocation
+    DB-->>Backend: Commit Successful
+    Backend-->>Customer: HTTP 201 Created ("Claim recorded pending bank verification")
 
-    Note over PG,Backend: Webhook Callback (Server-to-Server)
+    Note over Accountant,KVB: Accounting Desk Verification (Maker != Checker)
 
-    PG->>Backend: POST /webhooks/payment-gateway (Signed Payload)
-    Backend->>Backend: Verifies HMAC SHA-256 Signature
-    Backend->>Backend: Checks Idempotency (Has event ID been processed?)
-    alt Signature Valid & Not Processed
-        Backend->>Backend: Database Transaction: Mark SUCCESS, Allocate Due, Issue Bilingual Receipt
-        Backend->>Backend: Fire-and-forget: Enqueue Receipt Job to BullMQ (notification-queue)
-        Backend-->>PG: HTTP 200 OK
-    else Duplicate Event
-        Backend-->>PG: HTTP 200 OK (Idempotent ignore)
-    else Invalid Signature
-        Backend-->>PG: HTTP 400 Bad Request (Alert Security)
-    end
+    Accountant->>Backend: GET /payments/pending-upi-claims
+    Backend-->>Accountant: Returns pending claims with subscriber name, due & UTR
+    Accountant->>KVB: Checks KVB NetBanking / Mobile App for matching ₹ credit & UTR
+    Accountant->>Backend: POST /payments/:id/verify-upi-claim { verificationNotes }
+    Backend->>Backend: Enforces Maker != Checker (Submitter != Accountant)
+    Backend->>DB: Transaction: Payment -> SUCCESS, Issue Sequential Receipt, Mark Due -> PAID
+    DB-->>Backend: Commit Successful
+    Backend->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (Push/SMS)
+    Backend-->>Accountant: HTTP 200 OK (Receipt KC-REC-PRD-YYYY-XXXXX issued)
+    Queue-->>Customer: Instant Push Notification & Digital Passbook updated to PAID!
 ```
 
 ---
 
-## 2. Webhook Security & Idempotency Rules
+## 2. The 3 Security & Financial Invariant Guards
 
-1. **HMAC SHA-256 Signature Verification**:
-   - The backend validates the `X-Webhook-Signature` header against the raw request body using the gateway's secret key.
-   - If the signature does not match, the request is rejected immediately with HTTP 400, and a security alert is logged.
-2. **Idempotent Webhook Processing**:
-   - Payment providers frequently send duplicate webhook callbacks.
-   - The backend checks `ProviderWebhookEvent` table for the unique `eventId`.
-   - If already processed, the system immediately returns `HTTP 200 OK` without executing double allocations or issuing duplicate receipts.
-3. **Never Trust App Success Redirects Alone**:
-   - The client mobile app's return screen is for UI presentation only. Internal payment status is marked `SUCCESS` **only** upon cryptographic webhook verification or direct server-to-server status poll.
+### 2.1 Whole-Rupee Amount Locking ($I_{net} = I_{base} - Div$)
+The generated NPCI URI dynamically locks the exact net installment due into the `am` parameter:
+```
+upi://pay?pa=kumaranfinance@kvb&pn=Kumaran+Finance&am=3950&cu=INR&tn=KCA-1L-20M-01+Ticket+%231+Month+3&tr=80210f78...
+```
+When launched on Android, the payment app does not allow the subscriber to edit or change the amount, preventing underpayments or overpayments.
+
+### 2.2 Bank UTR Anti-Duplication Constraint (PostgreSQL 17)
+- In [`apps/api/prisma/schema.prisma`](file:///u:/Kumaran-finance/apps/api/prisma/schema.prisma):
+  ```prisma
+  transactionRef String? @unique // UPI Ref, Cheque number, Bank UTR
+  ```
+- Migration [`20261027094809_add_transaction_ref_unique_constraint`](file:///u:/Kumaran-finance/apps/api/prisma/migrations/20261027094809_add_transaction_ref_unique_constraint/migration.sql) establishes a B-tree unique index in PostgreSQL (`Payment_transactionRef_key`).
+- Standard SQL rule: `NULL` entries are permitted infinitely for physical cash transactions, but any non-null 12-digit UTR string can only be entered once across the lifetime of the database.
+- Collision attempts return `HTTP 409 Conflict` (`DUPLICATE_TRANSACTION_REF`).
+
+### 2.3 Strict Maker != Checker Separation
+- If an office staff member or collection agent enters a payment claim on behalf of a customer, they are permanently recorded as the `maker` (`recordedByUserId`).
+- The endpoint `POST /payments/:id/verify-upi-claim` enforces that `recordedByUserId != checkerUserId`.
+- Only an independent staff member (`ACCOUNTANT`, `BRANCH_MANAGER`, or `SUPER_ADMIN`) who did not submit the claim can verify the credit against KVB NetBanking.
 
 ---
 
-## 3. Daily Settlement Reconciliation Procedure
+## 3. Endpoints & API Contract Reference
 
-At 06:00 AM IST daily, an automated BullMQ reconciliation job reconciles internal records against the provider's settlement report:
-
-```mermaid
-flowchart TD
-    Start["Automated Daily 06:00 AM BullMQ Job"] --> Fetch["Fetch Provider Settlement Report (Yesterday's Transactions)"]
-    Fetch --> Match{"Compare Gateway Order ID vs Internal Payment Record"}
-    Match -- Amount & Status Match --> RecPass["Mark Payment: RECONCILED"]
-    Match -- Gateway SUCCESS but Internal PENDING --> AutoResolve["Auto-Update Internal State to SUCCESS & Allocate Due"]
-    Match -- Gateway REFUNDED but Internal SUCCESS --> FlagException["Flag Dispute Exception & Alert Accountant Dashboard"]
-```
-
-### Reconciliation Mismatch Handling
-| Scenario | Cause | Resolution Action |
+| Method & Path | Primary Role | Description |
 |---|---|---|
-| **Ghost Drop** | Customer debited, but app closed before webhook fired | Automated reconciliation detects settlement; updates internal status to `SUCCESS` and generates receipt retroactively. |
-| **Amount Discrepancy** | Customer paid ₹3,500 but gateway captured ₹3,000 | Flagged as `RECONCILIATION_EXCEPTION`. Accountant investigates before allocating. |
-| **Unmapped Credit** | Payment received without valid ticket reference | Placed in `UNCLAIMED_SUSPENSE_ACCOUNT` awaiting manual identification. |
+| `GET /installments/:dueId/upi-intent` | `CUSTOMER`, All Staff | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
+| `POST /payments/upi-claim` | `CUSTOMER`, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
+| `GET /payments/pending-upi-claims` | `ACCOUNTANT`, `SUPER_ADMIN` | Lists all pending UPI claims for Accounting Desk statement matching. |
+| `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
+
+---
+
+## 4. Automated Tests & Live Verification Proofs
+
+- **Unit Test Suite**: [`apps/api/test/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/payment.spec.ts)
+  - Bank UTR anti-duplication collision rejection (`ConflictException 409`)
+  - Customer UPI claim submission in `INITIATED` status
+  - Duplicate pending claim prevention on same due
+  - Dual control verification with sequential bilingual receipt issuance
+  - Submitter self-verification rejection (`maker != checker`)
+- **Live Server Integration Script**: [`apps/api/scripts/verify-upi-intent-and-claims.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-upi-intent-and-claims.ts)
+  - Proves end-to-end execution against live PostgreSQL 17 on Port 5433 with 100% pass rate.
