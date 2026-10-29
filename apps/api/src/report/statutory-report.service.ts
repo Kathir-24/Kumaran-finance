@@ -204,11 +204,11 @@ export class StatutoryReportService {
 
     const whereAuction: {
       chitGroupId: string;
-      status: 'MINUTES_FILED' | 'COMPLETED';
+      status: { in: ('MINUTES_FILED' | 'COMPLETED')[] };
       auctionDate?: { gte?: Date; lte?: Date };
     } = {
       chitGroupId: query.chitGroupId,
-      status: 'MINUTES_FILED',
+      status: { in: ['MINUTES_FILED', 'COMPLETED'] },
     };
 
     if (query.fromDate || query.toDate) {
