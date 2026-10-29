@@ -143,8 +143,9 @@ export class CustomerController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCustomerDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.customerService.update(id, dto);
+    return this.customerService.update(id, dto, currentUser);
   }
 
   @Post(':id/nominees')
@@ -167,17 +168,7 @@ export class CustomerController {
     @Body() dto: CreateNomineeDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
-    if (
-      currentUser.roles.includes(Role.CUSTOMER) &&
-      !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
-      currentUser.sub !== customerId
-    ) {
-      throw new ForbiddenException(
-        'Subscribers can only designate nominees for their own account',
-      );
-    }
-
-    return this.customerService.addNominee(customerId, dto);
+    return this.customerService.addNominee(customerId, dto, currentUser);
   }
 
   @Delete(':id/nominees/:nomineeId')
@@ -192,8 +183,9 @@ export class CustomerController {
   async removeNominee(
     @Param('id') customerId: string,
     @Param('nomineeId') nomineeId: string,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.customerService.removeNominee(customerId, nomineeId);
+    return this.customerService.removeNominee(customerId, nomineeId, currentUser);
   }
 
   @Patch(':id/kyc-status')
@@ -208,8 +200,9 @@ export class CustomerController {
   async updateKycStatus(
     @Param('id') id: string,
     @Body() dto: UpdateKycDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.customerService.updateKycStatus(id, dto);
+    return this.customerService.updateKycStatus(id, dto, currentUser);
   }
 
   @Patch(':id/fcm-token')
@@ -301,7 +294,7 @@ export class CustomerController {
       );
     }
 
-    return this.customerService.uploadDocument(customerId, dto, file);
+    return this.customerService.uploadDocument(customerId, dto, file, currentUser);
   }
 
   @Get(':id/documents/:docId/url')
@@ -337,7 +330,7 @@ export class CustomerController {
       );
     }
 
-    return this.customerService.getDocumentPresignedUrl(customerId, docId);
+    return this.customerService.getDocumentPresignedUrl(customerId, docId, currentUser);
   }
 
   @Delete(':id/documents/:docId')

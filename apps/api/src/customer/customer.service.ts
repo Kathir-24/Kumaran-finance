@@ -10,6 +10,8 @@ import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
@@ -222,13 +224,17 @@ export class CustomerService {
   /**
    * Updates customer profile details
    */
-  async update(id: string, dto: UpdateCustomerDto) {
+  async update(id: string, dto: UpdateCustomerDto, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     if (dto.phone && dto.phone !== customer.phone) {
@@ -272,13 +278,17 @@ export class CustomerService {
   /**
    * Adds and links a verified nominee to a customer
    */
-  async addNominee(customerId: string, dto: CreateNomineeDto) {
+  async addNominee(customerId: string, dto: CreateNomineeDto, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     return this.prisma.nominee.create({
@@ -295,7 +305,20 @@ export class CustomerService {
   /**
    * Removes a linked nominee
    */
-  async removeNominee(customerId: string, nomineeId: string) {
+  async removeNominee(customerId: string, nomineeId: string, currentUser?: JwtPayload) {
+    if (currentUser) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { id: true, branchId: true, phone: true },
+      });
+
+      if (!customer) {
+        throw new NotFoundException(`Customer with ID ${customerId} not found`);
+      }
+
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
+    }
+
     const nominee = await this.prisma.nominee.findUnique({
       where: { id: nomineeId },
     });
@@ -319,13 +342,17 @@ export class CustomerService {
   /**
    * Updates customer KYC verification status
    */
-  async updateKycStatus(id: string, dto: UpdateKycDto) {
+  async updateKycStatus(id: string, dto: UpdateKycDto, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     await this.prisma.customer.update({
@@ -380,6 +407,7 @@ export class CustomerService {
     customerId: string,
     dto: UploadCustomerDocumentDto,
     file?: { originalname: string; mimetype: string; size: number; buffer: Buffer },
+    currentUser?: JwtPayload,
   ) {
     if (!file || !file.buffer) {
       throw new BadRequestException('A valid document file is required for upload');
@@ -397,11 +425,15 @@ export class CustomerService {
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true, customerCode: true },
+      select: { id: true, customerCode: true, branchId: true, phone: true },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     const rawExt = path.extname(file.originalname).toLowerCase() || '.bin';
@@ -432,14 +464,18 @@ export class CustomerService {
   /**
    * Generates a 15-minute time-limited presigned URL to view a customer KYC document
    */
-  async getDocumentPresignedUrl(customerId: string, docId: string) {
+  async getDocumentPresignedUrl(customerId: string, docId: string, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true },
+      select: { id: true, branchId: true, phone: true },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     const document = await this.prisma.customerDocument.findFirst({
@@ -464,11 +500,15 @@ export class CustomerService {
   async deleteDocument(customerId: string, docId: string, currentUser: any) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true },
+      select: { id: true, branchId: true, phone: true },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     const document = await this.prisma.customerDocument.findFirst({
@@ -477,15 +517,6 @@ export class CustomerService {
 
     if (!document) {
       throw new NotFoundException(`Document with ID ${docId} not found for this customer`);
-    }
-
-    // Customer persona authorization guard
-    if (
-      currentUser.roles?.includes(Role.CUSTOMER) &&
-      !currentUser.roles.some((r: any) => r !== Role.CUSTOMER) &&
-      currentUser.sub !== customerId
-    ) {
-      throw new ForbiddenException('Subscribers are only permitted to manage their own KYC documents');
     }
 
     // Protection for verified documents: only Super Admin can delete a verified document

@@ -646,4 +646,124 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('8. Anti-BOLA / IDOR Cross-Branch Guardians (OWASP API1:2023)', () => {
+    const branchPrdId = 'branch-prd-001';
+    const branchErdId = 'branch-erd-002';
+
+    const branchManagerPrdPayload = {
+      sub: 'manager-prd-uuid',
+      phone: '9876543212',
+      roles: [Role.BRANCH_MANAGER],
+      branchId: branchPrdId,
+      tokenType: 'access' as const,
+    };
+
+    const superAdminPayload = {
+      sub: 'admin-uuid',
+      phone: '9876543210',
+      roles: [Role.SUPER_ADMIN],
+      branchId: branchPrdId,
+      tokenType: 'access' as const,
+    };
+
+    const mockErdCustomer = {
+      id: 'cust-erd-uuid-999',
+      customerCode: 'KC-CUST-00999',
+      fullName: 'S. Ramanathan',
+      phone: '9842199999',
+      branchId: branchErdId,
+      isKycVerified: false,
+    };
+
+    const mockKycDoc = {
+      id: 'doc-erd-001',
+      customerId: mockErdCustomer.id,
+      docType: KycDocumentType.AADHAAR_FRONT,
+      s3Key: 'kyc/cust-erd-uuid-999/AADHAAR_FRONT-test.jpg',
+      fileName: 'aadhaar.jpg',
+      verified: false,
+      uploadedAt: new Date(),
+    };
+
+    it('BOLA-INV-1: Branch Manager of Branch PRD cannot view presigned KYC URL of Branch ERD customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+
+      await expect(
+        customerController.getDocumentUrl(mockErdCustomer.id, mockKycDoc.id, branchManagerPrdPayload),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('BOLA-INV-2: Branch Manager of Branch PRD cannot delete KYC document of Branch ERD customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+
+      await expect(
+        customerController.deleteDocument(mockErdCustomer.id, mockKycDoc.id, branchManagerPrdPayload),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('BOLA-INV-3: Branch Manager of Branch PRD cannot upload KYC document for Branch ERD customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+
+      await expect(
+        customerController.uploadDocument(
+          mockErdCustomer.id,
+          { docType: KycDocumentType.AADHAAR_FRONT },
+          { originalname: 'doc.jpg', mimetype: 'image/jpeg', size: 1024, buffer: Buffer.from('abc') } as any,
+          branchManagerPrdPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('BOLA-INV-4: Branch Manager of Branch PRD cannot update profile of Branch ERD customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+
+      await expect(
+        customerController.update(
+          mockErdCustomer.id,
+          { fullName: 'Tampered Name' },
+          branchManagerPrdPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('BOLA-INV-5: Branch Manager of Branch PRD cannot update KYC status of Branch ERD customer', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+
+      await expect(
+        customerController.updateKycStatus(
+          mockErdCustomer.id,
+          { isKycVerified: true },
+          branchManagerPrdPayload,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('BOLA-INV-6: Super Admin can view, update, and manage Branch ERD customer (Global Oversight)', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue(mockErdCustomer);
+      prismaMock.customerDocument.findFirst.mockResolvedValue(mockKycDoc);
+      storageServiceMock.getPresignedUrl.mockResolvedValue('https://storage/presigned-url');
+
+      const res = await customerController.getDocumentUrl(
+        mockErdCustomer.id,
+        mockKycDoc.id,
+        superAdminPayload,
+      );
+      expect(res.url).toBe('https://storage/presigned-url');
+    });
+
+    it('BOLA-INV-7: Branch Manager of Branch PRD CAN access a customer belonging to Branch PRD (Same Branch)', async () => {
+      const mockPrdCustomer = { ...mockErdCustomer, branchId: branchPrdId };
+      prismaMock.customer.findUnique.mockResolvedValue(mockPrdCustomer);
+      prismaMock.customerDocument.findFirst.mockResolvedValue(mockKycDoc);
+      storageServiceMock.getPresignedUrl.mockResolvedValue('https://storage/presigned-url-prd');
+
+      const res = await customerController.getDocumentUrl(
+        mockPrdCustomer.id,
+        mockKycDoc.id,
+        branchManagerPrdPayload,
+      );
+      expect(res.url).toBe('https://storage/presigned-url-prd');
+    });
+  });
 });

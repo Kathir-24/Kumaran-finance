@@ -269,4 +269,49 @@ export class DocumentAccessHelper {
       }
     }
   }
+
+  /**
+   * Verifies that the requesting user has permission to view, upload, or modify
+   * customer records and KYC documents based on persona and branch boundaries.
+   * Enforces Anti-BOLA/IDOR rules:
+   * 1. Super Admin, Auditor, Accountant: Global oversight.
+   * 2. Branch Manager: Scoped strictly to their assigned branch. Cross-branch access throws 403 Forbidden.
+   * 3. Customer: Scoped strictly to self. Third-party access throws 403 Forbidden.
+   * 4. Collection Agent: Blocked from viewing/mutating KYC files.
+   */
+  static assertCustomerAccess(
+    customer: { id: string; branchId: string; phone?: string | null },
+    user: JwtPayload,
+  ): void {
+    if (
+      user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.AUDITOR) ||
+      user.roles.includes(Role.ACCOUNTANT)
+    ) {
+      return; // Global access
+    }
+
+    if (
+      user.roles.includes(Role.BRANCH_MANAGER) &&
+      !user.roles.includes(Role.SUPER_ADMIN)
+    ) {
+      if (user.branchId && customer.branchId !== user.branchId) {
+        throw new ForbiddenException(
+          'BOLA_VIOLATION: Access denied. Customer profile and KYC documents belong to another branch office',
+        );
+      }
+      return;
+    }
+
+    if (user.roles.includes(Role.CUSTOMER)) {
+      if (user.sub !== customer.id && (!customer.phone || customer.phone !== user.phone)) {
+        throw new ForbiddenException(
+          'BOLA_VIOLATION: Access denied. Subscribers are only permitted to access their own account',
+        );
+      }
+      return;
+    }
+
+    throw new ForbiddenException('BOLA_VIOLATION: Access denied. Unauthorized to access this customer record');
+  }
 }
