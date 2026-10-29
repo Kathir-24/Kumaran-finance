@@ -14,6 +14,7 @@ import { generateSecret, generateURI, verifySync } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notification/services/sms.service';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
+import { decryptAesGcm, encryptAesGcm } from '../common/crypto/aes-gcm.util';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
@@ -149,9 +150,14 @@ export class AuthService {
       throw new UnauthorizedException('User account invalid or 2FA not configured');
     }
 
+    const secret = decryptAesGcm(
+      user.totpSecret,
+      this.configService.get<string>('JWT_SECRET') || 'default-jwt-secret-key-32-chars-min',
+    );
+
     const result = verifySync({
       token: dto.totpCode,
-      secret: user.totpSecret,
+      secret,
     });
 
     if (!result.valid) {
@@ -233,10 +239,15 @@ export class AuthService {
       );
     }
 
+    const encryptedSecret = encryptAesGcm(
+      dto.secret,
+      this.configService.get<string>('JWT_SECRET') || 'default-jwt-secret-key-32-chars-min',
+    );
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        totpSecret: dto.secret,
+        totpSecret: encryptedSecret,
         isTotpEnabled: true,
       },
     });
@@ -351,11 +362,17 @@ export class AuthService {
 
     await this.smsService.sendOtpSms(trimmedPhone, otpCode);
 
+    // Debug OTP is restricted strictly to local automated testing (NODE_ENV === 'test' or explicit ALLOW_DEBUG_OTP === 'true')
+    // It must NEVER be exposed in staging or production environments.
+    const allowDebugOtp =
+      process.env.NODE_ENV === 'test' ||
+      (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEBUG_OTP === 'true');
+
     return {
       success: true,
       message: 'OTP sent successfully to registered mobile number.',
       expiresInSeconds: OTP_EXPIRY_SECONDS,
-      ...(process.env.NODE_ENV !== 'production' ? { debugOtp: otpCode } : {}),
+      ...(allowDebugOtp ? { debugOtp: otpCode } : {}),
     };
   }
 
@@ -571,6 +588,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid token type for refresh operation');
     }
 
+    // Role-based handling for Chit Subscribers (Role.CUSTOMER)
+    if (payload.roles?.includes(Role.CUSTOMER)) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!customer) {
+        throw new UnauthorizedException('Session revoked or subscriber profile no longer exists');
+      }
+
+      return this.generateCustomerAuthTokens({
+        id: customer.id,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        branchId: customer.branchId,
+      });
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
@@ -591,10 +626,28 @@ export class AuthService {
    * Invalidates active session by clearing stored refresh token hash and device FCM push token
    */
   async logout(userId: string) {
-    await this.prisma.user.update({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      data: { refreshTokenHash: null, fcmToken: null },
+      select: { id: true },
     });
+
+    if (user) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { refreshTokenHash: null, fcmToken: null },
+      });
+    } else {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (customer) {
+        await this.prisma.customer.update({
+          where: { id: userId },
+          data: { fcmToken: null },
+        });
+      }
+    }
 
     return {
       success: true,

@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChitStatus, InitializationMode, Prisma } from '@prisma/client';
+import { ChitStatus, InitializationMode, Prisma, Role } from '@prisma/client';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DISCOUNT_CEILING_DIVISOR,
@@ -468,9 +469,10 @@ export class ChitService {
   }
 
   /**
-   * Get single chit scheme details with tickets and auctions summary
+   * Get single chit scheme details with tickets and auctions summary.
+   * If requested by a Chit Subscriber (Role.CUSTOMER), sanitizes fellow members' PII.
    */
-  async findOne(id: string) {
+  async findOne(id: string, currentUser?: JwtPayload) {
     const chit = await this.prisma.chitGroup.findUnique({
       where: { id },
       include: {
@@ -509,6 +511,46 @@ export class ChitService {
 
     if (!chit) {
       throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+    }
+
+    // DPDP & Anti-BOLA: If requester is strictly a Chit Subscriber (Role.CUSTOMER),
+    // protect fellow subscribers' PII (phone number, customer identity).
+    // The subscriber sees full details only for their own ticket; other members are masked.
+    const isCustomerOnly =
+      currentUser &&
+      currentUser.roles?.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r) =>
+        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT, Role.AUDITOR] as Role[]).includes(r),
+      );
+
+    if (isCustomerOnly) {
+      const sanitizedTickets = chit.tickets.map((t) => {
+        const isOwnTicket =
+          t.customerId === currentUser.sub ||
+          t.customer?.id === currentUser.sub ||
+          t.customer?.phone === currentUser.phone;
+
+        if (isOwnTicket) {
+          return t;
+        }
+
+        return {
+          ...t,
+          customer: t.customer
+            ? {
+                id: 'MASKED',
+                customerCode: 'KC-CUST-RESERVED',
+                fullName: `Subscriber (Ticket #${t.ticketNumber})`,
+                phone: '+91 ******0000',
+              }
+            : null,
+        };
+      });
+
+      return {
+        ...chit,
+        tickets: sanitizedTickets,
+      };
     }
 
     return chit;

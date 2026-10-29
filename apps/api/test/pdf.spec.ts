@@ -580,6 +580,28 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         DocumentAccessHelper.assertStorageKeyAccess('safety-proof/auc-1/cheque.pdf', collectionAgent1);
       }).toThrow(ForbiddenException);
     });
+
+    it('should restrict direct storage access to receipts and vouchers for customer and collection agents', () => {
+      // Customer blocked from raw storage path
+      expect(() => {
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', customerSundaram);
+      }).toThrow(ForbiddenException);
+
+      expect(() => {
+        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', customerSundaram);
+      }).toThrow(ForbiddenException);
+
+      // Collection agent blocked from raw storage path
+      expect(() => {
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', collectionAgent1);
+      }).toThrow(ForbiddenException);
+
+      // Super Admin and Auditor permitted
+      expect(() => {
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', superAdminUser);
+        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', auditorUser);
+      }).not.toThrow();
+    });
   });
 });
 

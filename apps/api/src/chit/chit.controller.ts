@@ -23,6 +23,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiCreatedResponseEnvelope,
   ApiOkResponseEnvelope,
@@ -119,8 +120,11 @@ export class ChitController {
   })
   @ApiOkResponseEnvelope(ChitGroupDetailResponseDto, { description: 'Chit scheme found' })
   @ApiResponse({ status: 404, description: 'Chit scheme not found' })
-  async findOne(@Param('id') id: string) {
-    return this.chitService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.chitService.findOne(id, currentUser);
   }
 
   @Patch(':id')

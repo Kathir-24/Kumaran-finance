@@ -49,18 +49,24 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
 
+  // Bank-Grade Security: Trust upstream Nginx reverse proxy (1 hop)
+  // Ensures req.ip correctly resolves to real client IP via X-Forwarded-For
+  // for independent throttler rate-limiting buckets and fraud audit trails.
+  (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
+
   // 1. Security Headers via Helmet
   app.use(
     helmet({
-      crossOriginEmbedderPolicy: false, // Allows PDF rendering and Swagger assets
-      contentSecurityPolicy: false, // Allows Swagger UI inline scripts without CDN failures
+      crossOriginEmbedderPolicy: false, // Allows PDF rendering and assets
+      contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false, // Bank-grade CSP in production; relaxed in dev for Swagger UI
       xFrameOptions: { action: 'sameorigin' }, // Prevents clickjacking while allowing passbook iframes from same origin
     }),
   );
 
   // 2. Strict CORS Configuration
-  const configuredOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+  const rawOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS;
+  const configuredOrigins = rawOrigins
+    ? rawOrigins.split(',').map((o) => o.trim())
     : DEFAULT_CORS_ORIGINS;
 
   app.enableCors({
@@ -72,7 +78,7 @@ async function bootstrap() {
       if (!origin || configuredOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        callback(null, false);
       }
     },
     methods: CORS_ALLOWED_METHODS,
@@ -112,58 +118,60 @@ async function bootstrap() {
   // Global standardized error exception filter
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // Swagger OpenAPI Documentation
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Kumaran Chits — Operations API')
-    .setDescription(
-      'Official backend RESTful API for Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu). ' +
-        'Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.',
-    )
-    .setVersion('1.0.0')
-    .addServer('/', 'Default Base URL')
+  // Swagger OpenAPI Documentation (Strictly restricted to non-production environments)
+  if (process.env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Kumaran Chits — Operations API')
+      .setDescription(
+        'Official backend RESTful API for Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu). ' +
+          'Enforces 64-bit integer Rupees (BigInt), 4% commission lock, fixed 1/4 ceiling, and Maker-Checker dual control.',
+      )
+      .setVersion('1.0.0')
+      .addServer('/', 'Default Base URL')
 
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter staff JWT access token',
-        in: 'header',
-      },
-      'JWT-auth',
-    )
-    .addBasicAuth(
-      {
-        type: 'http',
-        scheme: 'basic',
-        description: 'Enter HTTP Basic Auth credentials for Prometheus metrics',
-      },
-      'basic',
-    )
-    .addTag('Health', 'System health checks')
-    .addTag('Auth', 'Staff identity, MPIN, and TOTP 2FA')
-    .addTag('Branches', 'Company branch offices')
-    .addTag('Staff Users', 'Office staff user administration')
-    .addTag('Customers', 'Customer intake, KYC, and Nominees')
-    .addTag('Chits', 'Chit schemes, tickets, and mid-cycle onboarding')
-    .addTag('Auctions', 'In-office auctions, bidding, and tie-breakers')
-    .addTag('Installment Dues', 'Monthly installment schedules and arrears')
-    .addTag('Subscriber Tickets & Passbook', 'Digital passbook and ticket ledger')
-    .addTag('Collections & Cash Handover', 'Doorstep field collections and end-of-day branch handover')
-    .addTag('Payments, Receipts & Reversals', 'Office counter payments, bilingual receipts, and dual-control reversals')
-    .addTag('Prize Disbursements & Safety Proof', 'Prize settlement, safety proof checklist, and bilingual payout vouchers')
-    .addTag('Dashboards & Statutory Reports', 'Form XXII, Form XVII, Form XXI, and executive dashboards')
-    .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
-    .addTag('Bilingual PDF Documents', 'On-demand A5 digital receipts, vouchers, Form XVII minutes, and Form XXI passbooks')
-    .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
-    .addTag('Observability & Metrics', 'Prometheus metrics, latency histograms, and system telemetry')
-    .build();
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter staff JWT access token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addBasicAuth(
+        {
+          type: 'http',
+          scheme: 'basic',
+          description: 'Enter HTTP Basic Auth credentials for Prometheus metrics',
+        },
+        'basic',
+      )
+      .addTag('Health', 'System health checks')
+      .addTag('Auth', 'Staff identity, MPIN, and TOTP 2FA')
+      .addTag('Branches', 'Company branch offices')
+      .addTag('Staff Users', 'Office staff user administration')
+      .addTag('Customers', 'Customer intake, KYC, and Nominees')
+      .addTag('Chits', 'Chit schemes, tickets, and mid-cycle onboarding')
+      .addTag('Auctions', 'In-office auctions, bidding, and tie-breakers')
+      .addTag('Installment Dues', 'Monthly installment schedules and arrears')
+      .addTag('Subscriber Tickets & Passbook', 'Digital passbook and ticket ledger')
+      .addTag('Collections & Cash Handover', 'Doorstep field collections and end-of-day branch handover')
+      .addTag('Payments, Receipts & Reversals', 'Office counter payments, bilingual receipts, and dual-control reversals')
+      .addTag('Prize Disbursements & Safety Proof', 'Prize settlement, safety proof checklist, and bilingual payout vouchers')
+      .addTag('Dashboards & Statutory Reports', 'Form XXII, Form XVII, Form XXI, and executive dashboards')
+      .addTag('Storage & Presigned Files', 'Encrypted document uploads and 15-minute presigned URLs')
+      .addTag('Bilingual PDF Documents', 'On-demand A5 digital receipts, vouchers, Form XVII minutes, and Form XXI passbooks')
+      .addTag('Background Jobs & Daily Maintenance', 'BullMQ queues, midnight arrears, and settlement reconciliation')
+      .addTag('Observability & Metrics', 'Prometheus metrics, latency histograms, and system telemetry')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    customSiteTitle: 'Kumaran Chits API Documentation',
-  });
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'Kumaran Chits API Documentation',
+    });
+  }
 
   // 6. Mount Bull Board Queue Monitor UI under /admin/queues with Super Admin Basic Auth
   const bullBoardService = app.get(BullBoardService);
@@ -177,7 +185,9 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`🚀 Kumaran Chits API running on: http://localhost:${port}`);
-  console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);
+  }
   console.log(`📊 Bull Board Queue Monitor at: http://localhost:${port}/admin/queues`);
   console.log(`📈 Prometheus Metrics Exporter at: http://localhost:${port}/metrics`);
 }

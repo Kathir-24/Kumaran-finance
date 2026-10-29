@@ -11,6 +11,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 
 @Injectable()
@@ -44,7 +45,16 @@ export class MetricsAuthGuard implements CanActivate {
     const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
     const [username, password] = credentials.split(':');
 
-    if (username === this.metricsUser && password === this.metricsPass) {
+    // Bank-Grade Security: Constant-time comparison to prevent side-channel timing attacks
+    const expectedUserBuf = crypto.createHash('sha256').update(this.metricsUser).digest();
+    const actualUserBuf = crypto.createHash('sha256').update(username || '').digest();
+    const expectedPassBuf = crypto.createHash('sha256').update(this.metricsPass).digest();
+    const actualPassBuf = crypto.createHash('sha256').update(password || '').digest();
+
+    const userMatches = crypto.timingSafeEqual(expectedUserBuf, actualUserBuf);
+    const passMatches = crypto.timingSafeEqual(expectedPassBuf, actualPassBuf);
+
+    if (userMatches && passMatches) {
       return true;
     }
 

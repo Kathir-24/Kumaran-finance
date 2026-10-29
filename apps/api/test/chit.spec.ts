@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { ChitStatus, InitializationMode } from '@prisma/client';
+import { ChitStatus, InitializationMode, Role } from '@prisma/client';
 import { ChitService } from '../src/chit/chit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -351,6 +351,100 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       await expect(
         chitService.activate(mockChitGroupId, mockAdminId),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('5. Scheme Member Privacy & DPDP Scoping (findOne)', () => {
+    it('should mask fellow members PII when accessed by Role.CUSTOMER', async () => {
+      const customerAId = 'cust-uuid-aaa';
+      const customerBId = 'cust-uuid-bbb';
+
+      const mockChit = {
+        id: 'chit-group-privacy-test',
+        groupCode: 'KCA-PRIVACY-01',
+        tickets: [
+          {
+            id: 'ticket-1',
+            ticketNumber: 1,
+            customerId: customerAId,
+            customer: {
+              id: customerAId,
+              customerCode: 'KC-CUST-AAA',
+              fullName: 'K. Customer A',
+              phone: '9876500001',
+            },
+          },
+          {
+            id: 'ticket-2',
+            ticketNumber: 2,
+            customerId: customerBId,
+            customer: {
+              id: customerBId,
+              customerCode: 'KC-CUST-BBB',
+              fullName: 'R. Customer B',
+              phone: '9876500002',
+            },
+          },
+        ],
+        auctions: [],
+      };
+
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChit);
+
+      // Customer A requesting details
+      const customerAPayload = {
+        sub: customerAId,
+        phone: '9876500001',
+        roles: [Role.CUSTOMER],
+        branchId: 'branch-1',
+        tokenType: 'access' as const,
+      };
+
+      const result = await chitService.findOne('chit-group-privacy-test', customerAPayload);
+
+      // Customer A's own ticket must be fully visible
+      expect(result.tickets[0].customer.fullName).toBe('K. Customer A');
+      expect(result.tickets[0].customer.phone).toBe('9876500001');
+
+      // Customer B's ticket must be masked
+      expect(result.tickets[1].customer.fullName).toBe('Subscriber (Ticket #2)');
+      expect(result.tickets[1].customer.phone).toBe('+91 ******0000');
+      expect(result.tickets[1].customer.customerCode).toBe('KC-CUST-RESERVED');
+    });
+
+    it('should provide unmasked member roster to privileged staff', async () => {
+      const mockChit = {
+        id: 'chit-group-privacy-test',
+        groupCode: 'KCA-PRIVACY-01',
+        tickets: [
+          {
+            id: 'ticket-1',
+            ticketNumber: 1,
+            customerId: 'cust-uuid-aaa',
+            customer: {
+              id: 'cust-uuid-aaa',
+              customerCode: 'KC-CUST-AAA',
+              fullName: 'K. Customer A',
+              phone: '9876500001',
+            },
+          },
+        ],
+        auctions: [],
+      };
+
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChit);
+
+      const staffPayload = {
+        sub: 'staff-uuid-001',
+        phone: '9876543210',
+        roles: [Role.SUPER_ADMIN],
+        branchId: 'branch-1',
+        tokenType: 'access' as const,
+      };
+
+      const result = await chitService.findOne('chit-group-privacy-test', staffPayload);
+      expect(result.tickets[0].customer.fullName).toBe('K. Customer A');
+      expect(result.tickets[0].customer.phone).toBe('9876500001');
     });
   });
 });

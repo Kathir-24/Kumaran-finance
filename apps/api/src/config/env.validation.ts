@@ -125,6 +125,33 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     );
   }
 
+  // Production Strict Password & Secret Hardening
+  if (nodeEnv === 'production') {
+    const jwtSecret = (config.JWT_SECRET as string) || '';
+    if (
+      jwtSecret.includes('replace-with-a-secure-random') ||
+      jwtSecret.length < 32
+    ) {
+      errors.push(
+        'In production, JWT_SECRET must be a cryptographically secure random secret (minimum 32 characters)',
+      );
+    }
+
+    const bullPass = config.BULL_BOARD_PASSWORD as string | undefined;
+    if (bullPass === 'chitflow_secret') {
+      errors.push(
+        'In production, BULL_BOARD_PASSWORD cannot use the insecure default "chitflow_secret"',
+      );
+    }
+
+    const metricsPass = config.METRICS_PASSWORD as string | undefined;
+    if (metricsPass === 'chitflow_secret') {
+      errors.push(
+        'In production, METRICS_PASSWORD cannot use the insecure default "chitflow_secret"',
+      );
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `\n❌ ENVIRONMENT CONFIGURATION ERROR:\n` +
@@ -141,7 +168,9 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     JWT_SECRET: config.JWT_SECRET as string,
     JWT_EXPIRES_IN: (config.JWT_EXPIRES_IN as string) ?? '15m',
     REFRESH_TOKEN_EXPIRES_IN: (config.REFRESH_TOKEN_EXPIRES_IN as string) ?? '7d',
-    CORS_ALLOWED_ORIGINS: config.CORS_ALLOWED_ORIGINS as string | undefined,
+    CORS_ALLOWED_ORIGINS:
+      (config.CORS_ALLOWED_ORIGINS as string | undefined) ??
+      (config.CORS_ORIGINS as string | undefined),
     DEFAULT_FOREMAN_COMMISSION_PERCENT: Number(config.DEFAULT_FOREMAN_COMMISSION_PERCENT ?? 4.0),
     PRIMARY_BRANCH_CODE: (config.PRIMARY_BRANCH_CODE as string) ?? 'PRD',
     STORAGE_DRIVER: storageDriver as 'local' | 's3',

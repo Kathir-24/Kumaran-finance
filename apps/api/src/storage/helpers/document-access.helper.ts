@@ -255,5 +255,18 @@ export class DocumentAccessHelper {
         );
       }
     }
+
+    if (key.startsWith('receipts/') || key.startsWith('vouchers/')) {
+      if (user.roles.includes(Role.CUSTOMER)) {
+        throw new ForbiddenException(
+          'Access denied: Please access receipts and vouchers through the authorized /pdf endpoints',
+        );
+      }
+      if (user.roles.includes(Role.COLLECTION_AGENT)) {
+        throw new ForbiddenException(
+          'Access denied: Direct storage file access is restricted for collection agents',
+        );
+      }
+    }
   }
 }

@@ -214,13 +214,13 @@ export class InstallmentService {
       throw new NotFoundException('Subscriber ticket not found');
     }
 
-    // Role-based scoping for CUSTOMER persona
+    // Role-based scoping for CUSTOMER persona: anti-BOLA check against ticket subscriber ownership
     if (userRole === Role.CUSTOMER && currentUserId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: currentUserId },
-        select: { phone: true },
-      });
-      if (!user || user.phone !== ticket.customer.phone) {
+      const isOwner =
+        ticket.customerId === currentUserId ||
+        ticket.customer?.id === currentUserId ||
+        ticket.customer?.phone === currentUserId;
+      if (!isOwner) {
         throw new ForbiddenException(
           'Access denied: You can only view your own ticket dues',
         );
@@ -310,13 +310,13 @@ export class InstallmentService {
       throw new NotFoundException('Subscriber ticket not found');
     }
 
-    // Role-based customer isolation
+    // Role-based customer isolation: anti-BOLA check against ticket subscriber ownership
     if (userRole === Role.CUSTOMER && currentUserId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: currentUserId },
-        select: { phone: true },
-      });
-      if (!user || user.phone !== ticket.customer.phone) {
+      const isOwner =
+        ticket.customerId === currentUserId ||
+        ticket.customer?.id === currentUserId ||
+        ticket.customer?.phone === currentUserId;
+      if (!isOwner) {
         throw new ForbiddenException(
           'Access denied: You can only view your own passbook ledger',
         );

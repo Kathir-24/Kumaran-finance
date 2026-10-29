@@ -7,6 +7,7 @@
 
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 @Injectable()
@@ -33,7 +34,16 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
     const [username, ...passParts] = credentials.split(':');
     const password = passParts.join(':');
 
-    if (username === this.expectedUser && password === this.expectedPass) {
+    // Bank-Grade Security: Constant-time comparison to prevent side-channel timing attacks
+    const expectedUserBuf = crypto.createHash('sha256').update(this.expectedUser).digest();
+    const actualUserBuf = crypto.createHash('sha256').update(username || '').digest();
+    const expectedPassBuf = crypto.createHash('sha256').update(this.expectedPass).digest();
+    const actualPassBuf = crypto.createHash('sha256').update(password || '').digest();
+
+    const userMatches = crypto.timingSafeEqual(expectedUserBuf, actualUserBuf);
+    const passMatches = crypto.timingSafeEqual(expectedPassBuf, actualPassBuf);
+
+    if (userMatches && passMatches) {
       next();
       return;
     }
