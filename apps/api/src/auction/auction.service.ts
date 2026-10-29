@@ -168,6 +168,26 @@ export class AuctionService {
     );
 
     return this.prisma.$transaction(async (tx) => {
+      // 0. State Guard: Verify existing auction is not already completed or filed
+      const existingAuction = await tx.auction.findUnique({
+        where: {
+          chitGroupId_installmentMonth: {
+            chitGroupId,
+            installmentMonth: month,
+          },
+        },
+      });
+
+      if (
+        existingAuction &&
+        (existingAuction.status === AuctionStatus.COMPLETED ||
+          existingAuction.status === AuctionStatus.MINUTES_FILED)
+      ) {
+        throw new BadRequestException(
+          `Cannot record bid: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
+        );
+      }
+
       // Upsert auction record
       const auction = await tx.auction.upsert({
         where: {
@@ -276,6 +296,26 @@ export class AuctionService {
     );
 
     return this.prisma.$transaction(async (tx) => {
+      // 0. State Guard: Verify existing auction is not already completed or filed
+      const existingAuction = await tx.auction.findUnique({
+        where: {
+          chitGroupId_installmentMonth: {
+            chitGroupId,
+            installmentMonth: month,
+          },
+        },
+      });
+
+      if (
+        existingAuction &&
+        (existingAuction.status === AuctionStatus.COMPLETED ||
+          existingAuction.status === AuctionStatus.MINUTES_FILED)
+      ) {
+        throw new BadRequestException(
+          `Cannot conduct tie-break draw: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
+        );
+      }
+
       // 1. Upsert Auction
       const auction = await tx.auction.upsert({
         where: {
@@ -398,7 +438,10 @@ export class AuctionService {
       throw new NotFoundException('Auction record not found');
     }
 
-    if (auction.status === AuctionStatus.COMPLETED) {
+    if (
+      auction.status === AuctionStatus.COMPLETED ||
+      auction.status === AuctionStatus.MINUTES_FILED
+    ) {
       throw new BadRequestException('Auction is already completed and finalized');
     }
 
@@ -420,7 +463,11 @@ export class AuctionService {
           SELECT id, status FROM "Auction" WHERE id = ${auctionId} FOR UPDATE
         `;
         const lockedAuction = lockedAuctions && lockedAuctions[0];
-        if (lockedAuction && lockedAuction.status === AuctionStatus.COMPLETED) {
+        if (
+          lockedAuction &&
+          (lockedAuction.status === AuctionStatus.COMPLETED ||
+            lockedAuction.status === AuctionStatus.MINUTES_FILED)
+        ) {
           throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
         }
       }
@@ -749,6 +796,12 @@ export class AuctionService {
 
     if (!auction) {
       throw new NotFoundException('Auction record not found');
+    }
+
+    if (auction.status === AuctionStatus.MINUTES_FILED) {
+      throw new BadRequestException(
+        'Statutory auction minutes have already been filed with the Registrar for this auction',
+      );
     }
 
     if (auction.status !== AuctionStatus.COMPLETED) {
