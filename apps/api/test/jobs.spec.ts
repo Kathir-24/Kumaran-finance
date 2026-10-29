@@ -20,9 +20,11 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
   beforeEach(() => {
     prismaMock = {
+      $transaction: jest.fn(async (cb) => cb(prismaMock)),
       installmentDue: {
         findMany: jest.fn(),
         updateMany: jest.fn(),
+        update: jest.fn(),
       },
       subscriberTicket: {
         findMany: jest.fn(),
@@ -30,7 +32,13 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       },
       payment: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      receipt: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
       },
       auction: {
         findMany: jest.fn(),
@@ -58,6 +66,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
     reconciliationService = new ReconciliationService(
       prismaMock as unknown as PrismaService,
+      notificationService,
     );
 
     auctionReminderSchedulerService = new AuctionReminderSchedulerService(
@@ -459,11 +468,68 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
     });
 
     it('should auto-resolve ghost drops when gateway is SUCCESS but internal is INITIATED', async () => {
-      prismaMock.payment.findFirst.mockResolvedValue({
+      const mockPayment = {
         id: 'pay-ghost',
+        branchId: 'branch-prd-001',
         paymentStatus: PaymentStatus.INITIATED,
+        paymentMethod: 'UPI',
         amount: 3750n,
         transactionRef: 'ORDER-GHOST-99',
+        notes: null,
+        allocations: [
+          {
+            id: 'alloc-1',
+            installmentDueId: 'due-ghost-1',
+            ticketId: 'tkt-ghost-1',
+            amountAllocated: 3750n,
+            due: {
+              id: 'due-ghost-1',
+              installmentMonth: 3,
+              status: DueStatus.UNPAID,
+            },
+            ticket: {
+              id: 'tkt-ghost-1',
+              ticketNumber: 5,
+              status: 'ACTIVE',
+              customer: {
+                fullName: 'M. Palanisamy',
+                phone: '9842100005',
+                fcmToken: null,
+              },
+              chitGroup: {
+                groupCode: 'KCA-1L-20M-01',
+                branchId: 'branch-prd-001',
+                branch: { code: 'PRD' },
+              },
+            },
+          },
+        ],
+        receipt: null,
+      };
+
+      prismaMock.payment.findFirst.mockResolvedValue(mockPayment);
+      prismaMock.payment.findUnique.mockResolvedValue(mockPayment);
+      prismaMock.payment.update.mockResolvedValue({
+        ...mockPayment,
+        paymentStatus: PaymentStatus.SUCCESS,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({
+        id: 'due-ghost-1',
+        status: DueStatus.PAID,
+        paidAmount: 3750n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([]);
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        id: 'tkt-ghost-1',
+        consecutiveUnpaidMonths: 0,
+      });
+      prismaMock.receipt.findUnique.mockResolvedValue(null);
+      prismaMock.receipt.findFirst.mockResolvedValue({
+        receiptNumber: 'KC-REC-PRD-2026-00010',
+      });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-new',
+        receiptNumber: 'KC-REC-PRD-2026-00011',
       });
 
       const result = await reconciliationService.reconcileSettlement([
@@ -477,10 +543,27 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       ]);
 
       expect(result.autoResolvedGhostDropsCount).toBe(1);
-      expect(prismaMock.payment.update).toHaveBeenCalledWith({
-        where: { id: 'pay-ghost' },
-        data: { paymentStatus: PaymentStatus.SUCCESS },
-      });
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(prismaMock.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'pay-ghost' },
+          data: expect.objectContaining({ paymentStatus: PaymentStatus.SUCCESS }),
+        }),
+      );
+      expect(prismaMock.installmentDue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'due-ghost-1' },
+          data: expect.objectContaining({ status: DueStatus.PAID, paidAmount: 3750n }),
+        }),
+      );
+      expect(prismaMock.receipt.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentId: 'pay-ghost',
+            receiptNumber: 'KC-REC-PRD-2026-00011',
+          }),
+        }),
+      );
     });
 
     it('should flag discrepancy when settlement amount does not match internal record', async () => {
