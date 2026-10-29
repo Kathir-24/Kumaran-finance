@@ -8,6 +8,7 @@ export interface JwtPayload {
   roles: Role[];
   branchId: string | null;
   tokenType: TokenType;
+  jti?: string;
   iat?: number;
   exp?: number;
 }

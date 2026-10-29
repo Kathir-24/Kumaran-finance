@@ -346,14 +346,23 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         tokenType: 'refresh',
       };
       const customerRefreshToken = jwtService.sign(customerPayload, { expiresIn: '7d' });
+      const hashedRefreshToken = await bcrypt.hash(customerRefreshToken, 12);
 
-      prismaMock.customer.findUnique.mockResolvedValue(mockCustomer);
+      prismaMock.customer.findUnique.mockResolvedValue({
+        ...mockCustomer,
+        refreshTokenHash: hashedRefreshToken,
+      });
+      prismaMock.customer.update.mockResolvedValue({
+        ...mockCustomer,
+        refreshTokenHash: hashedRefreshToken,
+      });
 
       const refreshRes = await authService.refreshToken({ refreshToken: customerRefreshToken });
       expect(refreshRes).toHaveProperty('accessToken');
       expect(refreshRes).toHaveProperty('refreshToken');
       expect(refreshRes.user.roles).toContain(Role.CUSTOMER);
       expect(refreshRes.user.name).toBe(mockCustomer.fullName);
+      expect(prismaMock.customer.update).toHaveBeenCalled();
     });
 
     it('should clear refresh token and fcmToken on staff logout', async () => {
@@ -368,7 +377,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       });
     });
 
-    it('should clear fcmToken on customer logout without touching User table', async () => {
+    it('should clear refreshTokenHash and fcmToken on customer logout without touching User table', async () => {
       const customerId = 'cust-uuid-888';
       prismaMock.user.findUnique.mockResolvedValue(null);
       prismaMock.customer.findUnique.mockResolvedValue({ id: customerId });
@@ -378,7 +387,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       expect(result.success).toBe(true);
       expect(prismaMock.customer.update).toHaveBeenCalledWith({
         where: { id: customerId },
-        data: { fcmToken: null },
+        data: { refreshTokenHash: null, fcmToken: null },
       });
     });
   });

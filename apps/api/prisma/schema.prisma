@@ -86,8 +86,10 @@ model Customer {
   pincode       String
   panNumber     String?
   aadhaarLast4  String?            // Storing only masked last 4 digits for data minimization
-  fcmToken      String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
-  isKycVerified Boolean            @default(false)
+  fcmToken         String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
+  refreshTokenHash String?            // Hashed refresh token for active session revocation (RFC 6819)
+  lastLoginAt      DateTime?          // Timestamp of most recent customer authentication
+  isKycVerified    Boolean            @default(false)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 

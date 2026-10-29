@@ -242,6 +242,10 @@ export class CustomerService {
       }
     }
 
+    const isPhoneChanged = Boolean(
+      dto.phone && dto.phone.trim() !== customer.phone,
+    );
+
     return this.prisma.customer.update({
       where: { id },
       data: {
@@ -255,6 +259,7 @@ export class CustomerService {
         pincode: dto.pincode?.trim(),
         panNumber: dto.panNumber?.trim(),
         aadhaarLast4: dto.aadhaarLast4?.trim(),
+        ...(isPhoneChanged ? { refreshTokenHash: null } : {}),
       },
       include: {
         branch: {

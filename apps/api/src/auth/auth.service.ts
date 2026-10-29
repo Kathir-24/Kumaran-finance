@@ -430,7 +430,7 @@ export class AuthService {
     }
 
     if (record.isCustomer) {
-      return this.generateCustomerAuthTokens({
+      return await this.generateCustomerAuthTokens({
         id: record.entityId,
         fullName: record.name,
         phone: record.phone,
@@ -524,7 +524,7 @@ export class AuthService {
   /**
    * Helper to issue JWT tokens for Chit Subscribers (Role.CUSTOMER)
    */
-  private generateCustomerAuthTokens(customer: {
+  private async generateCustomerAuthTokens(customer: {
     id: string;
     fullName: string;
     phone: string;
@@ -544,6 +544,7 @@ export class AuthService {
       roles: [Role.CUSTOMER],
       branchId: customer.branchId,
       tokenType: 'refresh',
+      jti: crypto.randomUUID(),
     };
 
     const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??
@@ -554,6 +555,17 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: jwtExpiresIn });
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
+
+    const refreshTokenHash = await this.hashRefreshToken(refreshToken);
+    const now = new Date();
+
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: {
+        refreshTokenHash,
+        lastLoginAt: now,
+      },
+    });
 
     return {
       verified: true,
@@ -567,7 +579,7 @@ export class AuthService {
         branchId: customer.branchId,
         isTotpEnabled: false,
         hasMpin: false,
-        lastLoginAt: new Date(),
+        lastLoginAt: now,
       },
       message: 'OTP verified successfully. Subscriber logged in.',
     };
@@ -598,6 +610,23 @@ export class AuthService {
         throw new UnauthorizedException('Session revoked or subscriber profile no longer exists');
       }
 
+      if (!customer.refreshTokenHash) {
+        throw new UnauthorizedException('Session revoked or customer logged out');
+      }
+
+      const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, customer.refreshTokenHash);
+      if (!isMatch) {
+        // RFC 6819 Token Reuse Trap: Token is valid JWT but does not match active session hash.
+        // Immediately revoke entire session family to contain compromised chain.
+        await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { refreshTokenHash: null },
+        });
+        throw new UnauthorizedException(
+          'Token reuse detected. Active session revoked for security. Please sign in again.',
+        );
+      }
+
       return this.generateCustomerAuthTokens({
         id: customer.id,
         fullName: customer.fullName,
@@ -610,13 +639,25 @@ export class AuthService {
       where: { id: payload.sub },
     });
 
-    if (!user || !user.isActive || !user.refreshTokenHash) {
+    if (!user || !user.isActive) {
       throw new UnauthorizedException('Session revoked or user account inactive');
     }
 
-    const isMatch = await bcrypt.compare(dto.refreshToken, user.refreshTokenHash);
+    if (!user.refreshTokenHash) {
+      throw new UnauthorizedException('Session revoked or user logged out');
+    }
+
+    const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, user.refreshTokenHash);
     if (!isMatch) {
-      throw new UnauthorizedException('Refresh token revoked or invalid');
+      // RFC 6819 Token Reuse Trap: Token is valid JWT but does not match active session hash.
+      // Immediately revoke entire session family to contain compromised chain.
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refreshTokenHash: null },
+      });
+      throw new UnauthorizedException(
+        'Token reuse detected. Active session revoked for security. Please sign in again.',
+      );
     }
 
     return this.generateAuthTokens(user);
@@ -644,7 +685,7 @@ export class AuthService {
       if (customer) {
         await this.prisma.customer.update({
           where: { id: userId },
-          data: { fcmToken: null },
+          data: { refreshTokenHash: null, fcmToken: null },
         });
       }
     }
@@ -730,7 +771,7 @@ export class AuthService {
       isTotpEnabled: false,
       hasMpin: false,
       isKycVerified: customer.isKycVerified,
-      lastLoginAt: null,
+      lastLoginAt: customer.lastLoginAt,
       branch: customer.branch
         ? {
             id: customer.branch.id,
@@ -793,6 +834,7 @@ export class AuthService {
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'refresh',
+      jti: crypto.randomUUID(),
     };
 
     const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??
@@ -804,7 +846,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: jwtExpiresIn });
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
 
-    const refreshTokenHash = await bcrypt.hash(refreshToken, BCRYPT_SALT_ROUNDS);
+    const refreshTokenHash = await this.hashRefreshToken(refreshToken);
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -819,5 +861,25 @@ export class AuthService {
       refreshToken,
       user: this.sanitizeUser(user),
     };
+  }
+
+  /**
+   * Cryptographically hashes a JWT refresh token for secure database storage.
+   * Pre-hashes with SHA-256 to eliminate bcrypt's 72-byte truncation boundary.
+   */
+  private async hashRefreshToken(token: string): Promise<string> {
+    const preHashed = crypto.createHash('sha256').update(token).digest('hex');
+    return bcrypt.hash(preHashed, BCRYPT_SALT_ROUNDS);
+  }
+
+  /**
+   * Timing-safe verification of candidate refresh token against stored bcrypt hash.
+   * Checks SHA-256 pre-hashed token first, with fallback to direct candidate comparison.
+   */
+  private async verifyRefreshTokenHash(token: string, storedHash: string): Promise<boolean> {
+    const preHashed = crypto.createHash('sha256').update(token).digest('hex');
+    const isMatch = await bcrypt.compare(preHashed, storedHash);
+    if (isMatch) return true;
+    return bcrypt.compare(token, storedHash);
   }
 }
