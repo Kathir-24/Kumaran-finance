@@ -177,7 +177,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `GET` | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact $I_{net}$ | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
+| `GET` | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact $I_{net}$ | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | 🚫 **Blocked (Exempt)** |
 
 ---
 
@@ -207,7 +207,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/payments/:id` | Get single payment details & history | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payment Only** | **Read-Only (Global)** |
 | `GET` | `/payments/:id/receipt` | Generate bilingual receipt (EN + தமிழ்) | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Receipt Only** | **Read-Only (Global)** |
 | `POST` | `/payments/upi-claim` | Customer self-submits bank UTR claim (`INITIATED`) | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Ticket Only** | 🚫 **Blocked** |
-| `GET` | `/payments/pending-upi-claims` | List pending UPI claims for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/payments/pending-upi-claims` | List pending UPI claims for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked (Desk Workbench)** |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify UTR credit & issue receipt (`maker != checker`) | **Allowed (Checker)** | **Allowed (Branch)** | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Commit reversal (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
