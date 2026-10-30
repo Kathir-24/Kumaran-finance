@@ -14,6 +14,12 @@ export const OTP_LENGTH = 6;
 
 export const OTP_EXPIRY_SECONDS = 300; // 5 minutes
 
+export const OTP_COOLDOWN_SECONDS = 60; // 60 seconds re-request cooldown
+
+export const OTP_LOCKOUT_SECONDS = 300; // 5-minute temporary lockout on repeated failed attempts
+
+export const OTP_MAX_VERIFY_ATTEMPTS = 3; // Lockout triggered on 3rd invalid attempt
+
 export const DEFAULT_JWT_ACCESS_EXPIRES_IN = '15m';
 
 export const DEFAULT_JWT_REFRESH_EXPIRES_IN = '7d';

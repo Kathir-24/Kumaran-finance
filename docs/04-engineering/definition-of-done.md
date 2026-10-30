@@ -40,6 +40,7 @@ flowchart LR
 - [ ] Endpoint is protected with JWT Auth Guard and Role Decorators (e.g., `@Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)`).
 - [ ] Branch scoping enforced: Users cannot read or mutate data outside their assigned branch unless granted global scope.
 - [ ] Sensitive operations (payment reversals, auction finalization, prize payouts) require Maker-Checker dual approval with **`maker_user_id != checker_user_id`** strictly enforced (`CONFIRMED-BY-DEVELOPER`).
+- [ ] Distributed SMS OTP request cooldown (60s via `auth:otp:cooldown:<phone>`) and 5-minute brute-force lockout (300s via `auth:otp:lockout:<phone>` on 3rd invalid attempt) enforced with in-memory fallback to protect SMS gateway quota and prevent cycling attacks.
 
 ### Gate 5: Automated Testing Coverage
 - [ ] Unit tests for services and calculation logic pass with 100% success rate.
@@ -48,6 +49,7 @@ flowchart LR
   $$\text{Foreman Commission } (4\%) + \text{Total Member Dividends} = \text{Discount}$$
 - [ ] **Full $N \times N$ Status Transition Matrix Coverage**: Every model with a status lifecycle has exhaustive $N \times N$ transition tests (113 total transitions across the 9 product lifecycles) verifying that all illegal transitions fail-closed with HTTP 400 `BadRequestException`.
 - [ ] **Ambiguous Failure & Network Disconnect Chaos Coverage**: External storage mid-upload drops verify zero orphan database records; external telecom 504 timeouts verify non-blocking financial ledger isolation and driver-level exponential backoff retries.
+- [ ] **SMS OTP Cooldown & Lockout Coverage**: Rate limit and brute-force tests verify 60s request cooldown (HTTP 429) and 3-attempt 5-minute lockout (HTTP 429) across distributed Redis and in-memory stores.
 - [ ] Negative tests verify that unauthorized requests, self-approvals (`maker == checker`), and illegal discount bids are cleanly rejected.
 
 ### Gate 6: Idempotency & Concurrency

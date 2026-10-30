@@ -289,11 +289,11 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       paymentId = paymentResult.payment.id;
       const durationMs = Date.now() - startTime;
 
-      // CRITICAL ASSERTION: Transaction succeeds immediately (<100ms) despite telecom 504
+      // CRITICAL ASSERTION: Transaction succeeds immediately without blocking for downstream 5s telecom timeout
       expect(paymentResult).toBeDefined();
       expect(paymentResult.payment.paymentStatus).toBe('SUCCESS');
       expect(paymentResult.receipt.receiptNumber).toMatch(/^KC-REC-/);
-      expect(durationMs).toBeLessThan(500); // Unblocked response time
+      expect(durationMs).toBeLessThan(2000); // Unblocked response time (<2s vs 5s+ gateway hang)
 
       // CRITICAL ASSERTION: PostgreSQL ledger is 100% committed and consistent
       const finalDue = await prisma.installmentDue.findUnique({

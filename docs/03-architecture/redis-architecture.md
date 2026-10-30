@@ -39,8 +39,10 @@ flowchart TD
 
     subgraph REDIS_STORE ["Redis 7 Container (Port 6379: chitflow-redis)"]
         direction TB
-        subgraph OTP_VAULT ["1. Transient Distributed OTP Vault"]
+        subgraph OTP_VAULT ["1. Transient Distributed OTP & Security Vault"]
             OTPKey["auth:otp:9876543210\nTTL: 300s\nSHA-256 Hash + Attempt Counter (0..3)"]
+            CoolKey["auth:otp:cooldown:9876543210\nTTL: 60s\nSMS Re-Request Rate-Limit Throttle"]
+            LockKey["auth:otp:lockout:9876543210\nTTL: 300s\nBrute-Force Penalty Lockout"]
         end
         subgraph BULLMQ_STORE ["2. BullMQ Queue & Stream Engine"]
             Q1["daily-maintenance-queue\n(Midnight Arrears Scan)"]
@@ -64,11 +66,17 @@ flowchart TD
 
 ---
 
-## 3. Deep-Dive: Distributed OTP Engine (`auth:otp:<phone>`)
+## 3. Deep-Dive: Distributed OTP Engine (`auth:otp:*`)
 
 Mobile onboarding for both staff (Agents/Partners) and customers relies on a 6-digit SMS OTP. Redis provides distributed, atomic state management to prevent race conditions across server instances:
 
-### 3.1 Redis OTP Payload Structure
+### 3.1 Redis OTP Key Topology & Schema
+
+| Redis Key | Type | TTL | Purpose | Value Stored |
+|---|:---:|:---:|---|---|
+| `auth:otp:<phone>` | `string` | 300s | Active OTP session with SHA-256 hashed code | JSON `OtpSessionRecord` (attempts counter, entityId, roles) |
+| `auth:otp:cooldown:<phone>` | `string` | 60s | SMS Gateway Flood Throttle | Unix timestamp of issuance |
+| `auth:otp:lockout:<phone>` | `string` | 300s | Brute-force penalty lock | Unix timestamp of lockout trigger |
 
 Stored at key `auth:otp:<phone>` with an exact `EX 300` TTL:
 
@@ -90,20 +98,18 @@ export interface OtpSessionRecord {
 
 1. **SHA-256 One-Way Hash**:
    - The raw 6-digit OTP code is **never** saved in Redis. If the Redis memory dump or monitor is inspected, only the 64-character SHA-256 hash is visible.
-2. **Brute-Force Lockout (3 Attempts)**:
-   - On each failed entry, `record.attempts` increments by 1.
-   - The remaining TTL is fetched via `redis.ttl(key)` and preserved so an attacker cannot extend the session lifetime through bad guesses:
-     ```typescript
-     const ttl = await redis.ttl(`auth:otp:${trimmedPhone}`);
-     if (ttl > 0) {
-       await redis.set(`auth:otp:${trimmedPhone}`, JSON.stringify(record), 'EX', ttl);
-     }
-     ```
-   - On the **4th invalid attempt**, Redis immediately deletes the key (`redis.del`), permanently locking out the session and requiring a new OTP request.
-3. **Anti-Replay Purge**:
-   - Upon successful verification, `redis.del(\`auth:otp:${trimmedPhone}\`)` is invoked immediately. A verified OTP cannot be re-used.
-4. **Seamless In-Memory Fallback**:
-   - If Redis is down or starting up, [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) falls back to an internal `Map<string, OtpSessionRecord>` with identical expiry and attempt rules, ensuring zero downtime.
+2. **60-Second Re-Request Cooldown (`auth:otp:cooldown:<phone>`)**:
+   - Upon dispatch of an SMS OTP, `auth:otp:cooldown:<phone>` is set with `EX 60`.
+   - Any re-request of `POST /auth/mobile/request-otp` within 60 seconds fails closed with `HTTP 429 Too Many Requests`, returning the remaining cooldown seconds.
+   - Zero downstream SMS dispatch, zero gateway fee incurred, protecting Kumaran Finance's paid MSG91 credits.
+3. **5-Minute Brute-Force Lockout (`auth:otp:lockout:<phone>`)**:
+   - On each failed OTP entry, `record.attempts` increments by 1.
+   - On the **3rd consecutive invalid attempt**, Redis immediately sets `auth:otp:lockout:<phone>` with `EX 300` (5 minutes) and purges the active `auth:otp:<phone>` session (`redis.del`).
+   - Any subsequent call to `verifyOtp` or `requestOtp` during this window fails closed with `HTTP 429 Too Many Requests`.
+4. **Anti-Replay Purge & Atomic Cleanup**:
+   - Upon successful verification, `redis.del('auth:otp:<phone>', 'auth:otp:cooldown:<phone>', 'auth:otp:lockout:<phone>')` is invoked immediately. A verified OTP cannot be re-used, and throttle states are reset cleanly.
+5. **Seamless In-Memory Fallback**:
+   - If Redis is down or starting up, [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) falls back to internal `Map` stores (`otpStore`, `cooldownStore`, `lockoutStore`) with identical expiry and attempt rules, ensuring zero downtime and 100% deterministic test execution.
 
 ---
 

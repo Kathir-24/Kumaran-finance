@@ -320,3 +320,37 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
 3. **Financial Payment Non-Blocking Telecom Isolation (`CHAOS-SMS-1`)**: Downstream Indian telecom 504 Gateway Timeouts or BullMQ queue delays do NOT block teller response times (<500ms) or roll back committed financial ledgers (`Payment`, `InstallmentDue: PAID`, `Receipt`).
 4. **Driver Exponential Backoff (`CHAOS-SMS-2`)**: `Msg91SmsDriver` catches HTTP 504 as `isRetryable`, applying exponential backoff delay ($\text{delay} = \text{base} \times 2^{\text{attempt}}$) across 3 attempts.
 5. **Mobile Push Primary Routing (`CHAOS-SMS-3`)**: When telecom SMS routes are partitioned, customers with active smartphones receive receipt alerts via free FCM Mobile App Push, completely bypassing carrier SMS outages.
+
+---
+
+## 10. SMS OTP Request Cooldown & Distributed Brute-Force Lockout Suite (Redis & In-Memory)
+
+> **Mandate**: To protect Kumaran Finance's paid MSG91 commercial SMS credits from bot flooding and prevent endless-cycling brute-force attacks against 6-digit OTP codes, the authentication system must enforce a 60-second request cooldown and a 5-minute (300s) brute-force lockout on the 3rd failed attempt across distributed Redis 7 instances with in-memory fallback.
+
+- **Test Harness File**: [`apps/api/test/otp-cooldown-lockout.spec.ts`](../../apps/api/test/otp-cooldown-lockout.spec.ts)
+- **Live Container Probe**: [`scripts/verify-otp-cooldown-lockout.ps1`](../../scripts/verify-otp-cooldown-lockout.ps1)
+
+### Scenarios Tested
+```typescript
+describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis & In-Memory)', () => {
+  // Part 1: In-Memory Resilience (Redis Offline Fallback)
+  //   OTP-RATE-1: Immediate second requestOtp within 60s MUST fail closed with HTTP 429
+  //   OTP-RATE-2: requestOtp after cooldown window expiration MUST succeed cleanly
+  //   OTP-RATE-3: 3 consecutive incorrect OTP entries MUST trigger 5-minute temporary lockout
+  //   OTP-RATE-4: Calling requestOtp while actively locked out MUST fail closed with HTTP 429 without sending SMS
+  //   OTP-RATE-5: Calling verifyOtp while actively locked out MUST fail closed with HTTP 429
+  //   OTP-RATE-6: Correct OTP verification MUST atomically clear active OTP, cooldown, and lockout states
+  // Part 2: Distributed Redis 7 Architecture
+  //   OTP-REDIS-1: Writes auth:otp:cooldown:<phone> with EX 60 and rejects subsequent requests
+  //   OTP-REDIS-2: 3rd failed attempt writes auth:otp:lockout:<phone> with EX 300 and deletes auth:otp:<phone>
+});
+```
+
+### Verification Assertions
+1. **SMS Re-Request Cooldown Guard (`OTP-RATE-1`)**: Requesting an OTP within 60 seconds of a previous request fails closed with `HTTP 429 Too Many Requests`. The response contains the exact remaining wait time, and zero downstream SMS is dispatched.
+2. **Post-Cooldown Restoration (`OTP-RATE-2`)**: Once 60 seconds have elapsed, calls to `requestOtp` succeed cleanly, resetting the cooldown timer.
+3. **3-Attempt Lockout Penalty (`OTP-RATE-3`)**: The 3rd consecutive incorrect OTP submission in `verifyOtp` triggers an immediate 300-second (5-minute) lockout with `HTTP 429 Too Many Requests` and purges the active OTP session.
+4. **Lockout Shielding on All Endpoints (`OTP-RATE-4` & `OTP-RATE-5`)**: While `auth:otp:lockout:<phone>` is active, any attempt to request a new OTP or guess an OTP is rejected with `HTTP 429 Too Many Requests`.
+5. **Atomic Cleanup on Success (`OTP-RATE-6`)**: Successful verification with the correct 6-digit code atomically purges the active session, cooldown, and lockout keys (`clearOtpSession(phone, true)`).
+6. **Distributed Redis TTL Enforcement (`OTP-REDIS-1` & `OTP-REDIS-2`)**: Live Redis key inspection verifies `auth:otp:cooldown:<phone>` is written with `EX 60` and `auth:otp:lockout:<phone>` is written with `EX 300`.
+

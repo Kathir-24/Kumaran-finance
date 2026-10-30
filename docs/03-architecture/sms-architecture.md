@@ -248,4 +248,46 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
   * `CHAOS-SMS-2`: Driver exponential backoff verified $\to$ 2 timeouts followed by successful 3rd attempt, returns `success: true`.
   * `CHAOS-SMS-3`: Mobile App Push fallback verified $\to$ Dispatches cleanly via FCM when SMS carrier is offline.
 - **Live Docker Container Probe ([`scripts/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/verify-chaos-network-disconnect.ps1))**:
+
+---
+
+## 8. SMS Gateway Cost Protection: OTP Request Cooldown & Distributed Lockout
+
+> **Threat Model**: Automated bots or malicious actors invoking `POST /auth/mobile/request-otp` in a rapid loop can rapidly drain Kumaran Finance's paid MSG91 commercial SMS credits. Similarly, cycling brute-force attempts without penalty could bypass 3-attempt restrictions.
+
+### 8.1 60-Second SMS Re-Request Cooldown (`auth:otp:cooldown:<phone>`)
+1. **Zero-Spend Throttling**: When an OTP is dispatched, Redis key `auth:otp:cooldown:<phone>` is set with `EX 60`.
+2. **Immediate Fail-Closed**: Any repeated call to `requestOtp` within 60 seconds is rejected immediately with `HTTP 429 Too Many Requests`:
+   ```json
+   {
+     "statusCode": 429,
+     "error": {
+       "code": "HTTP_EXCEPTION",
+       "message": "OTP recently requested. Please wait 59 seconds before requesting a new code."
+     }
+   }
+   ```
+3. **Gateway Protection**: Zero downstream HTTP requests are sent to MSG91, consuming 0 SMS credits.
+
+### 8.2 5-Minute Distributed Brute-Force Lockout (`auth:otp:lockout:<phone>`)
+1. **3-Strike Penalty**: On the 3rd consecutive incorrect OTP submission in `verifyOtp`, the system immediately writes `auth:otp:lockout:<phone>` with `EX 300` (5 minutes) and destroys the active session (`auth:otp:<phone>`).
+2. **Bidirectional Lockdown**: During the 300-second lockout window, both `requestOtp` and `verifyOtp` are strictly blocked with `HTTP 429 Too Many Requests`.
+3. **Atomic Purge on Success**: When a subscriber or staff member successfully verifies their OTP, all three keys (`auth:otp:<phone>`, `auth:otp:cooldown:<phone>`, `auth:otp:lockout:<phone>`) are atomically purged via `redis.del`.
+
+### 8.3 Verification & Live Penetration Proofs
+- **Automated Integration Spec ([`test/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/otp-cooldown-lockout.spec.ts))**:
+  * `OTP-RATE-1`: Immediate second request within 60s rejected with HTTP 429.
+  * `OTP-RATE-2`: Request after 60s cooldown passes succeeds cleanly.
+  * `OTP-RATE-3`: 3rd invalid attempt triggers 5-minute lockout.
+  * `OTP-RATE-4`: Requesting OTP during active lockout fails closed with HTTP 429.
+  * `OTP-RATE-5`: Verifying OTP during active lockout fails closed with HTTP 429.
+  * `OTP-RATE-6`: Correct verification atomically wipes session, cooldown, and lockout keys.
+  * `OTP-REDIS-1` & `OTP-REDIS-2`: Distributed Redis key presence and TTL verification.
+- **Live Docker Penetration Probe ([`scripts/verify-otp-cooldown-lockout.ps1`](file:///u:/Kumaran-finance/scripts/verify-otp-cooldown-lockout.ps1))**:
+  * Probe 1: Cooldown HTTP 429 confirmed on port 3000.
+  * Probe 2: 3-attempt lockout penalty confirmed on port 3000.
+  * Probe 3: Direct Redis query confirms `ttl auth:otp:lockout:9876543210` = 300s, `auth:otp:9876543210` = nil.
+  * Probe 4: Both endpoints blocked during lockout.
+  * Probe 5: Clean key lifecycle verified.
+
   * `CHAOS-PROBE-2`: Cash payment on live container port 3000 committed in **201ms** with consistent database ledger state (`100% Pass`).

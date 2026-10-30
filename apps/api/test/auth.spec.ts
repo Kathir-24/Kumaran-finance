@@ -676,7 +676,12 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         set: jest.fn().mockResolvedValue('OK'),
         get: jest.fn(),
         del: jest.fn().mockResolvedValue(1),
-        ttl: jest.fn().mockResolvedValue(295),
+        ttl: jest.fn().mockImplementation((key: string) => {
+          if (key.startsWith('auth:otp:') && !key.includes('lockout') && !key.includes('cooldown')) {
+            return Promise.resolve(295);
+          }
+          return Promise.resolve(-2);
+        }),
       };
       const mockRedisProvider = {
         getClient: jest.fn().mockReturnValue(mockRedisClient),
@@ -712,7 +717,11 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       });
 
       expect(verifyRes.verified).toBe(true);
-      expect(mockRedisClient.del).toHaveBeenCalledWith(`auth:otp:${staffPhone}`);
+      expect(mockRedisClient.del).toHaveBeenCalledWith(
+        `auth:otp:${staffPhone}`,
+        `auth:otp:cooldown:${staffPhone}`,
+        `auth:otp:lockout:${staffPhone}`,
+      );
     });
 
     it('should increment attempts in Redis on mismatch and lockout after 3 failed attempts', async () => {
@@ -720,7 +729,12 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         set: jest.fn().mockResolvedValue('OK'),
         get: jest.fn(),
         del: jest.fn().mockResolvedValue(1),
-        ttl: jest.fn().mockResolvedValue(280),
+        ttl: jest.fn().mockImplementation((key: string) => {
+          if (key.startsWith('auth:otp:') && !key.includes('lockout') && !key.includes('cooldown')) {
+            return Promise.resolve(280);
+          }
+          return Promise.resolve(-2);
+        }),
       };
       const mockRedisProvider = {
         getClient: jest.fn().mockReturnValue(mockRedisClient),
@@ -745,15 +759,26 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       await expect(
         redisAuthService.verifyOtp({ phone: staffPhone, otp: '000000' }),
       ).rejects.toThrow(BadRequestException);
-      expect(mockRedisClient.set).toHaveBeenCalledTimes(2); // Initial save + update attempts
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        `auth:otp:${staffPhone}`,
+        expect.any(String),
+        'EX',
+        280,
+      );
 
-      // Attempt 4: lockout
-      savedPayload.attempts = 3;
+      // Attempt 3: triggers 5-minute lockout penalty and removes active OTP
+      savedPayload.attempts = 2; // Increments to 3 on verify
       mockRedisClient.get.mockResolvedValue(JSON.stringify(savedPayload));
 
       await expect(
         redisAuthService.verifyOtp({ phone: staffPhone, otp: '000000' }),
       ).rejects.toThrow('Too many invalid verification attempts');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        `auth:otp:lockout:${staffPhone}`,
+        expect.any(String),
+        'EX',
+        300,
+      );
       expect(mockRedisClient.del).toHaveBeenCalledWith(`auth:otp:${staffPhone}`);
     });
   });

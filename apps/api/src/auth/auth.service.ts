@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   Optional,
@@ -20,6 +22,9 @@ import {
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
   DEFAULT_JWT_REFRESH_EXPIRES_IN,
   OTP_EXPIRY_SECONDS,
+  OTP_COOLDOWN_SECONDS,
+  OTP_LOCKOUT_SECONDS,
+  OTP_MAX_VERIFY_ATTEMPTS,
   TOTP_ISSUER_NAME,
 } from '../common/constants';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -60,6 +65,8 @@ export interface OtpSessionRecord {
 @Injectable()
 export class AuthService {
   private readonly otpStore = new Map<string, OtpSessionRecord>();
+  private readonly cooldownStore = new Map<string, number>();
+  private readonly lockoutStore = new Map<string, number>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -290,10 +297,130 @@ export class AuthService {
   }
 
   /**
+   * Checks if mobile number is locked out due to repeated invalid attempts
+   */
+  async checkOtpLockout(phone: string): Promise<{ locked: boolean; remainingSeconds: number }> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      const ttl = await redis.ttl(`auth:otp:lockout:${phone}`);
+      if (ttl > 0) {
+        return { locked: true, remainingSeconds: ttl };
+      }
+      return { locked: false, remainingSeconds: 0 };
+    }
+
+    const expiresAt = this.lockoutStore.get(phone);
+    if (expiresAt && Date.now() < expiresAt) {
+      const remainingSeconds = Math.ceil((expiresAt - Date.now()) / 1000);
+      return { locked: true, remainingSeconds };
+    }
+    if (expiresAt) {
+      this.lockoutStore.delete(phone);
+    }
+    return { locked: false, remainingSeconds: 0 };
+  }
+
+  /**
+   * Checks if mobile number is in request cooldown (60s)
+   */
+  async checkOtpCooldown(phone: string): Promise<{ active: boolean; remainingSeconds: number }> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      const ttl = await redis.ttl(`auth:otp:cooldown:${phone}`);
+      if (ttl > 0) {
+        return { active: true, remainingSeconds: ttl };
+      }
+      return { active: false, remainingSeconds: 0 };
+    }
+
+    const expiresAt = this.cooldownStore.get(phone);
+    if (expiresAt && Date.now() < expiresAt) {
+      const remainingSeconds = Math.ceil((expiresAt - Date.now()) / 1000);
+      return { active: true, remainingSeconds };
+    }
+    if (expiresAt) {
+      this.cooldownStore.delete(phone);
+    }
+    return { active: false, remainingSeconds: 0 };
+  }
+
+  /**
+   * Sets OTP request cooldown (60 seconds)
+   */
+  async setOtpCooldown(phone: string, ttlSeconds: number = OTP_COOLDOWN_SECONDS): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      await redis.set(`auth:otp:cooldown:${phone}`, String(Date.now()), 'EX', ttlSeconds);
+    } else {
+      this.cooldownStore.set(phone, Date.now() + ttlSeconds * 1000);
+    }
+  }
+
+  /**
+   * Sets brute-force lockout (300 seconds / 5 minutes)
+   */
+  async setOtpLockout(phone: string, ttlSeconds: number = OTP_LOCKOUT_SECONDS): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      await redis.set(`auth:otp:lockout:${phone}`, String(Date.now()), 'EX', ttlSeconds);
+    } else {
+      this.lockoutStore.set(phone, Date.now() + ttlSeconds * 1000);
+    }
+  }
+
+  /**
+   * Atomically clears OTP session, and optionally cooldown and lockout (upon successful verification)
+   */
+  async clearOtpSession(phone: string, clearAll = false): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      const keys = [`auth:otp:${phone}`];
+      if (clearAll) {
+        keys.push(`auth:otp:cooldown:${phone}`, `auth:otp:lockout:${phone}`);
+      }
+      await redis.del(...keys);
+    } else {
+      this.otpStore.delete(phone);
+      if (clearAll) {
+        this.cooldownStore.delete(phone);
+        this.lockoutStore.delete(phone);
+      }
+    }
+  }
+
+  /**
    * Requests a 6-digit SMS OTP for mobile device onboarding
    */
   async requestOtp(dto: RequestOtpDto) {
     const trimmedPhone = dto.phone.trim();
+
+    // Guard 1: Distributed Brute-Force Lockout check (HTTP 429)
+    const lockout = await this.checkOtpLockout(trimmedPhone);
+    if (lockout.locked) {
+      throw new HttpException(
+        `Too many invalid verification attempts. This mobile number is temporarily locked out. Please try again in ${lockout.remainingSeconds} seconds.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // Guard 2: SMS Rate-limiting Cooldown check (60s) (HTTP 429)
+    const cooldown = await this.checkOtpCooldown(trimmedPhone);
+    if (cooldown.active) {
+      throw new HttpException(
+        `OTP recently requested. Please wait ${cooldown.remainingSeconds} seconds before requesting a new code.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     // Check staff user
     const user = await this.prisma.user.findUnique({
@@ -360,6 +487,9 @@ export class AuthService {
       this.otpStore.set(trimmedPhone, otpRecord);
     }
 
+    // Activate 60-second cooldown lock
+    await this.setOtpCooldown(trimmedPhone, OTP_COOLDOWN_SECONDS);
+
     await this.smsService.sendOtpSms(trimmedPhone, otpCode);
 
     // Debug OTP is restricted strictly to local automated testing (NODE_ENV === 'test' or explicit ALLOW_DEBUG_OTP === 'true')
@@ -372,6 +502,7 @@ export class AuthService {
       success: true,
       message: 'OTP sent successfully to registered mobile number.',
       expiresInSeconds: OTP_EXPIRY_SECONDS,
+      cooldownSeconds: OTP_COOLDOWN_SECONDS,
       ...(allowDebugOtp ? { debugOtp: otpCode } : {}),
     };
   }
@@ -381,6 +512,16 @@ export class AuthService {
    */
   async verifyOtp(dto: VerifyOtpDto) {
     const trimmedPhone = dto.phone.trim();
+
+    // Guard 1: Distributed Brute-Force Lockout check (HTTP 429)
+    const lockout = await this.checkOtpLockout(trimmedPhone);
+    if (lockout.locked) {
+      throw new HttpException(
+        `Too many invalid verification attempts. This mobile number is temporarily locked out. Please try again in ${lockout.remainingSeconds} seconds.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
     let record: OtpSessionRecord | undefined;
@@ -402,32 +543,32 @@ export class AuthService {
       throw new BadRequestException('OTP has expired or was not requested. Please request a new OTP.');
     }
 
-    record.attempts += 1;
-    if (record.attempts > 3) {
-      if (useRedis && redis) {
-        await redis.del(`auth:otp:${trimmedPhone}`);
-      } else {
-        this.otpStore.delete(trimmedPhone);
-      }
-      throw new BadRequestException('Too many invalid verification attempts. Please request a new OTP.');
-    }
-
     const candidateHash = crypto.createHash('sha256').update(dto.otp.trim()).digest('hex');
     if (candidateHash !== record.hashedOtp) {
+      record.attempts += 1;
+      if (record.attempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+        // Trigger 5-minute lockout penalty and destroy active OTP session
+        await this.setOtpLockout(trimmedPhone, OTP_LOCKOUT_SECONDS);
+        await this.clearOtpSession(trimmedPhone, false);
+        throw new HttpException(
+          'Too many invalid verification attempts. This mobile number is temporarily locked out for 5 minutes.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
       if (useRedis && redis) {
         const ttl = await redis.ttl(`auth:otp:${trimmedPhone}`);
         if (ttl > 0) {
           await redis.set(`auth:otp:${trimmedPhone}`, JSON.stringify(record), 'EX', ttl);
         }
       }
-      throw new BadRequestException('Invalid OTP code. Please enter the correct 6-digit code.');
+      throw new BadRequestException(
+        `Invalid OTP code. Please enter the correct 6-digit code. ${OTP_MAX_VERIFY_ATTEMPTS - record.attempts} attempt(s) remaining.`,
+      );
     }
 
-    if (useRedis && redis) {
-      await redis.del(`auth:otp:${trimmedPhone}`);
-    } else {
-      this.otpStore.delete(trimmedPhone);
-    }
+    // Successful verification: clear active OTP session, cooldown, and lockout atomically
+    await this.clearOtpSession(trimmedPhone, true);
 
     if (record.isCustomer) {
       return await this.generateCustomerAuthTokens({
