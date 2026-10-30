@@ -3,6 +3,7 @@
 // Product: Kumaran Chits (Kumaran Finance, Perundurai, Tamil Nadu)
 // Compliance: Definition of Done (Gate 5 & Gate 6), NFR §3 (Latency & Concurrency)
 // ADR-07: Single Discrete Payment Invariant & Zero Rupee Leak
+// ADR-10: Maker-Checker Dual Control Invariant
 // ==============================================================================
 
 import { PrismaClient } from '@prisma/client';
@@ -60,13 +61,13 @@ async function main() {
   console.log(`🚀 STARTING HIGH-CONCURRENCY STRESS & PESSIMISTIC LOCK HARNESS`);
   console.log(`   Kumaran Chits — Kumaran Finance (Perundurai, TN)`);
   console.log(`   Target Server: ${BASE_URL}`);
-  console.log(`   Compliance: NFR §3 (Latency & Concurrency), ADR-07 (Zero Double Payments)`);
+  console.log(`   Compliance: Gate 6 (Concurrency & Pessimistic Locks), NFR §3 (Latency)`);
   console.log(`======================================================\n`);
 
   // --------------------------------------------------------------------------
   // Step 1: Health Probe & Multi-Persona Authentication
   // --------------------------------------------------------------------------
-  console.log(`--- [1/5] Authenticating Personas for Concurrency Testing ---`);
+  console.log(`--- [1/6] Authenticating Personas for Concurrency Testing ---`);
   const healthRes = await fetch(`${BASE_URL}/health`);
   if (!healthRes.ok) {
     console.error(`❌ Health check failed on ${BASE_URL}/health`);
@@ -74,34 +75,67 @@ async function main() {
   }
   console.log(`   Server is healthy (200 OK)`);
 
-  const partnerAToken = await loginUser('9876543210', 'Admin@Kumaran2026');
-  const partnerBToken = await loginUser('9876543211', 'Admin@Kumaran2026');
-  console.log(`   ✅ Logged in Partner A (Maker) & Partner B (Checker)`);
+  const partnerAToken = await loginUser('9876543210', 'Admin@Kumaran2026'); // Super Admin / Maker
+  const partnerBToken = await loginUser('9876543211', 'Admin@Kumaran2026'); // Super Admin / Checker
+  const accountantToken = await loginUser('9876543213', 'Admin@Kumaran2026'); // Accountant
+  console.log(`   ✅ Logged in Partner A (Maker), Partner B (Checker), and Accountant`);
+
+  const partnerAUser = await prisma.user.findFirst({ where: { phone: '9876543210' } });
+  const partnerBUser = await prisma.user.findFirst({ where: { phone: '9876543211' } });
+  const agentUser = await prisma.user.findFirst({ where: { phone: '9876543214' } });
+
+  if (!partnerAUser || !partnerBUser || !agentUser) {
+    throw new Error('Required seed users not found in database.');
+  }
 
   // --------------------------------------------------------------------------
   // Step 2: TEST 1 — Double-Payment Stampede (Race Condition on Unpaid Due)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [2/5] TEST 1: Double-Payment Stampede (10 Parallel Requests) ---`);
+  console.log(`\n--- [2/6] TEST 1: Double-Payment Stampede (10 Parallel Requests) ---`);
   console.log(`   Firing 10 simultaneous POST /payments requests to a single unpaid due...`);
 
-  // Find an eligible unpaid due
-  const unpaidDue = await prisma.installmentDue.findFirst({
-    where: { status: 'UNPAID' },
-    include: { ticket: { include: { customer: true, chitGroup: true } } },
-    orderBy: { installmentMonth: 'asc' },
+  // Target a deterministic ticket due in active chit group
+  const activeGroup = await prisma.chitGroup.findFirst({
+    where: { status: 'ACTIVE' },
+    include: { tickets: { include: { customer: true } } },
   });
 
-  if (!unpaidDue) {
-    throw new Error('No UNPAID installment dues found in database to test.');
+  if (!activeGroup || activeGroup.tickets.length < 5) {
+    throw new Error('No active chit group with sufficient tickets found.');
   }
 
-  const targetTicketId = unpaidDue.ticketId;
-  const targetMonth = unpaidDue.installmentMonth;
-  const exactAmount = Number(unpaidDue.netPayableAmount);
+  const targetTicket = activeGroup.tickets[2]; // Ticket 3
+  let targetDue = await prisma.installmentDue.findFirst({
+    where: { ticketId: targetTicket.id, installmentMonth: 1 },
+  });
 
-  console.log(`   Target: Ticket #${unpaidDue.ticket.ticketNumber} (${unpaidDue.ticket.customer.fullName}), Month ${targetMonth}, Net: ₹${exactAmount}`);
+  if (!targetDue) {
+    targetDue = await prisma.installmentDue.create({
+      data: {
+        chitGroupId: activeGroup.id,
+        ticketId: targetTicket.id,
+        installmentMonth: 1,
+        dueDate: new Date(),
+        grossAmount: 5000n,
+        dividendDeduction: 0n,
+        netPayableAmount: 5000n,
+        paidAmount: 0n,
+        status: 'UNPAID',
+      },
+    });
+  }
 
-  // Launch 10 simultaneous requests at the exact same millisecond
+  // Clean fixture: Ensure zero historical allocations exist for target due
+  await prisma.paymentAllocation.deleteMany({
+    where: { installmentDueId: targetDue.id },
+  });
+  await prisma.installmentDue.update({
+    where: { id: targetDue.id },
+    data: { paidAmount: 0n, status: 'UNPAID' },
+  });
+
+  console.log(`   Target: Ticket #${targetTicket.ticketNumber} (${targetTicket.customer.fullName}), Month ${targetDue.installmentMonth}, Net: ₹${Number(targetDue.netPayableAmount)}`);
+
   const concurrencyCount = 10;
   const startTime = Date.now();
 
@@ -114,9 +148,9 @@ async function main() {
         Authorization: `Bearer ${partnerAToken}`,
       },
       body: JSON.stringify({
-        ticketId: targetTicketId,
-        installmentMonth: targetMonth,
-        amount: exactAmount,
+        ticketId: targetDue.ticketId,
+        installmentMonth: targetDue.installmentMonth,
+        amount: Number(targetDue.netPayableAmount),
         paymentMethod: 'CASH',
         idempotencyKey,
         notes: `Concurrency race test thread #${idx + 1}`,
@@ -135,15 +169,15 @@ async function main() {
   const rejectedResults = raceResults.filter((r) => r.status === 400 || r.status === 409);
   const internalErrors = raceResults.filter((r) => r.status >= 500);
 
-  // Database verification: count active SUCCESS allocations (ignoring historical reversed audit records)
+  // Database verification: count active SUCCESS allocations
   const totalAllocations = await prisma.paymentAllocation.count({
     where: {
-      installmentDueId: unpaidDue.id,
+      installmentDueId: targetDue.id,
       payment: { paymentStatus: 'SUCCESS' },
     },
   });
   const updatedDue = await prisma.installmentDue.findUnique({
-    where: { id: unpaidDue.id },
+    where: { id: targetDue.id },
   });
 
   const test1Passed =
@@ -154,7 +188,7 @@ async function main() {
     updatedDue?.status === 'PAID';
 
   recordAssertion(
-    'INV-1: Single Discrete Payment Invariant (ADR-07)',
+    'CP-1: Single Discrete Payment Invariant (ADR-07 & Gate 6)',
     'Strictly 1 payment succeeds, exactly 9 rejected, 0 double allocations, 0 server crashes',
     test1Passed,
     `Results: ${successResults.length} Succeeded (HTTP 201), ${rejectedResults.length} Rejected (HTTP 400/409), ${internalErrors.length} Internal Errors. DB Allocations: ${totalAllocations}. Elapsed: ${raceDuration}ms.`,
@@ -163,18 +197,38 @@ async function main() {
   // --------------------------------------------------------------------------
   // Step 3: TEST 2 — Idempotency Key Stampede (10 Parallel Requests, Same Key)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [3/5] TEST 2: Idempotency Key Collision Stampede (10 Parallel Requests) ---`);
+  console.log(`\n--- [3/6] TEST 2: Idempotency Key Collision Stampede (10 Parallel Requests) ---`);
   console.log(`   Firing 10 simultaneous POST /payments requests with identical Idempotency-Key...`);
 
-  const secondUnpaidDue = await prisma.installmentDue.findFirst({
-    where: { status: 'UNPAID' },
-    include: { ticket: true },
-    orderBy: { installmentMonth: 'asc' },
+  const secondTicket = activeGroup.tickets[3]; // Ticket 4
+  let secondDue = await prisma.installmentDue.findFirst({
+    where: { ticketId: secondTicket.id, installmentMonth: 1 },
   });
 
-  if (!secondUnpaidDue) {
-    throw new Error('No second UNPAID installment due found for idempotency test.');
+  if (!secondDue) {
+    secondDue = await prisma.installmentDue.create({
+      data: {
+        chitGroupId: activeGroup.id,
+        ticketId: secondTicket.id,
+        installmentMonth: 1,
+        dueDate: new Date(),
+        grossAmount: 5000n,
+        dividendDeduction: 0n,
+        netPayableAmount: 5000n,
+        paidAmount: 0n,
+        status: 'UNPAID',
+      },
+    });
   }
+
+  // Clean fixture
+  await prisma.paymentAllocation.deleteMany({
+    where: { installmentDueId: secondDue.id },
+  });
+  await prisma.installmentDue.update({
+    where: { id: secondDue.id },
+    data: { paidAmount: 0n, status: 'UNPAID' },
+  });
 
   const identicalKey = `idemp-collision-test-${Date.now()}`;
   const idempPromises = Array.from({ length: 10 }).map(async (_, idx) => {
@@ -185,9 +239,9 @@ async function main() {
         Authorization: `Bearer ${partnerAToken}`,
       },
       body: JSON.stringify({
-        ticketId: secondUnpaidDue.ticketId,
-        installmentMonth: secondUnpaidDue.installmentMonth,
-        amount: Number(secondUnpaidDue.netPayableAmount),
+        ticketId: secondDue.ticketId,
+        installmentMonth: secondDue.installmentMonth,
+        amount: Number(secondDue.netPayableAmount),
         paymentMethod: 'UPI',
         transactionRef: `UPI-CONCURRENT-REF-${Date.now()}`,
         idempotencyKey: identicalKey,
@@ -211,153 +265,267 @@ async function main() {
   const test2Passed = paymentsWithKey === 1 && idempServerErrors.length === 0;
 
   recordAssertion(
-    'INV-2: Idempotency Key Deduplication Guard',
+    'CP-2: Idempotency Key Deduplication Guard (Gate 6)',
     'Simultaneous retries with identical key yield exactly 1 database write and zero 500 crashes',
     test2Passed,
     `Payments Created: ${paymentsWithKey} (Expected 1). 500 Crashes: ${idempServerErrors.length}.`,
   );
 
   // --------------------------------------------------------------------------
-  // Step 4: TEST 3 — Auction Finalization Concurrent Race
+  // Step 4: TEST 3 — Auction Finalization Concurrent Checker Race
   // --------------------------------------------------------------------------
-  console.log(`\n--- [4/5] TEST 3: Auction Finalization Concurrent Checker Race ---`);
+  console.log(`\n--- [4/6] TEST 3: Auction Finalization Concurrent Checker Race ---`);
   console.log(`   Simulating 5 simultaneous checker finalization requests...`);
 
-  // Find an active chit group and create/schedule an auction for month 5
-  const activeGroup = await prisma.chitGroup.findFirst({
-    where: { status: 'ACTIVE' },
-    include: { tickets: true },
+  const testMonth = 8;
+  // Clean up any historical month 8 auction fixture
+  await prisma.auctionMinutes.deleteMany({
+    where: { auction: { chitGroupId: activeGroup.id, installmentMonth: testMonth } },
+  });
+  await prisma.auctionWinner.deleteMany({
+    where: { auction: { chitGroupId: activeGroup.id, installmentMonth: testMonth } },
+  });
+  await prisma.auctionTieBidder.deleteMany({
+    where: { auction: { chitGroupId: activeGroup.id, installmentMonth: testMonth } },
+  });
+  await prisma.auction.deleteMany({
+    where: { chitGroupId: activeGroup.id, installmentMonth: testMonth },
   });
 
-  let test3Passed = false;
-  let test3Details = '';
-
-  if (activeGroup && activeGroup.tickets.length > 0) {
-    const testMonth = 5;
-    // Check if auction already exists for month 5
-    let testAuction = await prisma.auction.findUnique({
-      where: {
-        chitGroupId_installmentMonth: {
-          chitGroupId: activeGroup.id,
-          installmentMonth: testMonth,
+  // Create clean scheduled auction fixture with bids recorded
+  const testAuction = await prisma.auction.create({
+    data: {
+      chitGroupId: activeGroup.id,
+      installmentMonth: testMonth,
+      auctionDate: new Date(),
+      status: 'SCHEDULED',
+      bidDiscount: 20000n,
+      foremanCommissionRate: 4.0,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 16000n,
+      dividendPerTicket: 800n,
+      prizeMoney: 80000n,
+      conductedByUserId: partnerAUser.id, // Maker
+      winner: {
+        create: {
+          ticketId: activeGroup.tickets[4].id,
+          wasTieBreakWinner: false,
+          disbursementStatus: 'PENDING_VERIFICATION',
         },
       },
-      include: { winner: true },
+    },
+    include: { winner: true },
+  });
+
+  const finalizePromises = Array.from({ length: 5 }).map(async (_, idx) => {
+    const res = await fetch(`${BASE_URL}/api/v1/auctions/${testAuction.id}/finalize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${partnerBToken}`, // Checker
+      },
+      body: JSON.stringify({
+        subscribersPresent: 18,
+        signedByForeman: true,
+        notes: `Concurrent finalization race attempt #${idx + 1}`,
+      }),
     });
+    return {
+      status: res.status,
+      body: await res.json().catch(() => ({})),
+    };
+  });
 
-    if (!testAuction) {
-      testAuction = await prisma.auction.create({
-        data: {
-          chitGroupId: activeGroup.id,
-          installmentMonth: testMonth,
-          auctionDate: new Date(),
-          status: 'SCHEDULED',
-          bidDiscount: 20000n,
-          foremanCommissionRate: 4.0,
-          foremanCommissionAmount: 4000n,
-          totalDividend: 16000n,
-          dividendPerTicket: 800n,
-          prizeMoney: 80000n,
-          conductedByUserId: (await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN', phone: '9876543210' } }))!.id,
-          winner: {
-            create: {
-              ticketId: activeGroup.tickets[0].id,
-              wasTieBreakWinner: false,
-              disbursementStatus: 'PENDING_VERIFICATION',
-            },
-          },
-        },
-        include: { winner: true },
-      });
-    }
+  const finalizeResults = await Promise.all(finalizePromises);
+  const finalizeSuccess = finalizeResults.filter((r) => r.status === 200 || r.status === 201);
+  const finalizeRejected = finalizeResults.filter((r) => r.status === 400);
+  const finalizeServerErrors = finalizeResults.filter((r) => r.status >= 500);
 
-    if (testAuction && testAuction.status === 'SCHEDULED') {
-      const finalizePromises = Array.from({ length: 5 }).map(async (_, idx) => {
-        const res = await fetch(`${BASE_URL}/api/v1/auctions/${testAuction.id}/finalize`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${partnerBToken}`,
-          },
-          body: JSON.stringify({
-            subscribersPresent: 18,
-            signedByForeman: true,
-            notes: `Concurrent finalization race attempt #${idx + 1}`,
-          }),
-        });
-        return {
-          status: res.status,
-          body: await res.json().catch(() => ({})),
-        };
-      });
+  const minutesCount = await prisma.auctionMinutes.count({
+    where: { auctionId: testAuction.id },
+  });
+  const finalizedAuction = await prisma.auction.findUnique({
+    where: { id: testAuction.id },
+  });
 
-      const finalizeResults = await Promise.all(finalizePromises);
-      const finalizeSuccess = finalizeResults.filter((r) => r.status === 200 || r.status === 201);
-      const finalizeRejected = finalizeResults.filter((r) => r.status === 400);
-
-      const minutesCount = await prisma.auctionMinutes.count({
-        where: { auctionId: testAuction.id },
-      });
-
-      test3Passed = finalizeSuccess.length === 1 && minutesCount === 1;
-      test3Details = `Successful Finalizations: ${finalizeSuccess.length} (Expected 1). Rejected: ${finalizeRejected.length}. Minutes Records: ${minutesCount}.`;
-    } else {
-      test3Passed = true;
-      test3Details = `Auction was already finalized in previous runs. State confirmed completed with 1 winner.`;
-    }
-  } else {
-    test3Passed = true;
-    test3Details = `No eligible group for new auction test; skipping auction creation.`;
-  }
+  const test3Passed =
+    finalizeSuccess.length === 1 &&
+    finalizeRejected.length === 4 &&
+    finalizeServerErrors.length === 0 &&
+    minutesCount === 1 &&
+    finalizedAuction?.status === 'COMPLETED';
 
   recordAssertion(
-    'INV-3: Auction Single-Finalization Concurrency Guard',
+    'CP-3: Auction Single-Finalization Concurrency Guard (Gate 6)',
     'Simultaneous checker commits result in strictly 1 finalized auction and 1 statutory minutes record',
     test3Passed,
-    test3Details,
+    `Successful: ${finalizeSuccess.length} (Expected 1). Rejected: ${finalizeRejected.length} (Expected 4). Minutes Records: ${minutesCount}. Status: ${finalizedAuction?.status}.`,
   );
 
   // --------------------------------------------------------------------------
-  // Step 5: TEST 4 — High-Throughput Burst & Latency Benchmark (NFR §3)
+  // Step 5: TEST 4 — Prize Disbursement Double-Release Race
   // --------------------------------------------------------------------------
-  console.log(`\n--- [5/5] TEST 4: High-Throughput Burst & Latency Benchmark (100 Requests) ---`);
+  console.log(`\n--- [5/6] TEST 4: Prize Disbursement Double-Release Race ---`);
+  console.log(`   Simulating 5 simultaneous release-payout requests for the same prize winner...`);
+
+  // Prepare winner into AUTHORIZED_BY_CHECKER state
+  await prisma.auctionWinner.update({
+    where: { id: testAuction.winner!.id },
+    data: {
+      disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+      disbursementMode: 'BANK_TRANSFER_NEFT',
+      disbursedAmount: 80000n,
+      authorizedByUserId: partnerBUser.id,
+    },
+  });
+
+  const disbursePromises = Array.from({ length: 5 }).map(async (_, idx) => {
+    const res = await fetch(`${BASE_URL}/api/v1/disbursements/auction/${testAuction.id}/disburse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accountantToken}`,
+      },
+      body: JSON.stringify({
+        paymentReference: `NEFT-CONCURRENT-REF-${Date.now()}-${idx}`,
+        disbursedAt: new Date().toISOString(),
+      }),
+    });
+    return {
+      status: res.status,
+      body: await res.json().catch(() => ({})),
+    };
+  });
+
+  const disburseResults = await Promise.all(disbursePromises);
+  const disburseSuccess = disburseResults.filter((r) => r.status === 200 || r.status === 201);
+  const disburseRejected = disburseResults.filter((r) => r.status === 400);
+  const disburseServerErrors = disburseResults.filter((r) => r.status >= 500);
+
+  const updatedWinner = await prisma.auctionWinner.findUnique({
+    where: { id: testAuction.winner!.id },
+  });
+
+  const test4Passed =
+    disburseSuccess.length === 1 &&
+    disburseRejected.length === 4 &&
+    disburseServerErrors.length === 0 &&
+    updatedWinner?.disbursementStatus === 'DISBURSED';
+
+  recordAssertion(
+    'CP-4: Prize Disbursement Double-Release Race Guard (Gate 6)',
+    'Simultaneous release requests result in strictly 1 disbursed status and 4 rejected without 500 errors',
+    test4Passed,
+    `Successful: ${disburseSuccess.length} (Expected 1). Rejected: ${disburseRejected.length} (Expected 4). Winner Status: ${updatedWinner?.disbursementStatus}.`,
+  );
+
+  // --------------------------------------------------------------------------
+  // Step 6: TEST 5 — Desk Cash Handover Double-Acknowledge Race
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [5.1/6] TEST 5: Desk Cash Handover Double-Acknowledge Race ---`);
+  console.log(`   Simulating 5 simultaneous vault deposit acknowledge requests...`);
+
+  // Create a clean cash payment pending handover recorded by Field Agent
+  const cashPayment = await prisma.payment.create({
+    data: {
+      branchId: activeGroup.branchId,
+      customerId: targetTicket.customerId,
+      paymentMethod: 'CASH',
+      amount: 5000n,
+      paymentStatus: 'SUCCESS',
+      cashHandoverStatus: 'PENDING_HANDOVER',
+      recordedByUserId: agentUser.id, // Field Agent
+      idempotencyKey: `handover-payment-${Date.now()}`,
+    },
+  });
+
+  const handoverPromises = Array.from({ length: 5 }).map(async (_, idx) => {
+    const res = await fetch(`${BASE_URL}/api/v1/collections/cash-handover/acknowledge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${partnerBToken}`, // Checker
+      },
+      body: JSON.stringify({
+        collectorUserId: agentUser.id,
+        paymentIds: [cashPayment.id],
+        acknowledgedAmount: 5000,
+        notes: `Concurrent handover acknowledge attempt #${idx + 1}`,
+      }),
+    });
+    return {
+      status: res.status,
+      body: await res.json().catch(() => ({})),
+    };
+  });
+
+  const handoverResults = await Promise.all(handoverPromises);
+  const handoverSuccess = handoverResults.filter((r) => r.status === 200 || r.status === 201);
+  const handoverRejected = handoverResults.filter((r) => r.status === 400);
+  const handoverServerErrors = handoverResults.filter((r) => r.status >= 500);
+
+  const acknowledgedPayment = await prisma.payment.findUnique({
+    where: { id: cashPayment.id },
+  });
+
+  const test5Passed =
+    handoverSuccess.length === 1 &&
+    handoverRejected.length === 4 &&
+    handoverServerErrors.length === 0 &&
+    acknowledgedPayment?.cashHandoverStatus === 'ACKNOWLEDGED';
+
+  recordAssertion(
+    'CP-5: Cash Handover Double-Acknowledge Race Guard (Gate 6)',
+    'Simultaneous vault acknowledgments result in strictly 1 deposit and 4 rejected',
+    test5Passed,
+    `Successful: ${handoverSuccess.length} (Expected 1). Rejected: ${handoverRejected.length} (Expected 4). Status: ${acknowledgedPayment?.cashHandoverStatus}.`,
+  );
+
+  // --------------------------------------------------------------------------
+  // Step 7: TEST 6 — High-Throughput Burst & Latency Benchmark (100 Requests, NFR §3)
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [6/6] TEST 6: High-Throughput Burst & Latency Benchmark (100 Requests) ---`);
   console.log(`   Bombarding server with 100 concurrent requests across read/write endpoints...`);
 
   const burstEndpoints = [
-    '/api/v1/chits',
-    '/api/v1/customers',
     '/health',
     '/api/v1/chits',
     '/api/v1/customers',
+    '/api/v1/reports/form-xxii',
+    '/api/v1/reports/audit-logs',
   ];
 
-  const totalBurstRequests = 50;
+  const totalBurstRequests = 100;
+  const concurrencyWorkers = 20; // 20 concurrent virtual users sustained across 100 requests
   const burstLatencies: number[] = [];
   let burstErrors = 0;
 
   const burstStart = Date.now();
-  const burstPromises = Array.from({ length: totalBurstRequests }).map(async (_, idx) => {
-    const endpoint = burstEndpoints[idx % burstEndpoints.length];
-    const reqStart = performance.now();
-    try {
-      const res = await fetch(`${BASE_URL}${endpoint}`, {
-        headers: {
-          Authorization: `Bearer ${partnerAToken}`,
-        },
-      });
-      const reqDuration = performance.now() - reqStart;
-      burstLatencies.push(reqDuration);
-      if (res.status >= 500) {
+  let requestCounter = 0;
+
+  const workers = Array.from({ length: concurrencyWorkers }).map(async () => {
+    while (requestCounter < totalBurstRequests) {
+      const idx = requestCounter++;
+      const endpoint = burstEndpoints[idx % burstEndpoints.length];
+      const reqStart = performance.now();
+      try {
+        const res = await fetch(`${BASE_URL}${endpoint}`, {
+          headers: {
+            Authorization: `Bearer ${partnerAToken}`,
+          },
+        });
+        const reqDuration = performance.now() - reqStart;
+        burstLatencies.push(reqDuration);
+        if (res.status >= 500) {
+          burstErrors++;
+        }
+      } catch {
         burstErrors++;
       }
-      return res.status;
-    } catch {
-      burstErrors++;
-      return 500;
     }
   });
 
-  await Promise.all(burstPromises);
+  await Promise.all(workers);
   const totalBurstDuration = Date.now() - burstStart;
 
   const p50 = calculatePercentile(burstLatencies, 50).toFixed(2);
@@ -365,16 +533,14 @@ async function main() {
   const p99 = calculatePercentile(burstLatencies, 99).toFixed(2);
   const maxLatency = Math.max(...burstLatencies).toFixed(2);
 
-  // NFR §3 specifies <= 500ms for writes and <= 200ms for reads. Under 50 parallel requests
-  // simultaneously virtualized on local Windows Docker, allow up to 650ms for p95.
-  const targetThresholdMs = 650;
-  const test4Passed = Number(p95) <= targetThresholdMs && burstErrors === 0;
+  const targetThresholdMs = 350; // NFR §3 target <= 350ms
+  const test6Passed = Number(p95) <= targetThresholdMs && burstErrors === 0;
 
   recordAssertion(
-    'INV-4: NFR §3 Response Latency & Availability Standard',
-    `Read latency p95 <= ${targetThresholdMs}ms under 50 simultaneous parallel requests, zero 500 internal errors`,
-    test4Passed,
-    `Latency Percentiles: p50 = ${p50}ms, p95 = ${p95}ms (Target <= ${targetThresholdMs}ms), p99 = ${p99}ms, Max = ${maxLatency}ms. Total Burst Time: ${totalBurstDuration}ms. Errors: ${burstErrors}/${totalBurstRequests}.`,
+    'NFR-3: Latency & High-Throughput Benchmark (NFR §3)',
+    `Read latency p95 <= ${targetThresholdMs}ms under 20 concurrent workers (100 total requests), zero 500 internal errors`,
+    test6Passed,
+    `Latency: p50 = ${p50}ms, p95 = ${p95}ms (Target <= ${targetThresholdMs}ms), p99 = ${p99}ms, Max = ${maxLatency}ms. Total Burst: ${totalBurstDuration}ms. Errors: ${burstErrors}/${totalBurstRequests}.`,
   );
 
   // --------------------------------------------------------------------------
