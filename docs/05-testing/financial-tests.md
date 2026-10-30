@@ -293,3 +293,30 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 3. **Prize Money Disbursement Race (`CONCURR-INV-3`)**: 5 simultaneous workers racing on `DisbursementService.releasePayout()` serialize via `SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${winner.id} FOR UPDATE`. Strictly 1 payout releases; remaining 4 workers receive HTTP 400 `Prize money has already been disbursed`.
 4. **Desk Cash Handover Contention (`CONCURR-INV-4`)**: 5 simultaneous workers racing on `CollectionService.acknowledgeHandover()` serialize via `SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE`. Strictly 1 cashier acknowledgment commits into branch vault; remaining 4 workers receive HTTP 400 `Payment has already been acknowledged or is not pending handover`.
 5. **Defaulter Ticket Substitution Race (`CONCURR-INV-5`)**: 5 simultaneous workers racing on `InstallmentService.substituteSubscriber()` serialize via `SELECT id, status FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE`. Strictly 1 replacement customer acquires the ticket; remaining 4 workers receive HTTP 400 `Subscriber substitution failed: Ticket is no longer in REMOVED_DEF_3M status`.
+
+---
+
+## 9. Ambiguous Failure & Network Disconnect Chaos Suite (Zero Orphan Records & Telecom 504 Isolation)
+
+> **Mandate**: Rural monsoon network drops and Indian telecom SMS gateway congestion must fail-closed safely without leaving dangling cloud pointers in PostgreSQL or blocking/reversing financial ledger commits.
+
+- **Test Harness File**: [`apps/api/test/chaos-network-disconnect.spec.ts`](../../apps/api/test/chaos-network-disconnect.spec.ts)
+- **Live Container Probe**: [`scripts/verify-chaos-network-disconnect.ps1`](../../scripts/verify-chaos-network-disconnect.ps1)
+
+### Chaos Scenarios Tested
+```typescript
+describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real DB)', () => {
+  // Scenario 1: CHAOS-S3-1: Network disconnect during KYC upload MUST fail closed without leaving orphan CustomerDocument records in DB
+  // Scenario 2: CHAOS-S3-2: Network disconnect during signed blank cheque upload MUST NOT update AuctionWinner or create orphan audit logs
+  // Scenario 3: CHAOS-SMS-1: Downstream Indian telecom 504 Gateway Timeout MUST NOT rollback or delay the financial payment transaction
+  // Scenario 4: CHAOS-SMS-2: Msg91SmsDriver MUST retry with exponential backoff on HTTP 504 and succeed when gateway recovers
+  // Scenario 5: CHAOS-SMS-3: NotificationService MUST preserve delivery via Mobile App Push when telecom SMS driver is offline
+});
+```
+
+### Verification Assertions
+1. **KYC Upload Disconnect Zero Orphan Guard (`CHAOS-S3-1`)**: When S3 throws `ETIMEDOUT` mid-upload, the database mutation is never executed. PostgreSQL contains strictly 0 orphan `CustomerDocument` records.
+2. **Cheque Collateral Upload Disconnect Guard (`CHAOS-S3-2`)**: When blank cheque S3 upload drops mid-stream, `AuctionWinner.securityDocS3Key` remains strictly `null` and `AuditLog` records 0 orphan events.
+3. **Financial Payment Non-Blocking Telecom Isolation (`CHAOS-SMS-1`)**: Downstream Indian telecom 504 Gateway Timeouts or BullMQ queue delays do NOT block teller response times (<500ms) or roll back committed financial ledgers (`Payment`, `InstallmentDue: PAID`, `Receipt`).
+4. **Driver Exponential Backoff (`CHAOS-SMS-2`)**: `Msg91SmsDriver` catches HTTP 504 as `isRetryable`, applying exponential backoff delay ($\text{delay} = \text{base} \times 2^{\text{attempt}}$) across 3 attempts.
+5. **Mobile Push Primary Routing (`CHAOS-SMS-3`)**: When telecom SMS routes are partitioned, customers with active smartphones receive receipt alerts via free FCM Mobile App Push, completely bypassing carrier SMS outages.

@@ -354,3 +354,27 @@ Time:        5.441 s
 | **Anti-BOLA Customer Scoping** | ✅ 100% Enforced | Customers attempting to access another subscriber's documents receive `HTTP 403 Forbidden`. |
 | **Path Traversal Immunity** | ✅ 100% Enforced | Directory traversal keys (`..`) rejected with `HTTP 400 Bad Request`. |
 | **Automated Database Backups** | ✅ 100% Enforced | Daily midnight dumps vaulted with `AES256` encryption and 30-day retention pruning. |
+| **S3 Mid-Upload Zero Orphan Guarantee** | ✅ 100% Enforced | External S3 upload is invoked before PostgreSQL database row creation. Mid-stream socket drops fail closed with strictly 0 orphan DB records (`CHAOS-S3-1`, `CHAOS-S3-2`). |
+
+---
+
+## 8. Ambiguous Failure & S3 Disconnect Invariants (Chaos Hardened)
+
+> **Mandate**: Rural network instability during monsoon seasons or broadband packet loss must NEVER leave dangling metadata records in PostgreSQL pointing to non-existent S3 objects.
+
+### 8.1 Fail-Closed Invariant Architecture
+In both [`CustomerService.uploadDocument`](file:///u:/Kumaran-finance/apps/api/src/customer/customer.service.ts) and [`DisbursementService.uploadSafetyProof`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts):
+```typescript
+// 1. External cloud storage upload executed FIRST
+await this.storageService.uploadFile(s3Key, file.buffer, file.mimetype);
+
+// 2. Database metadata record committed ONLY AFTER S3 storage acknowledges receipt
+return this.prisma.customerDocument.create({ ... });
+```
+
+### 8.2 Chaos Test & Live Probe Verification
+1. **Automated Chaos Integration Spec ([`test/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/chaos-network-disconnect.spec.ts))**:
+   - `CHAOS-S3-1`: KYC upload socket disconnect (`ETIMEDOUT`) simulated $\to$ Throws exception, database assertion confirms `SELECT COUNT(*) FROM "CustomerDocument"` is strictly **0**.
+   - `CHAOS-S3-2`: Blank cheque upload disconnect simulated $\to$ Throws exception, database assertion confirms `AuctionWinner.securityDocS3Key` remains strictly **null** and `AuditLog` count is **0**.
+2. **Live Docker Container Probe ([`scripts/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/verify-chaos-network-disconnect.ps1))**:
+   - `CHAOS-PROBE-1`: Penetration probe executed on live container port 3000 $\to$ **100% Pass** (`Zero orphan records in CustomerDocument`).
