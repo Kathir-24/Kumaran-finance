@@ -198,3 +198,24 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 2. **3-Month Consecutive Arrears & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
    - If a subscriber fails to pay their monthly installment for **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
    - The software tracks consecutive missed installments, flags the ticket with status `DEFAULT_3_MONTHS`, and provides an authorized workflow for company management / partners to formally remove the customer and reassign or settle the ticket according to company policy.
+
+---
+
+## 9. Whole-Rupee Input Boundary Invariants & Zero-Paise Enforcement (`CONFIRMED-BY-DEVELOPER`)
+
+> **Architectural Law (Rule 2 in AGENTS.md)**: All monetary values in Kumaran Finance exist strictly in 64-bit whole integer Rupees (`BigInt`). Paise, decimal fractions (`.00`), and IEEE-754 floating-point numbers (`float`, `number`) are strictly prohibited in financial code and rejected at the HTTP DTO boundary.
+
+### Invariant Rules Enforced at the Input Gateway:
+1. **Zero-Paise Integer Enforcement (`@IsInt`)**:
+   - Any financial payload containing fractional decimals (e.g., `amount: 3950.50`, `bidDiscount: 22000.25`, or `chitValue: 100000.75`) is rejected immediately at the `ValidationPipe` boundary with `HTTP 400 Bad Request`.
+   - The system **never** silently truncates paise via `Math.floor()` without failing closed.
+2. **Negative Value Elimination (`@IsPositive` / `@Min(1)`)**:
+   - Negative monetary inputs (`-5000`, `-1n`) are rejected at the DTO boundary with `HTTP 400 Bad Request`.
+3. **Zero Payment Rejection**:
+   - Zero-rupee payments or collections (`amount: 0`) are prohibited on positive settlement endpoints.
+4. **Statutory Ceiling & Floor Enforcement**:
+   - Winning discount bids must strictly satisfy $C_f \le D \le \frac{V}{4}$.
+   - Sub-floor bids ($D < 4.00\%$ Foreman Commission) and super-ceiling bids ($D > 25\%$ total chit value) are rejected fail-closed with `HTTP 400 Bad Request`.
+5. **Discrete Net Due Exact Match (ADR-07)**:
+   - Payment amount must identically equal `due.netPayableAmount` ($I_{net} = I_{base} - Div_{ticket}$).
+   - Partial payments, advance overpayments, and floating credit balances are rejected with `HTTP 400 Bad Request`.

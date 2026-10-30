@@ -241,3 +241,28 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
 4. **Auction Bidding & Tie-Break Guard**: `AuctionService.recordBid()` strictly asserts that the target auction is not `COMPLETED` or `MINUTES_FILED`. Attempting to submit bids or tie-breaks on finalized auctions throws `BadRequestException`.
 5. **Reversal Duplicate Protection**: `PaymentService.approveReversal()` strictly asserts `payment.reversal.status === 'REQUESTED'`. Attempting to approve an already `APPROVED` or `REJECTED` reversal throws `BadRequestException`.
 6. **Cash Handover Duplicate Signoff**: `CollectionService.acknowledgeHandover()` strictly asserts `payment.cashHandoverStatus === 'PENDING_HANDOVER'`. Attempting to re-acknowledge already vault-signed cash throws `BadRequestException`.
+
+---
+
+## 7. Financial Boundary & Negative Fuzzing Test Suite (Zero-Paise Enforcement)
+
+> **Mandate**: All financial mutation DTOs must enforce strict `@IsInt()` whole-rupee validation. Fractional paise, negative values, zero payments, and ceiling overflows must fail-closed with HTTP 400 `BadRequestException`.
+
+- **Test Harness File**: [`apps/api/test/financial-boundary-fuzz.spec.ts`](../../apps/api/test/financial-boundary-fuzz.spec.ts)
+- **Live Container Probe**: [`scripts/verify-financial-boundary-fuzz.ps1`](../../scripts/verify-financial-boundary-fuzz.ps1)
+
+### The 5 Fuzzing Threat Categories Tested
+```typescript
+describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)', () => {
+  // Category 1: Negative Monetary Inputs (-5000, -1, -20000, -100000) -> HTTP 400
+  // Category 2: Zero Amount Payments & Sub-Floor Violations (amount: 0, chitValue: 0) -> HTTP 400
+  // Category 3: Decimal Fractions & Paise Injections (3950.50, 22000.25, 100000.75) -> HTTP 400
+  // Category 4: Statutory Ceiling & Floor Bounds (bid < 4% commission, bid > 25% ceiling) -> HTTP 400
+  // Category 5: Type Confusion, NaN, Infinity & String Injections -> HTTP 400
+});
+```
+
+### Verification Assertions
+1. **Zero-Paise Integrity**: Submitting fractional paise (`3950.50` or `22000.25`) to `POST /payments`, `POST /collections`, or `POST /auctions/:id/record-bid` fails closed at the NestJS `ValidationPipe` boundary with HTTP 400 `BadRequestException`, eliminating silent `Math.floor()` paise truncation.
+2. **Negative Amount Shielding**: Negative monetary values on any payment, collection, handover, or chit creation endpoint fail closed with HTTP 400 `BadRequestException`.
+3. **Statutory 1/4 Ceiling & 4% Floor Invariants**: Auction bids below 4.00% Foreman Commission ($D < C_f$) or above the 1/4 ceiling ($D > V/4$) fail closed with HTTP 400 `BadRequestException`.

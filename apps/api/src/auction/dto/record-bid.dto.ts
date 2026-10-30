@@ -2,8 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsPositive,
   IsString,
 } from 'class-validator';
@@ -24,7 +24,7 @@ export class RecordBidDto {
   })
   @IsNotEmpty({ message: 'Bid discount is required' })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Bid discount must be a positive whole number' })
   bidDiscount: number;
 

@@ -40,7 +40,7 @@ export class HistoricalWinnerDto {
   })
   @IsNotEmpty()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive()
   bidDiscount: number;
 
@@ -79,7 +79,7 @@ export class OngoingMemberAllocationDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Opening balance must be a whole Rupee integer amount (zero paise/decimals)' })
   openingBalance?: number = 0;
 }
 
@@ -113,7 +113,7 @@ export class OnboardOngoingChitDto {
   })
   @IsNotEmpty()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Chit value must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive()
   chitValue: number;
 

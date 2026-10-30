@@ -59,8 +59,8 @@ export class RecordTieBreakDto {
   })
   @IsNotEmpty({ message: 'Bid discount is required' })
   @Type(() => Number)
-  @IsNumber()
-  @IsPositive()
+  @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
+  @IsPositive({ message: 'Bid discount must be a positive whole number' })
   bidDiscount: number;
 
   @ApiProperty({

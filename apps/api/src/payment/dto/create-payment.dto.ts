@@ -39,7 +39,7 @@ export class CreatePaymentDto {
   })
   @IsNotEmpty({ message: 'Payment amount is required' })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Payment amount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Payment amount must be a positive whole number' })
   amount: number;
 

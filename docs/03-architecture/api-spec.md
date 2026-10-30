@@ -520,6 +520,18 @@ This section provides granular contract specifications (request bodies, response
 
 ---
 
+### 3.11 Financial Input DTO Invariants & Zero-Paise Enforcement (Rule 2 in AGENTS.md)
+All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validation via NestJS `ValidationPipe`. Any request containing fractional decimals (e.g. `3950.50`, `22000.25`), negative numbers, zero (on positive endpoints), or non-numeric types is rejected immediately with `HTTP 400 Bad Request`:
+- `CreatePaymentDto.amount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+- `RecordCollectionDto.amount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+- `AcknowledgeHandoverDto.acknowledgedAmount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+- `RecordBidDto.bidDiscount`: `@IsInt()`, `@IsPositive()` ($C_f \le D \le V/4$)
+- `RecordTieBreakDto.bidDiscount`: `@IsInt()`, `@IsPositive()` (Exact $V/4$ ceiling)
+- `CreateChitGroupDto.chitValue`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+- `OnboardOngoingChitDto.chitValue`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+
+---
+
 ## 4. Related Architecture & Contract Documents
 
 - **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json)

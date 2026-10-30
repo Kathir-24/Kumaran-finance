@@ -39,7 +39,7 @@ export class RecordCollectionDto {
   })
   @IsNotEmpty({ message: 'Collection amount is required' })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Collection amount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Collection amount must be a positive whole number' })
   amount: number;
 

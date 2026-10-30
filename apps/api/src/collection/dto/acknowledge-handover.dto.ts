@@ -3,8 +3,8 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
@@ -27,7 +27,7 @@ export class AcknowledgeHandoverDto {
   })
   @IsNotEmpty({ message: 'Acknowledged cash amount is required' })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Acknowledged amount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Acknowledged amount must be a positive number' })
   acknowledgedAmount: number;
 

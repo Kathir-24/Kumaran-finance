@@ -28,6 +28,7 @@ flowchart LR
 
 ### Gate 2: Server-Side Input Validation
 - [ ] All DTOs use `class-validator` / `zod` with strict type checking.
+- [ ] Monetary DTO fields enforce `@IsInt()` to eliminate paise, fractional decimals, and floating-point injection attacks at the boundary.
 - [ ] No untrusted client-supplied values (e.g., client clocks, self-calculated balances, arbitrary payment status) are accepted.
 
 ### Gate 3: Database Integrity & Constraints

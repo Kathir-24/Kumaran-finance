@@ -42,7 +42,7 @@ export class CreateChitGroupDto {
   })
   @IsNotEmpty({ message: 'Chit value is required' })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: 'Chit value must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Chit value must be a positive whole number' })
   chitValue: number;
 
