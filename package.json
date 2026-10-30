@@ -2,6 +2,7 @@
   "name": "kumaran-finance-monorepo",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Monorepo for Kumaran Chits operations platform (Kumaran Finance, Perundurai)",
   "workspaces": [
     "apps/*",

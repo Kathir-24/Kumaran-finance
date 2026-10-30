@@ -223,12 +223,15 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
     });
 
     it('should forward unhandled non-HttpExceptions to Sentry', () => {
+      const logSpy = jest.spyOn((filter as any).logger, 'error').mockImplementation(() => {});
       const typeError = new TypeError('Cannot read properties of undefined');
 
       filter.catch(typeError, mockArgumentsHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(mockCaptureFn).toHaveBeenCalledWith(typeError);
+      expect(logSpy).toHaveBeenCalled();
+      logSpy.mockRestore();
     });
 
     it('should NOT forward 4xx client errors (401, 400, 404) to Sentry', () => {
