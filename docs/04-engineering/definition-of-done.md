@@ -45,6 +45,7 @@ flowchart LR
 - [ ] Integration tests verify database transactions and pessimistic row locking (`SELECT FOR UPDATE`).
 - [ ] Mathematical invariant tests verify zero rupee leaks:
   $$\text{Foreman Commission } (4\%) + \text{Total Member Dividends} = \text{Discount}$$
+- [ ] **Full $N \times N$ Status Transition Matrix Coverage**: Every model with a status lifecycle has exhaustive $N \times N$ transition tests (113 total transitions across the 9 product lifecycles) verifying that all illegal transitions fail-closed with HTTP 400 `BadRequestException`.
 - [ ] Negative tests verify that unauthorized requests, self-approvals (`maker == checker`), and illegal discount bids are cleanly rejected.
 
 ### Gate 6: Idempotency & Concurrency

@@ -208,3 +208,36 @@ it('should accept cash handover acknowledgment when confirmed by an independent 
   expect(handover.acknowledgedByUserId).toBe(partnerApproverId);
 });
 ```
+
+---
+
+## 6. Full-Product $N \times N$ Status Transition Matrix Exhaustion Suite (113 Transitions)
+
+> **Mandate**: Every operational model in Kumaran Chits possessing a status lifecycle must have 100% automated test coverage across its complete $N \times N$ transition permutations. Any illegal transition MUST fail-closed with HTTP 400 `BadRequestException`.
+
+- **Test Harness File**: [`apps/api/test/state-matrix-sweep.spec.ts`](../../apps/api/test/state-matrix-sweep.spec.ts)
+- **Live Container Probe**: [`scripts/verify-state-matrix-sweep.ps1`](../../scripts/verify-state-matrix-sweep.ps1)
+
+### Status Lifecycle Census & Test Assertions
+```typescript
+describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transitions)', () => {
+  // 1. ChitGroup: 5x5 = 25 transitions (5 allowed, 20 fail-closed HTTP 400)
+  // 2. SubscriberTicket: 4x4 = 16 transitions (5 allowed, 11 fail-closed HTTP 400)
+  // 3. Auction: 3x3 = 9 transitions (2 allowed, 7 fail-closed HTTP 400)
+  // 4. AuctionWinner Disbursement: 4x4 = 16 transitions (3 allowed, 13 fail-closed HTTP 400)
+  // 5. InstallmentDue: 3x3 = 9 transitions (4 allowed, 5 fail-closed HTTP 400)
+  // 6. Payment Status: 4x4 = 16 transitions (3 allowed, 13 fail-closed HTTP 400)
+  // 7. PaymentReversal: 3x3 = 9 transitions (2 allowed, 7 fail-closed HTTP 400)
+  // 8. Cash Handover: 2x2 = 4 transitions (1 allowed, 3 fail-closed HTTP 400)
+  // 9. Cheque Clearing: 3x3 = 9 transitions (2 allowed, 7 fail-closed HTTP 400)
+  // TOTAL: 113 Transitions Tested (27 Allowed, 86 Fail-Closed HTTP 400)
+});
+```
+
+### Verification Assertions
+1. **ChitGroup Activation Guard**: `ChitService.activate()` strictly asserts `chit.status === ChitStatus.DRAFT || chit.status === ChitStatus.REGISTERED`. Attempting to activate an `ACTIVE`, `COMPLETED`, or `CLOSED` chit group throws `BadRequestException`.
+2. **Defaulter & Arrears Removal Guard**: `InstallmentService.settleRemoval()` strictly asserts `ticket.status === 'REMOVED_DEF_3M'`. Attempting exit settlement on `ACTIVE` or `DEFAULT_3_MONTHS` tickets throws `BadRequestException`.
+3. **Disbursement Pipeline Guard**: `DisbursementService.releasePayout()` strictly asserts `winner.disbursementStatus === 'AUTHORIZED_BY_CHECKER'`. Attempting payout release on `PENDING_VERIFICATION` or `VERIFIED_BY_MAKER` winners throws `BadRequestException`.
+4. **Auction Bidding & Tie-Break Guard**: `AuctionService.recordBid()` strictly asserts that the target auction is not `COMPLETED` or `MINUTES_FILED`. Attempting to submit bids or tie-breaks on finalized auctions throws `BadRequestException`.
+5. **Reversal Duplicate Protection**: `PaymentService.approveReversal()` strictly asserts `payment.reversal.status === 'REQUESTED'`. Attempting to approve an already `APPROVED` or `REJECTED` reversal throws `BadRequestException`.
+6. **Cash Handover Duplicate Signoff**: `CollectionService.acknowledgeHandover()` strictly asserts `payment.cashHandoverStatus === 'PENDING_HANDOVER'`. Attempting to re-acknowledge already vault-signed cash throws `BadRequestException`.

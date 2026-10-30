@@ -353,8 +353,10 @@ export class ChitService {
       throw new NotFoundException('Chit scheme not found');
     }
 
-    if (chit.status === ChitStatus.ACTIVE) {
-      throw new BadRequestException('Chit scheme is already active');
+    if (chit.status !== ChitStatus.DRAFT && chit.status !== ChitStatus.REGISTERED) {
+      throw new BadRequestException(
+        `Cannot activate chit scheme: Scheme is in ${chit.status} status. Only DRAFT or REGISTERED schemes can be activated.`,
+      );
     }
 
     // 1. Verify capacity: all N tickets must be filled

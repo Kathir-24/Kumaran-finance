@@ -197,3 +197,153 @@ stateDiagram-v2
   - Requires **Company Management / Partner Authorization**: Company exercises its confirmed right to remove the customer from the chit group.
   - Generates an immutable audit event with `removedByUserId` and timestamp.
   - Ticket is freed for substitution / re-assignment or account settlement according to company terms.
+
+---
+
+## 7. Full-Product $N \times N$ Status Transition Matrices (113 Transitions across 9 Lifecycles)
+
+> **Architectural Invariant**: Every operational model in Kumaran Chits that possesses a status field is mathematically bounded by an exhaustive $N \times N$ transition matrix. Any transition not explicitly registered as **Allowed** is strictly **Fail-Closed** on the server, throwing an immediate HTTP 400 `BadRequestException`. Client applications (Web, Mobile) cannot force state bypasses.
+
+### Comprehensive Transition Census Summary
+| # | Entity & Status Column | Number of States ($N$) | Total Transitions ($N \times N$) | Legally Allowed | Strictly Fail-Closed |
+|---|---|:---:|:---:|:---:|:---:|
+| 1 | `ChitGroup.status` | 5 | 25 | 5 | 20 |
+| 2 | `SubscriberTicket.status` | 4 | 16 | 5 | 11 |
+| 3 | `Auction.status` | 3 | 9 | 2 | 7 |
+| 4 | `AuctionWinner.disbursementStatus` | 4 | 16 | 3 | 13 |
+| 5 | `InstallmentDue.status` | 3 | 9 | 4 | 5 |
+| 6 | `Payment.paymentStatus` | 4 | 16 | 3 | 13 |
+| 7 | `PaymentReversal.status` | 3 | 9 | 2 | 7 |
+| 8 | `Payment.cashHandoverStatus` | 2 | 4 | 1 | 3 |
+| 9 | `Payment.chequeStatus` | 3 | 9 | 2 | 7 |
+| **TOTAL** | **9 Status Lifecycles** | — | **113** | **27** | **86** |
+
+---
+
+### Matrix 1: `ChitGroup.status` ($5 \times 5 = 25$)
+- **States**: `DRAFT`, `REGISTERED`, `ACTIVE`, `COMPLETED`, `CLOSED`
+
+| From \ To | `DRAFT` | `REGISTERED` | `ACTIVE` | `COMPLETED` | `CLOSED` |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **`DRAFT`** | ❌ 400 | ✅ Allowed (Order entered) | ✅ Allowed (Fast-track) | ❌ 400 | ❌ 400 |
+| **`REGISTERED`** | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ filled) | ❌ 400 | ❌ 400 |
+| **`ACTIVE`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ months done) | ❌ 400 |
+| **`COMPLETED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Reconciled & signed) |
+| **`CLOSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (5)*: `DRAFT -> REGISTERED`, `DRAFT -> ACTIVE`, `REGISTERED -> ACTIVE`, `ACTIVE -> COMPLETED`, `COMPLETED -> CLOSED`.  
+*Fail-Closed (20)*: All other 20 transitions throw HTTP 400.
+
+---
+
+### Matrix 2: `SubscriberTicket.status` ($4 \times 4 = 16$)
+- **States**: `ACTIVE`, `DEFAULT_3_MONTHS`, `REMOVED_DEF_3M`, `SURRENDERED`
+
+| From \ To | `ACTIVE` | `DEFAULT_3_MONTHS` | `REMOVED_DEF_3M` | `SURRENDERED` |
+|---|:---:|:---:|:---:|:---:|
+| **`ACTIVE`** | ❌ 400 | ✅ Allowed (3 unpaid months) | ❌ 400 | ✅ Allowed (Voluntary surrender) |
+| **`DEFAULT_3_MONTHS`** | ✅ Allowed (Full arrears cleared) | ❌ 400 | ✅ Allowed (Company removes) | ❌ 400 |
+| **`REMOVED_DEF_3M`** | ✅ Allowed (New subscriber substituted) | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`SURRENDERED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (5)*: `ACTIVE -> DEFAULT_3_MONTHS`, `ACTIVE -> SURRENDERED`, `DEFAULT_3_MONTHS -> ACTIVE`, `DEFAULT_3_MONTHS -> REMOVED_DEF_3M`, `REMOVED_DEF_3M -> ACTIVE`.  
+*Fail-Closed (11)*: All other 11 transitions throw HTTP 400.
+
+---
+
+### Matrix 3: `Auction.status` ($3 \times 3 = 9$)
+- **States**: `SCHEDULED`, `COMPLETED`, `MINUTES_FILED`
+
+| From \ To | `SCHEDULED` | `COMPLETED` | `MINUTES_FILED` |
+|---|:---:|:---:|:---:|
+| **`SCHEDULED`** | ❌ 400 | ✅ Allowed (Checker finalizes) | ❌ 400 |
+| **`COMPLETED`** | ❌ 400 | ❌ 400 | ✅ Allowed (Form XVII minutes filed) |
+| **`MINUTES_FILED`** | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (2)*: `SCHEDULED -> COMPLETED`, `COMPLETED -> MINUTES_FILED`.  
+*Fail-Closed (7)*: All other 7 transitions throw HTTP 400.
+
+---
+
+### Matrix 4: `AuctionWinner.disbursementStatus` ($4 \times 4 = 16$)
+- **States**: `PENDING_VERIFICATION`, `VERIFIED_BY_MAKER`, `AUTHORIZED_BY_CHECKER`, `DISBURSED`
+
+| From \ To | `PENDING_VERIFICATION` | `VERIFIED_BY_MAKER` | `AUTHORIZED_BY_CHECKER` | `DISBURSED` |
+|---|:---:|:---:|:---:|:---:|
+| **`PENDING_VERIFICATION`** | ❌ 400 | ✅ Allowed (Maker verifies safety proof) | ❌ 400 | ❌ 400 |
+| **`VERIFIED_BY_MAKER`** | ❌ 400 | ❌ 400 | ✅ Allowed (Checker authorizes payout) | ❌ 400 |
+| **`AUTHORIZED_BY_CHECKER`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Accountant releases funds) |
+| **`DISBURSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (3)*: Strict linear pipeline `PENDING_VERIFICATION -> VERIFIED_BY_MAKER -> AUTHORIZED_BY_CHECKER -> DISBURSED`.  
+*Fail-Closed (13)*: All other 13 transitions throw HTTP 400.
+
+---
+
+### Matrix 5: `InstallmentDue.status` ($3 \times 3 = 9$)
+- **States**: `UNPAID`, `PAID`, `OVERDUE`
+
+| From \ To | `UNPAID` | `PAID` | `OVERDUE` |
+|---|:---:|:---:|:---:|
+| **`UNPAID`** | ❌ 400 | ✅ Allowed (Discrete payment) | ✅ Allowed (Due date passed) |
+| **`PAID`** | ✅ Allowed (Reversal approved) | ❌ 400 (Double-pay blocked) | ❌ 400 |
+| **`OVERDUE`** | ❌ 400 | ✅ Allowed (Arrears payment) | ❌ 400 |
+
+*Allowed (4)*: `UNPAID -> PAID`, `UNPAID -> OVERDUE`, `PAID -> UNPAID`, `OVERDUE -> PAID`.  
+*Fail-Closed (5)*: All other 5 transitions throw HTTP 400.
+
+---
+
+### Matrix 6: `Payment.paymentStatus` ($4 \times 4 = 16$)
+- **States**: `INITIATED`, `SUCCESS`, `FAILED`, `REVERSED`
+
+| From \ To | `INITIATED` | `SUCCESS` | `FAILED` | `REVERSED` |
+|---|:---:|:---:|:---:|:---:|
+| **`INITIATED`** | ❌ 400 | ✅ Allowed (Bank verified / Gateway confirmed) | ✅ Allowed (UTR reject / Gateway fail) | ❌ 400 |
+| **`SUCCESS`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Dual-control reversal) |
+| **`FAILED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`REVERSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (3)*: `INITIATED -> SUCCESS`, `INITIATED -> FAILED`, `SUCCESS -> REVERSED`.  
+*Fail-Closed (13)*: All other 13 transitions throw HTTP 400.
+
+---
+
+### Matrix 7: `PaymentReversal.status` ($3 \times 3 = 9$)
+- **States**: `REQUESTED`, `APPROVED`, `REJECTED`
+
+| From \ To | `REQUESTED` | `APPROVED` | `REJECTED` |
+|---|:---:|:---:|:---:|
+| **`REQUESTED`** | ❌ 400 | ✅ Allowed (Partner signs off) | ✅ Allowed (Partner rejects) |
+| **`APPROVED`** | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`REJECTED`** | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (2)*: `REQUESTED -> APPROVED`, `REQUESTED -> REJECTED`.  
+*Fail-Closed (7)*: All other 7 transitions throw HTTP 400.
+
+---
+
+### Matrix 8: `Payment.cashHandoverStatus` ($2 \times 2 = 4$)
+- **States**: `PENDING_HANDOVER`, `ACKNOWLEDGED`
+
+| From \ To | `PENDING_HANDOVER` | `ACKNOWLEDGED` |
+|---|:---:|:---:|
+| **`PENDING_HANDOVER`** | ❌ 400 | ✅ Allowed (Vault deposit signed off) |
+| **`ACKNOWLEDGED`** | ❌ 400 | ❌ 400 |
+
+*Allowed (1)*: `PENDING_HANDOVER -> ACKNOWLEDGED`.  
+*Fail-Closed (3)*: All other 3 transitions throw HTTP 400.
+
+---
+
+### Matrix 9: `Payment.chequeStatus` ($3 \times 3 = 9$)
+- **States**: `PENDING`, `CLEARED`, `BOUNCED`
+
+| From \ To | `PENDING` | `CLEARED` | `BOUNCED` |
+|---|:---:|:---:|:---:|
+| **`PENDING`** | ❌ 400 | ✅ Allowed (Bank credit confirmed) | ✅ Allowed (Dishonored by bank) |
+| **`CLEARED`** | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`BOUNCED`** | ❌ 400 | ❌ 400 | ❌ 400 |
+
+*Allowed (2)*: `PENDING -> CLEARED`, `PENDING -> BOUNCED`.  
+*Fail-Closed (7)*: All other 7 transitions throw HTTP 400.
