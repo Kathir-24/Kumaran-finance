@@ -101,6 +101,11 @@ jobs:
           pnpm run codegen:dart
           git diff --exit-code packages/api-client/src/generated/ apps/mobile/lib/core/api/models/
 
+      - name: Validate Docker Compose Orchestration Blueprints
+        run: |
+          docker compose -f infra/docker/docker-compose.yml config --quiet
+          docker compose -f infra/docker/docker-compose.fullstack.yml config --quiet
+
   docker-build-and-publish:
     name: Docker Build & Container Registry
     needs: code-quality-and-tests
