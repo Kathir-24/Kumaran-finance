@@ -1327,6 +1327,7 @@ async function run() {
     __dirname,
     '../../../.agents/teamwork/worker_m5_1/m5_raw_execution_evidence.json'
   );
+  fs.mkdirSync(path.dirname(jsonDumpPath), { recursive: true });
   fs.writeFileSync(jsonDumpPath, JSON.stringify(testResults, null, 2), 'utf-8');
   console.log(`\n💾 Raw Execution Evidence written to: ${jsonDumpPath}`);
 

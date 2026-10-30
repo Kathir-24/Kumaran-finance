@@ -1687,6 +1687,8 @@ ${discrepancyCatalog}
 - **Confirmation**: All test probes were executed live against local PostgreSQL 17, Redis 7, MinIO S3, and NestJS 12. No outputs were mocked or hardcoded.
 `;
 
+  fs.mkdirSync(require('path').dirname(PROOFS_FILE), { recursive: true });
+  fs.mkdirSync(require('path').dirname(PROOFS_FILE_REMEDIATION), { recursive: true });
   fs.writeFileSync(PROOFS_FILE, mdContent, 'utf-8');
   fs.writeFileSync(PROOFS_FILE_REMEDIATION, mdContent, 'utf-8');
   console.log(`✅ Verification proofs table written to ${PROOFS_FILE} and ${PROOFS_FILE_REMEDIATION}`);

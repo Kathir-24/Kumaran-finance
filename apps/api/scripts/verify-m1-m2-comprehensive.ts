@@ -1693,7 +1693,8 @@ ${failCount === 0
   : `Testing identified ${failCount} discrepancy issues as detailed in the granular evidence log.`}
 `;
 
-  const outputPath = path.resolve('..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
+  const outputPath = path.resolve(__dirname, '..', '..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, md, 'utf-8');
   console.log(`📄 Verification proof table successfully written to: ${outputPath}`);
 }
