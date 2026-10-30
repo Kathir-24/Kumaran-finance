@@ -70,8 +70,26 @@ async function run() {
   }
   console.log(`   Using Chit Group ID: ${chitGroupId} (KC-LIVE-20M-01)`);
 
+  // Ensure Month 2 auction exists and is COMPLETED with dividendPerTicket = 1050 for standalone repeatability
+  const m2AuctionStatus = queryDb(`SELECT status FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2;`).trim();
+  if (m2AuctionStatus !== 'COMPLETED') {
+    console.log(`   Month 2 auction status: '${m2AuctionStatus}'. Ensuring finalized Month 2 auction prerequisite fixture...`);
+    const winnerTicket = queryDb(`SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" = 4;`).trim();
+    queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2);`);
+    queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2);`);
+    queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2);`);
+    queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2;`);
+    const m2AuctionId = queryDb(`INSERT INTO public."Auction" ("id", "chitGroupId", "installmentMonth", "auctionDate", "bidDiscount", "foremanCommission", "totalDividend", "dividendPerTicket", "prizeMoney", "status", "initiatedByUserId", "finalizedByUserId", "createdAt", "updatedAt") VALUES (gen_random_uuid(), '${chitGroupId}', 2, '2026-12-15 00:00:00', 25000, 4000, 21000, 1050, 75000, 'COMPLETED', '${admin.userId}', '${admin.userId}', NOW(), NOW()) RETURNING id;`).trim();
+    queryDb(`INSERT INTO public."AuctionWinner" ("id", "auctionId", "ticketId", "bidAmount", "netPrizeMoney", "wasTieBreakWinner", "createdAt") VALUES (gen_random_uuid(), '${m2AuctionId}', '${winnerTicket}', 25000, 75000, true, NOW());`);
+    queryDb(`UPDATE public."SubscriberTicket" SET "isPrized" = true, "prizedAuctionId" = '${m2AuctionId}' WHERE id = '${winnerTicket}';`);
+    console.log(`   Created finalized Month 2 auction fixture with dividend ₹1,050.`);
+  }
+
   // Reset Ticket 19 status for test repeatability
-  queryDb(`UPDATE public."SubscriberTicket" SET status = 'ACTIVE', "consecutiveUnpaidMonths" = 0, "removedAt" = NULL, "removedByUserId" = NULL WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" = 19`);
+  queryDb(`UPDATE public."SubscriberTicket" SET status = 'ACTIVE', "consecutiveUnpaidMonths" = 0, "removedAt" = NULL, "removedByUserId" = NULL WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" = 19;`);
+  // Clear any existing Month 3 dues and allocations before scheduling
+  queryDb(`DELETE FROM public."PaymentAllocation" WHERE "installmentDueId" IN (SELECT id FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3);`);
+  queryDb(`DELETE FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3;`);
 
   // Fetch tickets for this group
   const rawTickets = queryDb(

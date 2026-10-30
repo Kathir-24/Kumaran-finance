@@ -55,6 +55,8 @@ async function run() {
   queryDb(`UPDATE public."User" SET "isTotpEnabled" = false, "totpSecret" = NULL, "mpinHash" = NULL WHERE phone = '9876543210'`);
   queryDb(`DELETE FROM public."User" WHERE phone = '9842154321'`);
   queryDb(`DELETE FROM public."Branch" WHERE code = 'ERD'`);
+  queryRedis('DEL auth:otp:9876543210 auth:otp:lockout:9876543210 auth:otp:cooldown:9876543210 auth:otp:9842154321 auth:otp:lockout:9842154321 auth:otp:cooldown:9842154321');
+
 
   let accessToken = '';
   let refreshToken = '';
@@ -213,6 +215,9 @@ async function run() {
   if (mpinLoginRes.status !== 200 || !mpinLoginRes.json?.data?.accessToken) {
     throw new Error(`Step 9 Failed: Mobile MPIN login failed`);
   }
+  accessToken = mpinLoginRes.json.data.accessToken;
+  refreshToken = mpinLoginRes.json.data.refreshToken;
+
 
   // --------------------------------------------------------------------------
   // Step 10: POST /auth/refresh-token (Rotate JWT access & refresh tokens)
@@ -292,7 +297,8 @@ async function run() {
   // Step 12.1: Brute-Force 3-Attempt Lockout Guard Test
   // --------------------------------------------------------------------------
   console.log(`\n--- [12.1/21] Brute-Force 3-Attempt Lockout Guard Test ---`);
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // Attempts 1 and 2 return 400 Bad Request with remaining attempts
+  for (let attempt = 1; attempt <= 2; attempt++) {
     const wrongOtpRes = await request('POST', '/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });
     const currentAttempts = JSON.parse(queryRedis('GET auth:otp:9876543210')).attempts;
     const remainingTtl = parseInt(queryRedis('TTL auth:otp:9876543210'), 10);
@@ -302,13 +308,18 @@ async function run() {
     }
   }
 
-  // 4th attempt must be rejected with lockout message
+  // 3rd attempt triggers 5-minute lockout penalty and returns HTTP 429
   const lockedOutRes = await request('POST', '/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });
-  console.log(`   Attempt 4 (Locked Out): Status ${lockedOutRes.status}, Error:`, lockedOutRes.json?.message || lockedOutRes.json?.error);
-  if (lockedOutRes.status !== 400 || !JSON.stringify(lockedOutRes.json).includes('Too many invalid verification attempts')) {
-    throw new Error(`Step 12.1 Failed: 4th attempt was not rejected with lockout error: ${JSON.stringify(lockedOutRes.json)}`);
+  console.log(`   Attempt 3 (Lockout Triggered): Status ${lockedOutRes.status}, Error:`, lockedOutRes.json?.message || lockedOutRes.json?.error);
+  if (lockedOutRes.status !== 429 || !JSON.stringify(lockedOutRes.json).includes('temporarily locked out')) {
+    throw new Error(`Step 12.1 Failed: 3rd attempt did not trigger 429 lockout: ${JSON.stringify(lockedOutRes.json)}`);
   }
   console.log(`   ✅ 3-Attempt Lockout Enforced: Key locked and purged from Redis after maximum failed attempts.`);
+
+  // Clear lockout and cooldown in Redis so subsequent tests can proceed
+  queryRedis('DEL auth:otp:lockout:9876543210');
+  queryRedis('DEL auth:otp:cooldown:9876543210');
+
 
   // Re-request fresh OTP for legitimate onboarding
   console.log(`   Re-requesting fresh OTP for legitimate staff onboarding...`);

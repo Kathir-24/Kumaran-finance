@@ -34,3 +34,11 @@ infra/docker/nginx/ssl/live/*.pem
 infra/docker/nginx/ssl/live/*.key
 infra/docker/nginx/ssl/live/*.pfx
 !infra/docker/nginx/ssl/live/.gitkeep
+
+# AI Agent scratchpads, proofs, and teamwork logs
+.agents/
+.agents/teamwork/
+
+# Experimental crawler & standalone probe scripts
+apps/api/scripts/verify-universal-endpoints-fuzzer.ts
+apps/api/test/run-live-adversarial-probes.mjs

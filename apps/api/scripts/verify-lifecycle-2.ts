@@ -75,8 +75,8 @@ async function run() {
   const token = loginRes.json.data.accessToken;
   console.log(`   Admin authenticated successfully.`);
 
-  // Clean up any test customer with phone '9842711223' to ensure repeatable runs
-  const existingCustId = queryDb(`SELECT id FROM public."Customer" WHERE phone = '9842711223'`);
+  // Clean up any test customer with phone '9842788990' to ensure repeatable runs
+  const existingCustId = queryDb(`SELECT id FROM public."Customer" WHERE phone = '9842788990'`);
   if (existingCustId && !existingCustId.startsWith('[DB ERROR]')) {
     queryDb(`DELETE FROM public."CustomerDocument" WHERE "customerId" = '${existingCustId}'`);
     queryDb(`DELETE FROM public."Nominee" WHERE "customerId" = '${existingCustId}'`);
@@ -96,7 +96,7 @@ async function run() {
   const createPayload = {
     fullName: 'Sundaram S',
     fullNameTamil: 'சுந்தரம் சு',
-    phone: '9842711223',
+    phone: '9842788990',
     altPhone: '9443211223',
     addressLine1: '14/2, Gandhi Nagar',
     addressLine2: 'Near Old Bus Stand',
@@ -105,6 +105,7 @@ async function run() {
     panNumber: 'ABCDE1234F',
     aadhaarLast4: '4821',
   };
+
   console.log(`   Payload:`, JSON.stringify(createPayload, null, 2));
 
   const createRes = await request('POST', '/customers', createPayload, token);

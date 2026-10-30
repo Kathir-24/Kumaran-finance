@@ -73,13 +73,14 @@ async function run() {
   }
   console.log(`   Using Chit Group ID: ${chitGroupId} (KC-LIVE-20M-01)`);
 
-  // Reset Month 2 auction and unprize non-company tickets for test repeatability
-  queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2)`);
-  queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2)`);
-  queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2)`);
-  queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2`);
-  queryDb(`UPDATE public."SubscriberTicket" SET "isPrized" = false, "prizedAuctionId" = NULL WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" > 1`);
-  console.log(`   Reset Month 2 auction state for clean repeatable test run.`);
+  // Reset all auctions >= Month 2, unprize non-company tickets, and reset defaulter status for test repeatability
+  queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 2);`);
+  queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 2);`);
+  queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 2);`);
+  queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 2;`);
+  queryDb(`UPDATE public."SubscriberTicket" SET "isPrized" = false, "prizedAuctionId" = NULL, "consecutiveUnpaidMonths" = 0, status = 'ACTIVE' WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" > 1;`);
+  queryDb(`UPDATE public."InstallmentDue" SET status = 'PAID', "paidAmount" = "netPayableAmount" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 1;`);
+  console.log(`   Reset auctions >= Month 2 and subscriber tickets for clean repeatable test run.`);
 
   // Fetch tickets for this group
   const rawTickets = queryDb(

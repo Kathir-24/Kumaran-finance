@@ -795,7 +795,9 @@
       "AUDITOR"
     ],
     "isPublic": false,
-    "notes": []
+    "notes": [
+      "CurrentUser injected"
+    ]
   },
   {
     "file": "src\\chit\\chit.controller.ts",
@@ -1264,7 +1266,9 @@
       "BRANCH_MANAGER"
     ],
     "isPublic": false,
-    "notes": []
+    "notes": [
+      "CurrentUser injected"
+    ]
   },
   {
     "file": "src\\customer\\customer.controller.ts",
@@ -1324,7 +1328,9 @@
       "BRANCH_MANAGER"
     ],
     "isPublic": false,
-    "notes": []
+    "notes": [
+      "CurrentUser injected"
+    ]
   },
   {
     "file": "src\\customer\\customer.controller.ts",
@@ -1353,7 +1359,9 @@
       "ACCOUNTANT"
     ],
     "isPublic": false,
-    "notes": []
+    "notes": [
+      "CurrentUser injected"
+    ]
   },
   {
     "file": "src\\customer\\customer.controller.ts",
