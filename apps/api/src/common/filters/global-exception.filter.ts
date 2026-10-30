@@ -54,10 +54,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         }
       }
     } else if (exception instanceof Error) {
-      this.logger.error(
-        `Unhandled Internal Error: ${exception.message}`,
-        exception.stack,
-      );
+      if (exception.message.includes('not allowed by CORS')) {
+        this.logger.warn(`CORS security policy blocked unauthorized request: ${exception.message}`);
+      } else {
+        this.logger.error(
+          `Unhandled Internal Error: ${exception.message}`,
+          exception.stack,
+        );
+      }
     } else {
       this.logger.error('Unknown exception caught', exception);
     }
