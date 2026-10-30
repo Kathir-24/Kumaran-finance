@@ -116,5 +116,6 @@ Before accepting any AI-generated code or committing to Git, ask the AI (or veri
 - [ ] *Does this transaction verify that `maker_user_id != checker_user_id`?*
 - [ ] *Are unpaid subscribers prevented from bidding in this auction?*
 - [ ] *Did you prevent a customer from holding 2 tickets in the same group?*
+- [ ] *Are all illegal status transitions fail-closed with HTTP 400 (`BadRequestException`) per the 9 lifecycle matrices?*
 - [ ] *Did you write automated unit tests covering failure edge cases?*
 - [ ] *Is the file under 350 lines, or does it need to be split into modular files?*
