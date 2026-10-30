@@ -677,6 +677,7 @@ export class AuthService {
       roles: [Role.CUSTOMER],
       branchId: customer.branchId,
       tokenType: 'access',
+      jti: crypto.randomUUID(),
     };
 
     const refreshPayload: JwtPayload = {
@@ -967,6 +968,7 @@ export class AuthService {
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'access',
+      jti: crypto.randomUUID(),
     };
 
     const refreshPayload: JwtPayload = {

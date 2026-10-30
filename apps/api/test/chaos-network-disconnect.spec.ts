@@ -63,7 +63,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
 
       // Resolve active chit group and ticket
       const ticket = await prisma.subscriberTicket.findFirst({
-        where: { status: 'ACTIVE' },
+        where: { status: 'ACTIVE', chitGroup: { status: 'ACTIVE' } },
         include: { chitGroup: true, customer: true },
       });
       if (ticket) {

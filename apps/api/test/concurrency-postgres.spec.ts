@@ -55,9 +55,13 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       makerUserId = maker?.id || '';
       checkerUserId = checker?.id || '';
 
-      // Resolve an active subscriber ticket
+      // Resolve an active subscriber ticket that does not have an existing winning auction
       activeTicket = await prisma.subscriberTicket.findFirst({
-        where: { status: 'ACTIVE' },
+        where: {
+          status: 'ACTIVE',
+          chitGroup: { status: 'ACTIVE' },
+          winningAuction: null,
+        },
         include: { chitGroup: true, customer: true },
       });
     } catch {
