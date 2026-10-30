@@ -30,7 +30,8 @@
     "db:restore:s3": "ts-node scripts/restore-from-s3.ts",
     "db:drp-drill": "ts-node scripts/drp-drill.ts",
     "test:stress": "ts-node scripts/verify-concurrency-stress.ts",
-    "test:ingress": "ts-node scripts/verify-docker-nginx.ts"
+    "test:ingress": "ts-node scripts/verify-docker-nginx.ts",
+    "test:simulation": "ts-node scripts/verify-full-20month-simulation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
