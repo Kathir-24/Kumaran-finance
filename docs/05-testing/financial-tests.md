@@ -266,3 +266,30 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
 1. **Zero-Paise Integrity**: Submitting fractional paise (`3950.50` or `22000.25`) to `POST /payments`, `POST /collections`, or `POST /auctions/:id/record-bid` fails closed at the NestJS `ValidationPipe` boundary with HTTP 400 `BadRequestException`, eliminating silent `Math.floor()` paise truncation.
 2. **Negative Amount Shielding**: Negative monetary values on any payment, collection, handover, or chit creation endpoint fail closed with HTTP 400 `BadRequestException`.
 3. **Statutory 1/4 Ceiling & 4% Floor Invariants**: Auction bids below 4.00% Foreman Commission ($D < C_f$) or above the 1/4 ceiling ($D > V/4$) fail closed with HTTP 400 `BadRequestException`.
+
+---
+
+## 8. Extended Concurrency & Row-Locking Test Suite (5 Scenarios)
+
+> **Mandate**: In high-velocity financial operations (installment payments, auction closing, prize payout release, desk cash handover, and defaulter ticket reassignment), race conditions and stampedes MUST be serialized at the database row level via PostgreSQL pessimistic row locks (`SELECT ... FOR UPDATE`). In all race condition scenarios, strictly 1 concurrent worker succeeds and all competing workers are cleanly rejected.
+
+- **Test Harness File**: [`apps/api/test/concurrency-postgres.spec.ts`](../../apps/api/test/concurrency-postgres.spec.ts)
+- **Live Container Probe**: [`scripts/verify-extended-concurrency.ps1`](../../scripts/verify-extended-concurrency.ps1)
+
+### Concurrency Invariant Scenarios Tested
+```typescript
+describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () => {
+  // Scenario 1: CONCURR-INV-1: 10 parallel workers racing to pay the exact same installment due MUST result in strictly 1 winner and 9 rejected (ADR-07)
+  // Scenario 2: CONCURR-INV-2: 5 parallel workers racing to finalize an auction MUST result in strictly 1 winner and 4 rejected
+  // Scenario 3: CONCURR-INV-3: 5 parallel workers racing to release prize payout MUST result in strictly 1 winner and 4 rejected
+  // Scenario 4: CONCURR-INV-4: 5 parallel workers racing to acknowledge the exact same cash handover batch MUST result in strictly 1 winner and 4 rejected
+  // Scenario 5: CONCURR-INV-5: 5 parallel workers racing to substitute different customers into the same vacated ticket MUST result in strictly 1 winner and 4 rejected
+});
+```
+
+### Verification Assertions
+1. **Installment Due Stampede (`CONCURR-INV-1`)**: 10 simultaneous workers racing on `PaymentService.recordPayment()` serialize via `SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE`. Strictly 1 payment commits; remaining 9 workers receive HTTP 400 `INSTALLMENT_ALREADY_PAID`.
+2. **Auction Finalization Contention (`CONCURR-INV-2`)**: 5 simultaneous workers racing on `AuctionService.finalizeAuction()` serialize via `SELECT id, status FROM "Auction" WHERE id = ${auctionId} FOR UPDATE`. Strictly 1 winner finalizes; remaining 4 workers receive HTTP 400 `Auction has already been finalized`.
+3. **Prize Money Disbursement Race (`CONCURR-INV-3`)**: 5 simultaneous workers racing on `DisbursementService.releasePayout()` serialize via `SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${winner.id} FOR UPDATE`. Strictly 1 payout releases; remaining 4 workers receive HTTP 400 `Prize money has already been disbursed`.
+4. **Desk Cash Handover Contention (`CONCURR-INV-4`)**: 5 simultaneous workers racing on `CollectionService.acknowledgeHandover()` serialize via `SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE`. Strictly 1 cashier acknowledgment commits into branch vault; remaining 4 workers receive HTTP 400 `Payment has already been acknowledged or is not pending handover`.
+5. **Defaulter Ticket Substitution Race (`CONCURR-INV-5`)**: 5 simultaneous workers racing on `InstallmentService.substituteSubscriber()` serialize via `SELECT id, status FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE`. Strictly 1 replacement customer acquires the ticket; remaining 4 workers receive HTTP 400 `Subscriber substitution failed: Ticket is no longer in REMOVED_DEF_3M status`.

@@ -346,6 +346,27 @@ if (dto.collectorUserId === acknowledgerUserId) {
 }
 ```
 
+### Proof 4: Pessimistic Row Locking on Cash Handover (SELECT FOR UPDATE)
+From [`apps/api/src/collection/collection.service.ts#L406-L422`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L406-L422):
+
+```typescript
+// 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate vault handovers
+if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
+  const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
+    SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE
+  `;
+  if (lockedPayments && lockedPayments.length > 0) {
+    for (const lp of lockedPayments) {
+      if (lp.cashHandoverStatus !== 'PENDING_HANDOVER') {
+        throw new BadRequestException(
+          `Payment ${lp.id} has already been acknowledged or is not pending handover`,
+        );
+      }
+    }
+  }
+}
+```
+
 ---
 
 ## 7. Automated Test Verification & Live Server Proof Matrix
@@ -386,6 +407,10 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
    - `[7/8] POST /payments/:id/reject-reversal (Reversal Rejection Branch)`: Maker requested reversal on Payment B. Maker self-rejection blocked with HTTP 403 Forbidden. Checker (Partner) rejected reversal $\to$ **Payment remains `SUCCESS`, InstallmentDue remains `PAID`, `AuditLog` entry `PAYMENT_REVERSAL_REJECTED` recorded** (`HTTP 200 OK`).
 
    - `[8/8] POST /payments/:id/approve-reversal (Reversal Approval Branch)`: Maker requested reversal on Payment A. Maker self-approval blocked with HTTP 403 Forbidden. Checker (Partner) approved reversal $\to$ **Payment marked `REVERSED`, InstallmentDue atomically restored to `0|UNPAID`, `AuditLog` entry `PAYMENT_REVERSED` recorded** (`HTTP 200 OK`).
+
+3. **Extended Concurrency Row-Locking Live Verification Output (`scripts/verify-extended-concurrency.ps1`)**:
+   - `[PROBE 1] Desk Cash Handover Contention`: Two concurrent background workers simultaneously attempted to sign off the exact same cash collection payment batch $\to$ **Worker 1 acquired row lock and succeeded (HTTP 200 OK), Worker 2 blocked and was safely rejected (HTTP 400 Bad Request: "Payment has already been acknowledged or is not pending handover")**. Final DB state verified as `ACKNOWLEDGED`.
+   - `[PROBE 2] Defaulter Ticket Substitution Race`: Two concurrent background workers simultaneously attempted to assign distinct candidate replacement customers to the same vacated ticket $\to$ **Worker 1 acquired row lock and succeeded (HTTP 200 OK, Ticket restored to `ACTIVE`), Worker 2 blocked and was safely rejected (HTTP 400 Bad Request: "Subscriber substitution failed: Ticket is no longer in REMOVED_DEF_3M status")**.
 
 ---
 

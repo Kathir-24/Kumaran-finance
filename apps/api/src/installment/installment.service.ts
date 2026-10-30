@@ -629,6 +629,19 @@ export class InstallmentService {
     const previousCustomerName = ticket.customer.fullName;
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate substitution
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedTickets = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+          SELECT id, status FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE
+        `;
+        const lockedTicket = lockedTickets && lockedTickets[0];
+        if (lockedTicket && lockedTicket.status !== 'REMOVED_DEF_3M') {
+          throw new BadRequestException(
+            `Subscriber substitution failed: Ticket ${ticketId} is no longer in REMOVED_DEF_3M status (current status: ${lockedTicket.status})`,
+          );
+        }
+      }
+
       const subTicket = await tx.subscriberTicket.update({
         where: { id: ticketId },
         data: {

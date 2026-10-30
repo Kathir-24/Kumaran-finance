@@ -1,6 +1,8 @@
 import { AuctionStatus, DueStatus, PaymentMethod, PrismaClient } from '@prisma/client';
 import { AuctionService } from '../src/auction/auction.service';
+import { CollectionService } from '../src/collection/collection.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
+import { InstallmentService } from '../src/installment/installment.service';
 import { PaymentService } from '../src/payment/payment.service';
 
 /**
@@ -11,12 +13,16 @@ import { PaymentService } from '../src/payment/payment.service';
  * 1. Payment Recording: Prevents double-spending & duplicate allocations (ADR-07)
  * 2. Auction Finalization: Prevents duplicate finalization & double dividend minting
  * 3. Prize Disbursement: Prevents concurrent maker-checker double-payouts
+ * 4. Vault Handover Acknowledgement: Prevents double-crediting branch vault balance
+ * 5. Defaulter Ticket Substitution: Prevents concurrent subscriber overwrite on vacated tickets
  */
 describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () => {
   let prisma: PrismaClient;
   let paymentService: PaymentService;
   let auctionService: AuctionService;
   let disbursementService: DisbursementService;
+  let collectionService: CollectionService;
+  let installmentService: InstallmentService;
   let isDbConnected = false;
 
   let makerUserId: string;
@@ -40,6 +46,8 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       paymentService = new PaymentService(prisma as any);
       auctionService = new AuctionService(prisma as any);
       disbursementService = new DisbursementService(prisma as any, null as any);
+      collectionService = new CollectionService(prisma as any);
+      installmentService = new InstallmentService(prisma as any);
 
       // Resolve Maker (Partner Admin 1) and Checker (Partner Admin 2)
       const maker = await prisma.user.findFirst({ where: { phone: '9876543210' } });
@@ -112,6 +120,9 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
+      if (fulfilled.length === 0) {
+        console.error('CONCURR-INV-4 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
+      }
 
       // CRITICAL ASSERTION: Exactly 1 transaction acquires the row lock and records payment
       expect(fulfilled).toHaveLength(1);
@@ -200,6 +211,9 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
+      if (fulfilled.length === 0) {
+        console.error('CONCURR-INV-4 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
+      }
 
       // CRITICAL ASSERTION: Exactly 1 finalization commit
       expect(fulfilled).toHaveLength(1);
@@ -281,6 +295,9 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
+      if (fulfilled.length === 0) {
+        console.error('CONCURR-INV-4 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
+      }
 
       // CRITICAL ASSERTION: Exactly 1 payout release succeeds
       expect(fulfilled).toHaveLength(1);
@@ -300,6 +317,181 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
     } finally {
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.delete({ where: { id: testAuction.id } });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // Scenario 4: Concurrent Desk Cash Handover Contention (SELECT FOR UPDATE)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-4: 5 parallel workers racing to acknowledge the exact same cash handover batch MUST result in strictly 1 winner and 4 rejected', async () => {
+    if (!isDbConnected || !makerUserId || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-4: DB or required seed data not present');
+      return;
+    }
+
+    const testPayment = await prisma.payment.create({
+      data: {
+        branchId: activeTicket.customer.branchId,
+        customerId: activeTicket.customerId,
+        amount: 4000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: 'SUCCESS',
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        recordedByUserId: makerUserId,
+      },
+    });
+
+    try {
+      const concurrencyCount = 5;
+      const handoverPromises = Array.from({ length: concurrencyCount }).map((_, idx) =>
+        collectionService.acknowledgeHandover(
+          {
+            collectorUserId: makerUserId,
+            acknowledgedAmount: 4000,
+            paymentIds: [testPayment.id],
+            notes: `Parallel handover attempt ${idx + 1}`,
+          },
+          checkerUserId,
+        ),
+      );
+
+      const results = await Promise.allSettled(handoverPromises);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      // CRITICAL ASSERTION: Exactly 1 acknowledgment succeeds
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(concurrencyCount - 1);
+
+      for (const rej of rejected) {
+        if (rej.status === 'rejected') {
+          expect(rej.reason.message).toContain('already been acknowledged');
+        }
+      }
+
+      // Final status check in DB
+      const finalPayment = await prisma.payment.findUnique({
+        where: { id: testPayment.id },
+      });
+      expect(finalPayment?.cashHandoverStatus).toBe('ACKNOWLEDGED');
+      expect(finalPayment?.cashHandoverAcknowledgedByUserId).toBe(checkerUserId);
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: 'CASH_HANDOVER_ACKNOWLEDGED',
+          entityId: makerUserId,
+        },
+      });
+      await prisma.payment.delete({ where: { id: testPayment.id } });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // Scenario 5: Concurrent Defaulter Ticket Substitution Race (SELECT FOR UPDATE)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-5: 5 parallel workers racing to substitute different customers into the same vacated ticket MUST result in strictly 1 winner and 4 rejected', async () => {
+    if (!isDbConnected || !activeTicket || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-5: DB or required seed data not present');
+      return;
+    }
+
+    // Resolve branch
+    const branchId = activeTicket.customer.branchId;
+    const timestamp = Date.now();
+
+    // Create an isolated defaulter customer whose ticket was vacated
+    const defaulterCustomer = await prisma.customer.create({
+      data: {
+        customerCode: `KC-CUST-DEF-${timestamp}`,
+        fullName: 'Defaulter Subscriber To Vacate',
+        phone: `91998${String(timestamp).slice(-5)}9`,
+        addressLine1: 'Defaulter Street',
+        city: 'Erode',
+        pincode: '638052',
+        isKycVerified: true,
+        branchId,
+      },
+    });
+
+    // Create an isolated test ticket in REMOVED_DEF_3M status
+    const removedTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: activeTicket.chitGroupId,
+        customerId: defaulterCustomer.id,
+        ticketNumber: 9999,
+        status: 'REMOVED_DEF_3M',
+        consecutiveUnpaidMonths: 3,
+        removedAt: new Date(),
+        removedByUserId: checkerUserId,
+      },
+    });
+
+    // Create 5 test replacement candidate customers with verified KYC
+    const testCustomers = await Promise.all(
+      Array.from({ length: 5 }).map((_, idx) =>
+        prisma.customer.create({
+          data: {
+            customerCode: `KC-CUST-RACE-${timestamp}-${idx + 1}`,
+            fullName: `Test Replacement Customer ${idx + 1}`,
+            phone: `91999${String(timestamp).slice(-5)}${idx}`,
+            addressLine1: 'Perundurai Road',
+            city: 'Erode',
+            pincode: '638052',
+            isKycVerified: true,
+            branchId,
+          },
+        }),
+      ),
+    );
+
+    try {
+      const concurrencyCount = 5;
+      const substitutionPromises = testCustomers.map((cust, idx) =>
+        installmentService.substituteSubscriber(
+          removedTicket.id,
+          checkerUserId,
+          {
+            newCustomerId: cust.id,
+            reason: `Parallel substitution stress worker ${idx + 1}`,
+          },
+        ),
+      );
+
+      const results = await Promise.allSettled(substitutionPromises);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      // CRITICAL ASSERTION: Exactly 1 substitution succeeds
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(concurrencyCount - 1);
+
+      for (const rej of rejected) {
+        if (rej.status === 'rejected') {
+          expect(rej.reason.message).toContain('Subscriber substitution failed');
+        }
+      }
+
+      // Verify that the ticket in DB is ACTIVE and assigned to the single winning customer
+      const finalTicket = await prisma.subscriberTicket.findUnique({
+        where: { id: removedTicket.id },
+      });
+      expect(finalTicket?.status).toBe('ACTIVE');
+      expect(finalTicket?.consecutiveUnpaidMonths).toBe(0);
+      const winningCustomerId = (fulfilled[0] as PromiseFulfilledResult<any>).value.ticket.newCustomerId;
+      expect(finalTicket?.customerId).toBe(winningCustomerId);
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
+          entityId: removedTicket.id,
+        },
+      });
+      await prisma.subscriberTicket.delete({ where: { id: removedTicket.id } });
+      await prisma.customer.deleteMany({
+        where: { id: { in: [...testCustomers.map((c) => c.id), defaulterCustomer.id] } },
+      });
     }
   });
 });

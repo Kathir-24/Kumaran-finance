@@ -51,6 +51,7 @@ flowchart LR
 
 ### Gate 6: Idempotency & Concurrency
 - [ ] Financial mutation endpoints (`POST /payments`, `POST /collections`, `POST /reversals`) enforce the `Idempotency-Key` header to safely handle network timeouts and retried requests.
+- [ ] Concurrency and double-spend protection enforced via PostgreSQL pessimistic row locks (`SELECT FOR UPDATE`) across all 5 financial contention points (Installment dues, Auction finalization, Prize payouts, Desk cash handover, and Defaulter ticket substitution) with automated parallel integration tests verifying strictly 1 winner and N-1 rejected.
 
 ### Gate 7: Immutable Audit Logging
 - [ ] Mutation emits an append-only `AuditLog` record capturing `userId`, `action`, `entityType`, `entityId`, `oldValue`, `newValue`, and timestamp.

@@ -402,84 +402,102 @@ export class CollectionService {
       );
     }
 
-    // 2. Fetch Specified Payments & Verify Collector Ownership
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        id: { in: dto.paymentIds },
-      },
-    });
-
-    if (payments.length !== dto.paymentIds.length) {
-      throw new BadRequestException('One or more payment IDs in the batch could not be found');
-    }
-
-    // Verify all belong to collector and are in PENDING_HANDOVER
-    for (const p of payments) {
-      if (p.recordedByUserId !== dto.collectorUserId) {
-        throw new BadRequestException(
-          `Payment ${p.id} was not recorded by collector ${dto.collectorUserId}`,
-        );
+    // 2. Fetch Specified Payments & Verify Collector Ownership within atomic transaction
+    return this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate vault handovers
+      if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
+        const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
+          SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE
+        `;
+        if (lockedPayments && lockedPayments.length > 0) {
+          for (const lp of lockedPayments) {
+            if (lp.cashHandoverStatus !== 'PENDING_HANDOVER') {
+              throw new BadRequestException(
+                `Payment ${lp.id} has already been acknowledged or is not pending handover`,
+              );
+            }
+          }
+        }
       }
-      if (p.paymentMethod !== PaymentMethod.CASH) {
-        throw new BadRequestException(`Payment ${p.id} is not a cash collection`);
-      }
-      if (p.cashHandoverStatus !== 'PENDING_HANDOVER') {
-        throw new BadRequestException(
-          `Payment ${p.id} has already been acknowledged or is not pending handover`,
-        );
-      }
-    }
 
-    // 3. Verify Physically Counted Amount Against Total Payments Sum
-    const totalBatchSum = payments.reduce((sum, p) => sum + p.amount, 0n);
-    const countedAmount = BigInt(Math.floor(dto.acknowledgedAmount));
-
-    if (totalBatchSum !== countedAmount) {
-      throw new BadRequestException(
-        `Cash Handover Discrepancy: Physically counted vault cash (₹${countedAmount.toString()}) does not match the sum of collection receipts (₹${totalBatchSum.toString()})`,
-      );
-    }
-
-    const acknowledgedAt = new Date();
-
-    // 4. Update Payments Status to ACKNOWLEDGED
-    await this.prisma.payment.updateMany({
-      where: { id: { in: dto.paymentIds } },
-      data: {
-        cashHandoverStatus: 'ACKNOWLEDGED',
-        cashHandoverAcknowledgedByUserId: acknowledgerUserId,
-        cashHandoverAcknowledgedAt: acknowledgedAt,
-      },
-    });
-
-    // 5. Immutable Audit Trail for Vault Deposit
-    await this.prisma.auditLog.create({
-      data: {
-        userId: acknowledgerUserId,
-        action: 'CASH_HANDOVER_ACKNOWLEDGED',
-        entityType: 'Payment',
-        entityId: dto.collectorUserId,
-        newValue: {
-          collectorUserId: dto.collectorUserId,
-          acknowledgedByUserId: acknowledgerUserId,
-          acknowledgedAmount: countedAmount.toString(),
-          totalPaymentsAcknowledged: payments.length,
-          paymentIds: dto.paymentIds,
-          notes: dto.notes || null,
+      const payments = await tx.payment.findMany({
+        where: {
+          id: { in: dto.paymentIds },
         },
-      },
-    });
+      });
 
-    return {
-      success: true,
-      message: `Cash handover of ₹${countedAmount.toString()} successfully verified and deposited into branch vault.`,
-      collectorUserId: dto.collectorUserId,
-      acknowledgedByUserId: acknowledgerUserId,
-      acknowledgedAmount: countedAmount,
-      totalPaymentsAcknowledged: payments.length,
-      acknowledgedAt,
-      notes: dto.notes || 'Physically counted and verified currency notes.',
-    };
+      if (payments.length !== dto.paymentIds.length) {
+        throw new BadRequestException('One or more payment IDs in the batch could not be found');
+      }
+
+      // Verify all belong to collector and are in PENDING_HANDOVER
+      for (const p of payments) {
+        if (p.recordedByUserId !== dto.collectorUserId) {
+          throw new BadRequestException(
+            `Payment ${p.id} was not recorded by collector ${dto.collectorUserId}`,
+          );
+        }
+        if (p.paymentMethod !== PaymentMethod.CASH) {
+          throw new BadRequestException(`Payment ${p.id} is not a cash collection`);
+        }
+        if (p.cashHandoverStatus !== 'PENDING_HANDOVER') {
+          throw new BadRequestException(
+            `Payment ${p.id} has already been acknowledged or is not pending handover`,
+          );
+        }
+      }
+
+      // 3. Verify Physically Counted Amount Against Total Payments Sum
+      const totalBatchSum = payments.reduce((sum, p) => sum + p.amount, 0n);
+      const countedAmount = BigInt(Math.floor(dto.acknowledgedAmount));
+
+      if (totalBatchSum !== countedAmount) {
+        throw new BadRequestException(
+          `Cash Handover Discrepancy: Physically counted vault cash (₹${countedAmount.toString()}) does not match the sum of collection receipts (₹${totalBatchSum.toString()})`,
+        );
+      }
+
+      const acknowledgedAt = new Date();
+
+      // 4. Update Payments Status to ACKNOWLEDGED
+      await tx.payment.updateMany({
+        where: { id: { in: dto.paymentIds } },
+        data: {
+          cashHandoverStatus: 'ACKNOWLEDGED',
+          cashHandoverAcknowledgedByUserId: acknowledgerUserId,
+          cashHandoverAcknowledgedAt: acknowledgedAt,
+        },
+      });
+
+      // 5. Immutable Audit Trail for Vault Deposit
+      await tx.auditLog.create({
+        data: {
+          userId: acknowledgerUserId,
+          action: 'CASH_HANDOVER_ACKNOWLEDGED',
+          entityType: 'Payment',
+          entityId: dto.collectorUserId,
+          newValue: {
+            collectorUserId: dto.collectorUserId,
+            acknowledgedByUserId: acknowledgerUserId,
+            acknowledgedAmount: countedAmount.toString(),
+            totalPaymentsAcknowledged: payments.length,
+            paymentIds: dto.paymentIds,
+            notes: dto.notes || null,
+          },
+        },
+      });
+
+      return {
+        success: true,
+        message: `Cash handover of ₹${countedAmount.toString()} successfully verified and deposited into branch vault.`,
+        collectorUserId: dto.collectorUserId,
+        acknowledgedByUserId: acknowledgerUserId,
+        acknowledgedAmount: countedAmount,
+        totalPaymentsAcknowledged: payments.length,
+        acknowledgedAt,
+        notes: dto.notes || 'Physically counted and verified currency notes.',
+      };
+    });
   }
 
   /**
