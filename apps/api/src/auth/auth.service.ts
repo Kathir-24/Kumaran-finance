@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   HttpException,
   HttpStatus,
@@ -476,7 +477,8 @@ export class AuthService {
     };
 
     const redis = this.redisProvider?.getClient();
-    if (redis && this.redisProvider?.getIsConnected()) {
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
       await redis.set(
         `auth:otp:${trimmedPhone}`,
         JSON.stringify(otpRecord),
@@ -490,7 +492,33 @@ export class AuthService {
     // Activate 60-second cooldown lock
     await this.setOtpCooldown(trimmedPhone, OTP_COOLDOWN_SECONDS);
 
-    await this.smsService.sendOtpSms(trimmedPhone, otpCode);
+    let dispatchResult: any;
+    try {
+      dispatchResult = await this.smsService.sendOtpSms(trimmedPhone, otpCode);
+    } catch (smsErr: any) {
+      // Rollback cooldown and active OTP session so user is not penalized or locked out by telecom partition
+      if (useRedis && redis) {
+        await redis.del(`auth:otp:${trimmedPhone}`, `auth:otp:cooldown:${trimmedPhone}`);
+      } else {
+        this.otpStore.delete(trimmedPhone);
+        this.cooldownStore.delete(trimmedPhone);
+      }
+      throw new BadGatewayException(
+        `Telecom SMS Gateway error (504 Timeout): ${smsErr.message || 'TRAI DLT gateway unreachable'}. Please try again.`,
+      );
+    }
+
+    if (dispatchResult && (dispatchResult === false || dispatchResult.success === false)) {
+      if (useRedis && redis) {
+        await redis.del(`auth:otp:${trimmedPhone}`, `auth:otp:cooldown:${trimmedPhone}`);
+      } else {
+        this.otpStore.delete(trimmedPhone);
+        this.cooldownStore.delete(trimmedPhone);
+      }
+      throw new BadGatewayException(
+        `Telecom SMS Gateway timed out (504): ${dispatchResult.error || 'TRAI DLT gateway unreachable'}. Please try again.`,
+      );
+    }
 
     // Debug OTP is restricted strictly to local automated testing (NODE_ENV === 'test' or explicit ALLOW_DEBUG_OTP === 'true')
     // It must NEVER be exposed in staging or production environments.

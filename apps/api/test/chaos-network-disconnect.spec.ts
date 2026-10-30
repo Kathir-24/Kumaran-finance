@@ -5,7 +5,11 @@
 // Invariants: Zero Orphan S3 DB Records & Financial Ledger Telecom Non-Blocking
 // ==============================================================================
 
+import { BadGatewayException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaClient, PaymentMethod, DueStatus } from '@prisma/client';
+import { AuthService } from '../src/auth/auth.service';
 import { CustomerService } from '../src/customer/customer.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { PaymentService } from '../src/payment/payment.service';
@@ -410,6 +414,149 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       }),
     );
     expect(mockSmsService.sendPaymentReceiptSms).not.toHaveBeenCalled();
+  });
+
+  // --------------------------------------------------------------------------
+  // Scenario 6: Redis Crash During Payment Recording (PostgreSQL Financial Truth Non-Blocking)
+  // --------------------------------------------------------------------------
+  it('CHAOS-REDIS-1: Redis crash during counter payment recording MUST commit PostgreSQL financial truth, while BullMQ degrades gracefully without failing payment', async () => {
+    if (!isDbConnected || !activeTicketId || !makerUserId) {
+      console.warn('Skipping CHAOS-REDIS-1: DB not connected');
+      return;
+    }
+
+    const testMonth = 950 + Math.floor(Math.random() * 40);
+
+    // Create an isolated installment due in UNPAID status
+    const testDue = await prisma.installmentDue.create({
+      data: {
+        ticketId: activeTicketId,
+        chitGroupId: activeChitGroupId,
+        installmentMonth: testMonth,
+        grossAmount: 5000n,
+        dividendDeduction: 1000n,
+        netPayableAmount: 4000n,
+        dueDate: new Date(),
+        status: DueStatus.UNPAID,
+      },
+    });
+
+    // Mock BullMQ Queue Provider simulating active Redis Crash (ECONNREFUSED / socket hangup)
+    const mockCrashQueueProvider = {
+      addJob: jest.fn().mockImplementation(() => {
+        throw new Error('RedisConnectionError: Connection is closed. Redis node crashed (ECONNREFUSED 127.0.0.1:6379)');
+      }),
+    };
+
+    const redisChaosPaymentService = new PaymentService(
+      prisma as any,
+      mockCrashQueueProvider as any,
+    );
+
+    let paymentId: string | undefined;
+    try {
+      const startTime = Date.now();
+      const paymentResult = await redisChaosPaymentService.recordPayment(
+        {
+          ticketId: activeTicketId,
+          installmentMonth: testMonth,
+          amount: 4000,
+          paymentMethod: PaymentMethod.CASH,
+          idempotencyKey: `chaos-redis-crash-${timestampNow()}`,
+          notes: 'Chaos test for Redis crash financial ledger non-blocking',
+        },
+        makerUserId,
+        branchId,
+      );
+      paymentId = paymentResult.payment.id;
+      const durationMs = Date.now() - startTime;
+
+      // CRITICAL ASSERTION 1: Payment succeeds and returns standard financial receipt envelope
+      expect(paymentResult).toBeDefined();
+      expect(paymentResult.payment.paymentStatus).toBe('SUCCESS');
+      expect(paymentResult.receipt.receiptNumber).toMatch(/^KC-REC-/);
+      expect(durationMs).toBeLessThan(2000);
+
+      // CRITICAL ASSERTION 2: PostgreSQL (financial truth) is 100% committed with zero data loss
+      const finalDue = await prisma.installmentDue.findUnique({
+        where: { id: testDue.id },
+      });
+      expect(finalDue?.status).toBe(DueStatus.PAID);
+      expect(finalDue?.paidAmount).toBe(4000n);
+
+      const allocation = await prisma.paymentAllocation.findFirst({
+        where: { paymentId: paymentResult.payment.id },
+      });
+      expect(allocation?.amountAllocated).toBe(4000n);
+
+      // CRITICAL ASSERTION 3: BullMQ attempted enqueue, caught the Redis drop, and degraded gracefully
+      expect(mockCrashQueueProvider.addJob).toHaveBeenCalledTimes(1);
+    } finally {
+      await prisma.paymentAllocation.deleteMany({ where: { installmentDueId: testDue.id } });
+      if (paymentId) {
+        await prisma.receipt.deleteMany({ where: { paymentId } });
+        await prisma.payment.deleteMany({ where: { id: paymentId } });
+      }
+      await prisma.installmentDue.deleteMany({ where: { id: testDue.id } });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // Scenario 7: External SMS / DLT Gateway 504 Timeout during OTP Login (Fail-Closed & Uncorrupted Counter)
+  // --------------------------------------------------------------------------
+  it('CHAOS-SMS-4: Indian telecom gateway times out (504) -> requestOtp fails-closed with BadGatewayException, rolls back cooldown/session, and leaves user OTP attempt counter uncorrupted', async () => {
+    if (!isDbConnected || !makerUserId) {
+      console.warn('Skipping CHAOS-SMS-4: DB not connected');
+      return;
+    }
+
+    const testStaffPhone = '9876543210'; // Seeded Super Admin user
+
+    // Mock SMS service simulating Indian telecom 504 Gateway Timeout from TRAI DLT SMSC
+    const mockFailingSmsService = {
+      sendOtpSms: jest.fn().mockRejectedValue(
+        new Error('HTTP 504: Gateway Timeout from TRAI DLT SMSC (Carrier network down)'),
+      ),
+    };
+
+    const jwtService = new JwtService({ secret: 'chaos-test-jwt-secret-key-12345' });
+    const configService = new ConfigService();
+
+    const chaosAuthService = new AuthService(
+      prisma as any,
+      jwtService,
+      configService,
+      mockFailingSmsService as any,
+    );
+
+    // Initial precondition check: cooldown and lockout must be inactive
+    const initialCooldown = await chaosAuthService.checkOtpCooldown(testStaffPhone);
+    const initialLockout = await chaosAuthService.checkOtpLockout(testStaffPhone);
+    expect(initialCooldown.active).toBe(false);
+    expect(initialLockout.locked).toBe(false);
+
+    // INVARIANT 1: requestOtp MUST fail-closed safely with BadGatewayException (HTTP 502/504)
+    await expect(
+      chaosAuthService.requestOtp({ phone: testStaffPhone }),
+    ).rejects.toThrow(BadGatewayException);
+
+    // INVARIANT 2: 60-second cooldown lock MUST be rolled back so the customer is NOT blocked when telecom recovers
+    const postCooldown = await chaosAuthService.checkOtpCooldown(testStaffPhone);
+    expect(postCooldown.active).toBe(false);
+    expect(postCooldown.remainingSeconds).toBe(0);
+
+    // INVARIANT 3: Brute-force lockout counter MUST NOT be incremented or corrupted (0 failed attempts)
+    const postLockout = await chaosAuthService.checkOtpLockout(testStaffPhone);
+    expect(postLockout.locked).toBe(false);
+    expect(postLockout.remainingSeconds).toBe(0);
+
+    // INVARIANT 4: Ghost OTP session MUST be cleared from store
+    const verifyAttempt = chaosAuthService.verifyOtp({ phone: testStaffPhone, otp: '123456' });
+    await expect(verifyAttempt).rejects.toThrow('OTP has expired or was not requested');
+
+    // INVARIANT 5: Database user profile remains 100% active and uncorrupted
+    const userInDb = await prisma.user.findUnique({ where: { phone: testStaffPhone } });
+    expect(userInDb?.isActive).toBe(true);
   });
 });
 
