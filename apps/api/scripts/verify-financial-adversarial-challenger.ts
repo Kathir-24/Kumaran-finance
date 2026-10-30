@@ -411,9 +411,9 @@ async function run() {
   queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2)`);
   queryDb(`DELETE FROM public."AuctionWinner" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2)`);
   queryDb(`DELETE FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 2`);
-  queryDb(`UPDATE public."SubscriberTicket" SET "isPrized" = false, "prizedAuctionId" = NULL WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" > 1`);
-
   const winningTicket = ticketsRaw.find((t) => t.ticketNumber === 2)!;
+  queryDb(`UPDATE public."SubscriberTicket" SET "isPrized" = false, "prizedAuctionId" = NULL, "consecutiveUnpaidMonths" = 0, status = 'ACTIVE' WHERE "chitGroupId" = '${chitGroupId}' AND "ticketNumber" > 1`);
+  queryDb(`UPDATE public."InstallmentDue" SET status = 'PAID', "paidAmount" = "netPayableAmount" WHERE "chitGroupId" = '${chitGroupId}' AND "ticketId" = '${winningTicket.id}' AND "installmentMonth" = 1`);
 
   // Record valid winning bid: ₹21,000 discount on ₹1,00,000 chit
   // Foreman commission = 4% = ₹4,000
@@ -433,7 +433,7 @@ async function run() {
     expectedStatus: 200,
     observedStatus: recordBidRes.status,
     condition: recordBidRes.status === 200,
-    details: `Auction ID: ${recordBidRes.json?.data?.id}`,
+    details: `Auction ID: ${recordBidRes.json?.data?.id}, Error: ${JSON.stringify(recordBidRes.json)}`,
   });
 
   const month2AuctionId = recordBidRes.json?.data?.id;
