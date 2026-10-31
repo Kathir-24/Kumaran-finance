@@ -8,8 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { formatRupee, assertWholeRupee, parseWholeRupees } from '../src/lib/currency.ts';
 import { GUARDRAIL_DEFINITIONS } from '../src/components/instructions/guardrails-data.ts';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import enMessages from '../messages/en.json' with { type: 'json' };
+import taMessages from '../messages/ta.json' with { type: 'json' };
 
 // Math calculation helper mirroring simulator & backend AuctionService
 function calculateChitMath(chitValue: number, durationMonths: number, bidDiscount: number) {
@@ -141,11 +141,8 @@ test('Completeness: All 10 Invariant Guardrails exist with code and violation pr
 });
 
 test('Bilingual Parity: Instructions dictionary keys match 100% between English and Tamil', () => {
-  const enPath = path.resolve('apps/web/messages/en.json');
-  const taPath = path.resolve('apps/web/messages/ta.json');
-
-  const en = JSON.parse(fs.readFileSync(enPath, 'utf8'));
-  const ta = JSON.parse(fs.readFileSync(taPath, 'utf8'));
+  const en = enMessages;
+  const ta = taMessages;
 
   function getKeys(obj: any, prefix = ''): string[] {
     let keys: string[] = [];
