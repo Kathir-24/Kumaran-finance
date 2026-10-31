@@ -52,7 +52,17 @@
     "logout": "Log Out",
     "inactivityWarning": "Session Inactivity Warning",
     "inactivityMessage": "You have been idle for 18 minutes. Your session will automatically lock in 2 minutes for security.",
-    "extendSession": "Stay Logged In"
+    "extendSession": "Stay Logged In",
+    "phoneRequired": "Mobile number is required",
+    "phoneInvalid": "Enter a valid 10-digit Indian mobile number (e.g. 9842100001)",
+    "passwordRequired": "Password is required",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "invalidCredentials": "Invalid mobile number or password. Please try again.",
+    "rateLimited": "Too many failed attempts. Account locked for 15 minutes.",
+    "timeoutNotice": "Your session expired due to 20 minutes of inactivity. Please sign in again.",
+    "loggedOutNotice": "You have been safely logged out.",
+    "signingIn": "Signing In...",
+    "phoneOnlyNotice": "Zero-Email Policy (ADR-18): Authenticate strictly with your 10-digit mobile number."
   },
   "nav": {
     "dashboard": "Dashboard",

@@ -31,6 +31,7 @@ export interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
+  tempToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   activeBranchId: string | null;
@@ -39,6 +40,7 @@ export interface AuthState {
 
 export interface AuthActions {
   setAuth: (user: AuthUser, tokens: { accessToken: string; refreshToken?: string }) => void;
+  setTempToken: (token: string | null) => void;
   updateUser: (partial: Partial<AuthUser>) => void;
   setActiveBranchId: (branchId: string | null) => void;
   recordActivity: () => void;
@@ -50,10 +52,26 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
+  tempToken: typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null,
   isAuthenticated: false,
   isLoading: false,
   activeBranchId: null,
   lastActivity: Date.now(),
+
+  setTempToken: (token) => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (token) {
+          sessionStorage.setItem('kc_temp_token', token);
+        } else {
+          sessionStorage.removeItem('kc_temp_token');
+        }
+      } catch {
+        // Safe fallback in restricted environments
+      }
+    }
+    set({ tempToken: token });
+  },
 
   setAuth: (user, tokens) => {
     // 1. Persist tokens in local storage bridge
@@ -66,6 +84,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       user: { ...user, activeBranchId },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken || null,
+      tempToken: null,
       isAuthenticated: true,
       isLoading: false,
       activeBranchId,
@@ -114,6 +133,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
+      tempToken: null,
       isAuthenticated: false,
       isLoading: false,
       activeBranchId: null,
