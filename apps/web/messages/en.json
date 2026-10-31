@@ -62,7 +62,14 @@
     "timeoutNotice": "Your session expired due to 20 minutes of inactivity. Please sign in again.",
     "loggedOutNotice": "You have been safely logged out.",
     "signingIn": "Signing In...",
-    "phoneOnlyNotice": "Zero-Email Policy (ADR-18): Authenticate strictly with your 10-digit mobile number."
+    "phoneOnlyNotice": "Zero-Email Policy (ADR-18): Authenticate strictly with your 10-digit mobile number.",
+    "totpRequired": "6-digit verification code is required",
+    "totpInvalid": "Code must be exactly 6 digits",
+    "invalidTotpCode": "Invalid or expired security code. Please check Microsoft Authenticator.",
+    "tempSessionExpired": "2FA verification session expired. Please sign in again.",
+    "verifyingTotp": "Verifying Code...",
+    "missingTempToken": "No pending login session found. Please sign in with your phone and password.",
+    "pasteHint": "Tip: You can paste the 6-digit code directly from your clipboard."
   },
   "nav": {
     "dashboard": "Dashboard",
