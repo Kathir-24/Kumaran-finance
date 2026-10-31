@@ -18,7 +18,8 @@ export const queryKeys = {
   },
   schemes: {
     all: ['schemes'] as const,
-    list: () => ['schemes', 'list'] as const,
+    list: (params?: { status?: string; search?: string; page?: number; limit?: number }) =>
+      ['schemes', 'list', params] as const,
     detail: (id: string) => ['schemes', id] as const,
     roster: (id: string) => ['schemes', id, 'roster'] as const,
   },
