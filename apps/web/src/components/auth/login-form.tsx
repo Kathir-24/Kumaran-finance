@@ -33,6 +33,7 @@ export function LoginForm() {
 
   const setAuth = useAuthStore((state) => state.setAuth);
   const setTempToken = useAuthStore((state) => state.setTempToken);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -41,6 +42,13 @@ export function LoginForm() {
   // Read URL query parameter for contextual notices (e.g., from inactivity guardian)
   const reason = searchParams.get('reason');
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
+
+  // Guard: Redirect already-authenticated users to target dashboard
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(redirectUrl);
+    }
+  }, [isAuthenticated, router, redirectUrl]);
 
   // ADR-18 Form Validation Schema: Strictly 10-digit Indian Mobile + min 6 char password
   const loginSchema = React.useMemo(

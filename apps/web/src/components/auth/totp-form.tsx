@@ -30,6 +30,7 @@ export function TotpForm() {
   const tempToken = useAuthStore((state) => state.tempToken);
   const setAuth = useAuthStore((state) => state.setAuth);
   const setTempToken = useAuthStore((state) => state.setTempToken);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [digits, setDigits] = React.useState<string[]>(['', '', '', '', '', '']);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -38,8 +39,13 @@ export function TotpForm() {
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
-  // Guard: Verify pending 2FA token exists; redirect to login if missing
+  // Guard: Verify pending 2FA token exists; redirect to login if missing, or to dashboard if already authenticated
   React.useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(redirectUrl);
+      return;
+    }
+
     const activeToken =
       tempToken || (typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null);
 
@@ -49,7 +55,7 @@ export function TotpForm() {
       // Focus the first input cell on mount
       inputRefs.current[0]?.focus();
     }
-  }, [tempToken, router]);
+  }, [isAuthenticated, tempToken, router, redirectUrl]);
 
   const submitCode = React.useCallback(
     async (codeToSubmit: string) => {

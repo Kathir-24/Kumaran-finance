@@ -48,6 +48,11 @@ export function SessionInactivityGuard({
   const lastActivityRef = React.useRef<number>(Date.now());
   const lastThrottleRef = React.useRef<number>(0);
 
+  // Automatically hydrate authentication session on initial client boot
+  React.useEffect(() => {
+    void useAuthStore.getState().hydrate();
+  }, []);
+
   // Resets inactivity timer when user acts
   const handleResetTimer = React.useCallback(() => {
     lastActivityRef.current = Date.now();
