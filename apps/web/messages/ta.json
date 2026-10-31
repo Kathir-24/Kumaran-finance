@@ -91,7 +91,20 @@
     "disable2faConfirm": "2FA-வை முடக்கு",
     "disablingTotp": "முடக்கப்படுகிறது...",
     "totpDisabledSuccess": "இருபடி அங்கீகாரம் முடக்கப்பட்டது.",
-    "wrongPassword": "தவறான கடவுச்சொல். 2FA-வை முடக்க இயலாது."
+    "wrongPassword": "தவறான கடவுச்சொல். 2FA-வை முடக்க இயலாது.",
+    "changePasswordTitle": "கடவுச்சொல்லை மாற்றவும்",
+    "changePasswordSubtitle": "உங்கள் பணிச்சூழல் உள்நுழைவு கடவுச்சொல்லை புதுப்பிக்கவும்",
+    "currentPasswordLabel": "தற்போதைய கடவுச்சொல்",
+    "currentPasswordPlaceholder": "தற்போதைய கடவுச்சொல்லை உள்ளிடவும்",
+    "newPasswordLabel": "புதிய கடவுச்சொல்",
+    "newPasswordPlaceholder": "புதிய கடவுச்சொல் (குறைந்தது 8 எழுத்துக்கள்)",
+    "confirmPasswordLabel": "புதிய கடவுச்சொல்லை உறுதிப்படுத்தவும்",
+    "confirmPasswordPlaceholder": "புதிய கடவுச்சொல்லை மீண்டும் உள்ளிடவும்",
+    "changePasswordButton": "கடவுச்சொல்லை புதுப்பிக்கவும்",
+    "changingPassword": "கடவுச்சொல் புதுப்பிக்கப்படுகிறது...",
+    "passwordChangedSuccess": "கடவுச்சொல் வெற்றிகரமாக மாற்றப்பட்டது. புதிய கடவுச்சொல்லுடன் உள்நுழையவும்.",
+    "passwordMismatch": "புதிய கடவுச்சொற்கள் பொருந்தவில்லை",
+    "newPasswordMinLength": "புதிய கடவுச்சொல் குறைந்தது 8 எழுத்துக்கள் இருக்க வேண்டும்"
   },
   "nav": {
     "dashboard": "முகப்பு பலகை",
@@ -108,6 +121,28 @@
     "branches": "நிறுவன கிளைகள்",
     "users": "ஊழியர் நிர்வாகம்",
     "auditLogs": "தணிக்கை பதிவுகள்"
+  },
+  "topbar": {
+    "selectBranch": "கிளையைத் தேர்ந்தெடுக்கவும்",
+    "allBranches": "அனைத்து கிளைகள் (நிறுவனம் முழுவதும்)",
+    "pendingApprovals": "நிலுவை ஒப்புதல்கள்",
+    "noPending": "நிலுவை எதுவும் இல்லை",
+    "security2fa": "இருபடி அங்கீகாரம் (2FA)",
+    "totpEnabledBadge": "2FA பாதுகாக்கப்பட்டது",
+    "totpDisabledBadge": "2FA முடக்கப்பட்டுள்ளது",
+    "setupTotpAction": "Authenticator-ஐ அமைக்கவும்",
+    "disableTotpAction": "2FA-வை முடக்குக",
+    "changePasswordAction": "கடவுச்சொல்லை மாற்றவும்",
+    "myProfile": "பணியாளர் சுயவிவரம்",
+    "role": "பங்கு",
+    "branch": "கிளை",
+    "phone": "கைபேசி"
+  },
+  "sidebar": {
+    "collapse": "பக்கப்பட்டியை சுருக்குக",
+    "expand": "பக்கப்பட்டியை விரிக்கவும்",
+    "brandTagline": "தலைமை அலுவலகம் — பெருந்துறை",
+    "navigation": "வழிகாட்டி"
   },
   "dashboard": {
     "executiveTitle": "பங்குதாரர் & தலைவர் நேரடி கண்காணிப்பு",

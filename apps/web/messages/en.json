@@ -91,7 +91,20 @@
     "disable2faConfirm": "Disable 2FA",
     "disablingTotp": "Disabling 2FA...",
     "totpDisabledSuccess": "Two-factor authentication has been disabled.",
-    "wrongPassword": "Invalid password. 2FA cannot be disabled."
+    "wrongPassword": "Invalid password. 2FA cannot be disabled.",
+    "changePasswordTitle": "Change Password",
+    "changePasswordSubtitle": "Update your office workstation login password",
+    "currentPasswordLabel": "Current Password",
+    "currentPasswordPlaceholder": "Enter current password",
+    "newPasswordLabel": "New Password",
+    "newPasswordPlaceholder": "Enter new password (min 8 characters)",
+    "confirmPasswordLabel": "Confirm New Password",
+    "confirmPasswordPlaceholder": "Re-enter new password",
+    "changePasswordButton": "Update Password",
+    "changingPassword": "Updating Password...",
+    "passwordChangedSuccess": "Password updated successfully. Please sign in with your new password.",
+    "passwordMismatch": "New passwords do not match",
+    "newPasswordMinLength": "New password must be at least 8 characters"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -108,6 +121,28 @@
     "branches": "Company Branches",
     "users": "Staff Administration",
     "auditLogs": "Audit Logs"
+  },
+  "topbar": {
+    "selectBranch": "Select Branch",
+    "allBranches": "All Branches (Company-wide)",
+    "pendingApprovals": "Pending Approvals",
+    "noPending": "All caught up",
+    "security2fa": "Two-Factor Authentication",
+    "totpEnabledBadge": "2FA Protected",
+    "totpDisabledBadge": "2FA Disabled",
+    "setupTotpAction": "Configure Microsoft Authenticator",
+    "disableTotpAction": "Disable 2FA Protection",
+    "changePasswordAction": "Change Password",
+    "myProfile": "Staff Profile",
+    "role": "Role",
+    "branch": "Branch",
+    "phone": "Phone"
+  },
+  "sidebar": {
+    "collapse": "Collapse Sidebar",
+    "expand": "Expand Sidebar",
+    "brandTagline": "Head Office — Perundurai",
+    "navigation": "Navigation"
   },
   "dashboard": {
     "executiveTitle": "Foreman & Partner Executive Pulse",

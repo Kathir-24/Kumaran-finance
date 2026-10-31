@@ -13,7 +13,7 @@
 |---|---|---|---|:---:|
 | **1. Foundation & Tooling** | [`foundation-and-tooling.md`](./foundation-and-tooling.md) | Shared Shell, Layout | All Personas | **COMPLETED** |
 | **2. Authentication & Identity** | [`authentication-and-identity.md`](./authentication-and-identity.md) | `/login`, `/2fa`, Modals | Super Admin, Accountant, Auditor | **COMPLETED** |
-| **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*` | All Office Staff | *Next Up* |
+| **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*` | All Office Staff | **Task 3.1 DONE** (Task 3.2 Next) |
 | **4. Chit Schemes Management** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]` | Super Admin, Accountant | Planned |
 | **5. Notebook Onboarding Grid** | [`notebook-onboarding-grid.md`](./notebook-onboarding-grid.md) | `/onboard`, `/onboard/[groupId]` | Desk Accountant, Super Admin | Planned |
 | **6. Customers & KYC Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/[id]` | Accountant, Super Admin | Planned |
@@ -50,7 +50,7 @@ docs/web/
 ├── README.md                            # Master index & implementation tracking matrix (This File)
 ├── foundation-and-tooling.md             # Scaffolding, Tailwind v4, i18n atoms, TanStack Query, BigInt math
 ├── authentication-and-identity.md        # Phone+Password login, RFC 6238 TOTP, 20-min inactivity guardian, modals
-├── dashboard-shell-and-rbac.md           # (Upcoming) App shell, dynamic RBAC sidebar, topbar, SSE stream
+├── dashboard-shell-and-rbac.md           # App shell, dynamic RBAC sidebar, topbar, branch context, SSE stream
 ├── chit-schemes-management.md            # (Upcoming) Scheme wizard, 4% commission lock, Month 1 & N invariants
 ├── notebook-onboarding-grid.md           # (Upcoming) Physical paper notebook transcription grid
 ├── customers-and-kyc.md                  # (Upcoming) Customer directory, ADR-13 ticket limit, S3 KYC scans

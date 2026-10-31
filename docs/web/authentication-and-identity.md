@@ -28,6 +28,7 @@ The Authentication & Identity module governs office staff access to the **Kumara
 | **Initiate TOTP Setup** | `POST /api/v1/auth/totp/setup` | `Bearer <JWT>` | *None* | `{ secret: string, otpauthUri: string, issuer: string, account: string }` | `401` Unauthorized |
 | **Enable 2FA** | `POST /api/v1/auth/totp/enable` | `Bearer <JWT>` | `{ secret: string, code: string }` | `{ success: true, message: string }` | `400` Invalid code<br>`401` Unauthorized<br>`429` Rate limited |
 | **Disable 2FA** | `POST /api/v1/auth/totp/disable` | `Bearer <JWT>` | `{ password: string }` | `{ success: true, message: string }` | `401` Invalid password |
+| **Change Password** | `POST /api/v1/auth/change-password` | `Bearer <JWT>` | `{ currentPassword: string, newPassword: string }` | `{ success: true, message: string }` | `400` New pass <8 chars<br>`401` Incorrect current pass |
 | **Get Staff Profile** | `GET /api/v1/auth/me` | `Bearer <JWT>` | *None* | `AuthUser` object with assigned branch | `401` Unauthorized |
 | **Staff Logout** | `POST /api/v1/auth/logout` | `Bearer <JWT>` | *None* | `{ success: true, message: string }` | `401` Unauthorized |
 
@@ -45,11 +46,13 @@ apps/web/src/
 │   ├── login-form.tsx                          # Phone+Password form, 2FA fork & active session redirect
 │   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste & guards
 │   ├── totp-enrollment-modal.tsx               # 3-step setup modal with SVG QR code & 1-click Base32 copy
-│   └── totp-disable-modal.tsx                  # Password-verified 2FA deactivation modal
+│   ├── totp-disable-modal.tsx                  # Password-verified 2FA deactivation modal
+│   └── change-password-modal.tsx               # Self-service password change modal with min-8 char validation
 └── test/
     ├── login-validation.spec.ts                # ADR-18 10-digit regex, password length & 2FA fork tests
     ├── totp-validation.spec.ts                 # RFC 6238 6-digit validation, paste extraction & guard tests
-    └── totp-enrollment.spec.ts                 # Base32 formatting, SVG QR, enable/disable & store sync tests
+    ├── totp-enrollment.spec.ts                 # Base32 formatting, SVG QR, enable/disable & store sync tests
+    └── change-password.spec.ts                 # Current/new password validation, DTO matching & i18n parity tests
 ```
 
 ---
