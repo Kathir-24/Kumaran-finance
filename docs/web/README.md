@@ -13,7 +13,7 @@
 |---|---|---|---|:---:|
 | **1. Foundation & Tooling** | [`foundation-and-tooling.md`](./foundation-and-tooling.md) | Shared Shell, Layout | All Personas | **COMPLETED** |
 | **2. Authentication & Identity** | [`authentication-and-identity.md`](./authentication-and-identity.md) | `/login`, `/2fa`, Modals | Super Admin, Accountant, Auditor | **COMPLETED** |
-| **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*` | All Office Staff | **Task 3.1 DONE** (Task 3.2 Next) |
+| **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*` | All Office Staff | **Tasks 3.1 & 3.2 DONE** (Task 3.3 Next) |
 | **4. Chit Schemes Management** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]` | Super Admin, Accountant | Planned |
 | **5. Notebook Onboarding Grid** | [`notebook-onboarding-grid.md`](./notebook-onboarding-grid.md) | `/onboard`, `/onboard/[groupId]` | Desk Accountant, Super Admin | Planned |
 | **6. Customers & KYC Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/[id]` | Accountant, Super Admin | Planned |

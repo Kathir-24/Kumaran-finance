@@ -5,6 +5,7 @@ export interface ApprovalsSummary {
   cashHandoversCount: number;
   disbursementAuthorizationsCount: number;
   paymentReversalsCount: number;
+  safetyProofVerificationsCount?: number;
 }
 
 export interface ApprovalsState {
@@ -12,6 +13,7 @@ export interface ApprovalsState {
   cashHandoversCount: number;
   disbursementAuthorizationsCount: number;
   paymentReversalsCount: number;
+  safetyProofVerificationsCount: number;
   isConnected: boolean;
   lastUpdated: number | null;
   setSummary: (summary: Partial<ApprovalsSummary>) => void;
@@ -24,6 +26,7 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
   cashHandoversCount: 0,
   disbursementAuthorizationsCount: 0,
   paymentReversalsCount: 0,
+  safetyProofVerificationsCount: 0,
   isConnected: false,
   lastUpdated: null,
 
@@ -32,13 +35,15 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
       const cashHandovers = summary.cashHandoversCount ?? state.cashHandoversCount;
       const disbursements = summary.disbursementAuthorizationsCount ?? state.disbursementAuthorizationsCount;
       const reversals = summary.paymentReversalsCount ?? state.paymentReversalsCount;
+      const safetyProofs = summary.safetyProofVerificationsCount ?? state.safetyProofVerificationsCount;
       const total =
-        summary.totalPendingCount ?? (cashHandovers + disbursements + reversals);
+        summary.totalPendingCount ?? (cashHandovers + disbursements + reversals + safetyProofs);
 
       return {
         cashHandoversCount: cashHandovers,
         disbursementAuthorizationsCount: disbursements,
         paymentReversalsCount: reversals,
+        safetyProofVerificationsCount: safetyProofs,
         totalPendingCount: total,
         lastUpdated: Date.now(),
       };
@@ -52,6 +57,7 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
       cashHandoversCount: 0,
       disbursementAuthorizationsCount: 0,
       paymentReversalsCount: 0,
+      safetyProofVerificationsCount: 0,
       isConnected: false,
       lastUpdated: null,
     }),

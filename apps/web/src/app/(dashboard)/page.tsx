@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useQuery } from '@tanstack/react-query';
 import {
   Landmark,
   BookOpen,
@@ -11,22 +12,51 @@ import {
   Receipt,
   BookCheck,
   ArrowRight,
-  TrendingUp,
   ShieldCheck,
   Building2,
   Clock,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatRupee } from '@kumaran/api-client';
+import { useApprovalsStore } from '@/stores/approvals-store';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+  KpiSummaryCards,
+  DashboardKpiData,
+} from '@/components/dashboard/kpi-summary-cards';
+import { PendingApprovalsBanner } from '@/components/dashboard/pending-approvals-banner';
+import { CashPulseChart } from '@/components/dashboard/cash-pulse-chart';
+import { ArrearAlertsWidget } from '@/components/dashboard/arrear-alerts-widget';
+import { FilingCountdownWidget } from '@/components/dashboard/filing-countdown-widget';
 
 export default function DashboardRootPage() {
   const t = useTranslations();
   const user = useAuthStore((s) => s.user);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
+
+  // Fetch Executive KPI Dashboard metrics from real backend
+  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+    queryKey: queryKeys.dashboard.kpis(activeBranchId ?? undefined),
+    queryFn: async () => {
+      return unwrapApiResponse<DashboardKpiData>(
+        apiClient.GET('/api/v1/reports/dashboard', {
+          params: { query: { branchId: activeBranchId ?? undefined } },
+        }),
+      );
+    },
+    staleTime: 60 * 1000,
+  });
+
+  // Real-time Maker-Checker approvals from zustand store (fed via SSE / initial fetch)
+  const approvals = useApprovalsStore((s) => ({
+    totalPendingCount: s.totalPendingCount,
+    cashHandoversCount: s.cashHandoversCount,
+    disbursementAuthorizationsCount: s.disbursementAuthorizationsCount,
+    paymentReversalsCount: s.paymentReversalsCount,
+    safetyProofVerificationsCount: s.safetyProofVerificationsCount,
+  }));
 
   const currentDate = new Intl.DateTimeFormat('en-IN', {
     weekday: 'long',
@@ -82,7 +112,7 @@ export default function DashboardRootPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Welcome Banner */}
+      {/* 1. Top Welcome Banner */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 mb-1">
@@ -109,7 +139,41 @@ export default function DashboardRootPage() {
         </div>
       </div>
 
-      {/* Contextual Rule Banner */}
+      {/* 2. Maker-Checker Pending Approvals Queue Banner (Guardrail 10) */}
+      <PendingApprovalsBanner approvals={approvals} />
+
+      {/* 3. Executive KPI Cards (Guardrail 2 Whole Rupee Math) */}
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {t('dashboard.executiveTitle')}
+        </h2>
+        <KpiSummaryCards
+          data={dashboardData}
+          isLoading={isDashboardLoading}
+        />
+      </section>
+
+      {/* 4. Financial Pulse & Arrears Aging Analytics Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7">
+          <CashPulseChart
+            collections={dashboardData?.todayCollections}
+            disbursementsTotal={dashboardData?.todayDisbursements?.total}
+            isLoading={isDashboardLoading}
+          />
+        </div>
+        <div className="lg:col-span-5">
+          <ArrearAlertsWidget
+            arrearsAging={dashboardData?.arrearsAging}
+            isLoading={isDashboardLoading}
+          />
+        </div>
+      </div>
+
+      {/* 5. Statutory 21-Day Form XVII Filing Countdown */}
+      <FilingCountdownWidget branchId={activeBranchId ?? undefined} />
+
+      {/* 6. Contextual Rule Banner (Guardrail 1 Single-Company Tenancy) */}
       <BusinessRuleBanner
         ruleNumber={1}
         title={t('rules.guardrail1Title')}
@@ -117,12 +181,12 @@ export default function DashboardRootPage() {
         bulletPoints={[
           'Single company tenancy: Built solely for Kumaran Finance (Perundurai, Erode)',
           'Zero company_id columns exist in PostgreSQL database',
-          'Enforces 4-partner maker-checker governance across web and mobile'
+          'Enforces 4-partner maker-checker governance across web and mobile',
         ]}
         referencePath="/instructions"
       />
 
-      {/* Quick Navigation Action Grid */}
+      {/* 7. Quick Navigation Action Grid */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
           செயல்பாட்டு தொகுதிகள் / Operational Modules
