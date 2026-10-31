@@ -4,7 +4,7 @@
 > **Status**: **100% Complete & Verified**  
 > **Target Audience**: Web Engineers, Security Engineers, Auditors  
 > **Associated Tasks**: Task 2.1, Task 2.2, Task 2.3  
-> **Key Architectural Decisions**: [ADR-18 (Phone-Only Staff Identity)](../../01-business/decision-log.md#adr-18-phone-only-identity--login-architecture), [Guardrail 10 (Dual Control)](../../01-business/financial-rules.md)
+> **Key Architectural Decisions**: [ADR-18 (Phone-Only Staff Identity)](../01-business/decision-log.md#adr-18-phone-only-identity--login-architecture), [Guardrail 10 (Dual Control)](../01-business/financial-rules.md)
 
 ---
 

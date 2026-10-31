@@ -7,7 +7,7 @@
 >
 > [!NOTE]
 > **Implementation Status**: This document defines the authoritative architectural blueprint and screen catalog for the Web Portal (`apps/web/`) and Mobile Application (`apps/mobile/`).
-> - **Web Portal Implementation Ledger**: All web modules, screen catalogs, and verification proofs are documented under [`docs/03-architecture/web/`](./web/README.md). Foundation & Authentication are **100% Complete & Verified** with 42/42 passing unit tests.
+> - **Web Portal Implementation Ledger**: All web modules, screen catalogs, and verification proofs are documented under [`docs/web/`](../web/README.md). Foundation & Authentication are **100% Complete & Verified** with 42/42 passing unit tests.
 > - **Backend REST API tier** (`apps/api/`) is **100% complete** with 587/587 passing tests (35 suites) recorded in [`completed-modules-api-registry.md`](./completed-modules-api-registry.md).
 
 ---

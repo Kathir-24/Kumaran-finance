@@ -46,7 +46,7 @@ flowchart LR
 ## 3. Directory Layout
 
 ```
-docs/03-architecture/web/
+docs/web/
 ├── README.md                            # Master index & implementation tracking matrix (This File)
 ├── foundation-and-tooling.md             # Scaffolding, Tailwind v4, i18n atoms, TanStack Query, BigInt math
 ├── authentication-and-identity.md        # Phone+Password login, RFC 6238 TOTP, 20-min inactivity guardian, modals
