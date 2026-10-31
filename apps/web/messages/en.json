@@ -1,0 +1,13 @@
+{
+  "app": {
+    "title": "Kumaran Chits",
+    "tagline": "Chit Operations Platform",
+    "branch": "Perundurai Head Office",
+    "badge": "Real Mode: PostgreSQL 17 + NestJS 12"
+  },
+  "common": {
+    "status": "Online",
+    "version": "1.0.0",
+    "zeroPaiseGuard": "Whole Rupee Math Enforced"
+  }
+}
