@@ -2,57 +2,38 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  Calendar,
-  CheckCircle2,
   Edit3,
-  FileCheck2,
-  Info,
   Loader2,
-  Lock,
   Play,
-  ShieldAlert,
-  Users,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TicketRosterTable, type TicketItem } from '@/components/schemes/ticket-roster-table';
 import { AssignTicketDialog } from '@/components/schemes/assign-ticket-dialog';
 import { EditSchemeDialog } from '@/components/schemes/edit-scheme-dialog';
+import { ActivateSchemeDialog } from '@/components/schemes/activate-scheme-dialog';
 import { cn } from '@/lib/utils';
 
 export default function SchemeDetailPage() {
   const t = useTranslations('schemes');
   const params = useParams();
   const id = params?.id as string;
-  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
   const [isAssignOpen, setIsAssignOpen] = React.useState(false);
   const [assignSlotNumber, setAssignSlotNumber] = React.useState<number | null>(null);
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isActivateModalOpen, setIsActivateModalOpen] = React.useState(false);
-  const [activationNotes, setActivationNotes] = React.useState('');
-  const [activationError, setActivationError] = React.useState<string | null>(null);
 
   // Fetch Scheme Details with real API
   const { data: scheme, isLoading, error } = useQuery({
@@ -76,30 +57,6 @@ export default function SchemeDetailPage() {
   const isDraft = scheme?.status === 'DRAFT' || scheme?.status === 'REGISTERED';
   const isFull = tickets.length >= totalTickets;
   const remainingSlots = Math.max(0, totalTickets - tickets.length);
-
-  // Activate Scheme Mutation
-  const activateMutation = useMutation({
-    mutationFn: async () => {
-      return unwrapApiResponse(
-        apiClient.POST('/api/v1/chits/{id}/activate', {
-          params: { path: { id } },
-          body: { notes: activationNotes.trim() || undefined },
-        })
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.schemes.detail(id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.schemes.list() });
-      setIsActivateModalOpen(false);
-    },
-    onError: (err: any) => {
-      if (err instanceof KumaranApiError) {
-        setActivationError(err.message);
-      } else {
-        setActivationError(err.message || 'Activation failed');
-      }
-    },
-  });
 
   if (isLoading) {
     return (
@@ -167,11 +124,7 @@ export default function SchemeDetailPage() {
             <Button
               size="sm"
               disabled={!isFull}
-              onClick={() => {
-                setActivationNotes('');
-                setActivationError(null);
-                setIsActivateModalOpen(true);
-              }}
+              onClick={() => setIsActivateModalOpen(true)}
               className={cn(
                 'font-semibold text-xs',
                 isFull
@@ -299,62 +252,12 @@ export default function SchemeDetailPage() {
       />
 
       {/* Scheme Activation Confirmation Modal */}
-      <Dialog open={isActivateModalOpen} onOpenChange={setIsActivateModalOpen}>
-        <DialogContent className="max-w-md border-slate-800 bg-slate-900 text-slate-100">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-slate-100">
-              {t('activateConfirmTitle')}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400 leading-relaxed">
-              {t('activateConfirmDesc')}
-            </DialogDescription>
-          </DialogHeader>
-
-          {activationError && (
-            <Alert variant="destructive" className="py-2">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertTitle className="text-xs font-bold">Activation Error</AlertTitle>
-              <AlertDescription className="text-xs">{activationError}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-2 py-2">
-            <label className="text-xs font-semibold text-slate-300">
-              Checker Approval Notes (Optional)
-            </label>
-            <Input
-              placeholder="e.g. Verified by Super Admin against physical register"
-              value={activationNotes}
-              onChange={(e) => setActivationNotes(e.target.value)}
-              className="text-xs border-slate-700 bg-slate-950 text-slate-100"
-            />
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setIsActivateModalOpen(false)}
-              disabled={activateMutation.isPending}
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              onClick={() => activateMutation.mutate()}
-              disabled={activateMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
-            >
-              {activateMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('activating')}
-                </>
-              ) : (
-                t('confirmActivationButton')
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ActivateSchemeDialog
+        chitGroupId={id}
+        isOpen={isActivateModalOpen}
+        onClose={() => setIsActivateModalOpen(false)}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }
