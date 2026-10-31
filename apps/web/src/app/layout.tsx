@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
+import { fontInter, fontTamil } from '@/lib/fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={`${fontInter.variable} ${fontTamil.variable}`}>
       <body className="min-h-screen bg-slate-950 text-slate-50 antialiased">
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
