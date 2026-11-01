@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { toSafeIsoDate } from '@/lib/date-utils';
 import {
   Dialog,
   DialogContent,
@@ -91,10 +92,10 @@ export function EditSchemeDialog({
           body: {
             groupName: groupName.trim(),
             groupNameTamil: groupNameTamil.trim() || undefined,
-            startDate: startDate ? new Date(startDate).toISOString() : undefined,
-            endDate: endDate ? new Date(endDate).toISOString() : undefined,
+            startDate: toSafeIsoDate(startDate),
+            endDate: toSafeIsoDate(endDate),
             sanctionOrderNumber: sanctionOrderNumber.trim() || undefined,
-            sanctionDate: sanctionDate ? new Date(sanctionDate).toISOString() : undefined,
+            sanctionDate: toSafeIsoDate(sanctionDate),
           },
         })
       );

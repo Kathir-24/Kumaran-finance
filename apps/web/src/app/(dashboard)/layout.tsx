@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStream } from '@/hooks/use-approvals-stream';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -13,9 +14,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const t = useTranslations('common');
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
   const hydrate = useAuthStore((s) => s.hydrate);
 
   // Layout presentation state
@@ -30,15 +33,15 @@ export default function DashboardLayout({
     hydrate();
   }, [hydrate]);
 
-  // Auth redirect guard
+  // Auth redirect guard: Strictly evaluate after initial hydration is complete
   React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isHydrated && !isLoading && !isAuthenticated) {
       router.replace('/login?reason=unauthenticated');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isHydrated, isLoading, isAuthenticated, router]);
 
   // Loading skeleton while validating session
-  if (isLoading || !isAuthenticated) {
+  if (!isHydrated || isLoading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-slate-950 text-slate-100">
         <div className="flex flex-col items-center gap-4">
@@ -47,7 +50,7 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-            <span>குமரன் சிட்ஸ் பணிச்சூழல் தொடங்குகிறது...</span>
+            <span>{t('workspaceInitializing')}</span>
           </div>
         </div>
       </div>

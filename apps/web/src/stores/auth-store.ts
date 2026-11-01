@@ -34,6 +34,7 @@ export interface AuthState {
   tempToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isHydrated: boolean;
   activeBranchId: string | null;
   lastActivity: number;
 }
@@ -54,7 +55,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   refreshToken: null,
   tempToken: typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: typeof window !== 'undefined' ? Boolean(getStoredAccessToken()) : false,
+  isHydrated: false,
   activeBranchId: null,
   lastActivity: Date.now(),
 
@@ -87,6 +89,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       tempToken: null,
       isAuthenticated: true,
       isLoading: false,
+      isHydrated: true,
       activeBranchId,
       lastActivity: Date.now(),
     });
@@ -136,6 +139,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       tempToken: null,
       isAuthenticated: false,
       isLoading: false,
+      isHydrated: true,
       activeBranchId: null,
     });
 
@@ -153,7 +157,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     const refreshToken = getStoredRefreshToken();
 
     if (!token) {
-      set({ isLoading: false, isAuthenticated: false, user: null });
+      set({ isLoading: false, isAuthenticated: false, isHydrated: true, user: null });
       return;
     }
 
@@ -173,6 +177,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         refreshToken: refreshToken || null,
         isAuthenticated: true,
         isLoading: false,
+        isHydrated: true,
         activeBranchId,
         lastActivity: Date.now(),
       });
@@ -185,6 +190,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         refreshToken: null,
         isAuthenticated: false,
         isLoading: false,
+        isHydrated: true,
         activeBranchId: null,
       });
     }

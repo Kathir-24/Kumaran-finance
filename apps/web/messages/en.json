@@ -34,7 +34,8 @@
     "view": "View",
     "filter": "Filter",
     "refresh": "Refresh",
-    "rupeesOnly": "Rupees Only"
+    "rupeesOnly": "Rupees Only",
+    "workspaceInitializing": "Initializing Kumaran Chits workspace..."
   },
   "auth": {
     "loginTitle": "Office Staff Login",

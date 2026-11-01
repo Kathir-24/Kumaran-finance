@@ -7,6 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { formatRupee, assertWholeRupee, parseWholeRupees } from '../src/lib/currency.ts';
+import { toSafeIsoDate } from '../src/lib/date-utils.ts';
 import enMessages from '../messages/en.json' with { type: 'json' };
 import taMessages from '../messages/ta.json' with { type: 'json' };
 
@@ -184,4 +185,25 @@ test('Bilingual Parity: Schemes dictionary contains 100% key parity including cr
     assert.ok(enKeys.includes(wk), `Missing wizard key in en.json: ${wk}`);
     assert.ok(taKeys.includes(wk), `Missing wizard key in ta.json: ${wk}`);
   }
+
+  // Ensure layout loading key exists in both dictionaries
+  assert.ok(enMessages.common.workspaceInitializing, 'Missing common.workspaceInitializing in en.json');
+  assert.ok(taMessages.common.workspaceInitializing, 'Missing common.workspaceInitializing in ta.json');
+});
+
+test('Safe Date Parsing: toSafeIsoDate handles valid, partial, and malformed dates without throwing RangeError', () => {
+  // Valid ISO strings
+  assert.equal(toSafeIsoDate('2026-11-01'), '2026-11-01T00:00:00.000Z');
+  assert.equal(toSafeIsoDate('2028-06-15T12:00:00.000Z'), '2028-06-15T12:00:00.000Z');
+
+  // Empty or nullish values return undefined
+  assert.equal(toSafeIsoDate(''), undefined);
+  assert.equal(toSafeIsoDate('   '), undefined);
+  assert.equal(toSafeIsoDate(null), undefined);
+  assert.equal(toSafeIsoDate(undefined), undefined);
+
+  // Malformed date strings return undefined instead of throwing RangeError: Invalid time value
+  assert.equal(toSafeIsoDate('invalid-date-string'), undefined);
+  assert.equal(toSafeIsoDate('2026-99-99'), undefined);
+  assert.doesNotThrow(() => toSafeIsoDate('garbage-text'));
 });

@@ -36,7 +36,7 @@ export function TotpForm() {
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const redirectUrl = searchParams.get('redirect') || '/';
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
   // Guard: Verify pending 2FA token exists; redirect to login if missing, or to dashboard if already authenticated

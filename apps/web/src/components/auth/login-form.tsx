@@ -41,7 +41,7 @@ export function LoginForm() {
 
   // Read URL query parameter for contextual notices (e.g., from inactivity guardian)
   const reason = searchParams.get('reason');
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const redirectUrl = searchParams.get('redirect') || '/';
 
   // Guard: Redirect already-authenticated users to target dashboard
   React.useEffect(() => {

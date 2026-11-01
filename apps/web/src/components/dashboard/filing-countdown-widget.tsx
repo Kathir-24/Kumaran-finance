@@ -43,12 +43,15 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
   const { data: chitsData, isLoading: chitsLoading } = useQuery({
     queryKey: ['dashboard', 'chits-filing-countdown', { branchId }],
     queryFn: async () => {
-      const res = await unwrapApiResponse<{ items: any[] }>(
+      const res = await unwrapApiResponse<{ data?: any[]; items?: any[] } | any[]>(
         apiClient.GET('/api/v1/chits', {
           params: { query: { status: 'ACTIVE', limit: 5 } },
         }),
       );
-      return res.items || [];
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.data)) return res.data;
+      if (res && Array.isArray((res as any).items)) return (res as any).items;
+      return [];
     },
     staleTime: 60 * 1000,
   });
@@ -75,7 +78,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
         const daysRemaining = 21 - diffDays;
 
         items.push({
-          auctionId: `mock-${group.id}`,
+          auctionId: group.lastAuctionId || group.id,
           chitGroupId: group.id,
           groupCode: group.groupCode,
           installmentMonth: group.currentInstallmentMonth,
@@ -83,7 +86,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
           daysRemaining,
           isOverdue: daysRemaining < 0,
           isUrgent: daysRemaining >= 0 && daysRemaining <= 5,
-          filedAtRegistrar: false,
+          filedAtRegistrar: Boolean(group.minutesFiledAtRegistrar),
         });
       }
     }

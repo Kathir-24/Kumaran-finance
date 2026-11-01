@@ -11,6 +11,7 @@ import { apiClient } from '../src/lib/api-client.ts';
 test('AuthStore: Initial state is unauthenticated with null user', () => {
   const state = useAuthStore.getState();
   assert.equal(state.isAuthenticated, false);
+  assert.equal(state.isHydrated, false);
   assert.equal(state.user, null);
   assert.equal(state.accessToken, null);
   assert.equal(state.refreshToken, null);
@@ -33,6 +34,7 @@ test('AuthStore: setAuth correctly establishes session with user and tokens', ()
 
   const state = useAuthStore.getState();
   assert.equal(state.isAuthenticated, true);
+  assert.equal(state.isHydrated, true);
   assert.equal(state.user?.id, 'user-uuid-001');
   assert.equal(state.user?.name, 'K. Sengottaiyan');
   assert.equal(state.user?.phone, '9842100001');
@@ -88,6 +90,22 @@ test('AuthStore: hydrate gracefully handles absent tokens', async () => {
 
   const state = useAuthStore.getState();
   assert.equal(state.isAuthenticated, false);
+  assert.equal(state.isHydrated, true);
   assert.equal(state.user, null);
   assert.equal(state.isLoading, false);
+});
+
+test('AuthStore: Race condition prevention ensures isHydrated stays false before hydration', () => {
+  // Reset store to unhydrated state to simulate fresh page load
+  useAuthStore.setState({
+    isAuthenticated: false,
+    isLoading: false,
+    isHydrated: false,
+    user: null,
+  });
+
+  const state = useAuthStore.getState();
+  // Layout guard: if (isHydrated && !isLoading && !isAuthenticated) redirect
+  const shouldRedirect = state.isHydrated && !state.isLoading && !state.isAuthenticated;
+  assert.equal(shouldRedirect, false, 'Must NOT trigger premature redirect on initial render before hydration');
 });

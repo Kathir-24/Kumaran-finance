@@ -19,6 +19,7 @@ import {
 import { formatRupee, parseWholeRupees } from '@kumaran/api-client';
 import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { toSafeIsoDate, getDefaultStartDate, projectEndDate } from '@/lib/date-utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,29 +40,6 @@ const PRESETS: PresetScheme[] = [
   { label: '₹5 Lakh / 20M', chitValue: 500000, durationMonths: 20 },
   { label: '₹10 Lakh / 25M', chitValue: 1000000, durationMonths: 25 },
 ];
-
-/**
- * Helper to compute default scheduled start date (1st of next month)
- */
-function getDefaultStartDate(): string {
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return nextMonth.toISOString().split('T')[0];
-}
-
-/**
- * Helper to project scheduled end date (+ durationMonths from start date)
- */
-function projectEndDate(startDateStr: string, durationMonths: number): string {
-  try {
-    const d = new Date(startDateStr);
-    if (isNaN(d.getTime())) return '';
-    d.setMonth(d.getMonth() + durationMonths);
-    return d.toISOString().split('T')[0];
-  } catch {
-    return '';
-  }
-}
 
 export function SchemeForm() {
   const t = useTranslations('schemes');
@@ -150,8 +128,10 @@ export function SchemeForm() {
           })
         );
       }
-      if (!startDate) throw new Error('Start date is required');
-      if (!endDate) throw new Error('End date is required');
+      const safeStartDate = toSafeIsoDate(startDate);
+      const safeEndDate = toSafeIsoDate(endDate);
+      if (!safeStartDate) throw new Error('Valid scheduled start date is required');
+      if (!safeEndDate) throw new Error('Valid scheduled maturity date is required');
 
       const body = {
         groupCode: groupCode.trim().toUpperCase(),
@@ -160,10 +140,10 @@ export function SchemeForm() {
         chitValue,
         durationMonths,
         totalTickets: durationMonths, // Strictly locked to duration
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
+        startDate: safeStartDate,
+        endDate: safeEndDate,
         sanctionOrderNumber: sanctionOrderNumber.trim() || undefined,
-        sanctionDate: sanctionDate ? new Date(sanctionDate).toISOString() : undefined,
+        sanctionDate: toSafeIsoDate(sanctionDate),
         branchId: selectedBranchId || undefined,
       };
 
