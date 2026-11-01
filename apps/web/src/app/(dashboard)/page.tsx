@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Landmark,
   BookOpen,
@@ -50,13 +51,15 @@ export default function DashboardRootPage() {
   });
 
   // Real-time Maker-Checker approvals from zustand store (fed via SSE / initial fetch)
-  const approvals = useApprovalsStore((s) => ({
-    totalPendingCount: s.totalPendingCount,
-    cashHandoversCount: s.cashHandoversCount,
-    disbursementAuthorizationsCount: s.disbursementAuthorizationsCount,
-    paymentReversalsCount: s.paymentReversalsCount,
-    safetyProofVerificationsCount: s.safetyProofVerificationsCount,
-  }));
+  const approvals = useApprovalsStore(
+    useShallow((s) => ({
+      totalPendingCount: s.totalPendingCount,
+      cashHandoversCount: s.cashHandoversCount,
+      disbursementAuthorizationsCount: s.disbursementAuthorizationsCount,
+      paymentReversalsCount: s.paymentReversalsCount,
+      safetyProofVerificationsCount: s.safetyProofVerificationsCount,
+    }))
+  );
 
   const currentDate = new Intl.DateTimeFormat('en-IN', {
     weekday: 'long',
