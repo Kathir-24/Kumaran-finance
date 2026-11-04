@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Building2,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
@@ -293,6 +294,82 @@ export default function NotebookOnboardingPage() {
     }
   };
 
+  // Demo Sample Data Auto-Filler for Instant Testing & Verification
+  const [isDemoLoading, setIsDemoLoading] = React.useState(false);
+
+  const fillSampleData = async () => {
+    setIsDemoLoading(true);
+    try {
+      const res = await unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/customers', {
+          params: { query: { limit: 30 } },
+        })
+      );
+      const custList: any[] = Array.isArray(res) ? res : res?.data || res?.items || [];
+
+      // 1. Assign unique verified subscribers to all durationMonths tickets (ADR-13 compliant)
+      const count = masterState.durationMonths;
+      const newMembers = generateInitialMembers(count);
+      for (let i = 0; i < count; i++) {
+        const c = custList[i] || {
+          id: `cust-demo-${i + 1}`,
+          fullName: `Verified Subscriber ${i + 1}`,
+          customerCode: `KC-CUST-${String(i + 1).padStart(5, '0')}`,
+          phone: `98427${String(10000 + i).slice(0, 5)}`,
+        };
+        newMembers[i].customerId = c.id;
+        newMembers[i].customerName = c.fullName;
+        newMembers[i].customerCode = c.customerCode || `KC-CUST-${String(i + 1).padStart(5, '0')}`;
+        newMembers[i].phone = c.phone || '9876543210';
+
+        // Mark past months as PAID with realistic receipt numbers
+        for (let m = 1; m < masterState.onboardedAtMonth; m++) {
+          newMembers[i].payments[m] = {
+            status: 'PAID',
+            receiptNumber: `REC-M${m}-${String(i + 1).padStart(3, '0')}`,
+          };
+        }
+      }
+      setMembers(newMembers);
+
+      // 2. Set valid past auction discounts (under 1/4 ceiling, tickets >= 2)
+      const maxCeiling = Math.floor(masterState.chitValue / 4);
+      const sampleAuctions: HistoricalAuctionState[] = [];
+      const start = new Date(masterState.startDate || new Date());
+      for (let m = 2; m < masterState.onboardedAtMonth; m++) {
+        const aucDate = new Date(start);
+        aucDate.setMonth(aucDate.getMonth() + (m - 1));
+        sampleAuctions.push({
+          month: m,
+          ticketNumber: m, // Ticket m won month m
+          bidDiscount: Math.min(20000 + (m * 1000), maxCeiling),
+          auctionDate: aucDate.toISOString(),
+        });
+      }
+      setHistoricalWinners(sampleAuctions);
+
+      // 3. Compute exact whole-rupee system total to achieve zero discrepancy
+      const baseInst = Math.floor(masterState.chitValue / count);
+      let calculatedTotal = 0;
+      // Month 1 collections = count * baseInst (since all marked PAID)
+      calculatedTotal += count * baseInst;
+      // Months 2..M-1 collections = count * netInstallment
+      for (const auc of sampleAuctions) {
+        const foremanComm = Math.floor((masterState.chitValue * 4) / 100);
+        const totDiv = Math.max(0, auc.bidDiscount - foremanComm);
+        const divPerTkt = Math.floor(totDiv / count);
+        const netInst = Math.max(0, baseInst - divPerTkt);
+        calculatedTotal += count * netInst;
+      }
+
+      setPhysicalNotebookTotal(calculatedTotal);
+    } catch (err) {
+      console.error('Failed to fill sample data:', err);
+    } finally {
+      setIsDemoLoading(false);
+    }
+  };
+
   // Grid Member Row Mutator
   const handleMemberChange = (ticketNumber: number, patch: Partial<GridMemberRow>) => {
     setMembers((prev) =>
@@ -499,6 +576,23 @@ export default function NotebookOnboardingPage() {
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>{t('clearDraft')}</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={fillSampleData}
+            disabled={isDemoLoading}
+            className="h-8 text-xs gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold cursor-pointer"
+            title="Auto-fill verified subscribers, past auctions, and balanced collections for instant testing"
+          >
+            {isDemoLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            )}
+            <span>Fill Sample Test Data</span>
           </Button>
         </div>
       </div>
