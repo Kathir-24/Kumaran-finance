@@ -29,6 +29,14 @@ export const queryKeys = {
     passbook: (id: string) => ['tickets', id, 'passbook'] as const,
     ledger: (id: string) => ['tickets', id, 'ledger'] as const,
   },
+  installments: {
+    all: ['installments'] as const,
+    groupMonth: (chitGroupId: string, month: number, status?: string) =>
+      ['installments', 'group-month', { chitGroupId, month, status }] as const,
+    upiIntent: (dueId: string) => ['installments', dueId, 'upi-intent'] as const,
+    defaulters: (branchId?: string, minMonths?: number) =>
+      ['installments', 'defaulters', { branchId, minMonths }] as const,
+  },
   auctions: {
     all: ['auctions'] as const,
     list: (chitGroupId?: string) => ['auctions', { chitGroupId }] as const,

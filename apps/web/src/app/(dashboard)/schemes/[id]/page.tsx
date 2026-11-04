@@ -22,10 +22,13 @@ import { TicketRosterTable, type TicketItem } from '@/components/schemes/ticket-
 import { AssignTicketDialog } from '@/components/schemes/assign-ticket-dialog';
 import { EditSchemeDialog } from '@/components/schemes/edit-scheme-dialog';
 import { ActivateSchemeDialog } from '@/components/schemes/activate-scheme-dialog';
+import { MonthlyInstallmentsPanel } from '@/components/schemes/monthly-installments-panel';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 export default function SchemeDetailPage() {
   const t = useTranslations('schemes');
+  const tInstallments = useTranslations('installments');
   const params = useParams();
   const id = params?.id as string;
   const user = useAuthStore((s) => s.user);
@@ -193,40 +196,72 @@ export default function SchemeDetailPage() {
         </div>
       </div>
 
-      {/* Roster Container */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-100">{t('rosterTitle')}</h2>
-            <p className="text-xs text-slate-400">{t('rosterSubtitle', { total: totalTickets })}</p>
-          </div>
-          {isDraft && canManage && !isFull && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setAssignSlotNumber(null);
-                setIsAssignOpen(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
-            >
-              {t('assignTicket')}
-            </Button>
-          )}
-        </div>
+      {/* Tabbed Management View: Tab 1 = Subscriber Roster | Tab 2 = Monthly Installments */}
+      <Tabs defaultValue="roster" className="space-y-4">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1">
+          <TabsTrigger
+            value="roster"
+            className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer"
+          >
+            {tInstallments('tabRoster', { total: totalTickets })}
+          </TabsTrigger>
+          <TabsTrigger
+            value="installments"
+            className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer"
+          >
+            {tInstallments('tabInstallments')}
+          </TabsTrigger>
+        </TabsList>
 
-        <TicketRosterTable
-          chitGroupId={id}
-          totalTickets={totalTickets}
-          isDraft={isDraft}
-          canManageTickets={canManage}
-          tickets={tickets}
-          onAssignClick={(slotNum) => {
-            setAssignSlotNumber(slotNum);
-            setIsAssignOpen(true);
-          }}
-          onUnassignSuccess={() => {}}
-        />
-      </div>
+        {/* Tab 1: Subscriber Roster */}
+        <TabsContent value="roster" className="space-y-3 outline-none mt-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-100">{t('rosterTitle')}</h2>
+              <p className="text-xs text-slate-400">{t('rosterSubtitle', { total: totalTickets })}</p>
+            </div>
+            {isDraft && canManage && !isFull && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAssignSlotNumber(null);
+                  setIsAssignOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+              >
+                {t('assignTicket')}
+              </Button>
+            )}
+          </div>
+
+          <TicketRosterTable
+            chitGroupId={id}
+            totalTickets={totalTickets}
+            isDraft={isDraft}
+            canManageTickets={canManage}
+            tickets={tickets}
+            onAssignClick={(slotNum) => {
+              setAssignSlotNumber(slotNum);
+              setIsAssignOpen(true);
+            }}
+            onUnassignSuccess={() => {}}
+          />
+        </TabsContent>
+
+        {/* Tab 2: Monthly Installments & Dues Tracker */}
+        <TabsContent value="installments" className="space-y-4 outline-none mt-2">
+          <MonthlyInstallmentsPanel
+            chitGroupId={id}
+            groupCode={scheme.groupCode}
+            durationMonths={scheme.durationMonths}
+            baseInstallment={scheme.baseInstallment}
+            startDate={scheme.startDate}
+            status={scheme.status}
+            currentInstallmentMonth={scheme.currentInstallmentMonth}
+            canManage={canManage}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <AssignTicketDialog
