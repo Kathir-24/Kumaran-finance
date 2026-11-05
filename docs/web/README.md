@@ -20,7 +20,7 @@
 | **Phase 7: Prize Disbursements & Safety Proof** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
 | **Phase 8: Collections, Handover & Reversals** | [`collections-and-handover.md`](./collections-and-handover.md), [`payment-reversals.md`](./payment-reversals.md) | `/collections`, `/collections/handover`, `/reversals` | Cashier, Field Agent, Partner | **COMPLETED** (Tasks 8.1–8.4 DONE) |
 | **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md), [`staff-administration.md`](./staff-administration.md), [`background-jobs-admin.md`](./background-jobs-admin.md) | `/branches`, `/branches/new`, `/users`, `/users/new`, `/admin/jobs` | Super Admin | **COMPLETED** (Tasks 9.1, 9.2, 9.3 DONE) |
-| **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/auditor` | Super Admin, Accountant, Auditor, Branch Manager | **IN PROGRESS** (Task 10.1 DONE) |
+| **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`form-xvii-minutes.md`](./form-xvii-minutes.md), [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/auditor` | Super Admin, Accountant, Auditor, Branch Manager | **IN PROGRESS** (Tasks 10.1, 10.2 DONE) |
 | **Phase 11: Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
 
 ---
@@ -61,6 +61,7 @@ docs/web/
 ├── staff-administration.md               # Staff user onboarding, RBAC roles, dual-role support & password resets
 ├── background-jobs-admin.md              # BullMQ queue telemetry, repeatable IST cron schedules, triggers & audit logs
 ├── form-xxii-cash-book.md              # Form XXII 12-column daily chit cash book & multi-mode financial day book
+├── form-xvii-minutes.md                # Form XVII auction minutes, 21-day filing countdown & Registrar filing portal
 ├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, statutory registers
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
 ```

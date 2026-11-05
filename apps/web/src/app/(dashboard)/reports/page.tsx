@@ -64,8 +64,8 @@ export default function ReportsHubPage() {
       description: 'Auction minutes, 4% commission, dividends & 21-day Registrar filing window',
       href: '/reports/minutes',
       icon: FileCheck,
-      badgeText: 'Task 10.2',
-      badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      badgeText: 'Active',
+      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       tag: 'Registrar Compliance',
     },
     {

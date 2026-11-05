@@ -90,8 +90,15 @@ export const queryKeys = {
       ['reports', 'day-book', params] as const,
     cashBook: (date?: string) => ['reports', 'cash-book', date] as const,
     arrears: () => ['reports', 'arrears'] as const,
-    formXvii: (chitGroupId: string, month: number) =>
-      ['reports', 'form-xvii', { chitGroupId, month }] as const,
+    formXvii: (
+      params: { chitGroupId: string; fromDate?: string; toDate?: string } | string,
+      month?: number
+    ) =>
+      typeof params === 'string'
+        ? month !== undefined
+          ? (['reports', 'form-xvii', { chitGroupId: params, month }] as const)
+          : (['reports', 'form-xvii', { chitGroupId: params }] as const)
+        : (['reports', 'form-xvii', params] as const),
   },
   customers: {
     all: ['customers'] as const,
