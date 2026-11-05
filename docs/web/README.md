@@ -11,18 +11,17 @@
 
 | Module / Milestone | Primary Documentation | Route Paths | Target Personas | Status |
 |---|---|---|---|:---:|
-| **1. Foundation & Tooling** | [`foundation-and-tooling.md`](./foundation-and-tooling.md) | Shared Shell, Layout | All Personas | **COMPLETED** |
-| **2. Authentication & Identity** | [`authentication-and-identity.md`](./authentication-and-identity.md) | `/login`, `/2fa`, Modals | Super Admin, Accountant, Auditor | **COMPLETED** |
-| **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*`, `/instructions` | All Office Staff | **COMPLETED** (Tasks 3.1, 3.2, 3.3 DONE) |
-| **4. Chit Schemes & Onboarding** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]`, `/schemes/onboard` | Super Admin, Accountant, Branch Manager | **COMPLETED** (Tasks 4.1, 4.2, 4.3, 4.4 DONE) |
-| **5. Customers & Passbook Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/new`, `/customers/[id]` | Super Admin, Branch Manager, Collection Agent | **COMPLETED** (Tasks 5.1, 5.2, 5.3 DONE) |
-| **6. In-Office Auction Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
-| **7. Defaulter Substitution Desk** | [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/schemes/[id]/defaulters` | Super Admin, Partner, Accountant | **COMPLETED** (Task 6.4 DONE) |
-| **8. Prize Disbursements** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
-| **9. Collections & Handover** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | **Task 8.1 COMPLETED** (Task 8.2 In Progress) |
-| **10. Payment Reversals** | [`payment-reversals.md`](./payment-reversals.md) | `/reversals` | Accountant (Maker), Partner (Checker) | Planned |
-| **11. Statutory Reports & Admin** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/users`, `/branches` | CA Auditor, Super Admin | Planned |
-| **12. Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
+| **Phase 1: Foundation & Tooling** | [`foundation-and-tooling.md`](./foundation-and-tooling.md) | Shared Shell, Layout | All Personas | **COMPLETED** |
+| **Phase 2: Authentication & Identity** | [`authentication-and-identity.md`](./authentication-and-identity.md) | `/login`, `/2fa`, Modals | Super Admin, Accountant, Auditor | **COMPLETED** |
+| **Phase 3: Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*`, `/instructions` | All Office Staff | **COMPLETED** (Tasks 3.1, 3.2, 3.3 DONE) |
+| **Phase 4: Chit Schemes & Onboarding** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]`, `/schemes/onboard` | Super Admin, Accountant, Branch Manager | **COMPLETED** (Tasks 4.1, 4.2, 4.3, 4.4 DONE) |
+| **Phase 5: Customers & Passbook Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/new`, `/customers/[id]` | Super Admin, Branch Manager, Collection Agent | **COMPLETED** (Tasks 5.1, 5.2, 5.3 DONE) |
+| **Phase 6: In-Office Auction Console & Defaulter Desk** | [`auctions-console.md`](./auctions-console.md), [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
+| **Phase 7: Prize Disbursements & Safety Proof** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
+| **Phase 8: Collections, Handover & Receipts** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | **Task 8.1 COMPLETED** (Task 8.2 In Progress) |
+| **Phase 9: Payment Reversals** | [`payment-reversals.md`](./payment-reversals.md) | `/reversals` | Accountant (Maker), Partner (Checker) | Planned |
+| **Phase 10: Statutory Reports & Admin** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/users`, `/branches` | CA Auditor, Super Admin | Planned |
+| **Phase 11: Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
 
 ---
 
