@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -12,13 +12,20 @@ import {
   FileCheck,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
   FileText,
+  Download,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { PayoutVoucherCard } from '@/components/disbursements/payout-voucher-card';
 import { SafetyProofChecklist } from '@/components/disbursements/safety-proof-checklist';
+import { DisbursementAuthModal } from '@/components/disbursements/disbursement-auth-modal';
+import { DisbursementReleaseModal } from '@/components/disbursements/disbursement-release-modal';
+import { BilingualVoucherDialog } from '@/components/disbursements/bilingual-voucher-dialog';
+import { useAuthStore } from '@/stores/auth-store';
 import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -26,6 +33,11 @@ export default function PayoutVoucherPage() {
   const t = useTranslations('disbursements');
   const params = useParams();
   const auctionId = params?.id as string;
+  const user = useAuthStore((s) => s.user);
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [releaseModalOpen, setReleaseModalOpen] = useState(false);
+  const [voucherModalOpen, setVoucherModalOpen] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.disbursements.detail(auctionId),
@@ -79,7 +91,6 @@ export default function PayoutVoucherPage() {
 
   const { auction, winner, makerName, checkerName } = data;
 
-  // Build combined voucher representation
   const voucherDetails = {
     ...winner,
     auction: auction || winner.auction,
@@ -89,6 +100,17 @@ export default function PayoutVoucherPage() {
   };
 
   const status = winner.disbursementStatus;
+
+  // Maker != Checker Guardrail 10 Evaluation
+  const isMaker = Boolean(
+    user?.id &&
+      winner?.verifiedByUserId &&
+      user.id.toLowerCase() === winner.verifiedByUserId.toLowerCase(),
+  );
+
+  const isSuperAdmin = Boolean(
+    user?.roles?.includes('SUPER_ADMIN') || (user as any)?.role === 'SUPER_ADMIN',
+  );
 
   return (
     <div className="space-y-6">
@@ -141,9 +163,56 @@ export default function PayoutVoucherPage() {
                 {t('statusDisbursed')}
               </Badge>
             )}
+
+            {/* Quick Actions in Header */}
+            {status === 'VERIFIED_BY_MAKER' && (
+              <Button
+                size="sm"
+                onClick={() => setAuthModalOpen(true)}
+                disabled={isMaker || !isSuperAdmin}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{t('actionAuthorizeChecker')}</span>
+              </Button>
+            )}
+
+            {status === 'AUTHORIZED_BY_CHECKER' && (
+              <Button
+                size="sm"
+                onClick={() => setReleaseModalOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>{t('actionReleasePayout')}</span>
+              </Button>
+            )}
+
+            {status === 'DISBURSED' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setVoucherModalOpen(true)}
+                className="border-slate-700 hover:bg-slate-800 text-slate-200 text-xs gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{t('actionViewVoucher')}</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Maker != Checker Guard Alert if Maker views voucher in VERIFIED_BY_MAKER status */}
+      {status === 'VERIFIED_BY_MAKER' && isMaker && (
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold text-sm">{t('makerGuardAlertTitle')}</div>
+            <div className="text-amber-300/80 mt-1">{t('makerGuardAlertDesc')}</div>
+          </div>
+        </div>
+      )}
 
       {/* ADR-15 & ADR-14 Invariant Banner */}
       <BusinessRuleBanner
@@ -167,6 +236,30 @@ export default function PayoutVoucherPage() {
           />
         </div>
       </div>
+
+      {/* Modals */}
+      <DisbursementAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        winner={{ ...winner, auctionId, auction, ticket: winner.ticket }}
+        onSuccess={() => refetch()}
+      />
+
+      <DisbursementReleaseModal
+        isOpen={releaseModalOpen}
+        onClose={() => setReleaseModalOpen(false)}
+        winner={{ ...winner, auctionId, auction, ticket: winner.ticket }}
+        onSuccess={() => {
+          refetch();
+          setVoucherModalOpen(true);
+        }}
+      />
+
+      <BilingualVoucherDialog
+        isOpen={voucherModalOpen}
+        onClose={() => setVoucherModalOpen(false)}
+        auctionId={auctionId}
+      />
     </div>
   );
 }
