@@ -84,6 +84,8 @@ export const queryKeys = {
   },
   collections: {
     all: ['collections'] as const,
+    dailySummary: (params?: { date?: string; branchId?: string; collectorUserId?: string }) =>
+      params ? (['collections', 'daily-summary', params] as const) : (['collections', 'daily-summary'] as const),
     agentSummary: (agentId?: string) => ['collections', 'agent-summary', { agentId }] as const,
     unacknowledged: () => ['collections', 'unacknowledged'] as const,
   },
