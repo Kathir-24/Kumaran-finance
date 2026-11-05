@@ -11,9 +11,9 @@ import { useAuthStore } from '../src/stores/auth-store.ts';
 import enMessages from '../messages/en.json' with { type: 'json' };
 import taMessages from '../messages/ta.json' with { type: 'json' };
 
-test('RBAC Navigation: SUPER_ADMIN has full access to all 13 modules', () => {
+test('RBAC Navigation: SUPER_ADMIN has full access to all 14 modules', () => {
   const allowed = filterNavItemsByRoles(MAIN_NAV_ITEMS, ['SUPER_ADMIN']);
-  assert.equal(allowed.length, 13, 'SUPER_ADMIN must see all 13 navigation modules');
+  assert.equal(allowed.length, 14, 'SUPER_ADMIN must see all 14 navigation modules');
 
   const hrefs = allowed.map((item) => item.href);
   assert.ok(hrefs.includes('/'));
@@ -29,6 +29,7 @@ test('RBAC Navigation: SUPER_ADMIN has full access to all 13 modules', () => {
   assert.ok(hrefs.includes('/instructions'));
   assert.ok(hrefs.includes('/branches'));
   assert.ok(hrefs.includes('/users'));
+  assert.ok(hrefs.includes('/admin/jobs'));
 });
 
 test('RBAC Navigation: ACCOUNTANT has operational access, excluding admin & auctions', () => {

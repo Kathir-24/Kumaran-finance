@@ -12,6 +12,7 @@ import {
   BookCheck,
   Building2,
   UserCog,
+  Activity,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -112,6 +113,12 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     href: '/users',
     labelKey: 'nav.users',
     icon: UserCog,
+    allowedRoles: ['SUPER_ADMIN'],
+  },
+  {
+    href: '/admin/jobs',
+    labelKey: 'nav.jobs',
+    icon: Activity,
     allowedRoles: ['SUPER_ADMIN'],
   },
 ];

@@ -128,4 +128,11 @@ export const queryKeys = {
     history: (params?: { page?: number; limit?: number }) =>
       params ? (['reversals', 'history', params] as const) : (['reversals', 'history'] as const),
   },
+  jobs: {
+    all: ['jobs'] as const,
+    queueStatus: () => ['jobs', 'queue-status'] as const,
+    repeatableSchedules: () => ['jobs', 'repeatable-schedules'] as const,
+    notificationAuditLogs: (params?: { limit?: number }) =>
+      ['jobs', 'notification-audit-logs', params] as const,
+  },
 } as const;
