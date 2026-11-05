@@ -1,0 +1,310 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Gavel,
+  ArrowLeft,
+  Clock,
+  Loader2,
+  AlertCircle,
+  ShieldCheck,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
+import {
+  DefaulterEligibilityRoster,
+  type SubscriberTicketItem,
+  type EligibleBidderItem,
+} from '@/components/auctions/defaulter-eligibility-roster';
+import {
+  BiddingConsole,
+  type RecordBidPayload,
+} from '@/components/auctions/bidding-console';
+import {
+  TieBreakModal,
+  type RecordTieBreakPayload,
+} from '@/components/auctions/tie-break-modal';
+import {
+  AuctionSummaryCard,
+  type AuctionSummaryData,
+} from '@/components/auctions/auction-summary-card';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
+
+export default function LiveAuctionRoomPage() {
+  const t = useTranslations('auctions');
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+
+  const auctionId = String(params.id);
+  const monthParam = searchParams.get('month');
+  const monthNum = monthParam ? parseInt(monthParam, 10) : undefined;
+
+  const [selectedTicket, setSelectedTicket] = React.useState<SubscriberTicketItem | null>(null);
+  const [isTieBreakOpen, setIsTieBreakOpen] = React.useState(false);
+  const [isModifying, setIsModifying] = React.useState(false);
+  const [clockTime, setClockTime] = React.useState<string>('');
+
+  // Live IST digital clock
+  React.useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setClockTime(
+        now.toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        }) + ' IST',
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 1. Fetch auction details
+  const {
+    data: auction,
+    isLoading: isAuctionLoading,
+    isError: isAuctionError,
+    refetch: refetchAuction,
+  } = useQuery<AuctionSummaryData & { chitGroup?: any }>({
+    queryKey: queryKeys.auctions.detail(auctionId),
+    queryFn: async () => {
+      return unwrapApiResponse<AuctionSummaryData & { chitGroup?: any }>(
+        apiClient.GET('/api/v1/auctions/{id}' as any, {
+          params: { path: { id: auctionId } },
+        }),
+      );
+    },
+    enabled: Boolean(auctionId),
+  });
+
+  const chitGroupId = auction?.chitGroupId || auction?.chitGroup?.id;
+  const currentMonth = auction?.installmentMonth ?? monthNum ?? 2;
+
+  // 2. Fetch eligible bidders (ADR-07 pre-auction defaulter guard)
+  const {
+    data: eligibleBidders = [],
+    isLoading: isEligibleLoading,
+  } = useQuery<EligibleBidderItem[]>({
+    queryKey: queryKeys.auctions.eligibleBidders(auctionId, currentMonth),
+    queryFn: async () => {
+      return unwrapApiResponse<EligibleBidderItem[]>(
+        apiClient.GET('/api/v1/auctions/{id}/eligible-bidders' as any, {
+          params: {
+            path: { id: auctionId },
+            query: { month: currentMonth },
+          },
+        }),
+      );
+    },
+    enabled: Boolean(auctionId),
+  });
+
+  // 3. Fetch all assigned subscriber tickets for chit scheme roster
+  const {
+    data: allTickets = [],
+    isLoading: isTicketsLoading,
+  } = useQuery<SubscriberTicketItem[]>({
+    queryKey: queryKeys.schemes.detail(chitGroupId),
+    queryFn: async () => {
+      if (!chitGroupId) return [];
+      return unwrapApiResponse<SubscriberTicketItem[]>(
+        apiClient.GET('/api/v1/chits/{id}/tickets' as any, {
+          params: { path: { id: chitGroupId } },
+        }),
+      );
+    },
+    enabled: Boolean(chitGroupId),
+  });
+
+  // Scheme parameters with safe fallbacks
+  const chitValue = Number(auction?.chitGroup?.chitValue || 100000);
+  const durationMonths = Number(auction?.chitGroup?.durationMonths || 20);
+  const baseInstallment = Math.floor(chitValue / durationMonths);
+  const maxCeiling = Math.floor(chitValue / 4);
+
+  // Record Bid Mutation
+  const recordBidMutation = useMutation({
+    mutationFn: async (payload: RecordBidPayload) => {
+      return unwrapApiResponse(
+        apiClient.POST('/api/v1/auctions/{id}/record-bid' as any, {
+          params: { path: { id: auctionId } },
+          body: payload,
+        }),
+      );
+    },
+    onSuccess: () => {
+      setIsModifying(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+      refetchAuction();
+    },
+  });
+
+  // Record Tie-Break Mutation
+  const recordTieBreakMutation = useMutation({
+    mutationFn: async (payload: RecordTieBreakPayload) => {
+      return unwrapApiResponse(
+        apiClient.POST('/api/v1/auctions/{id}/tie-break' as any, {
+          params: { path: { id: auctionId } },
+          body: payload,
+        }),
+      );
+    },
+    onSuccess: () => {
+      setIsModifying(false);
+      setIsTieBreakOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+      refetchAuction();
+    },
+  });
+
+  const hasRecordedResult = Boolean(
+    auction &&
+      auction.bidDiscount &&
+      auction.winner &&
+      !isModifying,
+  );
+
+  if (isAuctionLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  if (isAuctionError || !auction) {
+    return (
+      <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-8 text-center space-y-3">
+        <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
+        <h3 className="text-base font-semibold text-white">Auction Room Not Found</h3>
+        <p className="text-xs text-red-300 max-w-sm mx-auto">
+          The requested auction room could not be loaded. Please return to the auctions directory.
+        </p>
+        <Button size="sm" variant="outline" asChild className="border-slate-700 bg-slate-800 text-xs text-slate-200">
+          <Link href="/auctions">
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            <span>Return to Auctions</span>
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Top Header & Breadcrumb */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" asChild className="h-8 w-8 p-0 border-slate-800 bg-slate-900 text-slate-300">
+            <Link href={chitGroupId ? `/auctions?group=${chitGroupId}` : '/auctions'}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded">
+                {auction.chitGroup?.groupCode || 'SCHEME'}
+              </span>
+              <h1 className="text-lg font-bold text-white">
+                Month {auction.installmentMonth} — {t('liveRoomTitle')}
+              </h1>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {auction.chitGroup?.groupName || t('liveRoomSubtitle')}
+            </p>
+          </div>
+        </div>
+
+        {/* Real-time IST Clock */}
+        <div className="flex items-center gap-2 self-start md:self-auto bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-emerald-400">
+          <Clock className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
+          <span>{clockTime || 'IST Live'}</span>
+        </div>
+      </div>
+
+      {/* Embedded Statutory Rules Banners: Guardrail 6 & Guardrail 4 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <BusinessRuleBanner
+          ruleNumber={6}
+          title={t('guardrail6BannerTitle')}
+          description={t('guardrail6BannerDesc')}
+          referencePath="/instructions?rule=6"
+          defaultExpanded={false}
+        />
+        <BusinessRuleBanner
+          ruleNumber={4}
+          title="Universal Equal Dividend Deduction (Guardrail 4)"
+          description="Winning discount minus 4% commission is distributed equally to ALL members, including winner and past prized winners."
+          referencePath="/instructions?rule=4"
+          defaultExpanded={false}
+        />
+      </div>
+
+      {/* Main Two-Column Live Room Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Column (5 cols): Pre-Auction Defaulter Guard & Eligibility Roster */}
+        <div className="lg:col-span-5">
+          <DefaulterEligibilityRoster
+            allTickets={allTickets}
+            eligibleTickets={eligibleBidders}
+            selectedTicketId={selectedTicket?.id || auction.winner?.ticketId}
+            onSelectBidder={(ticket) => setSelectedTicket(ticket)}
+            isLoading={isTicketsLoading || isEligibleLoading}
+          />
+        </div>
+
+        {/* Right Column (7 cols): Bidding Console OR Auction Summary Card */}
+        <div className="lg:col-span-7 space-y-4">
+          {hasRecordedResult ? (
+            <AuctionSummaryCard
+              auction={auction}
+              chitValue={chitValue}
+              baseInstallment={baseInstallment}
+              totalTickets={durationMonths}
+              onModifyBid={() => setIsModifying(true)}
+            />
+          ) : (
+            <BiddingConsole
+              chitValue={chitValue}
+              durationMonths={durationMonths}
+              baseInstallment={baseInstallment}
+              selectedTicket={selectedTicket}
+              eligibleTickets={allTickets.filter((t) => t.status === 'ACTIVE' && !t.isPrized && t.consecutiveUnpaidMonths === 0)}
+              onSelectTicket={(ticket) => setSelectedTicket(ticket)}
+              onRecordBid={async (payload) => {
+                await recordBidMutation.mutateAsync(payload);
+              }}
+              onOpenTieBreak={() => setIsTieBreakOpen(true)}
+              isSubmitting={recordBidMutation.isPending}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Option A Physical Paper Token Tie-Break Modal */}
+      <TieBreakModal
+        isOpen={isTieBreakOpen}
+        onClose={() => setIsTieBreakOpen(false)}
+        ceilingDiscount={maxCeiling}
+        eligibleTickets={allTickets.filter((t) => t.status === 'ACTIVE' && !t.isPrized && t.consecutiveUnpaidMonths === 0)}
+        onRecordTieBreak={async (payload) => {
+          await recordTieBreakMutation.mutateAsync(payload);
+        }}
+        isSubmitting={recordTieBreakMutation.isPending}
+      />
+    </div>
+  );
+}

@@ -41,6 +41,8 @@ export const queryKeys = {
     all: ['auctions'] as const,
     list: (chitGroupId?: string) => ['auctions', { chitGroupId }] as const,
     detail: (auctionId: string) => ['auctions', auctionId] as const,
+    eligibleBidders: (id: string, month?: number) =>
+      ['auctions', id, 'eligible-bidders', { month }] as const,
   },
   disbursements: {
     all: ['disbursements'] as const,
