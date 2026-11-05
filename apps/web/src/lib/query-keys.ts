@@ -110,6 +110,15 @@ export const queryKeys = {
       page?: number;
       limit?: number;
     }) => ['reports', 'defaulters', params] as const,
+    auditLogs: (params?: {
+      entityType?: string;
+      action?: string;
+      userId?: string;
+      fromDate?: string;
+      toDate?: string;
+      page?: number;
+      limit?: number;
+    }) => ['reports', 'audit-logs', params] as const,
   },
   customers: {
     all: ['customers'] as const,

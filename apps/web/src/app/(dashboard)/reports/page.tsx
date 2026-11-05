@@ -92,8 +92,8 @@ export default function ReportsHubPage() {
       description: 'Append-only forensic audit trail of dual-control approvals, handovers & reversals',
       href: '/reports/audit-logs',
       icon: ShieldCheck,
-      badgeText: 'Task 10.4',
-      badgeColor: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+      badgeText: 'Active',
+      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       tag: 'CA Forensic Audit',
     },
   ];
