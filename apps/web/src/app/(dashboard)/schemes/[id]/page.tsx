@@ -10,6 +10,7 @@ import {
   Edit3,
   Loader2,
   Play,
+  UserX,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
@@ -111,6 +112,20 @@ export default function SchemeDetailPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
+          {scheme.status === 'ACTIVE' && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-amber-600/40 bg-amber-950/20 text-amber-300 hover:bg-amber-900/30 text-xs font-semibold"
+            >
+              <Link href={`/schemes/${id}/defaulters`}>
+                <UserX className="mr-1.5 h-3.5 w-3.5" />
+                <span>{t('defaultersDeskNavBtn')}</span>
+              </Link>
+            </Button>
+          )}
+
           {isDraft && isSuperAdmin && (
             <Button
               variant="outline"

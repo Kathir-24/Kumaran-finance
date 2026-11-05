@@ -28,6 +28,8 @@ export const queryKeys = {
     detail: (id: string) => ['tickets', id] as const,
     passbook: (id: string) => ['tickets', id, 'passbook'] as const,
     ledger: (id: string) => ['tickets', id, 'ledger'] as const,
+    defaulters: (params?: { branchId?: string; minConsecutiveMonths?: number }) =>
+      ['tickets', 'defaulters', params] as const,
   },
   installments: {
     all: ['installments'] as const,
