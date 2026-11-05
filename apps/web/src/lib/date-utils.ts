@@ -36,3 +36,22 @@ export function projectEndDate(startDateStr: string, durationMonths: number): st
     return '';
   }
 }
+
+/**
+ * Formats a date string or Date object into a readable localized date format (e.g., "22 Oct 2026").
+ * Returns '—' if input is null, undefined, or invalid.
+ */
+export function formatDate(dateInput?: string | Date | null): string {
+  if (!dateInput) return '—';
+  try {
+    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
+}

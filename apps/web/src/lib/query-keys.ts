@@ -49,8 +49,21 @@ export const queryKeys = {
   },
   disbursements: {
     all: ['disbursements'] as const,
-    list: () => ['disbursements', 'list'] as const,
-    detail: (id: string) => ['disbursements', id] as const,
+    list: (params?: {
+      chitGroupId?: string;
+      disbursementStatus?: string;
+      disbursementMode?: string;
+      fromDate?: string;
+      toDate?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      params
+        ? (['disbursements', 'list', params] as const)
+        : (['disbursements', 'list'] as const),
+    detail: (auctionId: string) => ['disbursements', 'detail', auctionId] as const,
+    safetyProofUrl: (auctionId: string) => ['disbursements', auctionId, 'safety-proof-url'] as const,
+    voucher: (auctionId: string) => ['disbursements', auctionId, 'voucher'] as const,
   },
   approvals: {
     all: ['approvals'] as const,
