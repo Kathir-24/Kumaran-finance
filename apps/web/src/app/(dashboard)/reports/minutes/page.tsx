@@ -53,13 +53,17 @@ export default function FormXviiMinutesPage() {
   const [filingAuction, setFilingAuction] = React.useState<FormXviiAuctionRecord | null>(null);
 
   // 1. Fetch Chit Schemes for the Scheme Selector
-  const { data: schemes = [], isLoading: isLoadingSchemes } = useQuery({
+  const { data: schemes = [], isLoading: isLoadingSchemes } = useQuery<
+    Array<{ id: string; groupCode: string; groupName: string; status: string }>
+  >({
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
-      const res = await unwrapApiResponse<Array<{ id: string; groupCode: string; groupName: string; status: string }>>(
+      const res = await unwrapApiResponse<any>(
         apiClient.GET('/api/v1/chits')
       );
-      return res || [];
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.data)) return res.data;
+      return [];
     },
     enabled: hasAccess,
   });

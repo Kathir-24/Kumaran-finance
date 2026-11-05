@@ -64,7 +64,10 @@ export default function AuditLogsReportPage() {
           params: { query: { limit: 100 } },
         })
       );
-      return res?.users || res || [];
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.data)) return res.data;
+      if (res && Array.isArray(res.users)) return res.users;
+      return [];
     },
     enabled: hasAccess && !isCustomer,
   });

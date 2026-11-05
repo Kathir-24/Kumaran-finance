@@ -56,13 +56,15 @@ export default function DefaultersRegisterPage() {
   });
 
   // 2. Fetch Chit Schemes for Filter
-  const { data: schemes = [] } = useQuery({
+  const { data: schemes = [] } = useQuery<Array<{ id: string; groupCode: string; groupName: string }>>({
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
-      const res = await unwrapApiResponse<Array<{ id: string; groupCode: string; groupName: string }>>(
+      const res = await unwrapApiResponse<any>(
         apiClient.GET('/api/v1/chits')
       );
-      return res || [];
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.data)) return res.data;
+      return [];
     },
     enabled: hasAccess,
   });
