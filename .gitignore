@@ -40,6 +40,10 @@ infra/docker/nginx/ssl/live/*.pfx
 .agents/
 .agents/teamwork/
 
+# Playwright test artifacts
+test-results/
+playwright-report/
+
 # Experimental crawler & standalone probe scripts
 apps/api/scripts/verify-universal-endpoints-fuzzer.ts
 apps/api/test/run-live-adversarial-probes.mjs

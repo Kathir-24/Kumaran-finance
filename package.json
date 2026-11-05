@@ -38,7 +38,8 @@
     "web:build": "pnpm --filter web run build",
     "web:start": "pnpm --filter web run start",
     "web:lint": "pnpm --filter web run lint",
-    "web:typecheck": "pnpm --filter web run typecheck"
+    "web:typecheck": "pnpm --filter web run typecheck",
+    "test:web:e2e": "pnpm --filter web run test:e2e"
   },
   "keywords": [
     "chit-fund",

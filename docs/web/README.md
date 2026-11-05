@@ -22,7 +22,7 @@
 | **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md), [`staff-administration.md`](./staff-administration.md), [`background-jobs-admin.md`](./background-jobs-admin.md) | `/branches`, `/branches/new`, `/users`, `/users/new`, `/admin/jobs` | Super Admin | **COMPLETED** (Tasks 9.1, 9.2, 9.3 DONE) |
 | **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`form-xvii-minutes.md`](./form-xvii-minutes.md), [`form-xxi-and-defaulters.md`](./form-xxi-and-defaulters.md), [`audit-logs-report.md`](./audit-logs-report.md), [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/ledger`, `/reports/defaulters`, `/reports/audit-logs` | Super Admin, Accountant, Auditor, Branch Manager, Collection Agent | **COMPLETED** (Tasks 10.1–10.4 DONE) |
 | **Phase 11: Bilingual Print & Document Engine** | [`print-templates.md`](./print-templates.md) | `/print/receipt/[id]`, `/print/voucher/[id]` | Cashier, Accountant, Super Admin, Customer | **COMPLETED** (Task 11.1 DONE) |
-| **Phase 12: Playwright E2E Tests & Docker Packaging** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
+| **Phase 12: Playwright E2E Tests & Docker Packaging** | [`playwright-e2e-testing.md`](./playwright-e2e-testing.md), [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | In Progress (Task 12.1 DONE) |
 
 ---
 
@@ -66,6 +66,7 @@ docs/web/
 ├── form-xxi-and-defaulters.md          # Form XXI subscriber continuous ledger & ADR-07 defaulters register
 ├── audit-logs-report.md                # Immutable forensic audit trail viewer, diff inspection & CA auditor register
 ├── print-templates.md                  # Bilingual A5 counter receipt & prize payout voucher print templates (ADR-11)
+├── playwright-e2e-testing.md           # Playwright E2E testing architecture, 6-persona fixtures & smoke runner
 ├── statutory-reports-and-admin.md        # Consolidated Phase 10 statutory registers and CA Auditor portals
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
 ```
