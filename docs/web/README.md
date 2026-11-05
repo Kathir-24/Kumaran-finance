@@ -59,6 +59,7 @@ docs/web/
 ├── payment-reversals.md                  # Maker-Checker reversal requests & approvals
 ├── branch-management.md                  # Branch offices administration, HO anchor, and regional expansion
 ├── staff-administration.md               # Staff user onboarding, RBAC roles, dual-role support & password resets
-├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, background jobs
+├── background-jobs-admin.md              # BullMQ queue telemetry, repeatable IST cron schedules, triggers & audit logs
+├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, statutory registers
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
 ```
