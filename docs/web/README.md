@@ -16,7 +16,7 @@
 | **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*`, `/instructions` | All Office Staff | **COMPLETED** (Tasks 3.1, 3.2, 3.3 DONE) |
 | **4. Chit Schemes & Onboarding** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]`, `/schemes/onboard` | Super Admin, Accountant, Branch Manager | **COMPLETED** (Tasks 4.1, 4.2, 4.3, 4.4 DONE) |
 | **5. Customers & Passbook Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/new`, `/customers/[id]` | Super Admin, Branch Manager, Collection Agent | **COMPLETED** (Tasks 5.1, 5.2, 5.3 DONE) |
-| **6. In-Office Auction Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]` | Super Admin, Branch Manager, Auditor | **COMPLETED** (Tasks 6.1, 6.2, 6.3 DONE) |
+| **6. In-Office Auction Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
 | **7. Defaulter Substitution Desk** | [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/schemes/[id]/defaulters` | Super Admin, Partner, Accountant | **COMPLETED** (Task 6.4 DONE) |
 | **8. Prize Disbursements** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements` | Super Admin (Maker/Checker) | Planned |
 | **9. Collections & Handover** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | Planned |
