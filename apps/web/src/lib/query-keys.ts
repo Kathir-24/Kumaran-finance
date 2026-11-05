@@ -84,6 +84,10 @@ export const queryKeys = {
   },
   reports: {
     all: ['reports'] as const,
+    formXxii: (params?: { date?: string; branchId?: string }) =>
+      ['reports', 'form-xxii', params] as const,
+    dayBook: (params?: { date?: string; branchId?: string }) =>
+      ['reports', 'day-book', params] as const,
     cashBook: (date?: string) => ['reports', 'cash-book', date] as const,
     arrears: () => ['reports', 'arrears'] as const,
     formXvii: (chitGroupId: string, month: number) =>

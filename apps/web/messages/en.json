@@ -985,6 +985,8 @@
   },
   "reports": {
     "title": "Statutory Registers & Reports",
+    "subtitle": "Mandatory Tamil Nadu Chit Funds registers, daily cash books, and CA audit journals",
+    "hubDescription": "Official statutory records maintained under Tamil Nadu Chit Funds Rules and Kumaran Finance audit standards",
     "formXxii": "Form XXII Chit Cash Book (12-Column Daily Ledger)",
     "formXvii": "Form XVII Auction Minutes",
     "formXxi": "Form XXI Subscribers' Ledger",
@@ -995,7 +997,78 @@
     "closingBalance": "Closing Cash Vault Balance (₹)",
     "registrarDeadline": "Registrar 21-Day Filing Deadline",
     "receiptsSide": "Receipts (Collections)",
-    "paymentsSide": "Payments (Disbursements)"
+    "paymentsSide": "Payments (Disbursements)",
+    "cashBookTitle": "Form XXII: Daily Chit Cash Book",
+    "cashBookSubtitle": "Statutory daily ledger isolating physical currency notes and coins held in branch safe",
+    "dayBookTitle": "Financial Day Book",
+    "dayBookSubtitle": "Consolidated journal capturing all payment modes (Cash, UPI, Bank, Cheque)",
+    "viewRegister": "Open Register",
+    "allBranches": "All Branches (Consolidated)",
+    "filterBranch": "Filter by Branch",
+    "tabs": {
+      "formXxii": "Form XXII (Cash Safe)",
+      "dayBook": "Financial Day Book (All Modes)"
+    },
+    "kpi": {
+      "openingCash": "Opening Cash in Safe",
+      "todayInflows": "Today's Cash Inflows",
+      "todayOutflows": "Today's Cash Outflows",
+      "closingCash": "Closing Cash in Safe",
+      "vaultBalanced": "Vault Cash Mathematically Balanced",
+      "vaultDiscrepancy": "Safe Cash Discrepancy Detected",
+      "netCashFlow": "Net Cash Flow",
+      "totalTransactions": "Total Transactions"
+    },
+    "date": {
+      "label": "Select Date",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "prevDay": "Previous Day",
+      "nextDay": "Next Day"
+    },
+    "table": {
+      "receiptNo": "Receipt No",
+      "voucherNo": "Voucher No",
+      "time": "Time (IST)",
+      "customer": "Customer",
+      "customerCode": "Code",
+      "groupTicket": "Group / Ticket",
+      "amount": "Amount",
+      "source": "Collection Source",
+      "counterCash": "Counter Cash",
+      "fieldHandover": "Evening Handover",
+      "receivedBy": "Received By",
+      "winner": "Prize Winner",
+      "particulars": "Particulars / Month",
+      "paymentMethod": "Payment Method",
+      "transactionRef": "UTR / Cheque Ref",
+      "noInflows": "No cash receipts recorded for this date",
+      "noOutflows": "No prize cash disbursements recorded for this date",
+      "noTransactions": "No transactions recorded for this date",
+      "totalReceipts": "Total Receipts",
+      "totalDisbursements": "Total Disbursements",
+      "totalAmount": "Total Amount"
+    },
+    "dayBook": {
+      "methodBreakdown": "Inflow Breakdown by Payment Mode",
+      "cashInflow": "Physical Cash",
+      "upiInflow": "UPI (QR / Intent)",
+      "bankInflow": "Bank Transfer (NEFT/IMPS)",
+      "chequeInflow": "Cheques Received",
+      "allModes": "All Modes",
+      "collectedBy": "Collector / Cashier"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "print": "Print A4 Sheet",
+      "exporting": "Exporting...",
+      "filenameFormXxii": "Form_XXII_Cash_Book",
+      "filenameDayBook": "Financial_Day_Book"
+    },
+    "statutoryBannerTitle": "Form XXII Statutory Standard (Tamil Nadu Chit Funds Rules)",
+    "statutoryBannerDesc": "This cash book isolates physical vault currency. Doorstep collections are recognized in safe cash exclusively after evening handover is acknowledged.",
+    "accessDeniedTitle": "Access Restricted",
+    "accessDeniedDesc": "Only authorized office staff (Accountant, Super Admin, Branch Manager, or Auditor) can inspect statutory registers."
   },
   "rules": {
     "bannerTitle": "Governing Product Business Rule",
