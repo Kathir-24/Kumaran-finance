@@ -17,8 +17,8 @@
 Kumaran-finance/
 ├── apps/
 │   ├── api/                 # NestJS 12 Backend (Modular Monolith)
-│   ├── mobile/              # Flutter Android-first application (To be initialized)
-│   └── web/                 # React / Next.js Admin Dashboard (To be initialized)
+│   ├── mobile/              # Flutter Android-first application (In development)
+│   └── web/                 # Next.js 15 Web Operations Portal (Admin, Accountant, Partners, Auditor)
 ├── infra/
 │   ├── docker/              # Docker Compose (PostgreSQL 17)
 │   └── scripts/             # Database backup & restore automation scripts
@@ -73,19 +73,26 @@ pnpm run prisma:seed
 
 ---
 
-### Step 4: Verify Quality Gates & Start Development Server
+### Step 4: Verify Quality Gates & Start Development Servers
 ```powershell
-# Run Oxlint linter (0 errors, 0 warnings expected)
+# 1. Run Oxlint linter (0 errors, 0 warnings expected)
 pnpm run lint
 
-# Run all 26 unit test suites (367 / 367 passing tests, 100% pass expected)
+# 2. Run backend unit & integration tests (100% pass expected)
 pnpm test
-
-# Run all 10 end-to-end integration test suites (88 / 88 passing tests, total 455 / 455 passing tests)
 pnpm run test:e2e:fresh
 
-# Run NestJS in development watch mode
+# 3. Run frontend unit tests (100% pass expected, 97 tests)
+pnpm --filter web test
+
+# 4. Strict frontend typecheck
+pnpm web:typecheck
+
+# 5. Start NestJS Backend API in development watch mode (Terminal 1)
 pnpm run start:dev
+
+# 6. Start Next.js Web Operations Portal (Terminal 2)
+pnpm web:dev
 ```
 
 ---
@@ -96,6 +103,7 @@ Open your browser to test the built-in administrative & observability portals:
 
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
+| **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
 | **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 109 physical paths (115 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |

@@ -111,6 +111,15 @@ Once started, the terminal will confirm:
 - `📚 Swagger documentation at: http://localhost:3000/api/docs`
 - `📊 Bull Board Queue Monitor at: http://localhost:3000/admin/queues`
 
+### Step 5: Start Web Application Server
+```powershell
+# Start Next.js web portal in development mode
+pnpm web:dev
+```
+Once started, open your browser to:
+- `🌐 Kumaran Chits Web Portal: http://localhost:3001`
+- Login with Super Admin credentials: `9876543210` / `Admin@Kumaran2026`
+
 ---
 
 ## Interactive Web Dashboards & Verification
@@ -119,6 +128,7 @@ Open your browser and verify the built-in administrative & observability portals
 
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
+| **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
 | **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 105 physical paths (111 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
@@ -154,17 +164,22 @@ pnpm db:drp:drill
 Run the automated test suite verifying all 10 non-negotiable financial invariants:
 
 ```powershell
-# Run Oxlint linter (0 warnings, 0 errors expected)
+# 1. Run Oxlint linter (0 warnings, 0 errors expected)
 pnpm run lint
 
-# Run all 24 unit test suites (343 / 343 passing tests, 100% pass rate)
+# 2. Run backend unit & integration tests (100% pass rate)
 pnpm test
-
-# Run all 10 end-to-end integration test suites (82 / 82 passing tests, total 425 / 425 passing tests)
 pnpm test:e2e:fresh
 
-# Run production compilation check
+# 3. Run frontend unit tests (100% pass rate, 97 tests)
+pnpm --filter web test
+
+# 4. Strict frontend TypeScript typecheck
+pnpm web:typecheck
+
+# 5. Run production compilation check
 pnpm run build
+pnpm web:build
 ```
 
 ---
