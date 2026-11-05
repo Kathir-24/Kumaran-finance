@@ -13,7 +13,8 @@ export const queryKeys = {
   },
   branches: {
     all: ['branches'] as const,
-    list: () => ['branches', 'list'] as const,
+    list: (params?: { activeOnly?: boolean; search?: string }) =>
+      ['branches', 'list', params] as const,
     detail: (id: string) => ['branches', id] as const,
   },
   schemes: {
