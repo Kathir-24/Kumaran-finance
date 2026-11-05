@@ -3,15 +3,17 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office — Perundurai, Tamil Nadu)  
 > **Route Path**: `/collections`, `/handover`  
-> **Status**: **Task 8.1 (Counter Payment Collection & Immediate Net Due Matching) COMPLETED** (Commit verified, 176/176 passing tests, 0 TS errors, clean Next.js build)
+> **Status**: **Phase 8 (Tasks 8.1 & 8.2) COMPLETED & VERIFIED** (16/16 Phase 8 tests pass, 184/184 full web test suite pass, 0 TS errors, clean Next.js 15 build)
 
 ---
 
 ## 1. Overview & Business Reality
 
-At the Perundurai branch office counter, subscribers walk in daily to pay their monthly chit subscription installments. Desk accountants and cashiers record discrete payments, provide instant NPCI UPI QR codes for scanning, and issue official sequential bilingual receipts.
+At the Perundurai branch office counter, subscribers pay their monthly chit subscription installments both in person (cash, cheque, or scanning the dynamic counter UPI QR) and remotely through mobile UPI applications. Desk accountants and cashiers record discrete payments, verify self-reported bank credits against company bank statements, and issue official sequential bilingual receipts.
 
-### Key Operational Capabilities (Task 8.1)
+### Key Operational Capabilities
+
+#### A. Task 8.1: Counter Payment Collection & Immediate Net Due Matching
 1. **ADR-07 Single Discrete Payment Rule**:
    - Each installment month requires strictly a single discrete payment.
    - Payment amount must identically match the exact net installment due ($I_{net} = I_{base} - Div_{ticket}$).
@@ -33,71 +35,120 @@ At the Perundurai branch office counter, subscribers walk in daily to pay their 
    - Total cheques in clearance (₹ whole rupees).
    - Filterable by payment method (`ALL`, `CASH`, `UPI`, `CHEQUE`, `BANK_TRANSFER`) and payment status (`ALL`, `SUCCESS`, `INITIATED`, `REVERSED`).
 
+#### B. Task 8.2: Customer Self-Reported UPI Claims Verification Desk
+1. **Customer Mobile UPI Payment Claim**:
+   - Customers paying remotely via deep-link or counter QR self-report their Bank UTR number (`POST /api/v1/payments/upi-claim`).
+   - Initial claim recorded in `PaymentStatus.INITIATED` without issuing a receipt. Due remains `UNPAID` or `OVERDUE`.
+2. **Accounting Desk Verification Queue**:
+   - Accounting staff accesses the **UPI Claims Verification Desk** tab at `/collections`.
+   - Lists all pending claims from `GET /api/v1/payments/pending-upi-claims`.
+   - Displays Subscriber, Ticket #, Month #, Locked Rupee Amount, Bank UTR with one-click clipboard copy, and Submitter details.
+3. **Bank Statement Reconciliation & Receipt Generation**:
+   - Desk Accountant cross-references the reported Bank UTR against the office bank account statement (KVB NetBanking / corporate statement).
+   - Once credit is confirmed, clicks **"Verify Bank Credit"** opening `VerifyClaimDialog`.
+   - Enforces credit confirmation checkbox and optional verification notes (e.g. `"Verified in KVB NetBanking at 15:30"`).
+   - Calls `POST /api/v1/payments/:id/verify-upi-claim` $\to$ transitions payment to `SUCCESS`, settles due to `PAID`, generates sequential receipt, recalculates arrears, and writes an audit log.
+   - Automatically opens `BilingualReceiptModal` to view/print/download the receipt.
+4. **Guardrail 10 Maker $\ne$ Checker Hard Guard**:
+   - A user who submitted the UPI claim (`claim.submittedByUser.id === currentUser.id`) **CANNOT** verify the bank credit.
+   - UI disables the verify CTA with a dedicated `Maker Guard` badge, backed by database-level exception `MAKER_CHECKER_VIOLATION`.
+
 ---
 
-## 2. Invariant Architectural Guardrails Enforced
+## 2. Invariant Architectural Guardrails & State Machine
 
 ```mermaid
 flowchart TD
-    W["Walk-in Subscriber at Counter"] --> S["Select Chit Group & Month\nLookup Member Ticket"]
-    S --> L["Auto-Calculate & Lock Inet\nInet = Ibase - Div (BigInt)"]
-    L --> G1{"ADR-07 Match Guard\nAmount === Inet?"}
-    G1 -- "No (Partial/Advance)" --> REJ["Strict Rejection: PARTIAL_PAYMENTS_NOT_ALLOWED\nMust identically match Inet"]
-    G1 -- "Yes (Exact Match)" --> M["Select Payment Method"]
-    M -->|CASH| C["Cash in Counter Drawer"]
-    M -->|UPI| U["Dynamic NPCI Vector SVG QR\nupi://pay?am=Inet&pa=kvb@kumaran..."]
-    M -->|CHEQUE/TRANSFER| T["Record Cheque # / Bank UTR"]
-    C & U & T --> API["POST /api/v1/payments\nBody: ticketId, month, amount, method, ref, idempotencyKey"]
-    API --> R["Atomic Success:\n1. Payment recorded (SUCCESS)\n2. Due status UNPAID -> PAID\n3. Receipt issued: KC-REC-PRD-YYYY-XXXXX\n4. Opens BilingualReceiptModal"]
-```
+    subgraph CounterDesk["Task 8.1: Counter Collections"]
+        W["Walk-in Subscriber at Counter"] --> S["Select Chit Group & Month\nLookup Member Ticket"]
+        S --> L["Auto-Calculate & Lock Inet\nInet = Ibase - Div (BigInt)"]
+        L --> G1{"ADR-07 Match Guard\nAmount === Inet?"}
+        G1 -- "No (Partial/Advance)" --> REJ["Strict Rejection: PARTIAL_PAYMENTS_NOT_ALLOWED"]
+        G1 -- "Yes (Exact Match)" --> M["Select Payment Method\n(CASH, UPI, CHEQUE, BANK_TRANSFER)"]
+        M --> POST1["POST /api/v1/payments"]
+        POST1 --> R1["Atomic Result:\n1. Payment SUCCESS\n2. Due PAID\n3. Receipt KC-REC-PRD-YYYY-XXXXX"]
+    end
 
-1. **Guardrail 1: Single Company Tenancy**: Zero `company_id` columns, query parameters, or HTTP headers.
-2. **Guardrail 2: Pure Whole Rupee Math**: All monetary values are 64-bit integer Rupees (`bigint`). Decimal paise and floats (`3750.50`, `3750.00`) are strictly rejected.
-3. **Guardrail 8 / ADR-07: Single Discrete Payment Matching**: Strict equality $Amount == I_{net}$.
-4. **Idempotency Protection**: Client generates `idempotencyKey: crypto.randomUUID()` to prevent duplicate submissions over unreliable networks.
-5. **NPCI Dynamic UPI QR Intent**: Generates standard `upi://pay?pa=...&pn=...&am=...&cu=INR&tn=...` with locked whole-rupee amount and merchant VPA (`kvb@kumaran`), rendered offline as a vector SVG via `qrcode`.
-6. **100% Bilingual Parity**: All receipts, UI labels, and modals have identical English and Tamil (`தமிழ்`) key coverage.
+    subgraph ClaimsDesk["Task 8.2: Customer UPI Claims Desk"]
+        MOB["Mobile Customer / Agent Submits UTR\nPOST /api/v1/payments/upi-claim"] --> PEND["Payment INITIATED\nDue UNPAID\nNo Receipt Issued"]
+        PEND --> QUEUE["GET /api/v1/payments/pending-upi-claims"]
+        QUEUE --> ACCT["Desk Accountant Matches Bank Statement\n(KVB NetBanking Credit)"]
+        ACCT --> G2{"Guardrail 10\nmaker != checker?"}
+        G2 -- "Same User (Self-Verify)" --> BLK["Blocked: MAKER_CHECKER_VIOLATION"]
+        G2 -- "Different Staff" --> VMOD["VerifyClaimDialog\nConfirm UTR Credit"]
+        VMOD --> POST2["POST /api/v1/payments/:id/verify-upi-claim"]
+        POST2 --> R2["Atomic Result:\n1. Payment SUCCESS\n2. Due PAID\n3. Receipt Issued\n4. AuditLog Created"]
+    end
+```
 
 ---
 
 ## 3. Modular File Architecture
 
-All files are strictly maintained $\le 300\text{--}350$ lines per **AGENTS.md Rule 4**:
+All files strictly comply with the $\le 300\text{--}350$ lines limit per **AGENTS.md Rule 4**:
 
 | File Path | Description | Line Count | Status |
 |---|---|:---:|:---:|
-| `apps/web/src/app/(dashboard)/collections/page.tsx` | Master counter collections desk route with 4 metrics & filters | 254 | **Complete** |
+| `apps/web/src/app/(dashboard)/collections/page.tsx` | Master collections route with dual-tab desk switcher & 4 metrics | 292 | **Complete** |
 | `apps/web/src/components/collections/payments-table.tsx` | Collections data table with method/status badges and receipt actions | 239 | **Complete** |
 | `apps/web/src/components/collections/counter-payment-modal.tsx` | Scheme & ticket lookup, ADR-07 locked amount, payment recording | 337 | **Complete** |
 | `apps/web/src/components/collections/counter-upi-qr.tsx` | Dynamic NPCI QR generator rendering offline vector SVG | 121 | **Complete** |
 | `apps/web/src/components/collections/bilingual-receipt-modal.tsx` | Printable bilingual receipt viewer and A5 PDF download | 263 | **Complete** |
-| `apps/web/src/lib/query-keys.ts` | React Query cache keys for payments (`list`, `detail`, `receipt`) | 108 | **Complete** |
-| `apps/web/test/counter-collections.spec.ts` | 8 automated invariant test suites | 326 | **Complete** |
+| `apps/web/src/components/collections/upi-claims-table.tsx` | Pending UPI claims queue with UTR copy and Maker!=Checker guard | 235 | **Complete** |
+| `apps/web/src/components/collections/verify-claim-dialog.tsx` | Bank statement credit confirmation modal with statement notes | 232 | **Complete** |
+| `apps/web/src/lib/query-keys.ts` | Centralized React Query cache keys for payments & claims | 108 | **Complete** |
+| `apps/web/test/counter-collections.spec.ts` | Task 8.1 invariant test suites | 326 | **Complete** |
+| `apps/web/test/upi-claims-verification.spec.ts` | Task 8.2 invariant test suites | 274 | **Complete** |
 
 ---
 
 ## 4. API Integration Endpoints
 
-- **`POST /api/v1/payments`**: Records discrete payment with `{ ticketId, installmentMonth, amount, paymentMethod, transactionRef, notes, idempotencyKey }`.
+- **`POST /api/v1/payments`**: Records discrete counter payment with `{ ticketId, installmentMonth, amount, paymentMethod, transactionRef, notes, idempotencyKey }`.
 - **`GET /api/v1/payments`**: Queries paginated ledger with filters (`paymentMethod`, `paymentStatus`, `limit`).
 - **`GET /api/v1/payments/:id/receipt`**: Returns structured bilingual receipt data (`BilingualReceiptResponseDto`).
 - **`GET /api/v1/pdf/receipt/:paymentId`**: Streams pixel-accurate A5 bilingual printable PDF.
 - **`GET /api/v1/installments/:dueId/upi-intent`**: Returns NPCI UPI deep-link URI with locked $I_{net}$ amount.
 - **`GET /api/v1/installments/group/:chitGroupId/month/:month`**: Returns member dues for selected scheme and month.
+- **`GET /api/v1/payments/pending-upi-claims`**: Lists all pending self-reported UPI claims in `INITIATED` status.
+- **`POST /api/v1/payments/:id/verify-upi-claim`**: Verifies bank statement credit, transitions payment to `SUCCESS`, and issues sequential receipt (`maker != checker`).
 
 ---
 
-## 5. Automated Verification & Test Proofs
+## 5. Automated Verification & Quality Gate Proofs
 
-- **Unit Test Suite**: `apps/web/test/counter-collections.spec.ts` asserts 8 non-negotiable invariants:
-  1. *ADR-07 Exact Match*: Rejects partial payments ($amount < I_{net}$) and overpayments ($amount > I_{net}$).
-  2. *Guardrail 2 Whole Rupee Math*: Rejects floating-point paise and fractional values.
-  3. *Due Status Transition*: `UNPAID` / `OVERDUE` $\to$ `PAID`.
-  4. *Sequential Receipt Numbering*: Format `KC-REC-PRD-2026-00045`.
-  5. *Payment Methods Enum*: `CASH`, `UPI`, `BANK_TRANSFER`, `CHEQUE`.
-  6. *NPCI Counter UPI Intent URI*: Valid format with locked whole rupees.
-  7. *Idempotency Protection*: Duplicate idempotency key returns existing payment without duplication.
-  8. *Bilingual Parity*: 100% dictionary match between `en.json` and `ta.json`.
-- **Full Web Test Suite**: `176/176` tests passing (100% pass rate).
-- **TypeScript Check**: `pnpm --filter web typecheck` (0 errors).
-- **Next.js 15 Build**: `pnpm --filter web build` (compiled and optimized cleanly).
+Phase 8 is validated by **two dedicated automated test suites asserting 16 non-negotiable financial and security invariants**:
+
+### A. Task 8.1 Tests (`apps/web/test/counter-collections.spec.ts`)
+```text
+▶ Task 8.1: Counter Payment Collection & Immediate Net Due Matching Unit Tests
+  ✔ ADR-07 Exact Match: Accepts exact Inet and strictly rejects partial or advance amounts
+  ✔ Guardrail 2 Whole Rupee Math: Rejects floating-point paise and fractional values
+  ✔ Due Status Transition: Transitions UNPAID and OVERDUE dues strictly to PAID
+  ✔ Sequential Receipt Numbering: Generates standard format with 5-digit padding
+  ✔ Payment Methods: Enforces allowed 4 payment methods and rejects unsupported ones
+  ✔ NPCI Counter UPI Intent: Generates valid UPI deep-link URI with locked whole rupee amount
+  ✔ Idempotency Protection: Re-submitting with identical idempotencyKey returns existing receipt
+  ✔ Bilingual Parity: All collections keys match 100% between en.json and ta.json
+✔ Task 8.1: Counter Payment Collection & Immediate Net Due Matching Unit Tests (8/8 pass)
+```
+
+### B. Task 8.2 Tests (`apps/web/test/upi-claims-verification.spec.ts`)
+```text
+▶ Task 8.2: Customer Self-Reported UPI Claims Verification Desk Unit Tests
+  ✔ Guardrail 10: Rejects self-verification when checkerUserId === recordedByUserId
+  ✔ RBAC Authority: Restricts verification strictly to Super Admin, Branch Manager, and Accountant
+  ✔ Payment State Transition: Transitions payment strictly from INITIATED to SUCCESS
+  ✔ Due Settlement: Marks due PAID with exact net amount upon claim verification
+  ✔ Sequential Receipt: Issues collision-proof receipt KC-REC-{BRANCH}-{YYYY}-{XXXXX}
+  ✔ Arrears Recalculation: Decrements consecutive unpaid arrears and updates ticket status
+  ✔ Bank UTR Validation: Enforces 6 to 35 alphanumeric characters and prevents duplicate claim submission
+  ✔ Bilingual Parity: All collections keys match 100% between en.json and ta.json
+✔ Task 8.2: Customer Self-Reported UPI Claims Verification Desk Unit Tests (8/8 pass)
+```
+
+### C. Workspace Health
+- **Total Tests**: **184 / 184 tests passing** (`pnpm --filter web test`).
+- **Static Typecheck**: `tsc --noEmit` exited with **0 errors**.
+- **Production Build**: `next build` compiled all 16 routes cleanly.
+- **Bilingual Dictionary Parity**: 100% bidirectional parity across all `collections` keys.
