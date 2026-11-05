@@ -108,4 +108,11 @@ export const queryKeys = {
     pendingUpiClaims: (branchId?: string) =>
       ['payments', 'pending-upi-claims', { branchId }] as const,
   },
+  reversals: {
+    all: ['reversals'] as const,
+    pending: (branchId?: string) =>
+      branchId ? (['reversals', 'pending', { branchId }] as const) : (['reversals', 'pending'] as const),
+    history: (params?: { page?: number; limit?: number }) =>
+      params ? (['reversals', 'history', params] as const) : (['reversals', 'history'] as const),
+  },
 } as const;

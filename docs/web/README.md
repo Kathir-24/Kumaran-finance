@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Phase 8 (Tasks 8.1, 8.2, 8.3) Complete & Verified** (192/192 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
+> **Status**: **Phase 8 (Tasks 8.1–8.4) Complete & Verified** (200/200 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
 
 ---
 
@@ -18,9 +18,9 @@
 | **Phase 5: Customers & Passbook Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/new`, `/customers/[id]` | Super Admin, Branch Manager, Collection Agent | **COMPLETED** (Tasks 5.1, 5.2, 5.3 DONE) |
 | **Phase 6: In-Office Auction Console & Defaulter Desk** | [`auctions-console.md`](./auctions-console.md), [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
 | **Phase 7: Prize Disbursements & Safety Proof** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
-| **Phase 8: Collections, Handover & Receipts** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/collections/handover` | Cashier, Field Agent, Partner | **Tasks 8.1, 8.2, 8.3 COMPLETED** (Task 8.4 Planned) |
-| **Phase 9: Payment Reversals** | [`payment-reversals.md`](./payment-reversals.md) | `/reversals` | Accountant (Maker), Partner (Checker) | Planned |
-| **Phase 10: Statutory Reports & Admin** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/users`, `/branches` | CA Auditor, Super Admin | Planned |
+| **Phase 8: Collections, Handover & Reversals** | [`collections-and-handover.md`](./collections-and-handover.md), [`payment-reversals.md`](./payment-reversals.md) | `/collections`, `/collections/handover`, `/reversals` | Cashier, Field Agent, Partner | **COMPLETED** (Tasks 8.1–8.4 DONE) |
+| **Phase 9: Staff Administration, Branches & Operations** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/branches`, `/users`, `/branches/new` | Super Admin | Planned |
+| **Phase 10: Statutory Reports & CA Auditor Portal** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/form-xxii` | CA Auditor, Super Admin | Planned |
 | **Phase 11: Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
 
 ---
