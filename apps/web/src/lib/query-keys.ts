@@ -43,6 +43,7 @@ export const queryKeys = {
     detail: (auctionId: string) => ['auctions', auctionId] as const,
     eligibleBidders: (id: string, month?: number) =>
       ['auctions', id, 'eligible-bidders', { month }] as const,
+    minutes: (auctionId: string) => ['auctions', auctionId, 'minutes'] as const,
   },
   disbursements: {
     all: ['disbursements'] as const,
