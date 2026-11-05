@@ -87,4 +87,23 @@ export const queryKeys = {
     agentSummary: (agentId?: string) => ['collections', 'agent-summary', { agentId }] as const,
     unacknowledged: () => ['collections', 'unacknowledged'] as const,
   },
+  payments: {
+    all: ['payments'] as const,
+    list: (params?: {
+      ticketId?: string;
+      customerId?: string;
+      chitGroupId?: string;
+      paymentMethod?: string;
+      paymentStatus?: string;
+      fromDate?: string;
+      toDate?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      params ? (['payments', 'list', params] as const) : (['payments', 'list'] as const),
+    detail: (id: string) => ['payments', id] as const,
+    receipt: (id: string) => ['payments', id, 'receipt'] as const,
+    pendingUpiClaims: (branchId?: string) =>
+      ['payments', 'pending-upi-claims', { branchId }] as const,
+  },
 } as const;

@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Phase 7 (Tasks 7.1 & 7.2) 100% Complete & Verified** (168/168 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
+> **Status**: **Phase 8 (Task 8.1) Counter Collections Desk Complete & Verified** (176/176 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
 
 ---
 
@@ -19,7 +19,7 @@
 | **6. In-Office Auction Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
 | **7. Defaulter Substitution Desk** | [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/schemes/[id]/defaulters` | Super Admin, Partner, Accountant | **COMPLETED** (Task 6.4 DONE) |
 | **8. Prize Disbursements** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
-| **9. Collections & Handover** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | Planned |
+| **9. Collections & Handover** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | **Task 8.1 COMPLETED** (Task 8.2 In Progress) |
 | **10. Payment Reversals** | [`payment-reversals.md`](./payment-reversals.md) | `/reversals` | Accountant (Maker), Partner (Checker) | Planned |
 | **11. Statutory Reports & Admin** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/users`, `/branches` | CA Auditor, Super Admin | Planned |
 | **12. Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
@@ -55,8 +55,8 @@ docs/web/
 ├── customers-and-kyc.md                  # Customer directory, intake wizard, Form XXI passbook, 15-min S3 KYC scans
 ├── auctions-console.md                   # In-office auction console, 1/4 ceiling math, Option A tie-break, Maker-Checker finalization
 ├── defaulter-substitution-desk.md        # Defaulter substitution, 3-month removal desk & 4% damages exit settlement
-├── prize-disbursements.md                # (Upcoming) Safety proof checklist, dual-control prize vouchers
-├── collections-and-handover.md           # (Upcoming) Counter collections, single discrete dues, cash handover
+├── prize-disbursements.md                # Safety proof checklist, dual-control prize vouchers, final settlement
+├── collections-and-handover.md           # Counter collections, ADR-07 discrete single due, dynamic UPI QR, receipts
 ├── payment-reversals.md                  # (Upcoming) Maker-Checker reversal requests & approvals
 ├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, staff user admin
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
