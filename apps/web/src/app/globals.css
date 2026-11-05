@@ -31,3 +31,27 @@ body {
 [lang="ta"] body {
   font-family: var(--font-tamil), var(--font-inter), system-ui, sans-serif;
 }
+
+@media print {
+  @page {
+    size: A5 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .print\:hidden,
+  nav,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

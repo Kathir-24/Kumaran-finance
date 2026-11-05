@@ -21,7 +21,8 @@
 | **Phase 8: Collections, Handover & Reversals** | [`collections-and-handover.md`](./collections-and-handover.md), [`payment-reversals.md`](./payment-reversals.md) | `/collections`, `/collections/handover`, `/reversals` | Cashier, Field Agent, Partner | **COMPLETED** (Tasks 8.1–8.4 DONE) |
 | **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md), [`staff-administration.md`](./staff-administration.md), [`background-jobs-admin.md`](./background-jobs-admin.md) | `/branches`, `/branches/new`, `/users`, `/users/new`, `/admin/jobs` | Super Admin | **COMPLETED** (Tasks 9.1, 9.2, 9.3 DONE) |
 | **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`form-xvii-minutes.md`](./form-xvii-minutes.md), [`form-xxi-and-defaulters.md`](./form-xxi-and-defaulters.md), [`audit-logs-report.md`](./audit-logs-report.md), [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/ledger`, `/reports/defaulters`, `/reports/audit-logs` | Super Admin, Accountant, Auditor, Branch Manager, Collection Agent | **COMPLETED** (Tasks 10.1–10.4 DONE) |
-| **Phase 11: Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
+| **Phase 11: Bilingual Print & Document Engine** | [`print-templates.md`](./print-templates.md) | `/print/receipt/[id]`, `/print/voucher/[id]` | Cashier, Accountant, Super Admin, Customer | **COMPLETED** (Task 11.1 DONE) |
+| **Phase 12: Playwright E2E Tests & Docker Packaging** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
 
 ---
 
@@ -64,6 +65,7 @@ docs/web/
 ├── form-xvii-minutes.md                # Form XVII auction minutes, 21-day filing countdown & Registrar filing portal
 ├── form-xxi-and-defaulters.md          # Form XXI subscriber continuous ledger & ADR-07 defaulters register
 ├── audit-logs-report.md                # Immutable forensic audit trail viewer, diff inspection & CA auditor register
+├── print-templates.md                  # Bilingual A5 counter receipt & prize payout voucher print templates (ADR-11)
 ├── statutory-reports-and-admin.md        # Consolidated Phase 10 statutory registers and CA Auditor portals
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
 ```
