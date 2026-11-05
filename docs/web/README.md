@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Foundation & Authentication 100% Complete & Verified** (42/42 passing unit tests, 0 TypeScript errors, clean production build)
+> **Status**: **Phase 6 (Tasks 6.1–6.3) 100% Complete & Verified** (144/144 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
 
 ---
 
@@ -15,9 +15,9 @@
 | **2. Authentication & Identity** | [`authentication-and-identity.md`](./authentication-and-identity.md) | `/login`, `/2fa`, Modals | Super Admin, Accountant, Auditor | **COMPLETED** |
 | **3. Dashboard Shell & RBAC** | [`dashboard-shell-and-rbac.md`](./dashboard-shell-and-rbac.md) | `/`, `(dashboard)/*`, `/instructions` | All Office Staff | **COMPLETED** (Tasks 3.1, 3.2, 3.3 DONE) |
 | **4. Chit Schemes & Onboarding** | [`chit-schemes-management.md`](./chit-schemes-management.md) | `/schemes`, `/schemes/new`, `/schemes/[id]`, `/schemes/onboard` | Super Admin, Accountant, Branch Manager | **COMPLETED** (Tasks 4.1, 4.2, 4.3, 4.4 DONE) |
-| **5. Notebook Onboarding Grid** | [`notebook-onboarding-grid.md`](./notebook-onboarding-grid.md) | `/onboard`, `/onboard/[groupId]` | Desk Accountant, Super Admin | Planned |
-| **6. Customers & KYC Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/[id]` | Accountant, Super Admin | Planned |
-| **7. Live Auctions Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[groupId]` | Super Admin, Foreman | Planned |
+| **5. Customers & Passbook Directory** | [`customers-and-kyc.md`](./customers-and-kyc.md) | `/customers`, `/customers/new`, `/customers/[id]` | Super Admin, Branch Manager, Collection Agent | **COMPLETED** (Tasks 5.1, 5.2, 5.3 DONE) |
+| **6. In-Office Auction Console** | [`auctions-console.md`](./auctions-console.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]` | Super Admin, Branch Manager, Auditor | **COMPLETED** (Tasks 6.1, 6.2, 6.3 DONE) |
+| **7. Defaulter Substitution Desk** | [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/schemes/[id]/defaulters` | Super Admin, Partner | Planned |
 | **8. Prize Disbursements** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements` | Super Admin (Maker/Checker) | Planned |
 | **9. Collections & Handover** | [`collections-and-handover.md`](./collections-and-handover.md) | `/collections`, `/handover` | Cashier, Field Agent, Partner | Planned |
 | **10. Payment Reversals** | [`payment-reversals.md`](./payment-reversals.md) | `/reversals` | Accountant (Maker), Partner (Checker) | Planned |
@@ -52,9 +52,9 @@ docs/web/
 ├── authentication-and-identity.md        # Phone+Password login, RFC 6238 TOTP, 20-min inactivity guardian, modals
 ├── dashboard-shell-and-rbac.md           # App shell, dynamic RBAC sidebar, topbar, branch context, SSE stream
 ├── chit-schemes-management.md            # Scheme wizard, 4% commission lock, mid-cycle onboarding grid, monthly dues tracker
-├── notebook-onboarding-grid.md           # (Upcoming) Physical paper notebook transcription grid
-├── customers-and-kyc.md                  # (Upcoming) Customer directory, ADR-13 ticket limit, S3 KYC scans
-├── auctions-console.md                   # (Upcoming) 25% ceiling discount, Option A paper token draw
+├── customers-and-kyc.md                  # Customer directory, intake wizard, Form XXI passbook, 15-min S3 KYC scans
+├── auctions-console.md                   # In-office auction console, 1/4 ceiling math, Option A tie-break, Maker-Checker finalization
+├── defaulter-substitution-desk.md        # (Upcoming) Defaulter substitution & 3-month removal desk
 ├── prize-disbursements.md                # (Upcoming) Safety proof checklist, dual-control prize vouchers
 ├── collections-and-handover.md           # (Upcoming) Counter collections, single discrete dues, cash handover
 ├── payment-reversals.md                  # (Upcoming) Maker-Checker reversal requests & approvals
