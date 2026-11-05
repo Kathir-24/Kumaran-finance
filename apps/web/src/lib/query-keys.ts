@@ -99,6 +99,17 @@ export const queryKeys = {
           ? (['reports', 'form-xvii', { chitGroupId: params, month }] as const)
           : (['reports', 'form-xvii', { chitGroupId: params }] as const)
         : (['reports', 'form-xvii', params] as const),
+    formXxi: (params: { chitGroupId: string; ticketNumber?: number } | string) =>
+      typeof params === 'string'
+        ? (['reports', 'form-xxi', { chitGroupId: params }] as const)
+        : (['reports', 'form-xxi', params] as const),
+    defaulters: (params?: {
+      chitGroupId?: string;
+      minArrearsMonths?: number;
+      branchId?: string;
+      page?: number;
+      limit?: number;
+    }) => ['reports', 'defaulters', params] as const,
   },
   customers: {
     all: ['customers'] as const,

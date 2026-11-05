@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpen,
   Calendar,
@@ -73,9 +74,18 @@ export default function ReportsHubPage() {
       description: 'Continuous 20-month schedule of base dues, dividend credits, payments & arrears',
       href: '/reports/ledger',
       icon: BookOpen,
-      badgeText: 'Task 10.3',
-      badgeColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+      badgeText: 'Active',
+      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       tag: 'Subscriber Passbooks',
+    },
+    {
+      title: 'Defaulters & Arrears Register',
+      description: 'Arrears aging analysis, recovery tracking, and ADR-07 3-month removal candidates',
+      href: '/reports/defaulters',
+      icon: AlertTriangle,
+      badgeText: 'Active',
+      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      tag: 'Risk & Recovery',
     },
     {
       title: t('auditLogs'),
