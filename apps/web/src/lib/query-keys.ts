@@ -60,7 +60,8 @@ export const queryKeys = {
   },
   customers: {
     all: ['customers'] as const,
-    list: (query?: string) => ['customers', { query }] as const,
+    list: (params?: string | { search?: string; page?: number; limit?: number; isKycVerified?: string }) =>
+      ['customers', 'list', typeof params === 'string' ? { search: params } : params] as const,
     detail: (id: string) => ['customers', id] as const,
   },
   collections: {

@@ -139,6 +139,7 @@ export class CustomerService {
       const search = query.search.trim();
       where.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },
+        { fullNameTamil: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search } },
         { customerCode: { contains: search, mode: 'insensitive' } },
       ];
