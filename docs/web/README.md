@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Phase 9 Task 9.1 Complete & Verified** (208/208 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
+> **Status**: **Phase 9 Tasks 9.1 & 9.2 Complete & Verified** (216/216 passing unit tests, 0 TypeScript errors, clean Next.js 15 production build)
 
 ---
 
@@ -19,7 +19,7 @@
 | **Phase 6: In-Office Auction Console & Defaulter Desk** | [`auctions-console.md`](./auctions-console.md), [`defaulter-substitution-desk.md`](./defaulter-substitution-desk.md) | `/auctions`, `/auctions/[id]/live`, `/auctions/[id]`, `/schemes/[id]/defaulters` | Super Admin, Branch Manager, Auditor, Accountant | **COMPLETED** (Tasks 6.1–6.4 DONE) |
 | **Phase 7: Prize Disbursements & Safety Proof** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
 | **Phase 8: Collections, Handover & Reversals** | [`collections-and-handover.md`](./collections-and-handover.md), [`payment-reversals.md`](./payment-reversals.md) | `/collections`, `/collections/handover`, `/reversals` | Cashier, Field Agent, Partner | **COMPLETED** (Tasks 8.1–8.4 DONE) |
-| **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md) | `/branches`, `/branches/new`, `/users`, `/admin/jobs` | Super Admin | **IN PROGRESS** (Task 9.1 DONE) |
+| **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md), [`staff-administration.md`](./staff-administration.md) | `/branches`, `/branches/new`, `/users`, `/users/new`, `/admin/jobs` | Super Admin | **IN PROGRESS** (Tasks 9.1 & 9.2 DONE) |
 | **Phase 10: Statutory Reports & CA Auditor Portal** | [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/form-xxii` | CA Auditor, Super Admin | Planned |
 | **Phase 11: Production PWA & E2E** | [`production-pwa-and-e2e.md`](./production-pwa-and-e2e.md) | Full Application | All Personas | Planned |
 
@@ -58,6 +58,7 @@ docs/web/
 ├── collections-and-handover.md           # Counter collections, ADR-07 discrete single due, dynamic UPI QR, receipts
 ├── payment-reversals.md                  # Maker-Checker reversal requests & approvals
 ├── branch-management.md                  # Branch offices administration, HO anchor, and regional expansion
-├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, staff user admin
+├── staff-administration.md               # Staff user onboarding, RBAC roles, dual-role support & password resets
+├── statutory-reports-and-admin.md        # (Upcoming) Form XVII countdown, CA Auditor portal, background jobs
 └── production-pwa-and-e2e.md             # (Upcoming) End-to-end multi-role journeys & PWA offline manifest
 ```

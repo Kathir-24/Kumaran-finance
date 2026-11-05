@@ -17,6 +17,18 @@ export const queryKeys = {
       ['branches', 'list', params] as const,
     detail: (id: string) => ['branches', id] as const,
   },
+  users: {
+    all: ['users'] as const,
+    list: (params?: {
+      search?: string;
+      role?: string;
+      branchId?: string;
+      isActive?: string;
+      page?: number;
+      limit?: number;
+    }) => ['users', 'list', params] as const,
+    detail: (id: string) => ['users', id] as const,
+  },
   schemes: {
     all: ['schemes'] as const,
     list: (params?: { status?: string; search?: string; page?: number; limit?: number }) =>
