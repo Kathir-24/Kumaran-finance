@@ -23,6 +23,7 @@
     "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f",
     "docker:fullstack:up": "docker compose -f infra/docker/docker-compose.fullstack.yml up -d --build",
     "docker:fullstack:down": "docker compose -f infra/docker/docker-compose.fullstack.yml down",
+    "docker:web:build": "docker build -f apps/web/Dockerfile -t chitflow-web .",
     "db:backup:s3": "pnpm --filter api exec ts-node scripts/backup-to-s3.ts",
     "db:restore:s3": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts",
     "db:backups:list": "pnpm --filter api exec ts-node scripts/restore-from-s3.ts --list",

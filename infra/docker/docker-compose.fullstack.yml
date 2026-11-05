@@ -1,6 +1,7 @@
 # ==============================================================================
 # Kumaran Chits — Production-Parity Full-Stack Docker Compose Orchestration
-# Services: PostgreSQL 17, Redis 7, MinIO (S3), MinIO Init, NestJS 12 API
+# Services: PostgreSQL 17, Redis 7, MinIO (S3), NestJS 12 API, Next.js 15 Web, Nginx Ingress, Backup Cron
+# Company: Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu)
 # ==============================================================================
 
 services:
@@ -82,12 +83,30 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
 
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    container_name: chitflow-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      NEXT_PUBLIC_BULL_BOARD_URL: ${NEXT_PUBLIC_BULL_BOARD_URL:-http://localhost:3000/admin/queues}
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3001}:3001"
+
   nginx:
     image: nginx:1.27-alpine
     container_name: chitflow-nginx
     restart: unless-stopped
     depends_on:
       - api
+      - web
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
       - "${NGINX_HTTPS_PORT:-443}:443"

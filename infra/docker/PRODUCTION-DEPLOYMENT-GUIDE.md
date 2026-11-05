@@ -16,7 +16,9 @@ flowchart TD
     Client["Clients\n(Web Admin Portal / Mobile App)"] -->|HTTPS :443\nHTTP :80 Redirect| Nginx["Nginx 1.27 Ingress\n(TLS 1.3 + SSE Zero-Buffer Reverse Proxy)"]
 
     subgraph Internal Docker Network
-        Nginx -->|Proxy HTTP/1.1| API["NestJS 12 Backend API\n(chitflow-api :3000)"]
+        Nginx -->|Proxy / & /_next/| Web["Next.js 15 Web Portal\n(chitflow-web :3001)\nNode 22 Standalone"]
+        Nginx -->|Proxy /api/ & SSE| API["NestJS 12 Backend API\n(chitflow-api :3000)"]
+        Web -->|Server-Side API Calls| API
         API --> DB[("PostgreSQL 17\n(chitflow-db :5432)")]
         API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)")]
         API --> S3[("MinIO / AWS S3\n(chitflow-minio :9000)")]
@@ -29,6 +31,7 @@ flowchart TD
 | Container | Service Name | Internal Port | Host Port | Purpose |
 |---|---|---|---|---|
 | `chitflow-nginx` | `nginx` | `80`, `443` | `80`, `443` | Ingress reverse proxy, TLS termination, SSE unbuffered streaming |
+| `chitflow-web` | `web` | `3001` | `127.0.0.1:3001` | Next.js 15 operations dashboard (Node 22 Alpine standalone ~100MB) |
 | `chitflow-api` | `api` | `3000` | `127.0.0.1:3000` | NestJS 12 backend modular monolith |
 | `chitflow-db` | `db` | `5432` | `127.0.0.1:5433` | PostgreSQL 17 database (Sole source of financial truth) |
 | `chitflow-redis` | `redis` | `6379` | `127.0.0.1:6379` | Redis 7 queue broker for BullMQ background workers |
