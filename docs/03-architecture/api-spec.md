@@ -177,9 +177,9 @@
 | `GET`  | `/reports/dashboard` | Executive KPI dashboard & vault metrics | Staff, Auditor |
 | `GET`  | `/reports/pending-approvals` | Aggregated Maker-Checker pending approvals queue | Staff, Auditor |
 | `GET`  | `/reports/approvals-stream` | Real-time Server-Sent Events (SSE) stream for live pending approval counts | Staff, Auditor |
-| `GET`  | `/reports/day-book` | Daily collection & disbursement journal | Staff, Auditor |
-| `GET`  | `/reports/form-xxii` | Form XXII: Cash Book (Physical Cash Only; `UNVERIFIED-LEGAL`) | Staff, Auditor |
-| `GET`  | `/reports/form-xvii` | Form XVII: Auction Minutes Consolidated Register (`UNVERIFIED-LEGAL`) | Staff, Auditor |
+| `GET`  | `/reports/day-book` | Daily collection & disbursement journal (HTTP 304 ETag cached for past closed dates) | Staff, Auditor |
+| `GET`  | `/reports/form-xxii` | Form XXII: Cash Book (Physical Cash Only; HTTP 304 ETag cached; `UNVERIFIED-LEGAL`) | Staff, Auditor |
+| `GET`  | `/reports/form-xvii` | Form XVII: Auction Minutes Consolidated Register (HTTP 304 ETag cached; `UNVERIFIED-LEGAL`) | Staff, Auditor |
 | `GET`  | `/reports/form-xxi` | Form XXI: Subscriber Ledger Register (`UNVERIFIED-LEGAL`) | Staff, Customer, Auditor |
 | `GET`  | `/reports/defaulters` | Overdue members with 1M, 2M, 3M aging buckets | Staff, Auditor |
 | `GET`  | `/reports/audit-logs` | Immutable audit trail of dual-control actions | Staff, Customer, Auditor |

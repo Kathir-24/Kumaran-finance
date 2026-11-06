@@ -5,6 +5,7 @@ import {
   Query,
   Sse,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -23,6 +24,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { ReportEtagInterceptor } from '../common/interceptors/report-etag.interceptor';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
 import { QueryDashboardDto } from './dto/query-dashboard.dto';
@@ -126,6 +128,7 @@ export class ReportController {
   }
 
   @Get('day-book')
+  @UseInterceptors(ReportEtagInterceptor)
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Day Book: Daily Collection & Disbursement Journal',
@@ -141,6 +144,7 @@ export class ReportController {
   }
 
   @Get('form-xxii')
+  @UseInterceptors(ReportEtagInterceptor)
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Form XXII: Cash Book Register (Physical Cash Only) [UNVERIFIED-LEGAL]',
@@ -156,6 +160,7 @@ export class ReportController {
   }
 
   @Get('form-xvii')
+  @UseInterceptors(ReportEtagInterceptor)
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Form XVII: Auction Minutes Consolidated Register [UNVERIFIED-LEGAL]',

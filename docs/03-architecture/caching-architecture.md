@@ -1,0 +1,182 @@
+# Kumaran Chits — Caching Architecture & Operational Specification
+
+> **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
+> **Target Audience**: AI Agents, Backend/Frontend Engineers, DevOps, Security Auditors  
+> **Mandatory Financial Invariant**: **PostgreSQL 17 is the sole source of financial truth.** Redis never stores authoritative financial ledger balances, member savings, or prized payout states. All caching is non-authoritative, time-bounded, and fail-open.
+
+---
+
+## 1. Executive Summary & 5-Tier Caching Topology
+
+Kumaran Chits employs a defense-in-depth, 5-tier caching hierarchy designed to maximize UI responsiveness and minimize database load while strictly upholding the Indian Chit Funds Act statutory compliance:
+
+```mermaid
+flowchart TD
+    subgraph TIER1 ["Tier 1: Edge & Ingress (Nginx Reverse Proxy)"]
+        N1["Next.js Static Chunks\n(/_next/static/*)\nCache-Control: public, max-age=31536000, immutable"]
+        N2["TLS Session Tickets\n(shared:SSL:10m)\nCache 40,000 handshakes for 24 hours"]
+        N3["Financial API Gateway\n(/api/v1/*)\nCache-Control: no-store, no-cache, must-revalidate\n(Strict HTTP Client Bypass)"]
+        N4["SSE Live Stream\n(/api/v1/reports/approvals-stream)\nproxy_cache off, proxy_buffering off"]
+    end
+
+    subgraph TIER2 ["Tier 2: Application Master Cache & OTP Vault (Redis 7)"]
+        R1["Master Reference Data\n• cache:master:branches:*\n• cache:master:schemes:*\nTTL: 1800s - 3600s + Atomic Eviction"]
+        R2["Presigned S3 Document URLs\n• url:presigned:<key>\nTTL: 600s (10 min) via MGET pipeline"]
+        R3["Distributed OTP & Security Vault\n• auth:otp:<phone> (TTL: 300s)\n• auth:otp:cooldown:<phone> (TTL: 60s)"]
+        R4["Distributed Rate-Limiting Sliding Windows\n• throttle:* (PTTL / Lua scripts)"]
+    end
+
+    subgraph TIER3 ["Tier 3: Relational Authority (PostgreSQL 17)"]
+        PG["Sole Financial Truth (Zero Redis/Memory Entity Caching)\n• Dues • Ledger Entries • Cash Safe\n• Auctions • Member Defaulters • Passbooks"]
+    end
+
+    subgraph TIER4 ["Tier 4: Web Workstation State (TanStack Query v5)"]
+        W1["staleTime: 60s (Tab-switch cache reuse)"]
+        W2["gcTime: 5m (Garbage collection)"]
+        W3["refetchOnWindowFocus: false (Cashier stability)"]
+        W4["mutations.retry: false (Zero duplicate ledger submissions)"]
+        W5["Deterministic queryKeys invalidation graph"]
+    end
+
+    subgraph TIER5 ["Tier 5: Mobile Field Agent Offline Cache (SQLite / Drift)"]
+        M1["cached_assigned_dues\n(Pre-cached morning route dues)"]
+        M2["offline_collections_queue\n(UUIDv4 Idempotency Key + Offline Cash Collections)"]
+        M3["Background Reconnection Auto-Sync Engine"]
+    end
+
+    TIER1 --> TIER2
+    TIER2 --> TIER3
+    TIER1 --> TIER4
+    TIER2 --> TIER5
+```
+
+---
+
+## 2. Master TTL & Cache Policy Inventory
+
+| Tier | Resource / Key Pattern | Engine / Header | TTL / Lifetime | Eviction Trigger | Failure Mode |
+|---|---|---|---|---|---|
+| **Tier 1: Edge** | Static Next.js Bundles (`/_next/static/*`) | `Cache-Control` | `31,536,000s` (1 year) | Immutable content hash | N/A |
+| **Tier 1: Edge** | TLS Session Handshakes | Nginx Shared Memory | `86,400s` (1 day) | LRU memory eviction | Full TLS handshake |
+| **Tier 1: Edge** | Financial APIs (`/api/v1/*`) | `Cache-Control` | `0s` (`no-store`) | Always bypassed | Direct upstream |
+| **Tier 1: Edge** | Live SSE Approval Stream | Nginx Buffering | `0s` (`off`) | Instant delivery | Live TCP stream |
+| **Tier 2: Redis** | Master Branch Directory (`cache:master:branches:*`) | Redis `String` (JSON) | `3,600s` (1 hour) | `POST /branches` or update | Fail-open to Postgres |
+| **Tier 2: Redis** | Master Scheme Catalog (`cache:master:schemes:*`) | Redis `String` (JSON) | `1,800s` (30 mins) | Scheme create/update/activate | Fail-open to Postgres |
+| **Tier 2: Redis** | Presigned S3 URLs (`url:presigned:<key>`) | Redis `String` | `600s` (10 mins) | `StorageService.deleteFile` | Generate fresh AWS URL |
+| **Tier 2: Redis** | Distributed SMS OTP (`auth:otp:<phone>`) | Redis `String` (JSON) | `300s` (5 mins) | Verified or 3 failed attempts | Lockout penalty |
+| **Tier 2: Redis** | SMS Request Cooldown (`auth:otp:cooldown:<phone>`) | Redis `String` | `60s` (1 min) | Natural expiration | Fallback in-memory map |
+| **Tier 2: Redis** | Rate Limiting Windows (`throttle:*`) | Redis Lua | Dynamic (60s–900s) | Natural window sliding | Memory fallback |
+| **Tier 2: HTTP** | Closed Historical Reports (`Day Book`, `Form XXII`) | HTTP `ETag` + `304` | Conditional | Content SHA-256 change | Full JSON serialization |
+| **Tier 4: Web** | Workstation Server State (TanStack Query) | Browser Memory | `staleTime: 60s` | `queryClient.invalidateQueries` | Fresh background fetch |
+| **Tier 5: Mobile** | Assigned Field Dues (`cached_assigned_dues`) | SQLite (Local) | Daily Field Round | Synchronized morning download | Offline inspection |
+| **Tier 5: Mobile** | Unsynced Collections (`offline_collections_queue`) | SQLite (Local) | Persistent | Network sync confirmation | Retries indefinitely |
+
+---
+
+## 3. Tier 2: Master Reference Data Caching Architecture
+
+### 3.1 Design Principles
+1. **Cache-Aside with Fail-Open Resilience**:
+   All Redis reads are wrapped in safety blocks. If the Redis server restarts, experiences network partition, or exceeds latency thresholds, the application logs a warning and queries PostgreSQL directly without throwing errors.
+2. **Atomic Invalidation on Mutations**:
+   Whenever administrative users execute write operations (e.g. creating a new branch, configuring a new chit scheme, or activating a chit group), all affected Redis cache keys are atomically evicted using Redis `DEL`.
+3. **BigInt & Decimal Safe Serialization**:
+   All monetary amounts and IDs are serialized into ISO-standard JSON strings with exact whole-rupee precision to prevent floating-point truncation.
+
+### 3.2 Key Naming Standard
+- `cache:master:branches:all` — Complete list of all branch offices.
+- `cache:master:branches:active` — Active branch offices only.
+- `cache:master:branch:<id>` — Single branch office detail.
+- `cache:master:schemes:all` — General chit scheme catalog.
+- `cache:master:scheme:<id>` — Chit scheme detail with configuration.
+
+---
+
+## 4. HTTP ETag & 304 Conditional Caching for Closed Reports
+
+Historical financial records (such as Day Books, Form XXII Cash Books, and Form XVII Auction Minutes for past closed dates) are legally immutable under the Indian Chit Funds Act once reconciled.
+
+### 4.1 Handshake Protocol
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser as Web Browser / Mobile App
+    participant Nginx as Nginx Reverse Proxy
+    participant NestJS as NestJS Report Controller
+    participant DB as PostgreSQL Database
+
+    Browser->>Nginx: GET /api/v1/reports/day-book?date=2026-10-15
+    Nginx->>NestJS: Forward Request
+    NestJS->>DB: Query immutable day book entries
+    DB-->>NestJS: Return records
+    NestJS->>NestJS: Compute SHA-256 ETag: W/"sha256-a1b2c3d4..."
+    NestJS-->>Browser: HTTP 200 OK (Payload + ETag: W/"sha256-a1b2c3d4...")
+
+    Note over Browser: User visits another tab and returns to 2026-10-15 report
+
+    Browser->>Nginx: GET /api/v1/reports/day-book?date=2026-10-15<br/>If-None-Match: W/"sha256-a1b2c3d4..."
+    Nginx->>NestJS: Forward Request with If-None-Match
+    NestJS->>NestJS: Hash matches incoming header!
+    NestJS-->>Browser: HTTP 304 Not Modified (0 bytes body)
+    Note over Browser: Browser reuses local memory cache immediately
+```
+
+---
+
+## 5. Tier 5: Mobile Offline SQLite & Idempotent Collection Queue
+
+Field collection agents collect subscription payments in rural areas with intermittent cellular reception around Perundurai and Erode.
+
+### 5.1 SQLite Local Database Schema
+
+```sql
+-- 1. Pre-cached assigned dues for the agent's morning route
+CREATE TABLE IF NOT EXISTS cached_assigned_dues (
+    due_id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    chit_group_id TEXT NOT NULL,
+    chit_group_code TEXT NOT NULL,
+    customer_id TEXT NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    route_name TEXT,
+    installment_month INTEGER NOT NULL,
+    due_amount INTEGER NOT NULL,       -- BigInt whole rupees
+    dividend_amount INTEGER NOT NULL,  -- BigInt whole rupees
+    net_payable INTEGER NOT NULL,      -- BigInt whole rupees
+    due_status TEXT NOT NULL,          -- UNPAID, PAID
+    due_date TEXT NOT NULL,
+    cached_at TEXT NOT NULL
+);
+
+-- 2. Offline collections queue awaiting server sync
+CREATE TABLE IF NOT EXISTS offline_collections_queue (
+    queue_id TEXT PRIMARY KEY,
+    due_id TEXT NOT NULL,
+    ticket_id TEXT NOT NULL,
+    amount_collected INTEGER NOT NULL,  -- BigInt whole rupees
+    payment_method TEXT NOT NULL,       -- CASH
+    collected_at TEXT NOT NULL,
+    idempotency_key TEXT UNIQUE NOT NULL, -- UUIDv4 generated at payment confirmation
+    receipt_number_provisional TEXT NOT NULL,
+    sync_status TEXT NOT NULL,          -- PENDING, SYNCING, FAILED, SYNCED
+    retry_count INTEGER DEFAULT 0,
+    last_error TEXT
+);
+```
+
+### 5.2 Idempotency & Conflict Resolution Invariants
+1. **UUIDv4 Idempotency Key**: Generated on the agent's Android device at the exact millisecond the customer hands over cash. It is never regenerated on retry.
+2. **Server Deduplication**: When connectivity restores and the sync engine posts the queued items to `/api/v1/collections`, the backend validates the `Idempotency-Key` header. If the transaction was already processed, the backend returns HTTP 200/409 with the existing receipt number, preventing duplicate collections.
+3. **Safe Queue Drainage**: An item is deleted from `offline_collections_queue` **only after** the server returns a successful HTTP confirmation.
+
+---
+
+## 6. Financial Non-Negotiables & Statutory Safety Rules
+
+1. **Zero Entity Caching of Financial Balances**:
+   Under ADR-01 and Chit Funds Act §22, dues, subscriber balances, auction winner payouts, and cash in safe must **never be cached in Redis or in-memory**. Every financial mutation or verification must execute directly against PostgreSQL 17 inside an ACID transaction (`SERIALIZABLE` or `READ COMMITTED` with row locks).
+2. **Maker $\ne$ Checker Isolation**:
+   Cached user roles or session claims must never bypass server-side database checks for Maker-Checker dual control (`maker_user_id !== checker_user_id`).
+3. **Fail-Open Policy for Master Data**:
+   If Redis goes offline, the system continues operating normally by falling back to PostgreSQL for branch and scheme reads.

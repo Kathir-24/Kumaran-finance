@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ChitStatus, InitializationMode, Prisma, Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -12,7 +14,10 @@ import {
   FOREMAN_COMMISSION_NUMERATOR,
   FOREMAN_COMMISSION_PERCENT,
   PERCENT_DENOMINATOR,
+  MASTER_CACHE_SCHEME_TTL_SECONDS,
+  MasterCacheKeys,
 } from '../common/constants';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateChitGroupDto } from './dto/create-chit-group.dto';
@@ -22,7 +27,30 @@ import { UpdateChitGroupDto } from './dto/update-chit-group.dto';
 
 @Injectable()
 export class ChitService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ChitService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
+  ) {}
+
+  /**
+   * Atomically invalidates scheme catalog and detail caches in Redis
+   */
+  private async invalidateSchemesCache(schemeId?: string): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const keys = [MasterCacheKeys.schemesAll];
+        if (schemeId) {
+          keys.push(MasterCacheKeys.schemeById(schemeId));
+        }
+        await redis.del(...keys);
+      } catch (err: any) {
+        this.logger.warn(`Failed to invalidate scheme cache: ${err.message}`);
+      }
+    }
+  }
 
   /**
    * Helper: validates whole-rupee math and returns calculated financial properties
@@ -81,7 +109,7 @@ export class ChitService {
 
     const math = this.calculateSchemeMath(dto.chitValue, dto.durationMonths);
 
-    return this.prisma.chitGroup.create({
+    const created = await this.prisma.chitGroup.create({
       data: {
         branchId,
         groupCode: dto.groupCode.trim(),
@@ -105,6 +133,9 @@ export class ChitService {
         branch: { select: { id: true, code: true, name: true } },
       },
     });
+
+    await this.invalidateSchemesCache(created.id);
+    return created;
   }
 
   /**
@@ -169,7 +200,7 @@ export class ChitService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const activated = await this.prisma.$transaction(async (tx) => {
       // 1. Create ChitGroup
       const chit = await tx.chitGroup.create({
         data: {
@@ -263,6 +294,9 @@ export class ChitService {
 
       return chit;
     });
+
+    await this.invalidateSchemesCache(activated.id);
+    return activated;
   }
 
   /**
@@ -366,7 +400,7 @@ export class ChitService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const activated = await this.prisma.$transaction(async (tx) => {
       // 2. Month 1 Rule for fresh chits
       if (chit.initMode === InitializationMode.NEW_GROUP) {
         // Month 1 has NO auction. Full pool is taken by Ticket #1 (Company representative)
@@ -411,7 +445,7 @@ export class ChitService {
       }
 
       // 3. Lock commission & activate
-      return tx.chitGroup.update({
+      const updatedChit = await tx.chitGroup.update({
         where: { id },
         data: {
           status: ChitStatus.ACTIVE,
@@ -422,13 +456,36 @@ export class ChitService {
           _count: { select: { tickets: true, auctions: true } },
         },
       });
+      return updatedChit;
     });
+
+    await this.invalidateSchemesCache(id);
+    return activated;
   }
 
   /**
-   * Search & list chit schemes with status filter and pagination
+   * Search & list chit schemes with status filter and pagination.
+   * Default catalog view cached in Redis for 30 minutes with fail-open safety.
    */
   async findAll(query: QueryChitDto) {
+    const isDefaultQuery =
+      (!query.status || (typeof query.status === 'string' && query.status.trim() === '')) &&
+      (!query.search || query.search.trim() === '') &&
+      (!query.page || Number(query.page) === 1) &&
+      (!query.limit || Number(query.limit) === 20);
+
+    const redis = this.redisProvider?.getClient();
+    if (isDefaultQuery && redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const cached = await redis.get(MasterCacheKeys.schemesAll);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Redis scheme cache read error: ${err.message}`);
+      }
+    }
+
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -461,13 +518,28 @@ export class ChitService {
       this.prisma.chitGroup.count({ where }),
     ]);
 
-    return {
+    const result = {
       data,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
     };
+
+    if (isDefaultQuery && redis && this.redisProvider?.getIsConnected()) {
+      try {
+        await redis.set(
+          MasterCacheKeys.schemesAll,
+          JSON.stringify(result),
+          'EX',
+          MASTER_CACHE_SCHEME_TTL_SECONDS,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Redis scheme cache write error: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -633,6 +705,7 @@ export class ChitService {
       },
     });
 
+    await this.invalidateSchemesCache(id);
     return updated;
   }
 

@@ -121,6 +121,7 @@ Every engineer and AI assistant contributing to `apps/api/` must strictly uphold
 7. **Evening Cash Handover Guard**: Strictly enforces `collector_user_id != acknowledger_user_id` when acknowledging physical field cash into the branch vault.
 8. **Hard Cash / Zero Cash Block**: Full cash receipts and prize payouts are supported at any rupee value without artificial software thresholds or blocks (`DisbursementMode.CASH`).
 9. **Lightweight Notebook Intake**: Customer intake mirrors physical notebooks—only Full Name, Phone, and Address are required (Aadhaar, PAN, and document scans are strictly optional).
+10. **PostgreSQL Sole Financial Truth & Caching Strategy**: Volatile financial ledgers and dues are never cached in Redis or in-memory. Master reference data (branches, schemes) are cached in Redis with atomic invalidation. Historical closed reports leverage HTTP 304 ETags ([`docs/03-architecture/caching-architecture.md`](../../docs/03-architecture/caching-architecture.md)).
 
 ---
 

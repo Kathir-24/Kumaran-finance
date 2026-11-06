@@ -99,6 +99,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Physical Notebook Onboarding SOP** | [`docs/07-operations/manual-onboarding-sop.md`](docs/07-operations/manual-onboarding-sop.md) |
 | **Troubleshooting & Diagnostics (N-Modes)**| [`docs/04-engineering/troubleshooting-guide.md`](docs/04-engineering/troubleshooting-guide.md) |
 | **Redis Architecture & Distributed OTP** | [`docs/03-architecture/redis-architecture.md`](docs/03-architecture/redis-architecture.md) |
+| **Caching Architecture & 5-Tier Strategy** | [`docs/03-architecture/caching-architecture.md`](docs/03-architecture/caching-architecture.md) |
 | **BullMQ Jobs & Background Queues** | [`docs/03-architecture/bullmq-architecture.md`](docs/03-architecture/bullmq-architecture.md) |
 | **Offline Sync & Resilience Architecture** | [`docs/03-architecture/offline-architecture.md`](docs/03-architecture/offline-architecture.md) |
 | **Push Notification & Mobile Alerts** | [`docs/03-architecture/push-notification-architecture.md`](docs/03-architecture/push-notification-architecture.md) |

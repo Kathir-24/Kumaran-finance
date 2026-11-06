@@ -6,6 +6,9 @@ import { QueryProvider } from '@/providers/query-provider';
 import { SessionInactivityGuard } from '@/components/security/session-inactivity-guard';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: 'Kumaran Chits — Kumaran Finance (Perundurai)',
   description: 'Official chit-fund operations platform for Kumaran Finance, Perundurai, Tamil Nadu',

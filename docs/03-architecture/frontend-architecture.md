@@ -159,6 +159,21 @@ apps/web/src/app/
 
 ---
 
+### 4.4 Server State Caching & SSR Route Dynamic Policies
+1. **Next.js 15 App Router Route Dynamic Configurations**:
+   - In [`apps/web/src/app/layout.tsx`](file:///u:/Kumaran-finance/apps/web/src/app/layout.tsx), root exports `export const dynamic = 'force-dynamic'` and `export const revalidate = 0`.
+   - Prevents static build-time caching of financial ledgers, ensuring live transactional state on every page load.
+2. **TanStack Query v5 Workstation Policies** ([`apps/web/src/providers/query-provider.tsx`](file:///u:/Kumaran-finance/apps/web/src/providers/query-provider.tsx)):
+   - `staleTime: 60 * 1000` (1 minute): In-flight tab navigation reuses fresh cache.
+   - `gcTime: 5 * 60 * 1000` (5 minutes): Inactive cache memory garbage-collected.
+   - `refetchOnWindowFocus: false`: Prevents disruptive refetches while desk accountants count cash or enter collections.
+   - `mutations: { retry: false }`: Strictly prohibits auto-retrying financial mutations to prevent duplicate ledger postings.
+3. **Deterministic Cache Key Factory** ([`apps/web/src/lib/query-keys.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/query-keys.ts)):
+   - Type-safe key registry across 12 domains (`branches`, `tickets`, `installments`, `auctions`, `disbursements`, `reports`, `collections`, `payments`, `reversals`).
+   - Mutations systematically trigger `queryClient.invalidateQueries` to evict stale cache subtrees immediately upon successful server commit.
+
+---
+
 ## 5. Mobile Application Architecture (`apps/mobile/`)
 
 The Mobile Application is the portable, offline-resilient operational tool for Field Agents, Customers, and the 4 Partners.
