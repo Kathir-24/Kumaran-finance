@@ -207,8 +207,14 @@ export class JobsController {
     summary: 'List active BullMQ repeatable cron jobs and next execution timestamps',
   })
   @ApiOkResponseEnvelope(RepeatableScheduleDto, { isArray: true, description: 'Active repeatable schedules' })
-  async getRepeatableSchedules() {
-    return this.queueProvider.getRepeatableJobs();
+  async getRepeatableSchedules(): Promise<RepeatableScheduleDto[]> {
+    const raw = await this.queueProvider.getRepeatableJobs();
+    return raw.map((item, index) => ({
+      key: item.id || `${item.queue}-${item.pattern || index}`,
+      name: item.queue,
+      cron: item.pattern || '',
+      next: item.next ?? null,
+    }));
   }
 }
 
