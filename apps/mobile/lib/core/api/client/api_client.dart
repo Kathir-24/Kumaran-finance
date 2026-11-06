@@ -75,7 +75,13 @@ class KumaranMobileApiClient {
       if (response.statusCode == 401 && authManager?.onUnauthorized != null) {
         await authManager!.onUnauthorized!();
       }
-      throw KumaranApiException.fromJson(response.statusCode, parsedJson);
+      final retryAfterStr = response.headers.value('retry-after');
+      final retryAfter = retryAfterStr != null ? int.tryParse(retryAfterStr) : null;
+      throw KumaranApiException.fromJson(
+        response.statusCode,
+        parsedJson,
+        retryAfterSeconds: retryAfter,
+      );
     }
 
     if (parsedJson is Map<String, dynamic>) {

@@ -13,6 +13,7 @@ export interface KumaranClientConfig {
   getRefreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
   onTokenRefreshed?: (tokens: { accessToken: string; refreshToken?: string }) => void | Promise<void>;
   onUnauthorized?: () => void | Promise<void>;
+  onRateLimited?: (retryAfterSeconds: number) => void | Promise<void>;
   fetch?: (input: Request) => Promise<Response>;
 }
 
@@ -77,7 +78,17 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
     },
 
     async onResponse({ response, request }) {
-      // Handle 401 Unauthorized with automatic refresh token rotation
+      // 1. Handle 429 Too Many Requests (Rate Limiting notification)
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 60;
+        if (config.onRateLimited) {
+          await config.onRateLimited(isNaN(retryAfterSeconds) ? 60 : retryAfterSeconds);
+        }
+        return response;
+      }
+
+      // 2. Handle 401 Unauthorized with automatic refresh token rotation
       if (response.status === 401 && config.getRefreshToken && config.onTokenRefreshed) {
         // Skip refresh attempts if this request was already the refresh endpoint
         if (request.url.includes('/auth/refresh-token')) {

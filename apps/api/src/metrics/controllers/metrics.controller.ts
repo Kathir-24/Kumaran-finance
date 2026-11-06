@@ -6,6 +6,7 @@
 
 import { Controller, Get, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiBasicAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { BypassEnvelope } from '../../common/decorators/bypass-envelope.decorator';
 import { DomainMetricsCollector } from '../collectors/domain-metrics.collector';
@@ -14,6 +15,7 @@ import { MetricsService } from '../services/metrics.service';
 
 @ApiTags('Observability & Metrics')
 @BypassEnvelope()
+@SkipThrottle()
 @Controller({ path: 'metrics', version: VERSION_NEUTRAL })
 export class MetricsController {
   constructor(

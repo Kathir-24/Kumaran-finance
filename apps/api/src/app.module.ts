@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuctionModule } from './auction/auction.module';
@@ -13,6 +13,7 @@ import {
   THROTTLE_DEFAULT_LIMIT,
   THROTTLE_DEFAULT_TTL_MS,
 } from './common/constants';
+import { AppThrottlerGuard, RedisThrottlerStorage } from './common/throttler';
 import { validateEnv } from './config/env.validation';
 import { CustomerModule } from './customer/customer.module';
 import { DisbursementModule } from './disbursement/disbursement.module';
@@ -36,12 +37,19 @@ import { UserModule } from './user/user.module';
       isGlobal: true,
       validate: validateEnv,
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: THROTTLE_DEFAULT_TTL_MS,
-        limit: THROTTLE_DEFAULT_LIMIT,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [JobsModule],
+      inject: [RedisThrottlerStorage],
+      useFactory: (storage: RedisThrottlerStorage) => ({
+        throttlers: [
+          {
+            ttl: THROTTLE_DEFAULT_TTL_MS,
+            limit: THROTTLE_DEFAULT_LIMIT,
+          },
+        ],
+        storage,
+      }),
+    }),
     PrismaModule,
     AuthModule,
     BranchModule,
@@ -66,7 +74,7 @@ import { UserModule } from './user/user.module';
     SentryService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

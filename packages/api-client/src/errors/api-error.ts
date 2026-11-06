@@ -12,8 +12,13 @@ export class KumaranApiError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
   public readonly details: any[];
+  public readonly retryAfterSeconds?: number;
 
-  constructor(statusCode: number, payload?: ApiErrorPayload | string) {
+  constructor(
+    statusCode: number,
+    payload?: ApiErrorPayload | string,
+    retryAfterSeconds?: number,
+  ) {
     if (typeof payload === 'string') {
       super(payload);
       this.statusCode = statusCode;
@@ -22,12 +27,17 @@ export class KumaranApiError extends Error {
     } else {
       super(payload?.message || `Request failed with status ${statusCode}`);
       this.statusCode = statusCode;
-      this.code = payload?.code || 'UNKNOWN_ERROR';
+      this.code = payload?.code || (statusCode === 429 ? 'TOO_MANY_REQUESTS' : 'UNKNOWN_ERROR');
       this.details = payload?.details || [];
     }
+    this.retryAfterSeconds = retryAfterSeconds;
 
     this.name = 'KumaranApiError';
     Object.setPrototypeOf(this, KumaranApiError.prototype);
+  }
+
+  get isRateLimited(): boolean {
+    return this.statusCode === 429;
   }
 
   get isUnauthorized(): boolean {

@@ -14,18 +14,25 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
+import {
+  PRESIGNED_URL_EXPIRES_IN_SECONDS,
+  THROTTLE_PDF_LIMIT,
+  THROTTLE_PDF_TTL_MS,
+} from '../common/constants';
 import { PdfService } from './pdf.service';
 
 @ApiTags('Bilingual PDF Documents')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Throttle({ default: { limit: THROTTLE_PDF_LIMIT, ttl: THROTTLE_PDF_TTL_MS } })
+@ApiResponse({ status: 429, description: 'Too many PDF generation requests. Please wait a minute.' })
 @Controller('pdf')
 export class PdfController {
   constructor(private readonly pdfService: PdfService) {}

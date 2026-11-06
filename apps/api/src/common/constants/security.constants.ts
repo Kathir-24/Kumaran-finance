@@ -40,6 +40,18 @@ export const THROTTLE_AUTH_LIMIT = isDev ? 1_000 : 5;
 export const THROTTLE_OTP_TTL_MS = isDev ? 60_000 : 300_000;
 export const THROTTLE_OTP_LIMIT = isDev ? 1_000 : 5;
 
+/** Bilingual PDF generation rate limit: 15 documents per minute in production, 1,000 in dev */
+export const THROTTLE_PDF_TTL_MS = 60_000;
+export const THROTTLE_PDF_LIMIT = isDev ? 1_000 : 15;
+
+/** Large KYC file upload rate limit: 5 uploads per minute in production, 1,000 in dev */
+export const THROTTLE_UPLOAD_TTL_MS = 60_000;
+export const THROTTLE_UPLOAD_LIMIT = isDev ? 1_000 : 5;
+
+/** Customer self-reported UPI claims: 5 submissions per 15 minutes in production, 1,000 in dev */
+export const THROTTLE_UPI_CLAIM_TTL_MS = isDev ? 60_000 : 900_000;
+export const THROTTLE_UPI_CLAIM_LIMIT = isDev ? 1_000 : 5;
+
 /** Allowed web frontend origins (configurable via CORS_ALLOWED_ORIGINS in .env) */
 export const DEFAULT_CORS_ORIGINS = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())

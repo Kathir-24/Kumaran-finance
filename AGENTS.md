@@ -104,6 +104,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Push Notification & Mobile Alerts** | [`docs/03-architecture/push-notification-architecture.md`](docs/03-architecture/push-notification-architecture.md) |
 | **SMS Architecture & Indian Telecom DLT** | [`docs/03-architecture/sms-architecture.md`](docs/03-architecture/sms-architecture.md) |
 | **Payment, Collections & Dual-Control Architecture** | [`docs/03-architecture/payment-architecture.md`](docs/03-architecture/payment-architecture.md) |
+| **Rate Limiting, Throttling & Abuse Prevention** | [`docs/03-architecture/rate-limiting-and-abuse-prevention.md`](docs/03-architecture/rate-limiting-and-abuse-prevention.md) |
 | **Document, Upload & Storage Architecture** | [`docs/03-architecture/document-and-storage-architecture.md`](docs/03-architecture/document-and-storage-architecture.md) |
 | **Observability, Monitoring & Audit Architecture** | [`docs/03-architecture/observability-and-monitoring-architecture.md`](docs/03-architecture/observability-and-monitoring-architecture.md) |
 | **Prometheus Metrics & APM Telemetry**    | [`apps/api/src/metrics/README.md`](apps/api/src/metrics/README.md) |

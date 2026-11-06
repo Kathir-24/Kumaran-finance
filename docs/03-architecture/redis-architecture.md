@@ -77,6 +77,8 @@ Mobile onboarding for both staff (Agents/Partners) and customers relies on a 6-d
 | `auth:otp:<phone>` | `string` | 300s | Active OTP session with SHA-256 hashed code | JSON `OtpSessionRecord` (attempts counter, entityId, roles) |
 | `auth:otp:cooldown:<phone>` | `string` | 60s | SMS Gateway Flood Throttle | Unix timestamp of issuance |
 | `auth:otp:lockout:<phone>` | `string` | 300s | Brute-force penalty lock | Unix timestamp of lockout trigger |
+| `throttle:<name>:<key>` | `integer` | Dynamic (e.g. 60s) | Distributed HTTP rate-limiting hit counter | Total request hits in current time window |
+| `throttle:block:<name>:<key>` | `string` | Dynamic (blockDuration) | Temporary block flag for abusive clients | `"1"` (active penalty lock) |
 
 Stored at key `auth:otp:<phone>` with an exact `EX 300` TTL:
 

@@ -1,9 +1,11 @@
-import { Controller, INestApplication, Post, VersioningType } from '@nestjs/common';
+import { Controller, Get, INestApplication, Post, VersioningType } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Throttle, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { Throttle, ThrottlerModule } from '@nestjs/throttler';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { AppThrottlerGuard } from '../src/common/throttler/app-throttler.guard';
 import { HealthController } from '../src/health/health.controller';
 
 @Controller('test-auth')
@@ -13,12 +15,21 @@ class TestAuthController {
   login() {
     return { success: true };
   }
+
+  @Get('user-dashboard')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  dashboard() {
+    return { success: true, message: 'dashboard loaded' };
+  }
 }
 
 describe('Throttler & Rate Limiting (e2e)', () => {
   let app: INestApplication<App>;
+  let jwtService: JwtService;
 
   beforeEach(async () => {
+    jwtService = new JwtService({ secret: 'test-secret-throttle' });
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
         ThrottlerModule.forRoot([
@@ -31,8 +42,12 @@ describe('Throttler & Rate Limiting (e2e)', () => {
       controllers: [HealthController, TestAuthController],
       providers: [
         {
+          provide: JwtService,
+          useValue: jwtService,
+        },
+        {
           provide: APP_GUARD,
-          useClass: ThrottlerGuard,
+          useClass: AppThrottlerGuard,
         },
       ],
     }).compile();
@@ -60,7 +75,7 @@ describe('Throttler & Rate Limiting (e2e)', () => {
     }
   });
 
-  it('/api/v1/test-auth/login (POST) - should enforce limit of 3 and return 429 on 4th request', async () => {
+  it('/api/v1/test-auth/login (POST) - should enforce limit of 3 and return 429 with Retry-After on 4th request', async () => {
     // Requests 1, 2, 3 must succeed
     for (let i = 0; i < 3; i++) {
       const res = await request(app.getHttpServer()).post('/api/v1/test-auth/login');
@@ -71,6 +86,34 @@ describe('Throttler & Rate Limiting (e2e)', () => {
     // 4th request must be throttled with 429
     const throttledRes = await request(app.getHttpServer()).post('/api/v1/test-auth/login');
     expect(throttledRes.status).toBe(429);
+    expect(throttledRes.header['retry-after']).toBeDefined();
+  });
+
+  it('NAT Isolation Proof: Two authenticated users sharing the SAME IP do not collide', async () => {
+    const tokenUser1 = jwtService.sign({ sub: 'usr_partner_01', roles: ['SUPER_ADMIN'] });
+    const tokenUser2 = jwtService.sign({ sub: 'usr_partner_02', roles: ['SUPER_ADMIN'] });
+
+    // User 1 uses up all 3 allowed requests
+    for (let i = 0; i < 3; i++) {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/test-auth/user-dashboard')
+        .set('Authorization', `Bearer ${tokenUser1}`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    }
+
+    // User 1's 4th request MUST be 429 throttled
+    const throttledUser1 = await request(app.getHttpServer())
+      .get('/api/v1/test-auth/user-dashboard')
+      .set('Authorization', `Bearer ${tokenUser1}`);
+    expect(throttledUser1.status).toBe(429);
+
+    // User 2 from the EXACT SAME IP (test runner socket) MUST NOT be blocked!
+    const user2Res = await request(app.getHttpServer())
+      .get('/api/v1/test-auth/user-dashboard')
+      .set('Authorization', `Bearer ${tokenUser2}`);
+    expect(user2Res.status).toBe(200);
+    expect(user2Res.body.success).toBe(true);
   });
 
   afterEach(async () => {

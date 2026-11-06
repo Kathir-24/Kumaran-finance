@@ -38,14 +38,14 @@ pnpm --filter api run test:e2e:fresh
 | 1 | API Versioning & Routing | `test/app.e2e-spec.ts` | 3 | 3 | 0 | 0.8s | ✅ PASS |
 | 2 | Standardized Response Envelope | `test/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 1.1s | ✅ PASS |
 | 3 | Security Headers & Strict CORS | `test/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 0.9s | ✅ PASS |
-| 4 | Throttler & Rate Limiting | `test/throttler.e2e-spec.ts` | 2 | 2 | 0 | 0.8s | ✅ PASS |
+| 4 | Throttler & Rate Limiting | `test/throttler.e2e-spec.ts` | 3 | 3 | 0 | 4.5s | ✅ PASS |
 | 5 | Authentication & Session Protocol | `test/evidence/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 4.2s | ✅ PASS |
 | 6 | Customer Intake, KYC & Anti-BOLA | `test/evidence/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 3.8s | ✅ PASS |
 | 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/evidence/03-chits-auctions.e2e-spec.ts` | 9 | 9 | 0 | 3.5s | ✅ PASS |
 | 8 | Payments, Discrete Math & UPI | `test/evidence/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 9.1s | ✅ PASS |
 | 9 | Disbursements, Safety & Jobs | `test/evidence/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 6.5s | ✅ PASS |
 | 10 | Storage & Document Streaming | `test/evidence/06-storage-documents.e2e-spec.ts` | 5 | 5 | 0 | 1.8s | ✅ PASS |
-| **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **88** | **88** | **0** | **36.76s** | ✅ **100% PASS** |
+| **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **89** | **89** | **0** | **40.46s** | ✅ **100% PASS** |
 
 ---
 
@@ -188,6 +188,9 @@ Exercises complex end-to-end multi-step operational journeys:
 | `TC-SEC-07` | `security-headers.e2e-spec.ts` | Rejects/denies CORS header on unauthorized phishing origin | Tier 2 | ✅ PASS |
 | `TC-THR-01` | `throttler.e2e-spec.ts` | `/health` (GET) exempt from throttling via `@SkipThrottle()` (15 requests) | Tier 1 | ✅ PASS |
 | `TC-THR-02` | `throttler.e2e-spec.ts` | Enforces limit of 3 and returns 429 on 4th request on login route | Tier 2 | ✅ PASS |
+| `TC-THR-03` | `throttler.e2e-spec.ts` | NAT Isolation Proof: Two authenticated users sharing SAME IP do not collide | Tier 2 | ✅ PASS |
+| `TC-THR-04` | `redis-throttler-storage.spec.ts` | Redis distributed evaluation, atomic increment, block state, and memory fallback | Tier 2 | ✅ PASS |
+| `TC-THR-05` | `otp-cooldown-lockout.spec.ts` | SMS OTP 60s cooldown and 3-attempt 5-min brute-force lockout (Redis + Memory) | Tier 2 | ✅ PASS |
 | `TC-HP-01` | `01-auth-security.e2e-spec.ts` | Office staff login returns standard envelope with JWT tokens | Tier 1 | ✅ PASS |
 | `TC-HP-02` | `01-auth-security.e2e-spec.ts` | Field Agent mobile quick unlock with 6-digit MPIN | Tier 1 | ✅ PASS |
 | `TC-HP-03` | `01-auth-security.e2e-spec.ts` | Authenticated profile retrieval (`/auth/me`) | Tier 1 | ✅ PASS |

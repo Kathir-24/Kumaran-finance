@@ -205,6 +205,7 @@ export class AuthController {
   @Post('totp/disable')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
+  @Throttle({ default: { limit: THROTTLE_AUTH_LIMIT, ttl: THROTTLE_AUTH_TTL_MS } })
   @ApiOperation({
     summary: 'Disable 2FA',
     description: 'Requires current password to disable two-factor authentication.',
@@ -213,6 +214,7 @@ export class AuthController {
     description: '2FA disabled',
   })
   @ApiResponse({ status: 401, description: 'Invalid password or unauthorized' })
+  @ApiResponse({ status: 429, description: 'Too many attempts. Account locked for 15 minutes.' })
   async disableTotp(@CurrentUser('sub') userId: string, @Body() dto: DisableTotpDto) {
     return this.authService.disableTotp(userId, dto);
   }

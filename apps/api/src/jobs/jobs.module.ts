@@ -6,6 +6,7 @@ import { BullBoardService } from './bull-board/bull-board.service';
 import { JobsController } from './jobs.controller';
 import { BullMqQueueProvider } from './providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from './providers/redis-connection.provider';
+import { RedisThrottlerStorage } from '../common/throttler/redis-throttler-storage.service';
 import { AuctionReminderSchedulerService } from './services/auction-reminder-scheduler.service';
 import { DailyArrearsService } from './services/daily-arrears.service';
 import { DistributedLockService } from './services/distributed-lock.service';
@@ -17,6 +18,7 @@ import { ReconciliationService } from './services/reconciliation.service';
   controllers: [JobsController],
   providers: [
     RedisConnectionProvider,
+    RedisThrottlerStorage,
     DistributedLockService,
     NotificationService,
     DailyArrearsService,
@@ -28,6 +30,7 @@ import { ReconciliationService } from './services/reconciliation.service';
   ],
   exports: [
     RedisConnectionProvider,
+    RedisThrottlerStorage,
     DistributedLockService,
     NotificationService,
     DailyArrearsService,

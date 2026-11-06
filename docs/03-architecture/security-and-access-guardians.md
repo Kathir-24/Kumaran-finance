@@ -38,6 +38,15 @@ At the perimeter, [`apps/api/src/main.ts`](file:///u:/Kumaran-finance/apps/api/s
 - **Allowed Headers & Methods**: Restricts cross-origin HTTP methods strictly to `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`. Permitted headers include `Content-Type`, `Authorization`, `X-Branch-Id`, `Idempotency-Key`, and `X-Request-Id`.
 - **Security Headers (Helmet)**: Sets standard OWASP headers including `X-Frame-Options: SAMEORIGIN` (prevents clickjacking while allowing in-app PDF iframes), while disabling CDN-breaking content security restrictions on Swagger API documentation routes.
 
+### 1.2 Ingress Rate Limiting & Abuse Prevention (OWASP API4:2023 Defense)
+
+To protect system resources and eliminate Denial of Service (DoS) attack vectors:
+- **Nginx Ingress Edge**: Limits requests at the reverse proxy (`limit_req_zone`: 30 req/s general, 3 req/s auth).
+- **NAT-Safe AppThrottlerGuard**: Tracks authenticated calls by `usr_<userId>` (preventing shared broadband IP lockout for Perundurai branch office staff) and public calls by `ip:<client_ip>`.
+- **Distributed Redis Storage**: Powered by atomic Redis Lua scripts (`throttle:*`) with seamless in-memory fallback.
+- **Granular Route Limits**: Specialized throttles on PDF compilation (15/min), KYC uploads (5/min), UPI claims (5/15m), and 2FA disabling (5/15m).
+- *Full Architectural Specification*: See [`docs/03-architecture/rate-limiting-and-abuse-prevention.md`](rate-limiting-and-abuse-prevention.md).
+
 ---
 
 ## 2. Component 1: Encrypted Storage Access Guardians

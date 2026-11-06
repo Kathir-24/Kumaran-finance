@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,6 +27,10 @@ import {
   ApiOkResponseEnvelope,
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import {
+  THROTTLE_UPI_CLAIM_LIMIT,
+  THROTTLE_UPI_CLAIM_TTL_MS,
+} from '../common/constants';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
@@ -271,6 +276,7 @@ export class PaymentController {
 
   @Post('upi-claim')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: THROTTLE_UPI_CLAIM_LIMIT, ttl: THROTTLE_UPI_CLAIM_TTL_MS } })
   @Roles(Role.CUSTOMER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Submit customer UPI payment claim (Bank UTR self-report)',
@@ -282,6 +288,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 400, description: 'Installment already paid or invalid scheme state' })
   @ApiResponse({ status: 409, description: 'Bank UTR already submitted or active pending claim exists' })
+  @ApiResponse({ status: 429, description: 'Too many UPI claim submissions. Please wait 15 minutes.' })
   async submitUpiClaim(
     @Body() dto: SubmitUpiClaimDto,
     @CurrentUser() currentUser: JwtPayload,

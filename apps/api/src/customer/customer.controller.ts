@@ -24,6 +24,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -35,6 +36,10 @@ import {
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
 import { ActionSuccessResponseDto } from '../common/dto/action-success.dto';
+import {
+  THROTTLE_UPLOAD_LIMIT,
+  THROTTLE_UPLOAD_TTL_MS,
+} from '../common/constants';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
@@ -241,6 +246,7 @@ export class CustomerController {
 
   @Post(':id/documents')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: THROTTLE_UPLOAD_LIMIT, ttl: THROTTLE_UPLOAD_TTL_MS } })
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -278,6 +284,7 @@ export class CustomerController {
   @ApiResponse({ status: 400, description: 'Missing file or unsupported file format' })
   @ApiResponse({ status: 403, description: 'Forbidden: Customers can only upload for their own profile' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
+  @ApiResponse({ status: 429, description: 'Too many document upload attempts. Please wait a minute.' })
   async uploadDocument(
     @Param('id') customerId: string,
     @Body() dto: UploadCustomerDocumentDto,
