@@ -4,8 +4,15 @@
 # Company: Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu)
 # ==============================================================================
 
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   db:
+    logging: *default-logging
     image: postgres:17
     container_name: chitflow-db
     restart: unless-stopped
@@ -31,6 +38,7 @@ services:
       retries: 5
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     container_name: chitflow-redis
     restart: unless-stopped
@@ -45,6 +53,7 @@ services:
       retries: 5
 
   minio:
+    logging: *default-logging
     image: cgr.dev/chainguard/minio:latest
     container_name: chitflow-minio
     restart: unless-stopped
@@ -59,6 +68,7 @@ services:
       - chitflow_miniodata:/data
 
   api:
+    logging: *default-logging
     build:
       context: ../../apps/api
       dockerfile: Dockerfile
@@ -94,6 +104,7 @@ services:
       - "127.0.0.1:3000:3000"
 
   web:
+    logging: *default-logging
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
@@ -111,6 +122,7 @@ services:
       - "127.0.0.1:${WEB_PORT:-3001}:3001"
 
   nginx:
+    logging: *default-logging
     image: nginx:1.27-alpine
     container_name: chitflow-nginx
     restart: unless-stopped
@@ -126,6 +138,7 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
 
   backup-cron:
+    logging: *default-logging
     image: postgres:17-alpine
     container_name: chitflow-backup-cron
     restart: unless-stopped

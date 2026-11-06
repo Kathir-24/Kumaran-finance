@@ -128,55 +128,76 @@ export class InstallmentService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // 1. Fetch all existing dues for all tickets in 1 single SQL query (Eliminates N+1 query pattern)
+      const ticketIds = chit.tickets.map((t) => t.id);
+      const existingDues = await tx.installmentDue.findMany({
+        where: {
+          ticketId: { in: ticketIds },
+          installmentMonth: month,
+        },
+      });
+      const existingDueMap = new Map((existingDues || []).map((d) => [d.ticketId, d]));
+
       const generatedDues = [];
+      const duesToUpdate = [];
+      const duesToCreate = [];
 
       for (const ticket of chit.tickets) {
-        const existingDue = await tx.installmentDue.findUnique({
-          where: {
-            ticketId_installmentMonth: {
-              ticketId: ticket.id,
-              installmentMonth: month,
-            },
-          },
-        });
-
+        const existingDue = existingDueMap.get(ticket.id);
         if (existingDue) {
           // If already PAID, do not alter financial figures
           if (existingDue.status === DueStatus.PAID) {
             generatedDues.push(existingDue);
             continue;
           }
-
-          const updated = await tx.installmentDue.update({
-            where: { id: existingDue.id },
-            data: {
-              grossAmount,
-              dividendDeduction: dividendPerTicket,
-              netPayableAmount,
-              cycleStartDate,
-              cycleEndDate,
-              dueDate,
-            },
-          });
-          generatedDues.push(updated);
+          duesToUpdate.push(existingDue);
         } else {
-          const created = await tx.installmentDue.create({
-            data: {
-              chitGroupId,
-              ticketId: ticket.id,
-              installmentMonth: month,
-              cycleStartDate,
-              cycleEndDate,
-              dueDate,
-              grossAmount,
-              dividendDeduction: dividendPerTicket,
-              netPayableAmount,
-              paidAmount: 0n,
-              status: DueStatus.UNPAID,
-            },
-          });
-          generatedDues.push(created);
+          duesToCreate.push(ticket);
         }
+      }
+
+      // Execute updates in parallel within transaction
+      if (duesToUpdate.length > 0) {
+        const updatedDues = await Promise.all(
+          duesToUpdate.map((due) =>
+            tx.installmentDue.update({
+              where: { id: due.id },
+              data: {
+                grossAmount,
+                dividendDeduction: dividendPerTicket,
+                netPayableAmount,
+                cycleStartDate,
+                cycleEndDate,
+                dueDate,
+              },
+            }),
+          ),
+        );
+        generatedDues.push(...updatedDues);
+      }
+
+      // Execute creations in parallel within transaction
+      if (duesToCreate.length > 0) {
+        const createdDues = await Promise.all(
+          duesToCreate.map((ticket) =>
+            tx.installmentDue.create({
+              data: {
+                chitGroupId,
+                ticketId: ticket.id,
+                installmentMonth: month,
+                cycleStartDate,
+                cycleEndDate,
+                dueDate,
+                grossAmount,
+                dividendDeduction: dividendPerTicket,
+                netPayableAmount,
+                paidAmount: 0n,
+                status: DueStatus.UNPAID,
+              },
+            }),
+          ),
+        );
+        generatedDues.push(...createdDues);
       }
 
       return {

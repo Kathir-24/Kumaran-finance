@@ -65,6 +65,11 @@ flowchart TD
   - Storage: 20 GB gp3 with storage autoscaling up to 100 GB.
   - Automated backups enabled with **7-day point-in-time recovery (PITR)**.
 
+### 2.4 Host Storage & Disk Capacity Monitoring Policy
+- **Automated Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
+- **Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
+- **PostgreSQL Server Timeouts**: Production database enforces `statement_timeout = 15000` (15s) and `lock_timeout = 5000` (5s) to guarantee rogue queries cannot cause cascading connection starvation.
+
 ---
 
 ## 3. Disaster Recovery Plan (DRP)

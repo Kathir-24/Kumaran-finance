@@ -11,6 +11,7 @@ import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import {
   JOB_DISPATCH_APPROVAL_ALERT,
   JOB_DISPATCH_PAYMENT_RECEIPT,
@@ -35,7 +36,29 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly queueProvider?: BullMqQueueProvider,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
+
+  private async invalidateDaybookCache(branchId?: string, paymentDate?: Date): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const dateStr = paymentDate
+          ? paymentDate.toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+        const keys = [
+          `report:daybook:ALL:${dateStr}`,
+          `report:daybook:ALL_BRANCHES:${dateStr}`,
+        ];
+        if (branchId) {
+          keys.push(`report:daybook:${branchId}:${dateStr}`);
+        }
+        await redis.del(...keys);
+      } catch (err: any) {
+        this.logger.warn(`Failed to invalidate daybook cache: ${err.message}`);
+      }
+    }
+  }
 
   /**
    * Helper to resolve customer ID for a authenticated user by phone.
@@ -325,6 +348,8 @@ export class PaymentService {
         );
       }
     }
+
+    this.invalidateDaybookCache(branchId, paymentDate).catch(() => {});
 
     return result;
   }
@@ -713,7 +738,7 @@ export class PaymentService {
 
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Update Reversal Record
       const notesCombined = dto.notes
         ? `${payment.reversal?.notes || ''} | Checker: ${dto.notes}`
@@ -789,6 +814,10 @@ export class PaymentService {
         dueStatus: DueStatus.UNPAID,
       };
     });
+
+    this.invalidateDaybookCache(payment.branchId, payment.paymentDate).catch(() => {});
+
+    return result;
   }
 
   /**

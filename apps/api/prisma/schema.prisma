@@ -26,6 +26,7 @@ model Branch {
   address     String
   phone       String
   isActive    Boolean  @default(true)
+  version     Int      @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -90,6 +91,7 @@ model Customer {
   refreshTokenHash String?            // Hashed refresh token for active session revocation (RFC 6819)
   lastLoginAt      DateTime?          // Timestamp of most recent customer authentication
   isKycVerified    Boolean            @default(false)
+  version          Int                @default(1)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 

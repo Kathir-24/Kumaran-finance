@@ -404,10 +404,11 @@ export class CollectionService {
 
     // 2. Fetch Specified Payments & Verify Collector Ownership within atomic transaction
     return this.prisma.$transaction(async (tx) => {
-      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate vault handovers
+      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) with deterministic ID sorting to eliminate deadlocks (40P01)
       if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
+        const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
         const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
-          SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE
+          SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${sortedPaymentIds}::text[]) ORDER BY id FOR UPDATE
         `;
         if (lockedPayments && lockedPayments.length > 0) {
           for (const lp of lockedPayments) {
@@ -662,7 +663,36 @@ export class CollectionService {
     const synced: SyncedOfflineItemResult[] = [];
     const failed: FailedOfflineItemResult[] = [];
 
+    // Pre-fetch all idempotency keys from the batch in 1 single query to skip redundant work
+    const incomingKeys = dto.items
+      .map((i) => i.idempotencyKey)
+      .filter((k): k is string => Boolean(k));
+    const preExistingPayments =
+      incomingKeys.length > 0
+        ? await this.prisma.payment.findMany({
+            where: { idempotencyKey: { in: incomingKeys } },
+            include: { receipt: true },
+          })
+        : [];
+    const preExistingMap = new Map(
+      (preExistingPayments || []).map((p) => [p.idempotencyKey!, p]),
+    );
+
     for (const item of dto.items) {
+      if (item.idempotencyKey && preExistingMap.has(item.idempotencyKey)) {
+        const existing = preExistingMap.get(item.idempotencyKey)!;
+        synced.push({
+          idempotencyKey: item.idempotencyKey,
+          paymentId: existing.id,
+          receiptNumber: existing.receipt?.receiptNumber || '',
+          amount: existing.amount.toString(),
+          status: 'SUCCESS',
+          isDuplicate: true,
+          collectedAt: existing.createdAt,
+        });
+        continue;
+      }
+
       try {
         const result: any = await this.recordCollection(
           {

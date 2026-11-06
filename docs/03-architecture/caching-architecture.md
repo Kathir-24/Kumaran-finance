@@ -66,6 +66,7 @@ flowchart TD
 | **Tier 2: Redis** | Distributed SMS OTP (`auth:otp:<phone>`) | Redis `String` (JSON) | `300s` (5 mins) | Verified or 3 failed attempts | Lockout penalty |
 | **Tier 2: Redis** | SMS Request Cooldown (`auth:otp:cooldown:<phone>`) | Redis `String` | `60s` (1 min) | Natural expiration | Fallback in-memory map |
 | **Tier 2: Redis** | Rate Limiting Windows (`throttle:*`) | Redis Lua | Dynamic (60s–900s) | Natural window sliding | Memory fallback |
+| **Tier 2: Redis** | Daybook Hot-Read Reports (`cache:reports:daybook:<branchId>:<date>`) | Redis `String` (BigInt Safe) | `60s` (1 min) | Payment / Reversal approval commit | Fail-open to Postgres |
 | **Tier 2: HTTP** | Closed Historical Reports (`Day Book`, `Form XXII`) | HTTP `ETag` + `304` | Conditional | Content SHA-256 change | Full JSON serialization |
 | **Tier 4: Web** | Workstation Server State (TanStack Query) | Browser Memory | `staleTime: 60s` | `queryClient.invalidateQueries` | Fresh background fetch |
 | **Tier 5: Mobile** | Assigned Field Dues (`cached_assigned_dues`) | SQLite (Local) | Daily Field Round | Synchronized morning download | Offline inspection |
@@ -89,6 +90,13 @@ flowchart TD
 - `cache:master:branch:<id>` — Single branch office detail.
 - `cache:master:schemes:all` — General chit scheme catalog.
 - `cache:master:scheme:<id>` — Chit scheme detail with configuration.
+
+### 3.3 Daybook & Report Hot-Read Hybrid Caching
+To protect PostgreSQL 17 from query storms during peak morning and closing reconciliation hours when multiple partners, accountants, and branch managers query real-time registers:
+- **Key Pattern**: `cache:reports:daybook:${branchId}:${date}`
+- **TTL**: 60 seconds (prevents cache staleness).
+- **Instant Event Invalidation**: Whenever a payment is collected at the counter, recorded via doorstep sync, or reversed under dual-control checker approval, `PaymentService.invalidateDaybookCache()` executes `DEL` across affected branch keys, ensuring instant sub-10ms response times without serving stale financial balances.
+- **BigInt Serialization**: Financial aggregates containing 64-bit integer BigInts are converted with a designated replacer/reviver schema to maintain whole-rupee precision.
 
 ---
 

@@ -1,5 +1,12 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   db:
+    logging: *default-logging
     image: postgres:17
     container_name: chitflow-db
     restart: unless-stopped
@@ -25,6 +32,7 @@ services:
       retries: 5
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     container_name: chitflow-redis
     restart: unless-stopped
@@ -39,6 +47,7 @@ services:
       retries: 5
 
   minio:
+    logging: *default-logging
     image: cgr.dev/chainguard/minio:latest
     container_name: chitflow-minio
     restart: unless-stopped

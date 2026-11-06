@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import {
   REGEX_AADHAAR_LAST_4,
   REGEX_INDIAN_PAN,
@@ -97,4 +97,12 @@ export class UpdateCustomerDto {
     message: 'Aadhaar must be strictly the last 4 digits (e.g. 4821)',
   })
   aadhaarLast4?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Current record version for optimistic concurrency control',
+  })
+  @IsOptional()
+  @IsInt()
+  version?: number;
 }

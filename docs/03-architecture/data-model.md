@@ -71,6 +71,7 @@ model Branch {
   address     String
   phone       String
   isActive    Boolean  @default(true)
+  version     Int      @default(1) // Optimistic concurrency control
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -133,6 +134,7 @@ model Customer {
   aadhaarLast4 String?            // Storing only masked last 4 digits for data minimization
   fcmToken     String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
   isKycVerified Boolean           @default(false)
+  version      Int                @default(1) // Optimistic concurrency control
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 

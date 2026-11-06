@@ -238,6 +238,12 @@ export class CustomerService {
       DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
+    if (dto.version !== undefined && customer.version !== dto.version) {
+      throw new ConflictException(
+        'CONCURRENT_MODIFICATION: Customer profile was updated by another user. Please reload.',
+      );
+    }
+
     if (dto.phone && dto.phone !== customer.phone) {
       const phoneExists = await this.prisma.customer.findUnique({
         where: { phone: dto.phone },
@@ -266,6 +272,7 @@ export class CustomerService {
         pincode: dto.pincode?.trim(),
         panNumber: dto.panNumber?.trim(),
         aadhaarLast4: dto.aadhaarLast4?.trim(),
+        version: { increment: 1 },
         ...(isPhoneChanged ? { refreshTokenHash: null } : {}),
       },
       include: {

@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
@@ -79,10 +80,39 @@ export interface PendingApprovalsResponse {
 
 @Injectable()
 export class ReportService {
+  private readonly logger = new Logger(ReportService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly statutoryReportService: StatutoryReportService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
+
+  private serializeReport(data: any): string {
+    return JSON.stringify(data, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
+  }
+
+  private deserializeReport(json: string): any {
+    return JSON.parse(json, (key, val) => {
+      if (
+        typeof val === 'string' &&
+        [
+          'totalInflows',
+          'totalOutflows',
+          'netCashFlow',
+          'cash',
+          'upi',
+          'bankTransfer',
+          'cheque',
+          'amount',
+        ].includes(key) &&
+        /^-?\d+$/.test(val)
+      ) {
+        return BigInt(val);
+      }
+      return val;
+    });
+  }
 
   /**
    * Executive Dashboard KPI & Status Summary
@@ -310,6 +340,21 @@ export class ReportService {
         ? requestingUser.branchId || undefined
         : query.branchId;
 
+    const dateStr = startOfDay.toISOString().split('T')[0];
+    const cacheKey = `report:daybook:${branchId || 'ALL'}:${dateStr}`;
+    const redis = this.redisProvider?.getClient();
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return this.deserializeReport(cached);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Redis daybook cache read error: ${err.message}`);
+      }
+    }
+
     // 1. Query Collections (Inflows) across all modes
     const payments = await this.prisma.payment.findMany({
       where: {
@@ -406,8 +451,8 @@ export class ReportService {
       };
     });
 
-    return {
-      date: startOfDay.toISOString().split('T')[0],
+    const reportResult = {
+      date: dateStr,
       branchId: branchId || 'ALL_BRANCHES',
       summary: {
         totalInflows,
@@ -423,6 +468,40 @@ export class ReportService {
       inflows: inflowsList,
       outflows: outflowsList,
     };
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        await redis.setex(cacheKey, 60, this.serializeReport(reportResult));
+      } catch (err: any) {
+        this.logger.warn(`Redis daybook cache write error: ${err.message}`);
+      }
+    }
+
+    return reportResult;
+  }
+
+  /**
+   * Invalidates Redis cache for daybook reports upon new payments or reversals.
+   */
+  async invalidateReportCache(branchId?: string, date?: Date): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const targetDate = date
+          ? date.toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+        const keys = [
+          `report:daybook:ALL:${targetDate}`,
+          `report:daybook:ALL_BRANCHES:${targetDate}`,
+        ];
+        if (branchId) {
+          keys.push(`report:daybook:${branchId}:${targetDate}`);
+        }
+        await redis.del(...keys);
+      } catch (err: any) {
+        this.logger.warn(`Failed to invalidate report cache: ${err.message}`);
+      }
+    }
   }
 
   /**
