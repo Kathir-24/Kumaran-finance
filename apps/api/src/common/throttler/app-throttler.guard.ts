@@ -14,8 +14,8 @@ import {
  * Resolves the "Branch Office NAT Collision" problem where multiple partners,
  * accountants, and field staff share a single office broadband router IP.
  *
- * For authenticated requests (Bearer JWT): tracks by `usr_<userId>`.
- * For public/unauthenticated requests (Login, OTP request): tracks by `ip:<normalizedIp>`.
+ * For authenticated requests (Cryptographically verified Bearer JWT): tracks by `usr_<userId>`.
+ * For public/unauthenticated requests (Login, OTP request): strictly tracks by `ip:<normalizedIp>`.
  */
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
@@ -29,22 +29,34 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 
   protected override async getTracker(req: Record<string, any>): Promise<string> {
+    const url = req.originalUrl || req.url || '';
+    const isPublicAuthRoute =
+      url.includes('/auth/web/login') ||
+      url.includes('/auth/mobile/login-mpin') ||
+      url.includes('/auth/mobile/request-otp') ||
+      url.includes('/auth/mobile/verify-otp');
+
+    // Public authentication endpoints MUST ALWAYS be throttled by client IP to prevent brute-forcing
+    if (isPublicAuthRoute) {
+      return super.getTracker(req);
+    }
+
     // 1. If req.user is already populated
     if (req.user?.sub) {
       return `usr_${req.user.sub}`;
     }
 
-    // 2. Inspect Bearer Authorization header to isolate authenticated staff/customers
+    // 2. Cryptographically verify Bearer token (rejects forged/untrusted tokens)
     const authHeader = req.headers?.authorization;
     if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ') && this.jwtService) {
       try {
         const token = authHeader.slice(7).trim();
-        const decoded = this.jwtService.decode(token) as { sub?: string } | null;
-        if (decoded?.sub) {
-          return `usr_${decoded.sub}`;
+        const verified = this.jwtService.verify(token) as { sub?: string } | null;
+        if (verified?.sub) {
+          return `usr_${verified.sub}`;
         }
       } catch {
-        // Fall back to IP on invalid / malformed token
+        // Fall back to IP on invalid / forged / expired token
       }
     }
 

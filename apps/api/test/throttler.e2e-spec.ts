@@ -116,6 +116,22 @@ describe('Throttler & Rate Limiting (e2e)', () => {
     expect(user2Res.body.success).toBe(true);
   });
 
+  it('Anti-Spoofing Proof: Forged Bearer token fails cryptographic signature and falls back to IP bucket', async () => {
+    const fakeToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhdHRhY2tlcl8wMSJ9.invalid_signature';
+
+    for (let i = 0; i < 3; i++) {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/test-auth/user-dashboard')
+        .set('Authorization', `Bearer ${fakeToken}`);
+      expect(res.status).toBe(200);
+    }
+
+    const throttled = await request(app.getHttpServer())
+      .get('/api/v1/test-auth/user-dashboard')
+      .set('Authorization', `Bearer ${fakeToken}`);
+    expect(throttled.status).toBe(429);
+  });
+
   afterEach(async () => {
     await app.close();
   });
