@@ -75,26 +75,29 @@ export function JobsStatusPanel({
     }
   };
 
-  const getQueueDescription = (queueName: string) => {
+  const getQueueDescription = (queueName?: string) => {
+    if (!queueName) return '';
     if (queueName.includes('daily-maintenance')) return t('queues.dailyMaintenanceDesc');
     if (queueName.includes('reconciliation')) return t('queues.reconciliationDesc');
     if (queueName.includes('notification')) return t('queues.notificationsDesc');
     return queueName;
   };
 
-  const getQueueDisplayName = (queueName: string) => {
+  const getQueueDisplayName = (queueName?: string) => {
+    if (!queueName) return '';
     if (queueName.includes('daily-maintenance')) return t('queues.dailyMaintenance');
     if (queueName.includes('reconciliation')) return t('queues.reconciliation');
     if (queueName.includes('notification')) return t('queues.notifications');
     return queueName;
   };
 
-  const getScheduleFrequency = (cron: string) => {
+  const getScheduleFrequency = (cron?: string | null) => {
+    if (!cron) return '—';
     if (cron === '1 0 * * *' || cron.includes('0 0') || cron.includes('1 0')) {
       return t('schedules.dailyArrears');
     }
-    if (cron === '0 6 * * *') return t('schedules.settlementRecon');
-    if (cron === '0 9 * * *') return t('schedules.preAuctionReminders');
+    if (cron === '0 6 * * *' || cron.includes('0 6')) return t('schedules.settlementRecon');
+    if (cron === '0 9 * * *' || cron.includes('0 9')) return t('schedules.preAuctionReminders');
     return cron;
   };
 
@@ -269,25 +272,30 @@ export function JobsStatusPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80 font-mono">
-                  {schedules.map((s) => (
-                    <tr key={s.key} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-slate-200 flex items-center gap-2">
-                        <Clock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                        <span className="font-sans">{s.name || s.key}</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-amber-300">
-                        <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800">
-                          {s.cron}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-300 font-sans">
-                        {getScheduleFrequency(s.cron)}
-                      </td>
-                      <td className="py-2.5 px-3 text-emerald-400 font-sans">
-                        {formatNextRun(s.next)}
-                      </td>
-                    </tr>
-                  ))}
+                  {schedules.map((s, idx) => {
+                    const cronExpr = s.cron || (s as any).pattern || '—';
+                    const scheduleKey = s.key || (s as any).id || `${s.name || (s as any).queue || 'sched'}-${idx}`;
+                    const scheduleName = s.name || (s as any).queue || scheduleKey;
+                    return (
+                      <tr key={scheduleKey} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-slate-200 flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          <span className="font-sans">{getQueueDisplayName(scheduleName)}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-amber-300">
+                          <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800">
+                            {cronExpr}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-300 font-sans">
+                          {getScheduleFrequency(cronExpr)}
+                        </td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-sans">
+                          {formatNextRun(s.next)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
