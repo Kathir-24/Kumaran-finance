@@ -326,7 +326,7 @@ export class CollectionService {
             ticketNumber: ticket.ticketNumber,
             receiptNumber: result.receiptNumber,
             transactionTimestamp: paymentDate.toISOString(),
-            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+            passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
         );
       } catch (queueErr: any) {

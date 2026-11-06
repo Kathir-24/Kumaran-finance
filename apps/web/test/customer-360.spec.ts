@@ -212,7 +212,7 @@ test('Task 5.3: Nominee Validation & Masked Aadhaar Last 4 Invariant', () => {
 
 test('Task 5.3: KYC Presigned S3 URL Lifespan & Security Invariant', () => {
   const presignedResponse = {
-    url: 'https://storage.kumaranfinance.com/kyc/customer-1/AADHAAR_FRONT-uuid.png?X-Amz-Expires=900',
+    url: 'https://storage.kumaranfinance.in/kyc/customer-1/AADHAAR_FRONT-uuid.png?X-Amz-Expires=900',
     expiresInSeconds: 900,
   };
 

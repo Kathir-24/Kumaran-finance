@@ -68,7 +68,7 @@ flowchart TD
 
 ### Step-by-Step Instructions:
 1. Arrive at the branch at 8:30 AM. Power on the PC and the desktop electronic currency counter.
-2. Log into `https://admin.kumaranfinance.com` using your mobile number, password, and Microsoft Authenticator TOTP.
+2. Log into `https://admin.kumaranfinance.in` using your mobile number, password, and Microsoft Authenticator TOTP.
 3. Open **Reports $\to$ Form XXII Daily Cash Book**.
 4. Note the opening cash balance (e.g., `₹3,42,500`) and verify that yesterday's safe vault count matches.
 5. Place currency notes neatly into the counter drawer slots sorted by denomination.

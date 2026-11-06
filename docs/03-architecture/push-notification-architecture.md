@@ -85,7 +85,7 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
   {
     "type": "RECEIPT",
     "receiptNumber": "KC-REC-PRD-2026-00014",
-    "passbookUrl": "https://app.kumaranfinance.com/passbook/e6dbbcdf-...",
+    "passbookUrl": "https://app.kumaranfinance.in/passbook/e6dbbcdf-...",
     "chitCode": "KC-LIVE-20M-01"
   }
   ```

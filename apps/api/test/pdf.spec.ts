@@ -99,7 +99,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         sizeBytes: 1024,
         mimeType: 'application/pdf',
       }),
-      getPresignedUrl: jest.fn().mockResolvedValue('https://storage.kumaranfinance.com/signed-url?exp=900'),
+      getPresignedUrl: jest.fn().mockResolvedValue('https://storage.kumaranfinance.in/signed-url?exp=900'),
     };
 
     pdfService = new PdfService(
@@ -313,7 +313,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         data: expect.objectContaining({ pdfS3Key: expect.any(String) }),
       });
       expect(storageMock.getPresignedUrl).toHaveBeenCalledWith(expect.any(String), 900);
-      expect(result.presignedUrl).toBe('https://storage.kumaranfinance.com/signed-url?exp=900');
+      expect(result.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-url?exp=900');
     });
 
     it('should allow customer to download their own receipt', async () => {

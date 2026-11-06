@@ -66,7 +66,7 @@ export class PdfController {
           type: 'object',
           properties: {
             key: { type: 'string', example: 'receipts/KC-REC-PRD-2026-00001.pdf' },
-            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/receipts/KC-REC-PRD-2026-00001.pdf?sig=...' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
         },
@@ -136,7 +136,7 @@ export class PdfController {
           type: 'object',
           properties: {
             key: { type: 'string', example: 'vouchers/payout-voucher-2026-01.pdf' },
-            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/vouchers/...?sig=...' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/vouchers/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
         },
@@ -205,7 +205,7 @@ export class PdfController {
           type: 'object',
           properties: {
             key: { type: 'string', example: 'minutes/form-xvii-2026-01.pdf' },
-            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/minutes/...?sig=...' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/minutes/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
         },
@@ -275,7 +275,7 @@ export class PdfController {
           type: 'object',
           properties: {
             key: { type: 'string', example: 'passbooks/form-xxi-passbook-01.pdf' },
-            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.com/passbooks/...?sig=...' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/passbooks/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
         },

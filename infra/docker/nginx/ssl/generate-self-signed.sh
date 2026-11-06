@@ -17,7 +17,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout "${LIVE_DIR}/privkey.pem" \
   -out "${LIVE_DIR}/fullchain.pem" \
   -subj "/C=IN/ST=Tamil Nadu/L=Perundurai/O=Kumaran Finance/OU=IT Operations/CN=localhost" \
-  -addext "subjectAltName=DNS:localhost,DNS:kumaranfinance.com,IP:127.0.0.1"
+  -addext "subjectAltName=DNS:localhost,DNS:kumaranfinance.in,IP:127.0.0.1"
 
 chmod 600 "${LIVE_DIR}/privkey.pem"
 chmod 644 "${LIVE_DIR}/fullchain.pem"

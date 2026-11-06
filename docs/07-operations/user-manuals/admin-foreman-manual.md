@@ -68,7 +68,7 @@ flowchart TD
 
 ### Step-by-Step Instructions:
 1. **Desktop Web Login**:
-   - Navigate to `https://admin.kumaranfinance.com`.
+   - Navigate to `https://admin.kumaranfinance.in`.
    - Enter your registered 10-digit mobile number and password.
    - When challenged, open **Microsoft Authenticator** on your smartphone, view the rotating 6-digit TOTP code, and type it into the portal.
    - Select your active branch: **`Head Office - Perundurai`**.
@@ -372,7 +372,7 @@ flowchart TD
 ```
 
 ### Step-by-Step Instructions:
-1. Navigate to `https://admin.kumaranfinance.com/admin/queues` (or `http://localhost:3000/admin/queues`).
+1. Navigate to `https://admin.kumaranfinance.in/admin/queues` (or `http://localhost:3000/admin/queues`).
 2. Log in using configured `BULL_BOARD_USER` and `BULL_BOARD_PASSWORD`.
 3. Verify live queue health:
    - **`daily-maintenance-queue`**: Runs nightly at **00:01 AM IST (`1 0 * * *`)** to recompute arrears balances and tag defaulters.

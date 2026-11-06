@@ -138,7 +138,7 @@ sequenceDiagram
 At 8:30 AM every morning at the Perundurai Head Office:
 
 1. **Log In to Desktop Web Portal**:
-   - Visit `https://admin.kumaranfinance.com`.
+   - Visit `https://admin.kumaranfinance.in`.
    - Enter registered mobile number and password. Enter 6-digit TOTP from Microsoft Authenticator.
    - Screen confirms assigned branch: **`Head Office - Perundurai (PRD)`**.
 2. **Review Branch Morning Dashboard**:

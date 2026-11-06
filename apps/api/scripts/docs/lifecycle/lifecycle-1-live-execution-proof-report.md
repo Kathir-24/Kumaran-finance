@@ -73,7 +73,7 @@ flowchart TD
         "id": "ebf67759-bf05-4fa6-b653-577b3f144900",
         "name": "P. Kumaran (Managing Partner)",
         "phone": "9876543210",
-        "email": "kumaran@kumaranfinance.com",
+        "email": "kumaran@kumaranfinance.in",
         "roles": ["SUPER_ADMIN"],
         "branchId": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
         "isTotpEnabled": false,
@@ -88,7 +88,7 @@ flowchart TD
   SELECT phone, email, roles, "lastLoginAt" FROM public."User" WHERE id = 'ebf67759-bf05-4fa6-b653-577b3f144900';
   ```
   ```text
-  9876543210|kumaran@kumaranfinance.com|{SUPER_ADMIN}|2026-10-22 14:48:59.119
+  9876543210|kumaran@kumaranfinance.in|{SUPER_ADMIN}|2026-10-22 14:48:59.119
   ```
   *Verdict: ✅ Login timestamp updated in DB, JWT tokens issued.*
 
@@ -111,7 +111,7 @@ flowchart TD
       "id": "ebf67759-bf05-4fa6-b653-577b3f144900",
       "name": "P. Kumaran (Managing Partner)",
       "phone": "9876543210",
-      "email": "kumaran@kumaranfinance.com",
+      "email": "kumaran@kumaranfinance.in",
       "roles": ["SUPER_ADMIN"],
       "branchId": "07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c",
       "isTotpEnabled": false,

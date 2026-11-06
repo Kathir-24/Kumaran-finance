@@ -65,17 +65,17 @@ sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli container
 ## 3. SSL / TLS Certificate Setup
 
 ### Option A: Production Setup with Let's Encrypt & Certbot (Recommended)
-1. Point your domain DNS records (`kumaranfinance.com` and `www.kumaranfinance.com`) to your server's public IP.
+1. Point your domain DNS records (`kumaranfinance.in` and `www.kumaranfinance.in`) to your server's public IP.
 2. Generate certificates using Certbot standalone mode:
    ```bash
    sudo apt-get install -y certbot
-   sudo certbot certonly --standalone -d kumaranfinance.com -d www.kumaranfinance.com --agree-tos -m admin@kumaranfinance.com
+   sudo certbot certonly --standalone -d kumaranfinance.in -d www.kumaranfinance.in --agree-tos -m admin@kumaranfinance.in
    ```
 3. Link the certificates into the Nginx SSL directory:
    ```bash
    sudo mkdir -p infra/docker/nginx/ssl/live
-   sudo cp /etc/letsencrypt/live/kumaranfinance.com/fullchain.pem infra/docker/nginx/ssl/live/
-   sudo cp /etc/letsencrypt/live/kumaranfinance.com/privkey.pem infra/docker/nginx/ssl/live/
+   sudo cp /etc/letsencrypt/live/kumaranfinance.in/fullchain.pem infra/docker/nginx/ssl/live/
+   sudo cp /etc/letsencrypt/live/kumaranfinance.in/privkey.pem infra/docker/nginx/ssl/live/
    ```
 
 ### Option B: Staging / Local Development (Self-Signed Certificates)

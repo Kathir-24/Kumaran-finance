@@ -53,14 +53,14 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Visit["Open Web Portal: https://admin.kumaranfinance.com"] --> Creds["Enter Assigned CA Credentials & Password"]
+    Visit["Open Web Portal: https://admin.kumaranfinance.in"] --> Creds["Enter Assigned CA Credentials & Password"]
     Creds --> TOTP["Enter Microsoft Authenticator 6-digit TOTP Code"]
     TOTP --> Console["Access Global Read-Only Forensic Console"]
     Console --> Sandboxed["Sandboxed Security Guard:\n• Full read visibility across all groups, ledgers & vouchers\n• Any mutation attempt (POST/PUT/PATCH/DELETE) yields HTTP 403 Forbidden"]
 ```
 
 ### Step-by-Step Instructions:
-1. Open Chrome/Edge and navigate to `https://admin.kumaranfinance.com`.
+1. Open Chrome/Edge and navigate to `https://admin.kumaranfinance.in`.
 2. Enter your assigned statutory auditor credentials and password.
 3. Complete 2-Factor Authentication using Microsoft Authenticator.
 4. **Strict Read-Only Enforcement**:

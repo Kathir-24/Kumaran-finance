@@ -131,7 +131,7 @@ sequenceDiagram
 Every morning at 8:45 AM, the Desk Accountant opens the branch cash desk:
 
 1. **Log In to Desktop Web Portal**:
-   - Open browser at `https://admin.kumaranfinance.com`.
+   - Open browser at `https://admin.kumaranfinance.in`.
    - Enter staff mobile number and password. Enter 6-digit TOTP code from Microsoft Authenticator.
 2. **Navigate to Daily Cash Book**: Go to **Accounting $\to$ Form XXII Cash Book**.
 3. **Inspect Opening Vault Balance**:

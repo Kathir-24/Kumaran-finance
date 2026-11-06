@@ -8358,7 +8358,7 @@
                     },
                     "presignedUrl": {
                       "type": "string",
-                      "example": "https://storage.kumaranfinance.com/receipts/KC-REC-PRD-2026-00001.pdf?sig=..."
+                      "example": "https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=..."
                     },
                     "expiresInSeconds": {
                       "type": "number",
@@ -8431,7 +8431,7 @@
                     },
                     "presignedUrl": {
                       "type": "string",
-                      "example": "https://storage.kumaranfinance.com/vouchers/...?sig=..."
+                      "example": "https://storage.kumaranfinance.in/vouchers/...?sig=..."
                     },
                     "expiresInSeconds": {
                       "type": "number",
@@ -8504,7 +8504,7 @@
                     },
                     "presignedUrl": {
                       "type": "string",
-                      "example": "https://storage.kumaranfinance.com/minutes/...?sig=..."
+                      "example": "https://storage.kumaranfinance.in/minutes/...?sig=..."
                     },
                     "expiresInSeconds": {
                       "type": "number",
@@ -8577,7 +8577,7 @@
                     },
                     "presignedUrl": {
                       "type": "string",
-                      "example": "https://storage.kumaranfinance.com/passbooks/...?sig=..."
+                      "example": "https://storage.kumaranfinance.in/passbooks/...?sig=..."
                     },
                     "expiresInSeconds": {
                       "type": "number",

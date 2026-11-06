@@ -140,7 +140,7 @@ sequenceDiagram
 ### Journey 1: Morning Login & Executive Business Pulse
 
 #### On Desktop Web Portal:
-1. Open Chrome/Edge and visit `https://admin.kumaranfinance.com`.
+1. Open Chrome/Edge and visit `https://admin.kumaranfinance.in`.
 2. **Screen 1 (Credentials)**: Enter your registered mobile number (e.g., `9842100001`) and password. Click **"Sign In"**.
 3. **Screen 2 (2FA Challenge)**: Open **Microsoft Authenticator** on your Android smartphone. View the 6-digit rotating code (e.g., `482 195`). Type the 6 digits into the portal. Click **"Verify Code"**.
 4. **Screen 3 (Branch Selection)**: System displays `Head Office - Perundurai (PRD)`. Click **"Enter Portal"**.

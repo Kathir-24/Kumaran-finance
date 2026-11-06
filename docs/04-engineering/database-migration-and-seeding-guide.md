@@ -192,12 +192,12 @@ apps/api/prisma/
 
 ### 5.3 Test Credentials
 All seeded staff members use password `Admin@Kumaran2026` and mobile MPIN `123456`:
-- **Managing Partner / Super Admin**: `9876543210` (`kumaran@kumaranfinance.com`)
-- **Operations Partner / Checker**: `9876543211` (`senthil@kumaranfinance.com`)
-- **Branch Manager (Maker)**: `9876543212` (`manager.prd@kumaranfinance.com`)
-- **Desk Accountant (Maker)**: `9876543213` (`accounts@kumaranfinance.com`)
-- **Field Agent 1 (Perundurai Route)**: `9876543214` (`murugan.agent@kumaranfinance.com`)
-- **Field Agent 2 (Erode Route)**: `9876543215` (`karthik.agent@kumaranfinance.com`)
+- **Managing Partner / Super Admin**: `9876543210` (`kumaran@kumaranfinance.in`)
+- **Operations Partner / Checker**: `9876543211` (`senthil@kumaranfinance.in`)
+- **Branch Manager (Maker)**: `9876543212` (`manager.prd@kumaranfinance.in`)
+- **Desk Accountant (Maker)**: `9876543213` (`accounts@kumaranfinance.in`)
+- **Field Agent 1 (Perundurai Route)**: `9876543214` (`murugan.agent@kumaranfinance.in`)
+- **Field Agent 2 (Erode Route)**: `9876543215` (`karthik.agent@kumaranfinance.in`)
 - **Statutory Auditor**: `9876543216` (`auditor@natarajanca.com`)
 
 ### 5.4 Executing the Seed

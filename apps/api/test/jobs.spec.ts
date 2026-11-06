@@ -238,8 +238,8 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
         ticketNumber: 7,
         paymentMode: 'CASH',
         transactionTimestamp: '19-Oct-2026 10:45 AM',
-        receiptDownloadUrl: 'https://storage.kumaranfinance.com/receipt-00412.pdf',
-        passbookAppUrl: 'https://app.kumaranfinance.com/passbook/tkt-7',
+        receiptDownloadUrl: 'https://storage.kumaranfinance.in/receipt-00412.pdf',
+        passbookAppUrl: 'https://app.kumaranfinance.in/passbook/tkt-7',
       });
 
       expect(res.smsId).toBeDefined();
@@ -255,7 +255,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       const whatsapp = logs.find((l) => l.channel === 'WHATSAPP');
       expect(whatsapp?.messageText).toContain('வணக்கம் திரு. *S. Sundaram*');
       expect(whatsapp?.messageText).toContain('செலுத்திய தொகை / Amount: *₹3,750*');
-      expect(whatsapp?.messageText).toContain('https://storage.kumaranfinance.com/receipt-00412.pdf');
+      expect(whatsapp?.messageText).toContain('https://storage.kumaranfinance.in/receipt-00412.pdf');
     });
 
     it('should dispatch free Mobile App Push Notification when fcmToken is available', async () => {
@@ -269,8 +269,8 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
         ticketNumber: 7,
         paymentMode: 'CASH',
         transactionTimestamp: '21-Oct-2026 11:30 AM',
-        receiptDownloadUrl: 'https://storage.kumaranfinance.com/receipt-00413.pdf',
-        passbookAppUrl: 'https://app.kumaranfinance.com/passbook/tkt-7',
+        receiptDownloadUrl: 'https://storage.kumaranfinance.in/receipt-00413.pdf',
+        passbookAppUrl: 'https://app.kumaranfinance.in/passbook/tkt-7',
         fcmToken: 'fcm-device-token-android-sundaram-phone',
       });
 

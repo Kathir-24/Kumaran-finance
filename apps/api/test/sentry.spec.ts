@@ -137,7 +137,7 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
         user: {
           id: 'user-001',
           username: 'partner_erode',
-          email: 'sensitive@kumaranfinance.com',
+          email: 'sensitive@kumaranfinance.in',
           ip_address: '192.168.1.5',
         },
         breadcrumbs: [

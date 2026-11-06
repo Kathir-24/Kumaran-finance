@@ -28,7 +28,7 @@ if ($opensslCmd) {
         -keyout $keyFile `
         -out $certFile `
         -subj "/C=IN/ST=Tamil Nadu/L=Perundurai/O=Kumaran Finance/OU=IT Operations/CN=localhost" `
-        -addext "subjectAltName=DNS:localhost,DNS:kumaranfinance.com,IP:127.0.0.1"
+        -addext "subjectAltName=DNS:localhost,DNS:kumaranfinance.in,IP:127.0.0.1"
     
     Write-Host "[SUCCESS] Self-signed certificates generated successfully via OpenSSL:" -ForegroundColor Green
     Write-Host "  - Certificate: $certFile"
@@ -36,7 +36,7 @@ if ($opensslCmd) {
 } else {
     Write-Host "[INFO] OpenSSL not found on path, generating certificate via PowerShell New-SelfSignedCertificate..." -ForegroundColor Yellow
     $cert = New-SelfSignedCertificate `
-        -DnsName "localhost", "kumaranfinance.com" `
+        -DnsName "localhost", "kumaranfinance.in" `
         -CertStoreLocation "Cert:\CurrentUser\My" `
         -NotAfter (Get-Date).AddYears(1) `
         -KeyAlgorithm RSA `

@@ -11576,7 +11576,7 @@ export interface operations {
                     "application/json": {
                         /** @example receipts/KC-REC-PRD-2026-00001.pdf */
                         key?: string;
-                        /** @example https://storage.kumaranfinance.com/receipts/KC-REC-PRD-2026-00001.pdf?sig=... */
+                        /** @example https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=... */
                         presignedUrl?: string;
                         /** @example 900 */
                         expiresInSeconds?: number;
@@ -11623,7 +11623,7 @@ export interface operations {
                     "application/json": {
                         /** @example vouchers/payout-voucher-2026-01.pdf */
                         key?: string;
-                        /** @example https://storage.kumaranfinance.com/vouchers/...?sig=... */
+                        /** @example https://storage.kumaranfinance.in/vouchers/...?sig=... */
                         presignedUrl?: string;
                         /** @example 900 */
                         expiresInSeconds?: number;
@@ -11670,7 +11670,7 @@ export interface operations {
                     "application/json": {
                         /** @example minutes/form-xvii-2026-01.pdf */
                         key?: string;
-                        /** @example https://storage.kumaranfinance.com/minutes/...?sig=... */
+                        /** @example https://storage.kumaranfinance.in/minutes/...?sig=... */
                         presignedUrl?: string;
                         /** @example 900 */
                         expiresInSeconds?: number;
@@ -11717,7 +11717,7 @@ export interface operations {
                     "application/json": {
                         /** @example passbooks/form-xxi-passbook-01.pdf */
                         key?: string;
-                        /** @example https://storage.kumaranfinance.com/passbooks/...?sig=... */
+                        /** @example https://storage.kumaranfinance.in/passbooks/...?sig=... */
                         presignedUrl?: string;
                         /** @example 900 */
                         expiresInSeconds?: number;

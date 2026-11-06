@@ -215,7 +215,7 @@ Payload: {
   recipientPhone: "9876543220",
   amountPaid: "3950",
   receiptNumber: "KC-REC-PRD-2026-00014",
-  passbookAppUrl: "https://app.kumaranfinance.com/passbook/e6dbbcdf-..."
+  passbookAppUrl: "https://app.kumaranfinance.in/passbook/e6dbbcdf-..."
 }
 ```
 

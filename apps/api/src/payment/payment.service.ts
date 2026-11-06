@@ -316,7 +316,7 @@ export class PaymentService {
             ticketNumber: ticket.ticketNumber,
             receiptNumber: result.receipt.receiptNumber,
             transactionTimestamp: paymentDate.toISOString(),
-            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+            passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
         );
       } catch (queueErr: any) {
@@ -1201,7 +1201,7 @@ export class PaymentService {
             ticketNumber: ticket.ticketNumber,
             receiptNumber: result.receipt.receiptNumber,
             transactionTimestamp: verificationDate.toISOString(),
-            passbookAppUrl: `https://app.kumaranfinance.com/passbook/${ticket.id}`,
+            passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
         );
       } catch (queueErr: any) {

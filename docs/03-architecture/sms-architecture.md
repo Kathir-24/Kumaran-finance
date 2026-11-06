@@ -220,7 +220,7 @@ Tests:       22 passed, 22 total
 During live server execution of [`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts):
 ```text
 [Nest] LOG [MockSmsDriver] [MockSmsDriver] Bypassed SMS to +91******0105 (Template: 1407169823412093848):
-"Kumaran Chits: Received Rs.3,950 for Chit KC-LIVE-20M-01, Ticket #5 on 2026-10-24T14:21:11.027Z. Receipt: KC-REC-PRD-2026-00014. View passbook: https://app.kumaranfinance.com/passbook/ed087ad5-ee76-481b-bc65-6de55ba61db0"
+"Kumaran Chits: Received Rs.3,950 for Chit KC-LIVE-20M-01, Ticket #5 on 2026-10-24T14:21:11.027Z. Receipt: KC-REC-PRD-2026-00014. View passbook: https://app.kumaranfinance.in/passbook/ed087ad5-ee76-481b-bc65-6de55ba61db0"
 [Nest] LOG [NotificationService] Dispatched bilingual receipt notifications to 9842100105 for Receipt KC-REC-PRD-2026-00014
 ```
 

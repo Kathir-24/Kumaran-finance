@@ -143,7 +143,7 @@ sequenceDiagram
 At 9:30 AM, the Chartered Accountant begins the statutory audit:
 
 1. **Log In to Desktop Web Portal**:
-   - Visit `https://admin.kumaranfinance.com`.
+   - Visit `https://admin.kumaranfinance.in`.
    - Enter auditor credentials and Microsoft Authenticator 6-digit TOTP code.
    - Screen displays badge: **`ROLE: AUDITOR (READ-ONLY / GLOBAL SCOPE)`**.
    - Notice that all mutation action buttons ("+ Create Scheme", "Record Payment", "Disburse Prize") are completely absent from the UI.
