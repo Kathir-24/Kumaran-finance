@@ -33,10 +33,16 @@ flowchart TD
 | `chitflow-nginx` | `nginx` | `80`, `443` | `80`, `443` | Ingress reverse proxy, TLS termination, SSE unbuffered streaming |
 | `chitflow-web` | `web` | `3001` | `127.0.0.1:3001` | Next.js 15 operations dashboard (Node 22 Alpine standalone ~100MB) |
 | `chitflow-api` | `api` | `3000` | `127.0.0.1:3000` | NestJS 12 backend modular monolith |
-| `chitflow-db` | `db` | `5432` | `127.0.0.1:5433` | PostgreSQL 17 database (Sole source of financial truth) |
+| `chitflow-db` | `db` | `5432` | `127.0.0.1:5433` | PostgreSQL 17 database (Sole financial truth; max_connections=150, statement_timeout=15s, lock_timeout=5s) |
 | `chitflow-redis` | `redis` | `6379` | `127.0.0.1:6379` | Redis 7 queue broker for BullMQ background workers |
 | `chitflow-minio` | `minio` | `9000`, `9001` | `127.0.0.1:9000` | Private S3-compatible document storage (KYC scans & PDF receipts) |
 | `chitflow-backup-cron` | `backup-cron` | N/A | N/A | Autonomous cron worker executing encrypted S3 pg_dump at 02:00 AM IST |
+
+### 1.1 Database Concurrency & Connection Sizing Guardrails
+- **PostgreSQL Max Connections**: Configured to `150` with `512MB` shared buffers.
+- **Server-Side Safety Timeouts**: `statement_timeout = 15000` (15s query termination), `lock_timeout = 5000` (5s lock wait abort).
+- **Prisma Connection Pool**: Sized explicitly in `DATABASE_URL` via `&connection_limit=25&pool_timeout=10` (budgets 25 connections per API replica, preventing connection exhaustion).
+- **Container Log Limits**: Global JSON-file logging bounded to `max-size: 50m` and `max-file: 5` across all services to prevent disk exhaustion.
 
 ---
 

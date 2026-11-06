@@ -9,6 +9,16 @@ services:
     image: postgres:17
     container_name: chitflow-db
     restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=150"
+      - "-c"
+      - "shared_buffers=512MB"
+      - "-c"
+      - "statement_timeout=15000"
+      - "-c"
+      - "lock_timeout=5000"
     env_file: .env
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
@@ -65,7 +75,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       API_PREFIX: api/v1
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public&connection_limit=25&pool_timeout=10
       REDIS_HOST: redis
       REDIS_PORT: 6379
       STORAGE_DRIVER: s3

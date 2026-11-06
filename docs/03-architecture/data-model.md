@@ -239,6 +239,7 @@ model SubscriberTicket {
   @@unique([chitGroupId, ticketNumber])
   // Architectural Constraint: Prevents a single customer from holding 2 or more tickets in the SAME chit group
   @@unique([chitGroupId, customerId])
+  @@index([customerId]) // Fast lookup for customer mobile passbooks
 }
 
 // -------------------------------------------------------------
@@ -371,6 +372,7 @@ model InstallmentDue {
 
   @@unique([ticketId, installmentMonth])
   @@index([chitGroupId, installmentMonth])
+  @@index([status, dueDate]) // Optimizes midnight arrears and defaulter batch processing
 }
 
 enum PaymentMethod {
