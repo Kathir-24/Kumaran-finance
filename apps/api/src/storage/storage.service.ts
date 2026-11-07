@@ -131,6 +131,18 @@ export class StorageService {
   }
 
   /**
+   * Generates a time-limited presigned PUT URL (defaults to 5 minutes / 300 seconds)
+   * for direct client-to-storage uploads, eliminating server RAM buffering.
+   */
+  async getPresignedUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresInSeconds: number = 300,
+  ): Promise<string> {
+    return this.driver.getPresignedUploadUrl(key, mimeType, expiresInSeconds);
+  }
+
+  /**
    * Batch resolves multiple storage keys in a single roundtrip via Redis MGET pipeline.
    */
   async getBatchPresignedUrls(

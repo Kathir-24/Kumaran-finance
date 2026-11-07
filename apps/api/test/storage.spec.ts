@@ -104,6 +104,15 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       expect(url).toBe(`/api/v1/storage/file/${key}`);
     });
 
+    it('should return local upload URL for presigned upload access', async () => {
+      const uploadUrl = await driver.getPresignedUploadUrl(
+        'kyc/cust-001/doc.jpg',
+        'image/jpeg',
+        300,
+      );
+      expect(uploadUrl).toBe('/api/v1/storage/upload/kyc/cust-001/doc.jpg');
+    });
+
     it('should throw NotFoundException when getting a non-existent file', async () => {
       await expect(driver.get('non-existent/file.pdf')).rejects.toThrow(
         NotFoundException,
@@ -184,6 +193,17 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       const notExists = await s3Driver.exists('missing.pdf');
       expect(notExists).toBe(false);
     });
+
+    it('should generate a presigned PUT upload URL with 5-minute expiry', async () => {
+      const uploadUrl = await s3Driver.getPresignedUploadUrl(
+        'kyc/cust-001/doc.jpg',
+        'image/jpeg',
+        300,
+      );
+      expect(uploadUrl).toBeDefined();
+      expect(typeof uploadUrl).toBe('string');
+      expect(uploadUrl).toContain('kumaran-chits-private-storage');
+    });
   });
 
   describe('4. StorageService Dual-Driver Orchestration', () => {
@@ -198,6 +218,20 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
 
       const service = new StorageService(configMock);
       expect(service.getActiveDriverName()).toBe('local');
+    });
+
+    it('should delegate getPresignedUploadUrl to the active driver', async () => {
+      const configMock = {
+        get: jest.fn((key: string) => {
+          if (key === 'STORAGE_DRIVER') return 'local';
+          if (key === 'LOCAL_STORAGE_PATH') return testStorageDir;
+          return null;
+        }),
+      } as unknown as ConfigService;
+
+      const service = new StorageService(configMock);
+      const uploadUrl = await service.getPresignedUploadUrl('kyc/cust-001/doc.jpg', 'image/jpeg', 300);
+      expect(uploadUrl).toBe('/api/v1/storage/upload/kyc/cust-001/doc.jpg');
     });
 
     it('should switch to S3 driver when provider-agnostic S3_* credentials are configured', () => {
@@ -261,6 +295,20 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
 
       const service = new StorageService(configMock);
       expect(service.getActiveDriverName()).toBe('local');
+    });
+
+    it('should delegate getPresignedUploadUrl to the active driver', async () => {
+      const configMock = {
+        get: jest.fn((key: string) => {
+          if (key === 'STORAGE_DRIVER') return 'local';
+          if (key === 'LOCAL_STORAGE_PATH') return testStorageDir;
+          return null;
+        }),
+      } as unknown as ConfigService;
+
+      const service = new StorageService(configMock);
+      const uploadUrl = await service.getPresignedUploadUrl('kyc/cust-001/doc.jpg', 'image/jpeg', 300);
+      expect(uploadUrl).toBe('/api/v1/storage/upload/kyc/cust-001/doc.jpg');
     });
 
     it('should cache generated presigned URLs in Redis and serve them without driver calls', async () => {

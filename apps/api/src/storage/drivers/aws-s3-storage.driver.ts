@@ -142,6 +142,25 @@ export class AwsS3StorageDriver implements StorageDriver {
     });
   }
 
+  async getPresignedUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresInSeconds: number = 300,
+  ): Promise<string> {
+    const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: sanitizedKey,
+      ContentType: mimeType,
+      ...(this.isCustomEndpoint ? {} : { ServerSideEncryption: 'AES256' }),
+    });
+
+    return getSignedUrl(this.s3Client, command, {
+      expiresIn: expiresInSeconds,
+    });
+  }
+
   async delete(key: string): Promise<void> {
     const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
 

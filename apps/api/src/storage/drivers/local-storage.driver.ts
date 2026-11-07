@@ -82,6 +82,15 @@ export class LocalStorageDriver implements StorageDriver {
     return `/api/v1/storage/file/${sanitizedKey}`;
   }
 
+  async getPresignedUploadUrl(
+    key: string,
+    _mimeType: string,
+    _expiresInSeconds: number = 300,
+  ): Promise<string> {
+    const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
+    return `/api/v1/storage/upload/${sanitizedKey}`;
+  }
+
   async delete(key: string): Promise<void> {
     const fullPath = this.resolveFilePath(key);
     if (fs.existsSync(fullPath)) {
