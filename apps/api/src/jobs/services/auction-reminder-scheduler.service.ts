@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AuctionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuctionReminderJobPayload } from '../dto/job-payloads.dto';
 import { NotificationService } from './notification.service';
+import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 
 export interface ScanUpcomingAuctionsResult {
   chitsCount: number;
@@ -17,6 +18,7 @@ export class AuctionReminderSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
 
   /**
@@ -83,6 +85,25 @@ export class AuctionReminderSchedulerService {
 
       if (subscribers.length === 0) {
         continue;
+      }
+
+      // Cost & Anti-Spam Protection: 24-hour Redis broadcast idempotency lock per auction and month
+      const broadcastLockKey = `lock:broadcast:auction:${auction.id}:${auction.installmentMonth}`;
+      const redis = this.redisProvider?.getClient();
+      if (redis && this.redisProvider?.getIsConnected()) {
+        try {
+          const acquired = await redis.set(broadcastLockKey, '1', 'EX', 86400, 'NX');
+          if (!acquired) {
+            this.logger.warn(
+              `[AuctionReminder] Broadcast for Chit ${chitGroup.groupCode} Month ${auction.installmentMonth} has already been dispatched in the last 24 hours. Skipping duplicate dispatch to prevent excess SMS billing.`,
+            );
+            continue;
+          }
+        } catch (err: any) {
+          this.logger.warn(
+            `[AuctionReminder] Redis broadcast lock check error: ${err.message}. Proceeding with caution.`,
+          );
+        }
       }
 
       const payload: AuctionReminderJobPayload = {
