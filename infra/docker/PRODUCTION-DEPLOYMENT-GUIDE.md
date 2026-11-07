@@ -44,6 +44,12 @@ flowchart TD
 - **Prisma Connection Pool**: Sized explicitly in `DATABASE_URL` via `&connection_limit=25&pool_timeout=10` (budgets 25 connections per API replica, preventing connection exhaustion).
 - **Container Log Limits**: Global JSON-file logging bounded to `max-size: 50m` and `max-file: 5` across all services to prevent disk exhaustion.
 
+### 1.2 Redis Memory Bounds & Eviction Policy
+- **Maximum Memory Ceiling**: `--maxmemory 512mb` bounds container RAM usage to prevent host OOM kills.
+- **Eviction Strategy**: `--maxmemory-policy volatile-lru` automatically evicts least recently used keys with an explicit TTL (`EX`) under memory pressure.
+- **BullMQ Queue Safety**: Critical BullMQ persistent structures (queues, active jobs, worker locks) carry no expiration TTL and are strictly immune from eviction.
+- **Persistence Snapshots**: `--save 900 1` and `--save 300 10` guarantee periodic RDB persistence snapshots without excessive I/O overhead.
+
 ---
 
 ## 2. Server Prerequisites & Initialization

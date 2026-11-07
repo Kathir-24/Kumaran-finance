@@ -65,6 +65,14 @@ flowchart TD
   - Storage: 20 GB gp3 with storage autoscaling up to 100 GB.
   - Automated backups enabled with **7-day point-in-time recovery (PITR)**.
 
+### 2.3 Redis Cache & Queue Infrastructure (AWS ElastiCache Redis 7)
+- **Node Type**: `cache.t4g.micro` (Dev/Test) $\to$ `cache.t4g.small` (Production Multi-AZ).
+- **Parameter Group Configurations**:
+  - `maxmemory-policy = volatile-lru` (Evicts keys with an explicit TTL under memory pressure, protecting BullMQ job queues).
+- **CloudWatch Monitoring & Alarms**:
+  - `DatabaseMemoryUsagePercentage >= 75%` triggers an operational warning alert before memory saturation.
+  - `EngineCPUUtilization >= 70%` triggers an alert for cluster resizing.
+
 ### 2.4 Host Storage & Disk Capacity Monitoring Policy
 - **Automated Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
 - **Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.

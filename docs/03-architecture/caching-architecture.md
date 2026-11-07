@@ -182,7 +182,90 @@ CREATE TABLE IF NOT EXISTS offline_collections_queue (
 
 ---
 
-## 6. Financial Non-Negotiables & Statutory Safety Rules
+## 6. Cache Stampede (Thundering Herd) & Distributed Mutex Locking
+
+When heavy aggregation reports (such as the Executive Dashboard with 8 live queries or Day Book with multi-payment mode totals) expire, multiple concurrent requests from partners, branch accountants, and auditors could simultaneously trigger redundant database queries.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client1 as Partner Dashboard (Client 1)
+    participant Client2 as Branch Accountant (Client 2)
+    participant Redis as Redis 7 Cache & Locks
+    participant DB as PostgreSQL 17 Sole Financial Truth
+
+    Note over Client1,Client2: Cache expired for report:dashboard:ALL
+    Client1->>Redis: GET report:dashboard:ALL (MISS)
+    Client2->>Redis: GET report:dashboard:ALL (MISS)
+    Client1->>Redis: SET lock:report:dashboard:ALL 1 PX 4000 NX -> OK
+    Client2->>Redis: SET lock:report:dashboard:ALL 1 PX 4000 NX -> NULL (Blocked)
+    Note over Client2: Waits 250ms coalescing retry
+    Client1->>DB: Execute 8 aggregation queries (Sole compute)
+    DB-->>Client1: Return raw ledger & group data
+    Client1->>Redis: SETEX report:dashboard:ALL 30s (+jitter) JSON
+    Client1->>Redis: DEL lock:report:dashboard:ALL
+    Client1-->>Client1: Render Fresh Dashboard
+    Client2->>Redis: GET report:dashboard:ALL (HIT!)
+    Client2-->>Client2: Render Dashboard (<5ms)
+```
+
+### 6.1 Mutex Guard & Coalescing Protocol
+1. **Atomic Lock Acquisition**: `SET lock:<cacheKey> 1 PX 4000 NX` guarantees that exactly one process computes the aggregate from PostgreSQL.
+2. **Wait-and-Retry Coalescing**: Competing requests pause for 250ms and re-query Redis. In over 99% of cases, the freshly computed cache is served without hitting PostgreSQL.
+3. **Guaranteed Release**: Lock keys are released inside `finally` blocks, and carry a 4,000ms safety TTL to prevent deadlocks in case of unexpected process termination.
+
+---
+
+## 7. Cache Avalanche & Centralized TTL Jitter Math
+
+### 7.1 Problem
+When identical TTL values are used across hundreds of entities (e.g. 1 hour for all branches, 30 minutes for all chit groups), application restart or morning synchronization at 09:00 AM causes all cache keys to expire simultaneously. The resulting avalanche floods PostgreSQL with duplicate reads.
+
+### 7.2 Jitter Engine Implementation
+The centralized `withTtlJitter(baseSeconds, jitterFraction = 0.15)` utility applies a $\pm 15\%$ uniform pseudo-random variance:
+$$\text{TTL}_{\text{jittered}} = \max\left(1, \text{baseSeconds} + \Delta\right), \quad \Delta \in [-\lfloor 0.15 \times \text{base} \rfloor, +\lfloor 0.15 \times \text{base} \rfloor]$$
+
+| Cache Category | Base TTL | Jitter Range ($\pm 15\%$) | Protected Layer |
+|---|---|---|---|
+| Master Branch Directory | 3,600s (1 hr) | 3,060s – 4,140s | PostgreSQL Branch lookups |
+| Master Chit Schemes | 1,800s (30 min) | 1,530s – 2,070s | Chit group & ticket joins |
+| Executive Dashboard | 30s | 26s – 34s | Multi-aggregate KPI metrics |
+| Day Book Journal | 60s | 51s – 69s | Payment collection aggregates |
+| S3 Presigned URLs | 600s (10 min) | 510s – 690s | AWS S3 Presign API |
+
+---
+
+## 8. Cache Penetration & Negative Caching Sentinel
+
+### 8.1 Threat Model
+Repetitive lookups for non-existent UUIDs or deleted entities bypass traditional caching layers and execute full indexed index scans on PostgreSQL every time, creating vector for resource starvation.
+
+### 8.2 Negative Caching Sentinel
+When `BranchService.findById` or `ChitService.findOne` encounters a missing ID:
+1. It writes a negative sentinel `{ "__notFound": true }` to Redis with a short **60-second TTL**.
+2. Subsequent requests for the same non-existent ID read the sentinel and throw `NotFoundException` immediately without hitting PostgreSQL.
+3. Upon entity creation or intake, the key is evicted atomically via `redis.del`, ensuring new valid entities are accessible without delay.
+
+---
+
+## 9. Redis Memory Bounds, `volatile-lru` Eviction & Concurrency Bulkheads
+
+### 9.1 Redis Memory Ceiling & Queue Preservation
+In production, Redis is shared between master caches, rate limiters, distributed locks, and BullMQ background workers (`notification-queue`, `daily-arrears-queue`).
+- **Memory Ceiling**: `--maxmemory 512mb` enforces an absolute RAM boundary.
+- **Eviction Policy**: `--maxmemory-policy volatile-lru` restricts key eviction strictly to keys configured with an explicit TTL (`EX`).
+- **BullMQ Queue Safety**: Because BullMQ queues (delayed jobs, parent-child flows, stream records) do not carry Redis TTLs, `volatile-lru` guarantees persistent queues are never evicted, preventing job loss.
+
+### 9.2 Fail-Open Concurrency Bulkhead
+If Redis goes offline or experiences a network partition:
+- Master reference reads (branches, schemes) fall back directly to PostgreSQL.
+- Heavy dashboard aggregations enter **Fail-Open Bulkhead Mode**:
+  - Max **3 concurrent fallback computations** are permitted simultaneously on PostgreSQL.
+  - When all 3 slots are occupied, subsequent requests receive the last known in-memory snapshot (`lastKnownDashboardSnapshot`), safeguarding PostgreSQL connection pools (150 connections) from sudden saturation.
+
+---
+
+## 10. Financial Non-Negotiables & Statutory Safety Rules
 
 1. **Zero Entity Caching of Financial Balances**:
    Under ADR-01 and Chit Funds Act §22, dues, subscriber balances, auction winner payouts, and cash in safe must **never be cached in Redis or in-memory**. Every financial mutation or verification must execute directly against PostgreSQL 17 inside an ACID transaction (`SERIALIZABLE` or `READ COMMITTED` with row locks).
@@ -190,3 +273,5 @@ CREATE TABLE IF NOT EXISTS offline_collections_queue (
    Cached user roles or session claims must never bypass server-side database checks for Maker-Checker dual control (`maker_user_id !== checker_user_id`).
 3. **Fail-Open Policy for Master Data**:
    If Redis goes offline, the system continues operating normally by falling back to PostgreSQL for branch and scheme reads.
+4. **PostgreSQL as Sole Financial Truth**:
+   Redis serves purely as an ephemeral performance and rate-limiting tier; financial ledgers and audit records reside permanently in PostgreSQL 17.
