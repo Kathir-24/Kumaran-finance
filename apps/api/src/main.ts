@@ -186,6 +186,9 @@ async function bootstrap() {
     });
   });
 
+  // 7. Enable NestJS lifecycle shutdown hooks for graceful backing service cleanup
+  app.enableShutdownHooks();
+
   const port = process.env.PORT ?? 3000;
   const server = await app.listen(port);
   // High-traffic keep-alive alignment: ensure Node keeps sockets open longer than Nginx (65s)
@@ -194,6 +197,34 @@ async function bootstrap() {
     server.keepAliveTimeout = 70000; // 70 seconds (> Nginx 65s)
     server.headersTimeout = 71000;   // 71 seconds (> keepAliveTimeout)
   }
+
+  // Graceful Process Termination: Drain in-flight HTTP connections on container stop (SIGTERM/SIGINT)
+  let isShuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`[ProcessGuard] Received ${signal}. Initiating graceful connection draining (15s deadline)...`);
+
+    // Give load balancers 2 seconds to detect draining via /health before closing listener
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    try {
+      if (server && typeof server.close === 'function') {
+        await new Promise<void>((resolve, reject) => {
+          server.close((err: any) => (err ? reject(err) : resolve()));
+        });
+      }
+      await app.close();
+      console.log(`[ProcessGuard] All HTTP sockets, database pools, and Redis clients closed cleanly.`);
+      process.exit(0);
+    } catch (err: any) {
+      console.error(`[ProcessGuard] Error during graceful shutdown: ${err.message}`);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
   console.log(`🚀 Kumaran Chits API running on: http://localhost:${port}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);

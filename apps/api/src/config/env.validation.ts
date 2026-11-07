@@ -127,6 +127,12 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
 
   // Production Strict Password & Secret Hardening
   if (nodeEnv === 'production') {
+    if (storageDriver !== 's3') {
+      errors.push(
+        "In production, STORAGE_DRIVER must be set to 's3' with dedicated object storage to prevent local disk fragmentation across horizontal instances",
+      );
+    }
+
     const jwtSecret = (config.JWT_SECRET as string) || '';
     if (
       jwtSecret.includes('replace-with-a-secure-random') ||
