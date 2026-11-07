@@ -233,3 +233,34 @@ cd apps\api
 # WARNING: Drops the local database, re-applies all migrations, and runs seed.ts
 pnpm exec prisma migrate reset
 ```
+
+---
+
+## 7. Zero-Downtime Database Migration Standard (Expand-and-Contract Pattern)
+
+In production, Kumaran Chits employs rolling container deployments with zero downtime. During deployments, the newly deployed API instance and the currently active instance may run concurrently against the database for several seconds. To prevent breaking live customer transactions or field collection operations, all database migrations must adhere strictly to the **Expand-and-Contract Pattern**.
+
+### 7.1 The 3-Phase Migration Lifecycle
+
+| Phase | Schema Migration (DDL) | Application Code Deployment | Operational Action |
+|---|---|---|---|
+| **Phase 1: Expand** | Add new columns as **nullable** or with safe **default values**. Add new tables or indexes concurrently. | Deploy code that reads with fallback (from new column, falling back to old column) and writes synchronously to **both old and new columns**. | Old and new application containers run concurrently without throwing `ColumnNotFound` errors. |
+| **Phase 2: Backfill** | No schema changes. | Execute background data backfill script in small, batched transactions (e.g. 500 rows per batch) to populate historical records. | Verifies data parity between old and new columns. |
+| **Phase 3: Contract** | Drop legacy column, legacy constraints, or obsolete tables in an isolated migration. | Deploy cleanup code that removes dual-write logic and reads exclusively from the new column. | Executed strictly **after** 100% of running application containers are on the new version. |
+
+### 7.2 Prohibited "Dangerous DDL" Operations
+
+The following DDL actions are strictly prohibited in a single-step release:
+1. ❌ **Direct `DROP COLUMN`**: If dropped while an older application instance is still processing requests, the old instance will crash immediately with `QueryError: column does not exist`.
+2. ❌ **Direct `RENAME COLUMN`**: Renaming breaks existing queries. Instead, create a new column, dual-write in Phase 1, backfill in Phase 2, and drop the old column in Phase 3.
+3. ❌ **Adding `NOT NULL` without `DEFAULT`**: PostgreSQL requires an exclusive table lock to validate all existing rows and will reject any `INSERT` from older code versions that do not specify the new column. Always add as nullable, backfill existing nulls, set a default, and then add `NOT NULL` in Phase 3.
+4. ❌ **Non-Concurrent Index Creation on Large Tables**: Use `CREATE INDEX CONCURRENTLY` in raw SQL migrations where feasible to prevent table lock escalation during business hours.
+
+### 7.3 Pre-Migration Safety Checklist
+Before running `pnpm exec prisma migrate deploy` in production:
+- [ ] Database backup snapshot verified via `backup-db.sh` or AWS S3 snapshot.
+- [ ] Migration contains zero destructive `DROP` or `RENAME` statements on active business columns.
+- [ ] New monetary columns use PostgreSQL `BigInt` (not `INTEGER` or `NUMERIC`/`FLOAT`).
+- [ ] New foreign keys are indexed to prevent sequential table scans during joins and deletes.
+- [ ] Rollback strategy verified (previous migration state documented).
+
