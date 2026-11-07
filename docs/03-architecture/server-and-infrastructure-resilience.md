@@ -199,3 +199,23 @@ docker compose -f infra/docker/docker-compose.fullstack.yml exec certbot certbot
 # Reload Nginx to load renewed certificates
 docker compose -f infra/docker/docker-compose.fullstack.yml exec nginx nginx -s reload
 ```
+
+### 3.4 Zero-Downtime Deployment with Automated Rollback Trap
+Deployments preserve the previous image tag as `chitflow-api:previous`. If deep health checks (`/health/readiness`) fail after 30 attempts (60s), the script automatically executes a rollback to `chitflow-api:previous` and alerts the operator:
+```bash
+# Linux / Production Server
+bash infra/scripts/zero-downtime-deploy.sh
+
+# Windows Server / Admin Terminal
+.\infra\scripts\zero-downtime-deploy.ps1
+```
+
+### 3.5 One-Click Emergency Operator Rollback
+If a critical runtime defect is detected post-deployment, on-call operators can instantly revert to the previous verified release with zero dropped connections:
+```bash
+# Linux / Production Server
+bash infra/scripts/rollback.sh
+
+# Windows Server / Admin Terminal
+.\infra\scripts\rollback.ps1
+```

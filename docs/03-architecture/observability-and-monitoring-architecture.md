@@ -215,9 +215,60 @@ sequenceDiagram
    - Normal client validation errors (`400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`) are returned to the user without sending alerts to Sentry.
    - Only true unhandled server-side crashes ($\ge 500$) trigger Sentry incident alerts.
 
-### 3.2 Health & Diagnostic Probes
-* `GET /health`: Liveness probe returning `{ status: 'ok', sentryActive: boolean, time: ISOString }`.
-* `GET /health/sentry-test`: Intentional $500$ crash diagnostic endpoint throwing `InternalServerErrorException('Sentry Verification Diagnostic Test Error')` to verify Sentry event capture in staging.
+### 3.2 Health & Container Readiness Probes
+
+Kumaran Chits implements multi-tier health probes adhering strictly to cloud-native orchestrator standards:
+
+| Endpoint | Type | Purpose | Backing Checks |
+|---|---|---|---|
+| `GET /health` | Deep Readiness | Probes whether API can safely accept financial mutations | PostgreSQL pool (`SELECT 1`, timeout: 2000ms) + Redis queue broker (`PING`, timeout: 1500ms). Returns 200 or 503. |
+| `GET /health/readiness` | Deep Readiness Alias | Explicit alias for Kubernetes / Docker Compose / ALB healthcheck | Identical to `/health`. Used by Docker Compose to prevent premature routing. |
+| `GET /health/liveness` | Shallow Liveness | Probes whether the Node.js event loop is running | Returns HTTP 200 `{ status: 'alive' }` without downstream DB checks to prevent restart loops during transient DB spikes. |
+| `GET /health/sentry-test` | Crash Diagnostic | Intentional 500 crash probe | Throws `InternalServerErrorException` to verify Sentry event capture in staging. |
+
+#### Docker Compose Native Health Check:
+The API service in `infra/docker/docker-compose.fullstack.yml` is monitored via native Docker health checks:
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/readiness || exit 1"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 15s
+```
+Dependent services (`web` and `nginx`) strictly wait on `api: condition: service_healthy` before initiating traffic routing.
+
+---
+
+### 3.3 End-to-End Request ID Trace Correlation (`X-Request-ID`)
+
+To maintain full end-to-end trace correlation without requiring heavy distributed tracing clusters (e.g. Jaeger or OpenTelemetry collectors), Kumaran Chits utilizes the HTTP **`X-Request-ID`** standard:
+
+```mermaid
+flowchart LR
+    Client["Browser / Mobile Client"] -->|"X-Request-ID (optional)"| Nginx["NGINX Ingress\nAssigns $request_id\nLogs rid=$request_id"]
+    Nginx -->|"proxy_set_header X-Request-ID"| Nest["NestJS 12 API\nRequestIdInterceptor"]
+    Nest -->|"res.setHeader('X-Request-ID')"| Client
+    Nest -->|"scope.setTag('requestId')"| Sentry["Sentry Crash APM"]
+    Nest -->|"logContext: requestId"| Winston["Winston JSON Logs"]
+```
+
+1. **NGINX Ingress Generation**: NGINX assigns a unique `$request_id` (32-character hexadecimal string) to every incoming HTTP connection, logs `rid="$request_id"` in `access.log`, and proxies `X-Request-ID` upstream.
+2. **NestJS `RequestIdInterceptor`**: Injects or preserves `X-Request-ID`, attaches `req.requestId`, and echoes the header on the outgoing HTTP response.
+3. **Sentry & Exception Filter**: `GlobalExceptionFilter` enriches Sentry error scopes with `scope.setTag('requestId', req.headers['x-request-id'])` so crashes can be correlated back to exact NGINX log entries.
+
+---
+
+### 3.4 Frontend Client-Side Error Telemetry & Incident IDs
+
+To ensure unhandled React rendering crashes and browser runtime errors are not lost, Next.js 15 (`apps/web`) integrates a dedicated client-side error reporter:
+
+1. **Incident Code Generation (`ERR-KUM-XXXXXX`)**:
+   Every error caught by React error boundaries (`global-error.tsx`, `error.tsx`, and `(dashboard)/error.tsx`) generates a deterministic or unique 6-character hex incident code (e.g. `ERR-KUM-A8F29D`).
+2. **Context Telemetry**:
+   Gathers timestamp, current route URL, userAgent, error digest, and message. Dispatches to Sentry if active or logs structured diagnostic info to the console.
+3. **Actionable UI Action**:
+   The user interface displays the incident reference code on screen alongside a **"Copy / நகலெடு"** button, allowing subscribers, accountants, or partners to immediately copy and report the incident code to IT support.
 
 ---
 

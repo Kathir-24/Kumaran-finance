@@ -116,6 +116,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Observability, Monitoring & Audit Architecture** | [`docs/03-architecture/observability-and-monitoring-architecture.md`](docs/03-architecture/observability-and-monitoring-architecture.md) |
 | **Prometheus Metrics & APM Telemetry**    | [`apps/api/src/metrics/README.md`](apps/api/src/metrics/README.md) |
 | **Daily Operations, Cash Handover & Reversals**| [`docs/07-operations/operations-sop.md`](docs/07-operations/operations-sop.md) |
+| **Production Deployment & Rollback Guide**| [`docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md`](docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md) |
 | **User Manuals Suite Index**              | [`docs/07-operations/user-manuals/README.md`](docs/07-operations/user-manuals/README.md) |
 | **Web Admin & Partner Operations**       | [`docs/07-operations/user-manuals/admin-foreman-manual.md`](docs/07-operations/user-manuals/admin-foreman-manual.md) |
 | **Desk Accountant & Cashier Operations**   | [`docs/07-operations/user-manuals/accountant-desk-manual.md`](docs/07-operations/user-manuals/accountant-desk-manual.md) |
