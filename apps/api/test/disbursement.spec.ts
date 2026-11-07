@@ -234,6 +234,10 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             chitCode: 'KCA-1L-20M-01',
           }),
         }),
+        expect.objectContaining({
+          jobId: 'approval-alert:disbursement:auction-uuid-001',
+          priority: 1,
+        }),
       );
     });
 
