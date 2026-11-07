@@ -28,6 +28,7 @@ export function isTransientTransactionError(err: any): boolean {
     code === 'P2034' || // Prisma transaction conflict / deadlock
     code === '40P01' || // PostgreSQL deadlock_detected
     code === '40001' || // PostgreSQL serialization_failure
+    (code === 'P2002' && (message.includes('receiptNumber') || message.includes('Receipt_receiptNumber_key'))) || // Sequential receipt generation collision retry
     message.includes('deadlock detected') ||
     message.includes('could not serialize access') ||
     message.includes('Transaction failed due to a write conflict')
@@ -38,9 +39,10 @@ export function isTransientTransactionError(err: any): boolean {
  * Executes a Prisma transaction with automated exponential backoff and jitter upon transient deadlocks.
  */
 export async function withTransactionRetry<T>(
-  prisma: PrismaClient,
+  prisma: { $transaction: (action: any, options?: any) => Promise<any> },
   action: (tx: any) => Promise<T>,
   options?: RetryOptions,
+  txOptions?: { maxWait?: number; timeout?: number; isolationLevel?: any },
 ): Promise<T> {
   const maxRetries = options?.maxRetries ?? 3;
   const baseDelayMs = options?.baseDelayMs ?? 50;
@@ -50,7 +52,9 @@ export async function withTransactionRetry<T>(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await prisma.$transaction(action);
+      return txOptions
+        ? await prisma.$transaction(action, txOptions)
+        : await prisma.$transaction(action);
     } catch (err: any) {
       lastError = err;
 

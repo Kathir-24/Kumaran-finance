@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import {
   JOB_DISPATCH_PAYMENT_RECEIPT,
@@ -177,7 +178,7 @@ export class CollectionService {
 
     let result: any;
     try {
-      result = await this.prisma.$transaction(async (tx) => {
+      result = await withTransactionRetry(this.prisma, async (tx) => {
         // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
         if (typeof tx.$queryRaw === 'function') {
           const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
@@ -407,7 +408,7 @@ export class CollectionService {
     }
 
     // 2. Fetch Specified Payments & Verify Collector Ownership within atomic transaction
-    return this.prisma.$transaction(async (tx) => {
+    return withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) with deterministic ID sorting to eliminate deadlocks (40P01)
       if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
         const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();

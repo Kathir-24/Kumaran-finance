@@ -18,10 +18,8 @@ import {
   NOTIFICATION_QUEUE,
 } from '../jobs/constants/queue-names.constant';
 import type { ApprovalAlertJobPayload } from '../jobs/dto/job-payloads.dto';
-import {
-  formatBilingualReceiptText,
-  ReceiptDataInput,
-} from './bilingual-receipt.helper';
+import { formatBilingualReceiptText, ReceiptDataInput } from './bilingual-receipt.helper';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { QueryPaymentDto } from './dto/query-payment.dto';
@@ -193,7 +191,7 @@ export class PaymentService {
 
     let result: any;
     try {
-      result = await this.prisma.$transaction(async (tx) => {
+      result = await withTransactionRetry(this.prisma, async (tx) => {
         // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments and serialize receipt/arrears
         if (typeof tx.$queryRaw === 'function') {
           // A. Lock Branch row to serialize sequential receipt generation per branch without table-level locking
@@ -772,7 +770,7 @@ export class PaymentService {
 
     const now = new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock on affected Subscriber Tickets (deterministic sort) to serialize arrears updates
       if (typeof tx.$queryRaw === 'function') {
         const ticketIds = [...new Set(payment.allocations.map((a) => a.ticketId))].sort();
@@ -1168,7 +1166,7 @@ export class PaymentService {
       ? `${payment.notes || ''} | Verified by ${checkerUserId}: ${dto.verificationNotes.trim()}`
       : `${payment.notes || ''} | Verified by ${checkerUserId}`;
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 1. Update Payment to SUCCESS
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
