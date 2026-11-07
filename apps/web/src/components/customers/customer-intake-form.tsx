@@ -208,52 +208,55 @@ export function CustomerIntakeForm() {
           </Alert>
         )}
 
-        {/* Section 1: Primary Subscriber Details */}
-        <SubscriberDetailsSection
-          fullName={fullName}
-          setFullName={setFullName}
-          fullNameTamil={fullNameTamil}
-          setFullNameTamil={setFullNameTamil}
-          phone={phone}
-          setPhone={setPhone}
-          altPhone={altPhone}
-          setAltPhone={setAltPhone}
-          onFillSample={fillSampleSubscriber}
-        />
+        {/* Form Body Locked During In-Flight Submission */}
+        <fieldset disabled={intakeMutation.isPending} className="space-y-6 disabled:opacity-75">
+          {/* Section 1: Primary Subscriber Details */}
+          <SubscriberDetailsSection
+            fullName={fullName}
+            setFullName={setFullName}
+            fullNameTamil={fullNameTamil}
+            setFullNameTamil={setFullNameTamil}
+            phone={phone}
+            setPhone={setPhone}
+            altPhone={altPhone}
+            setAltPhone={setAltPhone}
+            onFillSample={fillSampleSubscriber}
+          />
 
-        {/* Section 2: Residential Address */}
-        <AddressDetailsSection
-          addressLine1={addressLine1}
-          setAddressLine1={setAddressLine1}
-          addressLine2={addressLine2}
-          setAddressLine2={setAddressLine2}
-          city={city}
-          setCity={setCity}
-          pincode={pincode}
-          setPincode={setPincode}
-        />
+          {/* Section 2: Residential Address */}
+          <AddressDetailsSection
+            addressLine1={addressLine1}
+            setAddressLine1={setAddressLine1}
+            addressLine2={addressLine2}
+            setAddressLine2={setAddressLine2}
+            city={city}
+            setCity={setCity}
+            pincode={pincode}
+            setPincode={setPincode}
+          />
 
-        {/* Section 3: Nominee Details (Optional Toggle) */}
-        <NomineeDetailsSection
-          includeNominee={includeNominee}
-          setIncludeNominee={setIncludeNominee}
-          nomineeName={nomineeName}
-          setNomineeName={setNomineeName}
-          nomineeRelation={nomineeRelation}
-          setNomineeRelation={setNomineeRelation}
-          nomineePhone={nomineePhone}
-          setNomineePhone={setNomineePhone}
-          nomineeAadhaarLast4={nomineeAadhaarLast4}
-          setNomineeAadhaarLast4={setNomineeAadhaarLast4}
-        />
+          {/* Section 3: Nominee Details (Optional Toggle) */}
+          <NomineeDetailsSection
+            includeNominee={includeNominee}
+            setIncludeNominee={setIncludeNominee}
+            nomineeName={nomineeName}
+            setNomineeName={setNomineeName}
+            nomineeRelation={nomineeRelation}
+            setNomineeRelation={setNomineeRelation}
+            nomineePhone={nomineePhone}
+            setNomineePhone={setNomineePhone}
+            nomineeAadhaarLast4={nomineeAadhaarLast4}
+            setNomineeAadhaarLast4={setNomineeAadhaarLast4}
+          />
 
-        {/* Section 4: Statutory Tax & KYC (Optional per ADR-16) */}
-        <KycTaxDetailsSection
-          panNumber={panNumber}
-          setPanNumber={setPanNumber}
-          aadhaarLast4={aadhaarLast4}
-          setAadhaarLast4={setAadhaarLast4}
-        />
+          {/* Section 4: Statutory Tax & KYC (Optional per ADR-16) */}
+          <KycTaxDetailsSection
+            panNumber={panNumber}
+            setPanNumber={setPanNumber}
+            aadhaarLast4={aadhaarLast4}
+            setAadhaarLast4={setAadhaarLast4}
+          />
+        </fieldset>
 
         {/* Submit Actions */}
         <div className="flex items-center justify-end gap-3 pt-2">

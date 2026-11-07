@@ -151,17 +151,18 @@ export function UserForm() {
                 </Alert>
               )}
 
-              {/* Staff Full Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">{t('nameLabel')}</label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('namePlaceholder')}
-                  className="bg-slate-950 border-slate-700 text-slate-100 focus:border-emerald-500"
-                  required
-                />
-              </div>
+              <fieldset disabled={createMutation.isPending} className="space-y-4 disabled:opacity-75">
+                {/* Staff Full Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">{t('nameLabel')}</label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('namePlaceholder')}
+                    className="bg-slate-950 border-slate-700 text-slate-100 focus:border-emerald-500"
+                    required
+                  />
+                </div>
 
               {/* 10-Digit Phone Handle (ADR-18) */}
               <div className="space-y-1.5">
@@ -248,8 +249,9 @@ export function UserForm() {
                 />
                 <p className="text-[11px] text-slate-500">{t('passwordHelp')}</p>
               </div>
+            </fieldset>
 
-              {/* Form Action Buttons */}
+            {/* Form Action Buttons */}
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
                 <Button
                   type="button"

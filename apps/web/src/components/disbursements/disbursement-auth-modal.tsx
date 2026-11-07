@@ -26,6 +26,7 @@ import { formatRupee } from '@/lib/currency';
 import { useAuthStore } from '@/stores/auth-store';
 import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 
 export interface AuthWinnerTarget {
   id: string;
@@ -78,14 +79,18 @@ export function DisbursementAuthModal({
     (BigInt(winner?.auction?.chitGroup?.chitValue ?? 0) -
       BigInt(winner?.auction?.bidDiscount ?? 0));
 
+  // Client-Side Idempotency Session Hook
+  const { idempotencyKey, resetKey } = useIdempotentAction();
+
   useEffect(() => {
     if (isOpen && winner) {
+      resetKey();
       setDisbursementMode('ACCOUNT_PAYEE_CHEQUE');
       setDisbursedAmount(defaultNetPrize ? defaultNetPrize.toString() : '');
       setNotes('');
       setErrorMsg(null);
     }
-  }, [isOpen, winner, defaultNetPrize]);
+  }, [isOpen, winner, defaultNetPrize, resetKey]);
 
   // Maker != Checker Guard (Guardrail 10)
   const isMaker = Boolean(
@@ -115,12 +120,14 @@ export function DisbursementAuthModal({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             disbursementMode,
             disbursedAmount: disbursedAmount ? Number(disbursedAmount) : undefined,
             notes: notes.trim() || undefined,
+            idempotencyKey,
           }),
         },
       );
@@ -132,6 +139,7 @@ export function DisbursementAuthModal({
       return res.json();
     },
     onSuccess: () => {
+      resetKey();
       queryClient.invalidateQueries({ queryKey: queryKeys.disbursements.all });
       if (winner?.auctionId) {
         queryClient.invalidateQueries({
@@ -163,7 +171,7 @@ export function DisbursementAuthModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <fieldset disabled={authorizeMutation.isPending} className="space-y-4 py-2 disabled:opacity-75">
           {/* Maker != Checker Guardrail 10 Alert */}
           {isMaker && (
             <div className="p-3.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-3">
@@ -245,7 +253,7 @@ export function DisbursementAuthModal({
               className="text-xs"
             />
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button

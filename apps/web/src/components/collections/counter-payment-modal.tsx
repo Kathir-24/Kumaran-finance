@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
 import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 import { CounterUpiQr } from './counter-upi-qr';
 
 export type PaymentMethod = 'CASH' | 'UPI' | 'CHEQUE' | 'BANK_TRANSFER';
@@ -41,6 +42,15 @@ export function CounterPaymentModal({
   const [transactionRef, setTransactionRef] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Client-Side Idempotency Session Hook
+  const { idempotencyKey, resetKey } = useIdempotentAction();
+
+  useEffect(() => {
+    if (isOpen) {
+      resetKey();
+    }
+  }, [isOpen, selectedDueId, resetKey]);
 
   // Fetch active schemes
   const { data: schemesData } = useQuery({
@@ -130,7 +140,7 @@ export function CounterPaymentModal({
           paymentMethod,
           transactionRef: transactionRef.trim() || undefined,
           notes: notes.trim() || undefined,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey,
         }),
       });
 
@@ -141,6 +151,7 @@ export function CounterPaymentModal({
       return res.json();
     },
     onSuccess: (data) => {
+      resetKey();
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['installments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -171,7 +182,7 @@ export function CounterPaymentModal({
           </div>
         )}
 
-        <div className="space-y-3.5 text-xs">
+        <fieldset disabled={recordPaymentMutation.isPending} className="space-y-3.5 text-xs disabled:opacity-75">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] text-slate-300">{t('selectSchemeLabel')}</label>
@@ -305,10 +316,17 @@ export function CounterPaymentModal({
               className="mt-1 h-8 bg-slate-800 border-slate-700 text-xs text-slate-100"
             />
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="flex items-center justify-end gap-2 border-t border-slate-800/80 pt-3">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} className="border-slate-700 hover:bg-slate-800 text-xs">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            disabled={recordPaymentMutation.isPending}
+            className="border-slate-700 hover:bg-slate-800 text-xs"
+          >
             Cancel
           </Button>
           <Button

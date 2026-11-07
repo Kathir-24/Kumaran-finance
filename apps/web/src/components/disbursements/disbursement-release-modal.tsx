@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
 import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 
 export interface ReleaseWinnerTarget {
   id: string;
@@ -77,14 +78,18 @@ export function DisbursementReleaseModal({
 
   const isCashMode = winner?.disbursementMode === 'CASH';
 
+  // Client-Side Idempotency Session Hook
+  const { idempotencyKey, resetKey } = useIdempotentAction();
+
   useEffect(() => {
     if (isOpen && winner) {
+      resetKey();
       setPaymentReference(isCashMode ? `CASH-VAULT-${Date.now().toString().slice(-6)}` : '');
       setDisbursedAt(new Date().toISOString().split('T')[0]);
       setNotes('');
       setErrorMsg(null);
     }
-  }, [isOpen, winner, isCashMode]);
+  }, [isOpen, winner, isCashMode, resetKey]);
 
   const releaseMutation = useMutation({
     mutationFn: async () => {
@@ -100,12 +105,14 @@ export function DisbursementReleaseModal({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             paymentReference: paymentReference.trim(),
             disbursedAt: disbursedAt ? new Date(disbursedAt).toISOString() : undefined,
             notes: notes.trim() || undefined,
+            idempotencyKey,
           }),
         },
       );
@@ -117,6 +124,7 @@ export function DisbursementReleaseModal({
       return res.json();
     },
     onSuccess: () => {
+      resetKey();
       queryClient.invalidateQueries({ queryKey: queryKeys.disbursements.all });
       if (winner?.auctionId) {
         queryClient.invalidateQueries({
@@ -148,7 +156,7 @@ export function DisbursementReleaseModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <fieldset disabled={releaseMutation.isPending} className="space-y-4 py-2 disabled:opacity-75">
           {errorMsg && (
             <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -230,7 +238,7 @@ export function DisbursementReleaseModal({
               className="text-xs"
             />
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
