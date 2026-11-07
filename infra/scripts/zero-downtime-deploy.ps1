@@ -19,6 +19,18 @@ Write-Host "====================================================================
 Write-Host "🚀 Starting Zero-Downtime Hot Deployment for Kumaran Chits API..." -ForegroundColor Cyan
 Write-Host "========================================================================" -ForegroundColor Cyan
 
+# Step 0: Preserve current running image tag for automated rollback safety
+$prevImageId = ""
+try {
+    $prevImageId = (docker inspect --format='{{.Image}}' chitflow-api 2>$null).Trim()
+    if ($prevImageId) {
+        Write-Host "🏷️ Preserving previous image target ($prevImageId) as chitflow-api:previous..." -ForegroundColor Yellow
+        docker tag $prevImageId "chitflow-api:previous" 2>$null
+    }
+} catch {
+    # Non-fatal if container does not exist on fresh spin-up
+}
+
 # Step 1: Pre-build the updated API container image
 Write-Host "📦 Step 1: Building updated API container image..." -ForegroundColor Yellow
 docker compose -f $ComposeFile build $TargetService
@@ -53,8 +65,31 @@ for ($i = 1; $i -le $MaxRetries; $i++) {
     Start-Sleep -Seconds $RetryIntervalSeconds
 }
 
+# Step 3b: Automated Rollback Trap on Health Probe Timeout
 if (-not $isReady) {
-    Write-Error "API failed deep health check after $($MaxRetries * $RetryIntervalSeconds) seconds. Aborting deployment."
+    Write-Host "❌ Error: API failed deep health check after $($MaxRetries * $RetryIntervalSeconds) seconds." -ForegroundColor Red
+    if ($prevImageId) {
+        Write-Host "⚠️ Initiating AUTOMATED ROLLBACK to previous container image (chitflow-api:previous)..." -ForegroundColor Red
+        $currentImageName = (docker inspect --format='{{.Config.Image}}' chitflow-api 2>$null).Trim()
+        if (-not $currentImageName) { $currentImageName = "docker-api" }
+        docker tag "chitflow-api:previous" $currentImageName 2>$null
+        docker compose -f $ComposeFile up -d --no-deps $TargetService
+        Write-Host "⏳ Verifying rollback container readiness..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
+        try {
+            $rollbackResp = Invoke-WebRequest -Uri $HealthEndpoint -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue
+            if ($rollbackResp.StatusCode -eq 200) {
+                Write-Host "✅ Rollback container recovered successfully (HTTP 200). Reloading Nginx ingress..." -ForegroundColor Green
+                docker exec chitflow-nginx nginx -s reload 2>$null
+                Write-Host "🚨 DEPLOYMENT FAILED: Automated rollback executed. System restored to previous working version." -ForegroundColor Yellow
+            } else {
+                Write-Host "🚨 CRITICAL: Rollback container also failed health check. Immediate operator intervention required!" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "🚨 CRITICAL: Rollback container also failed health check. Immediate operator intervention required!" -ForegroundColor Red
+        }
+    }
+    Write-Error "Deployment aborted due to health probe failure."
 }
 
 # Step 4: Reload Nginx reverse proxy with zero dropped connections
