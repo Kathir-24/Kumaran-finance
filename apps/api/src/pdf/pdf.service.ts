@@ -32,7 +32,7 @@ export class PdfService {
    */
   async generateReceiptPdf(
     paymentId: string,
-    requestingUser: JwtPayload,
+    requestingUser?: JwtPayload,
   ): Promise<GeneratedPdfResult> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -61,10 +61,12 @@ export class PdfService {
       throw new NotFoundException('Payment or receipt not found');
     }
 
-    // Enforce 6-persona ownership & data scoping
-    DocumentAccessHelper.assertReceiptAccess(payment, requestingUser);
+    // Enforce 6-persona ownership & data scoping when called in HTTP user context
+    if (requestingUser) {
+      DocumentAccessHelper.assertReceiptAccess(payment, requestingUser);
+    }
 
-    // If receipt PDF has already been generated and persisted to S3/storage, stream directly
+    // If receipt PDF has already been generated and persisted to S3/storage, return directly
     if (payment.receipt.pdfS3Key) {
       try {
         const file = await this.storageService.getFile(payment.receipt.pdfS3Key);

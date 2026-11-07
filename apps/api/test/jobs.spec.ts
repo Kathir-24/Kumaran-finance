@@ -284,6 +284,44 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(pushNotif?.messageText).toContain('மாத தவணை தொகை ரூ. 4,100 பெறப்பட்டது! ரசீது எண்: KC-REC-PRD-2026-00413');
     });
 
+    it('should asynchronously trigger receipt PDF pre-rendering when PdfService is injected', async () => {
+      const pdfServiceMock = {
+        generateReceiptPdf: jest.fn().mockResolvedValue({
+          buffer: Buffer.from('%PDF-1.4 mock'),
+          key: 'receipts/PRD/2026/KC-REC-PRD-2026-00414.pdf',
+          presignedUrl: 'https://storage.kumaranfinance.in/receipt-00414.pdf',
+        }),
+      };
+
+      const pushServiceMock = {
+        sendPushNotification: jest.fn().mockResolvedValue({ messageId: 'push-partner-msg-01' }),
+      };
+
+      const serviceWithPdf = new NotificationService(
+        undefined,
+        pushServiceMock as any,
+        prismaMock as unknown as PrismaService,
+        undefined,
+        pdfServiceMock as any,
+      );
+
+      await serviceWithPdf.dispatchPaymentReceipt({
+        paymentId: 'pay-003',
+        receiptNumber: 'KC-REC-PRD-2026-00414',
+        recipientPhone: '9842143210',
+        subscriberName: 'S. Sundaram',
+        amountPaid: '5000',
+        chitCode: 'KCA-1L-20M-01',
+        ticketNumber: 7,
+        paymentMode: 'CASH',
+        transactionTimestamp: '21-Oct-2026 12:00 PM',
+        receiptDownloadUrl: 'https://storage.kumaranfinance.in/receipt-00414.pdf',
+        passbookAppUrl: 'https://app.kumaranfinance.in/passbook/tkt-7',
+      });
+
+      expect(pdfServiceMock.generateReceiptPdf).toHaveBeenCalledWith('pay-003');
+    });
+
     it('should broadcast upcoming auction reminder to subscribers in Tamil', async () => {
       const res = await notificationService.dispatchAuctionReminder({
         chitGroupId: 'group-001',

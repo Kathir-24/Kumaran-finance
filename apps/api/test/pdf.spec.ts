@@ -99,6 +99,11 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         sizeBytes: 1024,
         mimeType: 'application/pdf',
       }),
+      getFile: jest.fn().mockResolvedValue({
+        buffer: Buffer.from('%PDF-1.4 pre-rendered-receipt-content'),
+        mimeType: 'application/pdf',
+        sizeBytes: 1024,
+      }),
       getPresignedUrl: jest.fn().mockResolvedValue('https://storage.kumaranfinance.in/signed-url?exp=900'),
     };
 
@@ -313,6 +318,38 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         data: expect.objectContaining({ pdfS3Key: expect.any(String) }),
       });
       expect(storageMock.getPresignedUrl).toHaveBeenCalledWith(expect.any(String), 900);
+      expect(result.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-url?exp=900');
+    });
+
+    it('should pre-render receipt PDF when requestingUser is omitted (background BullMQ worker mode)', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(mockPaymentData);
+
+      const result = await pdfService.generateReceiptPdf('pay-001');
+
+      expect(result.buffer).toBeInstanceOf(Buffer);
+      expect(storageMock.uploadFile).toHaveBeenCalled();
+      expect(prismaMock.receipt.update).toHaveBeenCalledWith({
+        where: { id: 'rec-001' },
+        data: expect.objectContaining({ pdfS3Key: expect.any(String) }),
+      });
+      expect(result.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-url?exp=900');
+    });
+
+    it('should return pre-rendered PDF directly if receipt.pdfS3Key already exists without regenerating', async () => {
+      const mockPaymentWithS3Key = {
+        ...mockPaymentData,
+        receipt: {
+          id: 'rec-001',
+          receiptNumber: 'KC-REC-PRD-2026-00045',
+          pdfS3Key: 'receipts/PRD/2026/KC-REC-001.pdf',
+        },
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(mockPaymentWithS3Key);
+
+      const result = await pdfService.generateReceiptPdf('pay-001', superAdminUser);
+
+      expect(storageMock.getFile).toHaveBeenCalledWith('receipts/PRD/2026/KC-REC-001.pdf');
+      expect(result.key).toBe('receipts/PRD/2026/KC-REC-001.pdf');
       expect(result.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-url?exp=900');
     });
 

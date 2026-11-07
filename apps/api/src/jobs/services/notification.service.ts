@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PushService } from '../../notification/services/push.service';
 import { SmsService } from '../../notification/services/sms.service';
+import { PdfService } from '../../pdf/pdf.service';
 import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 import type {
   ApprovalAlertJobPayload,
@@ -64,16 +65,29 @@ export class NotificationService {
     @Optional() private readonly pushService?: PushService,
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly redisProvider?: RedisConnectionProvider,
+    @Optional() private readonly pdfService?: PdfService,
   ) {}
 
   /**
    * Formats and records/dispatches bilingual payment receipt alert:
    * - Primary (₹0 Cost): Mobile App Push Notification (FCM) deep-linking to /passbook.
    * - Fallback: Indian DLT-Compliant SMS via SmsService (only if customer has no registered smartphone/FCM token).
+   * - Offloads receipt PDF pre-rendering asynchronously to S3 so client downloads are instant (0ms latency).
    */
   async dispatchPaymentReceipt(
     payload: PaymentReceiptNotificationJobPayload,
   ): Promise<{ smsId?: string; pushId?: string; whatsappId: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
+    // Asynchronously pre-render receipt PDF into S3 so user downloads encounter 0ms generation delay
+    if (this.pdfService && payload.paymentId) {
+      try {
+        await this.pdfService.generateReceiptPdf(payload.paymentId);
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to pre-render receipt PDF for payment ${payload.paymentId}: ${err.message}`,
+        );
+      }
+    }
+
     const formattedAmount = BigInt(payload.amountPaid).toLocaleString('en-IN');
 
     let smsId: string | undefined;

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationModule } from '../notification/notification.module';
+import { PdfModule } from '../pdf/pdf.module';
 import { BullBoardAuthMiddleware } from './bull-board/bull-board-auth.middleware';
 import { BullBoardService } from './bull-board/bull-board.service';
 import { JobsController } from './jobs.controller';
@@ -14,7 +15,7 @@ import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
 
 @Module({
-  imports: [PrismaModule, NotificationModule],
+  imports: [PrismaModule, NotificationModule, PdfModule],
   controllers: [JobsController],
   providers: [
     RedisConnectionProvider,
