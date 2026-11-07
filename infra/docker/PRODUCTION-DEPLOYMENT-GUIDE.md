@@ -1,7 +1,7 @@
 # Kumaran Chits — Production Deployment & Operations Guide
 
 > **Platform**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Target OS**: Ubuntu 24.04 LTS (AWS EC2 / Self-Hosted VPS)  
+> **Target OS**: Ubuntu 24.04 LTS (Self-Hosted Linux VPS / Cloud Instance)  
 > **Orchestration**: Docker Compose v2 (Modular Production Parity)  
 > **Key Guardrails**: PostgreSQL 17 Port 5433, Native `BigInt` Math, TLS 1.3, Zero Buffer SSE, Automated 02:00 AM IST Off-Site Backup
 
@@ -25,7 +25,7 @@ flowchart TD
         Worker --> DB
         API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)")]
         Worker --> Redis
-        API --> S3[("MinIO / AWS S3\n(chitflow-minio :9000)")]
+        API --> S3[("MinIO / S3 Storage\n(chitflow-minio :9000)")]
 
         BackupCron["Automated Backup Cron\n(chitflow-backup-cron)\n02:00 AM IST Nightly"] --> DB
         BackupCron --> S3
@@ -75,7 +75,7 @@ flowchart TD
 ### 2.1 Hardware Requirements
 - **CPU**: 2 vCPU or higher (4 vCPU recommended)
 - **RAM**: 4 GB minimum (8 GB recommended)
-- **Disk**: 50 GB NVMe / SSD (Encrypted with LUKS / AWS KMS)
+- **Disk**: 50 GB NVMe / SSD (Encrypted storage)
 
 ### 2.2 Host Package Installation (Ubuntu 24.04 LTS)
 ```bash
@@ -184,7 +184,7 @@ data: {"type":"APPROVALS_UPDATE","summary":{"totalPendingCount":2,"cashHandovers
 ### 6.1 Schedule & Operation
 - The `chitflow-backup-cron` container runs `crond` scheduled for `02:00 AM IST` (`30 20 * * *` UTC).
 - Dumps PostgreSQL database using custom binary format (`pg_dump -F c`).
-- Uploads directly to private AWS S3 / MinIO under `backups/db/YYYY/MM/kumaran_chits_backup_YYYYMMDD_HHMMSS.dump`.
+- Uploads directly to private S3 / MinIO storage under `backups/db/YYYY/MM/kumaran_chits_backup_YYYYMMDD_HHMMSS.dump`.
 - Prunes local dumps older than 7 days and enforces 30-day S3 retention.
 
 ### 6.2 Manual Backup Trigger (On-Demand Snapshot)

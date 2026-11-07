@@ -258,7 +258,7 @@ The following DDL actions are strictly prohibited in a single-step release:
 
 ### 7.3 Pre-Migration Safety Checklist
 Before running `pnpm exec prisma migrate deploy` in production:
-- [ ] Database backup snapshot verified via `backup-db.sh` or AWS S3 snapshot.
+- [ ] Database backup snapshot verified via `backup-db.sh` or off-site S3 snapshot.
 - [ ] Migration contains zero destructive `DROP` or `RENAME` statements on active business columns.
 - [ ] New monetary columns use PostgreSQL `BigInt` (not `INTEGER` or `NUMERIC`/`FLOAT`).
 - [ ] New foreign keys are indexed to prevent sequential table scans during joins and deletes.

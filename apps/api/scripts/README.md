@@ -98,7 +98,7 @@ bash infra/scripts/drp-drill.sh
 ## 3. Automated S3 Database Backup (`backup-to-s3.ts`)
 
 - **Schedule**: Every midnight at 02:00 AM IST via OS cron / Task Scheduler.
-- **Encryption**: Uses `AES256` server-side encryption when uploading to AWS S3. Local MinIO runs standard mode.
+- **Encryption**: Uses `AES256` server-side encryption when uploading to cloud S3 storage. Local MinIO runs standard mode.
 - **Retention Pruning**: Scans `backups/db/` and auto-deletes snapshots older than **30 days** per DRP §3.2.
 - **Execution**: `pnpm run db:backup:s3`
 

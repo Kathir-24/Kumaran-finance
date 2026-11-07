@@ -221,10 +221,10 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
   console.log(
     config.endpoint
       ? `[BACKUP] Uploading to S3/MinIO storage...`
-      : `[BACKUP] Uploading to AWS S3 storage with AES256 server-side encryption...`,
+      : `[BACKUP] Uploading to S3-compatible storage with AES256 server-side encryption...`,
   );
 
-  // 2. Upload to S3 storage (AES256 SSE on AWS S3; standard on local MinIO)
+  // 2. Upload to S3 storage (AES256 SSE on S3-compatible cloud storage; standard on local MinIO)
   const putParams: any = {
     Bucket: config.bucket,
     Key: s3Key,

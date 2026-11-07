@@ -51,7 +51,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Full name (English and optional Tamil), mobile phone number, physical address, and nominee details.
   - Known local subscribers are onboarded immediately without forced identity paperwork.
   - Optional Fields: Masked Aadhaar (last 4 digits only, e.g., `4821`), PAN number, and document uploads are strictly optional and never mandatory.
-- **Document Storage**: Optional identity and agreement scans stored in secure private AWS S3 storage with time-limited presigned access links.
+- **Document Storage**: Optional identity and agreement scans stored in secure private S3-compatible storage (Cloudflare R2, MinIO, or private S3) with time-limited presigned access links.
 
 ### Module 4: Chit Scheme Management (New & Ongoing) (`CONFIRMED-BY-DEVELOPER`)
 - **Scheme Parameters**: Chit Value ($V$), Duration Months ($N$), Total Tickets ($M = N$), Base Monthly Installment ($I_{base} = V / N$). All values in whole integer Rupees (₹).

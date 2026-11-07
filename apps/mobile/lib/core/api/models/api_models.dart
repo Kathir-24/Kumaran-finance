@@ -5502,7 +5502,7 @@ class VerifySafetyProofDto {
   final bool agreementSigned;
   /// Whether the nominee has signed the agreement / guarantee
   final bool nomineeSigned;
-  /// Private AWS S3 key of scanned uploaded security papers / blank cheques
+  /// Private S3 storage key of scanned uploaded security papers / blank cheques
   final String? securityDocS3Key;
   /// Maker verification remarks and observations
   final String? notes;

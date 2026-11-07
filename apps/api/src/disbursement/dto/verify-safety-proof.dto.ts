@@ -47,7 +47,7 @@ export class VerifySafetyProofDto {
 
   @ApiPropertyOptional({
     example: 'kyc/payouts/KCA-1L-20M-01/winner-ticket-07-cheques.pdf',
-    description: 'Private AWS S3 key of scanned uploaded security papers / blank cheques',
+    description: 'Private S3 storage key of scanned uploaded security papers / blank cheques',
   })
   @IsOptional()
   @IsString()

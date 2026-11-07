@@ -1,94 +1,119 @@
-# Kumaran Chits — AWS Infrastructure & Disaster Recovery Plan (DRP)
+# Kumaran Chits — Production Infrastructure, Hosting Alternatives & Disaster Recovery Plan (DRP)
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
-> **Target Cloud**: Fresh AWS Account (Region: `ap-south-1` — Mumbai, India)  
+> **Company Reality**: 1 physical branch office (Head Office: Perundurai, Erode, Tamil Nadu), 4 equal partners, 1 desk accountant/cashier, 2–3 field collection agents, known subscribers, physical notebook onboarding.  
+> **Primary Target Hosting**: Single Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore) + Cloudflare R2 (S3-Compatible Object Storage)  
 > **Availability Targets**: $\text{RPO} \le 15\text{ minutes}$, $\text{RTO} \le 2\text{ hours}$
 
 ---
 
-## 1. AWS Cloud Architecture Diagram
+## 1. Production Architecture Overview
+
+Kumaran Chits is packaged as a high-reliability, cloud-agnostic Docker Compose modular monolith. It is completely decoupled from proprietary cloud vendor lock-in and can run identically on a flat-fee Linux VPS, an on-premise physical office server, or an enterprise cloud provider.
 
 ```mermaid
 flowchart TD
-    Internet((Internet)) --> WAF[AWS WAF / CloudFront\nDDoS Protection & TLS Termination]
-    WAF --> ALB[Application Load Balancer / Nginx]
-
-    subgraph VPC["AWS Virtual Private Cloud (ap-south-1)"]
-        subgraph PublicSubnet["Public Subnet (AZ-1 & AZ-2)"]
-            ALB
+    Clients["Client Tier\n• Mobile Field App (Flutter Android)\n• Web Operations Dashboard (Next.js 15)"]
+    
+    Cloudflare["Edge Ingress & CDN Tier\n• Cloudflare DNS & Free TLS Termination\n• DDoS Protection & Edge Rate Limiting"]
+    
+    subgraph HostServer ["Linux Production VPS / Dedicated Host (Mumbai / Bangalore)"]
+        Nginx["NGINX Reverse Proxy (Port 80/443)\n• Gzip Compression | SSL Offloading\n• Edge Rate Limiting | X-Request-ID Tracer"]
+        
+        subgraph AppTier ["Application Services"]
+            API["NestJS 12 API (:3000)\n• Stateless JWT Verification\n• Native BigInt Integer Math\n• ENABLE_BULLMQ_WORKERS=false"]
+            Worker["Dedicated BullMQ Worker (:3002)\n• Midnight Arrears & Defaulter Sweep\n• DLT SMS & Push Notification Dispatch\n• ENABLE_BULLMQ_WORKERS=true"]
+            Web["Next.js 15 Web Portal (:3001)\n• Standalone Node.js Container\n• Bilingual English / தமிழ் Interface"]
         end
-
-        subgraph PrivateSubnet["Private App Subnet"]
-            App1["NestJS API Container 1\n(ECS Fargate / EC2 Docker)"]
-            App2["NestJS API Container 2\n(Redundancy)"]
-            Worker["BullMQ Background Worker\n(Reminders & Reconciliations)"]
-        end
-
-        subgraph SecureDataSubnet["Isolated Database Subnet"]
-            RDS[("AWS RDS PostgreSQL 17\n(Multi-AZ Automated Backups)\nAES-256 KMS Encryption")]
-            Redis[("AWS ElastiCache Redis 7\n(Queue & Fast Caching)")]
+        
+        subgraph DataTier ["Data & Authority Services"]
+            DB[("PostgreSQL 17 Database\n• Port 5432 / Internal Docker Network\n• Sole Financial Truth | BigInt Math\n• max_connections=150")]
+            Redis[("Redis 7 In-Memory Cache & Queue\n• Port 6379 / Internal Docker Network\n• volatile-lru | Distributed Mutexes")]
+            BackupCron["Automated Backup Runner\n• Nightly pg_dump (02:00 AM IST)\n• Encrypted Archive Pipeline"]
         end
     end
-
-    subgraph S3Bucket["AWS S3 Secure Storage"]
-        KYCBucket["Private S3 Bucket\n(KYC Docs & Bilingual PDF Receipts)\nBlocked Public Access | KMS Encrypted"]
+    
+    subgraph StorageTier ["S3-Compatible Object Storage"]
+        R2[("Cloudflare R2 / MinIO\n• Encrypted KYC Scans & Signed PDFs\n• 100% Free Egress Download Fees\n• 15-Minute Presigned PUT/GET URLs")]
     end
 
-    ALB --> App1
-    ALB --> App2
-    App1 --> RDS
-    App2 --> RDS
-    App1 --> Redis
+    Clients --> Cloudflare
+    Cloudflare --> Nginx
+    Nginx --> API
+    Nginx --> Web
+    API --> DB
+    API --> Redis
+    Worker --> DB
     Worker --> Redis
-    Worker --> RDS
-    App1 --> KYCBucket
+    BackupCron --> DB
+    BackupCron -.->|Nightly Encrypted Backup| R2
+    API -.->|Presigned URLs| R2
+    Clients -.->|Direct Upload/Download| R2
 ```
 
 ---
 
-## 2. Fresh AWS Account Provisioning Checklist
+## 2. Production Hosting Models & Cost Comparison
 
-### 2.1 Root Account & Security Hardening
-1. **Enable Hardware/App MFA on AWS Root Account**: Use Microsoft Authenticator immediately upon account creation.
-2. **Never use Root for deployment**: Create an administrative IAM user `admin-kumaran` with MFA for initial setup.
-3. **Region Pinning**: Lock all resources to `ap-south-1` (Mumbai) for regulatory compliance and lowest latency to Tamil Nadu.
-4. **AWS Cost & Budget Alerts**: Configure an AWS Budget alert at $50/month and $100/month to prevent surprise billing.
+Kumaran Finance operates 1 branch office in Perundurai. To avoid surprise cloud bills, high egress bandwidth penalties, and unnecessary DevOps complexity, three hosting options are supported:
 
-### 2.2 Network & Compute Configuration
-- **VPC Setup**: 10.0.0.0/16 VPC with 2 Public Subnets (for ALB) and 2 Private Subnets (for App & Database).
-- **Security Groups**:
-  - `ALB-SG`: Ingress ports 80/443 from `0.0.0.0/0`.
-  - `App-SG`: Ingress port 3000 solely from `ALB-SG`.
-  - `DB-SG`: Ingress port 5432 solely from `App-SG`.
-- **Database (AWS RDS PostgreSQL 17)**:
-  - Instance: `db.t4g.micro` (Dev/Test) $\to$ `db.t4g.small` / `db.t4g.medium` (Production) $\to$ `db.m6g.large` (Dedicated Graviton).
-  - **T4g Unlimited CPU Burst Policy**: Configured with T4g Unlimited mode enabled, ensuring zero CPU throttling during monthly collection rush periods (10th–15th of each month) and live branch auctions.
-  - Storage: 20 GB gp3 with storage autoscaling up to 100 GB.
-  - Automated backups enabled with **7-day point-in-time recovery (PITR)**.
+### 2.1 Primary Recommended Model: Flat-Fee Linux VPS + Cloudflare R2
+- **Compute Provider**: Hostinger VPS (Mumbai) or DigitalOcean Droplet (Bangalore).
+- **Recommended Hardware**: 4 vCPU, 8 GB RAM, 100 GB NVMe SSD.
+- **Object Storage**: Cloudflare R2 (100% S3-compatible protocol).
+- **Cost Structure**:
+  - Compute: **Flat ₹900 to ₹1,800 / month** (billed in INR with GST invoices).
+  - Object Storage (Cloudflare R2): **₹0 / month** (under 10 GB free tier with **₹0 bandwidth egress fees**).
+  - **Total Monthly Cost**: **₹900 – ₹1,800 flat (Zero surprise billing)**.
+- **Why this fits Kumaran Finance**:
+  1. **100% Predictable Expense**: No metered NAT gateway fees, no per-request charges.
+  2. **High Availability for Doorstep Agents**: Runs in a Tier-4 data center (Mumbai/Bangalore) with 99.99% network uptime, ensuring field agents can collect installments from morning to evening.
+  3. **Single-Command Setup**: Entire system boots from a single command: `docker compose -f infra/docker/docker-compose.fullstack.yml up -d`.
 
-### 2.3 Redis Cache & Queue Infrastructure (AWS ElastiCache Redis 7)
-- **Node Type**: `cache.t4g.micro` (Dev/Test) $\to$ `cache.t4g.small` (Production Multi-AZ).
-- **Parameter Group Configurations**:
-  - `maxmemory-policy = volatile-lru` (Evicts keys with an explicit TTL under memory pressure, protecting BullMQ job queues).
-- **CloudWatch Monitoring & Alarms**:
-  - `DatabaseMemoryUsagePercentage >= 75%` triggers an operational warning alert before memory saturation.
-  - `EngineCPUUtilization >= 70%` triggers an alert for cluster resizing.
+### 2.2 Alternative Model 2: Local Head Office Mini-Server (Perundurai)
+- **Hardware**: Dedicated office mini-PC (e.g. Intel NUC, Dell OptiPlex Micro, 16 GB RAM, 512 GB NVMe, mini-UPS).
+- **One-Time Cost**: ~₹25,000 to ₹35,000 hardware purchase.
+- **Monthly Cloud Cost**: **₹0 / month forever**.
+- **External Access**: Exposed securely to field collection agents via a **free Cloudflare Tunnel** (`cloudflared`), requiring no public static IP or port forwarding.
+- **Trade-off**: Requires local power and broadband reliability in Perundurai; if office internet drops, field collection agents cannot sync online until restored.
 
-### 2.4 Host Storage & SSL Certificate Expiration Monitoring Policy
+### 2.3 Alternative Model 3: Enterprise Cloud (AWS / GCP)
+- Available as an optional cloud target if Kumaran Finance expands into multiple branches across Tamil Nadu in the future.
+- Uses AWS ECS Fargate, RDS PostgreSQL 17, and S3 in `ap-south-1` (Mumbai).
+- Cost: ~₹4,500 to ₹9,000+ ($60–$120/month) with metered egress and managed service premiums.
+
+---
+
+## 3. Server Configuration & Security Hardening (Linux VPS)
+
+### 3.1 Host Sizing & Startup Parameters
+- **OS**: Ubuntu 24.04 LTS (x86_64).
+- **Docker & Docker Compose**: Installed via official Docker repository (`docker-ce`, `docker-compose-plugin`).
+- **PostgreSQL Database Server Limits**:
+  - `max_connections = 150`
+  - `shared_buffers = 512MB`
+  - `statement_timeout = 15000` (15s query kill safeguard)
+  - `lock_timeout = 5000` (5s lock abort safeguard)
+- **Redis Cache Limits**:
+  - `maxmemory 512mb` with `maxmemory-policy volatile-lru`.
+
+### 3.2 S3-Compatible Storage Setup (Cloudflare R2)
+Cloudflare R2 operates identically to S3 using the standard `@aws-sdk/client-s3` driver. In `.env`:
+```env
+STORAGE_DRIVER=s3
+S3_ENDPOINT=https://<cloudflare-account-id>.r2.cloudflarestorage.com
+S3_BUCKET=kumaran-chits-private
+S3_ACCESS_KEY_ID=<r2-access-key-id>
+S3_SECRET_ACCESS_KEY=<r2-secret-access-key>
+S3_REGION=auto
+S3_FORCE_PATH_STYLE=false
+```
+
+### 3.3 Host Storage & SSL Certificate Expiration Monitoring Policy
 - **Storage Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
 - **Storage Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
 - **SSL/TLS Expiration Probe**: Automated certificate monitoring probe via [`infra/scripts/cert-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.sh) (Linux) and [`infra/scripts/cert-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.ps1) (Windows) triggers a critical alert whenever certificate validity drops to **$\le 30$ days** (`SSL_EXPIRY_THRESHOLD_SECONDS=2592000`).
-- **PostgreSQL Server Timeouts**: Production database enforces `statement_timeout = 15000` (15s) and `lock_timeout = 5000` (5s) to guarantee rogue queries cannot cause cascading connection starvation.
-
-### 2.5 Horizontal Autoscaling & Multi-AZ High Availability
-- **Target Tracking Autoscaling**: Configured via AWS ECS Auto Scaling. Triggers scale-out when Average CPU Utilization $\ge 60\%$ or API response time exceeds $500\text{ms}$ (p95) for 2 consecutive minutes. Minimum 2 replicas running across distinct AZs (`ap-south-1a`, `ap-south-1b`).
-- **Scheduled Auction-Day Pre-Warming**: Pre-warms cluster from 2 to 4 active replicas 30 minutes prior to scheduled branch auctions.
-- **Deep Health Probing & Zero-Downtime Rolling Updates**: Configured via `/health/readiness` (PostgreSQL `SELECT 1` + Redis `PING`) with `minimumHealthyPercent = 100` and graceful 15-second connection draining. Full specification in [`docs/03-architecture/horizontal-scaling-and-high-availability.md`](../03-architecture/horizontal-scaling-and-high-availability.md).
-
-### 2.6 Edge CDN, Cloud Quotas & Bandwidth Saturation Prevention
-- **AWS CloudFront Edge CDN**: Deployed in front of the Application Load Balancer. Static assets (`/_next/static/*`, images, fonts) are cached with `Cache-Control: public, max-age=31536000, immutable`, while dynamic `/api/*` endpoints bypass edge caching (`no-store`). High-bandwidth documents (PDF receipts, KYC scans) use 15-minute temporary presigned S3 URLs directly.
 - **SMS DLT Provider Credit Guardian**: SMS gateway balance is monitored with automated alerts at 500 remaining credits, with seamless fallback to free Firebase Cloud Messaging (FCM) mobile push alerts and Web Push notifications.
-- **Full Infrastructure Specification**: Consult [`docs/03-architecture/server-and-infrastructure-resilience.md`](../03-architecture/server-and-infrastructure-resilience.md).
 
 ---
 
@@ -97,13 +122,13 @@ flowchart TD
 ### 3.1 Recovery Metrics
 | Metric | Target | How It Is Achieved |
 |---|---|---|
-| **Recovery Point Objective (RPO)** | **$\le 15$ minutes** | PostgreSQL continuous Write-Ahead Log (WAL) archiving to S3 via AWS RDS automated backups. |
-| **Recovery Time Objective (RTO)** | **$\le 2$ hours** | Containerized app rebuild from Docker registry + automated point-in-time database snapshot restore. |
+| **Recovery Point Objective (RPO)** | **$\le 15$ minutes** | PostgreSQL continuous Write-Ahead Log (WAL) archiving and automated nightly database dumps via `chitflow-backup-cron`. |
+| **Recovery Time Objective (RTO)** | **$\le 2$ hours** | Automated database snapshot restore via `restore-db.sh` / `restore-from-s3.sh` and Docker container rebuild. |
 
-### 3.2 Backup Lifecycle & Retention Schedule
-1. **Continuous Backups**: Automated RDS transactions backed up continuously for 7 days (point-in-time restore to any second).
-2. **Daily Snapshot**: Encrypted RDS snapshot taken every midnight (02:00 AM IST) and retained for **30 days**.
-3. **S3 Versioning & Cross-Region Replication (CRR)**: S3 buckets storing customer KYC and PDF receipts have **Object Versioning enabled** and **Cross-Region Replication (CRR)** configured from `ap-south-1` (Mumbai) to `ap-south-2` (Hyderabad) to eliminate single-region point-of-failure risks. Nightly encrypted PostgreSQL snapshots are also replicated to the secondary region.
+### 4.2 Backup Lifecycle & Retention Schedule
+1. **Automated Nightly Snapshot**: Full encrypted `pg_dump` taken every night at 02:00 AM IST by `chitflow-backup-cron`, verified, and uploaded to offsite S3-compatible storage (Cloudflare R2 / MinIO).
+2. **Local Retention Buffer**: Last 7 daily backup dumps retained on host SSD for sub-minute disaster recovery.
+3. **Offsite S3 Replication**: Encrypted archives retained offsite for **30 days** in S3-compatible object storage with versioning enabled to eliminate local hardware failure risks.
 
 ### 3.3 Quarterly Disaster Recovery Drill Procedure
 Once every 90 days (or on demand during audits), the developer and Kumaran Finance administrator execute this automated drill:
@@ -176,35 +201,27 @@ For on-premise branch operations and local developer testing, automated scripts 
 
 ---
 
-## 4. Production Go-Live Deployment Checklist (Local vs Live AWS)
+## 4. Production Go-Live Deployment Checklist (VPS & Cloud Production)
 
-Before launching the platform into live customer and partner operations in Perundurai, the DevOps engineer must verify all 5 infrastructure transitions from local development defaults to hardened AWS production configurations:
+Before launching the platform into live customer and partner operations in Perundurai, the DevOps engineer must verify all 5 infrastructure transitions from local development defaults to hardened production configurations:
 
-| Security Area | Local / Staging Default | Required in Live Production (AWS) | Implementation Verification |
+| Security Area | Local / Staging Default | Required in Live Production (VPS / Cloud) | Implementation Verification |
 |---|---|---|---|
-| **HTTPS / TLS** | Local HTTP (`http://localhost:3000`) | Enforce HTTPS-only via **AWS CloudFront / Application Load Balancer (ALB)** with an auto-renewing **AWS Certificate Manager (ACM)** SSL/TLS certificate. | Port 80 traffic automatically redirects (HTTP 301) to HTTPS port 443. Plaintext HTTP is rejected at the load balancer. |
-| **Secrets Storage** | Plain text `.env` file on local disk | Store sensitive credentials (`DATABASE_URL`, `JWT_SECRET`) in **AWS Secrets Manager** or **AWS SSM Parameter Store** (`SecureString`). | Zero production passwords or JWT keys committed to git, Docker images, or unencrypted disk storage. |
-| **Database Subnet Isolation** | Docker container port `5433` exposed on `127.0.0.1` | Deploy **AWS RDS PostgreSQL 17** in a **Private VPC Subnet** with **zero public IP address** (`PubliclyAccessible: No`). | Security group `DB-SG` allows inbound port 5432 exclusively from the Application Security Group (`App-SG`). Zero direct internet access. |
-| **S3 Bucket Encryption & Access** | Local filesystem (`./storage/uploads`) | Enable **AWS SSE-KMS** encryption and turn on **Block All Public Access** on S3 bucket. | S3 bucket blocks all public ACLs and bucket policies. Documents are strictly accessible via 15-minute temporary presigned URLs. |
-| **Automated Database Backups** | Local PowerShell scripts (`infra/scripts/backup-db.ps1`) | Enable **AWS RDS Automated Backups** with **7-day Continuous Point-in-Time Recovery (PITR)** and daily snapshots retained for **30 days**. | Nightly automated snapshot scheduled at 02:00 AM IST. RPO $\le 15$ min, RTO $\le 2$ hours verified via quarterly recovery drill. |
+| **HTTPS / TLS** | Local HTTP (`http://localhost:3000`) | Enforce HTTPS-only via **Nginx Ingress with Let's Encrypt / Certbot** or **Cloudflare Edge SSL**. | Port 80 traffic automatically redirects (HTTP 301) to HTTPS port 443. Plaintext HTTP is rejected at ingress. |
+| **Secrets Storage** | Plain text `.env` file on local disk | Store sensitive credentials (`DATABASE_URL`, `JWT_SECRET`) in root-owned `chmod 600 .env` file or cloud secrets manager. | Zero production passwords or JWT keys committed to git, Docker images, or unencrypted storage. |
+| **Database Subnet Isolation** | Docker container port `5433` exposed on `127.0.0.1` | Deploy **PostgreSQL 17** within an isolated Docker bridge network (`chitflow-internal`) with **zero public host port mapping**. | Database port 5432 is accessible exclusively by internal services (`chitflow-api`, `chitflow-worker`, `backup-cron`). Zero external internet exposure. |
+| **S3 Bucket Encryption & Access** | Local filesystem (`./storage/uploads`) | Enable **Server-Side Encryption** and enforce **Block All Public Access** on private S3 bucket (Cloudflare R2, MinIO, or S3). | Bucket blocks all public access. Documents are strictly accessible via 15-minute temporary presigned URLs. |
+| **Automated Database Backups** | Local PowerShell scripts (`infra/scripts/backup-db.ps1`) | Enable **Automated Midnight pg_dump cron (`backup-cron`)** streamed off-site to S3 object storage with daily retention. | Nightly automated snapshot scheduled at 02:00 AM IST. RPO $\le 15$ min, RTO $\le 2$ hours verified via quarterly recovery drill. |
 
-### 4.1 Production Secrets Injection Architecture
-In production container environments (AWS ECS Fargate or Docker):
-- The NestJS API container does **not** mount a physical `.env` file.
-- Instead, the ECS Task Definition directly references secrets by ARN from **AWS Secrets Manager**:
-  ```json
-  "secrets": [
-    {
-      "name": "DATABASE_URL",
-      "valueFrom": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:kumaran/production/db-url"
-    },
-    {
-      "name": "JWT_SECRET",
-      "valueFrom": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:kumaran/production/jwt-secret"
-    }
-  ]
+### 4.1 Production Secrets Management & Injection
+In Linux VPS and production container environments:
+- The production environment file (`.env`) is placed outside public web directories and protected with strict Linux permissions:
+  ```bash
+  chmod 600 /opt/kumaran-chits/.env
+  chown root:root /opt/kumaran-chits/.env
   ```
-- AWS ECS injects the decrypted values directly into process environment variables in memory at container boot time, preventing disk exposure.
+- Docker Compose loads environment variables securely at container instantiation time into process memory, preventing unauthorized access by non-root OS users or disk scanners.
+- In managed cloud container environments (e.g., ECS / K8s), secrets can alternatively be injected directly from secret vaults (e.g. AWS Secrets Manager, HashiCorp Vault, or Doppler) into memory at boot time.
 
 ---
 

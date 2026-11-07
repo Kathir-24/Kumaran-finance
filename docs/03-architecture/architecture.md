@@ -26,7 +26,7 @@ flowchart TD
     subgraph DataTier["Data & Storage Tier"]
         Postgres[("PostgreSQL 17\n(Authoritative Financial State)\nNumeric Math | Row Locking | Audit Logs")]
         Redis[("Redis 7 + BullMQ\n(Non-Authoritative Jobs Queue & OTP Cache)\nReceipt Dispatches | Arrears | Reconciliations | OTP State")]
-        S3["AWS S3 Private Object Storage\n(Encrypted KYC Docs & PDF Receipts)\nPresigned URLs Only"]
+        S3["S3-Compatible Private Storage\n(Cloudflare R2 / MinIO / S3)\nPresigned URLs Only"]
     end
 
     subgraph External["External Services"]
@@ -41,7 +41,7 @@ flowchart TD
 
     Nest -->|Prisma ORM / Transactions| Postgres
     Nest -->|BullMQ Queue| Redis
-    Nest -->|AWS SDK (Presigned URLs)| S3
+    Nest -->|S3 Protocol (Presigned URLs)| S3
     Nest -->|HTTP / Webhooks| PG
     Nest -->|FCM SDK| FCM
     Nest -->|HTTP API| SMS
@@ -117,5 +117,5 @@ apps/api/src/
    - The TypeScript / NestJS layer uses JavaScript native `bigint` for financial calculations. Binary floats (`number`) and fractional paise are strictly disallowed in financial services (`CONFIRMED-BY-DEVELOPER`).
    - Clean whole-rupee numbers are maintained across installments, dividends, commissions, and prize payouts without fractional accumulation.
 3. **Private Document Storage**:
-   - Customer KYC documents and generated PDF receipts are stored in an **AWS S3 Private Bucket** with AES-256 server-side encryption (`aws:kms`).
+   - Customer KYC documents and generated PDF receipts are stored in an **S3-Compatible Private Bucket** (Cloudflare R2, MinIO, or private S3) with AES-256 server-side encryption.
    - Clients access files solely through short-lived presigned URLs (valid for 15 minutes).

@@ -138,10 +138,10 @@ Following deployment, verify system health using these live endpoints:
 
 ## 7. Storage Bucket CORS & CDN Delivery Configuration
 
-When configuring production AWS S3 or MinIO object storage for Kumaran Chits, apply the following CORS policy to enable direct browser presigned PUT uploads:
+When configuring production S3-compatible object storage (Cloudflare R2, MinIO, or private S3) for Kumaran Chits, apply the following CORS policy to enable direct browser presigned PUT uploads:
 
-### 7.1 S3 Bucket CORS Configuration
-Apply this JSON configuration to the `kumaran-chits-private` S3 bucket in the AWS Console or via AWS CLI:
+### 7.1 S3 Bucket / Cloudflare R2 CORS Configuration
+Apply this JSON configuration to the `kumaran-chits-private` bucket in the Cloudflare R2 / S3 storage dashboard:
 
 ```json
 [
@@ -160,9 +160,9 @@ Apply this JSON configuration to the `kumaran-chits-private` S3 bucket in the AW
 ]
 ```
 
-### 7.2 CloudFront / CDN Media Edge Rules
-- **Origin**: Connect to `kumaran-chits-private.s3.ap-south-1.amazonaws.com`.
-- **Query String Forwarding**: Forward all query parameters (`X-Amz-*`) to enable AWS4 presigned signature verification.
+### 7.2 Cloudflare / CDN Media Edge Rules
+- **Origin**: Connect to `kumaran-chits-private` R2 bucket or S3 endpoint.
+- **Query String Forwarding**: Forward all query parameters (`X-Amz-*`) to enable standard S3 presigned signature verification.
 - **Cache-Control**: Pass through `Cache-Control: private, max-age=900` to prevent public caching of private customer documents while allowing browser caching during active viewing sessions.
-- **TLS Version**: Enforce TLS 1.3 minimum (`SecurityPolicy: TLSv1.3_2021`).
+- **TLS Version**: Enforce TLS 1.3 minimum.
 - **Geo-Restriction**: Whitelist India (`IN`) to prevent foreign scraping of financial records.

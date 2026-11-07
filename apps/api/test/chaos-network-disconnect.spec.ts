@@ -114,7 +114,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
     // Mock storageService.uploadFile to simulate mid-stream socket drop / timeout
     const uploadSpy = jest
       .spyOn(storageService, 'uploadFile')
-      .mockRejectedValueOnce(new Error('AWS S3 Network Drop: ETIMEDOUT / Connection Reset'));
+      .mockRejectedValueOnce(new Error('S3 Storage Network Drop: ETIMEDOUT / Connection Reset'));
 
     const mockFile = {
       originalname: 'aadhaar_front_scan.jpg',
@@ -130,7 +130,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
           { docType: KycDocumentType.AADHAAR_FRONT },
           mockFile,
         ),
-      ).rejects.toThrow('AWS S3 Network Drop: ETIMEDOUT');
+      ).rejects.toThrow('S3 Storage Network Drop: ETIMEDOUT');
 
       // CRITICAL ASSERTION: Database has ZERO orphan document records
       const docCount = await prisma.customerDocument.count({
@@ -195,7 +195,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
 
     const uploadSpy = jest
       .spyOn(storageService, 'uploadFile')
-      .mockRejectedValueOnce(new Error('AWS S3 Network Drop: ETIMEDOUT / Connection Reset'));
+      .mockRejectedValueOnce(new Error('S3 Storage Network Drop: ETIMEDOUT / Connection Reset'));
 
     const mockChequeFile = {
       originalname: 'signed_blank_cheque_sbi.jpg',
@@ -211,7 +211,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
           mockChequeFile,
           makerUserId,
         ),
-      ).rejects.toThrow('AWS S3 Network Drop: ETIMEDOUT');
+      ).rejects.toThrow('S3 Storage Network Drop: ETIMEDOUT');
 
       // CRITICAL ASSERTIONS:
       // 1. securityDocS3Key remains null in DB

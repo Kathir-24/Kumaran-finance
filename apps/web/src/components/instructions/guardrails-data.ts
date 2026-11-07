@@ -157,7 +157,7 @@ export const GUARDRAIL_DEFINITIONS: GuardrailDefinition[] = [
     details: [
       'Property collateral documents are completely eliminated (ADR-15).',
       'Flexible on-demand safety proof checklist: signed agreement with winner & nominee, signed blank cheques, promissory notes.',
-      'Private AWS S3 encrypted document attachment recordkeeper.',
+      'Private S3-compatible encrypted document attachment recordkeeper.',
     ],
     docRef: 'docs/01-business/decision-log.md#adr-15',
   },

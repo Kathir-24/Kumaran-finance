@@ -8,7 +8,7 @@
 
 ## 1. Architectural Overview & Topology
 
-Kumaran Chits is built as a horizontally scalable modular monolith designed for seamless multi-instance operation behind modern Layer 7 load balancers (AWS Application Load Balancer / Nginx 1.27+). 
+Kumaran Chits is built as a horizontally scalable modular monolith designed for seamless multi-instance operation behind modern Layer 7 load balancers (NGINX Ingress 1.27+ / Reverse Proxy). 
 
 The platform guarantees stateful integrity across horizontal instances while maintaining high throughput during peak chit fund operational periods (such as monthly collection rush hours on the 10th to 15th of every month, scheduled branch chit auctions, and partner disbursement approvals).
 
@@ -20,7 +20,7 @@ flowchart TD
     end
 
     subgraph IngressTier["Edge Ingress & Reverse Proxy"]
-        ALB["AWS Application Load Balancer / Nginx Ingress\n- Algorithm: least_conn\n- Deep Readiness Health Probes\n- Zero-Downtime Hot Configuration Reload"]
+        ALB["NGINX Ingress / Layer 7 Reverse Proxy\n- Algorithm: least_conn\n- Deep Readiness Health Probes\n- Zero-Downtime Hot Configuration Reload"]
     end
 
     subgraph ComputeTier["Horizontally Scaled Application Cluster"]
@@ -31,8 +31,8 @@ flowchart TD
 
     subgraph DistributedTier["Shared Distributed State Tier"]
         RedisCluster[("Redis 7 In-Memory Cluster\n- Distributed Throttling & Sliding Windows\n- Distributed Notification Audit Log\n- Distributed Circuit Breaker State\n- SSE Pub/Sub Stream Engine")]
-        RDSCluster[("PostgreSQL 17 Multi-AZ Database\n- Standby Streaming Synchronous Replication\n- Sole Financial Truth (Native BigInt)\n- Connection Pool Quota (25/pod)")]
-        S3Storage[("AWS S3 Encrypted Object Store\n- Strict Production S3 Driver Requirement\n- Private KYC Scans & Signed PDF Receipts")]
+        RDSCluster[("PostgreSQL 17 Database Cluster\n- Streaming Standby Replication\n- Sole Financial Truth (Native BigInt)\n- Connection Pool Quota (25/pod)")]
+        S3Storage[("S3-Compatible Encrypted Object Store\n- Cloudflare R2 / MinIO / S3 Driver\n- Private KYC Scans & Signed PDF Receipts")]
     end
 
     Clients --> IngressTier
@@ -177,14 +177,14 @@ To achieve continuous 24/7 availability during code deployments:
 
 ## 8. Autoscaling Policies & Auction-Day Pre-Warming
 
-### 8.1 AWS ECS / Kubernetes Target Tracking Metrics
-- **Metric 1: Average CPU Utilization**: Scale out when CPU exceeds **60%** for 2 consecutive 1-minute intervals.
-- **Metric 2: Target Response Time**: Scale out when Application Latency exceeds **500ms** (p95) on `/api/`.
-- **Warm Headroom**: Minimum 2 replicas running across distinct Availability Zones (`ap-south-1a` and `ap-south-1b`).
+### 8.1 Autoscaling & Resource Monitoring
+- **Metric 1: Average CPU Utilization**: Scale out or alert when CPU exceeds **60%** for 2 consecutive 1-minute intervals.
+- **Metric 2: Target Response Time**: Scale out or alert when Application Latency exceeds **500ms** (p95) on `/api/`.
+- **Warm Headroom**: Minimum 2 worker processes running behind NGINX load balancer.
 - **Cooldown Periods**: Scale-out cooldown = 60s; Scale-in cooldown = 300s.
 
-### 8.2 Scheduled Scaling for Branch Auction Days
+### 8.2 Scheduled Capacity for Branch Auction Days
 - Monthly chit auctions are held at scheduled dates/times (e.g., 2nd Saturday or specific branch evenings).
-- An automated AWS EventBridge rule triggers an ECS scheduled scaling action:
-  - **30 minutes prior to auction start**: Pre-warms cluster from 2 to 4 active replicas.
+- An automated cron or scheduler triggers scheduled capacity preparation:
+  - **30 minutes prior to auction start**: Pre-warms cluster from 2 to 4 active worker processes.
   - **2 hours after auction completion**: Scales back to baseline 2 replicas.

@@ -14,7 +14,7 @@ flowchart LR
     Lint --> Validate["2. Prisma Schema Validate\nDB Schema Integrity"]
     Validate --> Test["3. Jest Automated Tests\nUnit & Financial Invariant Tests"]
     Test --> Build["4. Docker Build & Scan\nContainer Image Creation"]
-    Build --> Deploy["5. CD Deployment\nAWS Staging / Production"]
+    Build --> Deploy["5. CD Deployment\nLinux VPS / Cloud Production"]
 ```
 
 ### 1.1 GitHub Actions Workflow YAML (`.github/workflows/ci.yml`)
@@ -88,9 +88,9 @@ jobs:
       - name: Compile NestJS Application
         run: pnpm --filter api run build
 
-  # Note: The build-and-deploy stage is staged for activation once AWS ECR/ECS infrastructure is provisioned
+  # Note: The build-and-deploy stage is staged for activation once production VPS or container registry is configured
   build-and-deploy:
-    name: Build Docker Container & Deploy to AWS
+    name: Build Docker Container & Deploy
     needs: code-quality-and-tests
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest

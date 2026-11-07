@@ -160,7 +160,7 @@ export class BranchService {
     const redis = this.redisProvider?.getClient();
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
-        const keys = [
+        const keys: string[] = [
           MasterCacheKeys.branchesAll,
           MasterCacheKeys.branchesActive,
         ];

@@ -233,5 +233,5 @@ flowchart TD
 ### Statutory Auditor Formal Sign-Off:
 1. **Mathematical Conservation Invariant**: Confirmed $D = C_f + Div_{total}$ across all completed auctions without a single rupee variance.
 2. **Whole Rupee Arithmetic (`BigInt`)**: Confirmed all ledger values in the database are 64-bit integer Rupees (`BigInt`).
-3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private AWS S3 storage with 15-minute presigned access.
+3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private S3 storage with 15-minute presigned access.
 4. **Dual-Control Enforcement**: Certified that all high-risk mutations (reversals, activations, payouts, handovers) enforced non-identical Maker and Checker signatures.

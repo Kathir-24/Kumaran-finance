@@ -114,11 +114,11 @@ flowchart TD
 
 ### C.1. Server-Side Encryption Unsupported on MinIO (`NotImplemented: KMS not configured`)
 - **Symptoms**: `NotImplemented: Server side encryption specified but KMS is not configured` when uploading or running backups.
-- **Root Cause**: AWS S3 natively supports `ServerSideEncryption: 'AES256'`, but local MinIO requires external KMS/KES services if SSE is passed explicitly.
+- **Root Cause**: Cloud S3 providers natively handle server-side encryption, but local MinIO requires external KMS/KES services if SSE is passed explicitly without KMS configured.
 - **Remedy**:
   - The system dynamically detects `endpoint` / `S3_ENDPOINT`:
     - When `S3_ENDPOINT` is configured (local MinIO / Cloudflare R2), `ServerSideEncryption` is automatically bypassed.
-    - When running in production without `S3_ENDPOINT` (AWS S3), `AES256` is strictly enforced.
+    - When running without custom `S3_ENDPOINT`, `AES256` is strictly enforced.
   - Verify your [`apps/api/.env`](file:///u:/Kumaran-finance/apps/api/.env) has:
     ```ini
     STORAGE_DRIVER=s3
@@ -130,7 +130,7 @@ flowchart TD
 - **Symptoms**: `NoSuchBucket: The specified bucket does not exist`
 - **Root Cause**: Fresh MinIO volume started without creating `kumaran-chits-private`.
 - **Remedy**:
-  - Both [`AwsS3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) and [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/backup-to-s3.ts) feature self-healing `ensureBucketExists()` routines via `HeadBucketCommand` and `CreateBucketCommand`.
+  - Both [`S3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) and [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/backup-to-s3.ts) feature self-healing `ensureBucketExists()` routines via `HeadBucketCommand` and `CreateBucketCommand`.
   - To manually verify or recreate via MinIO Web Console: open [http://localhost:9001](http://localhost:9001) (`chitflow_admin` / `chitflow_storage_secret`) and create bucket `kumaran-chits-private`.
 
 ### C.3. Clock Skew Error (`RequestTimeTooSkewed`)

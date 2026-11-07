@@ -3602,7 +3602,7 @@ export interface components {
         DocumentPresignedUrlResponseDto: {
             /**
              * @description Time-limited 15-minute viewing URL
-             * @example https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...
+             * @example https://storage.kumaranchits.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...
              */
             url: string;
             /**
@@ -5726,7 +5726,7 @@ export interface components {
         SafetyProofUrlResponseDto: {
             /**
              * @description Time-limited S3 presigned URL for viewing the safety proof collateral scan
-             * @example https://chitflow-private-kyc.s3.ap-south-1.amazonaws.com/safety-proofs/...
+             * @example https://storage.kumaranchits.com/safety-proofs/...
              */
             url: string;
             /**
@@ -5776,7 +5776,7 @@ export interface components {
              */
             nomineeSigned: boolean;
             /**
-             * @description Private AWS S3 key of scanned uploaded security papers / blank cheques
+             * @description Private S3 storage key of scanned uploaded security papers / blank cheques
              * @example kyc/payouts/KCA-1L-20M-01/winner-ticket-07-cheques.pdf
              */
             securityDocS3Key?: string;

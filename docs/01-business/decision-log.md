@@ -75,7 +75,7 @@
 ---
 
 ### ADR-10: Ownership of Code, Cloud, and Domain (`CONFIRMED-BY-DEVELOPER` / `OPEN`)
-- **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, AWS cloud account, and domain registration.
+- **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, cloud hosting accounts, and domain registration.
 - **Future Handover (`OPEN`)**: A formal handover to Kumaran Finance may occur later. Handover terms, intellectual property assignment, and ongoing maintenance responsibilities are **OPEN** and subject to future commercial agreement.
 
 ---

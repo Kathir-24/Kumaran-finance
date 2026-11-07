@@ -74,7 +74,7 @@ Environment variables are validated fail-fast at server startup via [`src/config
 | `PRIMARY_BRANCH_CODE` | `string` | Optional | `PRD` | Branch code for Head Office (Perundurai). |
 | `STORAGE_DRIVER` | `string` | Optional | `local` | Attachment storage driver (`local` or `s3`). |
 | `LOCAL_STORAGE_PATH` | `string` | Optional | `./storage/uploads` | Path for uploaded KYC documents and PDF receipts in local mode. |
-| `S3_BUCKET` | `string` | If S3 | `kumaran-chits-private` | Universal S3 bucket name (AWS S3, MinIO, Cloudflare R2). |
+| `S3_BUCKET` | `string` | If S3 | `kumaran-chits-private` | Universal S3 bucket name (Cloudflare R2, MinIO, S3). |
 | `S3_REGION` | `string` | Optional | `ap-south-1` | S3 region (Mumbai). |
 | `S3_ACCESS_KEY_ID` | `string` | If S3 | `undefined` | S3 access key ID. |
 | `S3_SECRET_ACCESS_KEY`| `string` | If S3 | `undefined` | S3 secret access key. |

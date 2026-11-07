@@ -24,11 +24,11 @@ flowchart TD
     subgraph ENGINE["2. Encrypted Storage Engine & Guards"]
         SEC["StorageKeyHelper\n(Path Traversal & Collision Defense)"]
         ABAC["DocumentAccessHelper\n(6-Persona ABAC / Anti-BOLA Guard)"]
-        DRV["Dual-Driver Storage Engine\n(AwsS3StorageDriver <-> LocalStorageDriver)"]
+        DRV["Dual-Driver Storage Engine\n(S3StorageDriver <-> LocalStorageDriver)"]
     end
 
     subgraph VAULT["3. Private Vault & Delivery"]
-        S3["Private AWS S3 / MinIO Vault\n(Bucket: kumaran-chits-private, Zero Public Access)"]
+        S3["Private S3 Vault\n(Cloudflare R2 / MinIO / S3, Zero Public Access)"]
         URL["15-Minute Presigned Download URLs\n(AWS4-HMAC-SHA256, 900s TTL)"]
     end
 
@@ -39,7 +39,7 @@ flowchart TD
 1. **Zero Public S3 Buckets**: The cloud storage bucket (`kumaran-chits-private`) strictly blocks all public reads and writes (`BlockPublicAcls = true`, `BlockPublicPolicy = true`). No document is ever reachable without cryptographic authentication.
 2. **15-Minute Presigned URL Ceiling (`ADR-14`)**: Every document viewing link expires after exactly **900 seconds (15 minutes)**. Links cannot be cached indefinitely or shared across unauthorized devices.
 3. **Zero Loose Thermal Paper Slips (`ADR-11`)**: Loose thermal roll printers are eliminated. The subscriber's physical paper passbook (சீட்டு பாஸ்புக்) signed with pen is their ground truth. Digital PDFs exist for smartphone viewing, S3 cloud archival, and on-demand laser printing.
-4. **Server-Side Encryption (`AES256`)**: In production AWS S3, all uploaded objects are written with `ServerSideEncryption: 'AES256'`.
+4. **Server-Side Encryption (`AES256`)**: In production S3 storage (such as Cloudflare R2 or S3), all uploaded objects are written with `ServerSideEncryption: 'AES256'` (where supported).
 5. **Path Traversal Immunity**: Any key containing `..`, `//`, or backslashes is rejected with `HTTP 400 Bad Request`.
 6. **Maker $\ne$ Checker Financial Dual Control (`ADR-10`)**: The staff member who uploads and verifies prize collateral cannot authorize the payout.
 
@@ -177,7 +177,7 @@ classDiagram
         +exists(key) boolean
     }
 
-    class AwsS3StorageDriver {
+    class S3StorageDriver {
         -S3Client s3Client
         -string bucket
         +upload()
@@ -206,7 +206,7 @@ classDiagram
         +getActiveDriverName()
     }
 
-    StorageDriver <|.. AwsS3StorageDriver
+    StorageDriver <|.. S3StorageDriver
     StorageDriver <|.. LocalStorageDriver
     StorageService --> StorageDriver
 ```
@@ -215,7 +215,7 @@ classDiagram
 From [`StorageService.constructor()`](file:///u:/Kumaran-finance/apps/api/src/storage/storage.service.ts#L20-L70):
 1. Reads `STORAGE_DRIVER` from environment (`s3` or `local`).
 2. If `STORAGE_DRIVER === 's3'` and bucket credentials exist (`S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`):
-   - Instantiates [`AwsS3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts).
+   - Instantiates [`S3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) (also exported as `AwsS3StorageDriver` for backwards compatibility).
    - Supports custom `S3_ENDPOINT` (e.g. `http://127.0.0.1:9000` for MinIO) and `S3_FORCE_PATH_STYLE = true`.
 3. If credentials are missing or `STORAGE_DRIVER === 'local'`:
    - Falls back gracefully to [`LocalStorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/local-storage.driver.ts) storing files at `./storage/uploads/`.
@@ -296,7 +296,7 @@ Time:        5.441 s
 ```
 
 #### Key Test Assertions Verified:
-1. `storage.spec.ts`: Path traversal `..` throws `BadRequestException`. `LocalStorageDriver` writes and reads buffers. `AwsS3StorageDriver` passes `ServerSideEncryption: 'AES256'` to S3 client.
+1. `storage.spec.ts`: Path traversal `..` throws `BadRequestException`. `LocalStorageDriver` writes and reads buffers. `S3StorageDriver` passes `ServerSideEncryption: 'AES256'` to S3 client.
 2. `customer.spec.ts`: KYC file upload enforces 10 MB ceiling and MIME type whitelist. Missing file throws `BadRequestException`. Unauthorized customer upload throws `ForbiddenException`.
 3. `disbursement.spec.ts`: Uploading safety proof scan links key to `AuctionWinner.securityDocS3Key`. Maker verification transitions status to `VERIFIED_BY_MAKER` and dispatches `JOB_DISPATCH_APPROVAL_ALERT`.
 4. `pdf.spec.ts`: Field agents barred from downloading prize vouchers and statutory minutes (`HTTP 403`). Customers barred from downloading other members' passbooks. Embedded fonts render Tamil characters cleanly.
@@ -390,7 +390,7 @@ flowchart TD
     subgraph UPLOAD["Direct-to-Storage Upload Pipeline"]
         C1["Next.js Web / Flutter App"] -->|"1. POST /api/v1/storage/presigned-upload-url"| API["NestJS API Server\n(Anti-BOLA Auth Check)"]
         API -->|"2. Return Presigned PUT URL\n(300s TTL, AES256)"| C1
-        C1 -->|"3. Direct S3 PUT\n(Canvas Compressed <1.2MB)"| S3[("Private AWS S3 / MinIO\nkumaran-chits-private")]
+        C1 -->|"3. Direct S3 PUT\n(Canvas Compressed <1.2MB)"| S3[("Private S3 Vault\nkumaran-chits-private")]
     end
 
     subgraph ASYNC["Async Background PDF Bulkhead"]
@@ -408,7 +408,7 @@ flowchart TD
 
 ### 9.1 Direct-to-Storage Presigned PUT Uploads
 - **Endpoint**: `POST /api/v1/storage/presigned-upload-url`
-- **Mechanism**: The client requests a presigned S3 `PUT` upload URL with a 5-minute lifespan (`300s`). The API server verifies user ownership via `DocumentAccessHelper` before issuing the signed URL. The client then transfers the document directly to AWS S3 / MinIO via `PUT` with `Content-Type` and `ServerSideEncryption: 'AES256'`, completely bypassing the Node.js API memory heap.
+- **Mechanism**: The client requests a presigned S3 `PUT` upload URL with a 5-minute lifespan (`300s`). The API server verifies user ownership via `DocumentAccessHelper` before issuing the signed URL. The client then transfers the document directly to S3-compatible storage (Cloudflare R2, MinIO, or S3) via `PUT` with `Content-Type` and `ServerSideEncryption: 'AES256'`, completely bypassing the Node.js API memory heap.
 - **Fallback**: The standard multipart upload endpoint remains available as a transparent fallback for single-shot, low-latency uploads.
 
 ### 9.2 Cellular Upload Timeout Resilience & Client-Side Image Downscaling
@@ -419,7 +419,7 @@ flowchart TD
 - **Pre-Rendering Bulkhead**: In `NotificationService.dispatchPaymentReceipt`, the background BullMQ worker asynchronously pre-renders the subscription receipt PDF via `PdfService.generateReceiptPdf(paymentId)` immediately upon payment confirmation.
 - **Instantaneous User Downloads**: The pre-rendered PDF buffer is vaulted in S3 and its storage key is persisted to `Receipt.pdfS3Key` in PostgreSQL. When a subscriber, cashier, or partner subsequently requests the receipt, the document is served immediately from S3 with **0 ms rendering latency**, eliminating synchronous PDFKit canvas overhead on the API event loop.
 
-### 9.4 HTTP 302 Media Egress Offloading to S3 / CloudFront CDN
-- **Direct Edge Redirection**: All PDF retrieval endpoints (`/api/v1/pdf/receipt/:id`, `/voucher/:id`, `/minutes/:id`, `/passbook/:id`) and the generic storage proxy (`/api/v1/storage/file/*key`) support HTTP `302 Found` redirection directly to presigned S3 / CloudFront edge URLs when `?redirect=true` is requested (or automatically when `STORAGE_DRIVER=s3`).
+### 9.4 HTTP 302 Media Egress Offloading to S3 / Cloudflare CDN Edge
+- **Direct Edge Redirection**: All PDF retrieval endpoints (`/api/v1/pdf/receipt/:id`, `/voucher/:id`, `/minutes/:id`, `/passbook/:id`) and the generic storage proxy (`/api/v1/storage/file/*key`) support HTTP `302 Found` redirection directly to presigned S3 / CDN edge URLs when `?redirect=true` is requested (or automatically when `STORAGE_DRIVER=s3`).
 - **Origin Bandwidth Protection**: Binary streams bypass Node.js memory buffers and Express socket piping, shifting document egress load from the NestJS application instances to cloud object storage.
 - **Streaming Compatibility**: When raw binary streaming is required (e.g., test suites or legacy headless clients), passing `?stream=true` retains raw buffer streaming for 100% backward compatibility.

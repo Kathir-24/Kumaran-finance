@@ -201,7 +201,7 @@ The platform executes autonomous maintenance jobs scheduled strictly in Indian S
 | Time (IST) | Scheduled Routine | Automated Action Executed | Manual Trigger Override |
 |:---:|---|---|---|
 | **00:01 AM** | **Midnight Arrears Recalculation** | Transitions past unpaid dues to `OVERDUE`. Recalculates consecutive missed months, tags tickets with $\ge 3$ consecutive missed installments as `DEFAULT_3_MONTHS` (ADR-07), and emits warning notices. | `POST /api/v1/jobs/run-daily-arrears` |
-| **02:00 AM** | **Off-Site Encrypted S3 Backup** | `pg_dump` binary dump encrypted with `AES256` and streamed to AWS S3. Purges dumps older than 30 days. | `pnpm db:backup:s3` |
+| **02:00 AM** | **Off-Site Encrypted S3 Backup** | `pg_dump` binary dump encrypted with `AES256` and streamed to off-site S3 storage. Purges dumps older than 30 days. | `pnpm db:backup:s3` |
 | **06:00 AM** | **Payment Settlement Reconciliation** | Compares payment gateway orders against settlement reports to auto-resolve ghost drops (`INITIATED` $\to$ `SUCCESS`). | `POST /api/v1/jobs/run-reconciliation` |
 | **09:00 AM** | **Pre-Auction Broadcast Reminder** | Scans chits with auctions in 3 days; broadcasts bilingual mobile Push & DLT SMS alerts with date, time, and branch venue. | `POST /api/v1/jobs/run-pre-auction-scan` |
 

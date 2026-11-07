@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { JwtPayload } from '../src/auth/interfaces/jwt-payload.interface';
-import { AwsS3StorageDriver } from '../src/storage/drivers/aws-s3-storage.driver';
+import { AwsS3StorageDriver, S3StorageDriver } from '../src/storage/drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from '../src/storage/drivers/local-storage.driver';
 import { StorageKeyHelper } from '../src/storage/helpers/storage-key.helper';
 import { StorageController } from '../src/storage/storage.controller';
@@ -132,13 +132,17 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
     });
   });
 
-  describe('3. AwsS3StorageDriver (AWS S3 SDK Mocked Verification)', () => {
-    let s3Driver: AwsS3StorageDriver;
+  describe('3. S3StorageDriver & AwsS3StorageDriver (S3 SDK Mocked Verification)', () => {
+    let s3Driver: S3StorageDriver;
     let mockSend: jest.Mock;
+
+    it('should export AwsS3StorageDriver as exact backward-compatible alias of S3StorageDriver', () => {
+      expect(AwsS3StorageDriver).toBe(S3StorageDriver);
+    });
 
     beforeEach(() => {
       mockSend = jest.fn();
-      s3Driver = new AwsS3StorageDriver({
+      s3Driver = new S3StorageDriver({
         region: 'ap-south-1',
         bucket: 'kumaran-chits-private-storage',
         accessKeyId: 'MOCK_KEY_ID',

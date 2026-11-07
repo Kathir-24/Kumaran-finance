@@ -42,7 +42,7 @@ export class ChitService {
     const redis = this.redisProvider?.getClient();
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
-        const keys = [MasterCacheKeys.schemesAll];
+        const keys: string[] = [MasterCacheKeys.schemesAll];
         if (schemeId) {
           keys.push(MasterCacheKeys.schemeById(schemeId));
         }

@@ -454,7 +454,7 @@ export class CollectionService {
       }
 
       // 3. Verify Physically Counted Amount Against Total Payments Sum
-      const totalBatchSum = payments.reduce((sum, p) => sum + p.amount, 0n);
+      const totalBatchSum = payments.reduce((sum: bigint, p: any) => sum + p.amount, 0n);
       const countedAmount = BigInt(Math.floor(dto.acknowledgedAmount));
 
       if (totalBatchSum !== countedAmount) {

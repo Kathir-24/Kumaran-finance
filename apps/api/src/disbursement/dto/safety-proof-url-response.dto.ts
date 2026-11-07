@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class SafetyProofUrlResponseDto {
   @ApiProperty({
-    example: 'https://chitflow-private-kyc.s3.ap-south-1.amazonaws.com/safety-proofs/...',
+    example: 'https://storage.kumaranchits.com/safety-proofs/...',
     description: 'Time-limited S3 presigned URL for viewing the safety proof collateral scan',
   })
   url: string;

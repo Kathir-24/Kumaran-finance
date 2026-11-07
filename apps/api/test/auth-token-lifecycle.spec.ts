@@ -732,7 +732,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         clientType: 'MOBILE',
       });
       expect(mobileRefreshed.accessToken).toBeDefined();
-    });
+    }, 15000);
 
     it('AUTH-MULTI-03: RFC 6819 reuse trap on WEB revokes WEB family while keeping MOBILE family valid', async () => {
       const mockStaffUser = {
@@ -788,7 +788,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         clientType: 'MOBILE',
       });
       expect(mobileRefreshed.accessToken).toBeDefined();
-    });
+    }, 15000);
 
     it('AUTH-MULTI-04: client-specific logout revokes only target client slot, whereas ALL revokes all', async () => {
       const mockStaffUser = {

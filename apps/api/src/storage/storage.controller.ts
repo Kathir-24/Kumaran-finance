@@ -85,7 +85,7 @@ export class StorageController {
       }
       if (
         !currentUser.roles.some((r) =>
-          [Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT].includes(r),
+          ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
         )
       ) {
         throw new ForbiddenException('Only staff can upload auction safety proofs');

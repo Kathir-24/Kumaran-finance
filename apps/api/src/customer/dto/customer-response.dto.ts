@@ -144,7 +144,7 @@ export class CustomerDocumentResponseDto {
 
 export class DocumentPresignedUrlResponseDto {
   @ApiProperty({
-    example: 'https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...',
+    example: 'https://storage.kumaranchits.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...',
     description: 'Time-limited 15-minute viewing URL',
   })
   url: string;

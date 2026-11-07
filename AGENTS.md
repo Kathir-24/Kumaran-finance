@@ -23,7 +23,7 @@
   - **Mobile App**: Flutter + Dart (Android-first: 100% full feature parity for Partners/Super Admin + Field Agents & Customers) in `apps/mobile/`
   - **Shared Client SDK**: Typed Client API SDK in `packages/api-client/` (`@kumaran/api-client`) + Dart Models in `apps/mobile/lib/core/api/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
-  - **Object Storage**: Private AWS S3 (Encrypted KYC scans & PDF receipts with 15-minute presigned URLs)
+  - **Object Storage**: S3-Compatible Object Storage (Cloudflare R2, MinIO, or private S3 with 15-minute presigned URLs)
 
 ---
 

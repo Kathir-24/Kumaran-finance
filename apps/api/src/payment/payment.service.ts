@@ -857,7 +857,7 @@ export class PaymentService {
       };
     });
 
-    this.invalidateDaybookCache(payment.branchId, payment.paymentDate).catch(() => {});
+    this.invalidateDaybookCache(payment.branchId, payment.createdAt).catch(() => {});
 
     return result;
   }

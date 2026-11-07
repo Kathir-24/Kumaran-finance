@@ -14,7 +14,7 @@ This specification establishes the production server, container, and cloud infra
 ```mermaid
 flowchart TD
     subgraph IngressLayer["Edge Ingress & Certificate Tier"]
-        CloudFront["AWS CloudFront Edge CDN\n- Static Assets: max-age=31536000, immutable\n- Dynamic API: Cache-Control: no-store bypass\n- DDoS Protection & Edge SSL Termination"]
+        CloudFront["Cloudflare / Edge CDN\n- Static Assets: max-age=31536000, immutable\n- Dynamic API: Cache-Control: no-store bypass\n- DDoS Protection & Edge SSL Termination"]
         Nginx["Nginx Ingress (chitflow-nginx)\n- worker_rlimit_nofile: 65535\n- worker_connections: 2048\n- ulimits.nofile: 65535\n- gzip: ON | SSL: HTTP/2 | mem_limit: 256m"]
         Certbot["Certbot Renewal Sidecar (chitflow-certbot)\n- Automated Let's Encrypt renew (12h loop)\n- Shared /var/www/certbot challenge\n- mem_limit: 128m"]
     end
@@ -28,7 +28,7 @@ flowchart TD
     subgraph StateTier["State & Data Authority Tier"]
         DB["PostgreSQL 17 (chitflow-db)\n- max_connections: 150 | shared_buffers: 512MB\n- statement_timeout: 15s | lock_timeout: 5s\n- mem_limit: 1024m"]
         Redis["Redis 7 (chitflow-redis)\n- maxmemory: 512mb | volatile-lru\n- mem_limit: 640m"]
-        Minio["MinIO / AWS S3 (chitflow-minio)\n- Stateless KYC Scans & Signed PDFs\n- mem_limit: 512m"]
+        Minio["MinIO / S3 Storage (chitflow-minio)\n- Stateless KYC Scans & Signed PDFs\n- mem_limit: 512m"]
         Cron["Backup Cron (chitflow-backup-cron)\n- Encrypted Nightly pg_dump (02:00 AM IST)\n- mem_limit: 256m"]
     end
 
@@ -62,8 +62,8 @@ flowchart TD
   - The API service (`chitflow-api`) operates strictly with `ENABLE_BULLMQ_WORKERS=false`. It functions purely as a queue producer and dedicates 100% of its single-threaded event loop to incoming HTTP requests and live SSE streams.
   - A separate dedicated worker container (`chitflow-worker`) runs with `ENABLE_BULLMQ_WORKERS=true`. It has no public ingress ports and consumes background jobs in isolation.
 - **Compute Sizing & Horizontal Scaling**:
-  - AWS ECS Fargate autoscaling triggers additional API task replicas when average CPU utilization $\ge 60\%$ or p95 response time exceeds $500\text{ms}$ for 2 consecutive minutes.
-  - Auction-day scheduled pre-warming scales the API compute tier from 2 to 4 active tasks 30 minutes prior to scheduled branch auctions.
+  - Autoscaling or process orchestration triggers additional API worker replicas when average CPU utilization $\ge 60\%$ or p95 response time exceeds $500\text{ms}$ for 2 consecutive minutes.
+  - Auction-day scheduled pre-warming scales the API compute tier from 2 to 4 active workers 30 minutes prior to scheduled branch auctions.
 
 ### 2.2 Pillars 2 & 3: Memory Leaks, Bounded Caches & Container OOM Ceilings (Exit 137)
 - **The Vulnerability**: Without explicit V8 heap limits, Node.js can expand heap beyond physical container limits, triggering the Linux kernel Out-Of-Memory (OOM) killer (`exit code 137`) without an application error log.
@@ -106,10 +106,10 @@ flowchart TD
 
 ### 2.4 Pillar 5: Bandwidth Saturation & Edge CDN Architecture
 - **Origin Compression**: Nginx enables `gzip on;` with `gzip_comp_level 5;` and `gzip_types text/plain text/css application/json application/javascript application/xml;`.
-- **AWS CloudFront Edge CDN Distribution**:
-  - Deployed in front of the Application Load Balancer (ALB).
-  - **Static Asset Behaviors** (`/_next/static/*`, `/static/*`, images, fonts): Cached at CloudFront edge locations across India with `Cache-Control: public, max-age=31536000, immutable`.
-  - **Dynamic API Behaviors** (`/api/*`): CloudFront passes requests through directly with `Cache-Control: no-store, no-cache, must-revalidate` (TTL = 0).
+- **Edge CDN Distribution (Cloudflare / Reverse Proxy CDN)**:
+  - Deployed in front of Nginx Ingress or application entrypoint.
+  - **Static Asset Behaviors** (`/_next/static/*`, `/static/*`, images, fonts): Cached at edge locations across India with `Cache-Control: public, max-age=31536000, immutable`.
+  - **Dynamic API Behaviors** (`/api/*`): Passes requests through directly with `Cache-Control: no-store, no-cache, must-revalidate` (TTL = 0).
   - **Document Downloads**: Customer passbooks and receipts are accessed via 15-minute temporary presigned S3 URLs, offloading high-bandwidth downloads from the API origin server.
 
 ### 2.5 Pillar 6: File Descriptors & Socket Connection Hardening
@@ -144,23 +144,23 @@ flowchart TD
   - Monitored via [`infra/scripts/cert-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.sh) (Linux) and [`infra/scripts/cert-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.ps1) (Windows).
   - Inspects `fullchain.pem` validity and triggers a **Critical Alert** if certificate expiration is within **30 days** (`SSL_EXPIRY_THRESHOLD_SECONDS=2592000`).
 
-### 2.7 Pillar 8: Cloud Account Quotas & Service Limits
-- **AWS RDS Graviton CPU Burst Policy**:
-  - Production utilizes AWS RDS PostgreSQL 17 on Graviton3 (`db.t4g.medium` or `db.m6g.large`).
-  - For `t4g` instances, **T4g Unlimited** mode is enabled to permit continuous bursting above baseline during auction rush hours without throttling.
-- **CloudWatch Service Quota Alarms**:
-  - Configured at **80% of service quota** for ECS vCPU quotas, RDS allocated storage (with autoscaling up to 100GB), and VPC Elastic IPs.
+### 2.7 Pillar 8: Infrastructure Resource Quotas & Service Limits
+- **Flat-Fee Linux VPS & Database Resource Policy**:
+  - Production utilizes a dedicated 4 vCPU / 8GB–16GB RAM Linux VPS (Hostinger Mumbai or DigitalOcean Bangalore) running PostgreSQL 17, Redis 7, Nginx, and NestJS in isolated Docker containers with hard memory caps (`mem_limit`).
+  - Container memory allocations are pinned to prevent memory contention or OOM issues during auction rush hours.
+- **Resource Monitoring & Proactive Alarms**:
+  - Node Exporter / Prometheus alerts configured at **80% of disk storage**, **80% of RAM**, and **85% sustained CPU load**.
 - **SMS DLT Gateway Balance Guardian**:
   - SMS gateway (Indian DLT) credit balance is monitored via automated threshold alerts.
   - When SMS credits fall below 500 units, the system automatically falls back to free **Firebase Cloud Messaging (FCM) Push Notifications** and Web Push, ensuring customers continue receiving payment confirmations without interruption.
 
-### 2.8 Pillar 9: Multi-AZ Redundancy & Cross-Region Disaster Recovery
-- **Multi-AZ Availability**:
-  - Primary compute tier runs in AWS Region `ap-south-1` (Mumbai) across Availability Zones `ap-south-1a` and `ap-south-1b`.
-  - AWS RDS PostgreSQL 17 operates in Multi-AZ configuration with synchronous standby replication.
-- **Cross-Region Disaster Recovery (CRR)**:
-  - AWS S3 Cross-Region Replication (CRR) replicates all KYC scans and bilingual PDF receipts from `ap-south-1` (Mumbai) to `ap-south-2` (Hyderabad).
-  - Nightly encrypted database snapshots (02:00 AM IST) are replicated to the secondary AWS Region (`ap-south-2`).
+### 2.8 Pillar 9: Off-Site Redundancy & Disaster Recovery (DRP)
+- **High Availability & Redundancy**:
+  - Application instances run in Docker containers managed with auto-restart policies (`restart: unless-stopped`) and health probes.
+  - Database operates with continuous WAL archiving and automated midnight encrypted dumps (`backup-cron`).
+- **Off-Site Disaster Recovery (DRP)**:
+  - S3-compatible cloud storage (Cloudflare R2, MinIO, or S3) replicates all KYC scans and bilingual PDF receipts off-server with zero egress fees.
+  - Nightly encrypted database snapshots (02:00 AM IST) are transferred to off-site object storage (`S3_BUCKET`).
 - **Recovery Invariants**:
   - **Recovery Point Objective (RPO)**: $\le 15\text{ minutes}$ (via continuous PostgreSQL WAL archiving).
   - **Recovery Time Objective (RTO)**: $\le 2\text{ hours}$ (verified via quarterly automated drill `pnpm run db:drp:drill`).
