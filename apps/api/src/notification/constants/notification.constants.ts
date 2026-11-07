@@ -5,4 +5,5 @@
 // ==============================================================================
 
 export const SMS_DRIVER_TOKEN = 'SMS_DRIVER_TOKEN';
+export const SMS_BACKUP_DRIVER_TOKEN = 'SMS_BACKUP_DRIVER_TOKEN';
 export const PUSH_DRIVER_TOKEN = 'PUSH_DRIVER_TOKEN';

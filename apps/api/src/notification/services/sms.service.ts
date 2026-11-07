@@ -7,7 +7,7 @@
 
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SMS_DRIVER_TOKEN } from '../constants/notification.constants';
+import { SMS_BACKUP_DRIVER_TOKEN, SMS_DRIVER_TOKEN } from '../constants/notification.constants';
 import type { SmsDispatchResult, SmsDriver } from '../drivers/sms-driver.interface';
 import { DltTemplateFormatter } from '../helpers/dlt-template-formatter.helper';
 import { PhoneHelper } from '../helpers/phone.helper';
@@ -52,6 +52,9 @@ export class SmsService {
     @Inject(SMS_DRIVER_TOKEN) private readonly smsDriver: SmsDriver,
     private readonly configService: ConfigService,
     @Optional() private readonly metricsService?: MetricsService,
+    @Optional()
+    @Inject(SMS_BACKUP_DRIVER_TOKEN)
+    private readonly backupSmsDriver?: SmsDriver | null,
   ) {}
 
   /**
@@ -182,7 +185,24 @@ export class SmsService {
     const templateLabel = smsPayload.dltTemplateId || 'default';
 
     try {
-      const result = await this.smsDriver.sendSms(smsPayload);
+      let result = await this.smsDriver.sendSms(smsPayload);
+
+      // Multi-provider failover: if primary driver fails or trips circuit, attempt backup driver
+      if (!result.success && this.backupSmsDriver) {
+        this.logger.warn(
+          `[SmsService] Primary SMS provider ${this.smsDriver.providerName} failed (${result.error}); attempting failover to backup provider ${this.backupSmsDriver.providerName}`,
+        );
+        try {
+          const backupResult = await this.backupSmsDriver.sendSms(smsPayload);
+          if (backupResult.success) {
+            result = backupResult;
+          }
+        } catch (backupErr: any) {
+          this.logger.error(
+            `[SmsService] Backup SMS provider ${this.backupSmsDriver.providerName} also failed: ${backupErr.message}`,
+          );
+        }
+      }
 
       // Synchronize circuit breaker state gauge if supported by driver
       if (this.metricsService && typeof this.smsDriver.getCircuitBreakerState === 'function') {
@@ -196,13 +216,15 @@ export class SmsService {
         const statusLabel = result.bypassed
           ? 'bypassed'
           : result.success
-            ? 'success'
+            ? result.provider === this.backupSmsDriver?.providerName
+              ? 'fallback_success'
+              : 'success'
             : result.error?.includes('Circuit breaker')
               ? 'circuit_open'
               : 'failure';
 
         this.metricsService.smsDispatchesTotal.inc({
-          provider: this.smsDriver.providerName,
+          provider: result.provider,
           template: templateLabel,
           status: statusLabel,
         });
@@ -210,6 +232,29 @@ export class SmsService {
 
       return result;
     } catch (err: any) {
+      if (this.backupSmsDriver) {
+        this.logger.warn(
+          `[SmsService] Primary SMS provider ${this.smsDriver.providerName} threw error (${err.message}); attempting failover to backup provider ${this.backupSmsDriver.providerName}`,
+        );
+        try {
+          const backupResult = await this.backupSmsDriver.sendSms(smsPayload);
+          if (backupResult.success) {
+            if (this.metricsService) {
+              this.metricsService.smsDispatchesTotal.inc({
+                provider: this.backupSmsDriver.providerName,
+                template: templateLabel,
+                status: 'fallback_success',
+              });
+            }
+            return backupResult;
+          }
+        } catch (backupErr: any) {
+          this.logger.error(
+            `[SmsService] Backup SMS provider ${this.backupSmsDriver.providerName} also failed: ${backupErr.message}`,
+          );
+        }
+      }
+
       if (this.metricsService) {
         this.metricsService.smsDispatchesTotal.inc({
           provider: this.smsDriver.providerName,
