@@ -6,7 +6,8 @@
 // Guarantees graceful error recovery instead of a blank white screen.
 // ==============================================================================
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { reportClientError, type IncidentReport } from '@/lib/error-reporter';
 
 export default function GlobalError({
   error,
@@ -15,9 +16,21 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [incident, setIncident] = useState<IncidentReport | null>(null);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
-    console.error('[Kumaran Chits Fatal Global Error]', error);
+    const report = reportClientError(error);
+    setIncident(report);
   }, [error]);
+
+  const handleCopy = () => {
+    if (incident && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(incident.copyText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <html lang="en">
@@ -44,6 +57,22 @@ export default function GlobalError({
             {error?.message ||
               'A critical application error occurred. Please reload the application or contact Kumaran Finance IT Operations.'}
           </p>
+
+          {incident && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <span className="font-mono text-[11px] text-slate-400 bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-md">
+                Ref: {incident.incidentId}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium underline"
+              >
+                {copied ? 'Copied / நகலெடுக்கப்பட்டது' : 'Copy / நகலெடு'}
+              </button>
+            </div>
+          )}
+
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
             <button
               type="button"

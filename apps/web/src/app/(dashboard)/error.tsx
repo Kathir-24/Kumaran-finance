@@ -7,8 +7,9 @@
 // ==============================================================================
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, RotateCcw, Home, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Home, RefreshCw, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { reportClientError, type IncidentReport } from '@/lib/error-reporter';
 
 export default function DashboardErrorBoundary({
   error,
@@ -18,10 +19,10 @@ export default function DashboardErrorBoundary({
   reset: () => void;
 }) {
   const [isChunkError, setIsChunkError] = useState(false);
+  const [incident, setIncident] = useState<IncidentReport | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    console.error('[Dashboard Error Boundary Caught]', error);
-
     // Detect post-deployment version mismatch where browser references purged JS chunks
     const message = error?.message || '';
     const name = error?.name || '';
@@ -42,8 +43,19 @@ export default function DashboardErrorBoundary({
         console.warn('[Post-Deployment Version Skew] New version detected; reloading bundle...');
         window.location.reload();
       }
+    } else {
+      const report = reportClientError(error);
+      setIncident(report);
     }
   }, [error]);
+
+  const handleCopy = () => {
+    if (incident && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(incident.copyText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
@@ -52,7 +64,7 @@ export default function DashboardErrorBoundary({
       </div>
 
       <h2 className="text-lg font-bold text-slate-100">
-        {isChunkError ? 'Application Updated / புதிய பதிப்பு கிடைக்கிறது' : 'Operation Encountered an Error'}
+        {isChunkError ? 'Application Updated / புதிய பதிப்பு கிடைக்கிறது' : 'Operation Encountered an Error / பிழை நேரிட்டது'}
       </h2>
 
       <p className="mt-1 max-w-md text-xs text-slate-400 leading-relaxed">
@@ -60,6 +72,22 @@ export default function DashboardErrorBoundary({
           ? 'A new version of Kumaran Chits was deployed. Please refresh to load the latest system updates.'
           : error?.message || 'An unexpected client error occurred while loading this view.'}
       </p>
+
+      {!isChunkError && incident && (
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <span className="font-mono text-[11px] text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-md">
+            Reference: {incident.incidentId}
+          </span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-medium"
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copied ? 'Copied / நகலெடுக்கப்பட்டது' : 'Copy / நகலெடு'}
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 flex items-center gap-3">
         {isChunkError ? (
