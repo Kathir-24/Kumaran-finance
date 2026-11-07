@@ -91,6 +91,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Horizontal Scaling & High Availability** | [`docs/03-architecture/horizontal-scaling-and-high-availability.md`](docs/03-architecture/horizontal-scaling-and-high-availability.md) |
 | **Server & Infrastructure Resilience**    | [`docs/03-architecture/server-and-infrastructure-resilience.md`](docs/03-architecture/server-and-infrastructure-resilience.md) |
 | **Frontend Architecture & Cross-Platform** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
+| **Frontend Resilience & UI Hardening**     | [docs/03-architecture/frontend-architecture.md](docs/03-architecture/frontend-architecture.md#9-client-side-resilience--ui-performance-hardening-confirmed-by-developer) |
 | **Client API SDK & Contract Generator** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |
 | **Non-Functional Standards (NFR)** | [`docs/02-requirements/non-functional-requirements.md`](docs/02-requirements/non-functional-requirements.md) |

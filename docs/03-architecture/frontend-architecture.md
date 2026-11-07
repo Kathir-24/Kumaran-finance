@@ -262,3 +262,42 @@ Before any frontend screen (Web or Mobile) is marked complete, it must satisfy:
 4. [ ] Forms validate input client-side using Zod / Dart validators matching backend DTO schemas.
 5. [ ] Responsive layout adapts cleanly without horizontal overflow or clipped text.
 6. [ ] Audit logs capture user identity, timestamp, and client user-agent for all submitted mutations.
+
+
+---
+
+## 9. Client-Side Resilience & UI Performance Hardening (`CONFIRMED-BY-DEVELOPER`)
+
+To guarantee rock-solid stability under high latency, rural 3G/4G cellular packet loss, and peak in-office collection volume, the web client incorporates 5 frontend resilience mechanisms:
+
+### 1. Error Boundary Hierarchy & Chunk Skew Recovery
+```mermaid
+flowchart TD
+    Global["global-error.tsx\nFatal App Crash Fallback (Root HTML/Body + Bilingual Retry)"]
+    Segment["app/error.tsx\nRoot Non-Dashboard Route Boundaries"]
+    Dashboard["app/(dashboard)/error.tsx\nDashboard Error Boundary + ChunkLoadError Auto-Recovery"]
+    Nginx["Nginx Reverse Proxy\nCache-Control: no-cache, no-store on /"]
+
+    Global --> Segment
+    Segment --> Dashboard
+    Nginx -.->|"Ensures Fresh HTML"| Dashboard
+```
+- **ChunkLoadError Recovery**: When a new production release changes asset hashes while a user has the web app open, Next.js chunk fetching triggers `ChunkLoadError`. The dashboard error boundary detects this signature (`isChunkLoadError`) and triggers an automated `window.location.reload()`, throttled via `sessionStorage` (15-second lockout) to avoid reload loops if the network is down.
+- **Nginx Cache Directives**: Nginx forces `Cache-Control: no-cache, no-store, must-revalidate, max-age=0` on root HTML requests (`location /`), ensuring browser manifests are never stale.
+
+### 2. Session-Pinned Idempotency & Multi-Click Prevention
+- **Idempotency Key Lifecycles**: Instead of generating a new UUID inside the TanStack Query `mutationFn` (which defeats deduplication on network retries), actions use `useIdempotentAction`. The UUID v4 is pinned to the modal/form mount session and reused across retries until explicit settlement.
+- **Form Disabling**: Interactive forms wrap all input controls and buttons in `<fieldset disabled={mutation.isPending}>` to prevent accidental double-clicks.
+- **Synchronous Execution Lock**: `useIdempotentAction` maintains an internal `isExecuting` lock to reject simultaneous clicks before React state updates flush.
+
+### 3. Request Flooding Prevention & Query Cancellation
+- **Debounced Inputs**: Search bars across Schemes, Customers, and Collections use `useDebounce(input, 300)`.
+- **AbortSignal Query Cancellation**: All TanStack `queryFn` implementations accept `{ signal }` and forward it to `apiClient` and native `fetch`. Rapid keystrokes cancel pending in-flight HTTP requests automatically.
+- **SSE-Aware Approvals Polling**: `useApprovalsStream` conditions background HTTP polling on SSE health: `refetchInterval: isConnected ? false : 30_000`, eliminating redundant server load when the real-time event stream is healthy.
+
+### 4. Main-Thread UI Freezing Prevention
+- **Asynchronous Chunked CSV Export**: High-volume ledger exports (1,000+ rows) use `downloadCsvAsync` with 500-row batching. Each batch yields to the browser macro-task queue via `await new Promise((resolve) => setTimeout(resolve, 0))`, keeping the UI responsive without frame drops.
+- **Dynamic Code-Splitting**: Heavy visualization libraries (e.g., Recharts) are isolated via `next/dynamic` (`ssr: false` and pulse skeleton loader), eliminating ~450KB from the primary dashboard bundle.
+
+### 5. Route Loading Transitions & Zero Blank Screens
+- **Instant Route Skeletons**: `apps/web/src/app/(dashboard)/loading.tsx` renders immediately during App Router navigation, presenting pulse skeleton layouts for KPI cards, charts, and tables to provide continuous visual feedback during latency spikes.

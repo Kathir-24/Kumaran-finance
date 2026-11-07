@@ -282,3 +282,22 @@ PostgreSQL 17 is configured with `max_connections = 150`. To guarantee zero pool
 - **2 Active API Instances**: $2 \times 25 = 50$ connections.
 - **Dedicated BullMQ Worker**: `15` connections.
 - **Admin, Migrations & Backup Margin**: $150 - (50 + 15) = 85$ reserve connections for `pg_dump`, DRP drills, and Prisma CLI.
+
+
+---
+
+## 10. Static Asset Caching & Post-Deployment Chunk Skew Protection
+
+### 10.1 Ingress Cache-Control Headers Architecture
+To eliminate `ChunkLoadError` and broken UI states when static asset hashes change across production deployments:
+1. **HTML Document Proxy (`location /`)**:
+   - `Cache-Control "no-cache, no-store, must-revalidate, max-age=0"`
+   - `Pragma "no-cache"`
+   - `Expires "0"`
+   - **Rationale**: Browsers and CDNs must never cache the HTML entry document. Every page visit evaluates the newest chunk manifests directly from the Next.js server.
+2. **Hashed Static JavaScript/CSS Bundles (`location /_next/static/`)**:
+   - `Cache-Control "public, max-age=31536000, immutable"`
+   - **Rationale**: Filenames are cryptographically hashed based on content. Safe to cache for 1 year with zero revalidation overhead.
+3. **Automated Client-Side Skew Recovery**:
+   - Web application wraps routes in `(dashboard)/error.tsx`. When a user has an active tab open across a deployment, Next.js dynamic chunk imports trigger `ChunkLoadError`.
+   - The error boundary detects `ChunkLoadError` and executes an automated `window.location.reload()`, protected with a 15-second `sessionStorage` lockout to prevent infinite reloads if network connectivity is severed.
