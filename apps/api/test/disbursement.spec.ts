@@ -396,6 +396,48 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       expect(result.winner.disbursementMode).toBe(DisbursementMode.CASH);
       expect(result.winner.disbursedAmount).toBe(375000n);
     });
+
+    it('should proactively invalidate report dashboard, daybook, and approvals cache upon payout authorization', async () => {
+      const mockRedisClient = {
+        del: jest.fn().mockResolvedValue(4),
+      };
+      const mockRedisProvider = {
+        getClient: jest.fn().mockReturnValue(mockRedisClient),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+      const cachedDisbursementService = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        {} as any,
+        undefined,
+        mockRedisProvider as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockVerifiedAuction,
+        chitGroup: { branchId: 'branch-prd-01' },
+      });
+      prismaMock.auctionWinner.update.mockResolvedValue({
+        ...mockVerifiedAuction.winner,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+      });
+
+      await cachedDisbursementService.authorizePayout(
+        mockAuctionId,
+        { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(mockRedisClient.del).toHaveBeenCalledWith(
+        expect.stringContaining('report:daybook:ALL:'),
+        expect.stringContaining('report:daybook:ALL_BRANCHES:'),
+        'report:dashboard:ALL',
+        'report:approvals:ALL',
+        expect.stringContaining('report:daybook:branch-prd-01:'),
+        'report:dashboard:branch-prd-01',
+        'report:approvals:branch-prd-01',
+      );
+    });
   });
 
   describe('3. Payout Release & Voucher Generation', () => {

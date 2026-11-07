@@ -11,6 +11,7 @@ import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import {
   JOB_DISPATCH_APPROVAL_ALERT,
   NOTIFICATION_QUEUE,
@@ -42,7 +43,38 @@ export class DisbursementService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     @Optional() private readonly queueProvider?: BullMqQueueProvider,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
+
+  /**
+   * Proactively invalidates Redis cache for reports upon disbursement changes
+   */
+  private async invalidateReportCaches(branchId?: string, targetDate?: Date): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const dateStr = targetDate
+          ? targetDate.toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+        const keys = [
+          `report:daybook:ALL:${dateStr}`,
+          `report:daybook:ALL_BRANCHES:${dateStr}`,
+          'report:dashboard:ALL',
+          'report:approvals:ALL',
+        ];
+        if (branchId) {
+          keys.push(`report:daybook:${branchId}:${dateStr}`);
+          keys.push(`report:dashboard:${branchId}`);
+          keys.push(`report:approvals:${branchId}`);
+        }
+        await redis.del(...keys);
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to proactively invalidate report cache on disbursement change: ${err.message}`,
+        );
+      }
+    }
+  }
 
   /**
    * Helper to resolve customer ID for authenticated subscriber.
@@ -326,6 +358,9 @@ export class DisbursementService {
       }
     }
 
+    // Post-commit: Invalidate report cache for pending actions count
+    await this.invalidateReportCaches(auction.chitGroup?.branchId);
+
     return result;
   }
 
@@ -454,7 +489,7 @@ export class DisbursementService {
 
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
-      include: { winner: true },
+      include: { winner: true, chitGroup: true },
     });
 
     if (!auction) {
@@ -482,7 +517,7 @@ export class DisbursementService {
       ? BigInt(Math.floor(dto.disbursedAmount))
       : auction.prizeMoney || 0n;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate authorization
       if (typeof tx.$queryRaw === 'function') {
         const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
@@ -529,6 +564,11 @@ export class DisbursementService {
         winner: updated,
       };
     });
+
+    // Post-commit: Proactively invalidate report cache for authorizations
+    await this.invalidateReportCaches(auction.chitGroup?.branchId);
+
+    return result;
   }
 
   /**
@@ -541,7 +581,7 @@ export class DisbursementService {
   ) {
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
-      include: { winner: true },
+      include: { winner: true, chitGroup: true },
     });
 
     if (!auction) {
@@ -560,7 +600,7 @@ export class DisbursementService {
 
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate disbursement release
       if (typeof tx.$queryRaw === 'function') {
         const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
@@ -606,6 +646,11 @@ export class DisbursementService {
         winner: updated,
       };
     });
+
+    // Post-commit: Proactively invalidate report cache for disbursements
+    await this.invalidateReportCaches(auction.chitGroup?.branchId, releaseDate);
+
+    return result;
   }
 
   /**
@@ -872,5 +917,10 @@ export class DisbursementService {
         },
       };
     });
+
+    // Post-commit: Proactively invalidate report cache for final settlement
+    await this.invalidateReportCaches(chit.branchId, releaseDate);
+
+    return result;
   }
 }
