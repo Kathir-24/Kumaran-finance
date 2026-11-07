@@ -16,6 +16,7 @@ services:
     image: postgres:17
     container_name: chitflow-db
     restart: unless-stopped
+    mem_limit: 1024m
     command:
       - "postgres"
       - "-c"
@@ -42,6 +43,7 @@ services:
     image: redis:7-alpine
     container_name: chitflow-redis
     restart: unless-stopped
+    mem_limit: 640m
     command:
       - "redis-server"
       - "--maxmemory"
@@ -69,6 +71,7 @@ services:
     image: cgr.dev/chainguard/minio:latest
     container_name: chitflow-minio
     restart: unless-stopped
+    mem_limit: 512m
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-chitflow_admin}
@@ -86,6 +89,7 @@ services:
       dockerfile: Dockerfile
     container_name: chitflow-api
     restart: unless-stopped
+    mem_limit: 1280m
     depends_on:
       db:
         condition: service_healthy
@@ -97,6 +101,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       UV_THREADPOOL_SIZE: "16"
+      NODE_OPTIONS: "--max-old-space-size=1024"
       API_PREFIX: api/v1
       DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public&connection_limit=25&pool_timeout=10
       REDIS_HOST: redis
@@ -125,11 +130,13 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: chitflow-web
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       - api
     environment:
       NODE_ENV: production
       PORT: 3001
+      NODE_OPTIONS: "--max-old-space-size=512"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       NEXT_PUBLIC_BULL_BOARD_URL: ${NEXT_PUBLIC_BULL_BOARD_URL:-http://localhost:3000/admin/queues}
       NEXT_TELEMETRY_DISABLED: "1"
@@ -141,6 +148,7 @@ services:
     image: nginx:1.27-alpine
     container_name: chitflow-nginx
     restart: unless-stopped
+    mem_limit: 256m
     depends_on:
       - api
       - web
@@ -157,6 +165,7 @@ services:
     image: postgres:17-alpine
     container_name: chitflow-backup-cron
     restart: unless-stopped
+    mem_limit: 256m
     depends_on:
       db:
         condition: service_healthy

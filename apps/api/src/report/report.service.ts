@@ -86,7 +86,18 @@ export class ReportService {
   // Concurrency bulkhead for database protection during Redis outage
   private activeFallbackDashboardQueries = 0;
   private readonly MAX_CONCURRENT_FALLBACK_QUERIES = 3;
+  private readonly MAX_SNAPSHOT_ENTRIES = 20;
   private readonly lastKnownDashboardSnapshot: Map<string, any> = new Map();
+
+  private recordDashboardSnapshot(cacheKey: string, result: any): void {
+    if (this.lastKnownDashboardSnapshot.size >= this.MAX_SNAPSHOT_ENTRIES) {
+      const firstKey = this.lastKnownDashboardSnapshot.keys().next().value;
+      if (firstKey) {
+        this.lastKnownDashboardSnapshot.delete(firstKey);
+      }
+    }
+    this.lastKnownDashboardSnapshot.set(cacheKey, result);
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -386,7 +397,7 @@ export class ReportService {
           this.logger.warn(`Redis dashboard cache write error: ${err.message}`);
         }
       }
-      this.lastKnownDashboardSnapshot.set(cacheKey, result);
+      this.recordDashboardSnapshot(cacheKey, result);
       return result;
     } finally {
       if (isFallbackMode) {

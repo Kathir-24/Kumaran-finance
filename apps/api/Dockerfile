@@ -45,6 +45,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV UV_THREADPOOL_SIZE=16
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 
 # Install runtime dependencies for Prisma engine and pg_dump utilities
 RUN apk add --no-cache openssl libc6-compat postgresql-client

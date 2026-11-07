@@ -123,4 +123,19 @@ describe('Cache Stampede Guard (Thundering Herd) Tests', () => {
     expect(fallbackRes).toBeDefined();
     expect(dbComputeCount).toBe(1); // No additional DB query executed!
   });
+
+  it('bounds in-memory snapshot cache to max 20 entries, evicting oldest item', () => {
+    for (let i = 1; i <= 25; i++) {
+      (reportService as any).recordDashboardSnapshot(`key-${i}`, { index: i });
+    }
+
+    const snapshotMap: Map<string, any> = (reportService as any).lastKnownDashboardSnapshot;
+    expect(snapshotMap.size).toBe(20);
+    // Oldest keys 1 to 5 should have been evicted
+    expect(snapshotMap.has('key-1')).toBe(false);
+    expect(snapshotMap.has('key-5')).toBe(false);
+    // Keys 6 to 25 should be preserved
+    expect(snapshotMap.has('key-6')).toBe(true);
+    expect(snapshotMap.has('key-25')).toBe(true);
+  });
 });
