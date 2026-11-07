@@ -279,3 +279,14 @@ The rate limiting architecture is validated by automated unit and E2E test suite
    - Inspect the `Retry-After` response header to identify the remaining cooldown duration.
    - For OTP lockout diagnostics, query Redis: `TTL auth:otp:lockout:<phone>`.
    - For throttler diagnostics, query Redis: `KEYS throttle:*` and inspect hit counters via `GET throttle:<throttlerName>:<key>`.
+
+
+---
+
+## 10. 24-Hour Rolling Daily OTP Quota Defense
+
+To mitigate distributed SMS cost attacks that evade the 60-second cooldown window:
+1. **Daily Quota Ceiling**: Enforces maximum **5 OTP requests per 24 hours** per mobile phone number.
+2. **Redis Implementation**: Key `auth:otp:daily:${phone}` with a TTL of 86,400s (24h).
+3. **HTTP 429 Status**: Exceeding the quota returns HTTP 429 with `Daily OTP request limit exceeded for this mobile number (maximum 5 requests per 24 hours)`.
+4. **Telecom Failure Compensation**: If MSG91 dispatch throws an error or times out, the daily counter is decremented automatically (`decrementDailyOtpCount`) so users are not penalized for carrier failures.

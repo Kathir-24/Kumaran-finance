@@ -4,13 +4,13 @@
 // Compliance: docs/03-architecture/third-party-integrations-and-resilience.md
 // ==============================================================================
 
-import { HttpException, HttpStatus, BadRequestException, ConflictException } from '@nestjs/common';
+import { HttpException, HttpStatus, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from '../src/auth/auth.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SmsService } from '../src/notification/services/sms.service';
-import { SmsDriver, SmsDispatchResult, SmsPayload } from '../src/notification/drivers/sms-driver.interface';
+import { SmsDriver, SmsPayload } from '../src/notification/drivers/sms-driver.interface';
 import { Msg91SmsDriver } from '../src/notification/drivers/msg91-sms.driver';
 import { MetricsService } from '../src/metrics/services/metrics.service';
 

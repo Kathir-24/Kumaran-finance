@@ -10,7 +10,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MockPushDriver } from './drivers/mock-push.driver';
 import { MockSmsDriver } from './drivers/mock-sms.driver';
 import { PushDriverProvider } from './providers/push-driver.provider';
-import { SmsDriverProvider } from './providers/sms-driver.provider';
 import { PushService } from './services/push.service';
 import { SmsService } from './services/sms.service';
 import {

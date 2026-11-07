@@ -109,6 +109,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Offline Sync & Resilience Architecture** | [`docs/03-architecture/offline-architecture.md`](docs/03-architecture/offline-architecture.md) |
 | **Push Notification & Mobile Alerts** | [`docs/03-architecture/push-notification-architecture.md`](docs/03-architecture/push-notification-architecture.md) |
 | **SMS Architecture & Indian Telecom DLT** | [`docs/03-architecture/sms-architecture.md`](docs/03-architecture/sms-architecture.md) |
+| **Third-Party Integrations & Resilience** | [docs/03-architecture/third-party-integrations-and-resilience.md](docs/03-architecture/third-party-integrations-and-resilience.md) |
 | **Payment, Collections & Dual-Control Architecture** | [`docs/03-architecture/payment-architecture.md`](docs/03-architecture/payment-architecture.md) |
 | **Rate Limiting, Throttling & Abuse Prevention** | [`docs/03-architecture/rate-limiting-and-abuse-prevention.md`](docs/03-architecture/rate-limiting-and-abuse-prevention.md) |
 | **Document, Upload & Storage Architecture** | [`docs/03-architecture/document-and-storage-architecture.md`](docs/03-architecture/document-and-storage-architecture.md) |

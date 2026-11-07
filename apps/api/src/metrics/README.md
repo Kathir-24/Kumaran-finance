@@ -57,6 +57,12 @@ flowchart LR
 ### E. Standard V8 & Process Metrics
 Standard Node.js process metrics with prefix `nodejs_` (e.g., `nodejs_heap_size_used_bytes`, `nodejs_eventloop_lag_seconds`, `nodejs_version_info`).
 
+### F. External Third-Party & Telecom Telemetry
+| Metric Name | Type | Labels | Description |
+|---|---|---|---|
+| `kumaran_sms_dispatches_total` | Counter | `provider`, `template`, `status` | Dispatches categorized by telecom gateway, TRAI DLT template, and outcome (`success`, `fallback_success`, `circuit_open`, `failure`, `bypassed`). |
+| `kumaran_sms_circuit_breaker_state` | Gauge | `provider` | Gateway circuit breaker health (`0 = CLOSED`, `1 = HALF_OPEN`, `2 = OPEN`). |
+
 ---
 
 ## 3. Security & HTTP Basic Authentication
@@ -115,4 +121,10 @@ sum(bullmq_queue_jobs_count{status="failed"}) by (queue)
 ### 5. Pending Maker-Checker Approvals:
 ```promql
 chitflow_maker_checker_pending_count
+```
+
+
+### 6. SMS Gateway Circuit Breaker Status:
+```promql
+kumaran_sms_circuit_breaker_state{provider="msg91"}
 ```

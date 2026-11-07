@@ -291,3 +291,36 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
   * Probe 5: Clean key lifecycle verified.
 
   * `CHAOS-PROBE-2`: Cash payment on live container port 3000 committed in **201ms** with consistent database ledger state (`100% Pass`).
+
+
+---
+
+## 9. 24-Hour Rolling Daily Quotas, Socket Hardening & Multi-Provider Failover
+
+### 9.1 Rolling 24-Hour Daily OTP Quota (`auth:otp:daily:<phone>`)
+To permanently defeat slow-interval SMS wallet drainage attacks (e.g., requesting 1 OTP every 61 seconds):
+1. **Daily Limit Cap**: Maximum **5 OTP requests per 24 hours** per phone number.
+2. **Redis Lifecycle**: `INCR auth:otp:daily:<phone>` sets an initial expiration of `EX 86400` (24 hours).
+3. **Rejection Behavior**: 6th attempt within 24 hours fails closed with `HTTP 429 Too Many Requests`:
+   ```json
+   {
+     "statusCode": 429,
+     "error": {
+       "code": "HTTP_EXCEPTION",
+       "message": "Daily OTP request limit exceeded for this mobile number (maximum 5 requests per 24 hours). Please try again tomorrow or contact branch staff."
+     }
+   }
+   ```
+4. **Telecom Failure Rollback**: If MSG91 encounters downstream network timeout or DLT failure, the counter is atomically decremented (`decrementDailyOtpCount`) so users are not penalized.
+
+### 9.2 Socket-Level Timeout & Connection Cleanup (5,000ms)
+- `SMS_REQUEST_TIMEOUT_MS` defaults to `5000` (5 seconds).
+- Sockets bind explicit timeouts (`socket.setTimeout(5000)`). On timeout or socket disconnect, `req.destroy()` is executed immediately to free OS file descriptors and keep BullMQ notification queues fluid.
+
+### 9.3 Multi-Provider SMS Failover (`SMS_BACKUP_DRIVER_TOKEN`)
+- [`SmsService`](../../apps/api/src/notification/services/sms.service.ts) accepts an optional backup driver.
+- When primary driver dispatch fails or trips the `MSG91_SMS_GATEWAY` circuit breaker `OPEN`, the dispatcher automatically attempts delivery via the secondary backup driver without throwing unhandled exceptions.
+
+### 9.4 Prometheus APM Telemetry & Alerting
+- `kumaran_sms_dispatches_total`: Tracks count of SMS dispatches by provider, DLT template, and status (`success`, `fallback_success`, `circuit_open`, `failure`).
+- `kumaran_sms_circuit_breaker_state`: Exposes gateway state gauge (`0 = CLOSED`, `1 = HALF_OPEN`, `2 = OPEN`).
