@@ -31,7 +31,7 @@ flowchart TD
     subgraph "Persistence & Caching"
         API --> Redis[("Redis 7 In-Memory Cache\nDashboard: 30s | SSE: 15s")]
         API --> DB[("PostgreSQL 17 Primary Database\n(Whole Rupee BigInt Only)")]
-        API --> S3[("Private AWS S3 / MinIO\nPre-Generated PDF Cache")]
+        API --> S3[("Private S3 Vault (Cloudflare R2 / MinIO)\nPre-Generated PDF Cache")]
     end
 ```
 
@@ -44,7 +44,7 @@ flowchart TD
 | 1 | **Rate Limiting & Throttling** | Request floods bypassing edge or starving application | Tiered Nginx rate zones (3r/s auth, 30r/s API) returning HTTP 429 with explicit `Retry-After: 60` header and standard JSON envelope | `nginx.conf`, `GlobalExceptionFilter` |
 | 2 | **Endpoint Isolation & Bulkheads** | Heavy background workers degrading API latency | Dedicated `ENABLE_BULLMQ_WORKERS` flag allowing worker execution isolation into standalone container processes | `BullMqQueueProvider` |
 | 3 | **Response Latency & Optimization** | Uncached multi-query database aggregations on dashboard | Branch-scoped 30-second Redis caching for executive KPI queries with automated invalidation upon payments or handovers | `ReportService.getExecutiveDashboard` |
-| 4 | **API Timeouts** | Unbounded external AWS SDK requests or slow queries | `TimeoutInterceptor` (15s default deadline) and explicit AWS S3 SDK socket/connection timeouts (`NodeHttpHandler`) | `TimeoutInterceptor`, `AwsS3StorageDriver` |
+| 4 | **API Timeouts** | Unbounded external S3 SDK requests or slow queries | `TimeoutInterceptor` (15s default deadline) and explicit S3 SDK socket/connection timeouts (`NodeHttpHandler`) | `TimeoutInterceptor`, `S3StorageDriver` |
 | 5 | **Request Queue & Backpressure** | Concurrent requests overwhelming threadpool | Ingress queue bursts capped in Nginx; keepalive timeouts aligned (Node 70s > Nginx 65s) to eliminate `ECONNRESET` | `main.ts`, `chitflow.conf` |
 | 6 | **Thread Pool & Async I/O** | `bcrypt` (cost 12) starving 4-thread default libuv pool | Scaled container environment to `UV_THREADPOOL_SIZE=16` ensuring 12 threads remain open for non-blocking disk & DNS I/O | `apps/api/Dockerfile`, `docker-compose.fullstack.yml` |
 | 7 | **Synchronous Heavy Tasks** | CPU-intensive PDF rendering on repeated receipt views | S3 pre-generation check in `PdfService` to stream existing buffers directly instead of rerunning PDFKit synthesis | `PdfService.generateReceiptPdf` |

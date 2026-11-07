@@ -503,7 +503,7 @@ This section provides granular contract specifications (request bodies, response
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
 - **Authorized Personas**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` (Checker Inspection)
 - **Path Parameter**: `id` — Auction UUID
-- **Description**: Generates an AWS S3 / MinIO time-limited presigned viewing URL (strictly 15 minutes / 900 seconds TTL) for Partner B (Checker) or Auditor to visually inspect uploaded blank cheques and agreements before clicking Authorize Payout.
+- **Description**: Generates an S3 storage (Cloudflare R2 / MinIO) time-limited presigned viewing URL (strictly 15 minutes / 900 seconds TTL) for Partner B (Checker) or Auditor to visually inspect uploaded blank cheques and agreements before clicking Authorize Payout.
 - **Success Response (`HTTP 200 OK`)**:
   ```json
   {

@@ -13,7 +13,7 @@
 | **Spoofing (Identity)** | Attacker guesses collection agent's MPIN or steals credentials. | **Device Cryptographic Binding**: Requests must be signed by the private key inside the Android Keystore. 5 incorrect MPIN attempts triggers a 15-minute lock. |
 | **Tampering (Data)** | Disgruntled staff updates an active payment amount in the database. | **Append-Only History**: PostgreSQL trigger prevents `UPDATE` or `DELETE` on `Payment` and `PaymentAllocation` rows. Only maker-checker reversals are permitted. |
 | **Repudiation** | Customer or agent claims a cash collection was never made. | **Immutable Audit Log + Digital Receipt**: System logs timestamp, GPS/IP, agent ID, and issues a cryptographically hashed receipt number. |
-| **Information Disclosure** | Data leak reveals full Aadhaar or bank account numbers of subscribers. | **Aadhaar Masking & KMS Encryption**: Database stores only masked last 4 digits (`XXXXXXXX1234`). S3 KYC buckets use AES-256 KMS encryption. |
+| **Information Disclosure** | Data leak reveals full Aadhaar or bank account numbers of subscribers. | **Aadhaar Masking & S3 Encryption**: Database stores only masked last 4 digits (`XXXXXXXX1234`). Private S3 buckets (Cloudflare R2 / MinIO) use AES-256 server-side encryption with zero public access. |
 | **Denial of Service (DoS)** | Script floods the OTP endpoint or hammers auction finalization. | **Tiered Rate Limiting**: Max 3 OTP requests per hour per phone number. API throttled at 60 requests/minute per IP via NestJS Throttler. |
 | **Elevation of Privilege** | Collection agent calls Admin API to change chit discount ceiling. | **Server-Side RBAC Guards**: NestJS `@Roles(Role.SUPER_ADMIN)` guard checks database user role on every request; never trusts client tokens. |
 

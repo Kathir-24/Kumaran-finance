@@ -1,7 +1,8 @@
 # Kumaran Chits — Production Deployment & Operations Guide
 
 > **Platform**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Target OS**: Ubuntu 24.04 LTS (Self-Hosted Linux VPS / Cloud Instance)  
+> **Target OS**: Ubuntu 24.04 LTS (Flat-Fee Linux VPS: Hostinger Mumbai / DigitalOcean Bangalore)  
+> **Object Storage**: Cloudflare R2 (10 GB Free Tier, ₹0 Egress Bandwidth Fees) or MinIO S3  
 > **Orchestration**: Docker Compose v2 (Modular Production Parity)  
 > **Key Guardrails**: PostgreSQL 17 Port 5433, Native `BigInt` Math, TLS 1.3, Zero Buffer SSE, Automated 02:00 AM IST Off-Site Backup
 

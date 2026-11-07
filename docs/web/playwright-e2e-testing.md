@@ -2,7 +2,7 @@
 
 > **Subsystem**: Web Operations Portal (`apps/web/`)  
 > **Test Framework**: Playwright Test (`@playwright/test`)  
-> **Execution Strategy**: 100% Real API, Real PostgreSQL 17 Database & Real AWS S3 Scans — ZERO Mock Pages or Dummy Data.  
+> **Execution Strategy**: 100% Real API, Real PostgreSQL 17 Database & Real S3 Scans — ZERO Mock Pages or Dummy Data.  
 > **Test Coverage**: 40 Live E2E Assertions across 11 Test Suites (Suites 00 through 10) Passing (100% Green).
 
 ---

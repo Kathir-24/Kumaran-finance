@@ -55,7 +55,7 @@ u:\Kumaran-finance\docs\
 │   ├── financial-tests.md                    # Math invariant & concurrency tests
 │   └── payment-integration.md                # Webhooks, sandbox, & bank reconciliation
 ├── 06-devops/
-│   ├── infrastructure-and-drp.md             # Fresh AWS setup, backups, restore drill
+│   ├── infrastructure-and-drp.md             # Production VPS + Cloudflare R2 setup, backups, restore drill
 │   ├── ci-cd-pipeline.md                     # GitHub Actions pipeline
 │   └── security-threat-model.md              # Fintech OWASP Top 10, rate limits, audit defense
 └── 07-operations/
@@ -207,7 +207,7 @@ When running full-stack, access the system directly through Nginx on [http://loc
 Encountering an issue? Refer to the comprehensive [**Troubleshooting Guide (docs/04-engineering/troubleshooting-guide.md)**](docs/04-engineering/troubleshooting-guide.md) for root-cause analysis and copy-paste remedies covering:
 - **Category A**: Docker port collisions (5433, 6379, 9000, 9001) and daemon startup issues
 - **Category B**: PostgreSQL connection failures and Prisma migration conflicts
-- **Category C**: MinIO vs AWS S3 Server-Side Encryption (SSE-S3) and bucket self-healing
+- **Category C**: MinIO vs S3 Storage Server-Side Encryption (SSE-S3) and bucket self-healing
 - **Category D**: BullMQ Redis direct-execution fallback mode and Bull Board auth
 - **Category E**: The 10 Invariant Financial Guardrail rejections (Maker != Checker, 1/4 ceiling, defaulters)
 - **Category F**: JWT auth, token expiration, and RBAC matrix permissions

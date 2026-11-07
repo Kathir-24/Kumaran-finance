@@ -128,7 +128,7 @@ limit_req_status 429;
   ```
   Caps standard API requests to 30 requests/sec per IP with a burst allowance of 30.
 - **Container Health Probe Exemption (`/health`)**:
-  `location /health` contains **no `limit_req`** directives. Docker, AWS ECS, and Kubernetes liveness/readiness probes can poll every second without risk of false 429 downtime.
+  `location /health` contains **no `limit_req`** directives. Docker, container, and load balancer liveness/readiness probes can poll every second without risk of false 429 downtime.
 
 ---
 

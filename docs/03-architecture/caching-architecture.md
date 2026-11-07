@@ -62,7 +62,7 @@ flowchart TD
 | **Tier 1: Edge** | Live SSE Approval Stream | Nginx Buffering | `0s` (`off`) | Instant delivery | Live TCP stream |
 | **Tier 2: Redis** | Master Branch Directory (`cache:master:branches:*`) | Redis `String` (JSON) | `3,600s` (1 hour) | `POST /branches` or update | Fail-open to Postgres |
 | **Tier 2: Redis** | Master Scheme Catalog (`cache:master:schemes:*`) | Redis `String` (JSON) | `1,800s` (30 mins) | Scheme create/update/activate | Fail-open to Postgres |
-| **Tier 2: Redis** | Presigned S3 URLs (`url:presigned:<key>`) | Redis `String` | `600s` (10 mins) | `StorageService.deleteFile` | Generate fresh AWS URL |
+| **Tier 2: Redis** | Presigned S3 URLs (`url:presigned:<key>`) | Redis `String` | `600s` (10 mins) | `StorageService.deleteFile` | Generate fresh S3 URL |
 | **Tier 2: Redis** | Distributed SMS OTP (`auth:otp:<phone>`) | Redis `String` (JSON) | `300s` (5 mins) | Verified or 3 failed attempts | Lockout penalty |
 | **Tier 2: Redis** | SMS Request Cooldown (`auth:otp:cooldown:<phone>`) | Redis `String` | `60s` (1 min) | Natural expiration | Fallback in-memory map |
 | **Tier 2: Redis** | Rate Limiting Windows (`throttle:*`) | Redis Lua | Dynamic (60s–900s) | Natural window sliding | Memory fallback |
@@ -231,7 +231,7 @@ $$\text{TTL}_{\text{jittered}} = \max\left(1, \text{baseSeconds} + \Delta\right)
 | Master Chit Schemes | 1,800s (30 min) | 1,530s – 2,070s | Chit group & ticket joins |
 | Executive Dashboard | 30s | 26s – 34s | Multi-aggregate KPI metrics |
 | Day Book Journal | 60s | 51s – 69s | Payment collection aggregates |
-| S3 Presigned URLs | 600s (10 min) | 510s – 690s | AWS S3 Presign API |
+| S3 Presigned URLs | 600s (10 min) | 510s – 690s | S3 Storage Presign API |
 
 ---
 

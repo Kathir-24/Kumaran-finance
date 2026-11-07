@@ -227,7 +227,7 @@ model Receipt {
   receiptNumber String   @unique // e.g., "KC-REC-PRD-2026-00045"
   issuedAt      DateTime @default(now())
   isBilingual   Boolean  @default(true) // Formatted in English + தமிழ்
-  pdfS3Key      String?  // Storage key in private AWS S3 / MinIO
+  pdfS3Key      String?  // Storage key in private S3 storage (Cloudflare R2 / MinIO)
 }
 
 model PaymentReversal {
@@ -285,7 +285,7 @@ Kumaran Chits provides two distinct endpoints for receipts, each serving a speci
 | Endpoint | Content-Type | Response Body | Intended Usage & Device Experience |
 |---|---|---|---|
 | [`GET /payments/:id/receipt`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L134) | `application/json` | Structured JSON with calculation metadata + pre-formatted monospace bilingual text string | **Primary Digital Display**: Consumed by the Flutter Mobile App and Web Admin to render the receipt card instantly inside the customer's digital passbook view without PDF rendering overhead. |
-| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary A5 PDF document compiled via `pdfkit` (419.53 x 595.28 pt) or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private AWS S3 / MinIO storage. |
+| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary A5 PDF document compiled via `pdfkit` (419.53 x 595.28 pt) or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private S3 storage (Cloudflare R2 / MinIO). |
 
 > [!IMPORTANT]
 > **Zero Thermal Printers Rule (ADR-11)**:  

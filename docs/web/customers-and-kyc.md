@@ -55,7 +55,7 @@ flowchart TD
    - Master profile header at `/customers/[id]` with bilingual typography, residential address, home branch, statutory identifiers, and quick KYC toggle.
    - **Form XXI Continuous Digital Passbook**: Exact 6-column physical ledger ($I_{base}$ gross, $Div$ dividend, $I_{net}$ net payable, amount paid, status, receipt number, payment mode, paid date) with pure whole-rupee math enforcing the row-sum invariant: $I_{net} + Div_{ticket} \equiv I_{base}$.
    - **5 Summary Reconciliation Cards**: Total Scheduled Months ($N$), Total Gross Due ($\sum I_{base}$), Total Dividends ($\sum Div$), Total Paid ($\sum Paid$), and Outstanding Balance ($Net - Paid$).
-   - **Official Form XXI Printable PDF**: Direct download button fetching a 15-minute presigned S3 link generated on the fly via MinIO/AWS S3.
+   - **Official Form XXI Printable PDF**: Direct download button fetching a 15-minute presigned S3 link generated on the fly via MinIO/S3 storage.
    - **ADR-07 & ADR-12 Removal Warning**: High-visibility warning badge when $consecutiveUnpaidMonths \ge 3$ triggers company removal rights under ADR-07.
    - **Nominee Management**: Add and delete legal nominees with mandatory phone and masked Aadhaar.
    - **Private S3 KYC Document Vault**: Multipart file upload to private bucket with 15-minute time-limited presigned viewing links.

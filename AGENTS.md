@@ -24,6 +24,7 @@
   - **Shared Client SDK**: Typed Client API SDK in `packages/api-client/` (`@kumaran/api-client`) + Dart Models in `apps/mobile/lib/core/api/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
   - **Object Storage**: S3-Compatible Object Storage (Cloudflare R2, MinIO, or private S3 with 15-minute presigned URLs)
+  - **Production Hosting**: Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore at ₹900–₹1,800/month flat) + Cloudflare R2 (₹0 egress bandwidth fees)
 
 ---
 

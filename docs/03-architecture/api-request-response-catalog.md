@@ -422,7 +422,7 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-23T14:30:00.000Z",
   "data": {
-    "url": "https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/kyc/cust-uuid-001/AADHAAR_FRONT-xyz.jpg?X-Amz-Expires=900&X-Amz-Signature=...",
+    "url": "https://storage.kumaranchits.com/kyc/cust-uuid-001/AADHAAR_FRONT-xyz.jpg?X-Amz-Expires=900&X-Amz-Signature=...",
     "expiresInSeconds": 900
   }
 }
@@ -1558,7 +1558,7 @@ Content-Type: image/jpeg
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
     "key": "receipts/2026/KC-REC-PRD-2026-00412.pdf",
-    "presignedUrl": "https://kumaran-chits-private.s3.ap-south-1.amazonaws.com/receipts/2026/KC-REC-PRD-2026-00412.pdf?X-Amz-Algorithm=...",
+    "presignedUrl": "https://storage.kumaranchits.com/receipts/2026/KC-REC-PRD-2026-00412.pdf?X-Amz-Algorithm=...",
     "expiresInSeconds": 900
   }
 }

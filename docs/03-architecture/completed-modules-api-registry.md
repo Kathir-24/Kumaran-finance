@@ -255,7 +255,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 ### 11.1 Overview & Architecture
 - **Dual-Driver Pattern**:
   - `LocalStorageDriver`: Default for local development. Automatically writes files to `./storage/uploads/` and resolves absolute paths with path-traversal safeguards.
-  - `AwsS3StorageDriver`: Production driver using AWS SDK v3 (`@aws-sdk/client-s3`) with `ServerSideEncryption: 'AES256'` and `@aws-sdk/s3-request-presigner`.
+  - `S3StorageDriver` (also aliased as `AwsS3StorageDriver`): Production driver using S3 SDK v3 (`@aws-sdk/client-s3`) supporting Cloudflare R2 / MinIO / S3 with `ServerSideEncryption: 'AES256'` and `@aws-sdk/s3-request-presigner`.
 - **15-Minute Presigned Lifespan**: All presigned download URLs strictly expire in **900 seconds (15 minutes)** per `AGENTS.md` §1 and `prd.md` §3.
 - **Path Traversal Protection**: `StorageKeyHelper.sanitizeKey()` rejects any `..` or double slashes with `BadRequestException`.
 - **Deterministic Key Taxonomy**:
@@ -359,7 +359,7 @@ The system exposes exactly **11 public operations** that intentionally do not re
 | # | Endpoint & Method | Purpose & Target | Security & Hardening Mechanism | Automated Test Proof |
 |:---:|---|---|---|---|
 | **1** | `GET /` | Root server liveness check | Zero sensitive data returned (`"Kumaran Chits API is running"`). | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
-| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and MinIO connectivity. `@SkipThrottle()` enabled for Docker/AWS probes to prevent false positives. | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
+| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and MinIO connectivity. `@SkipThrottle()` enabled for Docker/load balancer probes to prevent false positives. | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
 | **3** | `GET /health/sentry-test` | Crash diagnostic validation | Triggers an intentional 500 exception to verify Sentry APM error logging without leaking stack traces. | [`apps/api/test/client-contract.spec.ts`](../test/client-contract.spec.ts) |
 | **4** | `POST /auth/web/login` | Staff office web portal login | Rate-limited via `@Throttle(5, 60)` (max 5 requests/min); verifies password with `bcrypt.compare` (salt 10-12); challenges for TOTP if 2FA active. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
 | **5** | `POST /auth/web/verify-totp` | Staff 2FA authentication | Validates cryptographic `tempToken` issued during Step 1 login + RFC 6238 6-digit authenticator code. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
@@ -387,7 +387,7 @@ The system exposes exactly **11 public operations** that intentionally do not re
 - **Physical Safe Cash Reconciliation Invariant**:
   $$\text{Closing Cash in Safe} = \text{Opening Cash} + \text{Cash Inflows} - \text{Cash Outflows}$$
   Enforced by Form XXII Cash Book Register (`/reports/form-xxii`) to match physical notes in vault to the exact Rupee.
-- **Encrypted Storage Service**: Dual-driver with local disk fallback and AWS S3 with `AES256` and 15-minute presigned URLs.
+- **Encrypted Storage Service**: Dual-driver with local disk fallback and S3-compatible cloud storage (Cloudflare R2 / MinIO) with `AES256` and 15-minute presigned URLs.
 - **Bilingual PDF Canvas Engine**: A5 digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.

@@ -24,14 +24,14 @@ flowchart TD
     subgraph CorePlatform["Kumaran Chits Core Monolith (apps/api)"]
         Auth["AuthService\n• 5 OTPs/24h Quota\n• 60s Cooldown\n• 300s Lockout"]
         Pay["PaymentService\n• UTR @unique\n• IdempotencyKey\n• Maker != Checker"]
-        Storage["StorageService\n• AWS S3 (ap-south-1)\n• 5s Connect / 10s Read\n• 15m Presigned URL Cache"]
+        Storage["StorageService\n• S3-Compatible Driver\n• 5s Connect / 10s Read\n• 15m Presigned URL Cache"]
         Queue["BullMQ Worker\n• notification-queue\n• reconciliation-queue"]
     end
 
     subgraph ExternalServices["External Providers & Gateways"]
         MSG91["MSG91 Indian DLT Gateway\n• 5s Socket Timeout\n• Circuit Breaker (5 err / 30s)\n• Fallback Driver"]
         KVB["Karur Vysya Bank (KVB)\n• Direct NPCI UPI Intent\n• ₹0 MDR Fees\n• Bank UTR Uniqueness"]
-        S3["Private AWS S3\n• Encrypted KYC & Receipts\n• CRR to ap-south-2"]
+        S3["Cloudflare R2 / MinIO\n• Encrypted KYC & Receipts\n• ₹0 Egress Bandwidth Fees"]
         Prometheus["Prometheus / Grafana\n• sms_dispatches_total\n• sms_circuit_breaker_state"]
     end
 
@@ -48,7 +48,7 @@ flowchart TD
 | **2. Payment Gateway Failures** | `PASS` | **ADR-19 Native UPI Intent**: Zero 3rd-party gateway downtime; payments settle directly into KVB account. `ReconciliationService` recovers ghost drops atomically. |
 | **3. Email Delivery Bottlenecks** | `PASS` | **ADR-18 Phone-Only Identity**: Zero email overhead. All receipts and alerts are queued asynchronously to BullMQ (`notification-queue`). |
 | **4. OTP & SMS Delays / Rate Limits** | `PASS` | **24h Rolling Quota (5/day)**, 60s cooldown lock, 5-attempt brute-force lockout, circuit breaker (5 failures / 30s), and automatic fallback driver. |
-| **5. Hanging External Calls** | `PASS` | **Tightened 5,000ms Outbound Timeout** on MSG91 with socket destroy, and 5s connect / 10s read timeout on AWS S3 (`NodeHttpHandler`). |
+| **5. Hanging External Calls** | `PASS` | **Tightened 5,000ms Outbound Timeout** on MSG91 with socket destroy, and 5s connect / 10s read timeout on S3 storage (`NodeHttpHandler`). |
 | **6. API Quotas & Usage Monitoring** | `PASS` | **Prometheus APM Telemetry**: `kumaran_sms_dispatches_total` and `kumaran_sms_circuit_breaker_state` monitored with Grafana alerts. |
 | **7. Duplicate Webhook Delivery** | `PASS` | **Database UTR Constraint**: `Payment.transactionRef @unique` rejects duplicate bank UTRs with HTTP 409; `Payment.idempotencyKey` prevents duplicate minting. |
 

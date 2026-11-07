@@ -16,7 +16,7 @@ Lifecycle 7 verifies the comprehensive payment lifecycle for Kumaran Chits opera
 2. Querying paginated collections with multi-criteria filters (`ticketId`, `paymentMethod`, `limit`, `page`).
 3. Single payment lookups with complete entity graph resolution (`customer`, `branch`, `recordedBy`, `allocations`, `receipt`) and strict **OWASP BOLA (Broken Object Level Authorization)** protection.
 4. Bilingual on-screen receipt layout rendering for the mobile passbook (English + தமிழ்).
-5. Standard **ISO A5 portrait PDF digital receipt** streaming and **15-minute presigned AWS S3 / MinIO** download link generation.
+5. Standard **ISO A5 portrait PDF digital receipt** streaming and **15-minute presigned S3 / MinIO** download link generation.
 6. Maker-Checker dual control on financial reversals (`maker_user_id != checker_user_id`), comprehensively verifying **both lifecycle branches**:
    - **Branch 1 (Rejection)**: Checker rejects reversal $\to$ Payment remains `SUCCESS`, `InstallmentDue` remains `PAID`, `AuditLog` captures rejection.
    - **Branch 2 (Approval)**: Checker approves reversal $\to$ Payment transitions to `REVERSED`, `InstallmentDue` restored to `0|UNPAID`, `AuditLog` captures approval.

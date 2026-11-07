@@ -52,7 +52,7 @@ To protect system resources and eliminate Denial of Service (DoS) attack vectors
 ## 2. Component 1: Encrypted Storage Access Guardians
 
 ### 2.1 Storage Key Prefix Categories
-All files stored locally or in private AWS S3 adhere to strict directory namespaces:
+All files stored locally or in private S3 storage (Cloudflare R2 / MinIO) adhere to strict directory namespaces:
 - `kyc/{customerId}/*`: Sensitive identity scans (Aadhaar, PAN, Photo, Signature).
 - `safety-proof/{auctionId}/*`: Company collateral (signed agreements, promissory notes, blank cheques).
 - `minutes/{chitGroupId}/*`: Statutory Form XVII auction minutes.
@@ -86,7 +86,7 @@ Direct document interactions at [`CustomerController`](file:///u:/Kumaran-financ
   - Subscribers (`CUSTOMER`) can upload identity scans **strictly for their own account** (`currentUser.sub === customerId`). Attempting to upload to a third-party `customerId` throws `403 Forbidden`.
   - File restrictions: Allowed MIME types (`image/jpeg`, `image/png`, `image/webp`, `application/pdf`), maximum size 10 MB, and path-sanitized key generation (`kyc/{customerId}/{docType}-{uuid}.{ext}`).
 - **Presigned Viewing URL (`GET /api/v1/customers/:id/documents/:docId/url`)**:
-  - Direct S3 bucket access is completely blocked to the public (private AWS S3 bucket).
+  - Direct S3 bucket access is completely blocked to the public (private S3 bucket).
   - Time-limited presigned URL generated with strict 900-second (15-minute) TTL.
   - Field collection agents are blocked (`403 Forbidden`) from viewing customer KYC documents per DPDP Act 2023 least-privilege principles.
   - Subscribers (`CUSTOMER`) are restricted strictly to viewing their own documents (`currentUser.sub === customerId`).

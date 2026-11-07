@@ -17,7 +17,7 @@ In Kumaran Chits, prize money disbursement to an auction winner is a high-liabil
    - Route `/disbursements` tracks all finalized auctions awaiting member verification and payout release.
    - 4 Top-level Metric Cards: Total Prize Winners, Pending Safety Verification, Authorized by Checker, Total Rupee Prize Outflow.
    - Filter tabs: `ALL`, `PENDING_VERIFICATION`, `VERIFIED_BY_MAKER`, `AUTHORIZED_BY_CHECKER`, `DISBURSED`.
-   - **ADR-15 Company Safety Proof Checklist**: Property documents (land deeds, patta, ec) are completely eliminated. The software records on-demand safety proof: signed formal chit agreement (`agreementSigned: boolean`), nominee personal guarantee (`nomineeSigned: boolean`), signed blank cheques (`blankChequeDetails: string`), and scanned uploads saved to private AWS S3 with 15-minute presigned URLs (`GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`).
+   - **ADR-15 Company Safety Proof Checklist**: Property documents (land deeds, patta, ec) are completely eliminated. The software records on-demand safety proof: signed formal chit agreement (`agreementSigned: boolean`), nominee personal guarantee (`nomineeSigned: boolean`), signed blank cheques (`blankChequeDetails: string`), and scanned uploads saved to private S3 storage (Cloudflare R2 / MinIO) with 15-minute presigned URLs (`GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`).
    - Maker records safety verification stamping `verifiedByUserId` and transitions status to `VERIFIED_BY_MAKER`.
 2. **Task 7.2 (Maker $\ne$ Checker Prize Money Payout Release & Final Settlement)**:
    - Route `/disbursements/[id]/voucher` enforces **Guardrail 10 Maker $\ne$ Checker**: A partner who verified the safety proof (Maker) **CANNOT** authorize the payout voucher.
@@ -50,7 +50,7 @@ flowchart TD
    Zero software caps or restrictions on cash prize payouts (`disbursementMode: 'CASH'`). Supported across all prize amounts with signed physical counter receipts.
 4. **Guardrail 10 Maker $\ne$ Checker Dual-Control**:
    Self-authorization is blocked when `currentUser.id === winner.verifiedByUserId`. The client renders a prominent warning alert (`makerGuardAlert`) and disables the authorization CTA.
-5. **Private AWS S3 Document Storage**:
+5. **Private S3 Document Storage**:
    Uploaded proof files (JPG, PNG, WEBP, PDF up to 10MB) are stored in private S3 buckets and accessed solely via time-limited 15-minute (900s) presigned URLs.
 
 ---
