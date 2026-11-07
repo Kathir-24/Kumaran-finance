@@ -25,6 +25,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
+  ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
 import {
@@ -97,7 +98,7 @@ export class InstallmentController {
   @ApiOperation({
     summary: 'Alias to list defaulters with consecutive arrears',
     description:
-      'Returns subscribers with continuous unpaid dues. Allowed: Staff and Auditor.',
+      'Returns subscribers with continuous unpaid dues with pagination. Allowed: Staff and Auditor.',
   })
   @ApiQuery({
     name: 'minConsecutiveMonths',
@@ -105,16 +106,23 @@ export class InstallmentController {
     type: Number,
     description: 'Minimum consecutive unpaid months threshold (default: 1)',
   })
-  @ApiOkResponseEnvelope(DefaulterItemResponseDto, { isArray: true, description: 'Defaulters list retrieved' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20, max: 100)' })
+  @ApiPaginatedResponseEnvelope(DefaulterItemResponseDto, { description: 'Defaulters list retrieved' })
   async getDefaultersAlias(
     @CurrentUser('branchId') branchId?: string | null,
     @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
     minConsecutiveMonths?: number,
+    @Query('page', new ParseIntPipe({ optional: true })) pageQuery?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limitQuery?: number,
   ) {
     const minMonths = minConsecutiveMonths ?? 1;
+    const page = Math.max(1, pageQuery || 1);
+    const limit = Math.min(100, Math.max(1, limitQuery || 20));
     return this.installmentService.getDefaulters(
       branchId || undefined,
       minMonths,
+      { page, limit },
     );
   }
 

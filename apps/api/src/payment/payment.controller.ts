@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   UseGuards,
@@ -12,6 +13,7 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -117,19 +119,25 @@ export class PaymentController {
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'List pending UPI payment claims awaiting bank statement verification',
-    description: 'Returns all claims in INITIATED status with customer and due details for Accounting Desk action.',
+    description: 'Returns paginated claims in INITIATED status with customer and due details for Accounting Desk action.',
   })
-  @ApiOkResponseEnvelope(PendingUpiClaimItemDto, {
-    isArray: true,
+  @ApiQuery({ name: 'branchId', required: false, type: String, description: 'Filter by branch ID (Super Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20, max: 100)' })
+  @ApiPaginatedResponseEnvelope(PendingUpiClaimItemDto, {
     description: 'Pending UPI claims retrieved successfully',
   })
   async getPendingUpiClaims(
     @CurrentUser() currentUser: JwtPayload,
     @Query('branchId') branchIdQuery?: string,
+    @Query('page', new ParseIntPipe({ optional: true })) pageQuery?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limitQuery?: number,
   ) {
     const isSuperAdmin = currentUser.roles.includes(Role.SUPER_ADMIN);
     const branchId = isSuperAdmin ? branchIdQuery : (currentUser.branchId || undefined);
-    return this.paymentService.getPendingUpiClaims(branchId);
+    const page = Math.max(1, pageQuery || 1);
+    const limit = Math.min(100, Math.max(1, limitQuery || 20));
+    return this.paymentService.getPendingUpiClaims(branchId, { page, limit });
   }
 
   @Get(':id')

@@ -105,6 +105,9 @@ export class ReportService {
           'bankTransfer',
           'cheque',
           'amount',
+          'total',
+          'currentCashInSafe',
+          'totalAmount',
         ].includes(key) &&
         /^-?\d+$/.test(val)
       ) {
@@ -126,6 +129,20 @@ export class ReportService {
       !requestingUser.roles.includes(Role.SUPER_ADMIN)
         ? requestingUser.branchId || undefined
         : query.branchId;
+
+    const cacheKey = `report:dashboard:${branchId || 'ALL'}`;
+    const redis = this.redisProvider?.getClient();
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return this.deserializeReport(cached);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Redis dashboard cache read error: ${err.message}`);
+      }
+    }
 
     const startOfToday = new Date();
     startOfToday.setUTCHours(0, 0, 0, 0);
@@ -288,7 +305,7 @@ export class ReportService {
       }
     }
 
-    return {
+    const result = {
       scope: branchId ? `BRANCH_${branchId}` : 'COMPANY_WIDE',
       activeChitsCount,
       totalSubscribersCount,
@@ -322,6 +339,16 @@ export class ReportService {
         },
       },
     };
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        await redis.setex(cacheKey, 30, this.serializeReport(result));
+      } catch (err: any) {
+        this.logger.warn(`Redis dashboard cache write error: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -493,9 +520,13 @@ export class ReportService {
         const keys = [
           `report:daybook:ALL:${targetDate}`,
           `report:daybook:ALL_BRANCHES:${targetDate}`,
+          'report:dashboard:ALL',
+          'report:approvals:ALL',
         ];
         if (branchId) {
           keys.push(`report:daybook:${branchId}:${targetDate}`);
+          keys.push(`report:dashboard:${branchId}`);
+          keys.push(`report:approvals:${branchId}`);
         }
         await redis.del(...keys);
       } catch (err: any) {
@@ -741,6 +772,20 @@ export class ReportService {
         ? requestingUser.branchId || undefined
         : rawBranchId;
 
+    const cacheKey = `report:approvals:${branchId || 'ALL'}`;
+    const redis = this.redisProvider?.getClient();
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Redis approvals cache read error: ${err.message}`);
+      }
+    }
+
     // 1. Pending Cash Handovers
     const pendingCashPayments = await this.prisma.payment.findMany({
       where: {
@@ -938,7 +983,7 @@ export class ReportService {
       paymentReversals.length +
       safetyProofVerifications.length;
 
-    return {
+    const result: PendingApprovalsResponse = {
       summary: {
         totalPendingCount,
         cashHandoversCount: cashHandovers.length,
@@ -954,5 +999,15 @@ export class ReportService {
       paymentReversals,
       safetyProofVerifications,
     };
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        await redis.setex(cacheKey, 15, JSON.stringify(result));
+      } catch (err: any) {
+        this.logger.warn(`Redis approvals cache write error: ${err.message}`);
+      }
+    }
+
+    return result;
   }
 }

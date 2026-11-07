@@ -124,6 +124,14 @@ Handles all outgoing subscriber communications without blocking HTTP request thr
 5. **Arrears & Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)**:
    - Dispatches statutory reminder notices when a member enters arrears.
 
+### 3.4 Process Bulkhead Isolation & Producer/Worker Scaling (`ENABLE_BULLMQ_WORKERS`)
+
+In monolithic development and single-container deployments, the NestJS process runs both producers and workers (`ENABLE_BULLMQ_WORKERS=true` by default).
+
+Under production high concurrency and traffic spikes:
+- **API Producer Process**: Configure `ENABLE_BULLMQ_WORKERS=false`. The API container initializes BullMQ queues to submit jobs, but never spins up background worker threads. This isolates API response latency from background worker CPU/memory consumption.
+- **Dedicated Worker Containers**: Spin up standalone containers with `ENABLE_BULLMQ_WORKERS=true`. These processes consume and execute jobs from Redis without binding to HTTP ingress ports.
+
 ---
 
 ## 4. Cost-Controlled Delivery Channel Hierarchy

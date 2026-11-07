@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   ApiOkResponseEnvelope,
+  ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
 import {
   DefaulterItemResponseDto,
@@ -50,7 +51,7 @@ export class TicketController {
   @ApiOperation({
     summary: 'List subscribers with consecutive arrears',
     description:
-      'Retrieves all subscribers with 1 or more consecutive unpaid installments. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.',
+      'Retrieves subscribers with 1 or more consecutive unpaid installments with pagination. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.',
   })
   @ApiQuery({
     name: 'minConsecutiveMonths',
@@ -58,16 +59,23 @@ export class TicketController {
     type: Number,
     description: 'Minimum consecutive unpaid months threshold (default: 1)',
   })
-  @ApiOkResponseEnvelope(DefaulterItemResponseDto, { isArray: true, description: 'Defaulters list retrieved' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20, max: 100)' })
+  @ApiPaginatedResponseEnvelope(DefaulterItemResponseDto, { description: 'Defaulters list retrieved' })
   async getDefaulters(
     @CurrentUser('branchId') branchId?: string | null,
     @Query('minConsecutiveMonths', new ParseIntPipe({ optional: true }))
     minConsecutiveMonths?: number,
+    @Query('page', new ParseIntPipe({ optional: true })) pageQuery?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limitQuery?: number,
   ) {
     const minMonths = minConsecutiveMonths ?? 1;
+    const page = Math.max(1, pageQuery || 1);
+    const limit = Math.min(100, Math.max(1, limitQuery || 20));
     return this.installmentService.getDefaulters(
       branchId || undefined,
       minMonths,
+      { page, limit },
     );
   }
 

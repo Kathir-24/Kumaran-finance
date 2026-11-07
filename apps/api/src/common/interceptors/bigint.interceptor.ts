@@ -17,40 +17,43 @@ if (typeof (BigInt.prototype as any).toJSON !== 'function') {
 @Injectable()
 export class BigIntInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next.handle().pipe(map((data) => this.transform(data, new WeakMap())));
+    return next.handle().pipe(map((data) => this.transform(data, new WeakSet())));
   }
 
-  private transform(value: any, seen: WeakMap<object, any> = new WeakMap()): any {
+  private transform(value: any, seen: WeakSet<object>): any {
     if (value === null || value === undefined) {
       return value;
     }
     if (typeof value === 'bigint') {
-      // Safe conversion for whole Rupees (amounts under ₹90,000 Crore fit safely in JS Number.MAX_SAFE_INTEGER)
       return Number(value);
     }
-    if (value instanceof Date || Buffer.isBuffer(value)) {
+    if (typeof value !== 'object' || value instanceof Date || Buffer.isBuffer(value)) {
       return value;
     }
-    if (typeof value === 'object') {
-      if (seen.has(value)) {
-        return seen.get(value);
-      }
+    if (seen.has(value)) {
+      return value;
+    }
+    seen.add(value);
 
-      if (Array.isArray(value)) {
-        const transformedArr: any[] = [];
-        seen.set(value, transformedArr);
-        for (const item of value) {
-          transformedArr.push(this.transform(item, seen));
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
+        if (typeof item === 'bigint') {
+          value[i] = Number(item);
+        } else if (typeof item === 'object' && item !== null) {
+          this.transform(item, seen);
         }
-        return transformedArr;
       }
+      return value;
+    }
 
-      const transformed: Record<string, any> = {};
-      seen.set(value, transformed);
-      for (const [key, val] of Object.entries(value)) {
-        transformed[key] = this.transform(val, seen);
+    for (const key of Object.keys(value)) {
+      const val = value[key];
+      if (typeof val === 'bigint') {
+        value[key] = Number(val);
+      } else if (typeof val === 'object' && val !== null) {
+        this.transform(val, seen);
       }
-      return transformed;
     }
     return value;
   }

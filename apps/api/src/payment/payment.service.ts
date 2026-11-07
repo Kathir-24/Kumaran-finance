@@ -49,9 +49,13 @@ export class PaymentService {
         const keys = [
           `report:daybook:ALL:${dateStr}`,
           `report:daybook:ALL_BRANCHES:${dateStr}`,
+          'report:dashboard:ALL',
+          'report:approvals:ALL',
         ];
         if (branchId) {
           keys.push(`report:daybook:${branchId}:${dateStr}`);
+          keys.push(`report:dashboard:${branchId}`);
+          keys.push(`report:approvals:${branchId}`);
         }
         await redis.del(...keys);
       } catch (err: any) {
@@ -1250,9 +1254,12 @@ export class PaymentService {
   }
 
   /**
-   * Retrieves pending UPI claims for Accounting Desk verification.
+   * Retrieves pending UPI claims for Accounting Desk verification with optional pagination.
    */
-  async getPendingUpiClaims(branchId?: string) {
+  async getPendingUpiClaims(
+    branchId?: string,
+    pagination?: { page: number; limit: number },
+  ) {
     const where: any = {
       paymentMethod: PaymentMethod.UPI,
       paymentStatus: PaymentStatus.INITIATED,
@@ -1261,28 +1268,36 @@ export class PaymentService {
       where.branchId = branchId;
     }
 
-    const claims = await this.prisma.payment.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        recordedByUser: {
-          select: { id: true, name: true, phone: true, roles: true },
-        },
-        allocations: {
-          include: {
-            due: true,
-            ticket: {
-              include: {
-                customer: true,
-                chitGroup: true,
+    const skip = pagination ? (pagination.page - 1) * pagination.limit : undefined;
+    const take = pagination ? pagination.limit : undefined;
+
+    const [claims, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          recordedByUser: {
+            select: { id: true, name: true, phone: true, roles: true },
+          },
+          allocations: {
+            include: {
+              due: true,
+              ticket: {
+                include: {
+                  customer: true,
+                  chitGroup: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      pagination ? this.prisma.payment.count({ where }) : Promise.resolve(0),
+    ]);
 
-    return claims.map((c) => {
+    const mapped = claims.map((c) => {
       const alloc = c.allocations[0];
       return {
         claimId: c.id,
@@ -1316,5 +1331,17 @@ export class PaymentService {
           : null,
       };
     });
+
+    if (pagination) {
+      return {
+        data: mapped,
+        total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: Math.ceil(total / pagination.limit),
+      };
+    }
+
+    return mapped;
   }
 }

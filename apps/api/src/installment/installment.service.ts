@@ -468,7 +468,11 @@ export class InstallmentService {
    * Lists all subscribers with continuous unpaid arrears.
    * Highlights subscribers with >= 3 consecutive missed months for company removal.
    */
-  async getDefaulters(branchId?: string, minConsecutiveMonths: number = 1) {
+  async getDefaulters(
+    branchId?: string,
+    minConsecutiveMonths: number = 1,
+    pagination?: { page: number; limit: number },
+  ) {
     const where: any = {
       consecutiveUnpaidMonths: { gte: minConsecutiveMonths },
       status: { not: 'REMOVED_DEF_3M' },
@@ -478,42 +482,50 @@ export class InstallmentService {
       where.chitGroup = { branchId };
     }
 
-    const tickets = await this.prisma.subscriberTicket.findMany({
-      where,
-      orderBy: { consecutiveUnpaidMonths: 'desc' },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            customerCode: true,
-            fullName: true,
-            fullNameTamil: true,
-            phone: true,
-          },
-        },
-        chitGroup: {
-          select: {
-            id: true,
-            groupCode: true,
-            groupName: true,
-            chitValue: true,
-            branch: { select: { id: true, name: true, code: true } },
-          },
-        },
-        dues: {
-          where: { status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] } },
-          orderBy: { installmentMonth: 'asc' },
-          select: {
-            installmentMonth: true,
-            netPayableAmount: true,
-            dueDate: true,
-            status: true,
-          },
-        },
-      },
-    });
+    const skip = pagination ? (pagination.page - 1) * pagination.limit : undefined;
+    const take = pagination ? pagination.limit : undefined;
 
-    return tickets.map((t) => {
+    const [tickets, total] = await Promise.all([
+      this.prisma.subscriberTicket.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { consecutiveUnpaidMonths: 'desc' },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              customerCode: true,
+              fullName: true,
+              fullNameTamil: true,
+              phone: true,
+            },
+          },
+          chitGroup: {
+            select: {
+              id: true,
+              groupCode: true,
+              groupName: true,
+              chitValue: true,
+              branch: { select: { id: true, name: true, code: true } },
+            },
+          },
+          dues: {
+            where: { status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] } },
+            orderBy: { installmentMonth: 'asc' },
+            select: {
+              installmentMonth: true,
+              netPayableAmount: true,
+              dueDate: true,
+              status: true,
+            },
+          },
+        },
+      }),
+      pagination ? this.prisma.subscriberTicket.count({ where }) : Promise.resolve(0),
+    ]);
+
+    const mappedData = tickets.map((t) => {
       const totalOverdueAmount = t.dues.reduce(
         (sum, d) => sum + d.netPayableAmount,
         0n,
@@ -533,6 +545,18 @@ export class InstallmentService {
         unpaidDues: t.dues,
       };
     });
+
+    if (pagination) {
+      return {
+        data: mappedData,
+        total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: Math.ceil(total / pagination.limit),
+      };
+    }
+
+    return mappedData;
   }
 
   /**

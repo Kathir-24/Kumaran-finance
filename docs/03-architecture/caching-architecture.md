@@ -66,6 +66,8 @@ flowchart TD
 | **Tier 2: Redis** | Distributed SMS OTP (`auth:otp:<phone>`) | Redis `String` (JSON) | `300s` (5 mins) | Verified or 3 failed attempts | Lockout penalty |
 | **Tier 2: Redis** | SMS Request Cooldown (`auth:otp:cooldown:<phone>`) | Redis `String` | `60s` (1 min) | Natural expiration | Fallback in-memory map |
 | **Tier 2: Redis** | Rate Limiting Windows (`throttle:*`) | Redis Lua | Dynamic (60s–900s) | Natural window sliding | Memory fallback |
+| **Tier 2: Redis** | Executive Dashboard KPIs (`report:dashboard:<branchId|ALL>`) | Redis `String` (BigInt Safe) | `30s` | Payment / Reversal / Handover commit | Fail-open to Postgres |
+| **Tier 2: Redis** | Live Approvals Stream Summary (`report:approvals:<branchId|ALL>`) | Redis `String` | `15s` | Payment / Reversal / Handover commit | Fail-open to Postgres |
 | **Tier 2: Redis** | Daybook Hot-Read Reports (`cache:reports:daybook:<branchId>:<date>`) | Redis `String` (BigInt Safe) | `60s` (1 min) | Payment / Reversal approval commit | Fail-open to Postgres |
 | **Tier 2: HTTP** | Closed Historical Reports (`Day Book`, `Form XXII`) | HTTP `ETag` + `304` | Conditional | Content SHA-256 change | Full JSON serialization |
 | **Tier 4: Web** | Workstation Server State (TanStack Query) | Browser Memory | `staleTime: 60s` | `queryClient.invalidateQueries` | Fresh background fetch |

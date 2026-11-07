@@ -87,6 +87,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Functional Requirements (10 Modules)** | [`docs/02-requirements/prd.md`](docs/02-requirements/prd.md) |
 | **User Stories & 6-Persona Journey Maps** | [`docs/02-requirements/user-stories-and-journeys.md`](docs/02-requirements/user-stories-and-journeys.md) |
 | **API Endpoints, DTOs & HTTP Methods** | [`docs/03-architecture/api-spec.md`](docs/03-architecture/api-spec.md) |
+| **API Resilience & High-Load Hardening** | [`docs/03-architecture/api-resilience-and-traffic-hardening.md`](docs/03-architecture/api-resilience-and-traffic-hardening.md) |
 | **Frontend Architecture & Cross-Platform** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **Client API SDK & Contract Generator** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |
