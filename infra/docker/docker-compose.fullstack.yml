@@ -42,6 +42,18 @@ services:
     image: redis:7-alpine
     container_name: chitflow-redis
     restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "volatile-lru"
+      - "--save"
+      - "900"
+      - "1"
+      - "--save"
+      - "300"
+      - "10"
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
