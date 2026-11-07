@@ -145,9 +145,15 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
   describe('1. Payment Pessimistic Locking & Zero Double Payment (ADR-07)', () => {
     it('should reject concurrent payment when locked row reveals status is already PAID', async () => {
       // Mock $queryRaw FOR UPDATE returning locked row that was just paid by parallel request
-      prismaMock.$queryRaw.mockResolvedValueOnce([
-        { id: 'due-uuid-001', status: DueStatus.PAID, netPayableAmount: 4000n },
-      ]);
+      prismaMock.$queryRaw.mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"Branch"')) return [{ id: 'branch-prd-001' }];
+        if (sql.includes('"SubscriberTicket"')) return [{ id: mockTicketId }];
+        if (sql.includes('"InstallmentDue"')) {
+          return [{ id: 'due-uuid-001', status: DueStatus.PAID, netPayableAmount: 4000n }];
+        }
+        return [];
+      });
 
       await expect(
         paymentService.recordPayment(
@@ -168,9 +174,15 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
 
     it('should proceed and lock row when locked row reveals status is UNPAID', async () => {
       // First concurrent request acquires row lock with status UNPAID
-      prismaMock.$queryRaw.mockResolvedValueOnce([
-        { id: 'due-uuid-001', status: DueStatus.UNPAID, netPayableAmount: 4000n },
-      ]);
+      prismaMock.$queryRaw.mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"Branch"')) return [{ id: 'branch-prd-001' }];
+        if (sql.includes('"SubscriberTicket"')) return [{ id: mockTicketId }];
+        if (sql.includes('"InstallmentDue"')) {
+          return [{ id: 'due-uuid-001', status: DueStatus.UNPAID, netPayableAmount: 4000n }];
+        }
+        return [];
+      });
 
       const result = await paymentService.recordPayment(
         {

@@ -162,17 +162,32 @@ export class ReportService {
         }
 
         // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
+        let lockAcquired = false;
         if (this.distributedLockService) {
           const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
-          if (!lock.acquired) {
-            // Another concurrent request is actively computing. Wait 250ms and re-check cache.
-            await new Promise((resolve) => setTimeout(resolve, 250));
-            const retryCached = await redis.get(cacheKey);
-            if (retryCached) {
-              return this.deserializeReport(retryCached);
-            }
-          } else {
+          if (lock.acquired) {
             releaseLock = lock.release;
+            lockAcquired = true;
+          }
+        } else {
+          const lockKey = `lock:${cacheKey}`;
+          const acquired = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
+          if (acquired === 'OK' || acquired === true || acquired === 1) {
+            lockAcquired = true;
+            releaseLock = async () => {
+              try {
+                await redis.del(lockKey);
+              } catch {}
+            };
+          }
+        }
+
+        if (!lockAcquired) {
+          // Another concurrent request is actively computing. Wait 250ms and re-check cache.
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const retryCached = await redis.get(cacheKey);
+          if (retryCached) {
+            return this.deserializeReport(retryCached);
           }
         }
       } catch (err: any) {
@@ -441,17 +456,32 @@ export class ReportService {
         }
 
         // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
+        let lockAcquired = false;
         if (this.distributedLockService) {
           const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
-          if (!lock.acquired) {
-            // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            const retryCached = await redis.get(cacheKey);
-            if (retryCached) {
-              return this.deserializeReport(retryCached);
-            }
-          } else {
+          if (lock.acquired) {
             releaseLock = lock.release;
+            lockAcquired = true;
+          }
+        } else {
+          const lockKey = `lock:${cacheKey}`;
+          const acquired = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
+          if (acquired === 'OK' || acquired === true || acquired === 1) {
+            lockAcquired = true;
+            releaseLock = async () => {
+              try {
+                await redis.del(lockKey);
+              } catch {}
+            };
+          }
+        }
+
+        if (!lockAcquired) {
+          // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const retryCached = await redis.get(cacheKey);
+          if (retryCached) {
+            return this.deserializeReport(retryCached);
           }
         }
       } catch (err: any) {

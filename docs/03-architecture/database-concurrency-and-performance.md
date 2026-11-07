@@ -87,8 +87,8 @@ model InstallmentDue {
 
 ## 4. Concurrency, Deadlock Elimination & Transaction Retries
 
-### 4.1 Deterministic Lock Ordering
-When multiple payments or receipts are locked simultaneously (e.g. during cash handover batch confirmation from collection agents to cashier desks), unordered locking causes cyclic wait deadlocks (PostgreSQL error `40P01`):
+### 4.1 Deterministic Lock Ordering & Pessimistic Row Locking
+When multiple payments, receipts, or ticket arrears are mutated concurrently, uncoordinated locking causes race conditions, duplicate receipts, lost updates, and cyclic wait deadlocks (PostgreSQL error `40P01`):
 
 ```
 Transaction A: Locks Payment #1 -> Waits for Payment #2
@@ -96,31 +96,57 @@ Transaction B: Locks Payment #2 -> Waits for Payment #1
 ===> PostgreSQL detects deadlock and aborts one transaction
 ```
 
-**Rule**: Every batch lock operation must sort IDs alphabetically before issuing `SELECT ... FOR UPDATE`:
-```typescript
-// apps/api/src/collection/collection.service.ts
-const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
+To eliminate deadlocks and guarantee serializability across high-concurrency write paths, Kumaran Chits enforces 3 row-locking guardrails:
 
-const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
-  SELECT id, "cashHandoverStatus" 
-  FROM "Payment" 
-  WHERE id = ANY(${sortedPaymentIds}::text[]) 
-  ORDER BY id FOR UPDATE
-`;
-```
+1. **Branch Row Lock for Collision-Free Sequential Receipts**:
+   In `PaymentService.recordPayment`, the active branch row is locked at the start of the transaction:
+   ```typescript
+   await tx.$queryRaw`SELECT id FROM "Branch" WHERE id = ${branchId} FOR UPDATE`;
+   ```
+   This serializes receipt number generation (`KC-REC-PRD-YYYY-XXXXX`) strictly per branch without requiring table-wide locks or external sequence generators, completely eliminating unique constraint collisions (`P2002`).
+
+2. **Subscriber Ticket Row Lock for Arrears Serialization**:
+   Consecutive arrears updates (`consecutiveUnpaidMonths`) are protected by locking the specific `SubscriberTicket` row:
+   ```typescript
+   // PaymentService.recordPayment:
+   await tx.$queryRaw`SELECT id FROM "SubscriberTicket" WHERE id = ${ticket.id} FOR UPDATE`;
+
+   // PaymentService.approveReversal (Deterministic Multi-Ticket Sort):
+   const ticketIds = [...new Set(payment.allocations.map((a) => a.ticketId))].sort();
+   await tx.$queryRaw`
+     SELECT id FROM "SubscriberTicket" WHERE id = ANY(${ticketIds}::text[]) ORDER BY id FOR UPDATE
+   `;
+   ```
+
+3. **Deterministic Multi-Row Sorting on Batch Handover**:
+   Every batch lock operation (e.g. evening cash handover acknowledgment) sorts IDs alphabetically before issuing `SELECT ... FOR UPDATE`:
+   ```typescript
+   // apps/api/src/collection/collection.service.ts
+   const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
+
+   const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
+     SELECT id, "cashHandoverStatus" 
+     FROM "Payment" 
+     WHERE id = ANY(${sortedPaymentIds}::text[]) 
+     ORDER BY id FOR UPDATE
+   `;
+   ```
 
 ### 4.2 Automated Transaction Retry Utility
-Transient deadlocks (`40P01`) or serialization failures (`40001`) under high concurrency are automatically retried using exponential backoff with full jitter:
+Transient deadlocks (`40P01`), serialization failures (`40001`), Prisma write conflicts (`P2034`), or edge-case receipt number conflicts are transparently retried using exponential backoff with randomized jitter:
 ```typescript
 // apps/api/src/common/utils/transaction-retry.util.ts
-export async function executeWithRetry<T>(
-  prisma: PrismaService,
-  operation: (tx: Prisma.TransactionClient) => Promise<T>,
-  options: TransactionRetryOptions = {},
+export async function withTransactionRetry<T>(
+  prisma: { $transaction: (action: any, options?: any) => Promise<any> },
+  action: (tx: any) => Promise<T>,
+  options?: RetryOptions,
+  txOptions?: { maxWait?: number; timeout?: number; isolationLevel?: any },
 ): Promise<T>
 ```
-- **Max Retries**: 3 attempts.
-- **Backoff Base**: 50ms with randomized jitter ($50\text{ms} \times 2^i \pm \text{rand}$).
+- **Max Retries**: 3 attempts (default).
+- **Backoff Algorithm**: $(50\text{ms} \times 2^{\text{attempt}}) + \text{rand}(0, 50\text{ms})$ capped at 1,000ms.
+- **Classification Filter**: `isTransientTransactionError` catches `40P01`, `40001`, `P2034`, write conflicts, and `P2002` on `receiptNumber`. Application validation errors (`BadRequestException`, `ForbiddenException`, `P2025`) fail fast on the first attempt without unnecessary retries.
+- **Integration Points**: Wired into `PaymentService.recordPayment`, `PaymentService.approveReversal`, `PaymentService.verifyUpiPaymentClaim`, `CollectionService.collectPayment`, and `CollectionService.acknowledgeHandover`.
 
 ---
 

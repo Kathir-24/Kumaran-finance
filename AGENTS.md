@@ -137,3 +137,5 @@ Before claiming any task is complete, verify:
 - [ ] Code is formatted and compiles cleanly without lint errors.
 - [ ] Storage uploads use direct presigned PUT URLs, 120s cellular timeouts, client compression, and async BullMQ pre-rendering.
 - [ ] Authentication uses fast-path Redis status caching (120s TTL) and client-scoped session families without cross-device refresh invalidation.
+- [ ] Financial write paths enforce row-level locking (`SELECT FOR UPDATE`), deterministic lock sorting, and automated retry on transient deadlocks (`withTransactionRetry`).
+- [ ] Heavy aggregate reports and batch background crons enforce safe distributed locking (`DistributedLockService`) with unique tokens and atomic Lua releases.

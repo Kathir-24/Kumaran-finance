@@ -5,7 +5,6 @@
 // ==============================================================================
 
 import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 
 const logger = new Logger('TransactionRetryUtil');
 
