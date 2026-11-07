@@ -70,6 +70,7 @@ export const CORS_ALLOWED_HEADERS = [
   'Authorization',
   'X-Branch-Id',
   'Idempotency-Key',
+  'X-Request-ID',
   'X-Requested-With',
   'Accept',
 ];
@@ -78,6 +79,7 @@ export const CORS_ALLOWED_HEADERS = [
 export const CORS_EXPOSED_HEADERS = [
   'Content-Disposition',
   'Retry-After',
+  'X-Request-ID',
   'X-RateLimit-Limit',
   'X-RateLimit-Remaining',
   'X-RateLimit-Reset',

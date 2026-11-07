@@ -14,6 +14,7 @@ import {
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 import { IdempotencyHeaderInterceptor } from './common/interceptors/idempotency-header.interceptor';
+import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middleware';
@@ -110,9 +111,10 @@ async function bootstrap() {
     }),
   );
 
-  // Global BigInt serializer, Request Timeout & Standardized Success Response Envelope
+  // Global Request ID tracer, BigInt serializer, Request Timeout & Standardized Success Response Envelope
   const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
+    new RequestIdInterceptor(),
     new IdempotencyHeaderInterceptor(),
     new TimeoutInterceptor(reflector),
     new BigIntInterceptor(),

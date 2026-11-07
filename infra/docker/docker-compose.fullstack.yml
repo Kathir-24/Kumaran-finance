@@ -124,6 +124,12 @@ services:
       PRIMARY_BRANCH_CODE: PRD
       # Set ENABLE_BULLMQ_WORKERS=false to run API as a lightweight job producer only (process bulkhead)
       ENABLE_BULLMQ_WORKERS: ${ENABLE_BULLMQ_WORKERS:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     ports:
       - "127.0.0.1:3000:3000"
 
@@ -183,7 +189,8 @@ services:
         soft: 65535
         hard: 65535
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -205,8 +212,10 @@ services:
         soft: 65535
         hard: 65535
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
       - "${NGINX_HTTPS_PORT:-443}:443"
