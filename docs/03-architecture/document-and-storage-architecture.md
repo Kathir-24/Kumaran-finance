@@ -378,3 +378,48 @@ return this.prisma.customerDocument.create({ ... });
    - `CHAOS-S3-2`: Blank cheque upload disconnect simulated $\to$ Throws exception, database assertion confirms `AuctionWinner.securityDocS3Key` remains strictly **null** and `AuditLog` count is **0**.
 2. **Live Docker Container Probe ([`scripts/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/verify-chaos-network-disconnect.ps1))**:
    - `CHAOS-PROBE-1`: Penetration probe executed on live container port 3000 $\to$ **100% Pass** (`Zero orphan records in CustomerDocument`).
+
+---
+
+## 9. High-Load Resilience, Direct-to-Storage Presigned Uploads & Media CDN Delivery
+
+To prevent origin API server memory starvation, buffer overflow crashes, and cellular timeouts during peak transaction windows, the storage subsystem incorporates four bank-grade resilience layers:
+
+```mermaid
+flowchart TD
+    subgraph UPLOAD["Direct-to-Storage Upload Pipeline"]
+        C1["Next.js Web / Flutter App"] -->|"1. POST /api/v1/storage/presigned-upload-url"| API["NestJS API Server\n(Anti-BOLA Auth Check)"]
+        API -->|"2. Return Presigned PUT URL\n(300s TTL, AES256)"| C1
+        C1 -->|"3. Direct S3 PUT\n(Canvas Compressed <1.2MB)"| S3[("Private AWS S3 / MinIO\nkumaran-chits-private")]
+    end
+
+    subgraph ASYNC["Async Background PDF Bulkhead"]
+        PAY["Payment Created\n(PostgreSQL Event)"] -->|"Enqueue Job"| QUEUE["BullMQ notification-queue"]
+        QUEUE -->|"Process Bulkhead"| WRK["Dedicated Chitflow Worker"]
+        WRK -->|"Pre-render & Save to S3\n(0ms User Request Latency)"| S3
+    end
+
+    subgraph EGRESS["Direct Media Egress"]
+        C2["Client Browser / Mobile"] -->|"GET /api/v1/pdf/receipt/:id"| API
+        API -->|"HTTP 302 Found\nLocation: S3 Presigned URL"| C2
+        C2 -->|"Direct Edge Download"| S3
+    end
+```
+
+### 9.1 Direct-to-Storage Presigned PUT Uploads
+- **Endpoint**: `POST /api/v1/storage/presigned-upload-url`
+- **Mechanism**: The client requests a presigned S3 `PUT` upload URL with a 5-minute lifespan (`300s`). The API server verifies user ownership via `DocumentAccessHelper` before issuing the signed URL. The client then transfers the document directly to AWS S3 / MinIO via `PUT` with `Content-Type` and `ServerSideEncryption: 'AES256'`, completely bypassing the Node.js API memory heap.
+- **Fallback**: The standard multipart upload endpoint remains available as a transparent fallback for single-shot, low-latency uploads.
+
+### 9.2 Cellular Upload Timeout Resilience & Client-Side Image Downscaling
+- **120-Second Timeout Exemption**: The standard 15-second `TimeoutInterceptor` deadline is extended to 120 seconds (`@SetTimeout(120_000)`) on KYC document upload (`POST /customers/:id/documents`) and winner safety proof upload (`POST /disbursements/auction/:auctionId/upload-safety-proof`). This guarantees that rural field collection agents in Tamil Nadu operating on fluctuating 3G/4G cellular networks can upload scans without premature timeout termination.
+- **Client-Side HTML5 Canvas Downscaling**: High-resolution smartphone camera photos ($\ge 12\text{ MP}$, $6\text{--}10\text{ MB}$) are automatically downscaled in the browser prior to transmission using `apps/web/src/lib/image-compressor.ts`. Images are resized to a maximum bounding box of $1920\times 1080$ with JPEG quality `0.82`, reducing payload size by $70\text{--}85\%$ ($< 1.2\text{ MB}$) with zero visible degradation of text or signatures. PDF documents bypass canvas processing to prevent vector corruption.
+
+### 9.3 BullMQ Asynchronous Background PDF Pre-Rendering
+- **Pre-Rendering Bulkhead**: In `NotificationService.dispatchPaymentReceipt`, the background BullMQ worker asynchronously pre-renders the subscription receipt PDF via `PdfService.generateReceiptPdf(paymentId)` immediately upon payment confirmation.
+- **Instantaneous User Downloads**: The pre-rendered PDF buffer is vaulted in S3 and its storage key is persisted to `Receipt.pdfS3Key` in PostgreSQL. When a subscriber, cashier, or partner subsequently requests the receipt, the document is served immediately from S3 with **0 ms rendering latency**, eliminating synchronous PDFKit canvas overhead on the API event loop.
+
+### 9.4 HTTP 302 Media Egress Offloading to S3 / CloudFront CDN
+- **Direct Edge Redirection**: All PDF retrieval endpoints (`/api/v1/pdf/receipt/:id`, `/voucher/:id`, `/minutes/:id`, `/passbook/:id`) and the generic storage proxy (`/api/v1/storage/file/*key`) support HTTP `302 Found` redirection directly to presigned S3 / CloudFront edge URLs when `?redirect=true` is requested (or automatically when `STORAGE_DRIVER=s3`).
+- **Origin Bandwidth Protection**: Binary streams bypass Node.js memory buffers and Express socket piping, shifting document egress load from the NestJS application instances to cloud object storage.
+- **Streaming Compatibility**: When raw binary streaming is required (e.g., test suites or legacy headless clients), passing `?stream=true` retains raw buffer streaming for 100% backward compatibility.

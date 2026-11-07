@@ -133,3 +133,36 @@ Following deployment, verify system health using these live endpoints:
 | **BullMQ Queue Monitor** | `GET /admin/queues` | Live dashboard showing zero stalled or delayed receipt jobs |
 | **Ingress Access Logs** | `/var/log/nginx/access.log` | Verify incoming requests contain `rid="<request-id>"` |
 | **Client Error Boundaries** | Web Browser (`apps/web`) | Displays actionable `Reference: ERR-KUM-XXXXXX` if a client crash occurs |
+
+---
+
+## 7. Storage Bucket CORS & CDN Delivery Configuration
+
+When configuring production AWS S3 or MinIO object storage for Kumaran Chits, apply the following CORS policy to enable direct browser presigned PUT uploads:
+
+### 7.1 S3 Bucket CORS Configuration
+Apply this JSON configuration to the `kumaran-chits-private` S3 bucket in the AWS Console or via AWS CLI:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedOrigins": [
+      "https://app.kumaranfinance.in",
+      "https://admin.kumaranfinance.in",
+      "http://localhost:3000",
+      "http://localhost:3001"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+### 7.2 CloudFront / CDN Media Edge Rules
+- **Origin**: Connect to `kumaran-chits-private.s3.ap-south-1.amazonaws.com`.
+- **Query String Forwarding**: Forward all query parameters (`X-Amz-*`) to enable AWS4 presigned signature verification.
+- **Cache-Control**: Pass through `Cache-Control: private, max-age=900` to prevent public caching of private customer documents while allowing browser caching during active viewing sessions.
+- **TLS Version**: Enforce TLS 1.3 minimum (`SecurityPolicy: TLSv1.3_2021`).
+- **Geo-Restriction**: Whitelist India (`IN`) to prevent foreign scraping of financial records.

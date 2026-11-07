@@ -135,3 +135,4 @@ Before claiming any task is complete, verify:
 - [ ] No unverified business or statutory rules were assumed without confirmation.
 - [ ] Automated tests verify calculation invariants with 100% pass rate.
 - [ ] Code is formatted and compiles cleanly without lint errors.
+- [ ] Storage uploads use direct presigned PUT URLs, 120s cellular timeouts, client compression, and async BullMQ pre-rendering.
