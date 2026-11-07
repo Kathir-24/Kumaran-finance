@@ -143,17 +143,25 @@ export class JobsController {
     @Param('month', ParseIntPipe) month: number,
     @Body() dto: SendAuctionReminderDto,
   ) {
-    return this.queueProvider.addJob(NOTIFICATION_QUEUE, JOB_DISPATCH_AUCTION_REMINDER, {
-      chitGroupId,
-      chitCode: dto.chitCode,
-      installmentMonth: month,
-      auctionDate: dto.auctionDate,
-      auctionTime: dto.auctionTime,
-      branchName: dto.branchName,
-      branchAddress: dto.branchAddress,
-      branchPhone: dto.branchPhone,
-      subscribers: dto.subscribers || [],
-    });
+    return this.queueProvider.addJob(
+      NOTIFICATION_QUEUE,
+      JOB_DISPATCH_AUCTION_REMINDER,
+      {
+        chitGroupId,
+        chitCode: dto.chitCode,
+        installmentMonth: month,
+        auctionDate: dto.auctionDate,
+        auctionTime: dto.auctionTime,
+        branchName: dto.branchName,
+        branchAddress: dto.branchAddress,
+        branchPhone: dto.branchPhone,
+        subscribers: dto.subscribers || [],
+      },
+      {
+        jobId: `auction-reminder:${chitGroupId}:m${month}`,
+        priority: 10,
+      },
+    );
   }
 
   @Get('queue-status')

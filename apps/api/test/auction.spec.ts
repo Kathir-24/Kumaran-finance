@@ -529,6 +529,10 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             },
           ],
         }),
+        expect.objectContaining({
+          jobId: `auction-result:${mockAuctionId}:m2`,
+          priority: 5,
+        }),
       );
     });
 

@@ -601,6 +601,10 @@ export class AuctionService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_AUCTION_RESULT,
           payload,
+          {
+            jobId: `auction-result:${auction.id}:m${auction.installmentMonth}`,
+            priority: 5,
+          },
         );
         this.logger.log(
           `Enqueued auction result notification for group ${auction.chitGroup.groupCode} Month ${auction.installmentMonth} (${tickets.length} subscribers)`,
