@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PushService } from '../../notification/services/push.service';
 import { SmsService } from '../../notification/services/sms.service';
+import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 import type {
   ApprovalAlertJobPayload,
   AuctionReminderJobPayload,
@@ -40,12 +41,29 @@ export class NotificationService {
       this.sentLog.shift();
     }
     this.sentLog.push(record);
+
+    if (this.redisProvider?.getIsConnected()) {
+      const client = this.redisProvider.getClient();
+      if (client) {
+        const json = JSON.stringify(record);
+        client
+          .pipeline()
+          .lpush('audit:notifications', json)
+          .ltrim('audit:notifications', 0, NotificationService.MAX_LOG_SIZE - 1)
+          .expire('audit:notifications', 604800) // 7-day retention
+          .exec()
+          .catch((err: any) => {
+            this.logger.warn(`Redis notification audit log push error: ${err.message}`);
+          });
+      }
+    }
   }
 
   constructor(
     @Optional() private readonly smsService?: SmsService,
     @Optional() private readonly pushService?: PushService,
     @Optional() private readonly prisma?: PrismaService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
 
   /**
@@ -500,9 +518,40 @@ ${payload.passbookAppUrl}
   }
 
   /**
-   * Clears in-memory sent logs (for clean test isolation).
+   * Distributed retrieval across horizontal instances from shared Redis cluster.
+   */
+  async getDistributedNotificationLog(limit = 100): Promise<SentNotificationRecord[]> {
+    const safeLimit = Math.max(1, limit);
+    if (this.redisProvider?.getIsConnected()) {
+      const client = this.redisProvider.getClient();
+      if (client) {
+        try {
+          const rawEntries = await client.lrange('audit:notifications', 0, safeLimit - 1);
+          if (rawEntries && rawEntries.length > 0) {
+            return rawEntries.map((row: string) => {
+              const parsed = JSON.parse(row);
+              parsed.sentAt = new Date(parsed.sentAt);
+              return parsed;
+            });
+          }
+        } catch (err: any) {
+          this.logger.warn(`Redis notification audit log read warning: ${err.message}`);
+        }
+      }
+    }
+    return this.getSentNotificationLog(safeLimit);
+  }
+
+  /**
+   * Clears sent logs in local memory and shared Redis cluster (for clean test isolation).
    */
   clearLog(): void {
     this.sentLog.length = 0;
+    if (this.redisProvider?.getIsConnected()) {
+      const client = this.redisProvider.getClient();
+      if (client) {
+        client.del('audit:notifications').catch(() => {});
+      }
+    }
   }
 }

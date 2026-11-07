@@ -100,4 +100,56 @@ describe('CircuitBreaker Unit Tests', () => {
     await breaker.execute(async () => 'success-2');
     expect(breaker.getState()).toBe('CLOSED');
   });
+
+  it('should synchronize OPEN state across instances via shared Redis client', async () => {
+    const memoryStore = new Map<string, string>();
+    const mockRedis = {
+      get: jest.fn(async (key: string) => memoryStore.get(key) || null),
+      set: jest.fn(async (key: string, val: string) => {
+        memoryStore.set(key, val);
+        return 'OK';
+      }),
+      del: jest.fn(async (key: string) => {
+        memoryStore.delete(key);
+        return 1;
+      }),
+    };
+
+    const breakerInstanceA = new CircuitBreaker({
+      name: 'DISTRIBUTED_SMS',
+      failureThreshold: 2,
+      resetTimeoutMs: 5000,
+      redisClient: mockRedis,
+    });
+
+    const breakerInstanceB = new CircuitBreaker({
+      name: 'DISTRIBUTED_SMS',
+      failureThreshold: 2,
+      resetTimeoutMs: 5000,
+      redisClient: mockRedis,
+    });
+
+    // Instance A experiences 2 failures and trips to OPEN
+    for (let i = 0; i < 2; i++) {
+      try {
+        await breakerInstanceA.execute(async () => {
+          throw new Error('Downstream failure on Pod A');
+        });
+      } catch {}
+    }
+
+    expect(breakerInstanceA.getState()).toBe('OPEN');
+    expect(mockRedis.set).toHaveBeenCalled();
+
+    // Instance B has 0 local failures, but should immediately sync OPEN state from Redis
+    await expect(
+      breakerInstanceB.execute(async () => 'Pod B should not hit downstream'),
+    ).rejects.toThrow(CircuitBreakerOpenException);
+
+    expect(breakerInstanceB.getState()).toBe('OPEN');
+
+    // Reset on Instance A clears Redis state
+    breakerInstanceA.reset();
+    expect(mockRedis.del).toHaveBeenCalled();
+  });
 });

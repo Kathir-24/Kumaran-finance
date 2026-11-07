@@ -20,6 +20,7 @@ export interface Msg91Config {
   maxRetries?: number;
   retryBaseDelayMs?: number;
   timeoutMs?: number;
+  redisClient?: any;
 }
 
 interface HttpResult {
@@ -52,6 +53,7 @@ export class Msg91SmsDriver implements SmsDriver {
       name: 'MSG91_SMS_GATEWAY',
       failureThreshold: 5,
       resetTimeoutMs: 30000,
+      redisClient: config.redisClient,
     });
   }
 
