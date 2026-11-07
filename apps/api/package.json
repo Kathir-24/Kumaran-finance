@@ -25,6 +25,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
+    "config:verify": "powershell -ExecutionPolicy Bypass -File ../../infra/scripts/verify-config.ps1",
     "openapi:export": "ts-node scripts/export-openapi.ts",
     "db:backup:s3": "ts-node scripts/backup-to-s3.ts",
     "db:restore:s3": "ts-node scripts/restore-from-s3.ts",

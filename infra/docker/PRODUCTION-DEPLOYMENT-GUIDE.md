@@ -196,3 +196,45 @@ To prevent race conditions where Nginx sends a request on an idle connection tha
 - **Dedicated Worker Containers (High-Load)**:
   - API Container: `ENABLE_BULLMQ_WORKERS=false` (producer-only, pure REST handling).
   - Worker Container: `ENABLE_BULLMQ_WORKERS=true` running command `node dist/main.js` without public ingress exposure.
+
+---
+
+## 9. Zero-Downtime Blue-Green Deployment & Multi-Instance Operations
+
+### 9.1 Zero-Downtime Hot Deployment Automation
+In production, standard `docker compose up -d --build` causes 5–15 seconds of service interruption as containers restart. To achieve 100% continuous availability with zero dropped requests:
+
+```bash
+# On Linux / Production Server:
+chmod +x infra/scripts/zero-downtime-deploy.sh
+./infra/scripts/zero-downtime-deploy.sh
+
+# On Windows PowerShell:
+.\infra\scripts\zero-downtime-deploy.ps1
+```
+
+**Automated Deployment Sequence**:
+1. Pre-builds the updated API container image.
+2. Starts the target container instance while keeping the existing container alive.
+3. Polls the deep readiness health probe (`/health/readiness`) every 2 seconds until HTTP 200 is confirmed.
+4. Executes zero-downtime Nginx hot reload (`nginx -s reload`).
+5. Allows a 15-second socket draining window for in-flight requests before terminating the old container.
+
+### 9.2 Deep Health Checks & Container Probing Standards
+The API exposes dedicated health probe endpoints tailored for load balancers and orchestrators:
+- **Readiness Probe (`GET /health/readiness` or `/health`)**: Probes live PostgreSQL connectivity (`SELECT 1`) and Redis queue responsiveness (`PING`). Returns `HTTP 200` when healthy; returns `HTTP 503 Service Unavailable` if backing services degrade. Load balancers use this to route customer traffic.
+- **Liveness Probe (`GET /health/liveness`)**: Pure in-process check verifying the Node.js event loop is responsive. Used by Kubernetes/ECS to detect process deadlocks without restarting containers during transient database spikes.
+
+### 9.3 Multi-Instance Configuration & Environment Verification
+Before deploying new replicas or initiating scaling, verify environment variable consistency:
+```bash
+# Verify configuration consistency across nodes:
+./infra/scripts/verify-config.sh infra/docker/.env
+```
+
+### 9.4 Database Connection Pool Allocation Budget
+PostgreSQL 17 is configured with `max_connections = 150`. To guarantee zero pool exhaustion across horizontally scaled instances:
+- **Each API Replica**: Sized to `25` connections via `&connection_limit=25&pool_timeout=10` in `DATABASE_URL`.
+- **2 Active API Instances**: $2 \times 25 = 50$ connections.
+- **Dedicated BullMQ Worker**: `15` connections.
+- **Admin, Migrations & Backup Margin**: $150 - (50 + 15) = 85$ reserve connections for `pg_dump`, DRP drills, and Prisma CLI.
