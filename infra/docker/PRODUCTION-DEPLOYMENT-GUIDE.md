@@ -186,3 +186,13 @@ To prevent race conditions where Nginx sends a request on an idle connection tha
 - **Auth Limits**: `3 req/s` with burst 5 on `/api/v1/auth/`
 - **General API Limits**: `30 req/s` with burst 30 on `/api/`
 - **Rejection Behavior**: Returns HTTP `429 Too Many Requests` with a standard JSON envelope and `Retry-After: 60` response header at both Nginx edge and application layers.
+
+### 8.4 Libuv Thread Pool Sizing (Zero Starvation on Bcrypt Operations)
+- **Setting**: `ENV UV_THREADPOOL_SIZE=16` in `apps/api/Dockerfile` and `docker-compose.fullstack.yml`.
+- **Sizing Rule**: Password/MPIN authentication uses `BCRYPT_SALT_ROUNDS = 12` (~300ms compute time per login). With 16 libuv threads, concurrent logins cannot starve asynchronous file system, DNS, or socket operations.
+
+### 8.5 Process Bulkhead Isolation & Producer/Worker Scaling (`ENABLE_BULLMQ_WORKERS`)
+- **Default**: `ENABLE_BULLMQ_WORKERS=true` runs background queue workers inside the API instance.
+- **Dedicated Worker Containers (High-Load)**:
+  - API Container: `ENABLE_BULLMQ_WORKERS=false` (producer-only, pure REST handling).
+  - Worker Container: `ENABLE_BULLMQ_WORKERS=true` running command `node dist/main.js` without public ingress exposure.

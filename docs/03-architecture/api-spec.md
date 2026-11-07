@@ -126,8 +126,8 @@
 |---|---|---|---|
 | `GET`  | `/tickets/:ticketId/dues` | Full monthly dues schedule for ticket | Staff, Member, Auditor |
 | `GET`  | `/tickets/:ticketId/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
-| `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears | Staff, Auditor |
-| `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | Staff, Auditor |
+| `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
+| `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
 | `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute removal after 3 continuous months arrears (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
 | `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
 | `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher | `SUPER_ADMIN`, `ACCOUNTANT` |
@@ -153,7 +153,7 @@
 | `GET`  | `/payments/:id` | Get single payment details & transaction history | Staff, Customer, Auditor |
 | `GET`  | `/payments/:id/receipt` | Generate bilingual PDF receipt (English + Tamil) | Staff, Customer, Auditor |
 | `POST` | `/payments/upi-claim` | **Customer UPI Claim**: Self-report 12-digit bank UTR reference; validates uniqueness and records payment in `INITIATED` status | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
-| `GET`  | `/payments/pending-upi-claims` | **Claims Queue**: List pending UPI claims awaiting bank credit statement verification | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `GET`  | `/payments/pending-upi-claims` | **Claims Queue**: List pending UPI claims awaiting bank credit statement verification with pagination (`?page=1&limit=20`, max 100) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify bank credit, transition to `SUCCESS`, issue bilingual receipt & mark due `PAID` (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |

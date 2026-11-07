@@ -168,7 +168,6 @@ export class PaymentService {
     const prefix = `KC-REC-${branchCode}-${year}-`;
     const lastReceipt = await this.prisma.receipt.findFirst({
       where: {
-        branchId,
         receiptNumber: { startsWith: prefix },
       },
       orderBy: { receiptNumber: 'desc' },
@@ -236,11 +235,27 @@ export class PaymentService {
         });
 
         // 3. Create Bilingual Receipt (with collision-proof sequence guarantee)
-        let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+        let seq = nextSeq;
+        if (typeof tx.receipt?.findFirst === 'function') {
+          const txLastReceipt = await tx.receipt.findFirst({
+            where: { receiptNumber: { startsWith: prefix } },
+            orderBy: { receiptNumber: 'desc' },
+            select: { receiptNumber: true },
+          });
+          if (txLastReceipt?.receiptNumber) {
+            const parts = txLastReceipt.receiptNumber.split('-');
+            const lastNum = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(lastNum) && lastNum >= seq) {
+              seq = lastNum + 1;
+            }
+          }
+        }
+
+        let finalReceiptNumber = `${prefix}${String(seq).padStart(5, '0')}`;
         if (typeof tx.receipt?.findUnique === 'function') {
           while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
-            nextSeq++;
-            finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+            seq++;
+            finalReceiptNumber = `${prefix}${String(seq).padStart(5, '0')}`;
           }
         }
 
