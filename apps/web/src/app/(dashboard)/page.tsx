@@ -17,6 +17,7 @@ import {
   Building2,
   Clock,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStore } from '@/stores/approvals-store';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
@@ -28,9 +29,22 @@ import {
   DashboardKpiData,
 } from '@/components/dashboard/kpi-summary-cards';
 import { PendingApprovalsBanner } from '@/components/dashboard/pending-approvals-banner';
-import { CashPulseChart } from '@/components/dashboard/cash-pulse-chart';
 import { ArrearAlertsWidget } from '@/components/dashboard/arrear-alerts-widget';
 import { FilingCountdownWidget } from '@/components/dashboard/filing-countdown-widget';
+
+const CashPulseChart = dynamic(
+  () => import('@/components/dashboard/cash-pulse-chart').then((mod) => mod.CashPulseChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-80 w-full rounded-2xl border border-slate-800 bg-slate-900/50 p-6 animate-pulse">
+        <div className="h-6 w-48 bg-slate-800 rounded mb-4" />
+        <div className="h-4 w-32 bg-slate-800/60 rounded mb-8" />
+        <div className="h-44 w-full bg-slate-800/30 rounded" />
+      </div>
+    ),
+  }
+);
 
 export default function DashboardRootPage() {
   const t = useTranslations();

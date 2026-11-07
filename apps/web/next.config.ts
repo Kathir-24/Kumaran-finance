@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   async redirects() {
     return [
       {
