@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
+import { DistributedLockService } from '../jobs/services/distributed-lock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
@@ -103,6 +104,7 @@ export class ReportService {
     private readonly prisma: PrismaService,
     private readonly statutoryReportService: StatutoryReportService,
     @Optional() private readonly redisProvider?: RedisConnectionProvider,
+    @Optional() private readonly distributedLockService?: DistributedLockService,
   ) {}
 
   private serializeReport(data: any): string {
@@ -149,8 +151,7 @@ export class ReportService {
 
     const cacheKey = `report:dashboard:${branchId || 'ALL'}`;
     const redis = this.redisProvider?.getClient();
-    let acquiredLock = false;
-    const lockKey = `lock:${cacheKey}`;
+    let releaseLock: (() => Promise<void>) | null = null;
     const isRedisConnected = Boolean(redis && this.redisProvider?.getIsConnected());
 
     if (isRedisConnected && redis) {
@@ -160,16 +161,18 @@ export class ReportService {
           return this.deserializeReport(cached);
         }
 
-        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock
-        const lockRes = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
-        acquiredLock = lockRes === 'OK';
-
-        if (!acquiredLock) {
-          // Another concurrent request is actively computing. Wait 250ms and re-check cache.
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          const retryCached = await redis.get(cacheKey);
-          if (retryCached) {
-            return this.deserializeReport(retryCached);
+        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
+        if (this.distributedLockService) {
+          const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
+          if (!lock.acquired) {
+            // Another concurrent request is actively computing. Wait 250ms and re-check cache.
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            const retryCached = await redis.get(cacheKey);
+            if (retryCached) {
+              return this.deserializeReport(retryCached);
+            }
+          } else {
+            releaseLock = lock.release;
           }
         }
       } catch (err: any) {
@@ -403,8 +406,8 @@ export class ReportService {
       if (isFallbackMode) {
         this.activeFallbackDashboardQueries = Math.max(0, this.activeFallbackDashboardQueries - 1);
       }
-      if (acquiredLock && redis) {
-        redis.del(lockKey).catch(() => {});
+      if (releaseLock) {
+        releaseLock().catch(() => {});
       }
     }
   }
@@ -428,8 +431,7 @@ export class ReportService {
     const dateStr = startOfDay.toISOString().split('T')[0];
     const cacheKey = `report:daybook:${branchId || 'ALL'}:${dateStr}`;
     const redis = this.redisProvider?.getClient();
-    let acquiredLock = false;
-    const lockKey = `lock:${cacheKey}`;
+    let releaseLock: (() => Promise<void>) | null = null;
 
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
@@ -438,16 +440,18 @@ export class ReportService {
           return this.deserializeReport(cached);
         }
 
-        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock
-        const lockRes = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
-        acquiredLock = lockRes === 'OK';
-
-        if (!acquiredLock) {
-          // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          const retryCached = await redis.get(cacheKey);
-          if (retryCached) {
-            return this.deserializeReport(retryCached);
+        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
+        if (this.distributedLockService) {
+          const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
+          if (!lock.acquired) {
+            // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            const retryCached = await redis.get(cacheKey);
+            if (retryCached) {
+              return this.deserializeReport(retryCached);
+            }
+          } else {
+            releaseLock = lock.release;
           }
         }
       } catch (err: any) {
@@ -579,8 +583,8 @@ export class ReportService {
       }
       return reportResult;
     } finally {
-      if (acquiredLock && redis) {
-        redis.del(lockKey).catch(() => {});
+      if (releaseLock) {
+        releaseLock().catch(() => {});
       }
     }
   }

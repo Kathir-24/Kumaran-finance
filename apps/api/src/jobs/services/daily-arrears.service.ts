@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus } from '@prisma/client';
 import { CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS } from '../../common/constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { DailyArrearsExecutionResult } from '../dto/job-payloads.dto';
+import { DistributedLockService } from './distributed-lock.service';
 import { NotificationService } from './notification.service';
 
 @Injectable()
@@ -12,14 +13,27 @@ export class DailyArrearsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly distributedLockService?: DistributedLockService,
   ) {}
 
   /**
    * Evaluates and transitions unpaid past-due installments to OVERDUE status,
    * recalculates consecutive unpaid months for each subscriber ticket,
    * updates default statuses (ADR-07), and dispatches default warnings.
+   * Guarded by DistributedLockService to prevent overlapping runs across replicas.
    */
   async processDailyOverdueAndArrears(
+    cutoffDate?: Date,
+  ): Promise<DailyArrearsExecutionResult> {
+    if (this.distributedLockService) {
+      return this.distributedLockService.runWithLock('daily-arrears', 60000, () =>
+        this.executeDailyOverdueAndArrears(cutoffDate),
+      );
+    }
+    return this.executeDailyOverdueAndArrears(cutoffDate);
+  }
+
+  private async executeDailyOverdueAndArrears(
     cutoffDate?: Date,
   ): Promise<DailyArrearsExecutionResult> {
     const effectiveCutoff = cutoffDate || new Date();

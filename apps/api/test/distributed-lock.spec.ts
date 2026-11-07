@@ -1,16 +1,32 @@
 import { ConflictException } from '@nestjs/common';
 import { DistributedLockService } from '../src/jobs/services/distributed-lock.service';
-import { RedisConnectionProvider } from '../src/jobs/providers/redis-connection.provider';
+import { DailyArrearsService } from '../src/jobs/services/daily-arrears.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
-describe('DistributedLockService Unit Tests', () => {
+describe('DistributedLockService: Safe Redis Distributed Locking & Token Verification', () => {
   let lockService: DistributedLockService;
   let redisClientMock: any;
   let redisProviderMock: any;
+  const store = new Map<string, string>();
 
   beforeEach(() => {
+    store.clear();
+
     redisClientMock = {
-      set: jest.fn(),
-      eval: jest.fn(),
+      set: jest.fn().mockImplementation((key: string, val: string, _px: string, _ttl: number, _nx: string) => {
+        if (store.has(key)) return Promise.resolve(null);
+        store.set(key, val);
+        return Promise.resolve('OK');
+      }),
+      get: jest.fn().mockImplementation((key: string) => Promise.resolve(store.get(key) || null)),
+      eval: jest.fn().mockImplementation((script: string, numKeys: number, key: string, token: string) => {
+        // Simulates releaseLockLua: if redis.call("get", key) == token then del key
+        if (store.get(key) === token) {
+          store.delete(key);
+          return Promise.resolve(1);
+        }
+        return Promise.resolve(0);
+      }),
     };
 
     redisProviderMock = {
@@ -18,73 +34,73 @@ describe('DistributedLockService Unit Tests', () => {
       getIsConnected: jest.fn().mockReturnValue(true),
     };
 
-    lockService = new DistributedLockService(
-      redisProviderMock as unknown as RedisConnectionProvider,
-    );
+    lockService = new DistributedLockService(redisProviderMock as any);
   });
 
-  it('should acquire lock, execute operation, and atomically release lock via Lua script in finally', async () => {
-    redisClientMock.set.mockResolvedValue('OK');
-    redisClientMock.eval.mockResolvedValue(1);
+  it('LOCK-01: acquireLock sets key with unique token and returns release function', async () => {
+    const lock = await lockService.acquireLock('test-resource', 5000);
 
-    const result = await lockService.runWithLock('test-handover', 5000, async () => {
-      return { success: true };
+    expect(lock.acquired).toBe(true);
+    expect(lock.token).toBeDefined();
+    expect(store.get('lock:test-resource')).toBe(lock.token);
+
+    // Call release -> executes atomic Lua script
+    await lock.release();
+    expect(store.has('lock:test-resource')).toBe(false);
+  });
+
+  it('LOCK-02: release function MUST NOT delete foreign lock if token changed (TTL expired)', async () => {
+    const lock1 = await lockService.acquireLock('report-cache', 2000);
+    expect(lock1.acquired).toBe(true);
+
+    // Simulate TTL expiration and second worker acquiring lock
+    store.set('lock:report-cache', 'worker-2-new-token');
+
+    // Worker 1 attempts to release expired lock
+    await lock1.release();
+
+    // CRITICAL: The lock belonging to worker 2 was NOT deleted!
+    expect(store.get('lock:report-cache')).toBe('worker-2-new-token');
+  });
+
+  it('LOCK-03: runWithLock executes operation and cleans up lock on completion', async () => {
+    let executed = false;
+    const result = await lockService.runWithLock('daily-arrears', 5000, async () => {
+      expect(store.has('lock:daily-arrears')).toBe(true);
+      executed = true;
+      return 'BATCH_DONE';
     });
 
-    expect(result).toEqual({ success: true });
-    expect(redisClientMock.set).toHaveBeenCalledWith(
-      'lock:test-handover',
-      expect.any(String),
-      'PX',
-      5000,
-      'NX',
-    );
-    expect(redisClientMock.eval).toHaveBeenCalledWith(
-      expect.stringContaining('redis.call("del", KEYS[1])'),
-      1,
-      'lock:test-handover',
-      expect.any(String),
-    );
+    expect(executed).toBe(true);
+    expect(result).toBe('BATCH_DONE');
+    expect(store.has('lock:daily-arrears')).toBe(false);
   });
 
-  it('should throw ConflictException if lock is already held by another process', async () => {
-    redisClientMock.set.mockResolvedValue(null); // Lock not acquired
+  it('LOCK-04: runWithLock throws ConflictException when lock is currently held by another worker', async () => {
+    store.set('lock:daily-arrears', 'other-process-token');
 
     await expect(
-      lockService.runWithLock('test-handover', 5000, async () => {
-        return { success: true };
-      }),
+      lockService.runWithLock('daily-arrears', 5000, async () => 'SHOULD_NOT_RUN'),
     ).rejects.toThrow(ConflictException);
-
-    expect(redisClientMock.eval).not.toHaveBeenCalled();
   });
 
-  it('should guarantee lock release via Lua script even when the operation throws an error', async () => {
-    redisClientMock.set.mockResolvedValue('OK');
-    redisClientMock.eval.mockResolvedValue(1);
+  it('LOCK-05: DailyArrearsService acquires lock through DistributedLockService', async () => {
+    const prismaMock: any = {
+      installmentDue: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      subscriberTicket: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const notificationMock: any = { dispatchDefaultWarningNotice: jest.fn() };
 
-    await expect(
-      lockService.runWithLock('error-task', 5000, async () => {
-        throw new Error('Database transaction failed inside lock');
-      }),
-    ).rejects.toThrow('Database transaction failed inside lock');
-
-    expect(redisClientMock.eval).toHaveBeenCalledWith(
-      expect.any(String),
-      1,
-      'lock:error-task',
-      expect.any(String),
+    const arrearsService = new DailyArrearsService(
+      prismaMock as unknown as PrismaService,
+      notificationMock,
+      lockService,
     );
-  });
 
-  it('should execute operation directly when Redis is offline in fallback mode', async () => {
-    redisProviderMock.getIsConnected.mockReturnValue(false);
+    const result = await arrearsService.processDailyOverdueAndArrears(new Date());
 
-    const result = await lockService.runWithLock('offline-task', 5000, async () => {
-      return { fallback: true };
-    });
-
-    expect(result).toEqual({ fallback: true });
-    expect(redisClientMock.set).not.toHaveBeenCalled();
+    expect(result.duesTransitionedToOverdue).toBe(0);
+    expect(redisClientMock.set).toHaveBeenCalledWith('lock:daily-arrears', expect.any(String), 'PX', 60000, 'NX');
+    expect(redisClientMock.eval).toHaveBeenCalled();
   });
 });

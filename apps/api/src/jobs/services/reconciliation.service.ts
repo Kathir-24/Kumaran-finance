@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DistributedLockService } from './distributed-lock.service';
 import { NotificationService } from './notification.service';
 import type { ReconciliationJobResult } from '../dto/job-payloads.dto';
 
@@ -19,6 +20,7 @@ export class ReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly notificationService?: NotificationService,
+    @Optional() private readonly distributedLockService?: DistributedLockService,
   ) {}
 
   /**
@@ -29,8 +31,22 @@ export class ReconciliationService {
    * 3. Mints collision-proof sequential bilingual Receipt (KC-REC-PRD-YYYY-NNNNN).
    * 4. Recalculates consecutive arrears and restores ACTIVE status if in default.
    * 5. Dispatches official receipt notification asynchronously post-commit.
+   * Guarded by DistributedLockService to prevent overlapping reconciliation runs across replicas.
    */
   async reconcileSettlement(
+    providerRecords: ProviderSettlementRecord[],
+  ): Promise<ReconciliationJobResult> {
+    if (this.distributedLockService) {
+      return this.distributedLockService.runWithLock(
+        'reconciliation-settlement',
+        60000,
+        () => this.executeReconcileSettlement(providerRecords),
+      );
+    }
+    return this.executeReconcileSettlement(providerRecords);
+  }
+
+  private async executeReconcileSettlement(
     providerRecords: ProviderSettlementRecord[],
   ): Promise<ReconciliationJobResult> {
     this.logger.log(`Starting payment reconciliation for ${providerRecords.length} gateway records`);
