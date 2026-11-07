@@ -64,6 +64,20 @@ export class PdfService {
     // Enforce 6-persona ownership & data scoping
     DocumentAccessHelper.assertReceiptAccess(payment, requestingUser);
 
+    // If receipt PDF has already been generated and persisted to S3/storage, stream directly
+    if (payment.receipt.pdfS3Key) {
+      try {
+        const file = await this.storageService.getFile(payment.receipt.pdfS3Key);
+        const presignedUrl = await this.storageService.getPresignedUrl(
+          payment.receipt.pdfS3Key,
+          PRESIGNED_URL_EXPIRES_IN_SECONDS,
+        );
+        return { buffer: file.buffer, key: payment.receipt.pdfS3Key, presignedUrl };
+      } catch {
+        // Transparent fallback: if stored object was pruned or missing, regenerate dynamically below
+      }
+    }
+
     const firstAlloc = payment.allocations[0];
     if (!firstAlloc) {
       throw new BadRequestException('Payment has no ticket allocations');

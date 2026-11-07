@@ -8,6 +8,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Readable } from 'stream';
 import { StorageKeyHelper } from '../helpers/storage-key.helper';
@@ -43,6 +44,10 @@ export class AwsS3StorageDriver implements StorageDriver {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
+      requestHandler: new NodeHttpHandler({
+        connectionTimeout: 5000, // 5s connection timeout
+        requestTimeout: 10000,    // 10s socket/read timeout
+      }),
     });
   }
 

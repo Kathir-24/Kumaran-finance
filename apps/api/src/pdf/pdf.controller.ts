@@ -26,12 +26,14 @@ import {
   THROTTLE_PDF_LIMIT,
   THROTTLE_PDF_TTL_MS,
 } from '../common/constants';
+import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import { PdfService } from './pdf.service';
 
 @ApiTags('Bilingual PDF Documents')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Throttle({ default: { limit: THROTTLE_PDF_LIMIT, ttl: THROTTLE_PDF_TTL_MS } })
+@SetTimeout(30000)
 @ApiResponse({ status: 429, description: 'Too many PDF generation requests. Please wait a minute.' })
 @Controller('pdf')
 export class PdfController {

@@ -84,6 +84,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      UV_THREADPOOL_SIZE: "16"
       API_PREFIX: api/v1
       DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public&connection_limit=25&pool_timeout=10
       REDIS_HOST: redis
@@ -100,6 +101,8 @@ services:
       REFRESH_TOKEN_EXPIRES_IN: 7d
       DEFAULT_FOREMAN_COMMISSION_PERCENT: 4.00
       PRIMARY_BRANCH_CODE: PRD
+      # Set ENABLE_BULLMQ_WORKERS=false to run API as a lightweight job producer only (process bulkhead)
+      ENABLE_BULLMQ_WORKERS: ${ENABLE_BULLMQ_WORKERS:-true}
     ports:
       - "127.0.0.1:3000:3000"
 

@@ -87,68 +87,75 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Reconciliation queue connection error: ${err.message}`);
       });
 
-      // 2. Initialize Workers with error guardians
-      this.maintenanceWorker = new Worker(
-        DAILY_MAINTENANCE_QUEUE,
-        async (job) => {
-          if (job.name === JOB_PROCESS_DAILY_ARREARS) {
-            const cutoff = job.data?.cutoffDate ? new Date(job.data.cutoffDate) : undefined;
-            return await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
-          }
-        },
-        { connection: client as any },
-      );
-      this.maintenanceWorker.on('error', (err) => {
-        this.logger.warn(`Maintenance worker connection error: ${err.message}`);
-      });
+      // 2. Initialize Workers with error guardians (if enabled for this process)
+      const enableWorkers = process.env.ENABLE_BULLMQ_WORKERS !== 'false';
+      if (enableWorkers) {
+        this.maintenanceWorker = new Worker(
+          DAILY_MAINTENANCE_QUEUE,
+          async (job) => {
+            if (job.name === JOB_PROCESS_DAILY_ARREARS) {
+              const cutoff = job.data?.cutoffDate ? new Date(job.data.cutoffDate) : undefined;
+              return await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
+            }
+          },
+          { connection: client as any },
+        );
+        this.maintenanceWorker.on('error', (err) => {
+          this.logger.warn(`Maintenance worker connection error: ${err.message}`);
+        });
 
-      this.notificationWorker = new Worker(
-        NOTIFICATION_QUEUE,
-        async (job) => {
-          if (job.name === JOB_DISPATCH_PAYMENT_RECEIPT) {
-            return await this.notificationService.dispatchPaymentReceipt(job.data);
-          }
-          if (job.name === JOB_DISPATCH_AUCTION_REMINDER) {
-            return await this.notificationService.dispatchAuctionReminder(job.data);
-          }
-          if (job.name === JOB_DISPATCH_DEFAULT_WARNING) {
-            return await this.notificationService.dispatchDefaultWarning(job.data);
-          }
-          if (job.name === JOB_DISPATCH_AUCTION_RESULT) {
-            return await this.notificationService.dispatchAuctionResult(job.data);
-          }
-          if (job.name === JOB_DISPATCH_APPROVAL_ALERT) {
-            return await this.notificationService.dispatchApprovalAlert(job.data);
-          }
-          if (job.name === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {
-            return await this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(
-              job.data?.targetDate ? new Date(job.data.targetDate) : undefined,
-            );
-          }
-        },
-        { connection: client as any },
-      );
-      this.notificationWorker.on('error', (err) => {
-        this.logger.warn(`Notification worker connection error: ${err.message}`);
-      });
+        this.notificationWorker = new Worker(
+          NOTIFICATION_QUEUE,
+          async (job) => {
+            if (job.name === JOB_DISPATCH_PAYMENT_RECEIPT) {
+              return await this.notificationService.dispatchPaymentReceipt(job.data);
+            }
+            if (job.name === JOB_DISPATCH_AUCTION_REMINDER) {
+              return await this.notificationService.dispatchAuctionReminder(job.data);
+            }
+            if (job.name === JOB_DISPATCH_DEFAULT_WARNING) {
+              return await this.notificationService.dispatchDefaultWarning(job.data);
+            }
+            if (job.name === JOB_DISPATCH_AUCTION_RESULT) {
+              return await this.notificationService.dispatchAuctionResult(job.data);
+            }
+            if (job.name === JOB_DISPATCH_APPROVAL_ALERT) {
+              return await this.notificationService.dispatchApprovalAlert(job.data);
+            }
+            if (job.name === JOB_SCAN_PRE_AUCTION_REMINDERS && this.auctionReminderSchedulerService) {
+              return await this.auctionReminderSchedulerService.scanAndBroadcastUpcomingAuctions(
+                job.data?.targetDate ? new Date(job.data.targetDate) : undefined,
+              );
+            }
+          },
+          { connection: client as any },
+        );
+        this.notificationWorker.on('error', (err) => {
+          this.logger.warn(`Notification worker connection error: ${err.message}`);
+        });
 
-      this.reconciliationWorker = new Worker(
-        RECONCILIATION_QUEUE,
-        async (job) => {
-          if (job.name === JOB_RUN_DAILY_RECONCILIATION) {
-            return await this.reconciliationService.reconcileSettlement(job.data?.records || []);
-          }
-        },
-        { connection: client as any },
-      );
-      this.reconciliationWorker.on('error', (err) => {
-        this.logger.warn(`Reconciliation worker connection error: ${err.message}`);
-      });
+        this.reconciliationWorker = new Worker(
+          RECONCILIATION_QUEUE,
+          async (job) => {
+            if (job.name === JOB_RUN_DAILY_RECONCILIATION) {
+              return await this.reconciliationService.reconcileSettlement(job.data?.records || []);
+            }
+          },
+          { connection: client as any },
+        );
+        this.reconciliationWorker.on('error', (err) => {
+          this.logger.warn(`Reconciliation worker connection error: ${err.message}`);
+        });
 
-      // 3. Register Automated Repeatable Cron Jobs (Asia/Kolkata timezone)
-      await this.registerRepeatableJobs();
+        // 3. Register Automated Repeatable Cron Jobs (Asia/Kolkata timezone)
+        await this.registerRepeatableJobs();
 
-      this.logger.log('BullMQ Queues, Workers, and Repeatable Crons initialized successfully.');
+        this.logger.log('BullMQ Queues, Workers, and Repeatable Crons initialized successfully.');
+      } else {
+        this.logger.log(
+          'BullMQ Queues initialized in Producer-Only mode (ENABLE_BULLMQ_WORKERS=false). Worker execution isolated to dedicated worker processes.',
+        );
+      }
     } catch (err: any) {
       this.logger.warn(`Could not start BullMQ workers on Redis: ${err.message}. Using direct execution.`);
     }

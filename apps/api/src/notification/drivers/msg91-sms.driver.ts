@@ -6,6 +6,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import * as https from 'https';
+import { CircuitBreaker } from '../../common/utils/circuit-breaker.util';
 import { PhoneHelper } from '../helpers/phone.helper';
 import {
   SmsDispatchResult,
@@ -37,6 +38,8 @@ export class Msg91SmsDriver implements SmsDriver {
   private readonly maxRetries: number;
   private readonly retryBaseDelayMs: number;
   private readonly timeoutMs: number;
+  private readonly maxRetryDelayMs: number;
+  private readonly circuitBreaker: CircuitBreaker;
 
   constructor(config: Msg91Config) {
     this.authKey = config.authKey;
@@ -44,6 +47,12 @@ export class Msg91SmsDriver implements SmsDriver {
     this.maxRetries = config.maxRetries ?? 2;
     this.retryBaseDelayMs = config.retryBaseDelayMs ?? 400;
     this.timeoutMs = config.timeoutMs ?? 15000;
+    this.maxRetryDelayMs = 3000;
+    this.circuitBreaker = new CircuitBreaker({
+      name: 'MSG91_SMS_GATEWAY',
+      failureThreshold: 5,
+      resetTimeoutMs: 30000,
+    });
   }
 
   async sendSms(payload: SmsPayload): Promise<SmsDispatchResult> {
@@ -75,7 +84,21 @@ export class Msg91SmsDriver implements SmsDriver {
     const postData = JSON.stringify(msg91Payload);
 
     try {
-      const response = await this.postWithRetry(postData);
+      const response = await this.circuitBreaker.execute(
+        async () => {
+          const res = await this.postWithRetry(postData);
+          if (!res.success || (res.statusCode && res.statusCode >= 500)) {
+            throw new Error(res.error || `HTTP ${res.statusCode}`);
+          }
+          return res;
+        },
+        (breakerError) => {
+          return {
+            success: false,
+            error: breakerError.message,
+          };
+        },
+      );
 
       if (!response.success || (response.statusCode && response.statusCode >= 400)) {
         this.logger.error(
@@ -132,7 +155,10 @@ export class Msg91SmsDriver implements SmsDriver {
         return result;
       }
 
-      const delay = this.retryBaseDelayMs * 2 ** attempt;
+      const exponentialDelay = this.retryBaseDelayMs * 2 ** attempt;
+      const cappedDelay = Math.min(this.maxRetryDelayMs, exponentialDelay);
+      const jitter = Math.floor(Math.random() * (cappedDelay * 0.5));
+      const delay = cappedDelay + jitter;
       this.logger.warn(
         `[Msg91SmsDriver] Retrying MSG91 HTTP request (Attempt ${attempt + 1}/${this.maxRetries}) after ${delay}ms delay...`,
       );

@@ -24,6 +24,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import { ReportEtagInterceptor } from '../common/interceptors/report-etag.interceptor';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
@@ -87,6 +88,7 @@ export class ReportController {
   }
 
   @Sse('approvals-stream')
+  @SetTimeout(0)
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Real-Time Server-Sent Events (SSE) Stream for Pending Approvals',
