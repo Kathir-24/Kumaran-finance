@@ -31,6 +31,7 @@ import {
   ApiOkResponseEnvelope,
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import { DisbursementService } from './disbursement.service';
 import { AuthorizePayoutDto } from './dto/authorize-payout.dto';
 import {
@@ -107,6 +108,7 @@ export class DisbursementController {
 
   @Post('auction/:auctionId/upload-safety-proof')
   @HttpCode(HttpStatus.CREATED)
+  @SetTimeout(120_000)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({

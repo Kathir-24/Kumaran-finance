@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { apiClient, unwrapApiResponse, getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { compressImageIfNeeded } from '@/lib/image-compressor';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 
@@ -96,9 +97,10 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
     setUploadError(null);
 
     try {
+      const fileToUpload = await compressImageIfNeeded(selectedFile);
       const formData = new FormData();
       formData.append('docType', docType);
-      formData.append('file', selectedFile);
+      formData.append('file', fileToUpload);
 
       const token = getStoredAccessToken();
       const response = await fetch(`${getApiBaseUrl()}/api/v1/customers/${customerId}/documents`, {

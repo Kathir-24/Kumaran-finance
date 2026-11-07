@@ -36,6 +36,7 @@ import {
   ApiPaginatedResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
 import { ActionSuccessResponseDto } from '../common/dto/action-success.dto';
+import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import {
   THROTTLE_UPLOAD_LIMIT,
   THROTTLE_UPLOAD_TTL_MS,
@@ -246,6 +247,7 @@ export class CustomerController {
 
   @Post(':id/documents')
   @HttpCode(HttpStatus.CREATED)
+  @SetTimeout(120_000)
   @Throttle({ default: { limit: THROTTLE_UPLOAD_LIMIT, ttl: THROTTLE_UPLOAD_TTL_MS } })
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
