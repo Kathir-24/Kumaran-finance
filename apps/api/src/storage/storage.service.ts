@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
+import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { AwsS3StorageDriver } from './drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from './drivers/local-storage.driver';
@@ -120,7 +121,7 @@ export class StorageService {
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
         const cacheTtl = Math.min(this.CACHE_TTL_SECONDS, Math.max(60, expiresInSeconds - 300));
-        await redis.set(cacheKey, url, 'EX', cacheTtl);
+        await redis.set(cacheKey, url, 'EX', withTtlJitter(cacheTtl));
       } catch (err: any) {
         this.logger.warn(`Redis presigned URL cache write error: ${err.message}`);
       }

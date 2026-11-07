@@ -289,15 +289,18 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       await service.uploadFile('doc-1.pdf', Buffer.from('test doc 1'), 'application/pdf');
       await service.uploadFile('doc-2.pdf', Buffer.from('test doc 2'), 'application/pdf');
 
-      // Call 1: Cache Miss -> calls driver, sets Redis cache
+      // Call 1: Cache Miss -> calls driver, sets Redis cache with jittered TTL (600s +/- 15%)
       const url1 = await service.getPresignedUrl('doc-1.pdf', 900);
       expect(url1).toBe('/api/v1/storage/file/doc-1.pdf');
       expect(redisClientMock.set).toHaveBeenCalledWith(
         'url:presigned:doc-1.pdf',
         '/api/v1/storage/file/doc-1.pdf',
         'EX',
-        600,
+        expect.any(Number),
       );
+      const storageTtl = redisClientMock.set.mock.calls[0][3];
+      expect(storageTtl).toBeGreaterThanOrEqual(510);
+      expect(storageTtl).toBeLessThanOrEqual(690);
 
       // Call 2: Cache Hit -> returns from Redis immediately
       const url2 = await service.getPresignedUrl('doc-1.pdf', 900);
