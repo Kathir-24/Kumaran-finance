@@ -35,6 +35,10 @@ export class MetricsService implements OnModuleInit {
   public readonly makerCheckerPendingCount: Gauge<string>;
   public readonly dailyCollectedAmountRupees: Gauge<string>;
 
+  // External Third-Party Telemetry
+  public readonly smsDispatchesTotal: Counter<string>;
+  public readonly smsCircuitBreakerState: Gauge<string>;
+
   constructor() {
     this.registry = new Registry();
     this.registry.setDefaultLabels({
@@ -113,6 +117,21 @@ export class MetricsService implements OnModuleInit {
     this.dailyCollectedAmountRupees = new Gauge({
       name: 'chitflow_daily_collected_amount_rupees',
       help: 'Cumulative collections recorded today in whole integer Rupees (BigInt)',
+      registers: [this.registry],
+    });
+
+    // 5. External Third-Party Telemetry
+    this.smsDispatchesTotal = new Counter({
+      name: 'kumaran_sms_dispatches_total',
+      help: 'Total count of SMS messages dispatched to external telecom providers',
+      labelNames: ['provider', 'template', 'status'], // status: 'success' | 'failure' | 'circuit_open' | 'bypassed'
+      registers: [this.registry],
+    });
+
+    this.smsCircuitBreakerState = new Gauge({
+      name: 'kumaran_sms_circuit_breaker_state',
+      help: 'Circuit breaker state for SMS gateway (0 = CLOSED/Healthy, 1 = HALF_OPEN, 2 = OPEN/Tripped)',
+      labelNames: ['provider'],
       registers: [this.registry],
     });
   }

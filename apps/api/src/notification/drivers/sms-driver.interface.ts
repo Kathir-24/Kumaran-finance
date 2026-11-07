@@ -22,4 +22,5 @@ export interface SmsDispatchResult {
 export interface SmsDriver {
   readonly providerName: string;
   sendSms(payload: SmsPayload): Promise<SmsDispatchResult>;
+  getCircuitBreakerState?(): string;
 }

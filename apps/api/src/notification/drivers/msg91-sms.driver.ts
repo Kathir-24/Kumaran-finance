@@ -57,6 +57,10 @@ export class Msg91SmsDriver implements SmsDriver {
     });
   }
 
+  getCircuitBreakerState(): string {
+    return this.circuitBreaker.getState();
+  }
+
   async sendSms(payload: SmsPayload): Promise<SmsDispatchResult> {
     const msisdn = PhoneHelper.formatIndianMsisdn(payload.to);
     const maskedPhone = PhoneHelper.maskPhone(payload.to);

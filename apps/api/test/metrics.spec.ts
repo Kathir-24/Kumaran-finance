@@ -91,6 +91,8 @@ describe('Prometheus Metrics Exporter Suite', () => {
       expect(output).toContain('http_request_duration_seconds');
       expect(output).toContain('chitflow_db_connected');
       expect(output).toContain('chitflow_active_chit_groups_total');
+      expect(output).toContain('kumaran_sms_dispatches_total');
+      expect(output).toContain('kumaran_sms_circuit_breaker_state');
       expect(metricsService.getContentType()).toContain('text/plain');
     });
   });

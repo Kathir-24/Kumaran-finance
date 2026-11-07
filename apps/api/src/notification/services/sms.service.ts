@@ -5,13 +5,14 @@
 // Invariant: Financial Non-Blocking Guarantee (SMS error never aborts payment)
 // ==============================================================================
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SMS_DRIVER_TOKEN } from '../constants/notification.constants';
 import type { SmsDispatchResult, SmsDriver } from '../drivers/sms-driver.interface';
 import { DltTemplateFormatter } from '../helpers/dlt-template-formatter.helper';
 import { PhoneHelper } from '../helpers/phone.helper';
 import { DLT_CONFIG } from '../templates/dlt-templates.constants';
+import { MetricsService } from '../../metrics/services/metrics.service';
 
 export interface PaymentReceiptSmsPayload {
   recipientPhone: string;
@@ -50,6 +51,7 @@ export class SmsService {
   constructor(
     @Inject(SMS_DRIVER_TOKEN) private readonly smsDriver: SmsDriver,
     private readonly configService: ConfigService,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
   /**
@@ -177,10 +179,45 @@ export class SmsService {
     variables?: Record<string, string>;
   }): Promise<SmsDispatchResult> {
     const maskedPhone = PhoneHelper.maskPhone(smsPayload.to);
+    const templateLabel = smsPayload.dltTemplateId || 'default';
 
     try {
-      return await this.smsDriver.sendSms(smsPayload);
+      const result = await this.smsDriver.sendSms(smsPayload);
+
+      // Synchronize circuit breaker state gauge if supported by driver
+      if (this.metricsService && typeof this.smsDriver.getCircuitBreakerState === 'function') {
+        const cbState = this.smsDriver.getCircuitBreakerState();
+        const gaugeVal = cbState === 'CLOSED' ? 0 : cbState === 'HALF_OPEN' ? 1 : 2;
+        this.metricsService.smsCircuitBreakerState.set({ provider: this.smsDriver.providerName }, gaugeVal);
+      }
+
+      // Record dispatch outcome counter
+      if (this.metricsService) {
+        const statusLabel = result.bypassed
+          ? 'bypassed'
+          : result.success
+            ? 'success'
+            : result.error?.includes('Circuit breaker')
+              ? 'circuit_open'
+              : 'failure';
+
+        this.metricsService.smsDispatchesTotal.inc({
+          provider: this.smsDriver.providerName,
+          template: templateLabel,
+          status: statusLabel,
+        });
+      }
+
+      return result;
     } catch (err: any) {
+      if (this.metricsService) {
+        this.metricsService.smsDispatchesTotal.inc({
+          provider: this.smsDriver.providerName,
+          template: templateLabel,
+          status: 'failure',
+        });
+      }
+
       this.logger.error(
         `[SmsService] Failed to send SMS to ${maskedPhone} via ${this.smsDriver.providerName}: ${err.message}`,
       );
