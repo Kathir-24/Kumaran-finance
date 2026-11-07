@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import { BullMqQueueProvider, JobEnqueueOptions } from '../src/jobs/providers/bullmq-queue.provider';
-import { NOTIFICATION_QUEUE, DAILY_MAINTENANCE_QUEUE, RECONCILIATION_QUEUE } from '../src/jobs/constants/queue-names.constant';
+import { NOTIFICATION_QUEUE, DAILY_MAINTENANCE_QUEUE } from '../src/jobs/constants/queue-names.constant';
 
 describe('Background Processing & Queue Resilience Suite', () => {
   let queueProvider: BullMqQueueProvider;
