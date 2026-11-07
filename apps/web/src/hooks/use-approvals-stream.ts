@@ -21,28 +21,31 @@ interface SseApprovalsMessage {
 export function useApprovalsStream() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
+  const isConnected = useApprovalsStore((s) => s.isConnected);
   const setSummary = useApprovalsStore((s) => s.setSummary);
   const setConnected = useApprovalsStore((s) => s.setConnected);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fallback / Initial TanStack Query fetch: Polls every 30s if SSE is not active
+  // Fallback / Initial TanStack Query fetch: Polls every 30s strictly when SSE is not active
   const { data: initialData } = useQuery({
     queryKey: ['approvals', 'pending', { branchId: activeBranchId }],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const response = await unwrapApiResponse<any>(
         apiClient.GET('/api/v1/reports/pending-approvals', {
           params: {
             query: activeBranchId ? { branchId: activeBranchId } : undefined,
           },
+          signal,
         })
       );
       return response;
     },
     enabled: isAuthenticated,
     staleTime: 15_000,
-    refetchInterval: 30_000,
+    // Cease background polling immediately when SSE stream is healthy
+    refetchInterval: isConnected ? false : 30_000,
   });
 
   // Synchronize initial HTTP response into store

@@ -8,6 +8,7 @@ import { BookOpen, FileSpreadsheet, Loader2, Plus, Search, Layers } from 'lucide
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
+import { useDebounce } from '@/hooks/use-debounce';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,15 +23,7 @@ export default function SchemesDirectoryPage() {
 
   const [activeTab, setActiveTab] = React.useState<FilterTab>('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [debouncedSearch, setDebouncedSearch] = React.useState('');
-
-  // Debounce search input
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearch = useDebounce(searchTerm.trim(), 300);
 
   const queryParams = React.useMemo(() => {
     const params: { status?: any; search?: string; limit: number } = { limit: 50 };
@@ -45,7 +38,7 @@ export default function SchemesDirectoryPage() {
 
   const { data: schemesResponse, isLoading } = useQuery({
     queryKey: queryKeys.schemes.list(queryParams),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       return unwrapApiResponse<{
         data: SchemeSummary[];
         total: number;
@@ -54,6 +47,7 @@ export default function SchemesDirectoryPage() {
       }>(
         apiClient.GET('/api/v1/chits', {
           params: { query: queryParams },
+          signal,
         })
       );
     },

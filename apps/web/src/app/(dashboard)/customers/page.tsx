@@ -9,6 +9,7 @@ import { Plus, Users } from 'lucide-react';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
+import { useDebounce } from '@/hooks/use-debounce';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,19 +48,15 @@ export default function CustomersDirectoryPage() {
     : 20;
 
   const [search, setSearch] = React.useState(initialSearch);
-  const [debouncedSearch, setDebouncedSearch] = React.useState(initialSearch);
+  const debouncedSearch = useDebounce(search, 300);
   const [kycFilter, setKycFilter] = React.useState<KycFilterOption>(initialKyc);
   const [page, setPage] = React.useState(initialPage);
   const [limit, setLimit] = React.useState(initialLimit);
 
-  // Debounce search input by 300ms
+  // Reset to page 1 on search keyword change
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1); // Reset to page 1 on new search keyword
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    setPage(1);
+  }, [debouncedSearch]);
 
   // Synchronize component state to URL query parameters
   React.useEffect(() => {
@@ -94,10 +91,11 @@ export default function CustomersDirectoryPage() {
   // Execute real backend query
   const { data: response, isLoading, isFetching } = useQuery({
     queryKey: queryKeys.customers.list(queryParams),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       return unwrapApiResponse<CustomerListResponse>(
         apiClient.GET('/api/v1/customers', {
           params: { query: queryParams },
+          signal,
         })
       );
     },
@@ -128,7 +126,6 @@ export default function CustomersDirectoryPage() {
   // Handlers
   const handleResetFilters = () => {
     setSearch('');
-    setDebouncedSearch('');
     setKycFilter('ALL');
     setPage(1);
   };

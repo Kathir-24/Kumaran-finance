@@ -34,7 +34,7 @@ export default function CollectionsPage() {
       paymentMethod: selectedMethod === 'ALL' ? undefined : selectedMethod,
       paymentStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
     }),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const token = getStoredAccessToken();
       const params = new URLSearchParams();
       if (selectedMethod !== 'ALL') params.append('paymentMethod', selectedMethod);
@@ -43,6 +43,7 @@ export default function CollectionsPage() {
 
       const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?${params.toString()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal,
       });
       if (!res.ok) throw new Error('Failed to fetch payments');
       const json = await res.json();
@@ -53,10 +54,11 @@ export default function CollectionsPage() {
   // Query global metrics
   const { data: globalData } = useQuery({
     queryKey: queryKeys.payments.list(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const token = getStoredAccessToken();
       const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?limit=200`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal,
       });
       if (!res.ok) return { data: [], total: 0 };
       const json = await res.json();
@@ -67,10 +69,11 @@ export default function CollectionsPage() {
   // Query pending self-reported UPI claims
   const { data: claimsData, isLoading: claimsLoading, refetch: refetchClaims, isFetching: claimsFetching } = useQuery({
     queryKey: queryKeys.payments.pendingUpiClaims(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const token = getStoredAccessToken();
       const res = await fetch(`${getApiBaseUrl()}/api/v1/payments/pending-upi-claims`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal,
       });
       if (!res.ok) return [];
       const json = await res.json();
