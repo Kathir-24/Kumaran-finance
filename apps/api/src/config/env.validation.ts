@@ -98,13 +98,13 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
 
   if (storageDriver === 's3') {
     if (!s3Bucket) {
-      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_BUCKET (or AWS_S3_BUCKET)");
+      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_BUCKET");
     }
     if (!s3AccessKeyId) {
-      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID)");
+      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_ACCESS_KEY_ID");
     }
     if (!s3SecretAccessKey) {
-      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY)");
+      errors.push("Missing mandatory S3 variable when STORAGE_DRIVER is 's3': S3_SECRET_ACCESS_KEY");
     }
   }
 

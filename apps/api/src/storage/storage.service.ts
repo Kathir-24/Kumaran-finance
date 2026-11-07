@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
-import { AwsS3StorageDriver } from './drivers/aws-s3-storage.driver';
+import { S3StorageDriver } from './drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from './drivers/local-storage.driver';
 import {
   FileDownloadResult,
@@ -56,7 +56,7 @@ export class StorageService {
       secretAccessKey
     ) {
       this.driverType = 's3';
-      this.driver = new AwsS3StorageDriver({
+      this.driver = new S3StorageDriver({
         bucket: s3Bucket,
         region,
         accessKeyId,

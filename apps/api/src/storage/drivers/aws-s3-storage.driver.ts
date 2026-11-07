@@ -18,7 +18,7 @@ import {
   UploadResult,
 } from '../interfaces/storage.interface';
 
-export interface AwsS3Config {
+export interface S3StorageConfig {
   region: string;
   bucket: string;
   accessKeyId: string;
@@ -27,13 +27,16 @@ export interface AwsS3Config {
   forcePathStyle?: boolean;
 }
 
+// Backward-compatibility alias
+export type AwsS3Config = S3StorageConfig;
+
 @Injectable()
-export class AwsS3StorageDriver implements StorageDriver {
+export class S3StorageDriver implements StorageDriver {
   private readonly s3Client: S3Client;
   private readonly bucket: string;
   private readonly isCustomEndpoint: boolean;
 
-  constructor(config: AwsS3Config) {
+  constructor(config: S3StorageConfig) {
     this.bucket = config.bucket;
     this.isCustomEndpoint = !!config.endpoint;
     this.s3Client = new S3Client({
@@ -191,3 +194,7 @@ export class AwsS3StorageDriver implements StorageDriver {
     }
   }
 }
+
+// Backward-compatibility aliases (guarantees zero breakage for existing imports & tests)
+export const AwsS3StorageDriver = S3StorageDriver;
+export type AwsS3StorageDriver = S3StorageDriver;
