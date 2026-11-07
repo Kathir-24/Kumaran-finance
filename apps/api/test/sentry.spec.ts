@@ -297,8 +297,8 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
       healthController = new HealthController();
     });
 
-    it('should return sentryActive state in check()', () => {
-      const res = healthController.check();
+    it('should return sentryActive state in check()', async () => {
+      const res = await healthController.check();
       expect(res.status).toBe('ok');
       expect(typeof res.sentryActive).toBe('boolean');
     });
