@@ -32,7 +32,15 @@ export interface SentNotificationRecord {
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
+  private static readonly MAX_LOG_SIZE = 200;
   private readonly sentLog: SentNotificationRecord[] = [];
+
+  private pushLog(record: SentNotificationRecord): void {
+    if (this.sentLog.length >= NotificationService.MAX_LOG_SIZE) {
+      this.sentLog.shift();
+    }
+    this.sentLog.push(record);
+  }
 
   constructor(
     @Optional() private readonly smsService?: SmsService,
@@ -82,7 +90,7 @@ export class NotificationService {
         `Dispatched free Mobile App Push Notification for Receipt ${payload.receiptNumber}`,
       );
 
-      this.sentLog.push({
+      this.pushLog({
         id: pushId,
         channel: 'PUSH_NOTIFICATION',
         recipientPhone: payload.recipientPhone,
@@ -111,7 +119,7 @@ export class NotificationService {
       }
 
       const smsText = `Kumaran Chits: Received Rs.${formattedAmount} for Chit ${payload.chitCode}, Ticket #${payload.ticketNumber} on ${payload.transactionTimestamp}. Receipt: ${payload.receiptNumber}. View passbook: ${payload.passbookAppUrl}`;
-      this.sentLog.push({
+      this.pushLog({
         id: smsId,
         channel: 'SMS_DLT',
         recipientPhone: payload.recipientPhone,
@@ -148,7 +156,7 @@ ${payload.passbookAppUrl}
 *குமரன் பைனான்ஸ் / Kumaran Finance*`;
 
     const whatsappId = `wa-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    this.sentLog.push({
+    this.pushLog({
       id: whatsappId,
       channel: 'WHATSAPP',
       recipientPhone: payload.recipientPhone,
@@ -206,7 +214,7 @@ ${payload.passbookAppUrl}
           }
         }
 
-        this.sentLog.push({
+        this.pushLog({
           id: pushId,
           channel: 'PUSH_NOTIFICATION',
           recipientPhone: sub.phone,
@@ -233,7 +241,7 @@ ${payload.passbookAppUrl}
         }
 
         const smsText = `Kumaran Chits: Auction for Chit ${payload.chitCode} Month ${payload.installmentMonth} is scheduled on ${payload.auctionDate} at ${payload.auctionTime}. Venue: ${payload.branchName}. Contact: ${payload.branchPhone} - *மாதம் ${payload.installmentMonth}* ஏலம் கீழ்கண்ட தேதியில் நடைபெற உள்ளது: ${payload.auctionDate}`;
-        this.sentLog.push({
+        this.pushLog({
           id: smsId,
           channel: 'SMS_DLT',
           recipientPhone: sub.phone,
@@ -288,7 +296,7 @@ ${payload.passbookAppUrl}
         }
       }
 
-      this.sentLog.push({
+      this.pushLog({
         id: notificationId,
         channel: 'PUSH_NOTIFICATION',
         recipientPhone: payload.customerPhone,
@@ -315,7 +323,7 @@ ${payload.passbookAppUrl}
       }
 
       const smsText = `Kumaran Chits: Urgent: Ticket #${payload.ticketNumber} in Chit ${payload.chitCode} has ${payload.consecutiveUnpaidMonths} months overdue (Rs.${formattedOverdue}). Clear dues to avoid cancellation - 3 மாத தவணைகள் நிலுவையில் உள்ளது. Contact: 0424-2223333`;
-      this.sentLog.push({
+      this.pushLog({
         id: notificationId,
         channel: 'SMS_DLT',
         recipientPhone: payload.customerPhone,
@@ -372,7 +380,7 @@ ${payload.passbookAppUrl}
           }
         }
 
-        this.sentLog.push({
+        this.pushLog({
           id: pushId,
           channel: 'PUSH_NOTIFICATION',
           recipientPhone: sub.phone,
@@ -387,7 +395,7 @@ ${payload.passbookAppUrl}
         const smsId = `sms-res-${Date.now()}-${count}`;
         const smsText = `Kumaran Chits: Chit ${payload.chitCode} Month ${payload.installmentMonth} Auction won at Rs.${formattedDiscount} discount. Dividend credit: Rs.${formattedDividend}. Next month installment: Rs.${formattedPayable}.`;
 
-        this.sentLog.push({
+        this.pushLog({
           id: smsId,
           channel: 'SMS_DLT',
           recipientPhone: sub.phone,
@@ -463,7 +471,7 @@ ${payload.passbookAppUrl}
         }
       }
 
-      this.sentLog.push({
+      this.pushLog({
         id: pushId,
         channel: 'PUSH_NOTIFICATION',
         recipientPhone: partner.phone,
@@ -487,7 +495,8 @@ ${payload.passbookAppUrl}
    * Retrieves sent notification records for audit review and test assertions.
    */
   getSentNotificationLog(limit = 100): SentNotificationRecord[] {
-    return [...this.sentLog].reverse().slice(0, limit);
+    const safeLimit = Math.max(1, limit);
+    return this.sentLog.slice(-safeLimit).reverse();
   }
 
   /**

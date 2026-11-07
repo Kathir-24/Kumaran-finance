@@ -19,4 +19,12 @@ export class RequestReversalDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Optional unique idempotency key to prevent duplicate reversal requests',
+  })
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }

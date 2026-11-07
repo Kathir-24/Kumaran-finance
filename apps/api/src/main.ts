@@ -13,6 +13,7 @@ import {
 } from './common/constants';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
+import { IdempotencyHeaderInterceptor } from './common/interceptors/idempotency-header.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middleware';
 import { BullBoardService } from './jobs/bull-board/bull-board.service';
@@ -111,6 +112,7 @@ async function bootstrap() {
   // Global BigInt serializer & Standardized Success Response Envelope
   const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
+    new IdempotencyHeaderInterceptor(),
     new BigIntInterceptor(),
     new TransformResponseInterceptor(reflector),
   );
@@ -183,7 +185,13 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
+  const server = await app.listen(port);
+  // High-traffic keep-alive alignment: ensure Node keeps sockets open longer than Nginx (65s)
+  // to completely eliminate sporadic 502 Bad Gateway (ECONNRESET) errors
+  if (server && typeof server.setTimeout === 'function') {
+    server.keepAliveTimeout = 70000; // 70 seconds (> Nginx 65s)
+    server.headersTimeout = 71000;   // 71 seconds (> keepAliveTimeout)
+  }
   console.log(`🚀 Kumaran Chits API running on: http://localhost:${port}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`📚 Swagger documentation at: http://localhost:${port}/api/docs`);

@@ -167,3 +167,22 @@ pnpm --filter api db:restore:s3
 pnpm --filter api db:drp-drill
 ```
 See [`docs/06-devops/infrastructure-and-drp.md`](../../docs/06-devops/infrastructure-and-drp.md) for full disaster recovery protocols.
+
+---
+
+## 8. High-Load Resilience, Keep-Alive & Payload Configuration
+
+### 8.1 HTTP Keep-Alive Alignment (Zero 502 Bad Gateway ECONNRESET)
+To prevent race conditions where Nginx sends a request on an idle connection that Node.js has closed:
+- **Nginx Ingress**: `keepalive_timeout 65s` (`nginx.conf`)
+- **NestJS Node Server**: `keepAliveTimeout = 70000ms (70s)`, `headersTimeout = 71000ms (71s)` (`main.ts`)
+- **Rule**: Upstream Node.js server keepalive **must exceed** ingress proxy keepalive by $\ge 5$ seconds.
+
+### 8.2 Payload Limits & Bulkhead Isolation
+- **Global API Body Size**: Restricted to `1 MB` (`client_max_body_size 1M;` in Nginx and Express JSON parser) to prevent memory exhaustion and payload flood attacks.
+- **Document & Safety Proof Scoped Uploads**: Extended to `25 MB` strictly for KYC documents (`/api/v1/customers/:id/documents`) and loan safety proof uploads (`/api/v1/disbursements/auction/:auctionId/upload-safety-proof`).
+
+### 8.3 Ingress Rate Limiting & Retry-After Contract
+- **Auth Limits**: `3 req/s` with burst 5 on `/api/v1/auth/`
+- **General API Limits**: `30 req/s` with burst 30 on `/api/`
+- **Rejection Behavior**: Returns HTTP `429 Too Many Requests` with a standard JSON envelope and `Retry-After: 60` response header at both Nginx edge and application layers.

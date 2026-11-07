@@ -10,12 +10,13 @@
 
 ## 1. Global Request & Response Conventions
 
-### 1.1 Required HTTP Headers
+### 1.1 Required & Resilience HTTP Headers
 | Header Name | Type | Description |
 |---|---|---|
 | `Authorization` | String | `Bearer <JWT_ACCESS_TOKEN>` for all authenticated endpoints |
-| `Content-Type` | String | `application/json` (or `multipart/form-data` for KYC document uploads) |
-| `Idempotency-Key` | String | Unique UUID required on financial mutation endpoints (`POST /payments`, `POST /collections/record`, `POST /collections/sync-offline-queue`, `POST /payments/:id/request-reversal`) to prevent duplicate transactions on network retries |
+| `Content-Type` | String | `application/json` (max 1 MB) or `multipart/form-data` (max 25 MB for KYC and safety-proof uploads) |
+| `Idempotency-Key` | String | Unique UUID required on financial mutation endpoints (`POST /payments`, `POST /collections/record`, `POST /collections/sync-offline-queue`, `POST /payments/:id/request-reversal`, `POST /disbursements/auction/:auctionId/release`). Intercepted by `IdempotencyHeaderInterceptor` to bridge headers directly to request bodies and guarantee idempotency across network retries. |
+| `Retry-After` (Response) | Integer / Seconds | Attached to all HTTP 429 (`TOO_MANY_REQUESTS`) responses by both NestJS `GlobalExceptionFilter` and Nginx edge rate limiter, indicating the backoff period before retrying. |
 
 ### 1.2 Standard Response Envelopes
 

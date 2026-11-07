@@ -71,6 +71,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.captureSentryError(exception, host, status, code);
     }
 
+    // Rate Limiting Guard: attach Retry-After header on 429 Too Many Requests
+    if (status === HttpStatus.TOO_MANY_REQUESTS) {
+      const res = exception instanceof HttpException ? exception.getResponse() : null;
+      let retryAfter = 60;
+      if (typeof res === 'object' && res !== null) {
+        retryAfter = (res as any).timeToBlockExpire || (res as any).retryAfter || 60;
+      }
+      response.setHeader('Retry-After', String(retryAfter));
+    }
+
     const payload: StandardErrorResponse = {
       success: false,
       statusCode: status,
