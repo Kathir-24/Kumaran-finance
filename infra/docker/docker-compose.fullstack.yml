@@ -123,9 +123,52 @@ services:
       DEFAULT_FOREMAN_COMMISSION_PERCENT: 4.00
       PRIMARY_BRANCH_CODE: PRD
       # Set ENABLE_BULLMQ_WORKERS=false to run API as a lightweight job producer only (process bulkhead)
-      ENABLE_BULLMQ_WORKERS: ${ENABLE_BULLMQ_WORKERS:-true}
+      ENABLE_BULLMQ_WORKERS: ${ENABLE_BULLMQ_WORKERS:-false}
     ports:
       - "127.0.0.1:3000:3000"
+
+  worker:
+    logging: *default-logging
+    build:
+      context: ../../apps/api
+      dockerfile: Dockerfile
+    container_name: chitflow-worker
+    restart: unless-stopped
+    mem_limit: 1280m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3002
+      UV_THREADPOOL_SIZE: "16"
+      NODE_OPTIONS: "--max-old-space-size=1024"
+      API_PREFIX: api/v1
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chitflow}:${POSTGRES_PASSWORD:-chitflow_dev_only}@db:5432/${POSTGRES_DB:-chitflow_dev}?schema=public&connection_limit=15&pool_timeout=10
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STORAGE_DRIVER: s3
+      S3_REGION: ap-south-1
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-chitflow_admin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-chitflow_storage_secret}
+      S3_BUCKET: ${MINIO_DEFAULT_BUCKET:-kumaran-chits-private}
+      S3_ENDPOINT: http://minio:9000
+      S3_FORCE_PATH_STYLE: "true"
+      JWT_SECRET: dev-secret-key-at-least-64-characters-long-for-local-docker-fullstack-testing
+      JWT_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      DEFAULT_FOREMAN_COMMISSION_PERCENT: 4.00
+      PRIMARY_BRANCH_CODE: PRD
+      # Process Bulkheading: Dedicated worker executes all background queues
+      ENABLE_BULLMQ_WORKERS: "true"
 
   web:
     logging: *default-logging
