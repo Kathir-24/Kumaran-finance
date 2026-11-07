@@ -70,6 +70,11 @@ flowchart TD
 - **Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
 - **PostgreSQL Server Timeouts**: Production database enforces `statement_timeout = 15000` (15s) and `lock_timeout = 5000` (5s) to guarantee rogue queries cannot cause cascading connection starvation.
 
+### 2.5 Horizontal Autoscaling & Multi-AZ High Availability
+- **Target Tracking Autoscaling**: Configured via AWS ECS Auto Scaling. Triggers scale-out when Average CPU Utilization $\ge 60\%$ or API response time exceeds $500\text{ms}$ (p95) for 2 consecutive minutes. Minimum 2 replicas running across distinct AZs (`ap-south-1a`, `ap-south-1b`).
+- **Scheduled Auction-Day Pre-Warming**: Pre-warms cluster from 2 to 4 active replicas 30 minutes prior to scheduled branch auctions.
+- **Deep Health Probing & Zero-Downtime Rolling Updates**: Configured via `/health/readiness` (PostgreSQL `SELECT 1` + Redis `PING`) with `minimumHealthyPercent = 100` and graceful 15-second connection draining. Full specification in [`docs/03-architecture/horizontal-scaling-and-high-availability.md`](../03-architecture/horizontal-scaling-and-high-availability.md).
+
 ---
 
 ## 3. Disaster Recovery Plan (DRP)
