@@ -47,8 +47,8 @@ export class Msg91SmsDriver implements SmsDriver {
     this.senderId = config.senderId || 'KMRCHT';
     this.maxRetries = config.maxRetries ?? 2;
     this.retryBaseDelayMs = config.retryBaseDelayMs ?? 400;
-    this.timeoutMs = config.timeoutMs ?? 15000;
-    this.maxRetryDelayMs = 3000;
+    this.timeoutMs = config.timeoutMs ?? 5000;
+    this.maxRetryDelayMs = 2000;
     this.circuitBreaker = new CircuitBreaker({
       name: 'MSG91_SMS_GATEWAY',
       failureThreshold: 5,
@@ -223,7 +223,15 @@ export class Msg91SmsDriver implements SmsDriver {
         });
       });
 
+      req.on('socket', (socket) => {
+        socket.setTimeout(this.timeoutMs);
+        socket.once('timeout', () => {
+          req.destroy(new Error('Socket connect timeout'));
+        });
+      });
+
       req.on('error', (err) => {
+        req.destroy();
         resolve({ success: false, error: `Network error: ${err.message}` });
       });
 

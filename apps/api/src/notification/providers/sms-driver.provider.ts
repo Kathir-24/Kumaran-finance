@@ -23,7 +23,7 @@ export const SmsDriverProvider: Provider = {
         senderId,
         maxRetries: configService.get<number>('SMS_MAX_RETRIES') || 2,
         retryBaseDelayMs: configService.get<number>('SMS_RETRY_BASE_DELAY_MS') || 400,
-        timeoutMs: configService.get<number>('SMS_REQUEST_TIMEOUT_MS') || 15000,
+        timeoutMs: configService.get<number>('SMS_REQUEST_TIMEOUT_MS') || 5000,
       });
     }
 
