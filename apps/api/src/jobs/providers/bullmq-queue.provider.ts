@@ -98,7 +98,12 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
               return await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
             }
           },
-          { connection: client as any },
+          {
+            connection: client as any,
+            concurrency: 2,
+            lockDuration: 30000,
+            stalledInterval: 30000,
+          },
         );
         this.maintenanceWorker.on('error', (err) => {
           this.logger.warn(`Maintenance worker connection error: ${err.message}`);
@@ -128,7 +133,12 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
               );
             }
           },
-          { connection: client as any },
+          {
+            connection: client as any,
+            concurrency: 5, // Process up to 5 push/SMS notifications in parallel
+            lockDuration: 30000,
+            stalledInterval: 30000,
+          },
         );
         this.notificationWorker.on('error', (err) => {
           this.logger.warn(`Notification worker connection error: ${err.message}`);
@@ -141,7 +151,12 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
               return await this.reconciliationService.reconcileSettlement(job.data?.records || []);
             }
           },
-          { connection: client as any },
+          {
+            connection: client as any,
+            concurrency: 2,
+            lockDuration: 30000,
+            stalledInterval: 30000,
+          },
         );
         this.reconciliationWorker.on('error', (err) => {
           this.logger.warn(`Reconciliation worker connection error: ${err.message}`);
@@ -349,6 +364,18 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
 
   getReconciliationQueue(): Queue | null {
     return this.reconciliationQueue;
+  }
+
+  getNotificationWorker(): Worker | null {
+    return this.notificationWorker;
+  }
+
+  getMaintenanceWorker(): Worker | null {
+    return this.maintenanceWorker;
+  }
+
+  getReconciliationWorker(): Worker | null {
+    return this.reconciliationWorker;
   }
 
   async onModuleDestroy(): Promise<void> {
