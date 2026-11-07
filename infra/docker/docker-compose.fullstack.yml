@@ -90,6 +90,10 @@ services:
     container_name: chitflow-api
     restart: unless-stopped
     mem_limit: 1280m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       db:
         condition: service_healthy
@@ -131,6 +135,10 @@ services:
     container_name: chitflow-web
     restart: unless-stopped
     mem_limit: 512m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       - api
     environment:
@@ -149,6 +157,10 @@ services:
     container_name: chitflow-nginx
     restart: unless-stopped
     mem_limit: 256m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       - api
       - web
