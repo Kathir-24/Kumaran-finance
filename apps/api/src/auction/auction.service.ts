@@ -9,6 +9,7 @@ import {
 import { AuctionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import {
   JOB_DISPATCH_AUCTION_RESULT,
   NOTIFICATION_QUEUE,
@@ -32,6 +33,7 @@ export class AuctionService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly queueProvider?: BullMqQueueProvider,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
 
   /**
@@ -605,6 +607,31 @@ export class AuctionService {
         );
       } catch (err: any) {
         this.logger.warn(`Failed to enqueue auction result notification: ${err.message}`);
+      }
+    }
+
+    // Post-commit: Proactively invalidate executive dashboard and daybook report caches in Redis
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const branchId = auction.chitGroup?.branchId;
+        const targetDate = new Date().toISOString().split('T')[0];
+        const keys = [
+          `report:daybook:ALL:${targetDate}`,
+          `report:daybook:ALL_BRANCHES:${targetDate}`,
+          'report:dashboard:ALL',
+          'report:approvals:ALL',
+        ];
+        if (branchId) {
+          keys.push(`report:daybook:${branchId}:${targetDate}`);
+          keys.push(`report:dashboard:${branchId}`);
+          keys.push(`report:approvals:${branchId}`);
+        }
+        await redis.del(...keys);
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to proactively invalidate report cache on auction finalization: ${err.message}`,
+        );
       }
     }
 

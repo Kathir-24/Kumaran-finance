@@ -577,6 +577,66 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
 
       expect(finalized).toBeDefined();
     });
+
+    it('should proactively invalidate report dashboard and daybook cache upon finalization', async () => {
+      const mockRedisClient = {
+        del: jest.fn().mockResolvedValue(4),
+      };
+      const mockRedisProvider = {
+        getClient: jest.fn().mockReturnValue(mockRedisClient),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+      const cachedAuctionService = new AuctionService(
+        prismaMock as unknown as PrismaService,
+        undefined,
+        mockRedisProvider as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        bidDiscount: 20000n,
+        dividendPerTicket: 800n,
+        foremanCommissionAmount: 4000n,
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        chitGroup: {
+          branchId: 'branch-prd-01',
+          groupName: 'Group A',
+          groupCode: 'KCA-1L-20M-01',
+          baseInstallment: 5000n,
+        },
+        winner: {
+          ticketId: mockTicketId1,
+          ticket: {
+            ticketNumber: 3,
+            customer: { fullName: 'Muthusamy K', customerCode: 'KC-CUST-00003' },
+          },
+        },
+      });
+
+      prismaMock.auction.update.mockResolvedValue({
+        id: mockAuctionId,
+        status: AuctionStatus.COMPLETED,
+        finalizedByUserId: mockCheckerId,
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+      prismaMock.auctionMinutes.upsert.mockResolvedValue({});
+
+      await cachedAuctionService.finalizeAuction(mockAuctionId, mockCheckerId);
+
+      expect(mockRedisClient.del).toHaveBeenCalledWith(
+        expect.stringContaining('report:daybook:ALL:'),
+        expect.stringContaining('report:daybook:ALL_BRANCHES:'),
+        'report:dashboard:ALL',
+        'report:approvals:ALL',
+        expect.stringContaining('report:daybook:branch-prd-01:'),
+        'report:dashboard:branch-prd-01',
+        'report:approvals:branch-prd-01',
+      );
+    });
   });
 
   describe('5. Statutory Auction Minutes & Scheme History', () => {

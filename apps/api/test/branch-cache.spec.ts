@@ -48,7 +48,7 @@ describe('BranchService Master Data Redis Caching', () => {
     branchService = new BranchService(prismaMock, redisProviderMock);
   });
 
-  it('1. Cache Miss: Queries Prisma DB and caches results in Redis with 1-hour TTL', async () => {
+  it('1. Cache Miss: Queries Prisma DB and caches results in Redis with 1-hour TTL with jitter', async () => {
     redisClientMock.get.mockResolvedValueOnce(null);
 
     const result = await branchService.findAll(false);
@@ -59,8 +59,11 @@ describe('BranchService Master Data Redis Caching', () => {
       MasterCacheKeys.branchesAll,
       JSON.stringify(mockBranches),
       'EX',
-      3600,
+      expect.any(Number),
     );
+    const ttl = redisClientMock.set.mock.calls[0][3];
+    expect(ttl).toBeGreaterThanOrEqual(3060);
+    expect(ttl).toBeLessThanOrEqual(4140);
   });
 
   it('2. Cache Hit: Returns cached branch list directly from Redis without hitting Prisma DB', async () => {
@@ -92,8 +95,11 @@ describe('BranchService Master Data Redis Caching', () => {
       MasterCacheKeys.branchById('branch-prd-01'),
       JSON.stringify(mockBranches[0]),
       'EX',
-      3600,
+      expect.any(Number),
     );
+    const ttl = redisClientMock.set.mock.calls[0][3];
+    expect(ttl).toBeGreaterThanOrEqual(3060);
+    expect(ttl).toBeLessThanOrEqual(4140);
 
     // Call 2: Hit
     redisClientMock.get.mockResolvedValueOnce(JSON.stringify(mockBranches[0]));
@@ -122,5 +128,31 @@ describe('BranchService Master Data Redis Caching', () => {
       MasterCacheKeys.branchesActive,
       MasterCacheKeys.branchById('branch-new-02'),
     );
+  });
+
+  it('6. Negative Caching: Non-existent branch lookup caches __notFound sentinel in Redis for 60s', async () => {
+    redisClientMock.get.mockResolvedValueOnce(null);
+    prismaMock.branch.findUnique.mockResolvedValueOnce(null);
+
+    await expect(branchService.findById('non-existent-branch')).rejects.toThrow(
+      'Branch with ID non-existent-branch not found',
+    );
+
+    expect(redisClientMock.set).toHaveBeenCalledWith(
+      MasterCacheKeys.branchById('non-existent-branch'),
+      JSON.stringify({ __notFound: true }),
+      'EX',
+      60,
+    );
+  });
+
+  it('7. Negative Caching Hit: Repetitive lookup for non-existent branch short-circuits without querying database', async () => {
+    redisClientMock.get.mockResolvedValueOnce(JSON.stringify({ __notFound: true }));
+
+    await expect(branchService.findById('non-existent-branch')).rejects.toThrow(
+      'Branch with ID non-existent-branch not found',
+    );
+
+    expect(prismaMock.branch.findUnique).not.toHaveBeenCalled();
   });
 });

@@ -60,7 +60,7 @@ describe('ChitService Master Scheme Redis Caching', () => {
     chitService = new ChitService(prismaMock, redisProviderMock);
   });
 
-  it('1. Cache Miss: Queries database and caches default catalog list in Redis with 30-min TTL', async () => {
+  it('1. Cache Miss: Queries database and caches default catalog list in Redis with 30-min TTL with jitter', async () => {
     redisClientMock.get.mockResolvedValueOnce(null);
 
     const result = await chitService.findAll({});
@@ -71,8 +71,11 @@ describe('ChitService Master Scheme Redis Caching', () => {
       MasterCacheKeys.schemesAll,
       expect.any(String),
       'EX',
-      1800,
+      expect.any(Number),
     );
+    const ttl = redisClientMock.set.mock.calls[0][3];
+    expect(ttl).toBeGreaterThanOrEqual(1530);
+    expect(ttl).toBeLessThanOrEqual(2070);
   });
 
   it('2. Cache Hit: Returns cached catalog directly from Redis without hitting database', async () => {
@@ -111,5 +114,31 @@ describe('ChitService Master Scheme Redis Caching', () => {
       MasterCacheKeys.schemesAll,
       MasterCacheKeys.schemeById(mockSchemeResult.data[0].id),
     );
+  });
+
+  it('5. Negative Caching: Non-existent scheme lookup caches __notFound sentinel in Redis for 60s', async () => {
+    redisClientMock.get.mockResolvedValueOnce(null);
+    prismaMock.chitGroup.findUnique.mockResolvedValueOnce(null);
+
+    await expect(chitService.findOne('non-existent-id')).rejects.toThrow(
+      'Chit scheme with ID non-existent-id not found',
+    );
+
+    expect(redisClientMock.set).toHaveBeenCalledWith(
+      MasterCacheKeys.schemeById('non-existent-id'),
+      JSON.stringify({ __notFound: true }),
+      'EX',
+      60,
+    );
+  });
+
+  it('6. Negative Caching Hit: Repetitive lookup for non-existent ID short-circuits without querying database', async () => {
+    redisClientMock.get.mockResolvedValueOnce(JSON.stringify({ __notFound: true }));
+
+    await expect(chitService.findOne('non-existent-id')).rejects.toThrow(
+      'Chit scheme with ID non-existent-id not found',
+    );
+
+    expect(prismaMock.chitGroup.findUnique).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ import {
   MASTER_CACHE_SCHEME_TTL_SECONDS,
   MasterCacheKeys,
 } from '../common/constants';
+import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
@@ -532,7 +533,7 @@ export class ChitService {
           MasterCacheKeys.schemesAll,
           JSON.stringify(result),
           'EX',
-          MASTER_CACHE_SCHEME_TTL_SECONDS,
+          withTtlJitter(MASTER_CACHE_SCHEME_TTL_SECONDS),
         );
       } catch (err: any) {
         this.logger.warn(`Redis scheme cache write error: ${err.message}`);
@@ -547,6 +548,24 @@ export class ChitService {
    * If requested by a Chit Subscriber (Role.CUSTOMER), sanitizes fellow members' PII.
    */
   async findOne(id: string, currentUser?: JwtPayload) {
+    const redis = this.redisProvider?.getClient();
+    const cacheKey = MasterCacheKeys.schemeById(id);
+
+    if (redis && this.redisProvider?.getIsConnected()) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.__notFound) {
+            throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof NotFoundException) throw err;
+        this.logger.warn(`Redis scheme negative cache read error: ${err.message}`);
+      }
+    }
+
     const chit = await this.prisma.chitGroup.findUnique({
       where: { id },
       include: {
@@ -584,6 +603,14 @@ export class ChitService {
     });
 
     if (!chit) {
+      if (redis && this.redisProvider?.getIsConnected()) {
+        try {
+          // Negative Caching: prevent cache penetration from repetitive invalid lookups (60s TTL)
+          await redis.set(cacheKey, JSON.stringify({ __notFound: true }), 'EX', 60);
+        } catch (err: any) {
+          this.logger.warn(`Redis scheme negative cache write error: ${err.message}`);
+        }
+      }
       throw new NotFoundException(`Chit scheme with ID ${id} not found`);
     }
 

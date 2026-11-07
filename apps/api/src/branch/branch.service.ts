@@ -9,6 +9,7 @@ import {
   MASTER_CACHE_BRANCH_TTL_SECONDS,
   MasterCacheKeys,
 } from '../common/constants';
+import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -54,7 +55,7 @@ export class BranchService {
           cacheKey,
           JSON.stringify(branches),
           'EX',
-          MASTER_CACHE_BRANCH_TTL_SECONDS,
+          withTtlJitter(MASTER_CACHE_BRANCH_TTL_SECONDS),
         );
       } catch (err: any) {
         this.logger.warn(`Redis branch cache write error: ${err.message}`);
@@ -76,9 +77,14 @@ export class BranchService {
       try {
         const cached = await redis.get(cacheKey);
         if (cached) {
-          return JSON.parse(cached);
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.__notFound) {
+            throw new NotFoundException(`Branch with ID ${id} not found`);
+          }
+          return parsed;
         }
       } catch (err: any) {
+        if (err instanceof NotFoundException) throw err;
         this.logger.warn(`Redis branch detail cache read error: ${err.message}`);
       }
     }
@@ -88,6 +94,14 @@ export class BranchService {
     });
 
     if (!branch) {
+      if (redis && this.redisProvider?.getIsConnected()) {
+        try {
+          // Negative Caching: prevent cache penetration from repetitive invalid lookups (60s TTL)
+          await redis.set(cacheKey, JSON.stringify({ __notFound: true }), 'EX', 60);
+        } catch (err: any) {
+          this.logger.warn(`Redis branch negative cache write error: ${err.message}`);
+        }
+      }
       throw new NotFoundException(`Branch with ID ${id} not found`);
     }
 
@@ -97,7 +111,7 @@ export class BranchService {
           cacheKey,
           JSON.stringify(branch),
           'EX',
-          MASTER_CACHE_BRANCH_TTL_SECONDS,
+          withTtlJitter(MASTER_CACHE_BRANCH_TTL_SECONDS),
         );
       } catch (err: any) {
         this.logger.warn(`Redis branch detail cache write error: ${err.message}`);
