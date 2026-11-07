@@ -77,9 +77,9 @@ Kumaran Finance operates 1 branch office in Perundurai. To avoid surprise cloud 
 - **External Access**: Exposed securely to field collection agents via a **free Cloudflare Tunnel** (`cloudflared`), requiring no public static IP or port forwarding.
 - **Trade-off**: Requires local power and broadband reliability in Perundurai; if office internet drops, field collection agents cannot sync online until restored.
 
-### 2.3 Alternative Model 3: Enterprise Cloud (AWS / GCP)
+### 2.3 Alternative Model 3: Enterprise Cloud Hyperscalers
 - Available as an optional cloud target if Kumaran Finance expands into multiple branches across Tamil Nadu in the future.
-- Uses AWS ECS Fargate, RDS PostgreSQL 17, and S3 in `ap-south-1` (Mumbai).
+- Uses managed container clusters, managed PostgreSQL 17, and S3-compatible cloud storage in Mumbai (`ap-south-1`).
 - Cost: ~₹4,500 to ₹9,000+ ($60–$120/month) with metered egress and managed service premiums.
 
 ---
@@ -221,7 +221,7 @@ In Linux VPS and production container environments:
   chown root:root /opt/kumaran-chits/.env
   ```
 - Docker Compose loads environment variables securely at container instantiation time into process memory, preventing unauthorized access by non-root OS users or disk scanners.
-- In managed cloud container environments (e.g., ECS / K8s), secrets can alternatively be injected directly from secret vaults (e.g. AWS Secrets Manager, HashiCorp Vault, or Doppler) into memory at boot time.
+- In managed cloud container environments (e.g., K8s / Nomad), secrets can alternatively be injected directly from secret vaults (e.g. HashiCorp Vault, Doppler, or cloud secrets vault) into memory at boot time.
 
 ---
 

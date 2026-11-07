@@ -257,14 +257,15 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       expect(service.getActiveDriverName()).toBe('s3');
     });
 
-    it('should switch to S3 driver when legacy AWS_* credentials are configured as fallback', () => {
+    it('should switch to S3 driver for Cloudflare R2 / S3-compatible storage', () => {
       const configMock = {
         get: jest.fn((key: string) => {
           if (key === 'STORAGE_DRIVER') return 's3';
-          if (key === 'AWS_S3_BUCKET') return 'kumaran-chits-private';
-          if (key === 'AWS_ACCESS_KEY_ID') return 'AKIA_SAMPLE_KEY';
-          if (key === 'AWS_SECRET_ACCESS_KEY') return 'SECRET_SAMPLE_KEY';
-          if (key === 'AWS_REGION') return 'ap-south-1';
+          if (key === 'S3_BUCKET') return 'kumaran-chits-r2';
+          if (key === 'S3_ACCESS_KEY_ID') return 'R2_ACCESS_KEY';
+          if (key === 'S3_SECRET_ACCESS_KEY') return 'R2_SECRET_KEY';
+          if (key === 'S3_REGION') return 'auto';
+          if (key === 'S3_ENDPOINT') return 'https://account-id.r2.cloudflarestorage.com';
           return null;
         }),
       } as unknown as ConfigService;

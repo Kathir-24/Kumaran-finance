@@ -14,6 +14,13 @@ MONTH=$(date +%m)
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 mkdir -p "${BACKUP_DIR}"
 
+# Map universal S3 credentials for CLI client execution
+mkdir -p ~/.aws
+printf "[default]\naws_access_key_id = %s\naws_secret_access_key = %s\n" \
+  "${S3_ACCESS_KEY_ID:-chitflow_admin}" \
+  "${S3_SECRET_ACCESS_KEY:-chitflow_storage_secret}" > ~/.aws/credentials
+printf "[default]\nregion = %s\n" "${S3_REGION:-ap-south-1}" > ~/.aws/config
+
 BACKUP_FILE="${BACKUP_DIR}/kumaran_chits_backup_${NOW}.dump"
 S3_BUCKET="${S3_BUCKET:-kumaran-chits-private}"
 S3_KEY="s3://${S3_BUCKET}/backups/db/${YEAR}/${MONTH}/kumaran_chits_backup_${NOW}.dump"

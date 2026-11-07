@@ -1374,7 +1374,7 @@ async function run() {
       inputSummary: `auctionId: ${disburseAuctionId}`,
       observedStatus: res.status,
       envelopeVerified: res.json?.success === true,
-      invariantChecked: 'Time-limited 15-minute AWS S3 presigned URL for Checker inspection',
+      invariantChecked: 'Time-limited 15-minute S3 presigned URL for Checker inspection',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
       details: `Presigned URL generated: ${res.json?.data?.url?.slice(0, 75)}... (Expires: 900s)`,
     });

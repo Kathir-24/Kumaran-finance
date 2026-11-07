@@ -50,7 +50,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
   ```json
   {
     "key": "receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-1L-M1-012.pdf",
-    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-1L-M1-012.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256...",
+    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-1L-M1-012.pdf?X-Amz-Algorithm=HMAC-SHA256...",
     "expiresInSeconds": 900
   }
   ```
@@ -71,7 +71,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
   ```json
   {
     "key": "vouchers/15a2dd0cc88c/2026/NEFT-KVB-20260818-0994.pdf",
-    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/vouchers/15a2dd0cc88c/2026/NEFT-KVB-20260818-0994.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256...",
+    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/vouchers/15a2dd0cc88c/2026/NEFT-KVB-20260818-0994.pdf?X-Amz-Algorithm=HMAC-SHA256...",
     "expiresInSeconds": 900
   }
   ```
@@ -92,7 +92,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
   ```json
   {
     "key": "minutes/34d43910-4ed4-40d5-8160-de975b6b2108/month-2.pdf",
-    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/minutes/34d43910-4ed4-40d5-8160-de975b6b2108/month-2.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256...",
+    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/minutes/34d43910-4ed4-40d5-8160-de975b6b2108/month-2.pdf?X-Amz-Algorithm=HMAC-SHA256...",
     "expiresInSeconds": 900
   }
   ```
@@ -113,7 +113,7 @@ Lifecycle 10 validates the document generation and storage architecture of Kumar
   ```json
   {
     "key": "passbooks/4b791dd2-0c85-4ebf-af48-47acefd3615a/ticket-5.pdf",
-    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/passbooks/4b791dd2-0c85-4ebf-af48-47acefd3615a/ticket-5.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256...",
+    "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/passbooks/4b791dd2-0c85-4ebf-af48-47acefd3615a/ticket-5.pdf?X-Amz-Algorithm=HMAC-SHA256...",
     "expiresInSeconds": 900
   }
   ```

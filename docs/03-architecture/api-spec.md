@@ -511,7 +511,7 @@ This section provides granular contract specifications (request bodies, response
     "statusCode": 200,
     "timestamp": "2026-10-23T19:48:32.618Z",
     "data": {
-      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=900&...",
+      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=HMAC-SHA256&X-Amz-Expires=900&...",
       "expiresInSeconds": 900,
       "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg"
     }

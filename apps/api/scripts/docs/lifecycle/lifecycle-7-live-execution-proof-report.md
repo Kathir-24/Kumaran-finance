@@ -225,7 +225,7 @@ flowchart TD
     ```json
     {
       "key": "receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-00014.pdf",
-      "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-00014.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256...",
+      "presignedUrl": "http://127.0.0.1:9000/kumaran-chits-private/receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-00014.pdf?X-Amz-Algorithm=HMAC-SHA256...",
       "expiresInSeconds": 900
     }
     ```

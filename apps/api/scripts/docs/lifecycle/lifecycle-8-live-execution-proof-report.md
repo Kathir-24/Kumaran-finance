@@ -132,7 +132,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
     "statusCode": 200,
     "timestamp": "2026-10-23T19:48:32.618Z",
     "data": {
-      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=chitflow_admin%2F20261023%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T194832Z&X-Amz-Expires=900&X-Amz-Signature=3ae4c31439db7e138098dadf2a9c2e5b8cc5337048d7fb117e0eb186a3182a1c&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "url": "http://127.0.0.1:9000/kumaran-chits-private/safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg?X-Amz-Algorithm=HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=chitflow_admin%2F20261023%2Fap-south-1%2Fs3%2Frequest&X-Amz-Date=20261023T194832Z&X-Amz-Expires=900&X-Amz-Signature=3ae4c31439db7e138098dadf2a9c2e5b8cc5337048d7fb117e0eb186a3182a1c&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
       "expiresInSeconds": 900,
       "securityDocS3Key": "safety-proofs/158898f8-0b5e-4836-8c8e-5a5aa2cbad55/1792784912285_signed_blank_cheques_sundaram.jpg"
     }

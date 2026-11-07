@@ -272,7 +272,7 @@ flowchart TD
 - **API Response**:
   ```json
   {
-    "url": "http://127.0.0.1:9000/kumaran-chits-private/kyc/dc946ed9-c584-466f-a5e6-bf57c020976f/AADHAAR_FRONT-b27401c8-7284-4103-bb8b-63b5778058a8.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=chitflow_admin%2F20261023%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T163408Z&X-Amz-Expires=900&X-Amz-Signature=dddec74a71b2235c9e3615cdd50b09561ca9c87e6fd8d431f49df389cc9d569d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+    "url": "http://127.0.0.1:9000/kumaran-chits-private/kyc/dc946ed9-c584-466f-a5e6-bf57c020976f/AADHAAR_FRONT-b27401c8-7284-4103-bb8b-63b5778058a8.jpg?X-Amz-Algorithm=HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=chitflow_admin%2F20261023%2Fap-south-1%2Fs3%2Frequest&X-Amz-Date=20261023T163408Z&X-Amz-Expires=900&X-Amz-Signature=dddec74a71b2235c9e3615cdd50b09561ca9c87e6fd8d431f49df389cc9d569d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
     "expiresInSeconds": 900
   }
   ```

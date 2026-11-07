@@ -1641,7 +1641,7 @@ Both positive happy paths (HTTP 200/201 with standard response envelope \`{ succ
 | **6. Fixed 1/4 Discount Ceiling** | Maximum bid discount capped at $V/4$ | Submitting historical bid discount of ₹30,000 on a ₹1,00,000 chit was rejected with \`HTTP 400 Bad Request\`. | **PASS** |
 | **7. ADR-13 Ticket Limit Constraint** | Max 1 ticket per customer in same chit group | Assigning second ticket to customer \`6cb8a9e8-...\` in group \`KC-E2E-20M-01\` was rejected with \`HTTP 409 Conflict\`. | **PASS** |
 | **8. Anti-BOLA / IDOR Scoping** | Customer persona restricted strictly to own records | Customer token accessing 3rd party profile (\`testCustomerId\`) was rejected with \`HTTP 403 Forbidden\`. | **PASS** |
-| **9. KYC S3 15-Minute Presigned URLs** | Presigned S3 viewing URLs strictly capped at 900s | Presigned URL generated for KYC doc returned \`expiresInSeconds: 900\` and AWS S3 signature headers. | **PASS** |
+| **9. KYC S3 15-Minute Presigned URLs** | Presigned S3 viewing URLs strictly capped at 900s | Presigned URL generated for KYC doc returned \`expiresInSeconds: 900\` and S3 signature headers. | **PASS** |
 | **10. RFC 6819 Token Rotation** | Token reuse revocation on refresh tokens | Replaying an already rotated refresh token triggered instant session revocation with \`HTTP 401 Unauthorized\`. | **PASS** |
 
 ---

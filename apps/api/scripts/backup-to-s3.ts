@@ -36,27 +36,18 @@ interface BackupConfig {
 }
 
 function resolveConfig(): BackupConfig {
-  const bucket =
-    process.env.S3_BUCKET ||
-    process.env.AWS_S3_BUCKET ||
-    process.env.AWS_S3_BUCKET_NAME ||
-    'kumaran-chits-private';
+  const bucket = process.env.S3_BUCKET || 'kumaran-chits-private';
 
-  const region =
-    process.env.S3_REGION || process.env.AWS_REGION || 'ap-south-1';
+  const region = process.env.S3_REGION || 'ap-south-1';
 
-  const accessKeyId =
-    process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || 'chitflow_admin';
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID || 'chitflow_admin';
 
   const secretAccessKey =
-    process.env.S3_SECRET_ACCESS_KEY ||
-    process.env.AWS_SECRET_ACCESS_KEY ||
-    'chitflow_storage_secret';
+    process.env.S3_SECRET_ACCESS_KEY || 'chitflow_storage_secret';
 
-  const endpoint = process.env.S3_ENDPOINT || process.env.AWS_ENDPOINT;
+  const endpoint = process.env.S3_ENDPOINT;
 
-  const rawForcePath =
-    process.env.S3_FORCE_PATH_STYLE || process.env.AWS_S3_FORCE_PATH_STYLE;
+  const rawForcePath = process.env.S3_FORCE_PATH_STYLE;
   const forcePathStyle =
     rawForcePath !== undefined
       ? rawForcePath === 'true' || rawForcePath === '1'

@@ -23,13 +23,6 @@ export interface EnvironmentVariables {
   S3_BUCKET?: string;
   S3_ENDPOINT?: string;
   S3_FORCE_PATH_STYLE?: boolean;
-  // Backward-compatibility aliases
-  AWS_REGION?: string;
-  AWS_ACCESS_KEY_ID?: string;
-  AWS_SECRET_ACCESS_KEY?: string;
-  AWS_S3_BUCKET?: string;
-  AWS_ENDPOINT?: string;
-  AWS_S3_FORCE_PATH_STYLE?: boolean;
   REDIS_HOST: string;
   REDIS_PORT: number;
   BULL_BOARD_USER?: string;
@@ -85,12 +78,12 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     errors.push(`Invalid STORAGE_DRIVER: ${storageDriver}. Must be 'local' or 's3'`);
   }
 
-  const s3Bucket = (config.S3_BUCKET ?? config.AWS_S3_BUCKET ?? config.AWS_S3_BUCKET_NAME) as string | undefined;
-  const s3AccessKeyId = (config.S3_ACCESS_KEY_ID ?? config.AWS_ACCESS_KEY_ID) as string | undefined;
-  const s3SecretAccessKey = (config.S3_SECRET_ACCESS_KEY ?? config.AWS_SECRET_ACCESS_KEY) as string | undefined;
-  const s3Region = (config.S3_REGION ?? config.AWS_REGION ?? 'ap-south-1') as string;
-  const s3Endpoint = (config.S3_ENDPOINT ?? config.AWS_ENDPOINT) as string | undefined;
-  const rawForcePathStyle = config.S3_FORCE_PATH_STYLE ?? config.AWS_S3_FORCE_PATH_STYLE;
+  const s3Bucket = config.S3_BUCKET as string | undefined;
+  const s3AccessKeyId = config.S3_ACCESS_KEY_ID as string | undefined;
+  const s3SecretAccessKey = config.S3_SECRET_ACCESS_KEY as string | undefined;
+  const s3Region = (config.S3_REGION ?? 'ap-south-1') as string;
+  const s3Endpoint = config.S3_ENDPOINT as string | undefined;
+  const rawForcePathStyle = config.S3_FORCE_PATH_STYLE;
   const s3ForcePathStyle =
     rawForcePathStyle !== undefined
       ? rawForcePathStyle === 'true' || rawForcePathStyle === true
@@ -188,13 +181,6 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     S3_BUCKET: s3Bucket,
     S3_ENDPOINT: s3Endpoint,
     S3_FORCE_PATH_STYLE: s3ForcePathStyle,
-    // Backward-compatibility aliases
-    AWS_REGION: s3Region,
-    AWS_ACCESS_KEY_ID: s3AccessKeyId,
-    AWS_SECRET_ACCESS_KEY: s3SecretAccessKey,
-    AWS_S3_BUCKET: s3Bucket,
-    AWS_ENDPOINT: s3Endpoint,
-    AWS_S3_FORCE_PATH_STYLE: s3ForcePathStyle,
     REDIS_HOST: (config.REDIS_HOST as string) ?? '127.0.0.1',
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
     BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',

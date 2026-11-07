@@ -29,7 +29,7 @@ flowchart TD
 
     subgraph VAULT["3. Private Vault & Delivery"]
         S3["Private S3 Vault\n(Cloudflare R2 / MinIO / S3, Zero Public Access)"]
-        URL["15-Minute Presigned Download URLs\n(AWS4-HMAC-SHA256, 900s TTL)"]
+        URL["15-Minute Presigned Download URLs\n(HMAC-SHA256, 900s TTL)"]
     end
 
     INTAKE --> ENGINE --> VAULT
@@ -313,7 +313,7 @@ Time:        5.441 s
   - PostgreSQL DB Output: `doc-uuid-001 | cust-uuid-001 | AADHAAR_FRONT | kyc/cust-uuid-001/AADHAAR_FRONT-3a7b1c.jpg | aadhaar_front_sundaram.jpg | f`
 * **Step 10 (`GET /customers/:id/documents/:docId/url`)**:
   - Status: **`200 OK`**
-  - Presigned URL: `http://127.0.0.1:9000/kumaran-chits-private/kyc/cust-uuid-001/AADHAAR_FRONT-3a7b1c.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256...`
+  - Presigned URL: `http://127.0.0.1:9000/kumaran-chits-private/kyc/cust-uuid-001/AADHAAR_FRONT-3a7b1c.jpg?X-Amz-Algorithm=HMAC-SHA256...`
   - `expiresInSeconds`: `900` (15 minutes).
 * **Step 11 (`DELETE /customers/:id/documents/:docId`)**:
   - Status: **`200 OK`**
@@ -348,7 +348,7 @@ Time:        5.441 s
 
 | Requirement | Implementation State | Verification Evidence |
 |---|:---:|---|
-| **Zero Public S3 Buckets** | ✅ 100% Enforced | Bucket `kumaran-chits-private` blocks all public access. All downloads require AWS4 signed signature. |
+| **Zero Public S3 Buckets** | ✅ 100% Enforced | Bucket `kumaran-chits-private` blocks all public access. All downloads require cryptographic presigned signature. |
 | **15-Minute Presigned Lifespan (ADR-14)** | ✅ 100% Enforced | All presigned URLs default strictly to `expiresInSeconds: 900` across KYC, Safety Proofs, and PDFs. |
 | **Bilingual Noto Sans Tamil Typography** | ✅ 100% Enforced | Standalone TTF fonts bundled in `apps/api/src/assets/fonts/` render Tamil script on Alpine Linux, Windows, and macOS. |
 | **Maker $\ne$ Checker on Safety Proofs (ADR-10)** | ✅ 100% Enforced | Maker uploads and verifies cheques; independent Checker authorizes disbursement. Self-approval throws `403`. |
