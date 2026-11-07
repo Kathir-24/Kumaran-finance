@@ -274,3 +274,34 @@ Content-Type: text/html; charset=utf-8
 [DisbursementService] Enqueued disbursement approval alert for Auction 9adf153f-a30f-44de-bc54-39bb3c952822
 [NotificationService] Dispatched high-priority approval push alerts to active partner(s) (maker excluded)
 ```
+
+---
+
+## 7. Queue Resilience, Concurrency Tuning & Priority Scheduling (`CONFIRMED-BY-DEVELOPER`)
+
+Under high load and bursty end-of-month collections, BullMQ queues enforce 3 operational resilience policies:
+
+### 7.1 Worker Concurrency & Stalled Job Recovery
+* **`notificationWorker` (`concurrency: 5`)**: Configured with 5 concurrent workers to handle parallel network I/O for MSG91 DLT SMS and Firebase FCM push dispatches, eliminating sequential worker bottlenecks.
+* **`maintenanceWorker` & `reconciliationWorker` (`concurrency: 2`)**: Configured with 2 parallel threads for midnight arrears and gateway audits.
+* **Stalled Job Protection**: Workers enforce `lockDuration: 30000` (30s) and `stalledInterval: 30000` (30s) to reclaim orphaned tasks if a container restarts mid-execution.
+
+### 7.2 Deterministic `jobId` Deduplication (At-Least-Once Delivery Safety)
+All enqueued jobs pass explicit deterministic `jobId` keys via `BullMqQueueProvider.addJob(..., { jobId })`. BullMQ drops or skips identical job IDs if already queued:
+* **Payment Receipts**: `jobId: receipt:${receiptNumber}`
+* **Reversal Alerts**: `jobId: approval-alert:reversal:${reversalId}`
+* **Disbursement Alerts**: `jobId: approval-alert:disbursement:${auctionId}`
+* **Auction Results**: `jobId: auction-result:${auctionId}:m${installmentMonth}`
+* **Pre-Auction Broadcasts**: `jobId: auction-reminder:${chitGroupId}:m${month}`
+
+### 7.3 3-Tier Priority Scheduling (Starvation Prevention)
+BullMQ prioritizes jobs with lower numerical priority values (`1` runs before `10`):
+1. **Priority 1 (Critical Real-Time)**:
+   * Real-time Payment Receipts (`JOB_DISPATCH_PAYMENT_RECEIPT`)
+   * Maker-Checker Partner Approval Push Alerts (`JOB_DISPATCH_APPROVAL_ALERT`)
+2. **Priority 5 (Operational / Medium)**:
+   * Post-Auction Results & Dividend Summaries (`JOB_DISPATCH_AUCTION_RESULT`)
+3. **Priority 10 (Background / Bulk)**:
+   * Pre-Auction Upcoming Reminders (`JOB_DISPATCH_AUCTION_REMINDER`)
+   * Daily Arrears Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)
+

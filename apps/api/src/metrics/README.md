@@ -128,3 +128,35 @@ chitflow_maker_checker_pending_count
 ```promql
 kumaran_sms_circuit_breaker_state{provider="msg91"}
 ```
+
+### 7. BullMQ Queue Backlog Alert (> 50 waiting jobs):
+```promql
+sum(bullmq_queue_jobs_count{status="waiting"}) by (queue) > 50
+```
+
+---
+
+## 6. Recommended Prometheus Alertmanager Rules
+
+```yaml
+groups:
+  - name: kumaran_chits_alerts
+    rules:
+      - alert: BullMQQueueBacklogHigh
+        expr: sum(bullmq_queue_jobs_count{status="waiting"}) by (queue) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "BullMQ queue {{ $labels.queue }} backlog exceeds 50 waiting jobs"
+          description: "Queue backlog has sustained > 50 waiting jobs for more than 5 minutes. Check worker concurrency or upstream downstream bottlenecks."
+
+      - alert: BullMQQueueJobsFailed
+        expr: sum(bullmq_queue_jobs_count{status="failed"}) by (queue) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BullMQ queue {{ $labels.queue }} has failed jobs in DLQ"
+          description: "Failed jobs detected. Inspect Bull Board at /admin/queues and trigger manual retry if appropriate."
+```

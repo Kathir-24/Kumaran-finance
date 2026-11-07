@@ -160,6 +160,10 @@ scrape_configs:
   ```promql
   sum(bullmq_queue_jobs_count{status="failed"}) by (queue) > 0
   ```
+* **High Background Queue Backlog Alert (Sustained Waiting > 50)**:
+  ```promql
+  sum(bullmq_queue_jobs_count{status="waiting"}) by (queue) > 50
+  ```
 
 ---
 
