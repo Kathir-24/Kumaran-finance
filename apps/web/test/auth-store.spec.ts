@@ -109,3 +109,45 @@ test('AuthStore: Race condition prevention ensures isHydrated stays false before
   const shouldRedirect = state.isHydrated && !state.isLoading && !state.isAuthenticated;
   assert.equal(shouldRedirect, false, 'Must NOT trigger premature redirect on initial render before hydration');
 });
+
+test('AuthStore: setTempToken securely stores 2FA challenge token in sessionStorage without leaking to localStorage', () => {
+  const mockSessionStorage = new Map<string, string>();
+  const mockLocalStorage = new Map<string, string>();
+
+  (globalThis as any).window = {};
+  (globalThis as any).sessionStorage = {
+    getItem: (key: string) => mockSessionStorage.get(key) || null,
+    setItem: (key: string, val: string) => mockSessionStorage.set(key, val),
+    removeItem: (key: string) => mockSessionStorage.delete(key),
+  };
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => mockLocalStorage.get(key) || null,
+    setItem: (key: string, val: string) => mockLocalStorage.set(key, val),
+    removeItem: (key: string) => mockLocalStorage.delete(key),
+  };
+
+  try {
+    // Set temp token for 2FA TOTP challenge
+    useAuthStore.getState().setTempToken('temp-totp-jwt-challenge-xyz');
+    assert.equal(useAuthStore.getState().tempToken, 'temp-totp-jwt-challenge-xyz');
+    assert.equal(mockSessionStorage.get('kc_temp_token'), 'temp-totp-jwt-challenge-xyz');
+    assert.equal(mockLocalStorage.has('kc_temp_token'), false, 'tempToken must never leak into localStorage');
+
+    // Establishing full authentication clears tempToken
+    const mockUser: AuthUser = {
+      id: 'user-002',
+      name: 'Manager',
+      phone: '9842100002',
+      roles: ['BRANCH_MANAGER'],
+      branchId: 'branch-prd-001',
+      isTotpEnabled: true,
+    };
+    useAuthStore.getState().setAuth(mockUser, { accessToken: 'access-token-123' });
+    assert.equal(useAuthStore.getState().tempToken, null);
+    assert.equal(mockSessionStorage.has('kc_temp_token'), false, 'tempToken must be purged from sessionStorage on setAuth');
+  } finally {
+    delete (globalThis as any).window;
+    delete (globalThis as any).sessionStorage;
+    delete (globalThis as any).localStorage;
+  }
+});

@@ -198,3 +198,65 @@ Every rule documented above is backed by automated negative and positive test as
    - Section 2: Smart Notification Router (Push-first for app users, DLT SMS fallback for keypad phones across payments, auctions, dividends, and defaults) verification (`PASS`).
    - Section 3: 06:00 AM settlement reconciliation, ghost drop auto-resolution, and discrepancy flagging (`PASS`).
    - Section 4: BullMQ queue health and administrative controller endpoint execution (`PASS`).
+3. **[`apps/api/test/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/auth-token-lifecycle.spec.ts)**:
+   - Section 1-7: Token issuance, rotation, logout, phone mutation revocation, and RFC 6819 reuse trap (`PASS`).
+   - Section 8: High-throughput JWT validation caching (120s TTL) and proactive cache eviction on status mutation (`PASS`).
+   - Section 9: Multi-device concurrent session isolation (`WEB` + `MOBILE`) without cross-device refresh collision (`PASS`).
+4. **[`apps/web/test/session-inactivity-guard.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/session-inactivity-guard.spec.ts)**:
+   - 20-minute inactivity auto-logout math, 18-minute warning modal display, and countdown reset (`PASS`).
+
+---
+
+## 7. Component 4: Authentication & Session Management Guardians
+
+```mermaid
+flowchart TD
+    subgraph JWT_VALIDATION ["1. High-Throughput JWT Validation Path"]
+        Req["API Request + Bearer JWT"] --> Strategy["JwtStrategy.validate(payload)"]
+        Strategy --> RedisCache{"Redis Key:\nuser:status:{id}?"}
+        RedisCache -->|HIT: 'ACTIVE'| Pass["Valid Session (0ms DB Query)"]
+        RedisCache -->|HIT: 'INACTIVE'| Reject["HTTP 401 Unauthorized\n(Instant Revocation)"]
+        RedisCache -->|MISS| QueryDB["Query PostgreSQL (user/customer)\nCache 'ACTIVE' / 'INACTIVE' with 120s TTL"]
+    end
+
+    subgraph MULTI_DEVICE ["2. Multi-Device Session Isolation"]
+        WebClient["Web Portal\n(clientType = 'WEB')"] --> RedisFamily1["auth:session:{userId}:WEB\n(7d TTL)"]
+        MobileClient["Flutter Mobile\n(clientType = 'MOBILE')"] --> RedisFamily2["auth:session:{userId}:MOBILE\n(7d TTL)"]
+        RedisFamily1 -.-> DBFallback["PostgreSQL refreshTokenHash\n(Zero-Downtime Fallback)"]
+        RedisFamily2 -.-> DBFallback
+    end
+
+    subgraph CLIENT_DEFENSE ["3. Client-Side Inactivity & Zero Password Reset Abuse"]
+        Inactivity["SessionInactivityGuard\n(18m Warning / 20m Logout)"]
+        ADR18["ADR-18 Phone-Only Identity\nZero Email Columns / Zero Public Reset Forms"]
+    end
+```
+
+### 7.1 High-Throughput JWT Validation Caching (120s TTL)
+- **Problem Solved**: On every authenticated HTTP request, NestJS `JwtStrategy` previously queried PostgreSQL (`findUnique({ id })`) to verify `isActive`. Under heavy traffic (500+ concurrent requests), this caused connection pool saturation on PostgreSQL.
+- **Implementation**: [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts) checks Redis key `user:status:${payload.sub}` first.
+  - If `'ACTIVE'`, request passes instantly with **zero DB queries**.
+  - If `'INACTIVE'`, request is immediately rejected with `401 Unauthorized`.
+  - If a cache miss occurs, PostgreSQL is queried and the result is cached for **120 seconds** (`EX 120`).
+- **Proactive Invalidation**: When a staff user's status is toggled, roles updated, or password changed in [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), `redis.del('user:status:${userId}')` is invoked immediately, guaranteeing instant access termination across the cluster.
+
+### 7.2 Multi-Device Concurrent Session Isolation
+- **Problem Solved**: Kumaran Finance partners and field agents frequently use both the **Web Portal** (for accounting, schemes, and minutes) and the **Android Mobile App** (for collections, receipts, and OTP approvals). Storing a single `refreshTokenHash` on the database row caused logging in on mobile to overwrite web's token hash. When web attempted its 15-minute background refresh, it failed the hash check, triggering the RFC 6819 token reuse trap and locking the user out of both devices.
+- **Implementation**: Refresh token families are isolated per device type via Redis key `auth:session:${userId}:${clientType}` (where `clientType` is `'WEB'`, `'MOBILE'`, or `'DESKTOP'`) with a 7-day TTL (`604,800s`).
+- **RFC 6819 Token Reuse Defense**:
+  - Rotating a token on Web updates only `auth:session:${userId}:WEB`, leaving Mobile completely unaffected.
+  - If a replayed/stolen refresh token is detected on Web, **only the Web session family is revoked**, leaving the partner's Mobile collection session active.
+  - When Redis is unavailable or on cold start, the system transparently falls back to the database `refreshTokenHash` column.
+
+### 7.3 Architectural Immunity Against Password-Reset Abuse
+- **Attack Vector Inapplicable**: In generic SaaS applications, public password-reset endpoints (`/auth/forgot-password`) suffer from email enumeration, account lockout DoS, and token brute-forcing.
+- **Kumaran Chits Architecture**:
+  1. **Strict Phone-Only Identity (ADR-18)**: Built exclusively for Kumaran Finance. Zero email columns exist in PostgreSQL.
+  2. **No Public Password Reset Form**: Subscribers and agents authenticate strictly via MSG91 6-digit SMS OTP (`/auth/mobile/request-otp` and `/auth/mobile/verify-otp`) protected by 60s cooldowns and 5-minute brute-force lockouts.
+  3. **Super Admin Dual-Control Reset**: If an office staff member forgets their password, a Super Admin performs an emergency reset via [`UserService.resetPassword()`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), which purges all active refresh tokens in Redis and DB, requiring the staff member to configure a new password on their next login.
+
+### 7.4 Client-Side 20-Minute Inactivity Guardian
+- **Implementation**: [`SessionInactivityGuard`](file:///u:/Kumaran-finance/apps/web/src/components/security/session-inactivity-guard.tsx) tracks user interactions (`mousemove`, `mousedown`, `keydown`, `scroll`, `touchstart`) with a 500ms throttle.
+- **18-Minute Warning**: Displays a non-intrusive warning modal showing a live 120-second countdown with an "I'm Still Here" button.
+- **20-Minute Hard Logout**: Automatically purges client state and redirects to `/login?reason=timeout`.
+- **Multi-Tab Sync**: Synchronized via `localStorage` storage events and broadcast channels so active work in one tab keeps all tabs alive.

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { REGEX_INDIAN_PHONE, REGEX_MPIN } from '../../common/constants';
 
 export class MpinLoginDto {
@@ -20,4 +20,15 @@ export class MpinLoginDto {
   @IsString()
   @Matches(REGEX_MPIN, { message: 'MPIN must be exactly 6 digits' })
   mpin: string;
+
+  @ApiPropertyOptional({
+    example: 'MOBILE',
+    enum: ['WEB', 'MOBILE', 'DESKTOP'],
+    description: 'Client device platform type for concurrent session isolation',
+    default: 'MOBILE',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['WEB', 'MOBILE', 'DESKTOP'])
+  clientType?: 'WEB' | 'MOBILE' | 'DESKTOP';
 }

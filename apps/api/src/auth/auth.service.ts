@@ -135,7 +135,7 @@ export class AuthService {
     }
 
     // Direct login without TOTP
-    return this.generateAuthTokens(user);
+    return this.generateAuthTokens(user, dto.clientType || 'WEB');
   }
 
   /**
@@ -175,7 +175,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired 6-digit TOTP code');
     }
 
-    return this.generateAuthTokens(user);
+    return this.generateAuthTokens(user, 'WEB');
   }
 
   /**
@@ -195,7 +195,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid phone or MPIN');
     }
 
-    return this.generateAuthTokens(user);
+    return this.generateAuthTokens(user, dto.clientType || 'MOBILE');
   }
 
   /**
@@ -753,12 +753,15 @@ export class AuthService {
     await this.clearOtpSession(trimmedPhone, true);
 
     if (record.isCustomer) {
-      return await this.generateCustomerAuthTokens({
-        id: record.entityId,
-        fullName: record.name,
-        phone: record.phone,
-        branchId: record.branchId,
-      });
+      return await this.generateCustomerAuthTokens(
+        {
+          id: record.entityId,
+          fullName: record.name,
+          phone: record.phone,
+          branchId: record.branchId,
+        },
+        dto.clientType || 'MOBILE',
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -766,7 +769,7 @@ export class AuthService {
     });
 
     if (user?.mpinHash) {
-      const tokens = await this.generateAuthTokens(user);
+      const tokens = await this.generateAuthTokens(user, dto.clientType || 'MOBILE');
       return {
         verified: true,
         ...tokens,
@@ -823,7 +826,7 @@ export class AuthService {
     });
 
     if (dto.setupToken) {
-      const tokens = await this.generateAuthTokens(user);
+      const tokens = await this.generateAuthTokens(user, 'MOBILE');
       return {
         success: true,
         message: '6-digit MPIN configured successfully.',
@@ -847,12 +850,15 @@ export class AuthService {
   /**
    * Helper to issue JWT tokens for Chit Subscribers (Role.CUSTOMER)
    */
-  private async generateCustomerAuthTokens(customer: {
-    id: string;
-    fullName: string;
-    phone: string;
-    branchId: string | null;
-  }) {
+  private async generateCustomerAuthTokens(
+    customer: {
+      id: string;
+      fullName: string;
+      phone: string;
+      branchId: string | null;
+    },
+    clientType: string = 'MOBILE',
+  ) {
     const accessPayload: JwtPayload = {
       sub: customer.id,
       phone: customer.phone,
@@ -882,6 +888,12 @@ export class AuthService {
 
     const refreshTokenHash = await this.hashRefreshToken(refreshToken);
     const now = new Date();
+
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
+      await redis.set(`auth:session:${customer.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
+    }
 
     await this.prisma.customer.update({
       where: { id: customer.id },
@@ -924,6 +936,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid token type for refresh operation');
     }
 
+    const clientType = dto.clientType || 'WEB';
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
     // Role-based handling for Chit Subscribers (Role.CUSTOMER)
     if (payload.roles?.includes(Role.CUSTOMER)) {
       const customer = await this.prisma.customer.findUnique({
@@ -934,14 +950,25 @@ export class AuthService {
         throw new UnauthorizedException('Session revoked or subscriber profile no longer exists');
       }
 
-      if (!customer.refreshTokenHash) {
+      let storedHash: string | null = null;
+      if (useRedis && redis) {
+        storedHash = await redis.get(`auth:session:${customer.id}:${clientType}`);
+      }
+      if (!storedHash) {
+        storedHash = customer.refreshTokenHash;
+      }
+
+      if (!storedHash) {
         throw new UnauthorizedException('Session revoked or customer logged out');
       }
 
-      const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, customer.refreshTokenHash);
+      const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, storedHash);
       if (!isMatch) {
         // RFC 6819 Token Reuse Trap: Token is valid JWT but does not match active session hash.
         // Immediately revoke entire session family to contain compromised chain.
+        if (useRedis && redis) {
+          await redis.del(`auth:session:${customer.id}:${clientType}`);
+        }
         await this.prisma.customer.update({
           where: { id: customer.id },
           data: { refreshTokenHash: null },
@@ -951,12 +978,15 @@ export class AuthService {
         );
       }
 
-      return this.generateCustomerAuthTokens({
-        id: customer.id,
-        fullName: customer.fullName,
-        phone: customer.phone,
-        branchId: customer.branchId,
-      });
+      return this.generateCustomerAuthTokens(
+        {
+          id: customer.id,
+          fullName: customer.fullName,
+          phone: customer.phone,
+          branchId: customer.branchId,
+        },
+        clientType,
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -967,14 +997,25 @@ export class AuthService {
       throw new UnauthorizedException('Session revoked or user account inactive');
     }
 
-    if (!user.refreshTokenHash) {
+    let storedHash: string | null = null;
+    if (useRedis && redis) {
+      storedHash = await redis.get(`auth:session:${user.id}:${clientType}`);
+    }
+    if (!storedHash) {
+      storedHash = user.refreshTokenHash;
+    }
+
+    if (!storedHash) {
       throw new UnauthorizedException('Session revoked or user logged out');
     }
 
-    const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, user.refreshTokenHash);
+    const isMatch = await this.verifyRefreshTokenHash(dto.refreshToken, storedHash);
     if (!isMatch) {
       // RFC 6819 Token Reuse Trap: Token is valid JWT but does not match active session hash.
       // Immediately revoke entire session family to contain compromised chain.
+      if (useRedis && redis) {
+        await redis.del(`auth:session:${user.id}:${clientType}`);
+      }
       await this.prisma.user.update({
         where: { id: user.id },
         data: { refreshTokenHash: null },
@@ -984,33 +1025,51 @@ export class AuthService {
       );
     }
 
-    return this.generateAuthTokens(user);
+    return this.generateAuthTokens(user, clientType);
   }
 
   /**
    * Invalidates active session by clearing stored refresh token hash and device FCM push token
    */
-  async logout(userId: string) {
+  async logout(userId: string, clientType?: string) {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
+      if (clientType && clientType !== 'ALL') {
+        await redis.del(`auth:session:${userId}:${clientType}`);
+      } else {
+        await redis.del(
+          `auth:session:${userId}:WEB`,
+          `auth:session:${userId}:MOBILE`,
+          `auth:session:${userId}:DESKTOP`,
+        );
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
     });
 
     if (user) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { refreshTokenHash: null, fcmToken: null },
-      });
+      if (!clientType || clientType === 'ALL') {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { refreshTokenHash: null, fcmToken: null },
+        });
+      }
     } else {
       const customer = await this.prisma.customer.findUnique({
         where: { id: userId },
         select: { id: true },
       });
       if (customer) {
-        await this.prisma.customer.update({
-          where: { id: userId },
-          data: { refreshTokenHash: null, fcmToken: null },
-        });
+        if (!clientType || clientType === 'ALL') {
+          await this.prisma.customer.update({
+            where: { id: userId },
+            data: { refreshTokenHash: null, fcmToken: null },
+          });
+        }
       }
     }
 
@@ -1126,6 +1185,16 @@ export class AuthService {
 
     const newPasswordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
 
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
+      await redis.del(
+        `auth:session:${userId}:WEB`,
+        `auth:session:${userId}:MOBILE`,
+        `auth:session:${userId}:DESKTOP`,
+      );
+    }
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -1143,7 +1212,7 @@ export class AuthService {
   /**
    * Helper to sign JWT access & refresh tokens and update DB state
    */
-  private async generateAuthTokens(user: User) {
+  private async generateAuthTokens(user: User, clientType: string = 'WEB') {
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
@@ -1172,6 +1241,12 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
 
     const refreshTokenHash = await this.hashRefreshToken(refreshToken);
+
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
+      await redis.set(`auth:session:${user.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
+    }
 
     await this.prisma.user.update({
       where: { id: user.id },

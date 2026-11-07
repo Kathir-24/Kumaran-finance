@@ -7,9 +7,10 @@ import {
   HttpStatus,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   THROTTLE_AUTH_LIMIT,
@@ -103,14 +104,23 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Revoke active session',
-    description: 'Clears the refresh token hash and device FCM push token in database, invalidating the session.',
+    description: 'Clears the refresh token hash and device FCM push token in database and Redis, invalidating the session.',
+  })
+  @ApiQuery({
+    name: 'clientType',
+    required: false,
+    enum: ['WEB', 'MOBILE', 'DESKTOP', 'ALL'],
+    description: 'Target client session family to revoke. Defaults to ALL if omitted.',
   })
   @ApiOkResponseEnvelope(ActionSuccessResponseDto, {
     description: 'Logged out successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid Bearer token' })
-  async logout(@CurrentUser('sub') userId: string) {
-    return this.authService.logout(userId);
+  async logout(
+    @CurrentUser('sub') userId: string,
+    @Query('clientType') clientType?: string,
+  ) {
+    return this.authService.logout(userId, clientType);
   }
 
   @Patch('fcm-token')

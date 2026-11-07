@@ -1,16 +1,20 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { RedisConnectionProvider } from '../../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
+
+const USER_STATUS_CACHE_TTL_SECONDS = 120; // 2 minutes
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
     if (!secret) {
@@ -29,6 +33,28 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token type for authorized request');
     }
 
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    const cacheKey = `user:status:${payload.sub}`;
+
+    // Fast Path: Check high-throughput Redis status cache (120s TTL)
+    if (useRedis && redis) {
+      try {
+        const cachedStatus = await redis.get(cacheKey);
+        if (cachedStatus === 'ACTIVE') {
+          return payload;
+        }
+        if (cachedStatus === 'INACTIVE') {
+          throw new UnauthorizedException('User account is deactivated or no longer exists');
+        }
+      } catch (err: any) {
+        if (err instanceof UnauthorizedException) {
+          throw err;
+        }
+        // Fall back to PostgreSQL on cache read error
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, isActive: true },
@@ -41,10 +67,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           select: { id: true },
         });
         if (customer) {
+          if (useRedis && redis) {
+            await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
+          }
           return payload;
         }
       }
+
+      if (useRedis && redis) {
+        await redis.set(cacheKey, 'INACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
+      }
       throw new UnauthorizedException('User account is deactivated or no longer exists');
+    }
+
+    if (useRedis && redis) {
+      await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
     }
 
     return payload;

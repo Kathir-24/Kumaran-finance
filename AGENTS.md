@@ -136,3 +136,4 @@ Before claiming any task is complete, verify:
 - [ ] Automated tests verify calculation invariants with 100% pass rate.
 - [ ] Code is formatted and compiles cleanly without lint errors.
 - [ ] Storage uploads use direct presigned PUT URLs, 120s cellular timeouts, client compression, and async BullMQ pre-rendering.
+- [ ] Authentication uses fast-path Redis status caching (120s TTL) and client-scoped session families without cross-device refresh invalidation.

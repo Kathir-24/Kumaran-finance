@@ -3,11 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { BCRYPT_SALT_ROUNDS } from '../common/constants';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
@@ -19,7 +21,22 @@ const DEFAULT_STAFF_PASSWORD = 'Admin@Kumaran2026';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly redisProvider?: RedisConnectionProvider,
+  ) {}
+
+  /**
+   * Evicts the cached user status in Redis when account status or credentials change
+   */
+  private async evictUserStatusCache(userId: string): Promise<void> {
+    if (this.redisProvider?.getIsConnected()) {
+      const client = this.redisProvider.getClient();
+      if (client) {
+        await client.del(`user:status:${userId}`).catch(() => {});
+      }
+    }
+  }
 
   /**
    * Sanitizes a raw User record to strip sensitive cryptographic credentials
@@ -194,6 +211,8 @@ export class UserService {
       },
     });
 
+    await this.evictUserStatusCache(id);
+
     return this.sanitizeUser(updated);
   }
 
@@ -225,6 +244,8 @@ export class UserService {
       },
     });
 
+    await this.evictUserStatusCache(id);
+
     return this.sanitizeUser(updated);
   }
 
@@ -251,6 +272,8 @@ export class UserService {
         refreshTokenHash: null,
       },
     });
+
+    await this.evictUserStatusCache(id);
 
     return {
       success: true,

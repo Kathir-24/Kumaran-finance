@@ -14,6 +14,8 @@ If you need to quickly recall what Redis does in Kumaran Chits:
 | Feature / Domain | Redis Key / Data Structure | Expiry / TTL | Service Responsible | Purpose & Behavior |
 |---|---|---|---|---|
 | **SMS OTP Verification** | `auth:otp:<phone>` (`String` - JSON) | `300s` (5 min) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Stores SHA-256 hashed 6-digit OTP code, 3-attempt lockout counter, user/customer metadata. Purged atomically on verify or lockout. |
+| **High-Throughput JWT Status** | `user:status:<userId>` (`String`) | `120s` (2 min) | [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts), [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts) | Caches user/customer active status (`ACTIVE` / `INACTIVE`) to prevent DB query storm on every authenticated API request. Evicted immediately on status, role, or password mutation. |
+| **Multi-Device Session Vault** | `auth:session:<userId>:<clientType>` (`String`) | `604,800s` (7 days) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Isolates client-specific refresh token bcrypt hashes across `WEB`, `MOBILE`, and `DESKTOP`. Prevents cross-device refresh token revocation traps while maintaining strict RFC 6819 per-client reuse detection with Postgres fallback. |
 | **Distributed Rate Limiter** | `throttle:*`<br>`throttle:block:*` | Dynamic (`60s` to `900s`) | [`RedisThrottlerStorage`](file:///u:/Kumaran-finance/apps/api/src/common/throttler/redis-throttler-storage.service.ts) | Atomic Lua hit counter & sliding block windows across containers with IP/User tracking. |
 | **Master Reference Data** | `cache:master:branches:*`<br>`cache:master:schemes:*` | `1800s` - `3600s` (30-60 min) | [`BranchService`](file:///u:/Kumaran-finance/apps/api/src/branch/branch.service.ts), [`ChitService`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.service.ts) | Caches static branch lists and chit scheme catalogs with atomic eviction on mutation and Postgres fail-open. |
 | **S3 Presigned Document URLs** | `url:presigned:<key>` (`String`) | `600s` (10 min) | [`StorageService`](file:///u:/Kumaran-finance/apps/api/src/storage/storage.service.ts) | Caches generated 15-minute S3 presigned URLs using Redis MGET pipeline with 5-minute safety margin. |
@@ -80,6 +82,8 @@ Mobile onboarding for both staff (Agents/Partners) and customers relies on a 6-d
 | `auth:otp:<phone>` | `string` | 300s | Active OTP session with SHA-256 hashed code | JSON `OtpSessionRecord` (attempts counter, entityId, roles) |
 | `auth:otp:cooldown:<phone>` | `string` | 60s | SMS Gateway Flood Throttle | Unix timestamp of issuance |
 | `auth:otp:lockout:<phone>` | `string` | 300s | Brute-force penalty lock | Unix timestamp of lockout trigger |
+| `auth:session:<userId>:<clientType>` | `string` | 604,800s (7d) | Concurrent client session token isolation | Bcrypt hash of client-scoped refresh token |
+| `user:status:<userId>` | `string` | 120s | Fast-path JWT validation cache | `"ACTIVE"` or `"INACTIVE"` status string |
 | `throttle:<name>:<key>` | `integer` | Dynamic (e.g. 60s) | Distributed HTTP rate-limiting hit counter | Total request hits in current time window |
 | `throttle:block:<name>:<key>` | `string` | Dynamic (blockDuration) | Temporary block flag for abusive clients | `"1"` (active penalty lock) |
 

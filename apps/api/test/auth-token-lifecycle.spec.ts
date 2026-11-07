@@ -1,7 +1,4 @@
 import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +14,8 @@ import { CustomerService } from '../src/customer/customer.service';
 import { SmsService } from '../src/notification/services/sms.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
+import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
+import { UserService } from '../src/user/user.service';
 
 describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Detection', () => {
   let authService: AuthService;
@@ -482,6 +481,341 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
 
       const updateCall = prismaMock.customer.update.mock.calls[0][0];
       expect(updateCall.data).not.toHaveProperty('refreshTokenHash');
+    });
+  });
+
+  // =========================================================================
+  // 8. HIGH-THROUGHPUT JWT VALIDATION CACHING & EVICTION
+  // =========================================================================
+  describe('8. High-Throughput JWT Validation Caching & Cache Eviction', () => {
+    let jwtStrategy: JwtStrategy;
+    let userService: UserService;
+    let redisClientMock: any;
+    let redisProviderMock: any;
+
+    beforeEach(() => {
+      redisClientMock = {
+        get: jest.fn(),
+        set: jest.fn().mockResolvedValue('OK'),
+        del: jest.fn().mockResolvedValue(1),
+      };
+
+      redisProviderMock = {
+        getClient: jest.fn().mockReturnValue(redisClientMock),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+
+      jwtStrategy = new JwtStrategy(
+        configService,
+        prismaMock as unknown as PrismaService,
+        redisProviderMock as any,
+      );
+
+      userService = new UserService(
+        prismaMock as unknown as PrismaService,
+        redisProviderMock as any,
+      );
+    });
+
+    it('JWT-CACHE-01: should return payload directly on Redis cache hit (ACTIVE) with zero DB queries', async () => {
+      redisClientMock.get.mockResolvedValue('ACTIVE');
+
+      const payload = {
+        sub: 'user-001',
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        tokenType: 'access' as const,
+      };
+
+      const result = await jwtStrategy.validate(payload);
+
+      expect(result).toBe(payload);
+      expect(redisClientMock.get).toHaveBeenCalledWith('user:status:user-001');
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.customer.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('JWT-CACHE-02: should immediately reject with UnauthorizedException on Redis cache hit (INACTIVE)', async () => {
+      redisClientMock.get.mockResolvedValue('INACTIVE');
+
+      const payload = {
+        sub: 'user-deactivated',
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        tokenType: 'access' as const,
+      };
+
+      await expect(jwtStrategy.validate(payload)).rejects.toThrow(
+        new UnauthorizedException('User account is deactivated or no longer exists'),
+      );
+
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('JWT-CACHE-03: should query DB and cache ACTIVE in Redis for 120s on cache miss', async () => {
+      redisClientMock.get.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'user-001',
+        isActive: true,
+      });
+
+      const payload = {
+        sub: 'user-001',
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        tokenType: 'access' as const,
+      };
+
+      const result = await jwtStrategy.validate(payload);
+
+      expect(result).toBe(payload);
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-001' },
+        select: { id: true, isActive: true },
+      });
+      expect(redisClientMock.set).toHaveBeenCalledWith(
+        'user:status:user-001',
+        'ACTIVE',
+        'EX',
+        120,
+      );
+    });
+
+    it('JWT-CACHE-04: UserService.updateStatus should evict Redis cache key', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'user-001',
+        isActive: true,
+        refreshTokenHash: 'hash-1',
+      });
+      prismaMock.user.update.mockResolvedValue({
+        id: 'user-001',
+        name: 'Staff A',
+        phone: '9842100001',
+        roles: [Role.ACCOUNTANT],
+        isActive: false,
+      });
+
+      await userService.updateStatus('user-001', { isActive: false }, 'super-admin-id');
+
+      expect(redisClientMock.del).toHaveBeenCalledWith('user:status:user-001');
+    });
+  });
+
+  // =========================================================================
+  // 9. MULTI-DEVICE CONCURRENT SESSION ISOLATION (WEB + MOBILE)
+  // =========================================================================
+  describe('9. Multi-Device Concurrent Session Isolation (Web + Mobile)', () => {
+    let authServiceWithRedis: AuthService;
+    let redisClientMock: any;
+    let redisProviderMock: any;
+    const sessionMap = new Map<string, string>();
+
+    beforeEach(() => {
+      sessionMap.clear();
+      redisClientMock = {
+        get: jest.fn().mockImplementation((key: string) => Promise.resolve(sessionMap.get(key) || null)),
+        set: jest.fn().mockImplementation((key: string, val: string) => {
+          sessionMap.set(key, val);
+          return Promise.resolve('OK');
+        }),
+        del: jest.fn().mockImplementation((...keys: string[]) => {
+          let count = 0;
+          for (const k of keys) {
+            if (sessionMap.delete(k)) count++;
+          }
+          return Promise.resolve(count);
+        }),
+      };
+
+      redisProviderMock = {
+        getClient: jest.fn().mockReturnValue(redisClientMock),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+
+      authServiceWithRedis = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        redisProviderMock as any,
+      );
+    });
+
+    it('AUTH-MULTI-01: staff login on WEB and MOBILE isolates refresh token families in Redis without collision', async () => {
+      const mockStaffUser = {
+        id: mockUserId,
+        phone: mockUserPhone,
+        passwordHash: await bcrypt.hash('CorrectPass@123', 10),
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        totpSecret: null,
+        mpinHash: null,
+        refreshTokenHash: null,
+      };
+
+      prismaMock.user.findFirst.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue(mockStaffUser);
+
+      // Login on Web
+      const webTokens = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'WEB',
+      });
+
+      // Login on Mobile
+      const mobileTokens = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'MOBILE',
+      });
+
+      expect(webTokens.accessToken).toBeDefined();
+      expect(mobileTokens.accessToken).toBeDefined();
+      expect(webTokens.refreshToken).not.toEqual(mobileTokens.refreshToken);
+
+      // Verify Redis keys exist independently
+      expect(sessionMap.has(`auth:session:${mockUserId}:WEB`)).toBe(true);
+      expect(sessionMap.has(`auth:session:${mockUserId}:MOBILE`)).toBe(true);
+      expect(sessionMap.get(`auth:session:${mockUserId}:WEB`)).not.toEqual(
+        sessionMap.get(`auth:session:${mockUserId}:MOBILE`),
+      );
+    });
+
+    it('AUTH-MULTI-02: rotating WEB refresh token does not invalidate concurrent MOBILE session', async () => {
+      const mockStaffUser = {
+        id: mockUserId,
+        phone: mockUserPhone,
+        passwordHash: await bcrypt.hash('CorrectPass@123', 10),
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        totpSecret: null,
+        mpinHash: null,
+        refreshTokenHash: null,
+      };
+
+      prismaMock.user.findFirst.mockResolvedValue(mockStaffUser);
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue(mockStaffUser);
+
+      // Login Web & Mobile
+      const webLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'WEB',
+      });
+      const mobileLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'MOBILE',
+      });
+
+      const initialMobileHash = sessionMap.get(`auth:session:${mockUserId}:MOBILE`);
+
+      // Rotate Web token
+      const webRefreshed = await authServiceWithRedis.refreshToken({
+        refreshToken: webLogin.refreshToken,
+        clientType: 'WEB',
+      });
+      expect(webRefreshed.accessToken).toBeDefined();
+
+      // Mobile Redis key is completely untouched and still valid
+      expect(sessionMap.get(`auth:session:${mockUserId}:MOBILE`)).toBe(initialMobileHash);
+
+      // Mobile can now refresh smoothly
+      const mobileRefreshed = await authServiceWithRedis.refreshToken({
+        refreshToken: mobileLogin.refreshToken,
+        clientType: 'MOBILE',
+      });
+      expect(mobileRefreshed.accessToken).toBeDefined();
+    });
+
+    it('AUTH-MULTI-03: RFC 6819 reuse trap on WEB revokes WEB family while keeping MOBILE family valid', async () => {
+      const mockStaffUser = {
+        id: mockUserId,
+        phone: mockUserPhone,
+        passwordHash: await bcrypt.hash('CorrectPass@123', 10),
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        totpSecret: null,
+        mpinHash: null,
+        refreshTokenHash: null,
+      };
+
+      prismaMock.user.findFirst.mockResolvedValue(mockStaffUser);
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue(mockStaffUser);
+
+      // Login Web & Mobile
+      const webLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'WEB',
+      });
+      const mobileLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'MOBILE',
+      });
+
+      // Legitimate Web rotation
+      await authServiceWithRedis.refreshToken({
+        refreshToken: webLogin.refreshToken,
+        clientType: 'WEB',
+      });
+
+      // Attacker replays old web token -> RFC 6819 trap triggered
+      await expect(
+        authServiceWithRedis.refreshToken({
+          refreshToken: webLogin.refreshToken,
+          clientType: 'WEB',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      // Web session slot is destroyed in Redis
+      expect(sessionMap.has(`auth:session:${mockUserId}:WEB`)).toBe(false);
+
+      // Mobile session slot is still healthy
+      expect(sessionMap.has(`auth:session:${mockUserId}:MOBILE`)).toBe(true);
+      const mobileRefreshed = await authServiceWithRedis.refreshToken({
+        refreshToken: mobileLogin.refreshToken,
+        clientType: 'MOBILE',
+      });
+      expect(mobileRefreshed.accessToken).toBeDefined();
+    });
+
+    it('AUTH-MULTI-04: client-specific logout revokes only target client slot, whereas ALL revokes all', async () => {
+      const mockStaffUser = {
+        id: mockUserId,
+        phone: mockUserPhone,
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+      };
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue(mockStaffUser);
+
+      sessionMap.set(`auth:session:${mockUserId}:WEB`, 'hash-web');
+      sessionMap.set(`auth:session:${mockUserId}:MOBILE`, 'hash-mobile');
+
+      // Logout only WEB
+      await authServiceWithRedis.logout(mockUserId, 'WEB');
+      expect(sessionMap.has(`auth:session:${mockUserId}:WEB`)).toBe(false);
+      expect(sessionMap.has(`auth:session:${mockUserId}:MOBILE`)).toBe(true);
+
+      // Logout ALL
+      await authServiceWithRedis.logout(mockUserId, 'ALL');
+      expect(sessionMap.has(`auth:session:${mockUserId}:MOBILE`)).toBe(false);
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUserId },
+        data: { refreshTokenHash: null, fcmToken: null },
+      });
     });
   });
 });

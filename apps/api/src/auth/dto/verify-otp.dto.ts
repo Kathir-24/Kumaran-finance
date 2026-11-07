@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
 import { REGEX_INDIAN_PHONE } from '../../common/constants';
 
 export class VerifyOtpDto {
@@ -20,4 +20,15 @@ export class VerifyOtpDto {
   @IsString()
   @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
   otp: string;
+
+  @ApiPropertyOptional({
+    example: 'MOBILE',
+    enum: ['WEB', 'MOBILE', 'DESKTOP'],
+    description: 'Client device platform type for concurrent session isolation',
+    default: 'MOBILE',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['WEB', 'MOBILE', 'DESKTOP'])
+  clientType?: 'WEB' | 'MOBILE' | 'DESKTOP';
 }

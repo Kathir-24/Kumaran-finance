@@ -79,7 +79,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // 1. Persist tokens in local storage bridge
     setStoredTokens(tokens);
 
-    // 2. Default active branch to assigned branch
+    // 2. Clear temporary 2FA challenge token from sessionStorage
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('kc_temp_token');
+      } catch {
+        // Safe fallback in restricted environments
+      }
+    }
+
+    // 3. Default active branch to assigned branch
     const activeBranchId = user.activeBranchId || user.branchId || null;
 
     set({
@@ -128,8 +137,15 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       }
     }
 
-    // 2. Purge local storage tokens
+    // 2. Purge local storage tokens & temporary challenge tokens
     clearStoredTokens();
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('kc_temp_token');
+      } catch {
+        // Safe fallback in restricted environments
+      }
+    }
 
     // 3. Reset store state
     set({
