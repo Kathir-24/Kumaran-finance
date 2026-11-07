@@ -194,8 +194,15 @@ export class PaymentService {
     let result: any;
     try {
       result = await this.prisma.$transaction(async (tx) => {
-        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
+        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments and serialize receipt/arrears
         if (typeof tx.$queryRaw === 'function') {
+          // A. Lock Branch row to serialize sequential receipt generation per branch without table-level locking
+          await tx.$queryRaw`SELECT id FROM "Branch" WHERE id = ${branchId} FOR UPDATE`;
+
+          // B. Lock SubscriberTicket row to serialize consecutive arrears calculations
+          await tx.$queryRaw`SELECT id FROM "SubscriberTicket" WHERE id = ${ticket.id} FOR UPDATE`;
+
+          // C. Lock InstallmentDue row to prevent double payment on the same installment
           const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
             SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
           `;
@@ -766,6 +773,16 @@ export class PaymentService {
     const now = new Date();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 0. Pessimistic Row Lock on affected Subscriber Tickets (deterministic sort) to serialize arrears updates
+      if (typeof tx.$queryRaw === 'function') {
+        const ticketIds = [...new Set(payment.allocations.map((a) => a.ticketId))].sort();
+        if (ticketIds.length > 0) {
+          await tx.$queryRaw`
+            SELECT id FROM "SubscriberTicket" WHERE id = ANY(${ticketIds}::text[]) ORDER BY id FOR UPDATE
+          `;
+        }
+      }
+
       // 1. Update Reversal Record
       const notesCombined = dto.notes
         ? `${payment.reversal?.notes || ''} | Checker: ${dto.notes}`

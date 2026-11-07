@@ -498,4 +498,94 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
     }
   });
+
+  // --------------------------------------------------------------------------
+  // Scenario 6: Concurrent Receipt Sequencing & Branch Row-Locking
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-6: Concurrent payments in the same branch MUST acquire branch lock and issue collision-free, distinct receipt numbers', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-6: DB or required seed data not present');
+      return;
+    }
+
+    const testMonth1 = 993;
+    const testMonth2 = 994;
+
+    const [due1, due2] = await Promise.all([
+      prisma.installmentDue.create({
+        data: {
+          ticketId: activeTicket.id,
+          chitGroupId: activeTicket.chitGroupId,
+          installmentMonth: testMonth1,
+          grossAmount: 5000n,
+          dividendDeduction: 1000n,
+          netPayableAmount: 4000n,
+          dueDate: new Date(),
+          status: DueStatus.UNPAID,
+        },
+      }),
+      prisma.installmentDue.create({
+        data: {
+          ticketId: activeTicket.id,
+          chitGroupId: activeTicket.chitGroupId,
+          installmentMonth: testMonth2,
+          grossAmount: 5000n,
+          dividendDeduction: 1000n,
+          netPayableAmount: 4000n,
+          dueDate: new Date(),
+          status: DueStatus.UNPAID,
+        },
+      }),
+    ]);
+
+    let payment1Id: string | undefined;
+    let payment2Id: string | undefined;
+
+    try {
+      const [res1, res2] = await Promise.all([
+        paymentService.recordPayment(
+          {
+            ticketId: activeTicket.id,
+            installmentMonth: testMonth1,
+            amount: 4000,
+            paymentMethod: PaymentMethod.CASH,
+            notes: 'Concurrent receipt test 1',
+          },
+          makerUserId,
+        ),
+        paymentService.recordPayment(
+          {
+            ticketId: activeTicket.id,
+            installmentMonth: testMonth2,
+            amount: 4000,
+            paymentMethod: PaymentMethod.CASH,
+            notes: 'Concurrent receipt test 2',
+          },
+          makerUserId,
+        ),
+      ]);
+
+      payment1Id = res1.payment.id;
+      payment2Id = res2.payment.id;
+
+      // Critical assertions: Both payments must succeed with different receipt numbers
+      expect(res1.payment.paymentStatus).toBe('SUCCESS');
+      expect(res2.payment.paymentStatus).toBe('SUCCESS');
+      expect(res1.receipt.receiptNumber).toBeDefined();
+      expect(res2.receipt.receiptNumber).toBeDefined();
+      expect(res1.receipt.receiptNumber).not.toEqual(res2.receipt.receiptNumber);
+    } finally {
+      if (payment1Id) {
+        await prisma.paymentAllocation.deleteMany({ where: { paymentId: payment1Id } });
+        await prisma.receipt.deleteMany({ where: { paymentId: payment1Id } });
+        await prisma.payment.deleteMany({ where: { id: payment1Id } });
+      }
+      if (payment2Id) {
+        await prisma.paymentAllocation.deleteMany({ where: { paymentId: payment2Id } });
+        await prisma.receipt.deleteMany({ where: { paymentId: payment2Id } });
+        await prisma.payment.deleteMany({ where: { id: payment2Id } });
+      }
+      await prisma.installmentDue.deleteMany({ where: { id: { in: [due1.id, due2.id] } } });
+    }
+  });
 });
