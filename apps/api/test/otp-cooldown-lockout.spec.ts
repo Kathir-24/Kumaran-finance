@@ -183,6 +183,62 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
         authService.verifyOtp({ phone: testPhone, otp: sentOtp }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('OTP-RATE-7: 6th requestOtp within 24 hours MUST fail closed with HTTP 429 Daily Limit Exceeded', async () => {
+      const quotaPhone = '9842100000';
+      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'user-quota',
+        name: 'Quota User',
+        phone: quotaPhone,
+        roles: ['SUPER_ADMIN'],
+        branchId: 'branch-prd',
+        isActive: true,
+      });
+
+      // 5 requests with cooldown clears between them
+      for (let i = 1; i <= 5; i++) {
+        const res = await authService.requestOtp({ phone: quotaPhone });
+        expect(res.success).toBe(true);
+        expect(res.dailyRemaining).toBe(5 - i);
+        // Clear 60s cooldown in test map to simulate waiting 60s
+        await authService.clearOtpSession(quotaPhone, true);
+      }
+
+      // 6th request must throw 429 daily quota exceeded
+      await expect(
+        authService.requestOtp({ phone: quotaPhone }),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await authService.requestOtp({ phone: quotaPhone });
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+        expect(err.message).toContain('Daily OTP request limit exceeded');
+      }
+    });
+
+    it('OTP-RATE-8: When SMS dispatch fails, daily counter MUST rollback automatically', async () => {
+      const failPhone = '9842100001';
+      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'user-fail',
+        name: 'Fail User',
+        phone: failPhone,
+        roles: ['SUPER_ADMIN'],
+        branchId: 'branch-prd',
+        isActive: true,
+      });
+
+      smsServiceMock.sendOtpSms.mockRejectedValueOnce(new Error('Downstream carrier error'));
+
+      await expect(
+        authService.requestOtp({ phone: failPhone }),
+      ).rejects.toThrow('Telecom SMS Gateway error');
+
+      // Daily quota should be rolled back and still have all 5 remaining
+      const quota = await authService.checkDailyOtpQuota(failPhone);
+      expect(quota.currentCount).toBe(0);
+      expect(quota.remaining).toBe(5);
+    });
   });
 
   describe('Part 2: Distributed Redis 7 Architecture', () => {
@@ -213,6 +269,27 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
           const item = mockRedisStore.get(key);
           if (!item) return Promise.resolve(-2);
           return Promise.resolve(item.ex || 60);
+        }),
+        incr: jest.fn().mockImplementation((key: string) => {
+          const item = mockRedisStore.get(key);
+          const current = item ? parseInt(item.value, 10) : 0;
+          const updated = current + 1;
+          mockRedisStore.set(key, { value: String(updated), ex: item?.ex || 0 });
+          return Promise.resolve(updated);
+        }),
+        decr: jest.fn().mockImplementation((key: string) => {
+          const item = mockRedisStore.get(key);
+          const current = item ? parseInt(item.value, 10) : 0;
+          const updated = Math.max(0, current - 1);
+          mockRedisStore.set(key, { value: String(updated), ex: item?.ex || 0 });
+          return Promise.resolve(updated);
+        }),
+        expire: jest.fn().mockImplementation((key: string, seconds: number) => {
+          const item = mockRedisStore.get(key);
+          if (item) {
+            item.ex = seconds;
+          }
+          return Promise.resolve(1);
         }),
       };
 

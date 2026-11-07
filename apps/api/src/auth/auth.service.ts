@@ -26,6 +26,8 @@ import {
   OTP_COOLDOWN_SECONDS,
   OTP_LOCKOUT_SECONDS,
   OTP_MAX_VERIFY_ATTEMPTS,
+  OTP_MAX_DAILY_REQUESTS,
+  OTP_DAILY_WINDOW_SECONDS,
   TOTP_ISSUER_NAME,
 } from '../common/constants';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -68,6 +70,7 @@ export class AuthService {
   private readonly otpStore = new Map<string, OtpSessionRecord>();
   private readonly cooldownStore = new Map<string, number>();
   private readonly lockoutStore = new Map<string, number>();
+  private readonly dailyQuotaStore = new Map<string, { count: number; expiresAt: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -399,11 +402,158 @@ export class AuthService {
     }
   }
 
+  private getMaxDailyOtpRequests(): number {
+    const configured = this.configService.get<number>('MAX_DAILY_OTP_REQUESTS');
+    return configured && configured > 0 ? configured : OTP_MAX_DAILY_REQUESTS;
+  }
+
+  /**
+   * Checks if mobile number has exceeded rolling 24-hour OTP request quota
+   */
+  async checkDailyOtpQuota(phone: string): Promise<{
+    allowed: boolean;
+    currentCount: number;
+    remaining: number;
+    maxDaily: number;
+    resetInSeconds: number;
+  }> {
+    const maxDaily = this.getMaxDailyOtpRequests();
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+
+    if (useRedis && redis) {
+      const key = `auth:otp:daily:${phone}`;
+      const [countStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
+      const currentCount = countStr ? parseInt(countStr, 10) : 0;
+      const resetInSeconds = ttl > 0 ? ttl : OTP_DAILY_WINDOW_SECONDS;
+
+      if (currentCount >= maxDaily) {
+        return {
+          allowed: false,
+          currentCount,
+          remaining: 0,
+          maxDaily,
+          resetInSeconds,
+        };
+      }
+      return {
+        allowed: true,
+        currentCount,
+        remaining: maxDaily - currentCount,
+        maxDaily,
+        resetInSeconds,
+      };
+    }
+
+    const record = this.dailyQuotaStore.get(phone);
+    const now = Date.now();
+    if (record && now < record.expiresAt) {
+      const resetInSeconds = Math.ceil((record.expiresAt - now) / 1000);
+      if (record.count >= maxDaily) {
+        return {
+          allowed: false,
+          currentCount: record.count,
+          remaining: 0,
+          maxDaily,
+          resetInSeconds,
+        };
+      }
+      return {
+        allowed: true,
+        currentCount: record.count,
+        remaining: maxDaily - record.count,
+        maxDaily,
+        resetInSeconds,
+      };
+    }
+
+    if (record) {
+      this.dailyQuotaStore.delete(phone);
+    }
+    return {
+      allowed: true,
+      currentCount: 0,
+      remaining: maxDaily,
+      maxDaily,
+      resetInSeconds: OTP_DAILY_WINDOW_SECONDS,
+    };
+  }
+
+  /**
+   * Increments daily OTP request counter with a rolling 24-hour expiration
+   */
+  async incrementDailyOtpCount(phone: string): Promise<number> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(
+      redis &&
+        this.redisProvider?.getIsConnected() &&
+        typeof redis.incr === 'function',
+    );
+
+    if (useRedis && redis) {
+      const key = `auth:otp:daily:${phone}`;
+      const newCount = await redis.incr(key);
+      if (newCount === 1 && typeof redis.expire === 'function') {
+        await redis.expire(key, OTP_DAILY_WINDOW_SECONDS);
+      }
+      return newCount;
+    }
+
+    const record = this.dailyQuotaStore.get(phone);
+    const now = Date.now();
+    if (record && now < record.expiresAt) {
+      record.count += 1;
+      return record.count;
+    }
+
+    const newRecord = { count: 1, expiresAt: now + OTP_DAILY_WINDOW_SECONDS * 1000 };
+    this.dailyQuotaStore.set(phone, newRecord);
+    return 1;
+  }
+
+  /**
+   * Decrements daily OTP request counter when upstream telecom dispatch fails
+   */
+  async decrementDailyOtpCount(phone: string): Promise<void> {
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(
+      redis &&
+        this.redisProvider?.getIsConnected() &&
+        typeof redis.decr === 'function',
+    );
+
+    if (useRedis && redis) {
+      const key = `auth:otp:daily:${phone}`;
+      const count = await redis.decr(key);
+      if (count <= 0) {
+        await redis.del(key);
+      }
+      return;
+    }
+
+    const record = this.dailyQuotaStore.get(phone);
+    if (record && record.count > 0) {
+      record.count -= 1;
+      if (record.count <= 0) {
+        this.dailyQuotaStore.delete(phone);
+      }
+    }
+  }
+
   /**
    * Requests a 6-digit SMS OTP for mobile device onboarding
    */
   async requestOtp(dto: RequestOtpDto) {
     const trimmedPhone = dto.phone.trim();
+
+    // Guard 0: Daily 24-Hour SMS OTP Quota check (HTTP 429)
+    const dailyQuota = await this.checkDailyOtpQuota(trimmedPhone);
+    if (!dailyQuota.allowed) {
+      throw new HttpException(
+        `Daily OTP request limit exceeded for this mobile number (maximum ${dailyQuota.maxDaily} requests per 24 hours). Please try again in ${Math.ceil(dailyQuota.resetInSeconds / 3600)} hours or contact branch staff.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     // Guard 1: Distributed Brute-Force Lockout check (HTTP 429)
     const lockout = await this.checkOtpLockout(trimmedPhone);
@@ -489,14 +639,16 @@ export class AuthService {
       this.otpStore.set(trimmedPhone, otpRecord);
     }
 
-    // Activate 60-second cooldown lock
+    // Activate 60-second cooldown lock and increment daily counter
     await this.setOtpCooldown(trimmedPhone, OTP_COOLDOWN_SECONDS);
+    await this.incrementDailyOtpCount(trimmedPhone);
 
     let dispatchResult: any;
     try {
       dispatchResult = await this.smsService.sendOtpSms(trimmedPhone, otpCode);
     } catch (smsErr: any) {
-      // Rollback cooldown and active OTP session so user is not penalized or locked out by telecom partition
+      // Rollback cooldown, daily count, and active OTP session so user is not penalized or locked out by telecom partition
+      await this.decrementDailyOtpCount(trimmedPhone);
       if (useRedis && redis) {
         await redis.del(`auth:otp:${trimmedPhone}`, `auth:otp:cooldown:${trimmedPhone}`);
       } else {
@@ -509,6 +661,7 @@ export class AuthService {
     }
 
     if (dispatchResult && (dispatchResult === false || dispatchResult.success === false)) {
+      await this.decrementDailyOtpCount(trimmedPhone);
       if (useRedis && redis) {
         await redis.del(`auth:otp:${trimmedPhone}`, `auth:otp:cooldown:${trimmedPhone}`);
       } else {
@@ -531,6 +684,7 @@ export class AuthService {
       message: 'OTP sent successfully to registered mobile number.',
       expiresInSeconds: OTP_EXPIRY_SECONDS,
       cooldownSeconds: OTP_COOLDOWN_SECONDS,
+      dailyRemaining: Math.max(0, dailyQuota.remaining - 1),
       ...(allowDebugOtp ? { debugOtp: otpCode } : {}),
     };
   }

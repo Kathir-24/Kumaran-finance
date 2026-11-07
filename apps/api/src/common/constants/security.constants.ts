@@ -20,6 +20,10 @@ export const OTP_LOCKOUT_SECONDS = 300; // 5-minute temporary lockout on repeate
 
 export const OTP_MAX_VERIFY_ATTEMPTS = 3; // Lockout triggered on 3rd invalid attempt
 
+export const OTP_MAX_DAILY_REQUESTS = 5; // Maximum 5 OTP dispatches per mobile number per rolling 24 hours
+
+export const OTP_DAILY_WINDOW_SECONDS = 86400; // 24-hour rolling rate-limit window
+
 export const DEFAULT_JWT_ACCESS_EXPIRES_IN = '15m';
 
 export const DEFAULT_JWT_REFRESH_EXPIRES_IN = '7d';

@@ -47,6 +47,7 @@ export interface EnvironmentVariables {
   SMS_MAX_RETRIES?: number;
   SMS_RETRY_BASE_DELAY_MS?: number;
   SMS_REQUEST_TIMEOUT_MS?: number;
+  MAX_DAILY_OTP_REQUESTS?: number;
   PUSH_DRIVER?: 'mock' | 'firebase';
   FIREBASE_PROJECT_ID?: string;
   FIREBASE_CLIENT_EMAIL?: string;
@@ -210,7 +211,8 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     MSG91_DLT_DEFAULT_TEMPLATE_ID: config.MSG91_DLT_DEFAULT_TEMPLATE_ID as string | undefined,
     SMS_MAX_RETRIES: config.SMS_MAX_RETRIES !== undefined ? Number(config.SMS_MAX_RETRIES) : 2,
     SMS_RETRY_BASE_DELAY_MS: config.SMS_RETRY_BASE_DELAY_MS !== undefined ? Number(config.SMS_RETRY_BASE_DELAY_MS) : 400,
-    SMS_REQUEST_TIMEOUT_MS: config.SMS_REQUEST_TIMEOUT_MS !== undefined ? Number(config.SMS_REQUEST_TIMEOUT_MS) : 15000,
+    SMS_REQUEST_TIMEOUT_MS: config.SMS_REQUEST_TIMEOUT_MS !== undefined ? Number(config.SMS_REQUEST_TIMEOUT_MS) : 5000,
+    MAX_DAILY_OTP_REQUESTS: config.MAX_DAILY_OTP_REQUESTS !== undefined ? Number(config.MAX_DAILY_OTP_REQUESTS) : 5,
     PUSH_DRIVER: (config.PUSH_DRIVER as string) as 'mock' | 'firebase' | undefined,
     FIREBASE_PROJECT_ID: config.FIREBASE_PROJECT_ID as string | undefined,
     FIREBASE_CLIENT_EMAIL: config.FIREBASE_CLIENT_EMAIL as string | undefined,
