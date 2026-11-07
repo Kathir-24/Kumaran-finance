@@ -98,6 +98,7 @@ export function LoginForm() {
           body: {
             phone: values.phone,
             password: values.password,
+            clientType: 'WEB',
           },
         }),
       );

@@ -27,12 +27,12 @@
     },
     "/health": {
       "get": {
-        "description": "Returns API health status, server timestamp, and Sentry monitoring connectivity.",
+        "description": "Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.",
         "operationId": "HealthController_check",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "System is healthy",
+            "description": "System and critical backing services are fully healthy and ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -42,7 +42,39 @@
             }
           }
         },
-        "summary": "System health check",
+        "summary": "System readiness health check",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/readiness": {
+      "get": {
+        "description": "Probes database and cache connectivity; returns 503 if service cannot process requests.",
+        "operationId": "HealthController_readiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Explicit container readiness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/liveness": {
+      "get": {
+        "description": "Verifies the Node.js event loop and HTTP server are responsive.",
+        "operationId": "HealthController_liveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Container process liveness probe",
         "tags": [
           "Health"
         ]
@@ -78,870 +110,6 @@
         "summary": "Sentry crash diagnostic test",
         "tags": [
           "Health"
-        ]
-      }
-    },
-    "/api/v1/auth/web/login": {
-      "post": {
-        "description": "Authenticates staff via 10-digit Indian mobile number and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.",
-        "operationId": "AuthController_login_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Login successful (returns JWT tokens) or 2FA challenge issued (returns tempToken)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/AuthTokensResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid credentials or inactive account"
-          },
-          "429": {
-            "description": "Too many login attempts. Account locked for 15 minutes."
-          }
-        },
-        "summary": "Office staff credentials login",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/web/verify-totp": {
-      "post": {
-        "description": "Validates 6-digit code against RFC 6238 TOTP secret and issues full JWT tokens.",
-        "operationId": "AuthController_verifyTotp_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TotpVerifyDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "TOTP verified, JWT tokens issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/AuthTokensResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or expired code or session"
-          },
-          "429": {
-            "description": "Too many verification attempts"
-          }
-        },
-        "summary": "Verify Microsoft Authenticator TOTP code",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/refresh-token": {
-      "post": {
-        "description": "Rotates 15-minute access token and 7-day refresh token.",
-        "operationId": "AuthController_refreshToken_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshTokenDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Tokens rotated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/AuthTokensResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or revoked refresh token"
-          }
-        },
-        "summary": "Refresh access token",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/logout": {
-      "post": {
-        "description": "Clears the refresh token hash and device FCM push token in database, invalidating the session.",
-        "operationId": "AuthController_logout_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Logged out successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Revoke active session",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/fcm-token": {
-      "patch": {
-        "description": "Updates the Firebase Cloud Messaging push token for the authenticated user for real-time mobile push notifications and instant Maker-Checker approvals. Pass null/empty to deregister.",
-        "operationId": "AuthController_updateFcmToken_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateFcmTokenDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Device FCM token updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/FcmTokenUpdateResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Register or clear user device FCM push token",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/me": {
-      "get": {
-        "description": "Returns profile, roles, and branch details of authenticated user or customer.",
-        "operationId": "AuthController_getProfile_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Profile retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/UserProfileResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Get current user profile",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/change-password": {
-      "post": {
-        "description": "Allows authenticated office staff to change their web portal password by verifying their current password. Revokes active refresh token sessions.",
-        "operationId": "AuthController_changePassword_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangePasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Password changed successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "New password too short or invalid"
-          },
-          "401": {
-            "description": "Incorrect current password or missing Bearer token"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Self-service password update for staff user",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/totp/setup": {
-      "post": {
-        "description": "Generates RFC 6238 Base32 secret and otpauth URI for QR code scanning.",
-        "operationId": "AuthController_setupTotp_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "TOTP setup parameters returned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/TotpSetupResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Initiate Microsoft Authenticator 2FA setup",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/totp/enable": {
-      "post": {
-        "description": "Verifies the 6-digit code with the generated secret and permanently locks 2FA.",
-        "operationId": "AuthController_enableTotp_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TotpEnableDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "2FA enabled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/TotpStatusResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid verification code"
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid Bearer token"
-          },
-          "429": {
-            "description": "Too many verification attempts"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Confirm and enable Microsoft Authenticator 2FA",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/totp/disable": {
-      "post": {
-        "description": "Requires current password to disable two-factor authentication.",
-        "operationId": "AuthController_disableTotp_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DisableTotpDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "2FA disabled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/TotpStatusResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid password or unauthorized"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Disable 2FA",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/mobile/request-otp": {
-      "post": {
-        "description": "Dispatches a TRAI DLT-compliant SMS OTP (Template ID 1407169823412093847) to registered phone number for field agents, partners, or customers.",
-        "operationId": "AuthController_requestOtp_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestOtpDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "SMS OTP dispatched successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/RequestOtpResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Phone number not registered"
-          },
-          "429": {
-            "description": "Too many OTP requests. Please wait 5 minutes."
-          }
-        },
-        "summary": "Request 6-digit SMS OTP for mobile device registration or login",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/mobile/verify-otp": {
-      "post": {
-        "description": "Validates 6-digit SMS OTP. For subscribers, returns full JWT tokens. For staff, returns an mpin_setup token if first-time setup or full tokens if MPIN is already configured.",
-        "operationId": "AuthController_verifyOtp_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyOtpDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OTP verified successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/VerifyOtpResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid or expired OTP"
-          },
-          "429": {
-            "description": "Too many verification attempts"
-          }
-        },
-        "summary": "Verify 6-digit SMS OTP for mobile device registration or login",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/mobile/login-mpin": {
-      "post": {
-        "description": "Quick biometric/MPIN login for field collection agents on mobile.",
-        "operationId": "AuthController_loginMpin_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MpinLoginDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "MPIN verified, tokens issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/AuthTokensResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid phone or MPIN"
-          },
-          "429": {
-            "description": "Too many MPIN attempts. Account locked for 15 minutes."
-          }
-        },
-        "summary": "Mobile quick unlock with 6-digit MPIN",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/mobile/set-mpin": {
-      "post": {
-        "description": "Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.",
-        "operationId": "AuthController_setMpin_v1",
-        "parameters": [
-          {
-            "name": "authorization",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetMpinDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "MPIN saved successfully or full auth tokens issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 200
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2026-10-22T07:28:14.000Z"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "statusCode",
-                    "timestamp",
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized — missing or invalid setup token / Bearer token"
-          }
-        },
-        "summary": "Set or change 6-digit MPIN for mobile quick unlock",
-        "tags": [
-          "Auth"
         ]
       }
     },
@@ -1549,6 +717,1374 @@
         "summary": "List active BullMQ repeatable cron jobs and next execution timestamps",
         "tags": [
           "Background Jobs & Daily Maintenance"
+        ]
+      }
+    },
+    "/api/v1/pdf/receipt/{paymentId}": {
+      "get": {
+        "description": "Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.",
+        "operationId": "PdfController_getReceiptPdf_v1",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "description": "Redirect directly to presigned S3/CDN URL (HTTP 302)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stream",
+            "required": false,
+            "in": "query",
+            "description": "Stream raw PDF binary buffer directly from origin API server",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bilingual receipt PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Bilingual subscription receipt digital PDF document binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "receipts/KC-REC-PRD-2026-00001.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirected to presigned S3 / CDN media edge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to receipt"
+          },
+          "429": {
+            "description": "Too many PDF generation requests. Please wait a minute."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream bilingual subscription receipt PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/voucher/{auctionId}": {
+      "get": {
+        "description": "Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.",
+        "operationId": "PdfController_getVoucherPdf_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "description": "Redirect directly to presigned S3/CDN URL (HTTP 302)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stream",
+            "required": false,
+            "in": "query",
+            "description": "Stream raw PDF binary buffer directly from origin API server",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payout voucher PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A4 prize disbursement voucher PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "vouchers/payout-voucher-2026-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.in/vouchers/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirected to presigned S3 / CDN media edge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to voucher"
+          },
+          "429": {
+            "description": "Too many PDF generation requests. Please wait a minute."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream bilingual prize payout voucher PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/minutes/{auctionId}": {
+      "get": {
+        "description": "Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.",
+        "operationId": "PdfController_getMinutesPdf_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "description": "Redirect directly to presigned S3/CDN URL (HTTP 302)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stream",
+            "required": false,
+            "in": "query",
+            "description": "Stream raw PDF binary buffer directly from origin API server",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction minutes PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Statutory Form XVII auction minutes PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "minutes/form-xvii-2026-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.in/minutes/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirected to presigned S3 / CDN media edge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to auction minutes"
+          },
+          "429": {
+            "description": "Too many PDF generation requests. Please wait a minute."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream Form XVII statutory auction minutes PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/pdf/passbook/{ticketId}": {
+      "get": {
+        "description": "Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.",
+        "operationId": "PdfController_getPassbookPdf_v1",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "Return presigned URL JSON instead of streaming PDF binary",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "description": "Redirect directly to presigned S3/CDN URL (HTTP 302)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stream",
+            "required": false,
+            "in": "query",
+            "description": "Stream raw PDF binary buffer directly from origin API server",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passbook statement PDF stream or presigned URL JSON",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Continuous subscriber passbook statement PDF binary stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "example": "passbooks/form-xxi-passbook-01.pdf"
+                    },
+                    "presignedUrl": {
+                      "type": "string",
+                      "example": "https://storage.kumaranfinance.in/passbooks/...?sig=..."
+                    },
+                    "expiresInSeconds": {
+                      "type": "number",
+                      "example": 900
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirected to presigned S3 / CDN media edge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to passbook"
+          },
+          "429": {
+            "description": "Too many PDF generation requests. Please wait a minute."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generate and stream Form XXI continuous 20-month passbook statement PDF",
+        "tags": [
+          "Bilingual PDF Documents"
+        ]
+      }
+    },
+    "/api/v1/storage/presigned-upload-url": {
+      "post": {
+        "description": "Generates a cryptographically signed S3 PUT URL (5-minute expiry) allowing clients to upload directly to object storage, bypassing API server memory buffering.",
+        "operationId": "StorageController_requestPresignedUploadUrl_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPresignedUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Direct presigned upload URL generated successfully"
+          },
+          "400": {
+            "description": "Invalid parameters or missing identifier"
+          },
+          "403": {
+            "description": "Forbidden: Unauthorized document purpose or ownership violation"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Request a time-limited direct presigned upload URL (S3 PUT)",
+        "tags": [
+          "Storage & Presigned Files"
+        ]
+      }
+    },
+    "/api/v1/storage/file/{key}": {
+      "get": {
+        "description": "Provides authenticated file streaming for locally stored documents or HTTP 302 redirect to presigned S3/CDN URLs.",
+        "operationId": "StorageController_streamFile_v1",
+        "parameters": [
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "description": "Redirect directly to presigned S3/CDN URL (HTTP 302)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stream",
+            "required": false,
+            "in": "query",
+            "description": "Stream raw binary buffer directly from origin API server",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored document binary stream returned",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirected to presigned S3 / CDN media edge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden access to file key"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Stream or redirect to a stored file securely",
+        "tags": [
+          "Storage & Presigned Files"
+        ]
+      }
+    },
+    "/api/v1/auth/web/login": {
+      "post": {
+        "description": "Authenticates staff via 10-digit Indian mobile number and password. Returns JWT tokens or a tempToken if 2FA TOTP is required.",
+        "operationId": "AuthController_login_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful (returns JWT tokens) or 2FA challenge issued (returns tempToken)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthTokensResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or inactive account"
+          },
+          "429": {
+            "description": "Too many login attempts. Account locked for 15 minutes."
+          }
+        },
+        "summary": "Office staff credentials login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/web/verify-totp": {
+      "post": {
+        "description": "Validates 6-digit code against RFC 6238 TOTP secret and issues full JWT tokens.",
+        "operationId": "AuthController_verifyTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP verified, JWT tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthTokensResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired code or session"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "summary": "Verify Microsoft Authenticator TOTP code",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh-token": {
+      "post": {
+        "description": "Rotates 15-minute access token and 7-day refresh token.",
+        "operationId": "AuthController_refreshToken_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens rotated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthTokensResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or revoked refresh token"
+          }
+        },
+        "summary": "Refresh access token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Clears the refresh token hash and device FCM push token in database and Redis, invalidating the session.",
+        "operationId": "AuthController_logout_v1",
+        "parameters": [
+          {
+            "name": "clientType",
+            "required": false,
+            "in": "query",
+            "description": "Target client session family to revoke. Defaults to ALL if omitted.",
+            "schema": {
+              "enum": [
+                "WEB",
+                "MOBILE",
+                "DESKTOP",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logged out successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Revoke active session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/fcm-token": {
+      "patch": {
+        "description": "Updates the Firebase Cloud Messaging push token for the authenticated user for real-time mobile push notifications and instant Maker-Checker approvals. Pass null/empty to deregister.",
+        "operationId": "AuthController_updateFcmToken_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFcmTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device FCM token updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FcmTokenUpdateResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Register or clear user device FCM push token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "Returns profile, roles, and branch details of authenticated user or customer.",
+        "operationId": "AuthController_getProfile_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfileResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "description": "Allows authenticated office staff to change their web portal password by verifying their current password. Revokes active refresh token sessions.",
+        "operationId": "AuthController_changePassword_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "New password too short or invalid"
+          },
+          "401": {
+            "description": "Incorrect current password or missing Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Self-service password update for staff user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/setup": {
+      "post": {
+        "description": "Generates RFC 6238 Base32 secret and otpauth URI for QR code scanning.",
+        "operationId": "AuthController_setupTotp_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP setup parameters returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TotpSetupResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Initiate Microsoft Authenticator 2FA setup",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/enable": {
+      "post": {
+        "description": "Verifies the 6-digit code with the generated secret and permanently locks 2FA.",
+        "operationId": "AuthController_enableTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpEnableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TotpStatusResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid verification code"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Confirm and enable Microsoft Authenticator 2FA",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/disable": {
+      "post": {
+        "description": "Requires current password to disable two-factor authentication.",
+        "operationId": "AuthController_disableTotp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TotpStatusResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid password or unauthorized"
+          },
+          "429": {
+            "description": "Too many attempts. Account locked for 15 minutes."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Disable 2FA",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/request-otp": {
+      "post": {
+        "description": "Dispatches a TRAI DLT-compliant SMS OTP (Template ID 1407169823412093847) to registered phone number for field agents, partners, or customers.",
+        "operationId": "AuthController_requestOtp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SMS OTP dispatched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RequestOtpResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone number not registered"
+          },
+          "429": {
+            "description": "Too many OTP requests. Please wait 5 minutes."
+          }
+        },
+        "summary": "Request 6-digit SMS OTP for mobile device registration or login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/verify-otp": {
+      "post": {
+        "description": "Validates 6-digit SMS OTP. For subscribers, returns full JWT tokens. For staff, returns an mpin_setup token if first-time setup or full tokens if MPIN is already configured.",
+        "operationId": "AuthController_verifyOtp_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyOtpResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired OTP"
+          },
+          "429": {
+            "description": "Too many verification attempts"
+          }
+        },
+        "summary": "Verify 6-digit SMS OTP for mobile device registration or login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/login-mpin": {
+      "post": {
+        "description": "Quick biometric/MPIN login for field collection agents on mobile.",
+        "operationId": "AuthController_loginMpin_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MpinLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MPIN verified, tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthTokensResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid phone or MPIN"
+          },
+          "429": {
+            "description": "Too many MPIN attempts. Account locked for 15 minutes."
+          }
+        },
+        "summary": "Mobile quick unlock with 6-digit MPIN",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/set-mpin": {
+      "post": {
+        "description": "Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.",
+        "operationId": "AuthController_setMpin_v1",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMpinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MPIN saved successfully or full auth tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActionSuccessResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid setup token / Bearer token"
+          }
+        },
+        "summary": "Set or change 6-digit MPIN for mobile quick unlock",
+        "tags": [
+          "Auth"
         ]
       }
     },
@@ -2995,6 +3531,9 @@
           },
           "404": {
             "description": "Customer not found"
+          },
+          "429": {
+            "description": "Too many document upload attempts. Please wait a minute."
           }
         },
         "security": [
@@ -3159,44 +3698,6 @@
         "summary": "Delete customer KYC document",
         "tags": [
           "Customers"
-        ]
-      }
-    },
-    "/api/v1/storage/file/{key}": {
-      "get": {
-        "description": "Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.",
-        "operationId": "StorageController_streamFile_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Stored document binary stream returned",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to file key"
-          },
-          "404": {
-            "description": "File not found"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Stream a stored file securely (Local storage driver fallback)",
-        "tags": [
-          "Storage & Presigned Files"
         ]
       }
     },
@@ -4896,7 +5397,7 @@
     },
     "/api/v1/installments/defaulters": {
       "get": {
-        "description": "Returns subscribers with continuous unpaid dues. Allowed: Staff and Auditor.",
+        "description": "Returns subscribers with continuous unpaid dues with pagination. Allowed: Staff and Auditor.",
         "operationId": "InstallmentController_getDefaultersAlias_v1",
         "parameters": [
           {
@@ -4904,6 +5405,24 @@
             "required": false,
             "in": "query",
             "description": "Minimum consecutive unpaid months threshold (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (default: 20, max: 100)",
             "schema": {
               "type": "number"
             }
@@ -4930,10 +5449,38 @@
                       "example": "2026-10-22T07:28:14.000Z"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DefaulterItemResponseDto"
-                      }
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DefaulterItemResponseDto"
+                          }
+                        },
+                        "total": {
+                          "type": "number",
+                          "example": 50
+                        },
+                        "page": {
+                          "type": "number",
+                          "example": 1
+                        },
+                        "limit": {
+                          "type": "number",
+                          "example": 20
+                        },
+                        "totalPages": {
+                          "type": "number",
+                          "example": 3
+                        }
+                      },
+                      "required": [
+                        "data",
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
                     }
                   },
                   "required": [
@@ -5032,7 +5579,7 @@
     },
     "/api/v1/tickets/defaulters": {
       "get": {
-        "description": "Retrieves all subscribers with 1 or more consecutive unpaid installments. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.",
+        "description": "Retrieves subscribers with 1 or more consecutive unpaid installments with pagination. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.",
         "operationId": "TicketController_getDefaulters_v1",
         "parameters": [
           {
@@ -5040,6 +5587,24 @@
             "required": false,
             "in": "query",
             "description": "Minimum consecutive unpaid months threshold (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (default: 20, max: 100)",
             "schema": {
               "type": "number"
             }
@@ -5066,10 +5631,38 @@
                       "example": "2026-10-22T07:28:14.000Z"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DefaulterItemResponseDto"
-                      }
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DefaulterItemResponseDto"
+                          }
+                        },
+                        "total": {
+                          "type": "number",
+                          "example": 50
+                        },
+                        "page": {
+                          "type": "number",
+                          "example": 1
+                        },
+                        "limit": {
+                          "type": "number",
+                          "example": 20
+                        },
+                        "totalPages": {
+                          "type": "number",
+                          "example": 3
+                        }
+                      },
+                      "required": [
+                        "data",
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
                     }
                   },
                   "required": [
@@ -6173,15 +6766,34 @@
     },
     "/api/v1/payments/pending-upi-claims": {
       "get": {
-        "description": "Returns all claims in INITIATED status with customer and due details for Accounting Desk action.",
+        "description": "Returns paginated claims in INITIATED status with customer and due details for Accounting Desk action.",
         "operationId": "PaymentController_getPendingUpiClaims_v1",
         "parameters": [
           {
             "name": "branchId",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Filter by branch ID (Super Admin only)",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (default: 20, max: 100)",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -6206,10 +6818,38 @@
                       "example": "2026-10-22T07:28:14.000Z"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PendingUpiClaimItemDto"
-                      }
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PendingUpiClaimItemDto"
+                          }
+                        },
+                        "total": {
+                          "type": "number",
+                          "example": 50
+                        },
+                        "page": {
+                          "type": "number",
+                          "example": 1
+                        },
+                        "limit": {
+                          "type": "number",
+                          "example": 20
+                        },
+                        "totalPages": {
+                          "type": "number",
+                          "example": 3
+                        }
+                      },
+                      "required": [
+                        "data",
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
                     }
                   },
                   "required": [
@@ -6684,6 +7324,9 @@
           },
           "409": {
             "description": "Bank UTR already submitted or active pending claim exists"
+          },
+          "429": {
+            "description": "Too many UPI claim submissions. Please wait 15 minutes."
           }
         },
         "security": [
@@ -8314,298 +8957,6 @@
         ]
       }
     },
-    "/api/v1/pdf/receipt/{paymentId}": {
-      "get": {
-        "description": "Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.",
-        "operationId": "PdfController_getReceiptPdf_v1",
-        "parameters": [
-          {
-            "name": "paymentId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "download",
-            "required": false,
-            "in": "query",
-            "description": "Return presigned URL JSON instead of streaming PDF binary",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Bilingual receipt PDF stream or presigned URL JSON",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary",
-                  "description": "Bilingual subscription receipt digital PDF document binary stream"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "example": "receipts/KC-REC-PRD-2026-00001.pdf"
-                    },
-                    "presignedUrl": {
-                      "type": "string",
-                      "example": "https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=..."
-                    },
-                    "expiresInSeconds": {
-                      "type": "number",
-                      "example": 900
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to receipt"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Generate and stream bilingual subscription receipt PDF",
-        "tags": [
-          "Bilingual PDF Documents"
-        ]
-      }
-    },
-    "/api/v1/pdf/voucher/{auctionId}": {
-      "get": {
-        "description": "Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.",
-        "operationId": "PdfController_getVoucherPdf_v1",
-        "parameters": [
-          {
-            "name": "auctionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "download",
-            "required": false,
-            "in": "query",
-            "description": "Return presigned URL JSON instead of streaming PDF binary",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Payout voucher PDF stream or presigned URL JSON",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary",
-                  "description": "A4 prize disbursement voucher PDF binary stream"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "example": "vouchers/payout-voucher-2026-01.pdf"
-                    },
-                    "presignedUrl": {
-                      "type": "string",
-                      "example": "https://storage.kumaranfinance.in/vouchers/...?sig=..."
-                    },
-                    "expiresInSeconds": {
-                      "type": "number",
-                      "example": 900
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to voucher"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Generate and stream bilingual prize payout voucher PDF",
-        "tags": [
-          "Bilingual PDF Documents"
-        ]
-      }
-    },
-    "/api/v1/pdf/minutes/{auctionId}": {
-      "get": {
-        "description": "Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.",
-        "operationId": "PdfController_getMinutesPdf_v1",
-        "parameters": [
-          {
-            "name": "auctionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "download",
-            "required": false,
-            "in": "query",
-            "description": "Return presigned URL JSON instead of streaming PDF binary",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auction minutes PDF stream or presigned URL JSON",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary",
-                  "description": "Statutory Form XVII auction minutes PDF binary stream"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "example": "minutes/form-xvii-2026-01.pdf"
-                    },
-                    "presignedUrl": {
-                      "type": "string",
-                      "example": "https://storage.kumaranfinance.in/minutes/...?sig=..."
-                    },
-                    "expiresInSeconds": {
-                      "type": "number",
-                      "example": 900
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to auction minutes"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Generate and stream Form XVII statutory auction minutes PDF",
-        "tags": [
-          "Bilingual PDF Documents"
-        ]
-      }
-    },
-    "/api/v1/pdf/passbook/{ticketId}": {
-      "get": {
-        "description": "Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.",
-        "operationId": "PdfController_getPassbookPdf_v1",
-        "parameters": [
-          {
-            "name": "ticketId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "download",
-            "required": false,
-            "in": "query",
-            "description": "Return presigned URL JSON instead of streaming PDF binary",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Passbook statement PDF stream or presigned URL JSON",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary",
-                  "description": "Continuous subscriber passbook statement PDF binary stream"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "example": "passbooks/form-xxi-passbook-01.pdf"
-                    },
-                    "presignedUrl": {
-                      "type": "string",
-                      "example": "https://storage.kumaranfinance.in/passbooks/...?sig=..."
-                    },
-                    "expiresInSeconds": {
-                      "type": "number",
-                      "example": 900
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden access to passbook"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Generate and stream Form XXI continuous 20-month passbook statement PDF",
-        "tags": [
-          "Bilingual PDF Documents"
-        ]
-      }
-    },
     "/metrics": {
       "get": {
         "description": "Exposes runtime HTTP latencies, process memory, BullMQ queue depths, and real-time chit fund financial KPIs in standard Prometheus format. Strictly protected by HTTP Basic Auth.",
@@ -8751,6 +9102,16 @@
             "example": "chitflow-api",
             "description": "Service identifier"
           },
+          "database": {
+            "type": "string",
+            "example": "connected",
+            "description": "Database connectivity status"
+          },
+          "redis": {
+            "type": "string",
+            "example": "connected",
+            "description": "Redis connectivity status"
+          },
           "sentryActive": {
             "type": "boolean",
             "example": false,
@@ -8767,591 +9128,6 @@
           "service",
           "sentryActive",
           "time"
-        ]
-      },
-      "SanitizedUserDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "user-uuid-001",
-            "description": "User unique ID"
-          },
-          "name": {
-            "type": "string",
-            "example": "K. Sengottaiyan",
-            "description": "Staff full name"
-          },
-          "phone": {
-            "type": "string",
-            "example": "9842100001",
-            "description": "Primary mobile number"
-          },
-          "roles": {
-            "type": "array",
-            "example": [
-              "SUPER_ADMIN"
-            ],
-            "description": "Assigned system roles",
-            "items": {
-              "type": "string",
-              "enum": [
-                "SUPER_ADMIN",
-                "BRANCH_MANAGER",
-                "ACCOUNTANT",
-                "COLLECTION_AGENT",
-                "CUSTOMER",
-                "AUDITOR"
-              ]
-            }
-          },
-          "branchId": {
-            "type": "object",
-            "example": "branch-prd-001",
-            "description": "Assigned branch ID",
-            "nullable": true
-          },
-          "isTotpEnabled": {
-            "type": "boolean",
-            "example": false,
-            "description": "Whether Microsoft Authenticator TOTP is enabled"
-          },
-          "hasMpin": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether 6-digit MPIN is configured"
-          },
-          "lastLoginAt": {
-            "type": "object",
-            "example": "2026-10-22T07:28:14.000Z",
-            "description": "Last login timestamp",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "phone",
-          "roles",
-          "branchId",
-          "isTotpEnabled",
-          "hasMpin",
-          "lastLoginAt"
-        ]
-      },
-      "AuthTokensResponseDto": {
-        "type": "object",
-        "properties": {
-          "accessToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "description": "15-minute JWT access token"
-          },
-          "refreshToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "description": "7-day rotating JWT refresh token"
-          },
-          "user": {
-            "description": "Authenticated user profile",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SanitizedUserDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "accessToken",
-          "refreshToken",
-          "user"
-        ]
-      },
-      "LoginDto": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "example": "9876543210",
-            "description": "Registered 10-digit Indian mobile number"
-          },
-          "password": {
-            "type": "string",
-            "example": "Admin@Kumaran2026",
-            "description": "Staff password (min 6 characters)"
-          }
-        },
-        "required": [
-          "phone",
-          "password"
-        ]
-      },
-      "TotpVerifyDto": {
-        "type": "object",
-        "properties": {
-          "tempToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "description": "Temporary session token returned from /auth/web/login when TOTP 2FA is required"
-          },
-          "totpCode": {
-            "type": "string",
-            "example": "492817",
-            "description": "6-digit rotating TOTP code generated by Microsoft Authenticator"
-          }
-        },
-        "required": [
-          "tempToken",
-          "totpCode"
-        ]
-      },
-      "RefreshTokenDto": {
-        "type": "object",
-        "properties": {
-          "refreshToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "description": "Cryptographic refresh token issued during login"
-          }
-        },
-        "required": [
-          "refreshToken"
-        ]
-      },
-      "ActionSuccessResponseDto": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Operational status or confirmation message",
-            "example": "Action completed successfully"
-          }
-        },
-        "required": [
-          "message"
-        ]
-      },
-      "FcmTokenUpdateResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the action succeeded"
-          },
-          "message": {
-            "type": "string",
-            "example": "Device FCM token registered successfully.",
-            "description": "Status message"
-          },
-          "fcmToken": {
-            "type": "object",
-            "example": "fcm-device-token-string",
-            "description": "Registered device push token",
-            "nullable": true
-          }
-        },
-        "required": [
-          "success",
-          "message",
-          "fcmToken"
-        ]
-      },
-      "UpdateFcmTokenDto": {
-        "type": "object",
-        "properties": {
-          "fcmToken": {
-            "type": "object",
-            "description": "Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.",
-            "example": "dK9Z...f8Qm:APA91bH7..."
-          },
-          "deviceType": {
-            "type": "string",
-            "description": "Client device operating system / platform",
-            "enum": [
-              "ANDROID",
-              "IOS",
-              "WEB"
-            ],
-            "example": "ANDROID"
-          }
-        }
-      },
-      "BranchSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "branch-prd-001",
-            "description": "Branch unique ID"
-          },
-          "code": {
-            "type": "string",
-            "example": "PRD",
-            "description": "Branch short code"
-          },
-          "name": {
-            "type": "string",
-            "example": "Head Office - Perundurai",
-            "description": "Branch name in English"
-          },
-          "nameTamil": {
-            "type": "object",
-            "example": "தலைமை அலுவலகம் - பெருந்துறை",
-            "description": "Branch name in Tamil",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name",
-          "nameTamil"
-        ]
-      },
-      "UserProfileResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "user-uuid-001",
-            "description": "User unique ID"
-          },
-          "name": {
-            "type": "string",
-            "example": "K. Sengottaiyan",
-            "description": "Staff full name"
-          },
-          "phone": {
-            "type": "string",
-            "example": "9842100001",
-            "description": "Primary mobile number"
-          },
-          "roles": {
-            "type": "array",
-            "example": [
-              "SUPER_ADMIN"
-            ],
-            "description": "Assigned system roles",
-            "items": {
-              "type": "string",
-              "enum": [
-                "SUPER_ADMIN",
-                "BRANCH_MANAGER",
-                "ACCOUNTANT",
-                "COLLECTION_AGENT",
-                "CUSTOMER",
-                "AUDITOR"
-              ]
-            }
-          },
-          "branchId": {
-            "type": "object",
-            "example": "branch-prd-001",
-            "description": "Assigned branch ID",
-            "nullable": true
-          },
-          "isTotpEnabled": {
-            "type": "boolean",
-            "example": false,
-            "description": "Whether Microsoft Authenticator TOTP is enabled"
-          },
-          "hasMpin": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether 6-digit MPIN is configured"
-          },
-          "lastLoginAt": {
-            "type": "object",
-            "example": "2026-10-22T07:28:14.000Z",
-            "description": "Last login timestamp",
-            "nullable": true
-          },
-          "branch": {
-            "nullable": true,
-            "description": "Assigned branch details",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/BranchSummaryDto"
-              }
-            ]
-          },
-          "fullNameTamil": {
-            "type": "object",
-            "example": "கே. செங்கோட்டையன்",
-            "description": "Full name in Tamil",
-            "nullable": true
-          },
-          "customerCode": {
-            "type": "string",
-            "example": "KC-CUST-00042",
-            "description": "Customer unique registration code (for subscribers)"
-          },
-          "isKycVerified": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether subscriber KYC is verified"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "phone",
-          "roles",
-          "branchId",
-          "isTotpEnabled",
-          "hasMpin",
-          "lastLoginAt",
-          "branch"
-        ]
-      },
-      "ChangePasswordDto": {
-        "type": "object",
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "example": "OldPass@123",
-            "description": "Current active staff password"
-          },
-          "newPassword": {
-            "type": "string",
-            "example": "NewSecurePass@2026",
-            "description": "New password (minimum 8 characters)"
-          }
-        },
-        "required": [
-          "currentPassword",
-          "newPassword"
-        ]
-      },
-      "TotpSetupResponseDto": {
-        "type": "object",
-        "properties": {
-          "secret": {
-            "type": "string",
-            "example": "JBSWY3DPEHPK3PXP",
-            "description": "RFC 6238 Base32 TOTP secret"
-          },
-          "otpauthUri": {
-            "type": "string",
-            "example": "otpauth://totp/Kumaran%20Chits:9842100001?secret=JBSWY3DPEHPK3PXP&issuer=Kumaran%20Chits",
-            "description": "otpauth URI for QR code generation"
-          },
-          "issuer": {
-            "type": "string",
-            "example": "Kumaran Chits",
-            "description": "TOTP issuer name"
-          },
-          "account": {
-            "type": "string",
-            "example": "9842100001",
-            "description": "User account identifier (phone)"
-          },
-          "instructions": {
-            "type": "string",
-            "example": "Scan this URI or enter the secret key into Microsoft Authenticator, then call /auth/totp/enable with the 6-digit code.",
-            "description": "Client setup instructions"
-          }
-        },
-        "required": [
-          "secret",
-          "otpauthUri",
-          "issuer",
-          "account",
-          "instructions"
-        ]
-      },
-      "TotpStatusResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the action succeeded"
-          },
-          "message": {
-            "type": "string",
-            "example": "Two-factor authentication (TOTP) successfully enabled for your account.",
-            "description": "Status message"
-          }
-        },
-        "required": [
-          "success",
-          "message"
-        ]
-      },
-      "TotpEnableDto": {
-        "type": "object",
-        "properties": {
-          "secret": {
-            "type": "string",
-            "example": "JBSWY3DPEHPK3PXP",
-            "description": "Base32 secret key received from /auth/totp/setup"
-          },
-          "code": {
-            "type": "string",
-            "example": "123456",
-            "description": "Current 6-digit TOTP code generated by Microsoft Authenticator"
-          }
-        },
-        "required": [
-          "secret",
-          "code"
-        ]
-      },
-      "DisableTotpDto": {
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string",
-            "example": "Admin@Kumaran2026",
-            "description": "Current user password to authorize 2FA deactivation"
-          }
-        },
-        "required": [
-          "password"
-        ]
-      },
-      "RequestOtpResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether OTP was successfully dispatched"
-          },
-          "message": {
-            "type": "string",
-            "example": "OTP sent successfully to registered mobile number.",
-            "description": "Status message"
-          },
-          "expiresInSeconds": {
-            "type": "number",
-            "example": 300,
-            "description": "OTP expiration period in seconds"
-          },
-          "debugOtp": {
-            "type": "string",
-            "example": "123456",
-            "description": "Generated OTP for automated local testing (only returned when NODE_ENV !== production)"
-          }
-        },
-        "required": [
-          "success",
-          "message",
-          "expiresInSeconds"
-        ]
-      },
-      "RequestOtpDto": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "example": "9842154321",
-            "description": "Registered 10-digit Indian mobile number of staff or customer"
-          }
-        },
-        "required": [
-          "phone"
-        ]
-      },
-      "VerifyOtpResponseDto": {
-        "type": "object",
-        "properties": {
-          "verified": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether OTP verification was successful"
-          },
-          "setupToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsIn...",
-            "description": "Scoped setup token for configuring MPIN (issued when first-time staff onboarding)"
-          },
-          "accessToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsIn...",
-            "description": "Full JWT access token (issued for customers or staff with pre-existing MPIN)"
-          },
-          "refreshToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsIn...",
-            "description": "Rotating refresh token"
-          },
-          "user": {
-            "description": "Authenticated user or customer profile",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/UserProfileResponseDto"
-              }
-            ]
-          },
-          "message": {
-            "type": "string",
-            "example": "OTP verified successfully.",
-            "description": "Status message"
-          }
-        },
-        "required": [
-          "verified",
-          "message"
-        ]
-      },
-      "VerifyOtpDto": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "example": "9842154321",
-            "description": "Registered 10-digit Indian mobile number"
-          },
-          "otp": {
-            "type": "string",
-            "example": "123456",
-            "description": "6-digit SMS OTP received on registered device"
-          }
-        },
-        "required": [
-          "phone",
-          "otp"
-        ]
-      },
-      "MpinLoginDto": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "example": "9876543210",
-            "description": "Registered 10-digit mobile number"
-          },
-          "mpin": {
-            "type": "string",
-            "example": "123456",
-            "description": "6-digit MPIN for field agent quick unlock"
-          }
-        },
-        "required": [
-          "phone",
-          "mpin"
-        ]
-      },
-      "SetMpinDto": {
-        "type": "object",
-        "properties": {
-          "mpin": {
-            "type": "string",
-            "example": "123456",
-            "description": "New 6-digit MPIN"
-          },
-          "setupToken": {
-            "type": "string",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "description": "Temporary setup token returned from verify-otp (required during first-time device registration)"
-          }
-        },
-        "required": [
-          "mpin"
         ]
       },
       "DailyArrearsExecutionResultDto": {
@@ -9770,6 +9546,680 @@
           "name",
           "cron",
           "next"
+        ]
+      },
+      "RequestPresignedUploadDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "description": "Purpose of upload",
+            "enum": [
+              "KYC",
+              "SAFETY_PROOF"
+            ],
+            "example": "KYC"
+          },
+          "docType": {
+            "type": "string",
+            "description": "Document classification type (e.g., AADHAAR_FRONT, PAN, CHEQUE, PROMISSORY_NOTE)",
+            "example": "AADHAAR_FRONT"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name including extension",
+            "example": "aadhaar_scan.jpg"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "MIME type of the file to be uploaded",
+            "example": "image/jpeg"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Customer UUID (mandatory when purpose is KYC)",
+            "example": "cust-uuid-001"
+          },
+          "auctionId": {
+            "type": "string",
+            "description": "Auction UUID (mandatory when purpose is SAFETY_PROOF)",
+            "example": "auc-uuid-001"
+          }
+        },
+        "required": [
+          "purpose",
+          "docType",
+          "fileName",
+          "mimeType"
+        ]
+      },
+      "SanitizedUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "user-uuid-001",
+            "description": "User unique ID"
+          },
+          "name": {
+            "type": "string",
+            "example": "K. Sengottaiyan",
+            "description": "Staff full name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842100001",
+            "description": "Primary mobile number"
+          },
+          "roles": {
+            "type": "array",
+            "example": [
+              "SUPER_ADMIN"
+            ],
+            "description": "Assigned system roles",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          },
+          "branchId": {
+            "type": "object",
+            "example": "branch-prd-001",
+            "description": "Assigned branch ID",
+            "nullable": true
+          },
+          "isTotpEnabled": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether Microsoft Authenticator TOTP is enabled"
+          },
+          "hasMpin": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether 6-digit MPIN is configured"
+          },
+          "lastLoginAt": {
+            "type": "object",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Last login timestamp",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "roles",
+          "branchId",
+          "isTotpEnabled",
+          "hasMpin",
+          "lastLoginAt"
+        ]
+      },
+      "AuthTokensResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "15-minute JWT access token"
+          },
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "7-day rotating JWT refresh token"
+          },
+          "user": {
+            "description": "Authenticated user profile",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SanitizedUserDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9876543210",
+            "description": "Registered 10-digit Indian mobile number"
+          },
+          "password": {
+            "type": "string",
+            "example": "Admin@Kumaran2026",
+            "description": "Staff password (min 6 characters)"
+          },
+          "clientType": {
+            "type": "string",
+            "example": "WEB",
+            "enum": [
+              "WEB",
+              "MOBILE",
+              "DESKTOP"
+            ],
+            "description": "Client device platform type for concurrent session isolation",
+            "default": "WEB"
+          }
+        },
+        "required": [
+          "phone",
+          "password"
+        ]
+      },
+      "TotpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "tempToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Temporary session token returned from /auth/web/login when TOTP 2FA is required"
+          },
+          "totpCode": {
+            "type": "string",
+            "example": "492817",
+            "description": "6-digit rotating TOTP code generated by Microsoft Authenticator"
+          }
+        },
+        "required": [
+          "tempToken",
+          "totpCode"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Cryptographic refresh token issued during login"
+          },
+          "clientType": {
+            "type": "string",
+            "example": "WEB",
+            "enum": [
+              "WEB",
+              "MOBILE",
+              "DESKTOP"
+            ],
+            "description": "Client device platform type for concurrent session isolation",
+            "default": "WEB"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ActionSuccessResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Operational status or confirmation message",
+            "example": "Action completed successfully"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "FcmTokenUpdateResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the action succeeded"
+          },
+          "message": {
+            "type": "string",
+            "example": "Device FCM token registered successfully.",
+            "description": "Status message"
+          },
+          "fcmToken": {
+            "type": "object",
+            "example": "fcm-device-token-string",
+            "description": "Registered device push token",
+            "nullable": true
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "fcmToken"
+        ]
+      },
+      "UpdateFcmTokenDto": {
+        "type": "object",
+        "properties": {
+          "fcmToken": {
+            "type": "object",
+            "description": "Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.",
+            "example": "dK9Z...f8Qm:APA91bH7..."
+          },
+          "deviceType": {
+            "type": "string",
+            "description": "Client device operating system / platform",
+            "enum": [
+              "ANDROID",
+              "IOS",
+              "WEB"
+            ],
+            "example": "ANDROID"
+          }
+        }
+      },
+      "BranchSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "branch-prd-001",
+            "description": "Branch unique ID"
+          },
+          "code": {
+            "type": "string",
+            "example": "PRD",
+            "description": "Branch short code"
+          },
+          "name": {
+            "type": "string",
+            "example": "Head Office - Perundurai",
+            "description": "Branch name in English"
+          },
+          "nameTamil": {
+            "type": "object",
+            "example": "தலைமை அலுவலகம் - பெருந்துறை",
+            "description": "Branch name in Tamil",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "nameTamil"
+        ]
+      },
+      "UserProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "user-uuid-001",
+            "description": "User unique ID"
+          },
+          "name": {
+            "type": "string",
+            "example": "K. Sengottaiyan",
+            "description": "Staff full name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "9842100001",
+            "description": "Primary mobile number"
+          },
+          "roles": {
+            "type": "array",
+            "example": [
+              "SUPER_ADMIN"
+            ],
+            "description": "Assigned system roles",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "BRANCH_MANAGER",
+                "ACCOUNTANT",
+                "COLLECTION_AGENT",
+                "CUSTOMER",
+                "AUDITOR"
+              ]
+            }
+          },
+          "branchId": {
+            "type": "object",
+            "example": "branch-prd-001",
+            "description": "Assigned branch ID",
+            "nullable": true
+          },
+          "isTotpEnabled": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether Microsoft Authenticator TOTP is enabled"
+          },
+          "hasMpin": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether 6-digit MPIN is configured"
+          },
+          "lastLoginAt": {
+            "type": "object",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Last login timestamp",
+            "nullable": true
+          },
+          "branch": {
+            "nullable": true,
+            "description": "Assigned branch details",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BranchSummaryDto"
+              }
+            ]
+          },
+          "fullNameTamil": {
+            "type": "object",
+            "example": "கே. செங்கோட்டையன்",
+            "description": "Full name in Tamil",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "example": "KC-CUST-00042",
+            "description": "Customer unique registration code (for subscribers)"
+          },
+          "isKycVerified": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether subscriber KYC is verified"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "roles",
+          "branchId",
+          "isTotpEnabled",
+          "hasMpin",
+          "lastLoginAt",
+          "branch"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "example": "OldPass@123",
+            "description": "Current active staff password"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewSecurePass@2026",
+            "description": "New password (minimum 8 characters)"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "TotpSetupResponseDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "JBSWY3DPEHPK3PXP",
+            "description": "RFC 6238 Base32 TOTP secret"
+          },
+          "otpauthUri": {
+            "type": "string",
+            "example": "otpauth://totp/Kumaran%20Chits:9842100001?secret=JBSWY3DPEHPK3PXP&issuer=Kumaran%20Chits",
+            "description": "otpauth URI for QR code generation"
+          },
+          "issuer": {
+            "type": "string",
+            "example": "Kumaran Chits",
+            "description": "TOTP issuer name"
+          },
+          "account": {
+            "type": "string",
+            "example": "9842100001",
+            "description": "User account identifier (phone)"
+          },
+          "instructions": {
+            "type": "string",
+            "example": "Scan this URI or enter the secret key into Microsoft Authenticator, then call /auth/totp/enable with the 6-digit code.",
+            "description": "Client setup instructions"
+          }
+        },
+        "required": [
+          "secret",
+          "otpauthUri",
+          "issuer",
+          "account",
+          "instructions"
+        ]
+      },
+      "TotpStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the action succeeded"
+          },
+          "message": {
+            "type": "string",
+            "example": "Two-factor authentication (TOTP) successfully enabled for your account.",
+            "description": "Status message"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "TotpEnableDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "JBSWY3DPEHPK3PXP",
+            "description": "Base32 secret key received from /auth/totp/setup"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Current 6-digit TOTP code generated by Microsoft Authenticator"
+          }
+        },
+        "required": [
+          "secret",
+          "code"
+        ]
+      },
+      "DisableTotpDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "example": "Admin@Kumaran2026",
+            "description": "Current user password to authorize 2FA deactivation"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "RequestOtpResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether OTP was successfully dispatched"
+          },
+          "message": {
+            "type": "string",
+            "example": "OTP sent successfully to registered mobile number.",
+            "description": "Status message"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 300,
+            "description": "OTP expiration period in seconds"
+          },
+          "debugOtp": {
+            "type": "string",
+            "example": "123456",
+            "description": "Generated OTP for automated local testing (only returned when NODE_ENV !== production)"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "expiresInSeconds"
+        ]
+      },
+      "RequestOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "Registered 10-digit Indian mobile number of staff or customer"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "VerifyOtpResponseDto": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether OTP verification was successful"
+          },
+          "setupToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Scoped setup token for configuring MPIN (issued when first-time staff onboarding)"
+          },
+          "accessToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Full JWT access token (issued for customers or staff with pre-existing MPIN)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn...",
+            "description": "Rotating refresh token"
+          },
+          "user": {
+            "description": "Authenticated user or customer profile",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserProfileResponseDto"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "OTP verified successfully.",
+            "description": "Status message"
+          }
+        },
+        "required": [
+          "verified",
+          "message"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9842154321",
+            "description": "Registered 10-digit Indian mobile number"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit SMS OTP received on registered device"
+          },
+          "clientType": {
+            "type": "string",
+            "example": "MOBILE",
+            "enum": [
+              "WEB",
+              "MOBILE",
+              "DESKTOP"
+            ],
+            "description": "Client device platform type for concurrent session isolation",
+            "default": "MOBILE"
+          }
+        },
+        "required": [
+          "phone",
+          "otp"
+        ]
+      },
+      "MpinLoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "9876543210",
+            "description": "Registered 10-digit mobile number"
+          },
+          "mpin": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit MPIN for field agent quick unlock"
+          },
+          "clientType": {
+            "type": "string",
+            "example": "MOBILE",
+            "enum": [
+              "WEB",
+              "MOBILE",
+              "DESKTOP"
+            ],
+            "description": "Client device platform type for concurrent session isolation",
+            "default": "MOBILE"
+          }
+        },
+        "required": [
+          "phone",
+          "mpin"
+        ]
+      },
+      "SetMpinDto": {
+        "type": "object",
+        "properties": {
+          "mpin": {
+            "type": "string",
+            "example": "123456",
+            "description": "New 6-digit MPIN"
+          },
+          "setupToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Temporary setup token returned from verify-otp (required during first-time device registration)"
+          }
+        },
+        "required": [
+          "mpin"
         ]
       },
       "BranchResponseDto": {
@@ -10684,6 +11134,11 @@
             "type": "string",
             "example": "4821",
             "description": "Updated masked last 4 digits of Aadhaar"
+          },
+          "version": {
+            "type": "number",
+            "example": 1,
+            "description": "Current record version for optimistic concurrency control"
           }
         }
       },
@@ -13795,6 +14250,11 @@
             "type": "string",
             "example": "Entered for Ticket 7 instead of Ticket 8 during evening rush at branch counter",
             "description": "Detailed explanation and supporting notes for the Checker review"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Optional unique idempotency key to prevent duplicate reversal requests"
           }
         },
         "required": [
@@ -14264,6 +14724,11 @@
             "type": "string",
             "example": "Handed over Account Payee Cheque #009182 to subscriber in person at branch counter",
             "description": "Cashier or accountant payout release notes"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Optional unique idempotency key to prevent duplicate prize disbursement"
           }
         },
         "required": [

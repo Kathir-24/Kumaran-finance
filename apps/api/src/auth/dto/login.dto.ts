@@ -26,6 +26,7 @@ export class LoginDto {
     enum: ['WEB', 'MOBILE', 'DESKTOP'],
     description: 'Client device platform type for concurrent session isolation',
     default: 'WEB',
+    required: false,
   })
   @IsOptional()
   @IsString()

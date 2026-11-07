@@ -26,6 +26,7 @@ export class VerifyOtpDto {
     enum: ['WEB', 'MOBILE', 'DESKTOP'],
     description: 'Client device platform type for concurrent session isolation',
     default: 'MOBILE',
+    required: false,
   })
   @IsOptional()
   @IsString()
