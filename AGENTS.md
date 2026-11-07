@@ -89,6 +89,7 @@ Before starting any task, read the exact corresponding specification document in
 | **API Endpoints, DTOs & HTTP Methods** | [`docs/03-architecture/api-spec.md`](docs/03-architecture/api-spec.md) |
 | **API Resilience & High-Load Hardening** | [`docs/03-architecture/api-resilience-and-traffic-hardening.md`](docs/03-architecture/api-resilience-and-traffic-hardening.md) |
 | **Horizontal Scaling & High Availability** | [`docs/03-architecture/horizontal-scaling-and-high-availability.md`](docs/03-architecture/horizontal-scaling-and-high-availability.md) |
+| **Server & Infrastructure Resilience**    | [`docs/03-architecture/server-and-infrastructure-resilience.md`](docs/03-architecture/server-and-infrastructure-resilience.md) |
 | **Frontend Architecture & Cross-Platform** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **Client API SDK & Contract Generator** | [`docs/03-architecture/frontend-architecture.md`](docs/03-architecture/frontend-architecture.md) |
 | **State Transitions & Lifecycle Guards** | [`docs/03-architecture/state-machines.md`](docs/03-architecture/state-machines.md) |

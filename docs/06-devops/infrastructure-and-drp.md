@@ -61,7 +61,8 @@ flowchart TD
   - `App-SG`: Ingress port 3000 solely from `ALB-SG`.
   - `DB-SG`: Ingress port 5432 solely from `App-SG`.
 - **Database (AWS RDS PostgreSQL 17)**:
-  - Instance: `db.t4g.micro` (Dev/Test) $\to$ `db.t4g.small` / `db.t4g.medium` (Production).
+  - Instance: `db.t4g.micro` (Dev/Test) $\to$ `db.t4g.small` / `db.t4g.medium` (Production) $\to$ `db.m6g.large` (Dedicated Graviton).
+  - **T4g Unlimited CPU Burst Policy**: Configured with T4g Unlimited mode enabled, ensuring zero CPU throttling during monthly collection rush periods (10th–15th of each month) and live branch auctions.
   - Storage: 20 GB gp3 with storage autoscaling up to 100 GB.
   - Automated backups enabled with **7-day point-in-time recovery (PITR)**.
 
@@ -73,15 +74,21 @@ flowchart TD
   - `DatabaseMemoryUsagePercentage >= 75%` triggers an operational warning alert before memory saturation.
   - `EngineCPUUtilization >= 70%` triggers an alert for cluster resizing.
 
-### 2.4 Host Storage & Disk Capacity Monitoring Policy
-- **Automated Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
-- **Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
+### 2.4 Host Storage & SSL Certificate Expiration Monitoring Policy
+- **Storage Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
+- **Storage Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
+- **SSL/TLS Expiration Probe**: Automated certificate monitoring probe via [`infra/scripts/cert-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.sh) (Linux) and [`infra/scripts/cert-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.ps1) (Windows) triggers a critical alert whenever certificate validity drops to **$\le 30$ days** (`SSL_EXPIRY_THRESHOLD_SECONDS=2592000`).
 - **PostgreSQL Server Timeouts**: Production database enforces `statement_timeout = 15000` (15s) and `lock_timeout = 5000` (5s) to guarantee rogue queries cannot cause cascading connection starvation.
 
 ### 2.5 Horizontal Autoscaling & Multi-AZ High Availability
 - **Target Tracking Autoscaling**: Configured via AWS ECS Auto Scaling. Triggers scale-out when Average CPU Utilization $\ge 60\%$ or API response time exceeds $500\text{ms}$ (p95) for 2 consecutive minutes. Minimum 2 replicas running across distinct AZs (`ap-south-1a`, `ap-south-1b`).
 - **Scheduled Auction-Day Pre-Warming**: Pre-warms cluster from 2 to 4 active replicas 30 minutes prior to scheduled branch auctions.
 - **Deep Health Probing & Zero-Downtime Rolling Updates**: Configured via `/health/readiness` (PostgreSQL `SELECT 1` + Redis `PING`) with `minimumHealthyPercent = 100` and graceful 15-second connection draining. Full specification in [`docs/03-architecture/horizontal-scaling-and-high-availability.md`](../03-architecture/horizontal-scaling-and-high-availability.md).
+
+### 2.6 Edge CDN, Cloud Quotas & Bandwidth Saturation Prevention
+- **AWS CloudFront Edge CDN**: Deployed in front of the Application Load Balancer. Static assets (`/_next/static/*`, images, fonts) are cached with `Cache-Control: public, max-age=31536000, immutable`, while dynamic `/api/*` endpoints bypass edge caching (`no-store`). High-bandwidth documents (PDF receipts, KYC scans) use 15-minute temporary presigned S3 URLs directly.
+- **SMS DLT Provider Credit Guardian**: SMS gateway balance is monitored with automated alerts at 500 remaining credits, with seamless fallback to free Firebase Cloud Messaging (FCM) mobile push alerts and Web Push notifications.
+- **Full Infrastructure Specification**: Consult [`docs/03-architecture/server-and-infrastructure-resilience.md`](../03-architecture/server-and-infrastructure-resilience.md).
 
 ---
 
@@ -96,7 +103,7 @@ flowchart TD
 ### 3.2 Backup Lifecycle & Retention Schedule
 1. **Continuous Backups**: Automated RDS transactions backed up continuously for 7 days (point-in-time restore to any second).
 2. **Daily Snapshot**: Encrypted RDS snapshot taken every midnight (02:00 AM IST) and retained for **30 days**.
-3. **S3 Versioning & Replication**: S3 buckets storing customer KYC and PDF receipts have **Object Versioning enabled**, preventing accidental deletions.
+3. **S3 Versioning & Cross-Region Replication (CRR)**: S3 buckets storing customer KYC and PDF receipts have **Object Versioning enabled** and **Cross-Region Replication (CRR)** configured from `ap-south-1` (Mumbai) to `ap-south-2` (Hyderabad) to eliminate single-region point-of-failure risks. Nightly encrypted PostgreSQL snapshots are also replicated to the secondary region.
 
 ### 3.3 Quarterly Disaster Recovery Drill Procedure
 Once every 90 days (or on demand during audits), the developer and Kumaran Finance administrator execute this automated drill:

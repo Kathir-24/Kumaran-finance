@@ -826,7 +826,7 @@ export class DisbursementService {
     const prizeMoney = chit.chitValue - commissionAmount;
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Create settlement auction record for Month N
       const settlementAuction = await tx.auction.create({
         data: {

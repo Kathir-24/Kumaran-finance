@@ -9,18 +9,22 @@
 
 ## 1. Production Architecture Overview
 
-The Kumaran Chits production environment orchestrates 6 containerized services with automated health checks and persistent volume storage:
+The Kumaran Chits production environment orchestrates 8 containerized services with automated health checks, process bulkheading, and persistent volume storage:
 
 ```mermaid
 flowchart TD
     Client["Clients\n(Web Admin Portal / Mobile App)"] -->|HTTPS :443\nHTTP :80 Redirect| Nginx["Nginx 1.27 Ingress\n(TLS 1.3 + SSE Zero-Buffer Reverse Proxy)"]
+    Certbot["Certbot Sidecar\n(chitflow-certbot)\nAutomated 12h renew"] -.->|Renew Certs| Nginx
 
     subgraph Internal Docker Network
-        Nginx -->|Proxy / & /_next/| Web["Next.js 15 Web Portal\n(chitflow-web :3001)\nNode 22 Standalone"]
-        Nginx -->|Proxy /api/ & SSE| API["NestJS 12 Backend API\n(chitflow-api :3000)"]
+        Nginx -->|Proxy / & /_next/| Web["Next.js 15 Web Portal\n(chitflow-web :3001)\nNode 22 Standalone (512MB)"]
+        Nginx -->|Proxy /api/ & SSE| API["NestJS 12 Backend API\n(chitflow-api :3000)\nEvent Loop 100% Dedicated"]
         Web -->|Server-Side API Calls| API
+        Worker["Dedicated BullMQ Worker\n(chitflow-worker)\nArrears, Reminders, Reconciliations"]
         API --> DB[("PostgreSQL 17\n(chitflow-db :5432)")]
+        Worker --> DB
         API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)")]
+        Worker --> Redis
         API --> S3[("MinIO / AWS S3\n(chitflow-minio :9000)")]
 
         BackupCron["Automated Backup Cron\n(chitflow-backup-cron)\n02:00 AM IST Nightly"] --> DB
@@ -28,15 +32,17 @@ flowchart TD
     end
 ```
 
-| Container | Service Name | Internal Port | Host Port | Purpose |
-|---|---|---|---|---|
-| `chitflow-nginx` | `nginx` | `80`, `443` | `80`, `443` | Ingress reverse proxy, TLS termination, SSE unbuffered streaming |
-| `chitflow-web` | `web` | `3001` | `127.0.0.1:3001` | Next.js 15 operations dashboard (Node 22 Alpine standalone ~100MB) |
-| `chitflow-api` | `api` | `3000` | `127.0.0.1:3000` | NestJS 12 backend modular monolith |
-| `chitflow-db` | `db` | `5432` | `127.0.0.1:5433` | PostgreSQL 17 database (Sole financial truth; max_connections=150, statement_timeout=15s, lock_timeout=5s) |
-| `chitflow-redis` | `redis` | `6379` | `127.0.0.1:6379` | Redis 7 queue broker for BullMQ background workers |
-| `chitflow-minio` | `minio` | `9000`, `9001` | `127.0.0.1:9000` | Private S3-compatible document storage (KYC scans & PDF receipts) |
-| `chitflow-backup-cron` | `backup-cron` | N/A | N/A | Autonomous cron worker executing encrypted S3 pg_dump at 02:00 AM IST |
+| Container | Service Name | Internal Port | Host Port | Memory Limit | Purpose |
+|---|---|---|---|---|---|
+| `chitflow-nginx` | `nginx` | `80`, `443` | `80`, `443` | `256m` | Ingress reverse proxy, TLS termination, SSE unbuffered streaming, `worker_rlimit_nofile 65535` |
+| `chitflow-certbot`| `certbot` | N/A | N/A | `128m` | Automated Let's Encrypt certificate renewal sidecar (12-hour renewal loop) |
+| `chitflow-web` | `web` | `3001` | `127.0.0.1:3001` | `512m` | Next.js 15 operations dashboard (Node 22 standalone ~100MB; `--max-old-space-size=512`) |
+| `chitflow-api` | `api` | `3000` | `127.0.0.1:3000` | `1280m` | NestJS 12 backend API (`--max-old-space-size=1024`; `ENABLE_BULLMQ_WORKERS=false`) |
+| `chitflow-worker` | `worker` | N/A | N/A | `1280m` | Dedicated BullMQ consumer worker (`ENABLE_BULLMQ_WORKERS=true`) |
+| `chitflow-db` | `db` | `5432` | `127.0.0.1:5433` | `1024m` | PostgreSQL 17 database (Sole financial truth; max_connections=150, statement_timeout=15s, lock_timeout=5s) |
+| `chitflow-redis` | `redis` | `6379` | `127.0.0.1:6379` | `640m` | Redis 7 queue broker (512mb volatile-lru + 128m buffer) |
+| `chitflow-minio` | `minio` | `9000`, `9001` | `127.0.0.1:9000` | `512m` | Private S3-compatible document storage (KYC scans & PDF receipts) |
+| `chitflow-backup-cron` | `backup-cron` | N/A | N/A | `256m` | Autonomous cron worker executing encrypted S3 pg_dump at 02:00 AM IST |
 
 ### 1.1 Database Concurrency & Connection Sizing Guardrails
 - **PostgreSQL Max Connections**: Configured to `150` with `512MB` shared buffers.
@@ -49,6 +55,18 @@ flowchart TD
 - **Eviction Strategy**: `--maxmemory-policy volatile-lru` automatically evicts least recently used keys with an explicit TTL (`EX`) under memory pressure.
 - **BullMQ Queue Safety**: Critical BullMQ persistent structures (queues, active jobs, worker locks) carry no expiration TTL and are strictly immune from eviction.
 - **Persistence Snapshots**: `--save 900 1` and `--save 300 10` guarantee periodic RDB persistence snapshots without excessive I/O overhead.
+
+### 1.3 Process Bulkheading & V8 Heap Sizing
+- **Process Bulkheading**: `chitflow-api` runs with `ENABLE_BULLMQ_WORKERS=false`, devoting 100% of its single-threaded event loop to HTTP requests. A dedicated `chitflow-worker` container executes background queues (`ENABLE_BULLMQ_WORKERS=true`), preventing CPU saturation.
+- **Deterministic V8 Heap Limits**:
+  - `api` & `worker`: `NODE_OPTIONS="--max-old-space-size=1024"` inside container capped at `mem_limit: 1280m`. Leaves 256MB off-heap buffer for Prisma engine binaries and libuv threads.
+  - `web`: `NODE_OPTIONS="--max-old-space-size=512"` inside container capped at `mem_limit: 512m`.
+- **Eliminating Exit Code 137**: By enforcing `--max-old-space-size` safely below `mem_limit`, Node triggers aggressive garbage collection before container memory reaches kernel threshold, eliminating Linux OOM kills.
+
+### 1.4 Nginx File Descriptors & Socket Tuning
+- **File Descriptors**: `worker_rlimit_nofile 65535;` configured in `nginx.conf`.
+- **Worker Connections**: `worker_connections 2048;` supporting concurrent client and upstream proxy sockets.
+- **Container ulimits**: `nofile: soft: 65535, hard: 65535` configured across `nginx`, `api`, `worker`, and `web` to sustain 24-hour Maker-Checker SSE streams (`/api/v1/reports/approvals-stream`) without socket exhaustion.
 
 ---
 
@@ -99,6 +117,26 @@ chmod +x infra/docker/nginx/ssl/generate-self-signed.sh
 
 # On Windows PowerShell:
 .\infra\docker\nginx\ssl\generate-self-signed.ps1
+```
+
+### Option C: Automated In-Cluster Renewal via Certbot Sidecar
+In production with Docker Compose, the `chitflow-certbot` sidecar container automatically checks and renews Let's Encrypt certificates every 12 hours via the shared ACME challenge volume:
+```bash
+# Verify Certbot sidecar renewal status
+docker compose -f infra/docker/docker-compose.fullstack.yml logs certbot
+
+# Trigger on-demand manual renewal
+docker compose -f infra/docker/docker-compose.fullstack.yml exec certbot certbot renew --webroot -w /var/www/certbot
+docker compose -f infra/docker/docker-compose.fullstack.yml exec nginx nginx -s reload
+```
+
+### 3.1 Storage & SSL Expiration Probes
+```powershell
+# Run host storage capacity monitor (alerts when disk usage >= 80%)
+powershell -ExecutionPolicy Bypass -File infra/scripts/disk-monitor.ps1 -DriveLetter U
+
+# Run SSL certificate expiration probe (alerts when expiry <= 30 days)
+powershell -ExecutionPolicy Bypass -File infra/scripts/cert-monitor.ps1
 ```
 
 ---
