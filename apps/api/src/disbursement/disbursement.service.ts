@@ -351,6 +351,10 @@ export class DisbursementService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_APPROVAL_ALERT,
           payload,
+          {
+            jobId: `approval-alert:disbursement:${auctionId}`,
+            priority: 1,
+          },
         );
         this.logger.log(`Enqueued disbursement approval alert for Auction ${auctionId}`);
       } catch (err: any) {

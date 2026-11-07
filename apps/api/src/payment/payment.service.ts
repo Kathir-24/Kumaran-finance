@@ -360,6 +360,10 @@ export class PaymentService {
             transactionTimestamp: paymentDate.toISOString(),
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
+          {
+            jobId: `receipt:${result.receipt.receiptNumber}`,
+            priority: 1,
+          },
         );
       } catch (queueErr: any) {
         this.logger.warn(
@@ -702,6 +706,10 @@ export class PaymentService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_APPROVAL_ALERT,
           payload,
+          {
+            jobId: `approval-alert:reversal:${result.reversal.id}`,
+            priority: 1,
+          },
         );
         this.logger.log(`Enqueued reversal approval alert for Payment ${paymentId}`);
       } catch (err: any) {
@@ -1250,6 +1258,10 @@ export class PaymentService {
             receiptNumber: result.receipt.receiptNumber,
             transactionTimestamp: verificationDate.toISOString(),
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
+          },
+          {
+            jobId: `receipt:${result.receipt.receiptNumber}`,
+            priority: 1,
           },
         );
       } catch (queueErr: any) {

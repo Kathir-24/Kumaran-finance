@@ -37,6 +37,13 @@ export interface QueueStatusReport {
   failedCount: number;
 }
 
+export interface JobEnqueueOptions {
+  jobId?: string;
+  priority?: number;
+  attempts?: number;
+  backoff?: { type: string; delay: number };
+}
+
 @Injectable()
 export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BullMqQueueProvider.name);
@@ -264,8 +271,14 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Adds a job to a BullMQ queue, or executes immediately if Redis is offline.
+   * Supports deterministic jobId deduplication and priority weighting (1=high, 10=low).
    */
-  async addJob(queueName: string, jobName: string, data: any): Promise<{ jobId: string; status: string }> {
+  async addJob(
+    queueName: string,
+    jobName: string,
+    data: any,
+    options?: JobEnqueueOptions,
+  ): Promise<{ jobId: string; status: string }> {
     const isConnected = this.redisProvider.getIsConnected();
 
     if (isConnected) {
@@ -276,11 +289,13 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
 
       if (targetQueue) {
         const job = await targetQueue.add(jobName, data, {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 1000 },
+          jobId: options?.jobId,
+          priority: options?.priority,
+          attempts: options?.attempts ?? 3,
+          backoff: options?.backoff ?? { type: 'exponential', delay: 1000 },
           removeOnComplete: true,
         });
-        return { jobId: job.id || `job-${Date.now()}`, status: 'ENQUEUED' };
+        return { jobId: job?.id || options?.jobId || `job-${Date.now()}`, status: 'ENQUEUED' };
       }
     }
 
@@ -307,7 +322,7 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return { jobId: `direct-${Date.now()}`, status: 'EXECUTED_DIRECT' };
+    return { jobId: options?.jobId || `direct-${Date.now()}`, status: 'EXECUTED_DIRECT' };
   }
 
   /**

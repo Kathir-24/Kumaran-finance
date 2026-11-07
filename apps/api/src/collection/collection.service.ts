@@ -328,6 +328,10 @@ export class CollectionService {
             transactionTimestamp: paymentDate.toISOString(),
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
+          {
+            jobId: `receipt:${result.receiptNumber}`,
+            priority: 1,
+          },
         );
       } catch (queueErr: any) {
         this.logger.warn(
