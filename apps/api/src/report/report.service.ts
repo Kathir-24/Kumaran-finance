@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
+import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
 import { QueryDashboardDto } from './dto/query-dashboard.dto';
@@ -82,6 +83,11 @@ export interface PendingApprovalsResponse {
 export class ReportService {
   private readonly logger = new Logger(ReportService.name);
 
+  // Concurrency bulkhead for database protection during Redis outage
+  private activeFallbackDashboardQueries = 0;
+  private readonly MAX_CONCURRENT_FALLBACK_QUERIES = 3;
+  private readonly lastKnownDashboardSnapshot: Map<string, any> = new Map();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly statutoryReportService: StatutoryReportService,
@@ -132,16 +138,48 @@ export class ReportService {
 
     const cacheKey = `report:dashboard:${branchId || 'ALL'}`;
     const redis = this.redisProvider?.getClient();
+    let acquiredLock = false;
+    const lockKey = `lock:${cacheKey}`;
+    const isRedisConnected = Boolean(redis && this.redisProvider?.getIsConnected());
 
-    if (redis && this.redisProvider?.getIsConnected()) {
+    if (isRedisConnected && redis) {
       try {
         const cached = await redis.get(cacheKey);
         if (cached) {
           return this.deserializeReport(cached);
         }
+
+        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock
+        const lockRes = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
+        acquiredLock = lockRes === 'OK';
+
+        if (!acquiredLock) {
+          // Another concurrent request is actively computing. Wait 250ms and re-check cache.
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const retryCached = await redis.get(cacheKey);
+          if (retryCached) {
+            return this.deserializeReport(retryCached);
+          }
+        }
       } catch (err: any) {
         this.logger.warn(`Redis dashboard cache read error: ${err.message}`);
       }
+    } else {
+      // Fail-Open Concurrency Bulkhead: When Redis is unavailable, limit concurrent heavy computations
+      if (this.activeFallbackDashboardQueries >= this.MAX_CONCURRENT_FALLBACK_QUERIES) {
+        const fallback = this.lastKnownDashboardSnapshot.get(cacheKey);
+        if (fallback) {
+          this.logger.warn(
+            `Fail-open bulkhead saturated (${this.activeFallbackDashboardQueries}/${this.MAX_CONCURRENT_FALLBACK_QUERIES}). Serving in-memory snapshot for ${cacheKey}`,
+          );
+          return fallback;
+        }
+      }
+    }
+
+    const isFallbackMode = !isRedisConnected;
+    if (isFallbackMode) {
+      this.activeFallbackDashboardQueries++;
     }
 
     const startOfToday = new Date();
@@ -340,15 +378,24 @@ export class ReportService {
       },
     };
 
-    if (redis && this.redisProvider?.getIsConnected()) {
-      try {
-        await redis.setex(cacheKey, 30, this.serializeReport(result));
-      } catch (err: any) {
-        this.logger.warn(`Redis dashboard cache write error: ${err.message}`);
+    try {
+      if (isRedisConnected && redis) {
+        try {
+          await redis.setex(cacheKey, withTtlJitter(30), this.serializeReport(result));
+        } catch (err: any) {
+          this.logger.warn(`Redis dashboard cache write error: ${err.message}`);
+        }
+      }
+      this.lastKnownDashboardSnapshot.set(cacheKey, result);
+      return result;
+    } finally {
+      if (isFallbackMode) {
+        this.activeFallbackDashboardQueries = Math.max(0, this.activeFallbackDashboardQueries - 1);
+      }
+      if (acquiredLock && redis) {
+        redis.del(lockKey).catch(() => {});
       }
     }
-
-    return result;
   }
 
   /**
@@ -370,12 +417,27 @@ export class ReportService {
     const dateStr = startOfDay.toISOString().split('T')[0];
     const cacheKey = `report:daybook:${branchId || 'ALL'}:${dateStr}`;
     const redis = this.redisProvider?.getClient();
+    let acquiredLock = false;
+    const lockKey = `lock:${cacheKey}`;
 
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
         const cached = await redis.get(cacheKey);
         if (cached) {
           return this.deserializeReport(cached);
+        }
+
+        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock
+        const lockRes = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
+        acquiredLock = lockRes === 'OK';
+
+        if (!acquiredLock) {
+          // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const retryCached = await redis.get(cacheKey);
+          if (retryCached) {
+            return this.deserializeReport(retryCached);
+          }
         }
       } catch (err: any) {
         this.logger.warn(`Redis daybook cache read error: ${err.message}`);
@@ -496,15 +558,20 @@ export class ReportService {
       outflows: outflowsList,
     };
 
-    if (redis && this.redisProvider?.getIsConnected()) {
-      try {
-        await redis.setex(cacheKey, 60, this.serializeReport(reportResult));
-      } catch (err: any) {
-        this.logger.warn(`Redis daybook cache write error: ${err.message}`);
+    try {
+      if (redis && this.redisProvider?.getIsConnected()) {
+        try {
+          await redis.setex(cacheKey, withTtlJitter(60), this.serializeReport(reportResult));
+        } catch (err: any) {
+          this.logger.warn(`Redis daybook cache write error: ${err.message}`);
+        }
+      }
+      return reportResult;
+    } finally {
+      if (acquiredLock && redis) {
+        redis.del(lockKey).catch(() => {});
       }
     }
-
-    return reportResult;
   }
 
   /**
