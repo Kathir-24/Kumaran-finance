@@ -1,10 +1,13 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Role } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { JwtPayload } from '../src/auth/interfaces/jwt-payload.interface';
 import { AwsS3StorageDriver } from '../src/storage/drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from '../src/storage/drivers/local-storage.driver';
 import { StorageKeyHelper } from '../src/storage/helpers/storage-key.helper';
+import { StorageController } from '../src/storage/storage.controller';
 import { StorageService } from '../src/storage/storage.service';
 
 describe('Component 1: Encrypted Storage Service Tests', () => {
@@ -362,6 +365,80 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       // Call 4: deleteFile purges cache
       await service.deleteFile('doc-1.pdf');
       expect(redisClientMock.del).toHaveBeenCalledWith('url:presigned:doc-1.pdf');
+    });
+  });
+
+  describe('6. StorageController HTTP 302 Redirect & Streaming Egress', () => {
+    const adminUser: JwtPayload = {
+      sub: 'usr-admin-1',
+      phone: '9842100001',
+      roles: [Role.SUPER_ADMIN],
+    };
+
+    let mockStorageService: any;
+    let controller: StorageController;
+    let mockRes: any;
+
+    beforeEach(() => {
+      mockStorageService = {
+        getActiveDriverName: jest.fn().mockReturnValue('local'),
+        getPresignedUrl: jest.fn().mockResolvedValue('https://storage.kumaranfinance.in/signed/doc.pdf?sig=abc'),
+        getFile: jest.fn().mockResolvedValue({
+          buffer: Buffer.from('%PDF-1.4 file content'),
+          mimeType: 'application/pdf',
+          sizeBytes: 19,
+        }),
+      };
+      controller = new StorageController(mockStorageService);
+      mockRes = {
+        redirect: jest.fn(),
+        setHeader: jest.fn(),
+        end: jest.fn(),
+      };
+    });
+
+    it('should redirect with HTTP 302 when redirect=true on local storage', async () => {
+      await controller.streamFile('kyc/usr-admin-1/pan.pdf', 'true', 'false', adminUser, mockRes);
+
+      expect(mockStorageService.getPresignedUrl).toHaveBeenCalledWith('kyc/usr-admin-1/pan.pdf');
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed/doc.pdf?sig=abc',
+      );
+      expect(mockRes.end).not.toHaveBeenCalled();
+    });
+
+    it('should automatically redirect when active driver is s3 and stream is not true', async () => {
+      mockStorageService.getActiveDriverName.mockReturnValue('s3');
+
+      await controller.streamFile('kyc/usr-admin-1/pan.pdf', 'false', 'false', adminUser, mockRes);
+
+      expect(mockStorageService.getPresignedUrl).toHaveBeenCalledWith('kyc/usr-admin-1/pan.pdf');
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed/doc.pdf?sig=abc',
+      );
+      expect(mockRes.end).not.toHaveBeenCalled();
+    });
+
+    it('should stream binary buffer directly when stream=true even if driver is s3', async () => {
+      mockStorageService.getActiveDriverName.mockReturnValue('s3');
+
+      await controller.streamFile('kyc/usr-admin-1/pan.pdf', 'false', 'true', adminUser, mockRes);
+
+      expect(mockStorageService.getFile).toHaveBeenCalledWith('kyc/usr-admin-1/pan.pdf');
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Length', 19);
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockRes.redirect).not.toHaveBeenCalled();
+    });
+
+    it('should stream binary buffer directly for local driver without redirect parameter', async () => {
+      mockStorageService.getActiveDriverName.mockReturnValue('local');
+
+      await controller.streamFile('kyc/usr-admin-1/pan.pdf', 'false', 'false', adminUser, mockRes);
+
+      expect(mockStorageService.getFile).toHaveBeenCalledWith('kyc/usr-admin-1/pan.pdf');
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockRes.redirect).not.toHaveBeenCalled();
     });
   });
 });

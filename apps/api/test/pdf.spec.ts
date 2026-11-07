@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import type { JwtPayload } from '../src/auth/interfaces/jwt-payload.interface';
 import { FontResolverHelper } from '../src/pdf/helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../src/pdf/helpers/rupee-words.helper';
+import { PdfController } from '../src/pdf/pdf.controller';
 import { PdfService } from '../src/pdf/pdf.service';
 import { FormXviiMinutesTemplate } from '../src/pdf/templates/form-xvii-minutes.template';
 import { FormXxiPassbookTemplate } from '../src/pdf/templates/form-xxi-passbook.template';
@@ -638,6 +639,228 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', superAdminUser);
         DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', auditorUser);
       }).not.toThrow();
+    });
+  });
+
+  describe('9. PdfController HTTP 302 S3/CDN Redirects & Streaming Fallback', () => {
+    let controller: PdfController;
+    let mockRes: any;
+
+    const controllerPayment = {
+      id: 'pay-001',
+      branchId: 'branch-PRD',
+      amount: 3750n,
+      paymentMethod: 'CASH',
+      createdAt: new Date('2026-10-18T10:00:00Z'),
+      recordedByUserId: 'usr-agent-1',
+      recordedByUser: { name: 'M. Kathiresan' },
+      receipt: { id: 'rec-001', receiptNumber: 'KC-REC-PRD-2026-00045' },
+      allocations: [
+        {
+          due: {
+            installmentMonth: 4,
+            grossAmount: 5000n,
+            dividendDeduction: 1250n,
+            netPayableAmount: 3750n,
+          },
+          ticket: {
+            ticketNumber: 7,
+            customer: {
+              fullName: 'S. Sundaram',
+              fullNameTamil: 'சுந்தரம்',
+              addressLine1: '14, Netaji Road',
+              city: 'Perundurai',
+              phone: '9842143210',
+            },
+            chitGroup: {
+              groupCode: 'KCA-1L-20M-01',
+              durationMonths: 20,
+              branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai', phone: '9876543210' },
+            },
+          },
+        },
+      ],
+    };
+
+    const controllerWinner = {
+      auctionId: 'auc-001',
+      disbursementStatus: 'DISBURSED',
+      disbursedAmount: 75000n,
+      disbursementMode: 'CASH',
+      paymentReference: 'VOU-001',
+      agreementSigned: true,
+      nomineeSigned: true,
+      isSecurityRequired: false,
+      disbursedAt: new Date(),
+      verifiedByUserId: 'usr-bm-1',
+      authorizedByUserId: 'usr-admin-1',
+      auction: {
+        installmentMonth: 4,
+        auctionDate: new Date(),
+        bidDiscount: 25000n,
+        chitGroup: {
+          groupCode: 'KCA-1L-20M-01',
+          chitValue: 100000n,
+          branchId: 'branch-PRD',
+          branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai' },
+        },
+      },
+      ticket: {
+        ticketNumber: 7,
+        customer: {
+          customerCode: 'KC-CUST-00007',
+          fullName: 'S. Sundaram',
+          fullNameTamil: 'சுந்தரம்',
+          phone: '9842143210',
+        },
+      },
+    };
+
+    const controllerAuction = {
+      id: 'auc-001',
+      installmentMonth: 4,
+      auctionDate: new Date('2026-10-18T10:00:00Z'),
+      bidDiscount: 25000n,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 21000n,
+      dividendPerTicket: 1050n,
+      prizeMoney: 75000n,
+      chitGroup: {
+        id: 'group-001',
+        groupCode: 'KCA-1L-20M-01',
+        groupName: 'Perundurai 1 Lakh',
+        chitValue: 100000n,
+        durationMonths: 20,
+        baseInstallment: 5000n,
+        sanctionOrderNumber: 'ROC/CHIT/2026/01',
+        branchId: 'branch-PRD',
+        branch: { name: 'Head Office' },
+      },
+      winner: {
+        wasTieBreakWinner: false,
+        ticket: {
+          ticketNumber: 7,
+          customer: {
+            customerCode: 'KC-CUST-00007',
+            fullName: 'S. Sundaram',
+            fullNameTamil: 'சுந்தரம்',
+            phone: '9842143210',
+          },
+        },
+      },
+      tieBidders: [],
+      minutes: {
+        subscribersPresent: 18,
+        minutesText: 'Minutes recorded',
+        signedByForeman: true,
+      },
+    };
+
+    const controllerTicket = {
+      id: 'tkt-001',
+      ticketNumber: 7,
+      isPrized: false,
+      chitGroup: {
+        id: 'group-001',
+        groupCode: 'KCA-1L-20M-01',
+        groupName: 'Perundurai 1 Lakh',
+        chitValue: 100000n,
+        durationMonths: 20,
+        baseInstallment: 5000n,
+        branchId: 'branch-PRD',
+      },
+      customer: {
+        customerCode: 'KC-CUST-00007',
+        fullName: 'S. Sundaram',
+        fullNameTamil: 'சுந்தரம்',
+        phone: '9842143210',
+      },
+      dues: [
+        {
+          installmentMonth: 1,
+          dueDate: new Date('2026-01-18'),
+          grossAmount: 5000n,
+          dividendDeduction: 0n,
+          netPayableAmount: 5000n,
+          paidAmount: 5000n,
+          status: 'PAID',
+          allocations: [],
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      controller = new PdfController(pdfService);
+      mockRes = {
+        redirect: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        end: jest.fn(),
+      };
+    });
+
+    it('should redirect to presigned S3 URL when redirect=true on receipt PDF', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(controllerPayment);
+
+      await controller.getReceiptPdf('pay-001', false, 'true', 'false', superAdminUser, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed-url?exp=900',
+      );
+      expect(mockRes.end).not.toHaveBeenCalled();
+    });
+
+    it('should return JSON payload when download=true on receipt PDF', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(controllerPayment);
+
+      await controller.getReceiptPdf('pay-001', true, 'false', 'false', superAdminUser, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        key: expect.any(String),
+        presignedUrl: 'https://storage.kumaranfinance.in/signed-url?exp=900',
+        expiresInSeconds: 900,
+      });
+      expect(mockRes.redirect).not.toHaveBeenCalled();
+    });
+
+    it('should stream binary buffer when neither redirect nor download is true', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(controllerPayment);
+
+      await controller.getReceiptPdf('pay-001', false, 'false', 'true', superAdminUser, mockRes);
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(mockRes.end).toHaveBeenCalledWith(expect.any(Buffer));
+      expect(mockRes.redirect).not.toHaveBeenCalled();
+    });
+
+    it('should redirect to presigned URL when redirect=true on payout voucher PDF', async () => {
+      prismaMock.auctionWinner.findUnique.mockResolvedValue(controllerWinner);
+
+      await controller.getVoucherPdf('auc-001', false, 'true', 'false', superAdminUser, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed-url?exp=900',
+      );
+    });
+
+    it('should redirect to presigned URL when redirect=true on Form XVII minutes PDF', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(controllerAuction);
+
+      await controller.getMinutesPdf('auc-001', false, 'true', 'false', superAdminUser, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed-url?exp=900',
+      );
+    });
+
+    it('should redirect to presigned URL when redirect=true on Form XXI passbook PDF', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(controllerTicket);
+
+      await controller.getPassbookPdf('tkt-001', false, 'true', 'false', superAdminUser, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://storage.kumaranfinance.in/signed-url?exp=900',
+      );
     });
   });
 });

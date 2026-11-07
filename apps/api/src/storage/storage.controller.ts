@@ -12,12 +12,14 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -112,9 +114,21 @@ export class StorageController {
 
   @Get('file/*key')
   @ApiOperation({
-    summary: 'Stream a stored file securely (Local storage driver fallback)',
+    summary: 'Stream or redirect to a stored file securely',
     description:
-      'Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.',
+      'Provides authenticated file streaming for locally stored documents or HTTP 302 redirect to presigned S3/CDN URLs.',
+  })
+  @ApiQuery({
+    name: 'redirect',
+    required: false,
+    type: Boolean,
+    description: 'Redirect directly to presigned S3/CDN URL (HTTP 302)',
+  })
+  @ApiQuery({
+    name: 'stream',
+    required: false,
+    type: Boolean,
+    description: 'Stream raw binary buffer directly from origin API server',
   })
   @ApiResponse({
     status: 200,
@@ -128,11 +142,14 @@ export class StorageController {
       },
     },
   })
+  @ApiResponse({ status: 302, description: 'Redirected to presigned S3 / CDN media edge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to file key' })
   @ApiResponse({ status: 404, description: 'File not found' })
   async streamFile(
     @Param('key') rawKey: string | string[],
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
@@ -143,6 +160,15 @@ export class StorageController {
         : '';
     const sanitizedKey = StorageKeyHelper.sanitizeKey(rawKeyStr);
     DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser);
+
+    if (
+      String(stream) !== 'true' &&
+      (String(redirect) === 'true' || this.storageService.getActiveDriverName() === 's3')
+    ) {
+      const presignedUrl = await this.storageService.getPresignedUrl(sanitizedKey);
+      res.redirect(presignedUrl);
+      return;
+    }
 
     const result = await this.storageService.getFile(sanitizedKey);
 

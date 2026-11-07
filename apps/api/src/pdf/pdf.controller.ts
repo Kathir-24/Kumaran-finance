@@ -59,6 +59,18 @@ export class PdfController {
     type: Boolean,
     description: 'Return presigned URL JSON instead of streaming PDF binary',
   })
+  @ApiQuery({
+    name: 'redirect',
+    required: false,
+    type: Boolean,
+    description: 'Redirect directly to presigned S3/CDN URL (HTTP 302)',
+  })
+  @ApiQuery({
+    name: 'stream',
+    required: false,
+    type: Boolean,
+    description: 'Stream raw PDF binary buffer directly from origin API server',
+  })
   @ApiResponse({
     status: 200,
     description: 'Bilingual receipt PDF stream or presigned URL JSON',
@@ -82,11 +94,14 @@ export class PdfController {
       },
     },
   })
+  @ApiResponse({ status: 302, description: 'Redirected to presigned S3 / CDN media edge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to receipt' })
   async getReceiptPdf(
     @Param('paymentId') paymentId: string,
     @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
@@ -98,6 +113,11 @@ export class PdfController {
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
+    }
+
+    if (String(redirect) === 'true') {
+      res.redirect(result.presignedUrl);
       return;
     }
 
@@ -129,6 +149,18 @@ export class PdfController {
     type: Boolean,
     description: 'Return presigned URL JSON instead of streaming PDF binary',
   })
+  @ApiQuery({
+    name: 'redirect',
+    required: false,
+    type: Boolean,
+    description: 'Redirect directly to presigned S3/CDN URL (HTTP 302)',
+  })
+  @ApiQuery({
+    name: 'stream',
+    required: false,
+    type: Boolean,
+    description: 'Stream raw PDF binary buffer directly from origin API server',
+  })
   @ApiResponse({
     status: 200,
     description: 'Payout voucher PDF stream or presigned URL JSON',
@@ -152,11 +184,14 @@ export class PdfController {
       },
     },
   })
+  @ApiResponse({ status: 302, description: 'Redirected to presigned S3 / CDN media edge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to voucher' })
   async getVoucherPdf(
     @Param('auctionId') auctionId: string,
     @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
@@ -168,6 +203,11 @@ export class PdfController {
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
+    }
+
+    if (String(redirect) === 'true') {
+      res.redirect(result.presignedUrl);
       return;
     }
 
@@ -198,6 +238,18 @@ export class PdfController {
     type: Boolean,
     description: 'Return presigned URL JSON instead of streaming PDF binary',
   })
+  @ApiQuery({
+    name: 'redirect',
+    required: false,
+    type: Boolean,
+    description: 'Redirect directly to presigned S3/CDN URL (HTTP 302)',
+  })
+  @ApiQuery({
+    name: 'stream',
+    required: false,
+    type: Boolean,
+    description: 'Stream raw PDF binary buffer directly from origin API server',
+  })
   @ApiResponse({
     status: 200,
     description: 'Auction minutes PDF stream or presigned URL JSON',
@@ -221,11 +273,14 @@ export class PdfController {
       },
     },
   })
+  @ApiResponse({ status: 302, description: 'Redirected to presigned S3 / CDN media edge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to auction minutes' })
   async getMinutesPdf(
     @Param('auctionId') auctionId: string,
     @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
@@ -237,6 +292,11 @@ export class PdfController {
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
+    }
+
+    if (String(redirect) === 'true') {
+      res.redirect(result.presignedUrl);
       return;
     }
 
@@ -268,6 +328,18 @@ export class PdfController {
     type: Boolean,
     description: 'Return presigned URL JSON instead of streaming PDF binary',
   })
+  @ApiQuery({
+    name: 'redirect',
+    required: false,
+    type: Boolean,
+    description: 'Redirect directly to presigned S3/CDN URL (HTTP 302)',
+  })
+  @ApiQuery({
+    name: 'stream',
+    required: false,
+    type: Boolean,
+    description: 'Stream raw PDF binary buffer directly from origin API server',
+  })
   @ApiResponse({
     status: 200,
     description: 'Passbook statement PDF stream or presigned URL JSON',
@@ -291,11 +363,14 @@ export class PdfController {
       },
     },
   })
+  @ApiResponse({ status: 302, description: 'Redirected to presigned S3 / CDN media edge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to passbook' })
   async getPassbookPdf(
     @Param('ticketId') ticketId: string,
     @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
     @CurrentUser() currentUser: JwtPayload,
     @Res() res: Response,
   ) {
@@ -307,6 +382,11 @@ export class PdfController {
         presignedUrl: result.presignedUrl,
         expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
       });
+      return;
+    }
+
+    if (String(redirect) === 'true') {
+      res.redirect(result.presignedUrl);
       return;
     }
 
