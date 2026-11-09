@@ -245,11 +245,11 @@ export function Sidebar({
       <aside
         className={cn(
           'hidden lg:block shrink-0 transition-all duration-200 ease-in-out',
-          isCollapsed ? 'w-[72px]' : 'w-64'
+          isCollapsed ? 'w-[72px]' : 'w-72'
         )}
       >
         <div className="fixed top-0 bottom-0 z-30 flex flex-col h-screen">
-          <div className={cn('h-full', isCollapsed ? 'w-[72px]' : 'w-64')}>
+          <div className={cn('h-full', isCollapsed ? 'w-[72px]' : 'w-72')}>
             {renderNavContent()}
           </div>
         </div>

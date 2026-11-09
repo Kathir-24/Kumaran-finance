@@ -43,6 +43,7 @@ infra/docker/nginx/ssl/live/*.pfx
 # Playwright test artifacts
 test-results/
 playwright-report/
+visual-audit-results/
 
 # Experimental crawler & standalone probe scripts
 apps/api/scripts/verify-universal-endpoints-fuzzer.ts

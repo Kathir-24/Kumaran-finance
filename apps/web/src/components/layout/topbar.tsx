@@ -51,6 +51,7 @@ export interface BranchDto {
 
 export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   const tTopbar = useTranslations('topbar');
+  const tNav = useTranslations('nav');
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
@@ -130,11 +131,11 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
             <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400">
               <Building2 className="h-4 w-4 text-emerald-400" />
               <div className="flex flex-col text-left">
-                <span className="font-semibold text-slate-100 max-w-[140px] sm:max-w-[200px] truncate">
+                <span className="font-semibold text-slate-100 max-w-[200px] sm:max-w-[280px] truncate">
                   {activeBranch ? activeBranch.name : tTopbar('allBranches')}
                 </span>
                 {activeBranch?.nameTamil && (
-                  <span className="text-[10px] text-slate-400 max-w-[140px] sm:max-w-[200px] truncate">
+                  <span className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[280px] truncate">
                     {activeBranch.nameTamil}
                   </span>
                 )}
@@ -246,7 +247,7 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
                       href="/collections/handover"
                       className="flex items-center justify-between py-2"
                     >
-                      <span>Evening Cash Handovers</span>
+                      <span>{tNav('handover')}</span>
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
                         {cashHandoversCount}
                       </span>
@@ -258,7 +259,7 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
                       href="/disbursements"
                       className="flex items-center justify-between py-2"
                     >
-                      <span>Prize Disbursements</span>
+                      <span>{tNav('disbursements')}</span>
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
                         {disbursementAuthorizationsCount}
                       </span>
@@ -270,7 +271,7 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
                       href="/reversals"
                       className="flex items-center justify-between py-2"
                     >
-                      <span>Payment Reversals</span>
+                      <span>{tNav('reversals')}</span>
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
                         {paymentReversalsCount}
                       </span>

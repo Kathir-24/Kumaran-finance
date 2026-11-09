@@ -56,7 +56,7 @@ export default function CollectionsPage() {
     queryKey: queryKeys.payments.list(),
     queryFn: async ({ signal }) => {
       const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?limit=200`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?limit=100`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal,
       });
