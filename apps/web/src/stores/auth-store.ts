@@ -177,6 +177,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       return;
     }
 
+    // Deduplication guard: Skip redundant network request if already loading or already authenticated with valid token
+    const state = get();
+    if (state.isLoading) return;
+    if (state.isAuthenticated && state.user && state.accessToken === token) {
+      return;
+    }
+
     set({ isLoading: true });
 
     try {
