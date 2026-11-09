@@ -30,7 +30,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RequestPresignedUploadDto, UploadPurpose } from './dto/request-presigned-upload.dto';
+import {
+  PresignedUploadResponseDto,
+  RequestPresignedUploadDto,
+  UploadPurpose,
+} from './dto/request-presigned-upload.dto';
 import { DocumentAccessHelper } from './helpers/document-access.helper';
 import { StorageKeyHelper } from './helpers/storage-key.helper';
 import { StorageService } from './storage.service';
@@ -55,13 +59,17 @@ export class StorageController {
     description:
       'Generates a cryptographically signed S3 PUT URL (5-minute expiry) allowing clients to upload directly to object storage, bypassing API server memory buffering.',
   })
-  @ApiResponse({ status: 201, description: 'Direct presigned upload URL generated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Direct presigned upload URL generated successfully',
+    type: PresignedUploadResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Invalid parameters or missing identifier' })
   @ApiResponse({ status: 403, description: 'Forbidden: Unauthorized document purpose or ownership violation' })
   async requestPresignedUploadUrl(
     @Body() dto: RequestPresignedUploadDto,
     @CurrentUser() currentUser: JwtPayload,
-  ) {
+  ): Promise<PresignedUploadResponseDto> {
     let key: string;
     const ext = dto.fileName.split('.').pop() || 'jpg';
 

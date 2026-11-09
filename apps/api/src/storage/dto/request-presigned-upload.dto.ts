@@ -65,3 +65,37 @@ export class RequestPresignedUploadDto {
   @IsString()
   auctionId?: string;
 }
+
+export class PresignedUploadResponseDto {
+  @ApiProperty({
+    description: 'Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)',
+    example: 'https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=...',
+  })
+  uploadUrl!: string;
+
+  @ApiProperty({
+    description: 'Storage object key',
+    example: 'kyc/cust-001/aadhaar_scan.jpg',
+  })
+  key!: string;
+
+  @ApiProperty({
+    description: 'HTTP method to use for direct upload',
+    example: 'PUT',
+  })
+  method!: string;
+
+  @ApiProperty({
+    description: 'URL expiry duration in seconds',
+    example: 300,
+  })
+  expiresInSeconds!: number;
+
+  @ApiProperty({
+    description: 'Required HTTP headers to pass in the PUT request',
+    example: { 'Content-Type': 'image/jpeg' },
+    type: 'object',
+    additionalProperties: { type: 'string' },
+  })
+  headers!: Record<string, string>;
+}

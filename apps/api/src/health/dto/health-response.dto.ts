@@ -20,3 +20,14 @@ export class HealthCheckResponseDto {
   time: string;
 }
 
+export class LivenessResponseDto {
+  @ApiProperty({ example: 'alive', description: 'Process liveness status' })
+  status: string;
+
+  @ApiProperty({ example: 'chitflow-api', description: 'Service identifier' })
+  service: string;
+
+  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Server timestamp' })
+  time: string;
+}
+

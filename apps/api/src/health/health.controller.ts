@@ -13,7 +13,7 @@ import { BypassEnvelope } from '../common/decorators/bypass-envelope.decorator';
 import { isSentryActive } from '../common/sentry/sentry.config';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
-import { HealthCheckResponseDto } from './dto/health-response.dto';
+import { HealthCheckResponseDto, LivenessResponseDto } from './dto/health-response.dto';
 
 @ApiTags('Health')
 @SkipThrottle()
@@ -128,6 +128,10 @@ export class HealthController {
     description:
       'Probes database and cache connectivity; returns 503 if service cannot process requests.',
   })
+  @ApiOkResponse({
+    description: 'System readiness health check status',
+    type: HealthCheckResponseDto,
+  })
   async readiness(): Promise<HealthCheckResponseDto> {
     return this.check();
   }
@@ -141,7 +145,11 @@ export class HealthController {
     summary: 'Container process liveness probe',
     description: 'Verifies the Node.js event loop and HTTP server are responsive.',
   })
-  liveness() {
+  @ApiOkResponse({
+    description: 'Container process liveness confirmation',
+    type: LivenessResponseDto,
+  })
+  liveness(): LivenessResponseDto {
     return {
       status: 'alive',
       service: 'chitflow-api',

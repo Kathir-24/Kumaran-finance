@@ -1802,6 +1802,36 @@
   {
     "file": "src\\health\\health.controller.ts",
     "controller": "HealthController",
+    "methodName": "readiness",
+    "httpMethod": "GET",
+    "route": "/{ path: health, version: VERSION_NEUTRAL }/readiness",
+    "classGuards": [],
+    "methodGuards": [],
+    "effectiveGuards": [],
+    "classRoles": [],
+    "methodRoles": [],
+    "effectiveRoles": [],
+    "isPublic": true,
+    "notes": []
+  },
+  {
+    "file": "src\\health\\health.controller.ts",
+    "controller": "HealthController",
+    "methodName": "liveness",
+    "httpMethod": "GET",
+    "route": "/{ path: health, version: VERSION_NEUTRAL }/liveness",
+    "classGuards": [],
+    "methodGuards": [],
+    "effectiveGuards": [],
+    "classRoles": [],
+    "methodRoles": [],
+    "effectiveRoles": [],
+    "isPublic": true,
+    "notes": []
+  },
+  {
+    "file": "src\\health\\health.controller.ts",
+    "controller": "HealthController",
     "methodName": "triggerSentryTest",
     "httpMethod": "GET",
     "route": "/{ path: health, version: VERSION_NEUTRAL }/sentry-test",
@@ -3163,15 +3193,52 @@
   {
     "file": "src\\storage\\storage.controller.ts",
     "controller": "StorageController",
+    "methodName": "requestPresignedUploadUrl",
+    "httpMethod": "POST",
+    "route": "/storage/presigned-upload-url",
+    "classGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "methodGuards": [],
+    "effectiveGuards": [
+      "JwtAuthGuard",
+      "RolesGuard"
+    ],
+    "classRoles": [],
+    "methodRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT",
+      "COLLECTION_AGENT",
+      "CUSTOMER"
+    ],
+    "effectiveRoles": [
+      "SUPER_ADMIN",
+      "BRANCH_MANAGER",
+      "ACCOUNTANT",
+      "COLLECTION_AGENT",
+      "CUSTOMER"
+    ],
+    "isPublic": false,
+    "notes": [
+      "CurrentUser injected"
+    ]
+  },
+  {
+    "file": "src\\storage\\storage.controller.ts",
+    "controller": "StorageController",
     "methodName": "streamFile",
     "httpMethod": "GET",
     "route": "/storage/file/*key",
     "classGuards": [
-      "JwtAuthGuard"
+      "JwtAuthGuard",
+      "RolesGuard"
     ],
     "methodGuards": [],
     "effectiveGuards": [
-      "JwtAuthGuard"
+      "JwtAuthGuard",
+      "RolesGuard"
     ],
     "classRoles": [],
     "methodRoles": [],

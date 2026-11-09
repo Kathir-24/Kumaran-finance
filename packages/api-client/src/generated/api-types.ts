@@ -2292,6 +2292,23 @@ export interface components {
              */
             time: string;
         };
+        LivenessResponseDto: {
+            /**
+             * @description Process liveness status
+             * @example alive
+             */
+            status: string;
+            /**
+             * @description Service identifier
+             * @example chitflow-api
+             */
+            service: string;
+            /**
+             * @description Server timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            time: string;
+        };
         DailyArrearsExecutionResultDto: {
             /**
              * @description Total installment dues checked
@@ -2599,6 +2616,37 @@ export interface components {
              * @example auc-uuid-001
              */
             auctionId?: string;
+        };
+        PresignedUploadResponseDto: {
+            /**
+             * @description Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)
+             * @example https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=...
+             */
+            uploadUrl: string;
+            /**
+             * @description Storage object key
+             * @example kyc/cust-001/aadhaar_scan.jpg
+             */
+            key: string;
+            /**
+             * @description HTTP method to use for direct upload
+             * @example PUT
+             */
+            method: string;
+            /**
+             * @description URL expiry duration in seconds
+             * @example 300
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Required HTTP headers to pass in the PUT request
+             * @example {
+             *       "Content-Type": "image/jpeg"
+             *     }
+             */
+            headers: {
+                [key: string]: string;
+            };
         };
         SanitizedUserDto: {
             /**
@@ -6305,11 +6353,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description System readiness health check status */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HealthCheckResponseDto"];
+                };
             };
         };
     };
@@ -6322,11 +6373,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Container process liveness confirmation */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LivenessResponseDto"];
+                };
             };
         };
     };
@@ -7038,7 +7092,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PresignedUploadResponseDto"];
+                };
             };
             /** @description Invalid parameters or missing identifier */
             400: {

@@ -104,7 +104,7 @@ Open your browser to test the built-in administrative & observability portals:
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
 | **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 109 physical paths (115 operations). |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 112 physical paths (118 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
 | **MinIO S3 Storage Console** | [http://localhost:9001](http://localhost:9001) | User: `chitflow_admin`<br>Pass: `chitflow_storage_secret` | Web file browser showing the `kumaran-chits-private` bucket. |

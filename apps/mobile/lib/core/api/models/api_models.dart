@@ -53,6 +53,37 @@ class HealthCheckResponseDto {
   }
 }
 
+class LivenessResponseDto {
+  /// Process liveness status
+  final String status;
+  /// Service identifier
+  final String service;
+  /// Server timestamp
+  final String time;
+
+  const LivenessResponseDto({
+    required this.status,
+    required this.service,
+    required this.time,
+  });
+
+  factory LivenessResponseDto.fromJson(Map<String, dynamic> json) {
+    return LivenessResponseDto(
+      status: json['status']?.toString() ?? '',
+      service: json['service']?.toString() ?? '',
+      time: json['time']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['status'] = status;
+    data['service'] = service;
+    data['time'] = time;
+    return data;
+  }
+}
+
 class DailyArrearsExecutionResultDto {
   /// Total installment dues checked
   final double totalDuesChecked;
@@ -541,6 +572,47 @@ class RequestPresignedUploadDto {
     data['mimeType'] = mimeType;
     data['customerId'] = customerId;
     data['auctionId'] = auctionId;
+    return data;
+  }
+}
+
+class PresignedUploadResponseDto {
+  /// Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)
+  final String uploadUrl;
+  /// Storage object key
+  final String key;
+  /// HTTP method to use for direct upload
+  final String method;
+  /// URL expiry duration in seconds
+  final double expiresInSeconds;
+  /// Required HTTP headers to pass in the PUT request
+  final dynamic headers;
+
+  const PresignedUploadResponseDto({
+    required this.uploadUrl,
+    required this.key,
+    required this.method,
+    required this.expiresInSeconds,
+    this.headers,
+  });
+
+  factory PresignedUploadResponseDto.fromJson(Map<String, dynamic> json) {
+    return PresignedUploadResponseDto(
+      uploadUrl: json['uploadUrl']?.toString() ?? '',
+      key: json['key']?.toString() ?? '',
+      method: json['method']?.toString() ?? '',
+      expiresInSeconds: (json['expiresInSeconds'] != null ? (json['expiresInSeconds'] as num).toDouble() : null) ?? 0.0,
+      headers: json['headers'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['uploadUrl'] = uploadUrl;
+    data['key'] = key;
+    data['method'] = method;
+    data['expiresInSeconds'] = expiresInSeconds;
+    data['headers'] = headers;
     return data;
   }
 }

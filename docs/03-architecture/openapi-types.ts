@@ -32,10 +32,50 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * System health check
-         * @description Returns API health status, server timestamp, and Sentry monitoring connectivity.
+         * System readiness health check
+         * @description Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.
          */
         get: operations["HealthController_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explicit container readiness probe
+         * @description Probes database and cache connectivity; returns 503 if service cannot process requests.
+         */
+        get: operations["HealthController_readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/liveness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Container process liveness probe
+         * @description Verifies the Node.js event loop and HTTP server are responsive.
+         */
+        get: operations["HealthController_liveness"];
         put?: never;
         post?: never;
         delete?: never;
@@ -56,6 +96,297 @@ export interface paths {
          * @description Triggers an intentional 500 error to verify Sentry event capture.
          */
         get: operations["HealthController_triggerSentryTest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/run-daily-arrears": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually trigger daily midnight arrears recalculation & default tagging
+         * @description Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.
+         */
+        post: operations["JobsController_runDailyArrears_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/enqueue-daily-arrears": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue daily arrears job to BullMQ queue
+         * @description Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.
+         */
+        post: operations["JobsController_enqueueDailyArrears_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/run-reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger payment settlement reconciliation
+         * @description Reconciles payment records against gateway provider settlement data to resolve ghost drops.
+         */
+        post: operations["JobsController_runReconciliation_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/enqueue-reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue reconciliation job to BullMQ queue
+         * @description Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.
+         */
+        post: operations["JobsController_enqueueReconciliation_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Broadcast bilingual auction reminder to chit subscribers
+         * @description Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.
+         */
+        post: operations["JobsController_sendAuctionReminder_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/queue-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get BullMQ queue health and job counts */
+        get: operations["JobsController_getQueueStatus_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/notification-audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get audit logs of dispatched Push Notifications and DLT SMS messages */
+        get: operations["JobsController_getNotificationLogs_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/run-pre-auction-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually trigger pre-auction reminders scan (default 3 days ahead)
+         * @description Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.
+         */
+        post: operations["JobsController_runPreAuctionScan_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/repeatable-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active BullMQ repeatable cron jobs and next execution timestamps */
+        get: operations["JobsController_getRepeatableSchedules_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/receipt/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate and stream bilingual subscription receipt PDF
+         * @description Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.
+         */
+        get: operations["PdfController_getReceiptPdf_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/voucher/{auctionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate and stream bilingual prize payout voucher PDF
+         * @description Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.
+         */
+        get: operations["PdfController_getVoucherPdf_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/minutes/{auctionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate and stream Form XVII statutory auction minutes PDF
+         * @description Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.
+         */
+        get: operations["PdfController_getMinutesPdf_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/passbook/{ticketId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate and stream Form XXI continuous 20-month passbook statement PDF
+         * @description Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.
+         */
+        get: operations["PdfController_getPassbookPdf_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/presigned-upload-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a time-limited direct presigned upload URL (S3 PUT)
+         * @description Generates a cryptographically signed S3 PUT URL (5-minute expiry) allowing clients to upload directly to object storage, bypassing API server memory buffering.
+         */
+        post: operations["StorageController_requestPresignedUploadUrl_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/file/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream or redirect to a stored file securely
+         * @description Provides authenticated file streaming for locally stored documents or HTTP 302 redirect to presigned S3/CDN URLs.
+         */
+        get: operations["StorageController_streamFile_v1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -135,7 +466,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke active session
-         * @description Clears the refresh token hash and device FCM push token in database, invalidating the session.
+         * @description Clears the refresh token hash and device FCM push token in database and Redis, invalidating the session.
          */
         post: operations["AuthController_logout_v1"];
         delete?: never;
@@ -338,177 +669,6 @@ export interface paths {
          * @description Configures 6-digit MPIN for quick mobile unlock. Accepts setupToken from verify-otp during onboarding, or an active Bearer JWT when changing MPIN in account settings.
          */
         post: operations["AuthController_setMpin_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-daily-arrears": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Manually trigger daily midnight arrears recalculation & default tagging
-         * @description Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.
-         */
-        post: operations["JobsController_runDailyArrears_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/enqueue-daily-arrears": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enqueue daily arrears job to BullMQ queue
-         * @description Drops the arrears check job onto the daily-maintenance-queue for asynchronous processing.
-         */
-        post: operations["JobsController_enqueueDailyArrears_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-reconciliation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Trigger payment settlement reconciliation
-         * @description Reconciles payment records against gateway provider settlement data to resolve ghost drops.
-         */
-        post: operations["JobsController_runReconciliation_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/enqueue-reconciliation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enqueue reconciliation job to BullMQ queue
-         * @description Drops external gateway settlement records onto the reconciliation-queue for asynchronous processing.
-         */
-        post: operations["JobsController_enqueueReconciliation_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/send-auction-reminder/{chitGroupId}/{month}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Broadcast bilingual auction reminder to chit subscribers
-         * @description Enqueues reminder dispatch to push notification and DLT SMS channels for scheduled chit scheme auctions.
-         */
-        post: operations["JobsController_sendAuctionReminder_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/queue-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get BullMQ queue health and job counts */
-        get: operations["JobsController_getQueueStatus_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/notification-audit-logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get audit logs of dispatched Push Notifications and DLT SMS messages */
-        get: operations["JobsController_getNotificationLogs_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/run-pre-auction-scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Manually trigger pre-auction reminders scan (default 3 days ahead)
-         * @description Scans scheduled auctions and broadcasts bilingual Push Notifications and DLT SMS to subscribers.
-         */
-        post: operations["JobsController_runPreAuctionScan_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/jobs/repeatable-schedules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List active BullMQ repeatable cron jobs and next execution timestamps */
-        get: operations["JobsController_getRepeatableSchedules_v1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -846,26 +1006,6 @@ export interface paths {
          * @description Removes a KYC document from cloud storage and database. Verified documents can only be deleted with Super Admin authorization. Customers restricted to self.
          */
         delete: operations["CustomerController_deleteDocument_v1"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storage/file/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stream a stored file securely (Local storage driver fallback)
-         * @description Provides authenticated file streaming for locally stored KYC scans, receipts, vouchers, and minutes.
-         */
-        get: operations["StorageController_streamFile_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1281,7 +1421,7 @@ export interface paths {
         };
         /**
          * Alias to list defaulters with consecutive arrears
-         * @description Returns subscribers with continuous unpaid dues. Allowed: Staff and Auditor.
+         * @description Returns subscribers with continuous unpaid dues with pagination. Allowed: Staff and Auditor.
          */
         get: operations["InstallmentController_getDefaultersAlias_v1"];
         put?: never;
@@ -1321,7 +1461,7 @@ export interface paths {
         };
         /**
          * List subscribers with consecutive arrears
-         * @description Retrieves all subscribers with 1 or more consecutive unpaid installments. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.
+         * @description Retrieves subscribers with 1 or more consecutive unpaid installments with pagination. Highlights subscribers with >= 3 consecutive unpaid months who are eligible for default removal. Allowed: Staff and Auditor.
          */
         get: operations["TicketController_getDefaulters_v1"];
         put?: never;
@@ -1576,6 +1716,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/pending-upi-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pending UPI payment claims awaiting bank statement verification
+         * @description Returns paginated claims in INITIATED status with customer and due details for Accounting Desk action.
+         */
+        get: operations["PaymentController_getPendingUpiClaims_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/{id}": {
         parameters: {
             query?: never;
@@ -1690,26 +1850,6 @@ export interface paths {
          * @description Records bank UTR reference from deep-link payment in INITIATED status. Desk Accountant verifies bank credit before receipt is issued.
          */
         post: operations["PaymentController_submitUpiClaim_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/payments/pending-upi-claims": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List pending UPI payment claims awaiting bank statement verification
-         * @description Returns all claims in INITIATED status with customer and due details for Accounting Desk action.
-         */
-        get: operations["PaymentController_getPendingUpiClaims_v1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2096,86 +2236,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pdf/receipt/{paymentId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate and stream bilingual subscription receipt PDF
-         * @description Generates pixel-accurate A5 bilingual (English + தமிழ்) subscription receipt document and saves to private storage.
-         */
-        get: operations["PdfController_getReceiptPdf_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pdf/voucher/{auctionId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate and stream bilingual prize payout voucher PDF
-         * @description Generates bilingual (English + தமிழ்) prize disbursement voucher with safety proof checklist stamps and dual-control signatures.
-         */
-        get: operations["PdfController_getVoucherPdf_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pdf/minutes/{auctionId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate and stream Form XVII statutory auction minutes PDF
-         * @description Generates statutory Form XVII auction minutes with financial breakdown, tie-break paper token table, and Foreman declaration.
-         */
-        get: operations["PdfController_getMinutesPdf_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pdf/passbook/{ticketId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate and stream Form XXI continuous 20-month passbook statement PDF
-         * @description Generates Form XXI continuous subscriber passbook statement with monthly dues schedule, dividend deductions, paid amounts, and arrears.
-         */
-        get: operations["PdfController_getPassbookPdf_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -2212,6 +2272,16 @@ export interface components {
              */
             service: string;
             /**
+             * @description Database connectivity status
+             * @example connected
+             */
+            database?: string;
+            /**
+             * @description Redis connectivity status
+             * @example connected
+             */
+            redis?: string;
+            /**
              * @description Whether Sentry APM is active
              * @example false
              */
@@ -2222,378 +2292,22 @@ export interface components {
              */
             time: string;
         };
-        SanitizedUserDto: {
+        LivenessResponseDto: {
             /**
-             * @description User unique ID
-             * @example user-uuid-001
+             * @description Process liveness status
+             * @example alive
              */
-            id: string;
+            status: string;
             /**
-             * @description Staff full name
-             * @example K. Sengottaiyan
+             * @description Service identifier
+             * @example chitflow-api
              */
-            name: string;
+            service: string;
             /**
-             * @description Primary mobile number
-             * @example 9842100001
-             */
-            phone: string;
-            /**
-             * @description Assigned system roles
-             * @example [
-             *       "SUPER_ADMIN"
-             *     ]
-             */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
-            /**
-             * @description Assigned branch ID
-             * @example branch-prd-001
-             */
-            branchId: Record<string, never> | null;
-            /**
-             * @description Whether Microsoft Authenticator TOTP is enabled
-             * @example false
-             */
-            isTotpEnabled: boolean;
-            /**
-             * @description Whether 6-digit MPIN is configured
-             * @example true
-             */
-            hasMpin: boolean;
-            /**
-             * @description Last login timestamp
+             * @description Server timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            lastLoginAt: Record<string, never> | null;
-        };
-        AuthTokensResponseDto: {
-            /**
-             * @description 15-minute JWT access token
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            accessToken: string;
-            /**
-             * @description 7-day rotating JWT refresh token
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            refreshToken: string;
-            /** @description Authenticated user profile */
-            user: components["schemas"]["SanitizedUserDto"];
-        };
-        LoginDto: {
-            /**
-             * @description Registered 10-digit Indian mobile number
-             * @example 9876543210
-             */
-            phone: string;
-            /**
-             * @description Staff password (min 6 characters)
-             * @example Admin@Kumaran2026
-             */
-            password: string;
-        };
-        TotpVerifyDto: {
-            /**
-             * @description Temporary session token returned from /auth/web/login when TOTP 2FA is required
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            tempToken: string;
-            /**
-             * @description 6-digit rotating TOTP code generated by Microsoft Authenticator
-             * @example 492817
-             */
-            totpCode: string;
-        };
-        RefreshTokenDto: {
-            /**
-             * @description Cryptographic refresh token issued during login
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            refreshToken: string;
-        };
-        ActionSuccessResponseDto: {
-            /**
-             * @description Operational status or confirmation message
-             * @example Action completed successfully
-             */
-            message: string;
-        };
-        FcmTokenUpdateResponseDto: {
-            /**
-             * @description Whether the action succeeded
-             * @example true
-             */
-            success: boolean;
-            /**
-             * @description Status message
-             * @example Device FCM token registered successfully.
-             */
-            message: string;
-            /**
-             * @description Registered device push token
-             * @example fcm-device-token-string
-             */
-            fcmToken: Record<string, never> | null;
-        };
-        UpdateFcmTokenDto: {
-            /**
-             * @description Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.
-             * @example dK9Z...f8Qm:APA91bH7...
-             */
-            fcmToken?: Record<string, never>;
-            /**
-             * @description Client device operating system / platform
-             * @example ANDROID
-             * @enum {string}
-             */
-            deviceType?: "ANDROID" | "IOS" | "WEB";
-        };
-        BranchSummaryDto: {
-            /**
-             * @description Branch unique ID
-             * @example branch-prd-001
-             */
-            id: string;
-            /**
-             * @description Branch short code
-             * @example PRD
-             */
-            code: string;
-            /**
-             * @description Branch name in English
-             * @example Head Office - Perundurai
-             */
-            name: string;
-            /**
-             * @description Branch name in Tamil
-             * @example தலைமை அலுவலகம் - பெருந்துறை
-             */
-            nameTamil: Record<string, never> | null;
-        };
-        UserProfileResponseDto: {
-            /**
-             * @description User unique ID
-             * @example user-uuid-001
-             */
-            id: string;
-            /**
-             * @description Staff full name
-             * @example K. Sengottaiyan
-             */
-            name: string;
-            /**
-             * @description Primary mobile number
-             * @example 9842100001
-             */
-            phone: string;
-            /**
-             * @description Assigned system roles
-             * @example [
-             *       "SUPER_ADMIN"
-             *     ]
-             */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
-            /**
-             * @description Assigned branch ID
-             * @example branch-prd-001
-             */
-            branchId: Record<string, never> | null;
-            /**
-             * @description Whether Microsoft Authenticator TOTP is enabled
-             * @example false
-             */
-            isTotpEnabled: boolean;
-            /**
-             * @description Whether 6-digit MPIN is configured
-             * @example true
-             */
-            hasMpin: boolean;
-            /**
-             * @description Last login timestamp
-             * @example 2026-10-22T07:28:14.000Z
-             */
-            lastLoginAt: Record<string, never> | null;
-            /** @description Assigned branch details */
-            branch: components["schemas"]["BranchSummaryDto"] | null;
-            /**
-             * @description Full name in Tamil
-             * @example கே. செங்கோட்டையன்
-             */
-            fullNameTamil?: Record<string, never> | null;
-            /**
-             * @description Customer unique registration code (for subscribers)
-             * @example KC-CUST-00042
-             */
-            customerCode?: string;
-            /**
-             * @description Whether subscriber KYC is verified
-             * @example true
-             */
-            isKycVerified?: boolean;
-        };
-        ChangePasswordDto: {
-            /**
-             * @description Current active staff password
-             * @example OldPass@123
-             */
-            currentPassword: string;
-            /**
-             * @description New password (minimum 8 characters)
-             * @example NewSecurePass@2026
-             */
-            newPassword: string;
-        };
-        TotpSetupResponseDto: {
-            /**
-             * @description RFC 6238 Base32 TOTP secret
-             * @example JBSWY3DPEHPK3PXP
-             */
-            secret: string;
-            /**
-             * @description otpauth URI for QR code generation
-             * @example otpauth://totp/Kumaran%20Chits:9842100001?secret=JBSWY3DPEHPK3PXP&issuer=Kumaran%20Chits
-             */
-            otpauthUri: string;
-            /**
-             * @description TOTP issuer name
-             * @example Kumaran Chits
-             */
-            issuer: string;
-            /**
-             * @description User account identifier (phone)
-             * @example 9842100001
-             */
-            account: string;
-            /**
-             * @description Client setup instructions
-             * @example Scan this URI or enter the secret key into Microsoft Authenticator, then call /auth/totp/enable with the 6-digit code.
-             */
-            instructions: string;
-        };
-        TotpStatusResponseDto: {
-            /**
-             * @description Whether the action succeeded
-             * @example true
-             */
-            success: boolean;
-            /**
-             * @description Status message
-             * @example Two-factor authentication (TOTP) successfully enabled for your account.
-             */
-            message: string;
-        };
-        TotpEnableDto: {
-            /**
-             * @description Base32 secret key received from /auth/totp/setup
-             * @example JBSWY3DPEHPK3PXP
-             */
-            secret: string;
-            /**
-             * @description Current 6-digit TOTP code generated by Microsoft Authenticator
-             * @example 123456
-             */
-            code: string;
-        };
-        DisableTotpDto: {
-            /**
-             * @description Current user password to authorize 2FA deactivation
-             * @example Admin@Kumaran2026
-             */
-            password: string;
-        };
-        RequestOtpResponseDto: {
-            /**
-             * @description Whether OTP was successfully dispatched
-             * @example true
-             */
-            success: boolean;
-            /**
-             * @description Status message
-             * @example OTP sent successfully to registered mobile number.
-             */
-            message: string;
-            /**
-             * @description OTP expiration period in seconds
-             * @example 300
-             */
-            expiresInSeconds: number;
-            /**
-             * @description Generated OTP for automated local testing (only returned when NODE_ENV !== production)
-             * @example 123456
-             */
-            debugOtp?: string;
-        };
-        RequestOtpDto: {
-            /**
-             * @description Registered 10-digit Indian mobile number of staff or customer
-             * @example 9842154321
-             */
-            phone: string;
-        };
-        VerifyOtpResponseDto: {
-            /**
-             * @description Whether OTP verification was successful
-             * @example true
-             */
-            verified: boolean;
-            /**
-             * @description Scoped setup token for configuring MPIN (issued when first-time staff onboarding)
-             * @example eyJhbGciOiJIUzI1NiIsIn...
-             */
-            setupToken?: string;
-            /**
-             * @description Full JWT access token (issued for customers or staff with pre-existing MPIN)
-             * @example eyJhbGciOiJIUzI1NiIsIn...
-             */
-            accessToken?: string;
-            /**
-             * @description Rotating refresh token
-             * @example eyJhbGciOiJIUzI1NiIsIn...
-             */
-            refreshToken?: string;
-            /** @description Authenticated user or customer profile */
-            user?: components["schemas"]["UserProfileResponseDto"];
-            /**
-             * @description Status message
-             * @example OTP verified successfully.
-             */
-            message: string;
-        };
-        VerifyOtpDto: {
-            /**
-             * @description Registered 10-digit Indian mobile number
-             * @example 9842154321
-             */
-            phone: string;
-            /**
-             * @description 6-digit SMS OTP received on registered device
-             * @example 123456
-             */
-            otp: string;
-        };
-        MpinLoginDto: {
-            /**
-             * @description Registered 10-digit mobile number
-             * @example 9876543210
-             */
-            phone: string;
-            /**
-             * @description 6-digit MPIN for field agent quick unlock
-             * @example 123456
-             */
-            mpin: string;
-        };
-        SetMpinDto: {
-            /**
-             * @description New 6-digit MPIN
-             * @example 123456
-             */
-            mpin: string;
-            /**
-             * @description Temporary setup token returned from verify-otp (required during first-time device registration)
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-             */
-            setupToken?: string;
+            time: string;
         };
         DailyArrearsExecutionResultDto: {
             /**
@@ -2869,6 +2583,471 @@ export interface components {
              * @example 1729641600000
              */
             next: Record<string, never> | null;
+        };
+        RequestPresignedUploadDto: {
+            /**
+             * @description Purpose of upload
+             * @example KYC
+             * @enum {string}
+             */
+            purpose: "KYC" | "SAFETY_PROOF";
+            /**
+             * @description Document classification type (e.g., AADHAAR_FRONT, PAN, CHEQUE, PROMISSORY_NOTE)
+             * @example AADHAAR_FRONT
+             */
+            docType: string;
+            /**
+             * @description Original file name including extension
+             * @example aadhaar_scan.jpg
+             */
+            fileName: string;
+            /**
+             * @description MIME type of the file to be uploaded
+             * @example image/jpeg
+             */
+            mimeType: string;
+            /**
+             * @description Customer UUID (mandatory when purpose is KYC)
+             * @example cust-uuid-001
+             */
+            customerId?: string;
+            /**
+             * @description Auction UUID (mandatory when purpose is SAFETY_PROOF)
+             * @example auc-uuid-001
+             */
+            auctionId?: string;
+        };
+        PresignedUploadResponseDto: {
+            /**
+             * @description Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)
+             * @example https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=...
+             */
+            uploadUrl: string;
+            /**
+             * @description Storage object key
+             * @example kyc/cust-001/aadhaar_scan.jpg
+             */
+            key: string;
+            /**
+             * @description HTTP method to use for direct upload
+             * @example PUT
+             */
+            method: string;
+            /**
+             * @description URL expiry duration in seconds
+             * @example 300
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Required HTTP headers to pass in the PUT request
+             * @example {
+             *       "Content-Type": "image/jpeg"
+             *     }
+             */
+            headers: {
+                [key: string]: string;
+            };
+        };
+        SanitizedUserDto: {
+            /**
+             * @description User unique ID
+             * @example user-uuid-001
+             */
+            id: string;
+            /**
+             * @description Staff full name
+             * @example K. Sengottaiyan
+             */
+            name: string;
+            /**
+             * @description Primary mobile number
+             * @example 9842100001
+             */
+            phone: string;
+            /**
+             * @description Assigned system roles
+             * @example [
+             *       "SUPER_ADMIN"
+             *     ]
+             */
+            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            /**
+             * @description Assigned branch ID
+             * @example branch-prd-001
+             */
+            branchId: Record<string, never> | null;
+            /**
+             * @description Whether Microsoft Authenticator TOTP is enabled
+             * @example false
+             */
+            isTotpEnabled: boolean;
+            /**
+             * @description Whether 6-digit MPIN is configured
+             * @example true
+             */
+            hasMpin: boolean;
+            /**
+             * @description Last login timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            lastLoginAt: Record<string, never> | null;
+        };
+        AuthTokensResponseDto: {
+            /**
+             * @description 15-minute JWT access token
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            accessToken: string;
+            /**
+             * @description 7-day rotating JWT refresh token
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            refreshToken: string;
+            /** @description Authenticated user profile */
+            user: components["schemas"]["SanitizedUserDto"];
+        };
+        LoginDto: {
+            /**
+             * @description Registered 10-digit Indian mobile number
+             * @example 9876543210
+             */
+            phone: string;
+            /**
+             * @description Staff password (min 6 characters)
+             * @example Admin@Kumaran2026
+             */
+            password: string;
+            /**
+             * @description Client device platform type for concurrent session isolation
+             * @default WEB
+             * @example WEB
+             * @enum {string}
+             */
+            clientType: "WEB" | "MOBILE" | "DESKTOP";
+        };
+        TotpVerifyDto: {
+            /**
+             * @description Temporary session token returned from /auth/web/login when TOTP 2FA is required
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            tempToken: string;
+            /**
+             * @description 6-digit rotating TOTP code generated by Microsoft Authenticator
+             * @example 492817
+             */
+            totpCode: string;
+        };
+        RefreshTokenDto: {
+            /**
+             * @description Cryptographic refresh token issued during login
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            refreshToken: string;
+            /**
+             * @description Client device platform type for concurrent session isolation
+             * @default WEB
+             * @example WEB
+             * @enum {string}
+             */
+            clientType: "WEB" | "MOBILE" | "DESKTOP";
+        };
+        ActionSuccessResponseDto: {
+            /**
+             * @description Operational status or confirmation message
+             * @example Action completed successfully
+             */
+            message: string;
+        };
+        FcmTokenUpdateResponseDto: {
+            /**
+             * @description Whether the action succeeded
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Device FCM token registered successfully.
+             */
+            message: string;
+            /**
+             * @description Registered device push token
+             * @example fcm-device-token-string
+             */
+            fcmToken: Record<string, never> | null;
+        };
+        UpdateFcmTokenDto: {
+            /**
+             * @description Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.
+             * @example dK9Z...f8Qm:APA91bH7...
+             */
+            fcmToken?: Record<string, never>;
+            /**
+             * @description Client device operating system / platform
+             * @example ANDROID
+             * @enum {string}
+             */
+            deviceType?: "ANDROID" | "IOS" | "WEB";
+        };
+        BranchSummaryDto: {
+            /**
+             * @description Branch unique ID
+             * @example branch-prd-001
+             */
+            id: string;
+            /**
+             * @description Branch short code
+             * @example PRD
+             */
+            code: string;
+            /**
+             * @description Branch name in English
+             * @example Head Office - Perundurai
+             */
+            name: string;
+            /**
+             * @description Branch name in Tamil
+             * @example தலைமை அலுவலகம் - பெருந்துறை
+             */
+            nameTamil: Record<string, never> | null;
+        };
+        UserProfileResponseDto: {
+            /**
+             * @description User unique ID
+             * @example user-uuid-001
+             */
+            id: string;
+            /**
+             * @description Staff full name
+             * @example K. Sengottaiyan
+             */
+            name: string;
+            /**
+             * @description Primary mobile number
+             * @example 9842100001
+             */
+            phone: string;
+            /**
+             * @description Assigned system roles
+             * @example [
+             *       "SUPER_ADMIN"
+             *     ]
+             */
+            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            /**
+             * @description Assigned branch ID
+             * @example branch-prd-001
+             */
+            branchId: Record<string, never> | null;
+            /**
+             * @description Whether Microsoft Authenticator TOTP is enabled
+             * @example false
+             */
+            isTotpEnabled: boolean;
+            /**
+             * @description Whether 6-digit MPIN is configured
+             * @example true
+             */
+            hasMpin: boolean;
+            /**
+             * @description Last login timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            lastLoginAt: Record<string, never> | null;
+            /** @description Assigned branch details */
+            branch: components["schemas"]["BranchSummaryDto"] | null;
+            /**
+             * @description Full name in Tamil
+             * @example கே. செங்கோட்டையன்
+             */
+            fullNameTamil?: Record<string, never> | null;
+            /**
+             * @description Customer unique registration code (for subscribers)
+             * @example KC-CUST-00042
+             */
+            customerCode?: string;
+            /**
+             * @description Whether subscriber KYC is verified
+             * @example true
+             */
+            isKycVerified?: boolean;
+        };
+        ChangePasswordDto: {
+            /**
+             * @description Current active staff password
+             * @example OldPass@123
+             */
+            currentPassword: string;
+            /**
+             * @description New password (minimum 8 characters)
+             * @example NewSecurePass@2026
+             */
+            newPassword: string;
+        };
+        TotpSetupResponseDto: {
+            /**
+             * @description RFC 6238 Base32 TOTP secret
+             * @example JBSWY3DPEHPK3PXP
+             */
+            secret: string;
+            /**
+             * @description otpauth URI for QR code generation
+             * @example otpauth://totp/Kumaran%20Chits:9842100001?secret=JBSWY3DPEHPK3PXP&issuer=Kumaran%20Chits
+             */
+            otpauthUri: string;
+            /**
+             * @description TOTP issuer name
+             * @example Kumaran Chits
+             */
+            issuer: string;
+            /**
+             * @description User account identifier (phone)
+             * @example 9842100001
+             */
+            account: string;
+            /**
+             * @description Client setup instructions
+             * @example Scan this URI or enter the secret key into Microsoft Authenticator, then call /auth/totp/enable with the 6-digit code.
+             */
+            instructions: string;
+        };
+        TotpStatusResponseDto: {
+            /**
+             * @description Whether the action succeeded
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example Two-factor authentication (TOTP) successfully enabled for your account.
+             */
+            message: string;
+        };
+        TotpEnableDto: {
+            /**
+             * @description Base32 secret key received from /auth/totp/setup
+             * @example JBSWY3DPEHPK3PXP
+             */
+            secret: string;
+            /**
+             * @description Current 6-digit TOTP code generated by Microsoft Authenticator
+             * @example 123456
+             */
+            code: string;
+        };
+        DisableTotpDto: {
+            /**
+             * @description Current user password to authorize 2FA deactivation
+             * @example Admin@Kumaran2026
+             */
+            password: string;
+        };
+        RequestOtpResponseDto: {
+            /**
+             * @description Whether OTP was successfully dispatched
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Status message
+             * @example OTP sent successfully to registered mobile number.
+             */
+            message: string;
+            /**
+             * @description OTP expiration period in seconds
+             * @example 300
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Generated OTP for automated local testing (only returned when NODE_ENV !== production)
+             * @example 123456
+             */
+            debugOtp?: string;
+        };
+        RequestOtpDto: {
+            /**
+             * @description Registered 10-digit Indian mobile number of staff or customer
+             * @example 9842154321
+             */
+            phone: string;
+        };
+        VerifyOtpResponseDto: {
+            /**
+             * @description Whether OTP verification was successful
+             * @example true
+             */
+            verified: boolean;
+            /**
+             * @description Scoped setup token for configuring MPIN (issued when first-time staff onboarding)
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            setupToken?: string;
+            /**
+             * @description Full JWT access token (issued for customers or staff with pre-existing MPIN)
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            accessToken?: string;
+            /**
+             * @description Rotating refresh token
+             * @example eyJhbGciOiJIUzI1NiIsIn...
+             */
+            refreshToken?: string;
+            /** @description Authenticated user or customer profile */
+            user?: components["schemas"]["UserProfileResponseDto"];
+            /**
+             * @description Status message
+             * @example OTP verified successfully.
+             */
+            message: string;
+        };
+        VerifyOtpDto: {
+            /**
+             * @description Registered 10-digit Indian mobile number
+             * @example 9842154321
+             */
+            phone: string;
+            /**
+             * @description 6-digit SMS OTP received on registered device
+             * @example 123456
+             */
+            otp: string;
+            /**
+             * @description Client device platform type for concurrent session isolation
+             * @default MOBILE
+             * @example MOBILE
+             * @enum {string}
+             */
+            clientType: "WEB" | "MOBILE" | "DESKTOP";
+        };
+        MpinLoginDto: {
+            /**
+             * @description Registered 10-digit mobile number
+             * @example 9876543210
+             */
+            phone: string;
+            /**
+             * @description 6-digit MPIN for field agent quick unlock
+             * @example 123456
+             */
+            mpin: string;
+            /**
+             * @description Client device platform type for concurrent session isolation
+             * @default MOBILE
+             * @example MOBILE
+             * @enum {string}
+             */
+            clientType: "WEB" | "MOBILE" | "DESKTOP";
+        };
+        SetMpinDto: {
+            /**
+             * @description New 6-digit MPIN
+             * @example 123456
+             */
+            mpin: string;
+            /**
+             * @description Temporary setup token returned from verify-otp (required during first-time device registration)
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+             */
+            setupToken?: string;
         };
         BranchResponseDto: {
             /**
@@ -3502,6 +3681,11 @@ export interface components {
              * @example 4821
              */
             aadhaarLast4?: string;
+            /**
+             * @description Current record version for optimistic concurrency control
+             * @example 1
+             */
+            version?: number;
         };
         CreateNomineeDto: {
             /**
@@ -5369,6 +5553,26 @@ export interface components {
              */
             collectedAt?: string;
         };
+        PendingUpiClaimItemDto: {
+            /** @example claim-uuid-001 */
+            claimId: string;
+            /** @example 3950 */
+            amount: number;
+            /** @example 429188123456 */
+            utrNumber: string;
+            /** @example Paid via PhonePe */
+            notes: string;
+            /** @example 2026-10-27T10:00:00.000Z */
+            createdAt: Record<string, never>;
+            /** @description Submitting user */
+            submittedByUser: Record<string, never>;
+            /** @description Customer details */
+            customer: Record<string, never>;
+            /** @description Subscriber ticket details */
+            ticket: Record<string, never>;
+            /** @description Installment due details */
+            due: Record<string, never>;
+        };
         PaymentDetailResponseDto: {
             /**
              * @description Payment record ID
@@ -5544,6 +5748,11 @@ export interface components {
              * @example Entered for Ticket 7 instead of Ticket 8 during evening rush at branch counter
              */
             notes?: string;
+            /**
+             * @description Optional unique idempotency key to prevent duplicate reversal requests
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            idempotencyKey?: string;
         };
         ApproveReversalDto: {
             /**
@@ -5601,26 +5810,6 @@ export interface components {
              * @example Paid via GPay to KVB account
              */
             notes?: string;
-        };
-        PendingUpiClaimItemDto: {
-            /** @example claim-uuid-001 */
-            claimId: string;
-            /** @example 3950 */
-            amount: number;
-            /** @example 429188123456 */
-            utrNumber: string;
-            /** @example Paid via PhonePe */
-            notes: string;
-            /** @example 2026-10-27T10:00:00.000Z */
-            createdAt: Record<string, never>;
-            /** @description Submitting user */
-            submittedByUser: Record<string, never>;
-            /** @description Customer details */
-            customer: Record<string, never>;
-            /** @description Subscriber ticket details */
-            ticket: Record<string, never>;
-            /** @description Installment due details */
-            due: Record<string, never>;
         };
         VerifyUpiClaimResponseDto: {
             /** @example true */
@@ -5838,6 +6027,11 @@ export interface components {
              * @example Handed over Account Payee Cheque #009182 to subscriber in person at branch counter
              */
             notes?: string;
+            /**
+             * @description Optional unique idempotency key to prevent duplicate prize disbursement
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            idempotencyKey?: string;
         };
         BilingualVoucherResponseDto: {
             /**
@@ -6139,13 +6333,53 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description System is healthy */
+            /** @description System and critical backing services are fully healthy and ready */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["HealthCheckResponseDto"];
+                };
+            };
+        };
+    };
+    HealthController_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description System readiness health check status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthCheckResponseDto"];
+                };
+            };
+        };
+    };
+    HealthController_liveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Container process liveness confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LivenessResponseDto"];
                 };
             };
         };
@@ -6172,598 +6406,6 @@ export interface operations {
                         message?: string;
                     };
                 };
-            };
-        };
-    };
-    AuthController_login_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginDto"];
-            };
-        };
-        responses: {
-            /** @description Login successful (returns JWT tokens) or 2FA challenge issued (returns tempToken) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["AuthTokensResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid credentials or inactive account */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many login attempts. Account locked for 15 minutes. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_verifyTotp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TotpVerifyDto"];
-            };
-        };
-        responses: {
-            /** @description TOTP verified, JWT tokens issued */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["AuthTokensResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid or expired code or session */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many verification attempts */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_refreshToken_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefreshTokenDto"];
-            };
-        };
-        responses: {
-            /** @description Tokens rotated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["AuthTokensResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid or revoked refresh token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_logout_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Logged out successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["ActionSuccessResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — missing or invalid Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_updateFcmToken_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateFcmTokenDto"];
-            };
-        };
-        responses: {
-            /** @description Device FCM token updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["FcmTokenUpdateResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — missing or invalid Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_getProfile_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Profile retrieved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["UserProfileResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — missing or invalid Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_changePassword_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChangePasswordDto"];
-            };
-        };
-        responses: {
-            /** @description Password changed successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["ActionSuccessResponseDto"];
-                    };
-                };
-            };
-            /** @description New password too short or invalid */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Incorrect current password or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_setupTotp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description TOTP setup parameters returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["TotpSetupResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — missing or invalid Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_enableTotp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TotpEnableDto"];
-            };
-        };
-        responses: {
-            /** @description 2FA enabled */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["TotpStatusResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid verification code */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized — missing or invalid Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many verification attempts */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_disableTotp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DisableTotpDto"];
-            };
-        };
-        responses: {
-            /** @description 2FA disabled */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["TotpStatusResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid password or unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_requestOtp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RequestOtpDto"];
-            };
-        };
-        responses: {
-            /** @description SMS OTP dispatched successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["RequestOtpResponseDto"];
-                    };
-                };
-            };
-            /** @description Phone number not registered */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many OTP requests. Please wait 5 minutes. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_verifyOtp_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerifyOtpDto"];
-            };
-        };
-        responses: {
-            /** @description OTP verified successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["VerifyOtpResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid or expired OTP */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many verification attempts */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_loginMpin_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MpinLoginDto"];
-            };
-        };
-        responses: {
-            /** @description MPIN verified, tokens issued */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["AuthTokensResponseDto"];
-                    };
-                };
-            };
-            /** @description Invalid phone or MPIN */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many MPIN attempts. Account locked for 15 minutes. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuthController_setMpin_v1: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetMpinDto"];
-            };
-        };
-        responses: {
-            /** @description MPIN saved successfully or full auth tokens issued */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["ActionSuccessResponseDto"];
-                    };
-                };
-            };
-            /** @description Unauthorized — missing or invalid setup token / Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -7165,6 +6807,959 @@ export interface operations {
             };
             /** @description Forbidden — Insufficient role permissions or BOLA violation */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PdfController_getReceiptPdf_v1: {
+        parameters: {
+            query?: {
+                /** @description Return presigned URL JSON instead of streaming PDF binary */
+                download?: boolean;
+                /** @description Redirect directly to presigned S3/CDN URL (HTTP 302) */
+                redirect?: boolean;
+                /** @description Stream raw PDF binary buffer directly from origin API server */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bilingual receipt PDF stream or presigned URL JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/json": {
+                        /** @example receipts/KC-REC-PRD-2026-00001.pdf */
+                        key?: string;
+                        /** @example https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=... */
+                        presignedUrl?: string;
+                        /** @example 900 */
+                        expiresInSeconds?: number;
+                    };
+                };
+            };
+            /** @description Redirected to presigned S3 / CDN media edge */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to receipt */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many PDF generation requests. Please wait a minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PdfController_getVoucherPdf_v1: {
+        parameters: {
+            query?: {
+                /** @description Return presigned URL JSON instead of streaming PDF binary */
+                download?: boolean;
+                /** @description Redirect directly to presigned S3/CDN URL (HTTP 302) */
+                redirect?: boolean;
+                /** @description Stream raw PDF binary buffer directly from origin API server */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                auctionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payout voucher PDF stream or presigned URL JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/json": {
+                        /** @example vouchers/payout-voucher-2026-01.pdf */
+                        key?: string;
+                        /** @example https://storage.kumaranfinance.in/vouchers/...?sig=... */
+                        presignedUrl?: string;
+                        /** @example 900 */
+                        expiresInSeconds?: number;
+                    };
+                };
+            };
+            /** @description Redirected to presigned S3 / CDN media edge */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to voucher */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many PDF generation requests. Please wait a minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PdfController_getMinutesPdf_v1: {
+        parameters: {
+            query?: {
+                /** @description Return presigned URL JSON instead of streaming PDF binary */
+                download?: boolean;
+                /** @description Redirect directly to presigned S3/CDN URL (HTTP 302) */
+                redirect?: boolean;
+                /** @description Stream raw PDF binary buffer directly from origin API server */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                auctionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Auction minutes PDF stream or presigned URL JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/json": {
+                        /** @example minutes/form-xvii-2026-01.pdf */
+                        key?: string;
+                        /** @example https://storage.kumaranfinance.in/minutes/...?sig=... */
+                        presignedUrl?: string;
+                        /** @example 900 */
+                        expiresInSeconds?: number;
+                    };
+                };
+            };
+            /** @description Redirected to presigned S3 / CDN media edge */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to auction minutes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many PDF generation requests. Please wait a minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PdfController_getPassbookPdf_v1: {
+        parameters: {
+            query?: {
+                /** @description Return presigned URL JSON instead of streaming PDF binary */
+                download?: boolean;
+                /** @description Redirect directly to presigned S3/CDN URL (HTTP 302) */
+                redirect?: boolean;
+                /** @description Stream raw PDF binary buffer directly from origin API server */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Passbook statement PDF stream or presigned URL JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "application/json": {
+                        /** @example passbooks/form-xxi-passbook-01.pdf */
+                        key?: string;
+                        /** @example https://storage.kumaranfinance.in/passbooks/...?sig=... */
+                        presignedUrl?: string;
+                        /** @example 900 */
+                        expiresInSeconds?: number;
+                    };
+                };
+            };
+            /** @description Redirected to presigned S3 / CDN media edge */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to passbook */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many PDF generation requests. Please wait a minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_requestPresignedUploadUrl_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestPresignedUploadDto"];
+            };
+        };
+        responses: {
+            /** @description Direct presigned upload URL generated successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresignedUploadResponseDto"];
+                };
+            };
+            /** @description Invalid parameters or missing identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Unauthorized document purpose or ownership violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_streamFile_v1: {
+        parameters: {
+            query?: {
+                /** @description Redirect directly to presigned S3/CDN URL (HTTP 302) */
+                redirect?: boolean;
+                /** @description Stream raw binary buffer directly from origin API server */
+                stream?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stored document binary stream returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Redirected to presigned S3 / CDN media edge */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden access to file key */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_login_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginDto"];
+            };
+        };
+        responses: {
+            /** @description Login successful (returns JWT tokens) or 2FA challenge issued (returns tempToken) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuthTokensResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid credentials or inactive account */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many login attempts. Account locked for 15 minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_verifyTotp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpVerifyDto"];
+            };
+        };
+        responses: {
+            /** @description TOTP verified, JWT tokens issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuthTokensResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid or expired code or session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many verification attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_refreshToken_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Tokens rotated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuthTokensResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid or revoked refresh token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_logout_v1: {
+        parameters: {
+            query?: {
+                /** @description Target client session family to revoke. Defaults to ALL if omitted. */
+                clientType?: "WEB" | "MOBILE" | "DESKTOP" | "ALL";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logged out successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — missing or invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_updateFcmToken_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFcmTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Device FCM token updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["FcmTokenUpdateResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — missing or invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_getProfile_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Profile retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UserProfileResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — missing or invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_changePassword_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Password changed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description New password too short or invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incorrect current password or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_setupTotp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description TOTP setup parameters returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["TotpSetupResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — missing or invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_enableTotp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpEnableDto"];
+            };
+        };
+        responses: {
+            /** @description 2FA enabled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["TotpStatusResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid verification code */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — missing or invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many verification attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_disableTotp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisableTotpDto"];
+            };
+        };
+        responses: {
+            /** @description 2FA disabled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["TotpStatusResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid password or unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many attempts. Account locked for 15 minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_requestOtp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestOtpDto"];
+            };
+        };
+        responses: {
+            /** @description SMS OTP dispatched successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RequestOtpResponseDto"];
+                    };
+                };
+            };
+            /** @description Phone number not registered */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many OTP requests. Please wait 5 minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_verifyOtp_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyOtpDto"];
+            };
+        };
+        responses: {
+            /** @description OTP verified successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["VerifyOtpResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid or expired OTP */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many verification attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_loginMpin_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MpinLoginDto"];
+            };
+        };
+        responses: {
+            /** @description MPIN verified, tokens issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuthTokensResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid phone or MPIN */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many MPIN attempts. Account locked for 15 minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_setMpin_v1: {
+        parameters: {
+            query?: never;
+            header: {
+                authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMpinDto"];
+            };
+        };
+        responses: {
+            /** @description MPIN saved successfully or full auth tokens issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["ActionSuccessResponseDto"];
+                    };
+                };
+            };
+            /** @description Unauthorized — missing or invalid setup token / Bearer token */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8054,6 +8649,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Too many document upload attempts. Please wait a minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     CustomerController_getDocumentUrl_v1: {
@@ -8152,47 +8754,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Customer or document not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StorageController_streamFile_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Stored document binary stream returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to file key */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description File not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -9305,6 +9866,10 @@ export interface operations {
             query?: {
                 /** @description Minimum consecutive unpaid months threshold (default: 1) */
                 minConsecutiveMonths?: number;
+                /** @description Page number (default: 1) */
+                page?: number;
+                /** @description Items per page (default: 20, max: 100) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -9325,7 +9890,17 @@ export interface operations {
                         statusCode: number;
                         /** @example 2026-10-22T07:28:14.000Z */
                         timestamp: string;
-                        data: components["schemas"]["DefaulterItemResponseDto"][];
+                        data: {
+                            data: components["schemas"]["DefaulterItemResponseDto"][];
+                            /** @example 50 */
+                            total: number;
+                            /** @example 1 */
+                            page: number;
+                            /** @example 20 */
+                            limit: number;
+                            /** @example 3 */
+                            totalPages: number;
+                        };
                     };
                 };
             };
@@ -9394,6 +9969,10 @@ export interface operations {
             query?: {
                 /** @description Minimum consecutive unpaid months threshold (default: 1) */
                 minConsecutiveMonths?: number;
+                /** @description Page number (default: 1) */
+                page?: number;
+                /** @description Items per page (default: 20, max: 100) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -9414,7 +9993,17 @@ export interface operations {
                         statusCode: number;
                         /** @example 2026-10-22T07:28:14.000Z */
                         timestamp: string;
-                        data: components["schemas"]["DefaulterItemResponseDto"][];
+                        data: {
+                            data: components["schemas"]["DefaulterItemResponseDto"][];
+                            /** @example 50 */
+                            total: number;
+                            /** @example 1 */
+                            page: number;
+                            /** @example 20 */
+                            limit: number;
+                            /** @example 3 */
+                            totalPages: number;
+                        };
                     };
                 };
             };
@@ -10142,6 +10731,65 @@ export interface operations {
             };
         };
     };
+    PaymentController_getPendingUpiClaims_v1: {
+        parameters: {
+            query?: {
+                /** @description Filter by branch ID (Super Admin only) */
+                branchId?: string;
+                /** @description Page number (default: 1) */
+                page?: number;
+                /** @description Items per page (default: 20, max: 100) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending UPI claims retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: {
+                            data: components["schemas"]["PendingUpiClaimItemDto"][];
+                            /** @example 50 */
+                            total: number;
+                            /** @example 1 */
+                            page: number;
+                            /** @example 20 */
+                            limit: number;
+                            /** @example 3 */
+                            totalPages: number;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PaymentController_getPaymentById_v1: {
         parameters: {
             query?: never;
@@ -10488,43 +11136,8 @@ export interface operations {
                 };
                 content?: never;
             };
-        };
-    };
-    PaymentController_getPendingUpiClaims_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Pending UPI claims retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example 2026-10-22T07:28:14.000Z */
-                        timestamp: string;
-                        data: components["schemas"]["PendingUpiClaimItemDto"][];
-                    };
-                };
-            };
-            /** @description Unauthorized — Invalid or missing Bearer token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
+            /** @description Too many UPI claim submissions. Please wait 15 minutes. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11542,194 +12155,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Forbidden — Insufficient role permissions or BOLA violation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PdfController_getReceiptPdf_v1: {
-        parameters: {
-            query?: {
-                /** @description Return presigned URL JSON instead of streaming PDF binary */
-                download?: boolean;
-            };
-            header?: never;
-            path: {
-                paymentId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Bilingual receipt PDF stream or presigned URL JSON */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/pdf": string;
-                    "application/json": {
-                        /** @example receipts/KC-REC-PRD-2026-00001.pdf */
-                        key?: string;
-                        /** @example https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=... */
-                        presignedUrl?: string;
-                        /** @example 900 */
-                        expiresInSeconds?: number;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to receipt */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PdfController_getVoucherPdf_v1: {
-        parameters: {
-            query?: {
-                /** @description Return presigned URL JSON instead of streaming PDF binary */
-                download?: boolean;
-            };
-            header?: never;
-            path: {
-                auctionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Payout voucher PDF stream or presigned URL JSON */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/pdf": string;
-                    "application/json": {
-                        /** @example vouchers/payout-voucher-2026-01.pdf */
-                        key?: string;
-                        /** @example https://storage.kumaranfinance.in/vouchers/...?sig=... */
-                        presignedUrl?: string;
-                        /** @example 900 */
-                        expiresInSeconds?: number;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to voucher */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PdfController_getMinutesPdf_v1: {
-        parameters: {
-            query?: {
-                /** @description Return presigned URL JSON instead of streaming PDF binary */
-                download?: boolean;
-            };
-            header?: never;
-            path: {
-                auctionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Auction minutes PDF stream or presigned URL JSON */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/pdf": string;
-                    "application/json": {
-                        /** @example minutes/form-xvii-2026-01.pdf */
-                        key?: string;
-                        /** @example https://storage.kumaranfinance.in/minutes/...?sig=... */
-                        presignedUrl?: string;
-                        /** @example 900 */
-                        expiresInSeconds?: number;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to auction minutes */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PdfController_getPassbookPdf_v1: {
-        parameters: {
-            query?: {
-                /** @description Return presigned URL JSON instead of streaming PDF binary */
-                download?: boolean;
-            };
-            header?: never;
-            path: {
-                ticketId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Passbook statement PDF stream or presigned URL JSON */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/pdf": string;
-                    "application/json": {
-                        /** @example passbooks/form-xxi-passbook-01.pdf */
-                        key?: string;
-                        /** @example https://storage.kumaranfinance.in/passbooks/...?sig=... */
-                        presignedUrl?: string;
-                        /** @example 900 */
-                        expiresInSeconds?: number;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden access to passbook */
             403: {
                 headers: {
                     [name: string]: unknown;

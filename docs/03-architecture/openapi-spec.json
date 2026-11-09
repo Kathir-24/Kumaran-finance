@@ -55,7 +55,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "System readiness health check status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Explicit container readiness probe",
@@ -71,7 +78,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Container process liveness confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Container process liveness probe",
@@ -1125,7 +1139,14 @@
         },
         "responses": {
           "201": {
-            "description": "Direct presigned upload URL generated successfully"
+            "description": "Direct presigned upload URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedUploadResponseDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid parameters or missing identifier"
@@ -9130,6 +9151,31 @@
           "time"
         ]
       },
+      "LivenessResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "alive",
+            "description": "Process liveness status"
+          },
+          "service": {
+            "type": "string",
+            "example": "chitflow-api",
+            "description": "Service identifier"
+          },
+          "time": {
+            "type": "string",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Server timestamp"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "time"
+        ]
+      },
       "DailyArrearsExecutionResultDto": {
         "type": "object",
         "properties": {
@@ -9591,6 +9637,48 @@
           "docType",
           "fileName",
           "mimeType"
+        ]
+      },
+      "PresignedUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)",
+            "example": "https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=..."
+          },
+          "key": {
+            "type": "string",
+            "description": "Storage object key",
+            "example": "kyc/cust-001/aadhaar_scan.jpg"
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method to use for direct upload",
+            "example": "PUT"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "description": "URL expiry duration in seconds",
+            "example": 300
+          },
+          "headers": {
+            "type": "object",
+            "description": "Required HTTP headers to pass in the PUT request",
+            "example": {
+              "Content-Type": "image/jpeg"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "key",
+          "method",
+          "expiresInSeconds",
+          "headers"
         ]
       },
       "SanitizedUserDto": {

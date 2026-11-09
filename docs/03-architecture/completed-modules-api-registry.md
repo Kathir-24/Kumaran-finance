@@ -28,7 +28,7 @@
 | **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
 | **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
 | **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 88 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **109 (115 ops + UI)**| **All Invariants 100% Satisfied** | **455 / 455 PASSING (367 Unit + 88 E2E)** |
+| **TOTAL VERIFIED SCOPE** | — | **112 (118 ops + UI)**| **All Invariants 100% Satisfied** | **712 / 712 PASSING (50 Test Suites)** |
 
 ---
 
@@ -38,11 +38,11 @@ An automated AST inspection utility (`apps/api/scripts/audit-persona-enforcement
 
 ```
 ================================================================
-AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 109 PATHS):
-Total Operations (Endpoints)     : 115
-  • Public Endpoints (No JWT)    : 11
-  • Guarded Endpoints (JWT/Basic): 104
-      - Enforced with Specific Roles : 96 (Strict RolesGuard RBAC)
+AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 112 PATHS):
+Total Operations (Endpoints)     : 118
+  • Public Endpoints (No JWT)    : 13
+  • Guarded Endpoints (JWT/Basic): 105
+      - Enforced with Specific Roles : 97 (Strict RolesGuard RBAC)
       - Guarded with JwtAuthGuard    : 8  (Contextual ABAC / Caller Identity)
 ================================================================
 ```
@@ -391,9 +391,9 @@ The system exposes exactly **11 public operations** that intentionally do not re
 - **Bilingual PDF Canvas Engine**: A5 digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **109 physical paths / 115 operations fully implemented, documented, and tested** (83 domain module routes + 9 branch & user routes + 1 storage route + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + health & root routes + Bull Board visual monitor at `/admin/queues`).
-- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 115 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **367 unit tests passing across 26 test suites + 88 E2E tests passing across 10 suites (455 / 455 total tests, 100% pass rate)**.
+- **Total Production Endpoints**: **112 physical paths / 118 operations fully implemented, documented, and tested** (83 domain module routes + 9 branch & user routes + 2 storage routes + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + 4 health routes + root route + Bull Board visual monitor at `/admin/queues`).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 118 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **712 tests passing across 50 test suites (712 / 712 total tests, 100% pass rate)**.
 
 
 

@@ -24,7 +24,7 @@ flowchart TD
     end
 
     subgraph API["Backend Modular Monolith (apps/api)"]
-        Nest["109 Physical Paths (115 Operations) | BigInt Math | RBAC Guards\nSingle Source of Financial Truth"]
+        Nest["112 Physical Paths (118 Operations) | BigInt Math | RBAC Guards\nSingle Source of Financial Truth"]
     end
 
     subgraph Personas["Persona Delivery Mapping"]
