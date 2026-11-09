@@ -138,27 +138,27 @@ export default function PayoutVoucherPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {status === 'PENDING_VERIFICATION' && (
-              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300 gap-1 font-mono text-xs">
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300 gap-1 font-mono text-xs whitespace-nowrap shrink-0">
                 <Clock className="w-3.5 h-3.5" />
                 {t('statusPendingVerification')}
               </Badge>
             )}
             {status === 'VERIFIED_BY_MAKER' && (
-              <Badge variant="outline" className="border-blue-500/40 bg-blue-500/10 text-blue-300 gap-1 font-mono text-xs">
+              <Badge variant="outline" className="border-blue-500/40 bg-blue-500/10 text-blue-300 gap-1 font-mono text-xs whitespace-nowrap shrink-0">
                 <FileCheck className="w-3.5 h-3.5" />
                 {t('statusVerifiedMaker')}
               </Badge>
             )}
             {status === 'AUTHORIZED_BY_CHECKER' && (
-              <Badge variant="outline" className="border-purple-500/40 bg-purple-500/10 text-purple-300 gap-1 font-mono text-xs">
+              <Badge variant="outline" className="border-purple-500/40 bg-purple-500/10 text-purple-300 gap-1 font-mono text-xs whitespace-nowrap shrink-0">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 {t('statusAuthorizedChecker')}
               </Badge>
             )}
             {status === 'DISBURSED' && (
-              <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300 gap-1 font-mono text-xs">
+              <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300 gap-1 font-mono text-xs whitespace-nowrap shrink-0">
                 <Banknote className="w-3.5 h-3.5" />
                 {t('statusDisbursed')}
               </Badge>
@@ -170,7 +170,7 @@ export default function PayoutVoucherPage() {
                 size="sm"
                 onClick={() => setAuthModalOpen(true)}
                 disabled={isMaker || !isSuperAdmin}
-                className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow"
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow shrink-0 whitespace-nowrap"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>{t('actionAuthorizeChecker')}</span>
@@ -181,7 +181,7 @@ export default function PayoutVoucherPage() {
               <Button
                 size="sm"
                 onClick={() => setReleaseModalOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow shrink-0 whitespace-nowrap"
               >
                 <Receipt className="w-3.5 h-3.5" />
                 <span>{t('actionReleasePayout')}</span>
@@ -193,7 +193,7 @@ export default function PayoutVoucherPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => setVoucherModalOpen(true)}
-                className="border-slate-700 hover:bg-slate-800 text-slate-200 text-xs gap-1.5"
+                className="border-slate-700 hover:bg-slate-800 text-slate-200 text-xs gap-1.5 shrink-0 whitespace-nowrap"
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>{t('actionViewVoucher')}</span>

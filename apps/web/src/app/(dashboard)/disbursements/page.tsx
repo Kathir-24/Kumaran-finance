@@ -111,10 +111,10 @@ export default function DisbursementsPage() {
           size="sm"
           onClick={() => refetch()}
           disabled={isFetching}
-          className="border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-200 text-xs gap-1.5 self-start md:self-auto"
+          className="w-full sm:w-auto shrink-0 justify-center border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-200 text-xs gap-1.5"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          <span>Refresh Queue</span>
+          <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isFetching ? 'animate-spin' : ''}`} />
+          <span>{t('refreshQueue')}</span>
         </Button>
       </div>
 
@@ -174,23 +174,25 @@ export default function DisbursementsPage() {
 
       {/* Tabs Filter */}
       <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="w-full">
-        <TabsList className="bg-slate-900 border-slate-800 p-1 flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="ALL" className="text-xs">
-            {t('tabAll', { count: totalWinnersCount })}
-          </TabsTrigger>
-          <TabsTrigger value="PENDING_VERIFICATION" className="text-xs">
-            {t('tabPendingVerification', { count: pendingCount })}
-          </TabsTrigger>
-          <TabsTrigger value="VERIFIED_BY_MAKER" className="text-xs">
-            {t('tabVerifiedMaker', { count: verifiedCount })}
-          </TabsTrigger>
-          <TabsTrigger value="AUTHORIZED_BY_CHECKER" className="text-xs">
-            {t('tabAuthorizedChecker', { count: authorizedCount })}
-          </TabsTrigger>
-          <TabsTrigger value="DISBURSED" className="text-xs">
-            {t('tabDisbursed', { count: disbursedCount })}
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto max-w-full pb-1 scrollbar-thin scrollbar-thumb-slate-800">
+          <TabsList className="bg-slate-900 border-slate-800 p-1 inline-flex w-max gap-1">
+            <TabsTrigger value="ALL" className="text-xs shrink-0 whitespace-nowrap">
+              {t('tabAll', { count: totalWinnersCount })}
+            </TabsTrigger>
+            <TabsTrigger value="PENDING_VERIFICATION" className="text-xs shrink-0 whitespace-nowrap">
+              {t('tabPendingVerification', { count: pendingCount })}
+            </TabsTrigger>
+            <TabsTrigger value="VERIFIED_BY_MAKER" className="text-xs shrink-0 whitespace-nowrap">
+              {t('tabVerifiedMaker', { count: verifiedCount })}
+            </TabsTrigger>
+            <TabsTrigger value="AUTHORIZED_BY_CHECKER" className="text-xs shrink-0 whitespace-nowrap">
+              {t('tabAuthorizedChecker', { count: authorizedCount })}
+            </TabsTrigger>
+            <TabsTrigger value="DISBURSED" className="text-xs shrink-0 whitespace-nowrap">
+              {t('tabDisbursed', { count: disbursedCount })}
+            </TabsTrigger>
+          </TabsList>
+        </div>
       </Tabs>
 
       {/* Disbursements Table */}

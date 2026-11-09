@@ -699,6 +699,7 @@
   "disbursements": {
     "title": "Prize Money Disbursements",
     "subtitle": "Prize money vouchers, ADR-15 company safety checklist, private S3 security scans, and ADR-14 hard cash payouts",
+    "refreshQueue": "Refresh Queue",
     "prepareVoucher": "Prepare Prize Voucher",
     "prizePayable": "Net Prize Money Payable (V - D)",
     "safetyChecklist": "ADR-15 Company Safety Proof Checklist",

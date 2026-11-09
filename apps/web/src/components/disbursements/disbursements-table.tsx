@@ -134,16 +134,16 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-lg backdrop-blur-sm">
-      <div className="overflow-x-auto">
-        <Table>
+      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+        <Table className="min-w-[880px]">
           <TableHeader className="bg-slate-950/70">
             <TableRow className="border-slate-800 hover:bg-transparent">
-              <TableHead className="text-slate-300 font-semibold">{t('tableSchemeMonth')}</TableHead>
-              <TableHead className="text-slate-300 font-semibold">{t('tableWinner')}</TableHead>
-              <TableHead className="text-slate-300 font-semibold text-center">{t('tableTicket')}</TableHead>
-              <TableHead className="text-slate-300 font-semibold text-right">{t('tablePrizeMoney')}</TableHead>
-              <TableHead className="text-slate-300 font-semibold text-center">{t('tableStatus')}</TableHead>
-              <TableHead className="text-slate-300 font-semibold text-right">{t('tableAction')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold whitespace-nowrap">{t('tableSchemeMonth')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold whitespace-nowrap">{t('tableWinner')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold text-center whitespace-nowrap">{t('tableTicket')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold text-right whitespace-nowrap">{t('tablePrizeMoney')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold text-center whitespace-nowrap">{t('tableStatus')}</TableHead>
+              <TableHead className="text-slate-300 font-semibold text-right whitespace-nowrap">{t('tableAction')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,7 +162,7 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
                   className="border-slate-800/60 hover:bg-slate-800/40 transition-colors"
                 >
                   {/* Scheme & Month */}
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <div className="font-semibold text-slate-100 flex items-center gap-1.5">
                       <span>{chitGroup?.groupCode || '—'}</span>
                       <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
@@ -177,11 +177,11 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
                   </TableCell>
 
                   {/* Winning Subscriber */}
-                  <TableCell>
-                    <div className="font-medium text-slate-200">
+                  <TableCell className="min-w-[170px]">
+                    <div className="font-medium text-slate-200 truncate max-w-[180px]" title={customer?.fullName || '—'}>
                       {customer?.fullName || '—'}
                     </div>
-                    <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-mono">
+                    <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-mono whitespace-nowrap">
                       <span>{customer?.customerCode}</span>
                       {customer?.phone && (
                         <>
@@ -193,14 +193,14 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
                   </TableCell>
 
                   {/* Ticket Number */}
-                  <TableCell className="text-center">
+                  <TableCell className="text-center whitespace-nowrap">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-800 text-slate-200 font-mono font-semibold text-sm border border-slate-700">
                       #{row.ticket?.ticketNumber ?? '—'}
                     </span>
                   </TableCell>
 
                   {/* Net Prize Money Payable */}
-                  <TableCell className="text-right">
+                  <TableCell className="text-right whitespace-nowrap">
                     <div className="font-mono font-bold text-base text-emerald-400">
                       {formatRupee(netPrize)}
                     </div>
@@ -210,7 +210,7 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
                   </TableCell>
 
                   {/* Disbursement Workflow Status */}
-                  <TableCell className="text-center">
+                  <TableCell className="text-center whitespace-nowrap">
                     <div className="flex flex-col items-center gap-1">
                       {getStatusBadge(row.disbursementStatus)}
                       {row.disbursementMode && (
@@ -222,20 +222,20 @@ export function DisbursementsTable({ items, isLoading = false }: DisbursementsTa
                   </TableCell>
 
                   {/* Action Link */}
-                  <TableCell className="text-right">
+                  <TableCell className="text-right whitespace-nowrap">
                     <Link href={`/disbursements/${row.auctionId || row.id}/voucher`}>
                       <Button
                         size="sm"
                         variant={action.variant}
                         className={
                           action.variant === 'default'
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 text-xs shadow'
-                            : 'border-slate-700 hover:bg-slate-800 text-slate-200 gap-1.5 text-xs'
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 text-xs shadow shrink-0 whitespace-nowrap'
+                            : 'border-slate-700 hover:bg-slate-800 text-slate-200 gap-1.5 text-xs shrink-0 whitespace-nowrap'
                         }
                       >
-                        <ActionIcon className="w-3.5 h-3.5" />
+                        <ActionIcon className="w-3.5 h-3.5 shrink-0" />
                         <span>{action.label}</span>
-                        <ArrowRight className="w-3 h-3 ml-0.5 opacity-70" />
+                        <ArrowRight className="w-3 h-3 ml-0.5 opacity-70 shrink-0" />
                       </Button>
                     </Link>
                   </TableCell>
