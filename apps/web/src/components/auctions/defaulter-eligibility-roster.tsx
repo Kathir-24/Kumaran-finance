@@ -142,23 +142,23 @@ export function DefaulterEligibilityRoster({
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-thin scrollbar-thumb-slate-800 text-[11px]">
           {(['ALL', 'ELIGIBLE', 'DEFAULTERS', 'PRIZED'] as const).map((filter) => {
             const isSelected = activeFilter === filter;
             return (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-2.5 py-1 rounded font-medium transition-all ${
+                className={`px-2.5 py-1 rounded font-medium transition-all shrink-0 whitespace-nowrap ${
                   isSelected
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                     : 'bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-slate-200'
                 }`}
               >
-                {filter === 'ALL' && `All (${totalCount})`}
-                {filter === 'ELIGIBLE' && `Eligible (${eligibleCount})`}
-                {filter === 'DEFAULTERS' && `Defaulters (${defaultersCount})`}
-                {filter === 'PRIZED' && `Prized (${prizedCount})`}
+                {filter === 'ALL' && t('rosterFilterAll', { count: totalCount })}
+                {filter === 'ELIGIBLE' && t('rosterFilterEligible', { count: eligibleCount })}
+                {filter === 'DEFAULTERS' && t('rosterFilterDefaulters', { count: defaultersCount })}
+                {filter === 'PRIZED' && t('rosterFilterPrized', { count: prizedCount })}
               </button>
             );
           })}

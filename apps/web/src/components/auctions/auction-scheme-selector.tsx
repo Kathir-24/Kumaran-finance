@@ -59,7 +59,7 @@ export function AuctionSchemeSelector({
         </span>
       </div>
 
-      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800">
+      <div className="flex items-center gap-2.5 overflow-x-auto max-w-full pb-2 scrollbar-thin scrollbar-thumb-slate-800">
         {schemes.map((scheme) => {
           const isSelected = scheme.id === selectedGroupId;
 

@@ -239,7 +239,7 @@ export default function AuctionDetailPage() {
       )}
 
       {/* Financial Snapshot Metrics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('chitValueLabel')}</span>
           <div className="text-sm font-bold text-white font-mono">{formatRupee(BigInt(chitValue))}</div>
@@ -262,7 +262,7 @@ export default function AuctionDetailPage() {
             {formatRupee(BigInt(dividendPerTicket))}
           </div>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
+        <div className="col-span-2 sm:col-span-1 lg:col-span-1 rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('netInstallmentCol')}</span>
           <div className="text-sm font-bold text-cyan-300 font-mono">{formatRupee(BigInt(nextMonthNet))}</div>
         </div>

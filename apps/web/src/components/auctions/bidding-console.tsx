@@ -252,19 +252,19 @@ export function BiddingConsole({
 
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="space-y-0.5">
-              <span className="text-[10px] text-slate-400">{t('foremanCommissionCalculated')}</span>
+              <span className="text-[10px] text-slate-400 leading-tight block">{t('foremanCommissionCalculated')}</span>
               <div className="font-mono font-bold text-slate-300">{formatRupee(BigInt(foremanCommission))}</div>
             </div>
             <div className="space-y-0.5">
-              <span className="text-[10px] text-slate-400">{t('universalDividendPool')}</span>
+              <span className="text-[10px] text-slate-400 leading-tight block">{t('universalDividendPool')}</span>
               <div className="font-mono font-bold text-slate-300">{formatRupee(BigInt(totalDividend))}</div>
             </div>
             <div className="space-y-0.5">
-              <span className="text-[10px] text-emerald-400 font-medium">{t('universalDividendPerMember')}</span>
+              <span className="text-[10px] text-emerald-400 font-medium leading-tight block">{t('universalDividendPerMember')}</span>
               <div className="font-mono font-bold text-emerald-300">{formatRupee(BigInt(dividendPerTicket))}</div>
             </div>
             <div className="space-y-0.5">
-              <span className="text-[10px] text-cyan-400 font-medium">{t('nextMonthNetInstallment')}</span>
+              <span className="text-[10px] text-cyan-400 font-medium leading-tight block">{t('nextMonthNetInstallment')}</span>
               <div className="font-mono font-bold text-cyan-300">{formatRupee(BigInt(nextMonthNetInstallment))}</div>
             </div>
           </div>
