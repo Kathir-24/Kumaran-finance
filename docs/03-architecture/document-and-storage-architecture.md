@@ -42,7 +42,7 @@ flowchart TD
 4. **Server-Side Encryption (`AES256`)**: In production S3 storage (such as Cloudflare R2 or S3), all uploaded objects are written with `ServerSideEncryption: 'AES256'` (where supported).
 5. **Path Traversal Immunity**: Any key containing `..`, `//`, or backslashes is rejected with `HTTP 400 Bad Request`.
 6. **Maker $\ne$ Checker Financial Dual Control (`ADR-10`)**: The staff member who uploads and verifies prize collateral cannot authorize the payout.
-7. **Production Storage (Cloudflare R2 Standard)**: Production utilizes **Cloudflare R2** (10 GB free tier, ₹0 egress bandwidth download fees) as the authoritative S3-compatible cloud vault, eliminating egress costs entirely.
+7. **Production Storage (Any Linux VPS + Cloudflare R2 Standard)**: The application runs on any flat-fee Linux VPS and pairs with **Cloudflare R2** (10 GB free tier, ₹0 egress bandwidth download fees) as the authoritative S3-compatible cloud vault, eliminating cloud egress and storage costs entirely.
 
 ---
 

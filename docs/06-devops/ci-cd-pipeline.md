@@ -88,7 +88,7 @@ jobs:
       - name: Compile NestJS Application
         run: pnpm --filter api run build
 
-  # Note: Staged for automated deployment to Linux VPS via SSH
+  # Note: Staged for automated deployment to any standard Linux VPS via SSH (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.)
   deploy-to-vps:
     name: Deploy to Production Linux VPS
     needs: code-quality-and-tests

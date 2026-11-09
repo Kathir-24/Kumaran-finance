@@ -24,7 +24,7 @@
 | **ADR-07** | Field Agent Collections & Payment Settlement | Offline entries marked `PENDING_SYNC`. Each month has strictly a single payment; **zero double payments** and **zero advance balance** (concept eliminated). End-of-day cash handover. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-08** | Receipt Language & Standards | Bilingual (English + Tamil) digital PDF receipts in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-09** | Customer Mobile App Scope | Phase 1: Passbook, dividend tracker, online payment, auction results display (`PROPOSED`). Build order `OPEN`. | `PROPOSED` | AI-assisted draft | None | 2026-10-17 | **Y** |
-| **ADR-10** | Infrastructure & Code Ownership | Developer currently holds code, cloud account, and domain (`CONFIRMED-BY-DEVELOPER`). Handover terms to Kumaran Finance are `OPEN`. | `CONFIRMED-BY-DEVELOPER` (current) / `OPEN` (handover) | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-10** | Infrastructure, Hosting & S3 Storage | Production targets any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.) + Cloudflare R2 (₹0 egress) with zero vendor lock-in. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-11** | Receipt Delivery & Passbook | Signed physical paper passbook is primary physical proof. Software records digital receipt ID for Form XXII cash book. Mobile App Push notification is primary (₹0 cost); SMS fallback for keypad phones (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
 | **ADR-12** | Notification Channels & Help Desk | Smart Hierarchy: OTP via SMS only; All operational alerts (Payments, Auctions, Dividends, Defaults) via Free Mobile Push with SMS fallback for keypad phones; WhatsApp Business API parked in V1; Direct phone calls for support (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
 | **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
@@ -77,6 +77,13 @@
 ### ADR-10: Ownership of Code, Cloud, and Domain (`CONFIRMED-BY-DEVELOPER` / `OPEN`)
 - **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, cloud hosting accounts, and domain registration.
 - **Future Handover (`OPEN`)**: A formal handover to Kumaran Finance may occur later. Handover terms, intellectual property assignment, and ongoing maintenance responsibilities are **OPEN** and subject to future commercial agreement.
+
+---
+
+### ADR-10: Infrastructure, Hosting & S3 Storage Architecture (`CONFIRMED-BY-DEVELOPER`)
+- **Hosting Model**: Single Flat-Fee Linux VPS (Ubuntu 24.04 LTS / Debian 12) from **any Linux VPS provider** (Hostinger Mumbai, DigitalOcean Bangalore, Hetzner, Linode, Vultr, Contabo, etc. at ~₹900–₹1,800/month flat) with fixed predictable billing.
+- **Zero Vendor Lock-In**: The entire production stack is containerized with standard Docker Compose v2. It has zero proprietary cloud dependencies and can be migrated to any other VPS host in under 15 minutes by transferring the database dump.
+- **Object Storage**: Universal S3-compatible object storage via **Cloudflare R2** (10 GB free tier with ₹0 egress bandwidth fees). All customer documents and bilingual PDF receipts use 15-minute presigned URLs (`HMAC-SHA256`) with zero public access.
 
 ---
 

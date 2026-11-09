@@ -24,7 +24,7 @@
   - **Shared Client SDK**: Typed Client API SDK in `packages/api-client/` (`@kumaran/api-client`) + Dart Models in `apps/mobile/lib/core/api/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
   - **Object Storage**: S3-Compatible Object Storage (Cloudflare R2, MinIO, or private S3 with 15-minute presigned URLs)
-  - **Production Hosting**: Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore at ₹900–₹1,800/month flat) + Cloudflare R2 (₹0 egress bandwidth fees)
+  - **Production Hosting**: Any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, or any Linux VPS provider at ~₹900–₹1,800/month flat) + Cloudflare R2 (₹0 egress bandwidth fees)
 
 ---
 
@@ -140,3 +140,4 @@ Before claiming any task is complete, verify:
 - [ ] Authentication uses fast-path Redis status caching (120s TTL) and client-scoped session families without cross-device refresh invalidation.
 - [ ] Financial write paths enforce row-level locking (`SELECT FOR UPDATE`), deterministic lock sorting, and automated retry on transient deadlocks (`withTransactionRetry`).
 - [ ] Heavy aggregate reports and batch background crons enforce safe distributed locking (`DistributedLockService`) with unique tokens and atomic Lua releases.
+- [ ] Production hosting targets any flat-fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.) + Cloudflare R2 with zero vendor lock-in.

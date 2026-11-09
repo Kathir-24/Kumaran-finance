@@ -149,7 +149,7 @@ pnpm docker:fullstack:down
 When running full-stack, access the system directly through Nginx on [http://localhost](http://localhost) (Port 80).
 
 > [!NOTE]
-> **Production Setup**: For live deployment on a Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore) + Cloudflare R2 (₹0 egress), refer to the [Production Infrastructure & DRP Guide](file:///u:/Kumaran-finance/docs/06-devops/infrastructure-and-drp.md) and the [Production Deployment & Operations Guide](file:///u:/Kumaran-finance/infra/docker/PRODUCTION-DEPLOYMENT-GUIDE.md).
+> **Production Setup**: For live deployment on any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.) + Cloudflare R2 (₹0 egress), refer to the [Production Infrastructure & DRP Guide](file:///u:/Kumaran-finance/docs/06-devops/infrastructure-and-drp.md) and the [Production Deployment & Operations Guide](file:///u:/Kumaran-finance/docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md).
 
 ---
 

@@ -55,7 +55,7 @@ u:\Kumaran-finance\docs\
 │   ├── financial-tests.md                    # Math invariant & concurrency tests
 │   └── payment-integration.md                # Webhooks, sandbox, & bank reconciliation
 ├── 06-devops/
-│   ├── infrastructure-and-drp.md             # Production VPS + Cloudflare R2 setup, backups, restore drill
+│   ├── infrastructure-and-drp.md             # Production hosting (Any Linux VPS + Cloudflare R2 setup), backups, restore drill
 │   ├── ci-cd-pipeline.md                     # GitHub Actions pipeline
 │   └── security-threat-model.md              # Fintech OWASP Top 10, rate limits, audit defense
 └── 07-operations/

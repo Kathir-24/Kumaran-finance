@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Production Target**: Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore) + Cloudflare R2 (Zero Egress S3)  
+> **Production Target**: Any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, etc.) + Cloudflare R2 (Zero Egress S3)  
 > **Target Audience**: DevOps Engineers, System Administrators, Managing Partners, and On-Call Engineers  
 > **Compliance**: ADR-01 through ADR-19, `docs/06-devops/infrastructure-and-drp.md`, and Zero-Downtime Operational Standards  
 
@@ -11,7 +11,7 @@
 ## 1. Operating Reality & Infrastructure Topology
 
 Kumaran Chits operates as a high-reliability, bank-grade modular monolith designed specifically for Kumaran Finance:
-- **Production Hosting**: Flat-Fee Linux VPS (Hostinger Mumbai or DigitalOcean Bangalore at ₹900–₹1,800/month flat) with fixed INR billing and GST tax invoices.
+- **Production Hosting**: Any Flat-Fee Linux VPS (e.g., Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, or any standard Linux VPS provider at ~₹900–₹1,800/month flat) with zero vendor lock-in and fixed predictable billing.
 - **Object Storage**: Cloudflare R2 (10 GB free tier, ₹0 egress bandwidth fees) via the universal S3 protocol driver.
 - **Topology**: Single-tenant Docker Compose production stack running PostgreSQL 17, Redis 7, NestJS 12 API, Next.js 15 Web Portal, and NGINX 1.27 Ingress.
 - **Concurrency & Resilience**: NGINX reverse-proxy handles TLS termination, edge rate limiting (30 req/s general, 3 req/s auth), and injects a deterministic `X-Request-ID` trace header into upstream services and response headers.

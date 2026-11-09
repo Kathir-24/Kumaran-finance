@@ -2,14 +2,14 @@
 
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Company Reality**: 1 physical branch office (Head Office: Perundurai, Erode, Tamil Nadu), 4 equal partners, 1 desk accountant/cashier, 2–3 field collection agents, known subscribers, physical notebook onboarding.  
-> **Primary Target Hosting**: Single Flat-Fee Linux VPS (Hostinger Mumbai / DigitalOcean Bangalore) + Cloudflare R2 (S3-Compatible Object Storage)  
+> **Primary Target Hosting**: Any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, etc.) + Cloudflare R2 (S3-Compatible Object Storage with ₹0 egress fees)  
 > **Availability Targets**: $\text{RPO} \le 15\text{ minutes}$, $\text{RTO} \le 2\text{ hours}$
 
 ---
 
 ## 1. Production Architecture Overview
 
-Kumaran Chits is packaged as a high-reliability, cloud-agnostic Docker Compose modular monolith. It is completely decoupled from proprietary cloud vendor lock-in and can run identically on a flat-fee Linux VPS, an on-premise physical office server, or an enterprise cloud provider.
+Kumaran Chits is packaged as a high-reliability, cloud-agnostic Docker Compose modular monolith. It is completely decoupled from proprietary cloud vendor lock-in and can run identically on any Linux VPS provider (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, OVHcloud, Contabo, etc.), an on-premise physical office server, or an enterprise cloud provider.
 
 ```mermaid
 flowchart TD
@@ -17,7 +17,7 @@ flowchart TD
     
     Cloudflare["Edge Ingress & CDN Tier\n• Cloudflare DNS & Free TLS Termination\n• DDoS Protection & Edge Rate Limiting"]
     
-    subgraph HostServer ["Linux Production VPS / Dedicated Host (Mumbai / Bangalore)"]
+    subgraph HostServer ["Any Linux Production VPS / Dedicated Host (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.)"]
         Nginx["NGINX Reverse Proxy (Port 80/443)\n• Gzip Compression | SSL Offloading\n• Edge Rate Limiting | X-Request-ID Tracer"]
         
         subgraph AppTier ["Application Services"]
@@ -57,18 +57,19 @@ flowchart TD
 
 Kumaran Finance operates 1 branch office in Perundurai. To avoid surprise cloud bills, high egress bandwidth penalties, and unnecessary DevOps complexity, three hosting options are supported:
 
-### 2.1 Primary Recommended Model: Flat-Fee Linux VPS + Cloudflare R2
-- **Compute Provider**: Hostinger VPS (Mumbai) or DigitalOcean Droplet (Bangalore).
-- **Recommended Hardware**: 4 vCPU, 8 GB RAM, 100 GB NVMe SSD.
+### 2.1 Primary Confirmed Model: Any Flat-Fee Linux VPS + Cloudflare R2
+- **Compute Provider**: **Any standard Linux VPS provider** running 64-bit Linux (Ubuntu 24.04 LTS or Debian 12 recommended). Supported providers include Hostinger (Mumbai), DigitalOcean (Bangalore), Hetzner, Linode / Akamai, Vultr, OVHcloud, Contabo, or any standard Linux VPS / bare-metal server.
+- **Recommended Hardware**: 4 vCPU, 8 GB RAM, 100 GB NVMe SSD (Minimum: 2 vCPU, 4 GB RAM with swap).
 - **Object Storage**: Cloudflare R2 (100% S3-compatible protocol).
 - **Cost Structure**:
-  - Compute: **Flat ₹900 to ₹1,800 / month** (billed in INR with GST invoices).
+  - Compute: **Flat ₹900 to ₹1,800 / month** (billed in INR with GST invoices, or fixed EUR/USD).
   - Object Storage (Cloudflare R2): **₹0 / month** (under 10 GB free tier with **₹0 bandwidth egress fees**).
   - **Total Monthly Cost**: **₹900 – ₹1,800 flat (Zero surprise billing)**.
 - **Why this fits Kumaran Finance**:
-  1. **100% Predictable Expense**: No metered NAT gateway fees, no per-request charges.
-  2. **High Availability for Doorstep Agents**: Runs in a Tier-4 data center (Mumbai/Bangalore) with 99.99% network uptime, ensuring field agents can collect installments from morning to evening.
-  3. **Single-Command Setup**: Entire system boots from a single command: `docker compose -f infra/docker/docker-compose.fullstack.yml up -d`.
+  1. **Zero Vendor Lock-In**: Because the entire architecture runs on open-source Docker Engine 24+ and Docker Compose v2, Kumaran Chits has zero vendor lock-in and can be spun up on or migrated between any Linux VPS provider in under 15 minutes by transferring the database dump.
+  2. **100% Predictable Expense**: No metered NAT gateway fees, no per-request charges, and no autoscaling billing spikes.
+  3. **High Availability for Doorstep Agents**: Runs in Tier-3/4 data centers (Mumbai/Bangalore/Singapore) with 99.99% network uptime, ensuring field agents can collect installments reliably.
+  4. **Single-Command Setup**: Entire system boots from a single command: `docker compose -f infra/docker/docker-compose.fullstack.yml up -d`.
 
 ### 2.2 Alternative Model 2: Local Head Office Mini-Server (Perundurai)
 - **Hardware**: Dedicated office mini-PC (e.g. Intel NUC, Dell OptiPlex Micro, 16 GB RAM, 512 GB NVMe, mini-UPS).

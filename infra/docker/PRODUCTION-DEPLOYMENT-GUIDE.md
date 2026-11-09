@@ -1,7 +1,7 @@
 # Kumaran Chits — Production Deployment & Operations Guide
 
 > **Platform**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Target OS**: Ubuntu 24.04 LTS (Flat-Fee Linux VPS: Hostinger Mumbai / DigitalOcean Bangalore)  
+> **Target OS**: Ubuntu 24.04 LTS or Debian 12 (Any Flat-Fee Linux VPS: Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, etc.)  
 > **Object Storage**: Cloudflare R2 (10 GB Free Tier, ₹0 Egress Bandwidth Fees) or MinIO S3  
 > **Orchestration**: Docker Compose v2 (Modular Production Parity)  
 > **Key Guardrails**: PostgreSQL 17 Port 5433, Native `BigInt` Math, TLS 1.3, Zero Buffer SSE, Automated 02:00 AM IST Off-Site Backup
@@ -78,7 +78,7 @@ flowchart TD
 - **RAM**: 4 GB minimum (8 GB recommended)
 - **Disk**: 50 GB NVMe / SSD (Encrypted storage)
 
-### 2.2 Host Package Installation (Ubuntu 24.04 LTS)
+### 2.2 Host Package Installation (Any Linux VPS — Ubuntu 24.04 LTS / Debian 12)
 ```bash
 # Update repositories and install Docker Engine & Compose
 sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg

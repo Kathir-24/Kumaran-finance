@@ -146,7 +146,7 @@ flowchart TD
 
 ### 2.7 Pillar 8: Infrastructure Resource Quotas & Service Limits
 - **Flat-Fee Linux VPS & Database Resource Policy**:
-  - Production utilizes a dedicated 4 vCPU / 8GB–16GB RAM Linux VPS (Hostinger Mumbai or DigitalOcean Bangalore) running PostgreSQL 17, Redis 7, Nginx, and NestJS in isolated Docker containers with hard memory caps (`mem_limit`).
+  - Production utilizes a dedicated 4 vCPU / 8GB–16GB RAM Linux VPS (from any Linux VPS provider such as Hostinger Mumbai, DigitalOcean Bangalore, Hetzner, Linode, Vultr, Contabo, etc.) running PostgreSQL 17, Redis 7, Nginx, and NestJS in isolated Docker containers with hard memory caps (`mem_limit`).
   - Container memory allocations are pinned to prevent memory contention or OOM issues during auction rush hours.
 - **Resource Monitoring & Proactive Alarms**:
   - Node Exporter / Prometheus alerts configured at **80% of disk storage**, **80% of RAM**, and **85% sustained CPU load**.
