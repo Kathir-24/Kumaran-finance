@@ -2620,7 +2620,7 @@ export interface components {
         PresignedUploadResponseDto: {
             /**
              * @description Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)
-             * @example https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=...
+             * @example https://storage.kumaranfinance.in/kyc/cust-001/aadhaar.jpg?signature=...
              */
             uploadUrl: string;
             /**
@@ -3786,7 +3786,7 @@ export interface components {
         DocumentPresignedUrlResponseDto: {
             /**
              * @description Time-limited 15-minute viewing URL
-             * @example https://storage.kumaranchits.com/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...
+             * @example https://storage.kumaranfinance.in/kyc/cust-001/AADHAAR_FRONT-xyz.jpg?token=...
              */
             url: string;
             /**
@@ -5915,7 +5915,7 @@ export interface components {
         SafetyProofUrlResponseDto: {
             /**
              * @description Time-limited S3 presigned URL for viewing the safety proof collateral scan
-             * @example https://storage.kumaranchits.com/safety-proofs/...
+             * @example https://storage.kumaranfinance.in/safety-proofs/...
              */
             url: string;
             /**

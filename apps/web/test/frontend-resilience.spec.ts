@@ -191,7 +191,7 @@ test('4. ChunkLoadError Detection: Intercepts stale build chunks and throttles r
   const standardChunkError = new Error('Loading chunk app/page failed (missing /_next/static/chunks/abc.js)');
   standardChunkError.name = 'ChunkLoadError';
 
-  const dynamicImportError = new TypeError('Failed to fetch dynamically imported module: https://app.kumaran.com/chunk-xyz.js');
+  const dynamicImportError = new TypeError('Failed to fetch dynamically imported module: https://app.kumaranfinance.in/chunk-xyz.js');
   const normalNetworkError = new Error('Gateway Timeout 504');
 
   assert.equal(isChunkLoadError(standardChunkError), true);

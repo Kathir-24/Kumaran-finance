@@ -69,7 +69,7 @@ export class RequestPresignedUploadDto {
 export class PresignedUploadResponseDto {
   @ApiProperty({
     description: 'Direct S3 / Cloudflare R2 presigned PUT upload URL (5-minute expiry)',
-    example: 'https://storage.kumaranfinance.com/kyc/cust-001/aadhaar.jpg?signature=...',
+    example: 'https://storage.kumaranfinance.in/kyc/cust-001/aadhaar.jpg?signature=...',
   })
   uploadUrl!: string;
 
