@@ -62,6 +62,7 @@ export function ReversalRequestModal({
   onSuccess,
 }: ReversalRequestModalProps) {
   const t = useTranslations('reversals');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -280,7 +281,7 @@ export function ReversalRequestModal({
 
         <DialogFooter className="bg-slate-950 p-4 border-t border-slate-800 flex items-center justify-between sm:justify-between">
           <Button type="button" variant="ghost" onClick={onClose} className="text-xs text-slate-400">
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             type="button"

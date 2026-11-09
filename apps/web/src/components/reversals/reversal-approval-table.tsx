@@ -53,17 +53,17 @@ export function ReversalApprovalTable({
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-lg">
-      <div className="overflow-x-auto">
-        <Table>
+      <div className="overflow-x-auto scrollbar-thin">
+        <Table className="min-w-[860px]">
           <TableHeader className="bg-slate-950/80">
             <TableRow className="border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              <TableHead className="w-28">{t('tableReversalId')}</TableHead>
-              <TableHead>{t('originalReceipt')}</TableHead>
-              <TableHead>Subscriber</TableHead>
-              <TableHead className="text-right">{t('amountReversed')}</TableHead>
-              <TableHead>Reason & Justification</TableHead>
-              <TableHead>{t('tableMaker')}</TableHead>
-              <TableHead className="text-center w-36">Actions</TableHead>
+              <TableHead className="w-28 whitespace-nowrap">{t('tableReversalId')}</TableHead>
+              <TableHead className="whitespace-nowrap">{t('originalReceipt')}</TableHead>
+              <TableHead className="whitespace-nowrap">{t('tableSubscriber')}</TableHead>
+              <TableHead className="text-right whitespace-nowrap">{t('amountReversed')}</TableHead>
+              <TableHead className="whitespace-nowrap">{t('tableReason')}</TableHead>
+              <TableHead className="whitespace-nowrap">{t('tableMaker')}</TableHead>
+              <TableHead className="text-center w-36 whitespace-nowrap">{t('tableActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-slate-800/60 bg-slate-900/40 text-xs">
@@ -73,24 +73,24 @@ export function ReversalApprovalTable({
 
               return (
                 <TableRow key={r.id} className="hover:bg-slate-800/30 transition-colors">
-                  <TableCell className="font-mono text-[11px] text-slate-400">
+                  <TableCell className="font-mono text-[11px] text-slate-400 whitespace-nowrap">
                     <div>{r.id.slice(0, 8)}</div>
                     <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="h-3 w-3 shrink-0" />
                       {formatDate(r.createdAt)}
                     </div>
                   </TableCell>
 
-                  <TableCell className="font-mono text-xs font-bold text-emerald-400">
+                  <TableCell className="font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">
                     {r.receiptNumber}
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <p className="font-semibold text-slate-200">{r.customerName || 'Subscriber'}</p>
                     <span className="font-mono text-[10px] text-slate-400">{r.customerCode || 'N/A'}</span>
                   </TableCell>
 
-                  <TableCell className="text-right font-mono font-bold text-slate-100 text-sm">
+                  <TableCell className="text-right font-mono font-bold text-slate-100 text-sm whitespace-nowrap">
                     {formatRupee(Number(r.amount))}
                   </TableCell>
 
@@ -103,14 +103,14 @@ export function ReversalApprovalTable({
                     )}
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <span className="inline-flex items-center gap-1 rounded bg-slate-800/80 px-2 py-0.5 font-mono text-[11px] text-slate-300 border border-slate-700">
                       <User className="h-3 w-3 text-slate-400" />
                       {r.initiatedByUserId.slice(0, 8)}
                     </span>
                   </TableCell>
 
-                  <TableCell className="text-center">
+                  <TableCell className="text-center whitespace-nowrap">
                     {isMaker ? (
                       <div className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/30 px-2 py-1 text-[10px] font-semibold text-amber-300" title={t('selfApprovalBlocked')}>
                         <ShieldAlert className="h-3 w-3 text-amber-400" />
@@ -130,7 +130,7 @@ export function ReversalApprovalTable({
                           className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold shadow-sm"
                         >
                           <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Approve
+                          {t('btnApprove')}
                         </Button>
                         <Button
                           type="button"
@@ -140,7 +140,7 @@ export function ReversalApprovalTable({
                           className="h-7 px-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-[11px]"
                         >
                           <XCircle className="h-3 w-3 mr-1" />
-                          Reject
+                          {t('btnReject')}
                         </Button>
                       </div>
                     )}

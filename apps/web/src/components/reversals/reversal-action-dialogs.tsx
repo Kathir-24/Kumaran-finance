@@ -52,6 +52,7 @@ export function ApproveReversalDialog({
   onSuccess,
 }: ApproveDialogProps) {
   const t = useTranslations('reversals');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const [checkerNotes, setCheckerNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -112,7 +113,7 @@ export function ApproveReversalDialog({
               {reversal.customerName} <span className="font-mono text-slate-400 text-[10px]">({reversal.customerCode})</span>
             </p>
             <div className="rounded bg-slate-900 p-2 text-[11px] text-slate-300 font-mono">
-              <strong>Reason:</strong> {reversal.reason}
+              <strong>{t('reasonPrefix')}</strong> {reversal.reason}
             </div>
           </div>
 
@@ -138,7 +139,7 @@ export function ApproveReversalDialog({
 
         <DialogFooter className="bg-slate-950 p-4 border-t border-slate-800 flex items-center justify-between sm:justify-between">
           <Button type="button" variant="ghost" onClick={onClose} className="text-xs text-slate-400">
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             type="button"
@@ -175,6 +176,7 @@ export function RejectReversalDialog({
   onSuccess,
 }: RejectDialogProps) {
   const t = useTranslations('reversals');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const [rejectionReason, setRejectionReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -258,7 +260,7 @@ export function RejectReversalDialog({
 
         <DialogFooter className="bg-slate-950 p-4 border-t border-slate-800 flex items-center justify-between sm:justify-between">
           <Button type="button" variant="ghost" onClick={onClose} className="text-xs text-slate-400">
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             type="button"
