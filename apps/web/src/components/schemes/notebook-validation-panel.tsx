@@ -158,7 +158,7 @@ export function NotebookValidationPanel({
 
         <Badge variant={isBalanced ? 'paid' : 'unpaid'} className="gap-1.5 py-1 px-3">
           <ShieldCheck className="h-3.5 w-3.5" />
-          <span>{isBalanced ? t('balancedSuccess') : 'Balancing Guard Required'}</span>
+          <span>{isBalanced ? t('balancedSuccess') : t('balancingGuardRequired')}</span>
         </Badge>
       </div>
 
@@ -188,7 +188,7 @@ export function NotebookValidationPanel({
           <div className="text-lg font-mono font-bold text-emerald-400 pt-1">
             {formatRupee(systemCalculatedTotal)}
           </div>
-          <p className="text-[11px] text-slate-400">Sum of all marked PAID cells in months 1..{onboardedAtMonth - 1}</p>
+          <p className="text-[11px] text-slate-400">{t('sumOfPaidCellsHelp', { prevMonth: onboardedAtMonth - 1 })}</p>
         </div>
 
         {/* Difference / Diagnostic Box */}
@@ -209,10 +209,10 @@ export function NotebookValidationPanel({
               isBalanced ? 'text-emerald-400' : 'text-rose-400'
             )}
           >
-            {formatRupee(Math.abs(discrepancy))} {discrepancy !== 0 && (discrepancy > 0 ? '(System Higher)' : '(Notebook Higher)')}
+            {formatRupee(Math.abs(discrepancy))} {discrepancy !== 0 && (discrepancy > 0 ? t('systemHigher') : t('notebookHigher'))}
           </div>
           <p className="text-[11px] text-slate-400">
-            {isBalanced ? t('balancedSuccess') : 'Must be ₹0 before submission'}
+            {isBalanced ? t('balancedSuccess') : t('mustBeZero')}
           </p>
         </div>
       </div>
@@ -220,49 +220,49 @@ export function NotebookValidationPanel({
       {/* Validation Checklist */}
       <div className="rounded-lg border border-slate-800 bg-slate-950 p-4 space-y-2.5">
         <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-          Statutory Pre-Submission Invariants Checklist
+          {t('checklistTitle')}
         </h4>
 
         {/* Item 1: Roster complete */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
           <span className="text-slate-300 flex items-center gap-2">
             {isRosterComplete ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="h-4 w-4 text-rose-400" />
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
             )}
-            <span>All {durationMonths} tickets allocated to verified subscribers</span>
+            <span>{t('rosterAllocated', { count: durationMonths })}</span>
           </span>
           <span className={isRosterComplete ? 'text-emerald-400' : 'text-rose-400'}>
-            {isRosterComplete ? 'Complete (20/20)' : `${unassignedCount} Unassigned`}
+            {isRosterComplete ? t('rosterCompleteBadge', { count: durationMonths }) : t('rosterUnassignedBadge', { count: unassignedCount })}
           </span>
         </div>
 
         {/* Item 2: ADR-13 Unique customer */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
           <span className="text-slate-300 flex items-center gap-2">
             {isAdr13Compliant ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="h-4 w-4 text-rose-400" />
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
             )}
-            <span>ADR-13: Max 1 ticket per customer in this chit group</span>
+            <span>{t('adr13Label')}</span>
           </span>
           <span className={isAdr13Compliant ? 'text-emerald-400' : 'text-rose-400 font-semibold'}>
-            {isAdr13Compliant ? 'Compliant' : `${duplicates.length} Duplicates Found`}
+            {isAdr13Compliant ? t('adr13CompliantBadge') : t('adr13ViolationBadge', { count: duplicates.length })}
           </span>
         </div>
 
         {/* Item 3: Past auctions valid */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
           <span className="text-slate-300 flex items-center gap-2">
             {pastAuctionsValid && !ceilingViolation && !invalidDiscount && !companyTicketWon && !duplicateWinner ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="h-4 w-4 text-rose-400" />
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
             )}
             <span>
-              Past auctions ({Math.max(0, onboardedAtMonth - 2)} months) valid with discounts &le; 1/4 ceiling
+              {t('guardrail6Checklist', { ceiling: formatRupee(maxCeilingDiscount) })}
             </span>
           </span>
           <span
@@ -273,7 +273,7 @@ export function NotebookValidationPanel({
             }
           >
             {ceilingViolation
-              ? 'Ceiling Exceeded'
+              ? t('ceilingExceededBadge')
               : invalidDiscount
               ? 'Enter Positive Discount'
               : companyTicketWon
@@ -281,23 +281,23 @@ export function NotebookValidationPanel({
               : duplicateWinner
               ? 'Duplicate Winner'
               : pastAuctionsValid
-              ? 'Valid'
+              ? t('validDiscountsBadge')
               : 'Incomplete'}
           </span>
         </div>
 
         {/* Item 4: Balancing match */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
           <span className="text-slate-300 flex items-center gap-2">
             {isBalanced ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="h-4 w-4 text-rose-400" />
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
             )}
-            <span>Pre-activation balancing guard matches exact whole Rupee</span>
+            <span>{t('guardrail8Checklist')}</span>
           </span>
           <span className={isBalanced ? 'text-emerald-400' : 'text-rose-400'}>
-            {isBalanced ? 'Matched (₹0 Diff)' : `₹${Math.abs(discrepancy)} Diff`}
+            {isBalanced ? t('balancedBadge') : t('discrepancyBadge', { diff: formatRupee(Math.abs(discrepancy)) })}
           </span>
         </div>
       </div>
@@ -306,7 +306,7 @@ export function NotebookValidationPanel({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2 border-t border-slate-800">
         <div className="text-xs text-slate-400">
           <p className="flex items-center gap-1.5 font-medium text-slate-300">
-            <FileCheck2 className="h-3.5 w-3.5 text-indigo-400" />
+            <FileCheck2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
             <span>Maker-Checker Governance (Guardrail 10)</span>
           </p>
           <p className="mt-0.5">
@@ -319,7 +319,7 @@ export function NotebookValidationPanel({
           size="lg"
           disabled={!isAllValid || isSubmitting || isLocked}
           onClick={onSubmit}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-2 shrink-0 shadow-lg"
+          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-2 shrink-0 shadow-lg"
         >
           {isSubmitting ? (
             <>

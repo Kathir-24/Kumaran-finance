@@ -592,7 +592,7 @@ export default function NotebookOnboardingPage() {
             ) : (
               <Sparkles className="h-3.5 w-3.5 text-amber-400" />
             )}
-            <span>Fill Sample Test Data</span>
+            <span>{t('fillSampleData')}</span>
           </Button>
         </div>
       </div>
@@ -601,13 +601,13 @@ export default function NotebookOnboardingPage() {
       <BusinessRuleBanner
         ruleNumber={5}
         title={t('month1CompanyNotice')}
-        description="Month 1 full pool is collected and held by the Company Representative (Foreman) ticket with strictly ₹0 dividend. Past auctions (Months 2 to K-1) are transcribed with 4.00% commission lock and fixed 1/4 ceiling (Guardrail 6)."
+        description={t('bannerDescription')}
         bulletPoints={[
-          'Month 1 has ₹0 dividend; Ticket #1 represents Company Representative',
-          'Past auction discounts cannot exceed 1/4 ceiling (V/4)',
-          'Subscriber payments are binary: PAID in full or UNPAID (Guardrail 8)',
-          'ADR-13: No customer can hold 2 or more tickets in the same chit group',
-          'Pre-Activation Balancing Guard requires exact whole-rupee match before submission',
+          t('bannerBullet1'),
+          t('bannerBullet2'),
+          t('bannerBullet3'),
+          t('bannerBullet4'),
+          t('bannerBullet5'),
         ]}
         referencePath="/instructions"
       />

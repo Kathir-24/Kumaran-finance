@@ -108,7 +108,7 @@ export function NotebookMasterForm({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
               <Sparkles className="h-3 w-3 text-amber-400" />
-              Presets:
+              {t('presetsLabel')}
             </span>
             {ONBOARD_PRESETS.map((p) => {
               const active = state.chitValue === p.chitValue && state.durationMonths === p.durationMonths;
@@ -152,7 +152,7 @@ export function NotebookMasterForm({
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
             <Building2 className="h-3 w-3 text-slate-400" />
-            <span>Branch Office</span>
+            <span>{t('branchOfficeLabel')}</span>
           </label>
           <select
             value={state.branchId}

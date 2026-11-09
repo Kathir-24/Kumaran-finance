@@ -80,6 +80,12 @@ export function NotebookEntryGrid({
   // Focus matrix tracking for keyboard navigation [ticketNumber, month]
   const [focusedCell, setFocusedCell] = React.useState<{ ticket: number; month: number } | null>(null);
 
+  const cellLabels = React.useMemo(() => ({
+    paid: t('paidStatus'),
+    unpaid: t('unpaidStatus'),
+    recPlaceholder: t('receiptPlaceholder'),
+  }), [t]);
+
   const baseInstallment = durationMonths > 0 ? Math.floor(chitValue / durationMonths) : 0;
   const foremanCommission = Math.floor((chitValue * 4) / 100);
   const maxCeilingDiscount = Math.floor(chitValue / 4);
@@ -219,7 +225,7 @@ export function NotebookEntryGrid({
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
               <UserCheck className="h-3.5 w-3.5" />
-              <span>Assign Subscriber to Ticket #{activePickerTicket}</span>
+              <span>{t('assignSubscriberTitle', { ticket: activePickerTicket })}</span>
             </h4>
             <Button
               type="button"
@@ -245,19 +251,19 @@ export function NotebookEntryGrid({
       )}
 
       {/* 3. The 400-Cell Historical Matrix */}
-      <div className="overflow-x-auto rounded-lg border border-slate-800">
-        <table className="w-full border-collapse text-left text-xs font-mono">
+      <div className="overflow-x-auto scrollbar-thin rounded-lg border border-slate-800">
+        <table className="w-full min-w-max border-collapse text-left text-xs font-mono">
           <thead>
             {/* Row 1: Month Numbers and Notices */}
             <tr className="border-b border-slate-800 bg-slate-950 text-slate-400">
               <th className="sticky left-0 z-20 bg-slate-950 p-3 min-w-[200px] font-sans font-semibold text-slate-200">
-                Ticket # & Subscriber (ADR-13)
+                {t('ticketSubscriberHeader')}
               </th>
 
               {/* Month 1 Header */}
               <th className="p-3 min-w-[130px] border-l border-slate-800 text-center bg-indigo-950/20 font-sans">
-                <span className="font-bold text-indigo-300">Month 1</span>
-                <span className="block text-[10px] text-indigo-400/80 font-normal">Company Ticket</span>
+                <span className="font-bold text-indigo-300">{t('month1Header')}</span>
+                <span className="block text-[10px] text-indigo-400/80 font-normal">{t('companyTicketLabel')}</span>
               </th>
 
               {/* Months 2 to M-1 Headers */}
@@ -269,14 +275,14 @@ export function NotebookEntryGrid({
                 return (
                   <th key={m} className="p-3 min-w-[160px] border-l border-slate-800 text-center font-sans">
                     <div className="flex items-center justify-center gap-1">
-                      <span className="font-bold text-slate-200">Month {m}</span>
+                      <span className="font-bold text-slate-200">{t('monthColHeader', { m })}</span>
                       <Trophy className="h-3 w-3 text-amber-400" />
                     </div>
 
                     {/* Past Auction inputs in header */}
                     <div className="mt-2 space-y-1.5 text-left font-sans">
                       <div>
-                        <label className="text-[10px] text-slate-400 block">Winner Ticket</label>
+                        <label className="text-[10px] text-slate-400 block">{t('winnerTicket')}</label>
                         <select
                           value={auction?.ticketNumber || 2}
                           onChange={(e) =>
@@ -287,14 +293,14 @@ export function NotebookEntryGrid({
                         >
                           {Array.from({ length: durationMonths - 1 }, (_, tIdx) => tIdx + 2).map((tNum) => (
                             <option key={tNum} value={tNum}>
-                              Ticket #{tNum}
+                              {t('ticketNumber')} #{tNum}
                             </option>
                           ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-[10px] text-slate-400 block">Winning Discount (₹)</label>
+                        <label className="text-[10px] text-slate-400 block">{t('winningDiscount')} (₹)</label>
                         <Input
                           type="number"
                           value={discount || ''}
@@ -309,12 +315,12 @@ export function NotebookEntryGrid({
                           )}
                         />
                         {isOverCeiling && (
-                          <span className="text-[9px] text-rose-400 block">Exceeds 1/4 ceiling</span>
+                          <span className="text-[9px] text-rose-400 block">{t('ceilingExceededBadge')}</span>
                         )}
                       </div>
 
                       <div className="pt-1 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
-                        <span>Net Due:</span>
+                        <span>{t('netPayable')}:</span>
                         <span className="font-mono text-emerald-400 font-semibold">
                           {formatRupee(monthlyCalculations[m]?.netInstallment || 0)}
                         </span>
@@ -326,13 +332,13 @@ export function NotebookEntryGrid({
 
               {/* Forward/Upcoming Active Month Indicator */}
               <th className="p-3 min-w-[140px] border-l border-slate-800 text-center bg-slate-950 text-slate-500 font-sans">
-                <span className="font-bold text-slate-400">Month {onboardedAtMonth}..{durationMonths}</span>
-                <span className="block text-[10px] text-slate-500 font-normal">Upcoming Digital</span>
+                <span className="font-bold text-slate-400">{t('monthColHeader', { m: `${onboardedAtMonth}..${durationMonths}` })}</span>
+                <span className="block text-[10px] text-slate-500 font-normal">{t('futureLiveAuctions')}</span>
               </th>
 
               {/* Total Arrears Column */}
               <th className="p-3 min-w-[120px] border-l border-slate-800 text-right font-sans font-semibold text-amber-300">
-                Opening Arrears
+                {t('openingArrears')}
               </th>
             </tr>
           </thead>
@@ -361,13 +367,13 @@ export function NotebookEntryGrid({
                         </span>
                         <div>
                           <p className="text-xs font-semibold text-slate-100 leading-tight">
-                            {member.customerName || `Ticket #${member.ticketNumber} (Unassigned)`}
+                            {member.customerName || `${t('ticketNumber')} #${member.ticketNumber}`}
                           </p>
                           <p className="text-[10px] text-slate-400 leading-tight">
                             {isCompanyRep ? (
-                              <span className="text-indigo-400 font-medium">Company Representative</span>
+                              <span className="text-indigo-400 font-medium">{t('companyRepresentative')}</span>
                             ) : (
-                              member.phone || member.customerCode || 'Click to assign subscriber'
+                              member.phone || member.customerCode || t('assignSubscriber')
                             )}
                           </p>
                         </div>
@@ -380,7 +386,7 @@ export function NotebookEntryGrid({
                           size="sm"
                           onClick={() => setActivePickerTicket(member.ticketNumber)}
                           className="h-6 w-6 p-0 text-slate-400 hover:text-emerald-400"
-                          title="Assign subscriber"
+                          title={t('assignSubscriber')}
                         >
                           <UserPlus className="h-3.5 w-3.5" />
                         </Button>
@@ -399,7 +405,8 @@ export function NotebookEntryGrid({
                       handleKeyDown,
                       onCellToggle,
                       onReceiptChange,
-                      isLocked
+                      isLocked,
+                      cellLabels
                     )}
                   </td>
 
@@ -420,7 +427,8 @@ export function NotebookEntryGrid({
                           handleKeyDown,
                           onCellToggle,
                           onReceiptChange,
-                          isLocked
+                          isLocked,
+                          cellLabels
                         )}
                       </td>
                     );
@@ -461,9 +469,13 @@ function renderCellButton(
   onKeyDown: (e: React.KeyboardEvent, ticket: number, month: number) => void,
   onCellToggle: (ticket: number, month: number) => void,
   onReceiptChange: (ticket: number, month: number, val: string) => void,
-  isLocked: boolean
+  isLocked: boolean,
+  labels?: { paid: string; unpaid: string; recPlaceholder: string }
 ) {
   const isPaid = status === 'PAID';
+  const paidText = labels?.paid || 'PAID';
+  const unpaidText = labels?.unpaid || 'UNPAID';
+  const recPlaceholder = labels?.recPlaceholder || 'Rec #';
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -481,14 +493,14 @@ function renderCellButton(
         )}
       >
         {isPaid ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-        <span>{isPaid ? 'PAID' : 'UNPAID'}</span>
+        <span>{isPaid ? paidText : unpaidText}</span>
       </button>
 
       {/* Optional physical receipt number input */}
       <input
         type="text"
         value={receiptNo || ''}
-        placeholder="Rec #"
+        placeholder={recPlaceholder}
         disabled={isLocked || !isPaid}
         onChange={(e) => onReceiptChange(ticket, month, e.target.value)}
         className="w-full h-5 rounded border border-slate-800 bg-slate-950 px-1 text-[10px] text-center text-slate-300 placeholder:text-slate-600 focus:border-slate-600 focus:outline-none"
