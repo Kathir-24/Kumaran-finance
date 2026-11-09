@@ -29,6 +29,7 @@ import { CashSettlementVoucherModal } from '@/components/collections/cash-settle
 
 export default function EveningCashHandoverPage() {
   const t = useTranslations('collections');
+  const tCommon = useTranslations('common');
   const { user, activeBranchId } = useAuthStore();
   const [selectedDate, setSelectedDate] = useState<string>(
     () => new Date().toISOString().slice(0, 10),
@@ -122,14 +123,14 @@ export default function EveningCashHandoverPage() {
           </h1>
           <p className="text-xs text-slate-400 mt-1">{t('handoverDeskSubtitle')}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-9 pl-9 pr-3 text-xs bg-slate-900 border-slate-800 text-slate-200"
+              className="h-9 pl-9 pr-3 text-xs bg-slate-900 border-slate-800 text-slate-200 w-full sm:w-auto"
             />
           </div>
           <Button
@@ -138,10 +139,10 @@ export default function EveningCashHandoverPage() {
             size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="h-9 border-slate-800 text-slate-300 hover:bg-slate-800 text-xs flex items-center gap-1.5"
+            className="h-9 border-slate-800 text-slate-300 hover:bg-slate-800 text-xs flex items-center gap-1.5 shrink-0"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
+            <span>{tCommon('refresh')}</span>
           </Button>
         </div>
       </div>
@@ -150,43 +151,43 @@ export default function EveningCashHandoverPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-1">
           <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Coins className="h-4 w-4" />{t('kpiCashPending')}
+            <Coins className="h-4 w-4 shrink-0" />{t('kpiCashPending')}
           </span>
-          <p className="text-2xl font-black text-amber-300 font-mono">{formatRupee(totals.cashPendingHandover)}</p>
+          <p className="text-2xl font-black text-amber-300 font-mono truncate">{formatRupee(totals.cashPendingHandover)}</p>
           <p className="text-[11px] text-amber-400/80 font-medium">{pendingAgentBatches.length} {t('tabPendingHandovers')}</p>
         </div>
 
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-1">
           <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Vault className="h-4 w-4" />{t('kpiCashInVault')}
+            <Vault className="h-4 w-4 shrink-0" />{t('kpiCashInVault')}
           </span>
-          <p className="text-2xl font-black text-emerald-300 font-mono">{formatRupee(totals.cashAcknowledgedInVault)}</p>
-          <p className="text-[11px] text-emerald-400/80 font-medium">{acknowledgedCollections.length} receipts locked</p>
+          <p className="text-2xl font-black text-emerald-300 font-mono truncate">{formatRupee(totals.cashAcknowledgedInVault)}</p>
+          <p className="text-[11px] text-emerald-400/80 font-medium">{t('receiptsLockedCount', { count: acknowledgedCollections.length })}</p>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Banknote className="h-4 w-4" />{t('kpiTotalCash')}
+            <Banknote className="h-4 w-4 shrink-0" />{t('kpiTotalCash')}
           </span>
-          <p className="text-2xl font-black text-slate-100 font-mono">{formatRupee(totals.cashCollected)}</p>
-          <p className="text-[11px] text-slate-400">Total cash today</p>
+          <p className="text-2xl font-black text-slate-100 font-mono truncate">{formatRupee(totals.cashCollected)}</p>
+          <p className="text-[11px] text-slate-400">{t('totalCashToday')}</p>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <CreditCard className="h-4 w-4" />{t('kpiDigital')}
+            <CreditCard className="h-4 w-4 shrink-0" />{t('kpiDigital')}
           </span>
-          <p className="text-2xl font-black text-slate-100 font-mono">{formatRupee(totals.digitalCollected)}</p>
-          <p className="text-[11px] text-slate-400">Bank & UPI transfers</p>
+          <p className="text-2xl font-black text-slate-100 font-mono truncate">{formatRupee(totals.digitalCollected)}</p>
+          <p className="text-[11px] text-slate-400">{t('bankUpiTransfers')}</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800">
+      <div className="flex border-b border-slate-800 overflow-x-auto max-w-full pb-0.5 scrollbar-thin scrollbar-thumb-slate-800">
         <button
           type="button"
           onClick={() => setActiveTab('pending')}
-          className={`pb-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+          className={`pb-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'pending' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -200,7 +201,7 @@ export default function EveningCashHandoverPage() {
         <button
           type="button"
           onClick={() => setActiveTab('settled')}
-          className={`pb-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+          className={`pb-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'settled' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -248,39 +249,39 @@ export default function EveningCashHandoverPage() {
           {acknowledgedCollections.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400">No cash collections acknowledged for {selectedDate}.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+              <table className="min-w-[780px] w-full text-left text-xs text-slate-300">
                 <thead className="bg-slate-950/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                   <tr>
-                    <th className="p-3">{t('tableReceiptNumber')}</th>
-                    <th className="p-3">{t('tableCustomer')}</th>
-                    <th className="p-3">{t('collector')}</th>
-                    <th className="p-3">{t('tableSchemeTicket')}</th>
-                    <th className="p-3">{t('tableMonth')}</th>
-                    <th className="p-3 text-right">{t('tableAmount')}</th>
-                    <th className="p-3 text-center">{t('tableActions')}</th>
+                    <th className="p-3 whitespace-nowrap">{t('tableReceiptNumber')}</th>
+                    <th className="p-3 whitespace-nowrap">{t('tableCustomer')}</th>
+                    <th className="p-3 whitespace-nowrap">{t('collector')}</th>
+                    <th className="p-3 whitespace-nowrap">{t('tableSchemeTicket')}</th>
+                    <th className="p-3 whitespace-nowrap">{t('tableMonth')}</th>
+                    <th className="p-3 text-right whitespace-nowrap">{t('tableAmount')}</th>
+                    <th className="p-3 text-center whitespace-nowrap">{t('tableActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 text-[11px]">
                   {acknowledgedCollections.map((c) => (
                     <tr key={c.paymentId} className="hover:bg-slate-800/30">
-                      <td className="p-3 font-mono font-bold text-emerald-400">{c.receiptNumber}</td>
-                      <td className="p-3 font-semibold text-slate-200">
+                      <td className="p-3 font-mono font-bold text-emerald-400 whitespace-nowrap">{c.receiptNumber}</td>
+                      <td className="p-3 font-semibold text-slate-200 whitespace-nowrap">
                         {c.customerName} <span className="font-mono text-[10px] text-slate-400 font-normal">({c.customerCode})</span>
                       </td>
-                      <td className="p-3 text-slate-300">{c.collectorName}</td>
-                      <td className="p-3 font-mono">{c.groupCode} T#{c.ticketNumber}</td>
-                      <td className="p-3">Month #{c.installmentMonth}</td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-100">{formatRupee(c.amount)}</td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-slate-300 whitespace-nowrap">{c.collectorName}</td>
+                      <td className="p-3 font-mono whitespace-nowrap">{c.groupCode} T#{c.ticketNumber}</td>
+                      <td className="p-3 whitespace-nowrap">Month #{c.installmentMonth}</td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-100 whitespace-nowrap">{formatRupee(c.amount)}</td>
+                      <td className="p-3 text-center whitespace-nowrap">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleViewHistoricalVoucher(c)}
-                          className="h-7 px-2 text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                          className="h-7 px-2 text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0 whitespace-nowrap"
                         >
-                          <FileText className="h-3.5 w-3.5 mr-1" />{t('viewVoucherBtn')}
+                          <FileText className="h-3.5 w-3.5 mr-1 shrink-0" />{t('viewVoucherBtn')}
                         </Button>
                       </td>
                     </tr>

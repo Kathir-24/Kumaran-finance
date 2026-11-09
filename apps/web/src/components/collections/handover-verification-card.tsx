@@ -248,27 +248,27 @@ export function HandoverVerificationCard({
         </button>
 
         {showReceipts && (
-          <div className="mt-2 overflow-x-auto rounded-lg border border-slate-800 max-h-52 overflow-y-auto">
-            <table className="w-full text-left text-xs text-slate-300">
+          <div className="mt-2 overflow-x-auto rounded-lg border border-slate-800 max-h-52 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
+            <table className="min-w-[520px] w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-[11px] font-semibold text-slate-400 uppercase tracking-wider sticky top-0">
                 <tr>
-                  <th className="p-2">{t('tableReceiptNumber')}</th>
-                  <th className="p-2">{t('tableCustomer')}</th>
-                  <th className="p-2">{t('tableSchemeTicket')}</th>
-                  <th className="p-2">{t('tableMonth')}</th>
-                  <th className="p-2 text-right">{t('tableAmount')}</th>
+                  <th className="p-2 whitespace-nowrap">{t('tableReceiptNumber')}</th>
+                  <th className="p-2 whitespace-nowrap">{t('tableCustomer')}</th>
+                  <th className="p-2 whitespace-nowrap">{t('tableSchemeTicket')}</th>
+                  <th className="p-2 whitespace-nowrap">{t('tableMonth')}</th>
+                  <th className="p-2 text-right whitespace-nowrap">{t('tableAmount')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-mono text-[11px]">
                 {batch.collections.map((c) => (
                   <tr key={c.paymentId} className="hover:bg-slate-800/30">
-                    <td className="p-2 text-emerald-400 font-bold">{c.receiptNumber}</td>
-                    <td className="p-2 font-sans text-slate-200">
+                    <td className="p-2 text-emerald-400 font-bold whitespace-nowrap">{c.receiptNumber}</td>
+                    <td className="p-2 font-sans text-slate-200 whitespace-nowrap">
                       {c.customerName} <span className="text-slate-400 text-[10px]">({c.customerCode})</span>
                     </td>
-                    <td className="p-2">{c.groupCode} T#{c.ticketNumber}</td>
-                    <td className="p-2">M#{c.installmentMonth}</td>
-                    <td className="p-2 text-right font-bold text-slate-100">{formatRupee(c.amount)}</td>
+                    <td className="p-2 whitespace-nowrap">{c.groupCode} T#{c.ticketNumber}</td>
+                    <td className="p-2 whitespace-nowrap">M#{c.installmentMonth}</td>
+                    <td className="p-2 text-right font-bold text-slate-100 whitespace-nowrap">{formatRupee(c.amount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -299,7 +299,7 @@ export function HandoverVerificationCard({
           type="button"
           disabled={!isExactMatch || isMaker || acknowledgeMutation.isPending}
           onClick={() => acknowledgeMutation.mutate()}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-5 h-9 shadow-lg shadow-emerald-950/40 disabled:opacity-40"
+          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-5 h-9 shadow-lg shadow-emerald-950/40 disabled:opacity-40 shrink-0 whitespace-nowrap justify-center"
         >
           {acknowledgeMutation.isPending ? (
             <>
