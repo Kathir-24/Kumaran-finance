@@ -46,12 +46,12 @@ export function PendingApprovalsBanner({
 
   if (totalPendingCount === 0) {
     return (
-      <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/40 px-4 py-2.5 text-xs text-slate-400">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-800/80 bg-slate-900/40 px-4 py-2.5 text-xs text-slate-400">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>{t('allClear')}</span>
         </div>
-        <Badge variant="paid" className="text-[10px] py-0 px-1.5">
+        <Badge variant="paid" className="text-[10px] py-0 px-1.5 self-start sm:self-center shrink-0">
           Maker ≠ Checker OK
         </Badge>
       </div>
@@ -60,17 +60,17 @@ export function PendingApprovalsBanner({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/80 to-slate-900/60 p-4 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1.5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
             <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4" />
-              {t('pendingApprovals')} ({totalPendingCount})
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              <span>{t('pendingApprovals')} ({totalPendingCount})</span>
             </h3>
           </div>
 
-          <p className="text-xs text-slate-300 max-w-3xl">
+          <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
             {t('makerCheckerReminder')}
           </p>
 
@@ -105,7 +105,7 @@ export function PendingApprovalsBanner({
           </div>
         </div>
 
-        <div className="flex items-center self-start lg:self-center">
+        <div className="flex items-center self-start md:self-center shrink-0">
           <Button asChild size="sm" className="bg-amber-500 text-slate-950 hover:bg-amber-400 font-medium text-xs">
             <Link href="/reports">
               <span>{t('reviewQueue')}</span>

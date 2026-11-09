@@ -42,27 +42,27 @@ export function BusinessRuleBanner({
         className
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shrink-0 mt-0.5 sm:mt-0">
             <ShieldCheck className="h-5 w-5" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[11px] font-semibold text-indigo-300 border border-indigo-500/30 uppercase tracking-wide">
                 {t('bannerTitle')} #{ruleNumber}
               </span>
             </div>
-            <h4 className="text-sm font-semibold text-slate-100 mt-0.5">{title}</h4>
+            <h4 className="text-sm font-semibold text-slate-100 mt-0.5 break-words leading-snug">{title}</h4>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-indigo-500/10 shrink-0">
           <Button
             asChild
             variant="ghost"
             size="sm"
-            className="text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/40 gap-1.5"
+            className="text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/40 gap-1.5 h-8 px-2.5"
           >
             <Link href={referencePath}>
               <span>{t('readFullInstructions')}</span>
@@ -75,7 +75,7 @@ export function BusinessRuleBanner({
             variant="ghost"
             size="icon"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-8 w-8 text-slate-400 hover:text-slate-200"
+            className="h-8 w-8 text-slate-400 hover:text-slate-200 shrink-0"
             aria-label={isExpanded ? 'Collapse rule' : 'Expand rule'}
           >
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

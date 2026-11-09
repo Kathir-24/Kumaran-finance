@@ -114,13 +114,13 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <span className="font-medium text-slate-300">{activeTickets}</span> {t('activeTickets')}
-                <span className="text-slate-600">•</span>
-                <span className="font-medium text-slate-300">{totalSubscribers}</span> {t('activeSubscribers')}
-              </span>
-              <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 gap-2">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0 flex-1">
+                <span><span className="font-medium text-slate-300">{activeTickets}</span> {t('activeTickets')}</span>
+                <span className="text-slate-600 hidden sm:inline">•</span>
+                <span><span className="font-medium text-slate-300">{totalSubscribers}</span> {t('activeSubscribers')}</span>
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-emerald-400 transition-colors shrink-0" />
             </div>
           </CardContent>
         </Card>

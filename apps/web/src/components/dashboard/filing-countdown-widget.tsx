@@ -171,7 +171,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 self-end sm:self-center">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
                   {item.filedAtRegistrar ? (
                     <Badge variant="paid" className="gap-1">
                       <CheckCircle2 className="h-3 w-3" />

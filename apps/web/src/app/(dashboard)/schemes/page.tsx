@@ -70,28 +70,28 @@ export default function SchemesDirectoryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
-            className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+            className="flex-1 sm:flex-initial border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-xs h-9"
             asChild
           >
             <Link href="/schemes/onboard">
-              <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-400" />
-              <span>{t('onboardNotebook')}</span>
+              <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-400 shrink-0" />
+              <span className="truncate">{t('onboardNotebook')}</span>
             </Link>
           </Button>
 
           {isSuperAdmin && (
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+              className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs h-9"
               asChild
             >
               <Link href="/schemes/new">
-                <Plus className="mr-1.5 h-4 w-4" />
-                <span>{t('newScheme')}</span>
+                <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                <span className="truncate">{t('newScheme')}</span>
               </Link>
             </Button>
           )}
@@ -110,33 +110,35 @@ export default function SchemesDirectoryPage() {
       {/* Toolbar: Status Tabs & Search Filter */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/80 p-1 text-xs shadow-sm">
-          {(
-            [
-              { key: 'ALL', labelKey: 'tabAll' },
-              { key: 'ACTIVE', labelKey: 'tabActive' },
-              { key: 'DRAFT', labelKey: 'tabPlanned' },
-              { key: 'COMPLETED', labelKey: 'tabCompleted' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'rounded-lg px-3.5 py-1.5 font-semibold transition-all',
-                activeTab === tab.key
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-              )}
-            >
-              {t(tab.labelKey)}
-            </button>
-          ))}
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar py-0.5">
+          <div className="inline-flex min-w-full sm:min-w-0 items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/80 p-1 text-xs shadow-sm">
+            {(
+              [
+                { key: 'ALL', labelKey: 'tabAll' },
+                { key: 'ACTIVE', labelKey: 'tabActive' },
+                { key: 'DRAFT', labelKey: 'tabPlanned' },
+                { key: 'COMPLETED', labelKey: 'tabCompleted' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'whitespace-nowrap shrink-0 rounded-lg px-3.5 py-1.5 font-semibold transition-all',
+                  activeTab === tab.key
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                )}
+              >
+                {t(tab.labelKey)}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search Input */}
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-80 shrink-0">
           <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
           <Input
             type="text"

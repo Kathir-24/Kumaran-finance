@@ -130,22 +130,22 @@ export default function DashboardRootPage() {
   return (
     <div className="space-y-6">
       {/* 1. Top Welcome Banner */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 mb-1">
-            <Building2 className="h-3.5 w-3.5" />
-            <span>{t('app.company')} • {t('app.branch')}</span>
+            <Building2 className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{t('app.company')} • {t('app.branch')}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             வணக்கம், {user?.name || 'Staff User'}
           </h1>
           <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-            <Clock className="h-3 w-3 text-slate-500" />
-            {currentDate}
+            <Clock className="h-3 w-3 text-slate-500 shrink-0" />
+            <span>{currentDate}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
           <Badge variant="paid" className="gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
             <span>{t('common.zeroPaiseGuard')}</span>

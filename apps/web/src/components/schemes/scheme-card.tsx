@@ -72,29 +72,29 @@ export function SchemeCard({ scheme, className }: SchemeCardProps) {
       )}
     >
       <CardHeader className="p-5 pb-3 space-y-2.5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-base font-bold text-emerald-400 tracking-wider">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-base font-bold text-emerald-400 tracking-wider whitespace-nowrap">
                 {scheme.groupCode}
               </span>
               <Badge variant={statusVariant} className="text-[10px] uppercase font-bold py-0.5">
                 {scheme.status}
               </Badge>
             </div>
-            <h3 className="text-base font-semibold text-slate-100 group-hover:text-emerald-300 transition-colors mt-0.5">
+            <h3 className="text-base font-semibold text-slate-100 group-hover:text-emerald-300 transition-colors mt-1 break-words">
               {scheme.groupName}
             </h3>
             {scheme.groupNameTamil && (
-              <p className="text-xs text-slate-400 font-tamil mt-0.5">
+              <p className="text-xs text-slate-400 font-tamil mt-0.5 break-words">
                 {scheme.groupNameTamil}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 rounded-full border border-indigo-500/30 bg-indigo-950/40 px-2.5 py-1 text-[11px] font-semibold text-indigo-300">
-            <Lock className="h-3 w-3 text-indigo-400" />
-            <span>{t('frozenCommissionBadge')}</span>
+          <div className="flex items-center gap-1.5 self-start shrink-0 rounded-full border border-indigo-500/30 bg-indigo-950/40 px-2.5 py-1 text-[11px] font-semibold text-indigo-300">
+            <Lock className="h-3 w-3 text-indigo-400 shrink-0" />
+            <span className="whitespace-nowrap">{t('frozenCommissionBadge')}</span>
           </div>
         </div>
       </CardHeader>
@@ -102,27 +102,27 @@ export function SchemeCard({ scheme, className }: SchemeCardProps) {
       <CardContent className="p-5 pt-1 space-y-4">
         {/* Financial metrics grid */}
         <div className="grid grid-cols-2 gap-2.5 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs">
-          <div>
-            <span className="text-[11px] text-slate-400">{t('chitValue')}</span>
-            <p className="font-mono text-sm font-bold text-slate-100">
+          <div className="min-w-0">
+            <span className="text-[11px] text-slate-400 block truncate" title={t('chitValue')}>{t('chitValue')}</span>
+            <p className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate">
               {formatRupee(scheme.chitValue)}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">{t('baseInstallment')}</span>
-            <p className="font-mono text-sm font-bold text-slate-100">
+          <div className="min-w-0">
+            <span className="text-[11px] text-slate-400 block truncate" title={t('baseInstallment')}>{t('baseInstallment')}</span>
+            <p className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate">
               {formatRupee(scheme.baseInstallment)}/mo
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">{t('duration')}</span>
-            <p className="font-mono text-sm font-semibold text-slate-200">
+          <div className="min-w-0">
+            <span className="text-[11px] text-slate-400 block truncate" title={t('duration')}>{t('duration')}</span>
+            <p className="font-mono text-sm font-semibold text-slate-200 mt-0.5 truncate">
               {scheme.durationMonths} {t('duration').includes('மாதங்கள்') ? 'மாதங்கள்' : 'Months'}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">{t('ceilingDiscount')}</span>
-            <p className="font-mono text-sm font-semibold text-indigo-300">
+          <div className="min-w-0">
+            <span className="text-[11px] text-slate-400 block truncate" title={t('ceilingDiscount')}>{t('ceilingDiscount')}</span>
+            <p className="font-mono text-sm font-semibold text-indigo-300 mt-0.5 truncate">
               {formatRupee(scheme.maxDiscountCeiling)}
             </p>
           </div>
