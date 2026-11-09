@@ -2,19 +2,16 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStream } from '@/hooks/use-approvals-stream';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
-import { Coins, Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const t = useTranslations('common');
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -40,21 +37,9 @@ export default function DashboardLayout({
     }
   }, [isHydrated, isLoading, isAuthenticated, router]);
 
-  // Loading skeleton while validating session
-  if (!isHydrated || isLoading || !isAuthenticated) {
-    return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-slate-950 text-slate-100">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 animate-pulse">
-            <Coins className="h-7 w-7" />
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-            <span>{t('workspaceInitializing')}</span>
-          </div>
-        </div>
-      </div>
-    );
+  // Guard: If client has confirmed unauthenticated state, prevent content flash while redirecting
+  if (isHydrated && !isAuthenticated) {
+    return null;
   }
 
   return (

@@ -72,6 +72,11 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = React.useState(false);
   const [isDisableModalOpen, setIsDisableModalOpen] = React.useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = React.useState(false);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Fetch branches from live backend
   const { data: branches = [] } = useQuery<BranchDto[]>({
@@ -101,16 +106,18 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   };
 
   const isSuperAdminOrAuditor =
-    user?.roles?.includes('SUPER_ADMIN') || user?.roles?.includes('AUDITOR');
+    isMounted && (user?.roles?.includes('SUPER_ADMIN') || user?.roles?.includes('AUDITOR'));
 
   const initials = React.useMemo(() => {
-    if (!user?.name) return 'KC';
+    if (!isMounted || !user?.name) return 'KC';
     const parts = user.name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return user.name.slice(0, 2).toUpperCase();
-  }, [user?.name]);
+  }, [isMounted, user?.name]);
+
+  const displayBranch = isMounted ? activeBranch : null;
 
   return (
     <>
@@ -132,11 +139,11 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
               <Building2 className="h-4 w-4 text-emerald-400" />
               <div className="flex flex-col text-left">
                 <span className="font-semibold text-slate-100 max-w-[200px] sm:max-w-[280px] truncate">
-                  {activeBranch ? activeBranch.name : tTopbar('allBranches')}
+                  {displayBranch ? displayBranch.name : tTopbar('allBranches')}
                 </span>
-                {activeBranch?.nameTamil && (
+                {displayBranch?.nameTamil && (
                   <span className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[280px] truncate">
-                    {activeBranch.nameTamil}
+                    {displayBranch.nameTamil}
                   </span>
                 )}
               </div>

@@ -40,6 +40,12 @@ export function Sidebar({
   const tSidebar = useTranslations('sidebar');
   const tCommon = useTranslations('common');
 
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const user = useAuthStore((s) => s.user);
   const userRoles = user?.roles || [];
 
@@ -116,91 +122,106 @@ export function Sidebar({
         {/* Navigation Item List */}
         <TooltipProvider delayDuration={150}>
           <nav className="flex flex-col gap-1 p-3">
-            {allowedNavItems.map((item) => {
-              const active = isItemActive(item.href);
-              const Icon = item.icon;
-              const badgeCount = getBadgeCount(item.badgeKey);
-              const labelSubKey = item.labelKey.replace('nav.', '');
-              let label = labelSubKey;
-              try {
-                label = tNav(labelSubKey as any);
-              } catch {
-                label = labelSubKey;
-              }
+            {isMounted ? (
+              allowedNavItems.map((item) => {
+                const active = isItemActive(item.href);
+                const Icon = item.icon;
+                const badgeCount = getBadgeCount(item.badgeKey);
+                const labelSubKey = item.labelKey.replace('nav.', '');
+                let label = labelSubKey;
+                try {
+                  label = tNav(labelSubKey as any);
+                } catch {
+                  label = labelSubKey;
+                }
 
-              const linkElement = (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onMobileClose}
-                  className={cn(
-                    'group relative flex items-center rounded-lg transition-all duration-150',
-                    isCollapsed
-                      ? 'h-11 w-11 justify-center mx-auto'
-                      : 'h-10 px-3 gap-3',
-                    active
-                      ? 'bg-emerald-500/10 text-emerald-400 font-medium'
-                      : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
-                  )}
-                >
-                  {/* Active Indicator Bar */}
-                  {active && (
-                    <span
+                const linkElement = (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onMobileClose}
+                    className={cn(
+                      'group relative flex items-center rounded-lg transition-all duration-150',
+                      isCollapsed
+                        ? 'h-11 w-11 justify-center mx-auto'
+                        : 'h-10 px-3 gap-3',
+                      active
+                        ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
+                    )}
+                  >
+                    {/* Active Indicator Bar */}
+                    {active && (
+                      <span
+                        className={cn(
+                          'absolute rounded-r-full bg-emerald-400',
+                          isCollapsed
+                            ? 'left-0 top-1.5 bottom-1.5 w-1'
+                            : 'left-0 top-1 bottom-1 w-1'
+                        )}
+                      />
+                    )}
+
+                    <Icon
                       className={cn(
-                        'absolute rounded-r-full bg-emerald-400',
-                        isCollapsed
-                          ? 'left-0 top-1.5 bottom-1.5 w-1'
-                          : 'left-0 top-1 bottom-1 w-1'
+                        'shrink-0 transition-transform duration-150 group-hover:scale-105',
+                        isCollapsed ? 'h-5 w-5' : 'h-4 w-4',
+                        active ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'
                       )}
                     />
-                  )}
 
-                  <Icon
-                    className={cn(
-                      'shrink-0 transition-transform duration-150 group-hover:scale-105',
-                      isCollapsed ? 'h-5 w-5' : 'h-4 w-4',
-                      active ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'
+                    {!isCollapsed && (
+                      <span className="truncate text-sm tracking-normal flex-1">
+                        {label}
+                      </span>
                     )}
-                  />
 
-                  {!isCollapsed && (
-                    <span className="truncate text-sm tracking-normal flex-1">
-                      {label}
-                    </span>
-                  )}
-
-                  {/* Badge Counter */}
-                  {badgeCount > 0 && (
-                    <span
-                      className={cn(
-                        'flex items-center justify-center rounded-full text-[10px] font-bold',
-                        active
-                          ? 'bg-emerald-500 text-slate-950 font-black'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
-                        isCollapsed
-                          ? 'absolute -top-1 -right-1 h-4 w-4'
-                          : 'h-5 min-w-[20px] px-1.5 ml-auto'
-                      )}
-                    >
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </span>
-                  )}
-                </Link>
-              );
-
-              if (isCollapsed) {
-                return (
-                  <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>{linkElement}</TooltipTrigger>
-                    <TooltipContent side="right" className="font-medium">
-                      {label}
-                    </TooltipContent>
-                  </Tooltip>
+                    {/* Badge Counter */}
+                    {badgeCount > 0 && (
+                      <span
+                        className={cn(
+                          'flex items-center justify-center rounded-full text-[10px] font-bold',
+                          active
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                          isCollapsed
+                            ? 'absolute -top-1 -right-1 h-4 w-4'
+                            : 'h-5 min-w-[20px] px-1.5 ml-auto'
+                        )}
+                      >
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </Link>
                 );
-              }
 
-              return linkElement;
-            })}
+                if (isCollapsed) {
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>{linkElement}</TooltipTrigger>
+                      <TooltipContent side="right" className="font-medium">
+                        {label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+
+                return linkElement;
+              })
+            ) : (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex items-center rounded-lg bg-slate-900/40 animate-pulse',
+                    isCollapsed ? 'h-11 w-11 mx-auto' : 'h-10 px-3 gap-3'
+                  )}
+                >
+                  <div className="h-4 w-4 rounded bg-slate-800 shrink-0" />
+                  {!isCollapsed && <div className="h-3.5 w-28 rounded bg-slate-800/80" />}
+                </div>
+              ))
+            )}
           </nav>
         </TooltipProvider>
       </div>

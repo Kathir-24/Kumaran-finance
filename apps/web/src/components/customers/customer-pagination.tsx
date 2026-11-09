@@ -59,7 +59,7 @@ export function CustomerPagination({
       </p>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center gap-1.5 self-center sm:self-auto">
+      <div className="flex items-center gap-1.5 self-center sm:self-auto overflow-x-auto max-w-full py-0.5">
         <Button
           variant="outline"
           size="sm"

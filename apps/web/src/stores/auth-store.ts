@@ -9,6 +9,8 @@ import {
   unwrapApiResponse,
   getStoredAccessToken,
   getStoredRefreshToken,
+  getStoredUserProfile,
+  setStoredUserProfile,
   setStoredTokens,
   clearStoredTokens,
 } from '../lib/api-client.ts';
@@ -53,9 +55,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
-  tempToken: typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null,
+  tempToken: null,
   isAuthenticated: false,
-  isLoading: typeof window !== 'undefined' ? Boolean(getStoredAccessToken()) : false,
+  isLoading: false,
   isHydrated: false,
   activeBranchId: null,
   lastActivity: Date.now(),
@@ -76,8 +78,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   setAuth: (user, tokens) => {
-    // 1. Persist tokens in local storage bridge
+    // 1. Persist tokens and user profile in local storage bridge
     setStoredTokens(tokens);
+    const activeBranchId = user.activeBranchId || user.branchId || null;
+    setStoredUserProfile({ ...user, activeBranchId });
 
     // 2. Clear temporary 2FA challenge token from sessionStorage
     if (typeof window !== 'undefined') {
@@ -87,9 +91,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         // Safe fallback in restricted environments
       }
     }
-
-    // 3. Default active branch to assigned branch
-    const activeBranchId = user.activeBranchId || user.branchId || null;
 
     set({
       user: { ...user, activeBranchId },
@@ -107,8 +108,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   updateUser: (partial) => {
     const currentUser = get().user;
     if (!currentUser) return;
+    const updated = { ...currentUser, ...partial };
+    setStoredUserProfile(updated);
     set({
-      user: { ...currentUser, ...partial },
+      user: updated,
     });
   },
 
@@ -116,7 +119,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     set({ activeBranchId: branchId });
     const currentUser = get().user;
     if (currentUser) {
-      set({ user: { ...currentUser, activeBranchId: branchId } });
+      const updated = { ...currentUser, activeBranchId: branchId };
+      setStoredUserProfile(updated);
+      set({ user: updated });
     }
   },
 
@@ -171,20 +176,33 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   hydrate: async () => {
     const token = getStoredAccessToken();
     const refreshToken = getStoredRefreshToken();
+    const cachedProfile = getStoredUserProfile<AuthUser>();
 
     if (!token) {
       set({ isLoading: false, isAuthenticated: false, isHydrated: true, user: null });
       return;
     }
 
-    // Deduplication guard: Skip redundant network request if already loading or already authenticated with valid token
-    const state = get();
-    if (state.isLoading) return;
-    if (state.isAuthenticated && state.user && state.accessToken === token) {
-      return;
+    // Immediately restore cached session from localStorage on client mount (0ms delay)
+    if (cachedProfile) {
+      const activeBranchId = cachedProfile.activeBranchId || cachedProfile.branchId || null;
+      set({
+        user: cachedProfile,
+        accessToken: token,
+        refreshToken: refreshToken || null,
+        isAuthenticated: true,
+        isHydrated: true,
+        isLoading: false,
+        activeBranchId,
+      });
     }
 
-    set({ isLoading: true });
+    const state = get();
+    if (state.isLoading) return;
+
+    if (!cachedProfile) {
+      set({ isLoading: true });
+    }
 
     try {
       // Fetch authenticated user profile from backend
@@ -193,9 +211,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       );
 
       const activeBranchId = profile.activeBranchId || profile.branchId || null;
+      const fullProfile = { ...profile, activeBranchId };
+
+      setStoredUserProfile(fullProfile);
 
       set({
-        user: { ...profile, activeBranchId },
+        user: fullProfile,
         accessToken: token,
         refreshToken: refreshToken || null,
         isAuthenticated: true,

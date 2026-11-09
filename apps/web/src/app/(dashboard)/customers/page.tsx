@@ -163,11 +163,11 @@ export default function CustomersDirectoryPage() {
         {canRegisterCustomer && (
           <Button
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm"
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm text-xs h-9"
             asChild
           >
             <Link href="/customers/new">
-              <Plus className="mr-1.5 h-4 w-4" />
+              <Plus className="mr-1.5 h-4 w-4 shrink-0" />
               <span>{t('newCustomer')}</span>
             </Link>
           </Button>

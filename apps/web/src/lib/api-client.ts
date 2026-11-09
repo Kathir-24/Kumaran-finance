@@ -10,9 +10,10 @@ import {
   type ApiErrorPayload,
 } from '@kumaran/api-client';
 
-// Storage keys for authentication tokens
+// Storage keys for authentication tokens and profile
 export const ACCESS_TOKEN_KEY = 'kc_access_token';
 export const REFRESH_TOKEN_KEY = 'kc_refresh_token';
+export const USER_PROFILE_KEY = 'kc_user_profile';
 
 /**
  * Returns the configured backend API base URL.
@@ -50,6 +51,35 @@ export function getStoredRefreshToken(): string | null {
 }
 
 /**
+ * SSR-safe getter for stored user profile.
+ */
+export function getStoredUserProfile<T = any>(): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(USER_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * SSR-safe setter for user profile.
+ */
+export function setStoredUserProfile<T = any>(user: T | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (user) {
+      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(USER_PROFILE_KEY);
+    }
+  } catch (err) {
+    console.error('[ApiClient] Failed to store user profile in localStorage', err);
+  }
+}
+
+/**
  * SSR-safe setter for auth tokens.
  */
 export function setStoredTokens(tokens: { accessToken: string; refreshToken?: string }): void {
@@ -73,6 +103,7 @@ export function clearStoredTokens(): void {
   try {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_PROFILE_KEY);
     window.dispatchEvent(new CustomEvent('kumaran:unauthorized'));
   } catch (err) {
     console.error('[ApiClient] Failed to clear auth tokens', err);

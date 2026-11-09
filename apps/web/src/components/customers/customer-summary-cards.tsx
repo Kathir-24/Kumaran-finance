@@ -65,7 +65,7 @@ export function CustomerSummaryCards({
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
@@ -73,7 +73,7 @@ export function CustomerSummaryCards({
             key={idx}
             className="border-slate-800 bg-slate-900/60 shadow-sm transition-all hover:border-slate-700/80"
           >
-            <CardContent className="p-4 space-y-2">
+            <CardContent className="p-3.5 sm:p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-400 truncate">
                   {card.title}

@@ -10,8 +10,11 @@ import {
   KumaranApiError,
   ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
+  USER_PROFILE_KEY,
   getStoredAccessToken,
   getStoredRefreshToken,
+  getStoredUserProfile,
+  setStoredUserProfile,
   setStoredTokens,
   clearStoredTokens,
   getApiBaseUrl,
@@ -27,8 +30,10 @@ test('ApiClient: Token storage bridge handles SSR environment safely', () => {
   // In Node environment without window, getters safely return null
   assert.equal(getStoredAccessToken(), null);
   assert.equal(getStoredRefreshToken(), null);
+  assert.equal(getStoredUserProfile(), null);
   // Setters and clearers execute safely without throwing errors
   assert.doesNotThrow(() => setStoredTokens({ accessToken: 'test-token' }));
+  assert.doesNotThrow(() => setStoredUserProfile({ id: 'test-user' }));
   assert.doesNotThrow(() => clearStoredTokens());
 });
 
@@ -57,19 +62,23 @@ test('ApiClient: Token storage bridge operates correctly when window/localStorag
   };
 
   try {
-    // 1. Set tokens
+    // 1. Set tokens & profile
     setStoredTokens({ accessToken: 'access-abc', refreshToken: 'refresh-xyz' });
+    setStoredUserProfile({ id: 'user-001', name: 'Tester' });
     assert.equal(mockStorage.get(ACCESS_TOKEN_KEY), 'access-abc');
     assert.equal(mockStorage.get(REFRESH_TOKEN_KEY), 'refresh-xyz');
+    assert.deepEqual(getStoredUserProfile(), { id: 'user-001', name: 'Tester' });
     assert.equal(getStoredAccessToken(), 'access-abc');
     assert.equal(getStoredRefreshToken(), 'refresh-xyz');
     assert.equal(dispatchedEvent, 'kumaran:auth_change');
 
-    // 2. Clear tokens
+    // 2. Clear tokens & profile
     clearStoredTokens();
     assert.equal(mockStorage.has(ACCESS_TOKEN_KEY), false);
     assert.equal(mockStorage.has(REFRESH_TOKEN_KEY), false);
+    assert.equal(mockStorage.has(USER_PROFILE_KEY), false);
     assert.equal(getStoredAccessToken(), null);
+    assert.equal(getStoredUserProfile(), null);
     assert.equal(dispatchedEvent, 'kumaran:unauthorized');
   } finally {
     delete (globalThis as any).window;

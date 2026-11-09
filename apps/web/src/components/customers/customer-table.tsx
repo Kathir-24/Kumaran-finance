@@ -87,8 +87,8 @@ export function CustomerTable({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-sm">
-        <Table>
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-x-auto shadow-sm">
+        <Table className="min-w-[800px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-36">{t('colCode')}</TableHead>
@@ -162,8 +162,8 @@ export function CustomerTable({
   }
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-sm">
-      <Table>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-x-auto shadow-sm">
+      <Table className="min-w-[800px]">
         <TableHeader>
           <TableRow>
             <TableHead className="w-36">{t('colCode')}</TableHead>
