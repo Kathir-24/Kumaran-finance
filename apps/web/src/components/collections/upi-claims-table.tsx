@@ -99,31 +99,31 @@ export function UpiClaimsTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-sm">
-      <Table>
+      <Table className="min-w-[850px]">
         <TableHeader className="bg-slate-950/80">
           <TableRow className="border-b border-slate-800 hover:bg-transparent">
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableClaimId')} & Date
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableCustomer')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableSchemeTicket')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableMonth')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400 text-right">
+            <TableHead className="text-[11px] font-semibold text-slate-400 text-right whitespace-nowrap">
               {t('tableAmount')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableUtrNumber')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {t('tableSubmittedBy')}
             </TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400 text-right">
+            <TableHead className="text-[11px] font-semibold text-slate-400 text-right whitespace-nowrap">
               {t('tableActions')}
             </TableHead>
           </TableRow>
@@ -139,7 +139,7 @@ export function UpiClaimsTable({
                 key={claim.claimId}
                 className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors"
               >
-                <TableCell className="font-mono text-xs">
+                <TableCell className="font-mono text-xs whitespace-nowrap">
                   <span className="font-bold text-sky-400 block">
                     #{claim.claimId.slice(0, 8)}
                   </span>
@@ -149,28 +149,28 @@ export function UpiClaimsTable({
                 </TableCell>
 
                 <TableCell className="text-xs">
-                  <div className="font-medium text-slate-200">
+                  <div className="font-medium text-slate-200 whitespace-nowrap">
                     {claim.customer?.fullName || 'Subscriber'}
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400">
+                  <div className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
                     {claim.customer?.customerCode} • {claim.customer?.phone}
                   </div>
                 </TableCell>
 
-                <TableCell className="font-mono text-xs text-slate-200">
+                <TableCell className="font-mono text-xs text-slate-200 whitespace-nowrap">
                   {claim.ticket?.groupCode}{' '}
                   <span className="text-slate-400">T#{claim.ticket?.ticketNumber}</span>
                 </TableCell>
 
-                <TableCell className="font-mono text-xs text-slate-300">
+                <TableCell className="font-mono text-xs text-slate-300 whitespace-nowrap">
                   Month #{claim.due?.installmentMonth || 1}
                 </TableCell>
 
-                <TableCell className="font-mono text-xs font-bold text-emerald-400 text-right">
+                <TableCell className="font-mono text-xs font-bold text-emerald-400 text-right whitespace-nowrap">
                   {formatRupee(claim.amount)}
                 </TableCell>
 
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded">
                       {claim.utrNumber}
@@ -189,22 +189,22 @@ export function UpiClaimsTable({
                     </button>
                   </div>
                   {claim.notes && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 italic">
+                    <div className="text-[10px] text-slate-400 mt-0.5 italic max-w-xs truncate">
                       "{claim.notes}"
                     </div>
                   )}
                 </TableCell>
 
                 <TableCell className="text-xs">
-                  <div className="font-medium text-slate-300">
+                  <div className="font-medium text-slate-300 whitespace-nowrap">
                     {claim.submittedByUser?.name || 'Customer App'}
                   </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
+                  <div className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
                     {claim.submittedByUser?.roles?.[0] || 'CUSTOMER'}
                   </div>
                 </TableCell>
 
-                <TableCell className="text-right">
+                <TableCell className="text-right whitespace-nowrap">
                   {isSelfSubmission ? (
                     <div
                       className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-950/40 border border-rose-500/30 text-[10px] text-rose-300"

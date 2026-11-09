@@ -155,18 +155,18 @@ export function PaymentsTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-sm">
-      <Table>
+      <Table className="min-w-[880px]">
         <TableHeader className="bg-slate-950/80">
           <TableRow className="border-b border-slate-800 hover:bg-transparent">
-            <TableHead className="text-[11px] font-semibold text-slate-400">Receipt #</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Scheme & Ticket</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Subscriber</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Month</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400 text-right">Amount Paid</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Mode</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Status</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400">Collected At</TableHead>
-            <TableHead className="text-[11px] font-semibold text-slate-400 text-right">Actions</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Receipt #</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Scheme & Ticket</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Subscriber</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Month</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 text-right whitespace-nowrap">Amount Paid</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Mode</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Status</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Collected At</TableHead>
+            <TableHead className="text-[11px] font-semibold text-slate-400 text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -179,28 +179,28 @@ export function PaymentsTable({
 
             return (
               <TableRow key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
-                <TableCell className="font-mono text-xs font-semibold text-emerald-400">
+                <TableCell className="font-mono text-xs font-semibold text-emerald-400 whitespace-nowrap">
                   {receiptNo}
                 </TableCell>
-                <TableCell className="font-mono text-xs text-slate-200">
+                <TableCell className="font-mono text-xs text-slate-200 whitespace-nowrap">
                   {groupCode} <span className="text-slate-400">T#{ticketNum}</span>
                 </TableCell>
                 <TableCell className="text-xs">
-                  <div className="font-medium text-slate-200">{subName}</div>
-                  {subPhone && <div className="text-[10px] text-slate-400 font-mono">{subPhone}</div>}
+                  <div className="font-medium text-slate-200 whitespace-nowrap">{subName}</div>
+                  {subPhone && <div className="text-[10px] text-slate-400 font-mono whitespace-nowrap">{subPhone}</div>}
                 </TableCell>
-                <TableCell className="text-xs font-mono text-slate-300">
+                <TableCell className="text-xs font-mono text-slate-300 whitespace-nowrap">
                   Month #{p.installmentMonth}
                 </TableCell>
-                <TableCell className="text-xs font-mono font-bold text-slate-100 text-right">
+                <TableCell className="text-xs font-mono font-bold text-slate-100 text-right whitespace-nowrap">
                   {formatRupee(p.amount)}
                 </TableCell>
-                <TableCell>{renderMethodBadge(p.paymentMethod)}</TableCell>
-                <TableCell>{renderStatusBadge(p.paymentStatus)}</TableCell>
+                <TableCell className="whitespace-nowrap">{renderMethodBadge(p.paymentMethod)}</TableCell>
+                <TableCell className="whitespace-nowrap">{renderStatusBadge(p.paymentStatus)}</TableCell>
                 <TableCell className="text-xs text-slate-400 whitespace-nowrap">
                   {formatDate(p.createdAt)}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1.5">
                     <Button
                       type="button"
