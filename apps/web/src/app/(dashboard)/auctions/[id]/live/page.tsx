@@ -236,12 +236,13 @@ export default function LiveAuctionRoomPage() {
       </div>
 
       {/* Embedded Statutory Rules Banners: Guardrail 6 & Guardrail 4 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
         <BusinessRuleBanner
           ruleNumber={6}
           title={t('guardrail6BannerTitle')}
           description={t('guardrail6BannerDesc')}
           referencePath="/instructions?rule=6"
+          className="h-full"
           defaultExpanded={false}
         />
         <BusinessRuleBanner
@@ -249,6 +250,7 @@ export default function LiveAuctionRoomPage() {
           title="Universal Equal Dividend Deduction (Guardrail 4)"
           description="Winning discount minus 4% commission is distributed equally to ALL members, including winner and past prized winners."
           referencePath="/instructions?rule=4"
+          className="h-full"
           defaultExpanded={false}
         />
       </div>

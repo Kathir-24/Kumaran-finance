@@ -94,12 +94,13 @@ export default function AuctionsPage() {
       </div>
 
       {/* Embedded Business Rule Banners: Guardrail 6 & Guardrail 5 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-stretch">
         <BusinessRuleBanner
           ruleNumber={6}
           title={t('guardrail6BannerTitle')}
           description={t('guardrail6BannerDesc')}
           referencePath="/instructions?rule=6"
+          className="h-full"
           defaultExpanded={false}
         />
         <BusinessRuleBanner
@@ -107,6 +108,7 @@ export default function AuctionsPage() {
           title={t('guardrail5BannerTitle')}
           description={t('guardrail5BannerDesc')}
           referencePath="/instructions?rule=5"
+          className="h-full"
           defaultExpanded={false}
         />
       </div>

@@ -1282,6 +1282,8 @@
   },
   "rules": {
     "bannerTitle": "Governing Product Business Rule",
+    "ruleBadge": "Rule #{number}",
+    "instructionsShort": "Instructions",
     "readFullInstructions": "Read Full Rule in Instructions",
     "guardrail1Title": "1. Single Company Tenancy",
     "guardrail1Desc": "Kumaran Chits operates solely for Kumaran Finance (Perundurai). Zero company_id columns exist.",

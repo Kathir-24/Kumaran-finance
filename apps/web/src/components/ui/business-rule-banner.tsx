@@ -38,53 +38,57 @@ export function BusinessRuleBanner({
   return (
     <div
       className={cn(
-        'rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 text-slate-100 shadow-sm backdrop-blur-sm transition-all',
+        'rounded-xl border border-indigo-500/25 bg-slate-900/80 p-3.5 text-slate-100 shadow-sm backdrop-blur-sm transition-all hover:border-indigo-500/40 flex flex-col justify-between',
         className
       )}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shrink-0 mt-0.5 sm:mt-0">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[11px] font-semibold text-indigo-300 border border-indigo-500/30 uppercase tracking-wide">
-                {t('bannerTitle')} #{ruleNumber}
-              </span>
+      <div>
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shrink-0 mt-0.5">
+              <ShieldCheck className="h-4 w-4" />
             </div>
-            <h4 className="text-sm font-semibold text-slate-100 mt-0.5 break-words leading-snug">{title}</h4>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300 border border-indigo-500/30 uppercase tracking-wide shrink-0 font-mono">
+                  {t('ruleBadge', { number: ruleNumber })}
+                </span>
+              </div>
+              <h4 className="text-xs sm:text-sm font-semibold text-slate-100 mt-1 break-words leading-snug">
+                {title}
+              </h4>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-indigo-500/10 shrink-0">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/40 gap-1.5 h-8 px-2.5"
-          >
-            <Link href={referencePath}>
-              <span>{t('readFullInstructions')}</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-1 shrink-0 pt-0.5">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/40 gap-1 h-7 px-2"
+            >
+              <Link href={referencePath} title={t('readFullInstructions')}>
+                <span className="hidden xl:inline">{t('instructionsShort')}</span>
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </Button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="h-8 w-8 text-slate-400 hover:text-slate-200 shrink-0"
-            aria-label={isExpanded ? 'Collapse rule' : 'Expand rule'}
-          >
-            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-7 w-7 text-slate-400 hover:text-slate-200 shrink-0"
+              aria-label={isExpanded ? 'Collapse rule' : 'Expand rule'}
+            >
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
         </div>
       </div>
 
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-indigo-500/20 text-xs text-slate-300 space-y-2">
+        <div className="mt-2.5 pt-2.5 border-t border-indigo-500/20 text-xs text-slate-300 space-y-2">
           <p className="leading-relaxed">{description}</p>
           {bulletPoints.length > 0 && (
             <ul className="list-disc pl-5 space-y-1 text-slate-300">
