@@ -107,7 +107,7 @@ export function NotificationAuditTable({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <CardTitle className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <Bell className="h-5 w-5 text-emerald-400" />
+                <Bell className="h-5 w-5 text-emerald-400 shrink-0" />
                 {t('audit.title')}
               </CardTitle>
               <CardDescription className="text-xs text-slate-400 mt-0.5">
@@ -116,7 +116,7 @@ export function NotificationAuditTable({
             </div>
 
             {/* Limit Selector */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
               <span className="text-xs text-slate-400">{t('audit.limitLabel')}:</span>
               {[25, 50, 100].map((l) => (
                 <button
@@ -138,7 +138,7 @@ export function NotificationAuditTable({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
             {/* Search Box */}
-            <div className="relative flex-1">
+            <div className="relative flex-1 w-full sm:w-auto">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <Input
                 type="text"
@@ -150,14 +150,14 @@ export function NotificationAuditTable({
             </div>
 
             {/* Channel Filters */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
               <Button
                 type="button"
                 variant={selectedChannel === 'ALL' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedChannel('ALL')}
                 className={cn(
-                  'h-8 text-xs',
+                  'h-8 text-xs shrink-0 whitespace-nowrap',
                   selectedChannel === 'ALL'
                     ? 'bg-slate-800 text-white'
                     : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
@@ -171,13 +171,13 @@ export function NotificationAuditTable({
                 size="sm"
                 onClick={() => setSelectedChannel('PUSH')}
                 className={cn(
-                  'h-8 text-xs gap-1',
+                  'h-8 text-xs gap-1 shrink-0 whitespace-nowrap',
                   selectedChannel === 'PUSH'
                     ? 'bg-emerald-600 text-slate-950 font-semibold'
                     : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                 )}
               >
-                <Smartphone className="h-3.5 w-3.5 text-emerald-400" />
+                <Smartphone className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                 {t('audit.filterPush')}
               </Button>
               <Button
@@ -186,13 +186,13 @@ export function NotificationAuditTable({
                 size="sm"
                 onClick={() => setSelectedChannel('SMS')}
                 className={cn(
-                  'h-8 text-xs gap-1',
+                  'h-8 text-xs gap-1 shrink-0 whitespace-nowrap',
                   selectedChannel === 'SMS'
                     ? 'bg-amber-600 text-slate-950 font-semibold'
                     : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                 )}
               >
-                <MessageSquare className="h-3.5 w-3.5 text-amber-400" />
+                <MessageSquare className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                 {t('audit.filterSms')}
               </Button>
             </div>
@@ -208,16 +208,16 @@ export function NotificationAuditTable({
               {t('audit.noLogs')}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-800">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto scrollbar-thin rounded-lg border border-slate-800">
+              <table className="w-full min-w-[760px] text-left text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800">
                   <tr>
-                    <th className="py-2.5 px-3">{t('audit.sentAt')}</th>
-                    <th className="py-2.5 px-3">{t('audit.channel')}</th>
-                    <th className="py-2.5 px-3">{t('audit.recipient')}</th>
-                    <th className="py-2.5 px-3">{t('audit.titleCol')}</th>
-                    <th className="py-2.5 px-3">{t('audit.bodyCol')}</th>
-                    <th className="py-2.5 px-3">{t('audit.status')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.sentAt')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.channel')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.recipient')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.titleCol')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.bodyCol')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('audit.status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
@@ -230,7 +230,7 @@ export function NotificationAuditTable({
                         <td className="py-2.5 px-3 text-slate-300 font-mono whitespace-nowrap">
                           {formatSentAt(log.sentAt)}
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-2.5 px-3 whitespace-nowrap">
                           <Badge
                             variant="outline"
                             className={cn(
@@ -243,7 +243,7 @@ export function NotificationAuditTable({
                             {isPush ? 'PUSH (FCM)' : 'SMS (DLT)'}
                           </Badge>
                         </td>
-                        <td className="py-2.5 px-3 font-mono font-medium text-slate-200">
+                        <td className="py-2.5 px-3 font-mono font-medium text-slate-200 whitespace-nowrap">
                           {log.recipient}
                         </td>
                         <td className="py-2.5 px-3 font-medium text-slate-100 max-w-[180px] truncate">
@@ -252,7 +252,7 @@ export function NotificationAuditTable({
                         <td className="py-2.5 px-3 text-slate-400 max-w-[280px] truncate">
                           {log.body}
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-2.5 px-3 whitespace-nowrap">
                           <span
                             className={cn(
                               'inline-flex items-center gap-1 text-[11px] font-semibold',

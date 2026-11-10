@@ -1867,7 +1867,12 @@
       "costBannerDesc": "Primary dispatches use free Mobile Push (FCM). Keypad SMS is strictly reserved as a fallback for non-smartphone users. Zero promotional marketing spam."
     },
     "accessDeniedTitle": "Partner Authority Required",
-    "accessDeniedDesc": "Only Managing Partners (Super Admin) or CA Auditors are authorized to access BullMQ operations control console under Kumaran Finance security policy."
+    "accessDeniedDesc": "Only Managing Partners (Super Admin) or CA Auditors are authorized to access BullMQ operations control console under Kumaran Finance security policy.",
+    "redisBrokerTitle": "Redis Broker",
+    "redisBrokerDesc": "3 Queues Operational",
+    "runningDesc": "Running in background",
+    "waitingDesc": "Awaiting worker thread",
+    "failedDesc": "Retry available in Bull Board"
   },
   "print": {
     "controls": {

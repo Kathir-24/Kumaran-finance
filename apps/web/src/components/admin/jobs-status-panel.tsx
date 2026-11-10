@@ -105,10 +105,10 @@ export function JobsStatusPanel({
     <div className="space-y-6">
       {/* Section 1: BullMQ Production Queues Grid */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-              <Layers className="h-5 w-5 text-emerald-400" />
+              <Layers className="h-5 w-5 text-emerald-400 shrink-0" />
               {t('queues.title')}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">{t('queues.desc')}</p>
@@ -119,7 +119,7 @@ export function JobsStatusPanel({
             size="sm"
             onClick={onRefresh}
             disabled={isLoadingQueues || isLoadingSchedules}
-            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-8"
+            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-8 shrink-0"
           >
             <RotateCw
               className={cn(
@@ -219,12 +219,12 @@ export function JobsStatusPanel({
                       </div>
                     </div>
 
-                    <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 px-1">
-                      <span>
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-400 px-1">
+                      <span className="whitespace-nowrap">
                         {t('completedJobs')}:{' '}
                         <strong className="text-slate-200 font-mono">{q.completed}</strong>
                       </span>
-                      <span>
+                      <span className="whitespace-nowrap">
                         {t('delayedJobs')}:{' '}
                         <strong className="text-slate-200 font-mono">{q.delayed}</strong>
                       </span>
@@ -261,14 +261,14 @@ export function JobsStatusPanel({
               {t('schedules.noSchedules')}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-800">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto scrollbar-thin rounded-lg border border-slate-800">
+              <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800">
                   <tr>
-                    <th className="py-2.5 px-3">{t('schedules.name')}</th>
-                    <th className="py-2.5 px-3">{t('schedules.cron')}</th>
-                    <th className="py-2.5 px-3">{t('schedules.frequency')}</th>
-                    <th className="py-2.5 px-3">{t('schedules.nextRun')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('schedules.name')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('schedules.cron')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('schedules.frequency')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('schedules.nextRun')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80 font-mono">
@@ -278,19 +278,19 @@ export function JobsStatusPanel({
                     const scheduleName = s.name || (s as any).queue || scheduleKey;
                     return (
                       <tr key={scheduleKey} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-slate-200 flex items-center gap-2">
+                        <td className="py-2.5 px-3 font-semibold text-slate-200 flex items-center gap-2 whitespace-nowrap">
                           <Clock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                           <span className="font-sans">{getQueueDisplayName(scheduleName)}</span>
                         </td>
-                        <td className="py-2.5 px-3 text-amber-300">
+                        <td className="py-2.5 px-3 text-amber-300 whitespace-nowrap">
                           <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800">
                             {cronExpr}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-slate-300 font-sans">
+                        <td className="py-2.5 px-3 text-slate-300 font-sans whitespace-nowrap">
                           {getScheduleFrequency(cronExpr)}
                         </td>
-                        <td className="py-2.5 px-3 text-emerald-400 font-sans">
+                        <td className="py-2.5 px-3 text-emerald-400 font-sans whitespace-nowrap">
                           {formatNextRun(s.next)}
                         </td>
                       </tr>

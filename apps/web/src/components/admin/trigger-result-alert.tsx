@@ -21,14 +21,14 @@ export function TriggerResultAlert({
   return (
     <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-xs space-y-1 font-mono text-emerald-300">
       <div className="font-sans font-semibold text-emerald-400 flex items-center gap-1.5 mb-1">
-        <CheckCircle2 className="h-4 w-4" />
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
         {isEnqueued ? enqueueMsg : successMsg}
       </div>
       {isEnqueued ? (
-        <div>Job ID: {result.jobId}</div>
+        <div className="break-all">Job ID: {result.jobId}</div>
       ) : (
         fields?.map((f) => (
-          <div key={f.label}>
+          <div key={f.label} className="break-words">
             {f.label}: {f.value}
           </div>
         ))

@@ -154,13 +154,13 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Trigger Card 1: Daily Arrears & Default Tagging */}
         <Card className="border-slate-800 bg-slate-900/80 shadow-sm flex flex-col justify-between">
           <div>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-amber-400" />
+                <Clock className="h-5 w-5 text-amber-400 shrink-0" />
                 {t('triggers.arrearsTitle')}
               </CardTitle>
               <CardDescription className="text-xs text-slate-400 mt-1">
@@ -208,7 +208,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
             </CardContent>
           </div>
 
-          <div className="p-6 pt-0 flex gap-2">
+          <div className="p-6 pt-0 flex flex-col sm:flex-row gap-2">
             <Button
               type="button"
               size="sm"
@@ -216,7 +216,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
               disabled={!isSuperAdmin || isRunningArrears || isEnqueuingArrears}
               className="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-semibold text-xs h-9"
             >
-              <Play className="h-3.5 w-3.5 mr-1" />
+              <Play className="h-3.5 w-3.5 mr-1 shrink-0" />
               {isRunningArrears ? t('triggers.runningArrears') : t('triggers.runArrears')}
             </Button>
             <Button
@@ -227,7 +227,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
               disabled={!isSuperAdmin || isRunningArrears || isEnqueuingArrears}
               className="border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800 text-xs h-9"
             >
-              <Send className="h-3 w-3 mr-1 text-amber-400" />
+              <Send className="h-3 w-3 mr-1 text-amber-400 shrink-0" />
               {isEnqueuingArrears ? '...' : t('triggers.enqueueArrears')}
             </Button>
           </div>
@@ -238,7 +238,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
           <div>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <Send className="h-5 w-5 text-indigo-400" />
+                <Send className="h-5 w-5 text-indigo-400 shrink-0" />
                 {t('triggers.preAuctionTitle')}
               </CardTitle>
               <CardDescription className="text-xs text-slate-400 mt-1">
@@ -294,7 +294,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
               disabled={!isSuperAdmin || isRunningAuctionScan}
               className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-9"
             >
-              <Play className="h-3.5 w-3.5 mr-1" />
+              <Play className="h-3.5 w-3.5 mr-1 shrink-0" />
               {isRunningAuctionScan ? t('triggers.runningPreAuction') : t('triggers.runPreAuction')}
             </Button>
           </div>
@@ -305,7 +305,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
           <div>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-400" />
+                <Sparkles className="h-5 w-5 text-emerald-400 shrink-0" />
                 {t('triggers.reconTitle')}
               </CardTitle>
               <CardDescription className="text-xs text-slate-400 mt-1">
@@ -315,10 +315,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
 
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 text-[11px] text-slate-400">
-                <p>
-                  Reconciles external gateway settlement records against internal PostgreSQL
-                  payments to detect and resolve ghost drops.
-                </p>
+                <p>{t('triggers.reconDesc')}</p>
               </div>
 
               {reconError && (
@@ -347,7 +344,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
             </CardContent>
           </div>
 
-          <div className="p-6 pt-0 flex gap-2">
+          <div className="p-6 pt-0 flex flex-col sm:flex-row gap-2">
             <Button
               type="button"
               size="sm"
@@ -355,7 +352,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
               disabled={!isSuperAdmin || isRunningRecon || isEnqueuingRecon}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs h-9"
             >
-              <Play className="h-3.5 w-3.5 mr-1" />
+              <Play className="h-3.5 w-3.5 mr-1 shrink-0" />
               {isRunningRecon ? t('triggers.runningRecon') : t('triggers.runRecon')}
             </Button>
             <Button
@@ -366,7 +363,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
               disabled={!isSuperAdmin || isRunningRecon || isEnqueuingRecon}
               className="border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800 text-xs h-9"
             >
-              <Send className="h-3 w-3 mr-1 text-emerald-400" />
+              <Send className="h-3 w-3 mr-1 text-emerald-400 shrink-0" />
               {isEnqueuingRecon ? '...' : t('triggers.enqueueRecon')}
             </Button>
           </div>
