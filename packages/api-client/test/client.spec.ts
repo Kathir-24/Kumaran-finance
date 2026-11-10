@@ -111,3 +111,70 @@ test('KumaranApiError properties and helpers', () => {
   const err500 = new KumaranApiError(500, { code: 'INTERNAL_SERVER_ERROR', message: 'Database timeout' });
   assert.equal(err500.isInternalServerError, true);
 });
+
+
+test('Client Factory: 401 retry on POST request with body succeeds using unconsumed cloned stream', async () => {
+  let initialCallCount = 0;
+  let refreshCallCount = 0;
+  let retriedCallCount = 0;
+  let retriedBodyReceived = '';
+
+  const mockFetch = async (req: Request) => {
+    const url = req.url;
+
+    if (url.includes('/api/v1/auth/refresh-token')) {
+      refreshCallCount++;
+      return new Response(
+        JSON.stringify({
+          data: {
+            accessToken: 'refreshed-jwt-access-token-99999',
+            refreshToken: 'new-refresh-token-11111',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (url.includes('/api/v1/payments')) {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader === 'Bearer initial-stale-token') {
+        initialCallCount++;
+        await req.text();
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      }
+
+      if (authHeader === 'Bearer refreshed-jwt-access-token-99999') {
+        retriedCallCount++;
+        retriedBodyReceived = await req.text();
+        return new Response(JSON.stringify({ success: true, data: { paymentId: 'pay-uuid-ok' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+  };
+
+  let activeToken = 'initial-stale-token';
+  const client = createKumaranClient({
+    baseUrl: 'http://127.0.0.1:3000',
+    getAccessToken: () => activeToken,
+    getRefreshToken: () => 'valid-refresh-token',
+    onTokenRefreshed: (tokens) => {
+      activeToken = tokens.accessToken;
+    },
+    fetch: mockFetch,
+  });
+
+  const postPayload = { amount: 10000, paymentMode: 'CASH' };
+  await client.POST('/api/v1/payments' as any, {
+    body: postPayload as any,
+  });
+
+  assert.equal(initialCallCount, 1, 'Initial request should have fired');
+  assert.equal(refreshCallCount, 1, 'Refresh token request should have fired on 401');
+  assert.equal(retriedCallCount, 1, 'Retried request should have fired with refreshed token');
+  assert.equal(activeToken, 'refreshed-jwt-access-token-99999');
+  assert.ok(retriedBodyReceived.includes('10000'), 'Retried body should contain original payload');
+});

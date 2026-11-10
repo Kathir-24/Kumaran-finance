@@ -43,13 +43,24 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
     fetch: config.fetch,
   });
 
-  // Mutex lock for token refreshing
+  // Mutex lock for token refreshing & unconsumed body clone map
   let isRefreshing = false;
   let refreshPromise: Promise<string | null> | null = null;
+  const requestCloneMap = new WeakMap<Request, Request>();
 
   const authAndIdempotencyMiddleware: Middleware = {
     async onRequest({ request }) {
-      // 1. Inject Bearer Access Token if available
+      // 1. Preserve an unconsumed clone of mutation requests for 401 retry
+      const method = request.method.toUpperCase();
+      if (request.body && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        try {
+          requestCloneMap.set(request, request.clone());
+        } catch {
+          // Ignore if clone is unsupported in environment
+        }
+      }
+
+      // 2. Inject Bearer Access Token if available
       if (config.getAccessToken) {
         const token = await config.getAccessToken();
         if (token && !request.headers.has('Authorization')) {
@@ -57,8 +68,7 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
         }
       }
 
-      // 2. Inject Idempotency-Key on mutation requests if missing
-      const method = request.method.toUpperCase();
+      // 3. Inject Idempotency-Key on mutation requests if missing
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         if (!request.headers.has('Idempotency-Key')) {
           const url = request.url;
@@ -106,11 +116,14 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
                 const refreshToken = await config.getRefreshToken!();
                 if (!refreshToken) return null;
 
-                const refreshRes = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ refreshToken }),
-                });
+                const fetchFn = config.fetch || fetch;
+                const refreshRes = await fetchFn(
+                  new Request(`${baseUrl}/api/v1/auth/refresh-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken, clientType: 'WEB' }),
+                  })
+                );
 
                 if (!refreshRes.ok) {
                   return null;
@@ -134,19 +147,23 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
 
           const newAccessToken = await refreshPromise;
           if (newAccessToken) {
-            // Clone request and retry with new access token
+            // Replay request with new access token and fresh unconsumed body stream
             const retryHeaders = new Headers(request.headers);
             retryHeaders.set('Authorization', `Bearer ${newAccessToken}`);
+
+            const cloned = requestCloneMap.get(request);
+            const retryBody = cloned ? cloned.body : request.body;
 
             const retriedRequest = new Request(request.url, {
               method: request.method,
               headers: retryHeaders,
-              body: request.body,
+              body: retryBody,
               // @ts-ignore
               duplex: 'half',
             });
 
-            return fetch(retriedRequest);
+            const fetchFn = config.fetch || fetch;
+            return fetchFn(retriedRequest);
           } else {
             if (config.onUnauthorized) {
               await config.onUnauthorized();

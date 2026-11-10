@@ -31,6 +31,7 @@ export interface SessionInactivityGuardProps {
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
 const DEFAULT_WARNING_MS = 18 * 60 * 1000; // 18 minutes
 const DEFAULT_CHECK_INTERVAL_MS = 1000; // 1 second
+const ACTIVITY_STORAGE_KEY = 'kc_last_active_timestamp';
 
 export function SessionInactivityGuard({
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -53,10 +54,20 @@ export function SessionInactivityGuard({
     void useAuthStore.getState().hydrate();
   }, []);
 
-  // Resets inactivity timer when user acts
+  // Resets inactivity timer when user acts and syncs timestamp across tabs
   const handleResetTimer = React.useCallback(() => {
-    lastActivityRef.current = Date.now();
+    const now = Date.now();
+    lastActivityRef.current = now;
     recordActivity();
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(ACTIVITY_STORAGE_KEY, now.toString());
+      } catch {
+        // Safe fallback in restricted environments
+      }
+    }
+
     if (isWarningOpen) {
       setIsWarningOpen(false);
     }
@@ -71,7 +82,7 @@ export function SessionInactivityGuard({
     }
   }, [handleResetTimer]);
 
-  // Mount activity listeners when user is authenticated
+  // Mount activity listeners and cross-tab storage sync when authenticated
   React.useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -81,6 +92,21 @@ export function SessionInactivityGuard({
     events.forEach((event) => {
       window.addEventListener(event, handleUserActivity, { passive: true });
     });
+
+    // Cross-tab synchronization: Listen to user activity in sibling tabs
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === ACTIVITY_STORAGE_KEY && e.newValue) {
+        const remoteTimestamp = parseInt(e.newValue, 10);
+        if (!isNaN(remoteTimestamp) && remoteTimestamp > lastActivityRef.current) {
+          lastActivityRef.current = remoteTimestamp;
+          if (isWarningOpen) {
+            setIsWarningOpen(false);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageEvent);
 
     const intervalId = window.setInterval(() => {
       const now = Date.now();
@@ -102,9 +128,10 @@ export function SessionInactivityGuard({
       events.forEach((event) => {
         window.removeEventListener(event, handleUserActivity);
       });
+      window.removeEventListener('storage', handleStorageEvent);
       window.clearInterval(intervalId);
     };
-  }, [isAuthenticated, timeoutMs, warningMs, checkIntervalMs, handleUserActivity, logout]);
+  }, [isAuthenticated, timeoutMs, warningMs, checkIntervalMs, handleUserActivity, logout, isWarningOpen]);
 
   if (!isAuthenticated) {
     return null;

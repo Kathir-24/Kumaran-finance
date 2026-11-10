@@ -1044,6 +1044,13 @@ export class AuthService {
           `auth:session:${userId}:DESKTOP`,
         );
       }
+      // Instant Stateless Token Invalidation: Invalidate all access tokens issued before this moment (15m TTL)
+      await redis.set(
+        `auth:revoked_before:${userId}`,
+        Math.floor(Date.now() / 1000).toString(),
+        'EX',
+        900,
+      );
     }
 
     const user = await this.prisma.user.findUnique({

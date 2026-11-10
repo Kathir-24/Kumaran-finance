@@ -137,29 +137,29 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Branch Switcher Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400">
-              <Building2 className="h-4 w-4 text-emerald-400" />
-              <div className="flex flex-col text-left">
-                <span className="font-semibold text-slate-100 max-w-[200px] sm:max-w-[280px] truncate">
-                  {displayBranch ? displayBranch.name : tTopbar('allBranches')}
-                </span>
-                {displayBranch?.nameTamil && (
-                  <span className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[280px] truncate">
-                    {displayBranch.nameTamil}
+          {/* Active Branch Display: Switcher for Super Admin/Auditor; Static Badge for Branch Staff */}
+          {isSuperAdminOrAuditor ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                <Building2 className="h-4 w-4 text-emerald-400" />
+                <div className="flex flex-col text-left">
+                  <span className="font-semibold text-slate-100 max-w-[200px] sm:max-w-[280px] truncate">
+                    {displayBranch ? displayBranch.name : tTopbar('allBranches')}
                   </span>
-                )}
-              </div>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400 ml-1" />
-            </DropdownMenuTrigger>
+                  {displayBranch?.nameTamil && (
+                    <span className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[280px] truncate">
+                      {displayBranch.nameTamil}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400 ml-1" />
+              </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuLabel>{tTopbar('selectBranch')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuContent align="start" className="w-64">
+                <DropdownMenuLabel>{tTopbar('selectBranch')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
 
-              {/* Company-wide option (Super Admin / Auditor) */}
-              {isSuperAdminOrAuditor && (
+                {/* Company-wide option */}
                 <DropdownMenuItem
                   onClick={() => handleSelectBranch(null)}
                   className="flex items-center justify-between py-2"
@@ -176,35 +176,49 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
                     <Check className="h-4 w-4 text-emerald-400" />
                   )}
                 </DropdownMenuItem>
-              )}
 
-              {/* Branch List */}
-              {branches.map((b) => {
-                const isSelected = activeBranchId === b.id;
-                return (
-                  <DropdownMenuItem
-                    key={b.id}
-                    onClick={() => handleSelectBranch(b.id)}
-                    className="flex items-center justify-between py-2"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium text-slate-200">
-                        {b.name}
-                      </span>
-                      {b.nameTamil && (
-                        <span className="text-[11px] text-slate-400">
-                          {b.nameTamil}
+                {/* Branch List */}
+                {branches.map((b) => {
+                  const isSelected = activeBranchId === b.id;
+                  return (
+                    <DropdownMenuItem
+                      key={b.id}
+                      onClick={() => handleSelectBranch(b.id)}
+                      className="flex items-center justify-between py-2"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium text-slate-200">
+                          {b.name}
                         </span>
+                        {b.nameTamil && (
+                          <span className="text-[11px] text-slate-400">
+                            {b.nameTamil}
+                          </span>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <Check className="h-4 w-4 text-emerald-400" />
                       )}
-                    </div>
-                    {isSelected && (
-                      <Check className="h-4 w-4 text-emerald-400" />
-                    )}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300">
+              <Building2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <div className="flex flex-col text-left">
+                <span className="font-semibold text-slate-100 max-w-[180px] sm:max-w-[240px] truncate">
+                  {displayBranch ? displayBranch.name : 'Head Office — Perundurai'}
+                </span>
+                {displayBranch?.nameTamil && (
+                  <span className="text-[10px] text-slate-400 max-w-[180px] sm:max-w-[240px] truncate">
+                    {displayBranch.nameTamil}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Actions, Pending Approvals, Locale, Profile */}

@@ -37,7 +37,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
     const cacheKey = `user:status:${payload.sub}`;
 
-    // Fast Path: Check high-throughput Redis status cache (120s TTL)
+    // Fast Path 1: Check if user session has been revoked upon logout
+    if (useRedis && redis) {
+      try {
+        const revokedBeforeStr = await redis.get(`auth:revoked_before:${payload.sub}`);
+        if (revokedBeforeStr) {
+          const revokedBefore = parseInt(revokedBeforeStr, 10);
+          if (payload.iat && payload.iat <= revokedBefore) {
+            throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof UnauthorizedException) {
+          throw err;
+        }
+        // Fall back to DB checks on cache read error
+      }
+    }
+
+    // Fast Path 2: Check high-throughput Redis status cache (120s TTL)
     if (useRedis && redis) {
       try {
         const cachedStatus = await redis.get(cacheKey);
