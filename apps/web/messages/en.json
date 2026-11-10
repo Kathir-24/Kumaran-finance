@@ -1626,7 +1626,15 @@
     "accessDeniedDesc": "Only Managing Partners (Super Admin) are authorized to register or configure branch offices under Kumaran Finance policy.",
     "superAdminOnlyBadge": "Super Admin Exclusive",
     "rule1Title": "Guardrail 1: Single Company Tenancy & Branch Network (ADR-01 & ADR-02)",
-    "rule1Desc": "All branches belong strictly to Kumaran Finance (zero company_id abstraction). Head Office Perundurai serves as the central anchor, with multi-branch scalability preserved."
+    "rule1Desc": "All branches belong strictly to Kumaran Finance (zero company_id abstraction). Head Office Perundurai serves as the central anchor, with multi-branch scalability preserved.",
+    "loadingBranches": "Loading branch directory...",
+    "clearSearchFilter": "Clear Search Filter",
+    "multiBranchBadge": "Multi-Branch v1",
+    "defaultHeadOffice": "Perundurai (PRD)",
+    "registrationError": "Registration Error",
+    "statusActive": "STATUS: ACTIVE",
+    "adrNoteTitle": "ADR-01 & ADR-02 Compliance Note",
+    "adrNoteDesc": "Branch creation operates within the single-company tenancy of Kumaran Finance. Zero multi-tenant schema overhead exists."
   },
   "users": {
     "title": "Staff User Administration",

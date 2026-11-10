@@ -67,7 +67,7 @@ export function BranchTable({
     return (
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center">
         <div className="inline-flex h-10 w-10 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-        <p className="mt-4 text-xs font-medium text-slate-400">Loading branch directory...</p>
+        <p className="mt-4 text-xs font-medium text-slate-400">{t('loadingBranches')}</p>
       </div>
     );
   }
@@ -85,7 +85,7 @@ export function BranchTable({
             onClick={onClearSearch}
             className="mt-4 border-slate-700 bg-slate-850 hover:bg-slate-800 text-xs"
           >
-            Clear Search Filter
+            {t('clearSearchFilter')}
           </Button>
         )}
       </div>
@@ -94,16 +94,16 @@ export function BranchTable({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/70 shadow-xl backdrop-blur-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-x-auto scrollbar-thin">
+        <table className="w-full min-w-[760px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800/80 bg-slate-950/60 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-              <th className="py-3.5 px-4">{t('code')}</th>
-              <th className="py-3.5 px-4">{t('name')}</th>
-              <th className="py-3.5 px-4">{t('address')}</th>
-              <th className="py-3.5 px-4">{t('phone')}</th>
-              <th className="py-3.5 px-4">{t('status')}</th>
-              <th className="py-3.5 px-4 text-right">{t('createdDate')}</th>
+              <th className="py-3.5 px-4 whitespace-nowrap">{t('code')}</th>
+              <th className="py-3.5 px-4 min-w-[180px]">{t('name')}</th>
+              <th className="py-3.5 px-4 min-w-[220px]">{t('address')}</th>
+              <th className="py-3.5 px-4 whitespace-nowrap">{t('phone')}</th>
+              <th className="py-3.5 px-4 whitespace-nowrap">{t('status')}</th>
+              <th className="py-3.5 px-4 text-right whitespace-nowrap">{t('createdDate')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">

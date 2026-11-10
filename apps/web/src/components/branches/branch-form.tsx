@@ -109,7 +109,7 @@ export function BranchForm() {
               {errorMsg && (
                 <Alert variant="destructive" className="border-rose-500/40 bg-rose-950/20 text-rose-300">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle className="text-xs font-bold">Registration Error</AlertTitle>
+                  <AlertTitle className="text-xs font-bold">{t('registrationError')}</AlertTitle>
                   <AlertDescription className="text-xs">{errorMsg}</AlertDescription>
                 </Alert>
               )}
@@ -272,15 +272,14 @@ export function BranchForm() {
 
               <div className="border-t border-slate-800/80 pt-2 flex items-center justify-between text-[10px] text-slate-500">
                 <span>Receipt Series: KC-REC-{(code.trim() || 'BR').toUpperCase()}-...</span>
-                <span className="text-emerald-400/90 font-mono">STATUS: ACTIVE</span>
+                <span className="text-emerald-400/90 font-mono">{t('statusActive')}</span>
               </div>
             </div>
 
             <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-3 text-[11px] text-amber-200/90 leading-relaxed">
-              <p className="font-semibold text-amber-300">ADR-01 & ADR-02 Compliance Note</p>
+              <p className="font-semibold text-amber-300">{t('adrNoteTitle')}</p>
               <p className="mt-1 text-slate-400">
-                Branch creation operates within the single-company tenancy of Kumaran Finance. Zero
-                multi-tenant schema overhead exists.
+                {t('adrNoteDesc')}
               </p>
             </div>
           </CardContent>

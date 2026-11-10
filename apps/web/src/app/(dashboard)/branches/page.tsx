@@ -112,7 +112,7 @@ export default function BranchesPage() {
       </div>
 
       {/* 4 Pulse KPI Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Branches */}
         <Card className="border-slate-800 bg-slate-900/80 shadow-md">
           <CardContent className="p-4 flex items-center justify-between">
@@ -121,7 +121,7 @@ export default function BranchesPage() {
               <h3 className="text-xl font-bold text-slate-100 mt-0.5">{totalCount}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiTotalDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="rounded-xl p-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
           </CardContent>
@@ -135,7 +135,7 @@ export default function BranchesPage() {
               <h3 className="text-xl font-bold text-emerald-400 mt-0.5">{activeCount}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiActiveDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="rounded-xl p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
               <CheckCircle2 className="h-5 w-5" />
             </div>
           </CardContent>
@@ -147,11 +147,11 @@ export default function BranchesPage() {
             <div>
               <p className="text-[11px] font-medium text-slate-400">{t('kpiHeadOffice')}</p>
               <h3 className="text-xs font-bold text-amber-300 mt-1 truncate max-w-[130px]">
-                {headOffice ? headOffice.name : 'Perundurai (PRD)'}
+                {headOffice ? headOffice.name : t('defaultHeadOffice')}
               </h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiHeadOfficeDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <div className="rounded-xl p-2.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
               <Landmark className="h-5 w-5" />
             </div>
           </CardContent>
@@ -162,10 +162,10 @@ export default function BranchesPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-medium text-slate-400">{t('kpiExpansion')}</p>
-              <h3 className="text-xs font-bold text-purple-300 mt-1">Multi-Branch v1</h3>
+              <h3 className="text-xs font-bold text-purple-300 mt-1">{t('multiBranchBadge')}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiExpansionDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="rounded-xl p-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
               <Network className="h-5 w-5" />
             </div>
           </CardContent>
@@ -184,7 +184,7 @@ export default function BranchesPage() {
       {/* Filter Tabs & Search Controls */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Segmented Filter Tabs */}
-        <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs">
+        <div className="inline-flex w-full sm:w-auto justify-between sm:justify-start overflow-x-auto scrollbar-none rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs shrink-0">
           {(['ALL', 'ACTIVE', 'INACTIVE'] as FilterTab[]).map((tab) => {
             const count =
               tab === 'ALL'
@@ -205,7 +205,7 @@ export default function BranchesPage() {
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors shrink-0 whitespace-nowrap',
                   activeTab === tab
                     ? 'bg-slate-800 text-slate-100 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
