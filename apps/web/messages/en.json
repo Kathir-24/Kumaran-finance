@@ -1745,7 +1745,17 @@
     "accessDeniedDesc": "Only Managing Partners (Super Admin) are authorized to onboard staff members or alter security credentials under Kumaran Finance operational policy.",
     "showingResults": "Showing {from} to {to} of {total} staff users",
     "prevPage": "Previous",
-    "nextPage": "Next"
+    "nextPage": "Next",
+    "loadingStaff": "Loading staff users...",
+    "clearSearchFilter": "Clear Search Filter",
+    "defaultBranch": "Head Office (PRD)",
+    "registrationError": "Registration Error",
+    "idSubtitle": "Staff Identity Record",
+    "fallbackStaffName": "Staff Full Name",
+    "assignedRolesLabel": "Assigned RBAC Roles",
+    "badgeStatusActive": "STATUS: ACTIVE",
+    "adr18NoteTitle": "ADR-18 Phone-Only Identity Note",
+    "adr18NoteDesc": "Staff login handle is solely the 10-digit Indian phone. Email authentication is permanently eliminated across the platform."
   },
   "jobs": {
     "title": "Background Jobs & Operations Control",

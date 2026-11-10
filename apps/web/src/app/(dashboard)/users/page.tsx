@@ -137,7 +137,7 @@ export default function UsersDirectoryPage() {
       </div>
 
       {/* 4 Pulse KPI Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-slate-800 bg-slate-900/80 shadow-md">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
@@ -145,7 +145,7 @@ export default function UsersDirectoryPage() {
               <h3 className="text-xl font-bold text-slate-100 mt-0.5">{total}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiTotalDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="rounded-xl p-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
               <Users className="h-5 w-5" />
             </div>
           </CardContent>
@@ -158,7 +158,7 @@ export default function UsersDirectoryPage() {
               <h3 className="text-xl font-bold text-emerald-400 mt-0.5">{activeCount}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiActiveDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="rounded-xl p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
               <UserCheck className="h-5 w-5" />
             </div>
           </CardContent>
@@ -171,7 +171,7 @@ export default function UsersDirectoryPage() {
               <h3 className="text-xl font-bold text-purple-300 mt-0.5">{partnerCount}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiPartnersDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="rounded-xl p-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
               <Shield className="h-5 w-5" />
             </div>
           </CardContent>
@@ -184,7 +184,7 @@ export default function UsersDirectoryPage() {
               <h3 className="text-xl font-bold text-indigo-300 mt-0.5">{agentCount}</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiFieldAgentsDesc')}</p>
             </div>
-            <div className="rounded-xl p-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="rounded-xl p-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
           </CardContent>
@@ -222,7 +222,7 @@ export default function UsersDirectoryPage() {
               setSelectedRole(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
+            className="w-full sm:w-auto rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
           >
             <option value="ALL">{t('filterRoleAll')}</option>
             <option value="SUPER_ADMIN">{t('roleSuperAdmin')}</option>
@@ -239,7 +239,7 @@ export default function UsersDirectoryPage() {
               setSelectedBranch(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
+            className="w-full sm:w-auto rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
           >
             <option value="ALL">{t('filterBranchAll')}</option>
             {branches.map((b) => (
@@ -250,7 +250,7 @@ export default function UsersDirectoryPage() {
           </select>
 
           {/* Status Tabs */}
-          <div className="inline-flex rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs">
+          <div className="inline-flex w-full sm:w-auto justify-between sm:justify-start overflow-x-auto scrollbar-none rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs shrink-0">
             {(['ALL', 'ACTIVE', 'INACTIVE'] as StatusFilter[]).map((tab) => (
               <button
                 key={tab}
@@ -260,7 +260,7 @@ export default function UsersDirectoryPage() {
                   setPage(1);
                 }}
                 className={cn(
-                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors shrink-0 whitespace-nowrap',
                   activeTab === tab
                     ? 'bg-slate-800 text-slate-100 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -288,7 +288,7 @@ export default function UsersDirectoryPage() {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 text-xs text-slate-400">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/80 pt-3 text-xs text-slate-400">
           <div>
             {t('showingResults', {
               from: (page - 1) * limit + 1,

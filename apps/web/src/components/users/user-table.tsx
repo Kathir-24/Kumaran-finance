@@ -96,7 +96,7 @@ export function UserTable({
     return (
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center">
         <div className="inline-flex h-10 w-10 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-        <p className="mt-4 text-xs font-medium text-slate-400">Loading staff users...</p>
+        <p className="mt-4 text-xs font-medium text-slate-400">{t('loadingStaff')}</p>
       </div>
     );
   }
@@ -114,7 +114,7 @@ export function UserTable({
             onClick={onClearSearch}
             className="mt-4 border-slate-700 bg-slate-850 hover:bg-slate-800 text-xs"
           >
-            Clear Search Filter
+            {t('clearSearchFilter')}
           </Button>
         )}
       </div>
@@ -124,17 +124,17 @@ export function UserTable({
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/70 shadow-xl backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full min-w-[880px] text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-800/80 bg-slate-950/60 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-                <th className="py-3.5 px-4">{t('colStaff')}</th>
-                <th className="py-3.5 px-4">{t('colPhone')}</th>
-                <th className="py-3.5 px-4">{t('colBranch')}</th>
-                <th className="py-3.5 px-4">{t('colRoles')}</th>
-                <th className="py-3.5 px-4">{t('colSecurity')}</th>
-                <th className="py-3.5 px-4">{t('colStatus')}</th>
-                <th className="py-3.5 px-4 text-right">{t('colActions')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('colStaff')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('colPhone')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('colBranch')}</th>
+                <th className="py-3.5 px-4 min-w-[180px]">{t('colRoles')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('colSecurity')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('colStatus')}</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">{t('colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
@@ -191,7 +191,7 @@ export function UserTable({
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-xs text-slate-300">
                         <Building2 className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                        <span>{u.branch?.name || 'Head Office (PRD)'}</span>
+                        <span>{u.branch?.name || t('defaultBranch')}</span>
                       </div>
                     </td>
 

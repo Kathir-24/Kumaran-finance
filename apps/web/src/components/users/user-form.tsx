@@ -146,7 +146,7 @@ export function UserForm() {
               {errorMsg && (
                 <Alert variant="destructive" className="border-rose-500/40 bg-rose-950/20 text-rose-300">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle className="text-xs font-bold">Registration Error</AlertTitle>
+                  <AlertTitle className="text-xs font-bold">{t('registrationError')}</AlertTitle>
                   <AlertDescription className="text-xs">{errorMsg}</AlertDescription>
                 </Alert>
               )}
@@ -300,7 +300,7 @@ export function UserForm() {
                     <div className="text-xs font-bold text-slate-100 tracking-wider">
                       KUMARAN FINANCE
                     </div>
-                    <div className="text-[10px] text-slate-400">Staff Identity Record</div>
+                    <div className="text-[10px] text-slate-400">{t('idSubtitle')}</div>
                   </div>
                 </div>
                 <span className="font-mono text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded">
@@ -310,7 +310,7 @@ export function UserForm() {
 
               <div>
                 <div className="text-base font-bold text-slate-100">
-                  {name.trim() || 'Staff Full Name'}
+                  {name.trim() || t('fallbackStaffName')}
                 </div>
                 <div className="flex items-center gap-1.5 font-mono text-xs text-slate-300 mt-1">
                   <Phone className="h-3 w-3 text-emerald-400" />
@@ -320,7 +320,7 @@ export function UserForm() {
 
               <div className="space-y-1.5 pt-1">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Assigned RBAC Roles
+                  {t('assignedRolesLabel')}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedRoles.map((r) => (
@@ -335,16 +335,15 @@ export function UserForm() {
               </div>
 
               <div className="border-t border-slate-800/80 pt-2.5 flex items-center justify-between text-[10px] text-slate-500">
-                <span>Branch: {selectedBranch?.name || 'Head Office - Perundurai'}</span>
-                <span className="text-emerald-400/90 font-mono">STATUS: ACTIVE</span>
+                <span>{t('colBranch')}: {selectedBranch?.name || t('defaultBranch')}</span>
+                <span className="text-emerald-400/90 font-mono">{t('badgeStatusActive')}</span>
               </div>
             </div>
 
             <div className="rounded-lg border border-indigo-500/20 bg-indigo-950/10 p-3 text-[11px] text-indigo-200/90 leading-relaxed">
-              <p className="font-semibold text-indigo-300">ADR-18 Phone-Only Identity Note</p>
+              <p className="font-semibold text-indigo-300">{t('adr18NoteTitle')}</p>
               <p className="mt-1 text-slate-400">
-                Staff login handle is solely the 10-digit Indian phone. Email authentication is
-                permanently eliminated across the platform.
+                {t('adr18NoteDesc')}
               </p>
             </div>
           </CardContent>
