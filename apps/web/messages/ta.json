@@ -130,6 +130,7 @@
     "selectBranch": "கிளையைத் தேர்ந்தெடுக்கவும்",
     "allBranches": "அனைத்து கிளைகள்",
     "pendingApprovals": "நிலுவை ஒப்புதல்கள்",
+    "safetyProofVerifications": "பாதுகாப்பு ஆவணங்கள்",
     "noPending": "நிலுவை எதுவும் இல்லை",
     "security2fa": "இருபடி அங்கீகாரம் (2FA)",
     "totpEnabledBadge": "2FA பாதுகாக்கப்பட்டது",

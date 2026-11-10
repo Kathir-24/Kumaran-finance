@@ -67,6 +67,10 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
     (s) => s.disbursementAuthorizationsCount
   );
   const paymentReversalsCount = useApprovalsStore((s) => s.paymentReversalsCount);
+  const safetyProofVerificationsCount = useApprovalsStore(
+    (s) => s.safetyProofVerificationsCount
+  );
+  const isConnected = useApprovalsStore((s) => s.isConnected);
 
   // 2FA & Password Management Modals state
   const [isEnrollModalOpen, setIsEnrollModalOpen] = React.useState(false);
@@ -236,9 +240,18 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
 
             <DropdownMenuContent align="end" className="w-72">
               <DropdownMenuLabel className="flex items-center justify-between">
-                <span>{tTopbar('pendingApprovals')}</span>
-                <span className="text-emerald-400 text-[11px]">
-                  Dual-Control (Maker $\ne$ Checker)
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'h-2 w-2 rounded-full shrink-0',
+                      isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                    )}
+                    title={isConnected ? 'Live SSE Stream Connected' : 'Polling Sync Mode'}
+                  />
+                  <span>{tTopbar('pendingApprovals')}</span>
+                </span>
+                <span className="text-emerald-400 text-[11px] font-mono">
+                  Maker ≠ Checker
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -281,6 +294,18 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
                       <span>{tNav('reversals')}</span>
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
                         {paymentReversalsCount}
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/disbursements"
+                      className="flex items-center justify-between py-2"
+                    >
+                      <span>{tTopbar('safetyProofVerifications')}</span>
+                      <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-bold text-blue-300">
+                        {safetyProofVerificationsCount}
                       </span>
                     </Link>
                   </DropdownMenuItem>

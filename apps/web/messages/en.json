@@ -130,6 +130,7 @@
     "selectBranch": "Select Branch",
     "allBranches": "All Branches (Company-wide)",
     "pendingApprovals": "Pending Approvals",
+    "safetyProofVerifications": "Safety Proofs",
     "noPending": "All caught up",
     "security2fa": "Two-Factor Authentication",
     "totpEnabledBadge": "2FA Protected",

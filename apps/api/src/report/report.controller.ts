@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Header,
+  Logger,
   MessageEvent,
   Query,
   Sse,
@@ -53,6 +55,8 @@ import { ReportService } from './report.service';
 @ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
 @Controller('reports')
 export class ReportController {
+  private readonly logger = new Logger(ReportController.name);
+
   constructor(private readonly reportService: ReportService) {}
 
   @Get('dashboard')
@@ -89,6 +93,8 @@ export class ReportController {
 
   @Sse('approvals-stream')
   @SetTimeout(0)
+  @Header('X-Accel-Buffering', 'no')
+  @Header('Cache-Control', 'no-cache, no-transform')
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Real-Time Server-Sent Events (SSE) Stream for Pending Approvals',
@@ -114,17 +120,31 @@ export class ReportController {
     return interval(15000).pipe(
       startWith(0),
       switchMap(async () => {
-        const approvals = await this.reportService.getPendingApprovals(
-          currentUser,
-          query,
-        );
-        return {
-          data: {
-            type: 'APPROVALS_UPDATE',
-            summary: approvals.summary,
-            timestamp: new Date().toISOString(),
-          },
-        } as MessageEvent;
+        try {
+          const approvals = await this.reportService.getPendingApprovals(
+            currentUser,
+            query,
+          );
+          return {
+            data: {
+              type: 'APPROVALS_UPDATE',
+              summary: approvals.summary,
+              timestamp: new Date().toISOString(),
+            },
+            id: Date.now().toString(),
+          } as MessageEvent;
+        } catch (err: any) {
+          this.logger.warn(
+            `Approvals SSE stream query error for user ${currentUser.sub}: ${err.message}`,
+          );
+          return {
+            data: {
+              type: 'HEARTBEAT',
+              timestamp: new Date().toISOString(),
+            },
+            id: Date.now().toString(),
+          } as MessageEvent;
+        }
       }),
     );
   }

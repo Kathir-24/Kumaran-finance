@@ -1,11 +1,12 @@
 import { create } from 'zustand';
+import { playNotificationChime } from '../lib/sound.ts';
 
 export interface ApprovalsSummary {
   totalPendingCount: number;
   cashHandoversCount: number;
   disbursementAuthorizationsCount: number;
   paymentReversalsCount: number;
-  safetyProofVerificationsCount?: number;
+  safetyProofVerificationsCount: number;
 }
 
 export interface ApprovalsState {
@@ -38,6 +39,11 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
       const safetyProofs = summary.safetyProofVerificationsCount ?? state.safetyProofVerificationsCount;
       const total =
         summary.totalPendingCount ?? (cashHandovers + disbursements + reversals + safetyProofs);
+
+      // Play subtle chime strictly when new approvals arrive while the session is live
+      if (state.lastUpdated !== null && total > state.totalPendingCount) {
+        playNotificationChime();
+      }
 
       return {
         cashHandoversCount: cashHandovers,
