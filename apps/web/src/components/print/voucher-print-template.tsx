@@ -82,26 +82,26 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
   return (
     <div className="w-full flex flex-col items-center">
       {/* Top Floating Action Bar (Hidden during Print) */}
-      <div className="w-full max-w-[210mm] mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-md backdrop-blur-md print:hidden">
+      <div className="w-full max-w-[210mm] mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-md backdrop-blur-md print:hidden">
         <Button
           asChild
           variant="ghost"
           size="sm"
-          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800 px-2.5"
+          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800 px-2.5 shrink-0 self-start sm:self-auto"
         >
           <Link href="/disbursements">
-            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5 shrink-0" />
             {t('controls.backToDisbursements')}
           </Link>
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             onClick={() => window.print()}
             size="sm"
-            className="h-8 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3.5 shadow-sm"
+            className="h-8 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3.5 shadow-sm shrink-0"
           >
-            <Printer className="h-3.5 w-3.5 mr-1.5" />
+            <Printer className="h-3.5 w-3.5 mr-1.5 shrink-0" />
             {t('controls.printVoucher')}
           </Button>
 
@@ -110,9 +110,9 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
             disabled={downloading}
             variant="outline"
             size="sm"
-            className="h-8 border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white text-xs px-3"
+            className="h-8 border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white text-xs px-3 shrink-0"
           >
-            <Download className="h-3.5 w-3.5 mr-1.5 text-blue-400" />
+            <Download className="h-3.5 w-3.5 mr-1.5 text-blue-400 shrink-0" />
             {downloading ? t('controls.downloading') : t('controls.downloadPdf')}
           </Button>
         </div>

@@ -228,7 +228,7 @@ export function TotpForm() {
           </label>
 
           {/* 6 Discrete Auto-Advancing Digit Cells */}
-          <div className="flex items-center justify-center space-x-2 sm:space-x-3" data-testid="totp-input-cells">
+          <div className="flex items-center justify-center space-x-1.5 sm:space-x-3" data-testid="totp-input-cells">
             {digits.map((digit, index) => (
               <React.Fragment key={index}>
                 <input
@@ -243,7 +243,7 @@ export function TotpForm() {
                   onChange={(e) => handleDigitChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={handlePaste}
-                  className="h-12 w-11 rounded-lg border border-slate-700 bg-slate-950 text-center font-mono text-xl font-bold text-slate-100 shadow-inner transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 sm:h-14 sm:w-12 sm:text-2xl"
+                  className="h-11 w-9 sm:h-14 sm:w-12 rounded-lg border border-slate-700 bg-slate-950 text-center font-mono text-lg sm:text-2xl font-bold text-slate-100 shadow-inner transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50"
                   data-testid={`totp-cell-${index}`}
                 />
                 {/* Visual separator between 3rd and 4th digits */}
