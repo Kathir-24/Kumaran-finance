@@ -78,7 +78,7 @@ export function CalculatorSimulator() {
           </div>
 
           <Badge variant="paid" className="text-xs">
-            Pure Whole Rupee Math
+            {t('pureWholeRupeeBadge')}
           </Badge>
         </div>
       </CardHeader>
@@ -87,7 +87,7 @@ export function CalculatorSimulator() {
         {/* Quick Presets */}
         <div>
           <span className="text-xs font-medium text-slate-400 block mb-2">
-            Quick Scheme Presets:
+            {t('quickPresetsLabel')}
           </span>
           <div className="flex flex-wrap gap-2">
             {presets.map((p, idx) => (
@@ -242,38 +242,38 @@ export function CalculatorSimulator() {
 
         {/* Passbook Row Sum Invariant Live Demonstration */}
         <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/90 space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 text-emerald-400" />
+              <BookOpen className="h-4 w-4 text-emerald-400 shrink-0" />
               {t('passbookPreview')}
             </span>
             <Badge variant="paid" className="text-[10px]">
-              Invariant: Inet + Div = Ibase
+              {t('passbookInvariantBadge')}
             </Badge>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left text-slate-300">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[580px] text-xs text-left text-slate-300">
               <thead className="text-[11px] uppercase bg-slate-900 border-b border-slate-800 text-slate-400">
                 <tr>
-                  <th className="px-3 py-2">Month #</th>
-                  <th className="px-3 py-2">Payment Window</th>
-                  <th className="px-3 py-2">Amount Paid (Inet)</th>
-                  <th className="px-3 py-2">Dividend (Div)</th>
-                  <th className="px-3 py-2">Total Gross (Ibase)</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t('passbookMonthCol')}</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t('passbookWindowCol')}</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t('passbookPaidCol')}</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t('passbookDivCol')}</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t('passbookGrossCol')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80 font-mono">
                 <tr>
-                  <td className="px-3 py-2 font-bold text-white">Month 2</td>
-                  <td className="px-3 py-2 text-slate-400">22nd to 21st</td>
-                  <td className="px-3 py-2 text-emerald-400 font-bold">
+                  <td className="px-3 py-2 font-bold text-white whitespace-nowrap">{t('month2Label')}</td>
+                  <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{t('windowSample')}</td>
+                  <td className="px-3 py-2 text-emerald-400 font-bold whitespace-nowrap">
                     {formatRupee(netInstallment)}
                   </td>
-                  <td className="px-3 py-2 text-blue-300">
+                  <td className="px-3 py-2 text-blue-300 whitespace-nowrap">
                     + {formatRupee(dividendPerTicket)}
                   </td>
-                  <td className="px-3 py-2 text-white font-bold">
+                  <td className="px-3 py-2 text-white font-bold whitespace-nowrap">
                     = {formatRupee(baseInstallment)}
                   </td>
                 </tr>

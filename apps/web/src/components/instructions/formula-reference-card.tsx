@@ -101,23 +101,23 @@ export function FormulaReferenceCard() {
 
       <CardContent className="p-4 space-y-6">
         {/* Glossary Table */}
-        <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60">
-          <table className="w-full text-xs text-left text-slate-300">
+        <div className="overflow-x-auto scrollbar-thin rounded-lg border border-slate-800 bg-slate-950/60">
+          <table className="w-full min-w-[680px] text-xs text-left text-slate-300">
             <thead className="text-[11px] uppercase bg-slate-900 border-b border-slate-800 text-slate-400">
               <tr>
-                <th className="px-3 py-2.5">Term</th>
-                <th className="px-3 py-2.5">Symbol</th>
-                <th className="px-3 py-2.5">Formula</th>
-                <th className="px-3 py-2.5">Operational Meaning</th>
+                <th className="px-3 py-2.5 whitespace-nowrap">{t('colTerm')}</th>
+                <th className="px-3 py-2.5 whitespace-nowrap">{t('colSymbol')}</th>
+                <th className="px-3 py-2.5 whitespace-nowrap">{t('colFormula')}</th>
+                <th className="px-3 py-2.5">{t('colMeaning')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
               {symbols.map((item, idx) => (
                 <tr key={idx} className="hover:bg-slate-900/40">
-                  <td className="px-3 py-2 font-medium text-white">{item.term}</td>
-                  <td className="px-3 py-2 font-mono text-emerald-400 font-bold">{item.symbol}</td>
-                  <td className="px-3 py-2 font-mono text-blue-300">{item.formula}</td>
-                  <td className="px-3 py-2 text-slate-400 leading-relaxed">{item.explanation}</td>
+                  <td className="px-3 py-2 font-medium text-white whitespace-nowrap">{item.term}</td>
+                  <td className="px-3 py-2 font-mono text-emerald-400 font-bold whitespace-nowrap">{item.symbol}</td>
+                  <td className="px-3 py-2 font-mono text-blue-300 whitespace-nowrap">{item.formula}</td>
+                  <td className="px-3 py-2 text-slate-400 leading-relaxed min-w-[280px]">{item.explanation}</td>
                 </tr>
               ))}
             </tbody>
@@ -126,31 +126,31 @@ export function FormulaReferenceCard() {
 
         {/* Walkthrough Example */}
         <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/80 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-              <Scale className="h-4 w-4 text-emerald-400" />
-              Standard Walkthrough Example: ₹1,00,000 (20 Months, 4% Commission)
+              <Scale className="h-4 w-4 text-emerald-400 shrink-0" />
+              {t('walkthroughTitle')}
             </span>
-            <Badge variant="paid" className="text-[10px]">
-              20 Members • 20 Tickets
+            <Badge variant="paid" className="text-[10px] shrink-0">
+              {t('walkthroughBadge')}
             </Badge>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 leading-relaxed">
             <div className="space-y-1.5 p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-              <h4 className="font-semibold text-emerald-400">Month 1: Company Pool (No Auction)</h4>
-              <p>• Company representative ticket takes the full gross pool of ₹1,00,000.</p>
-              <p>• Zero auction is conducted. Dividend is strictly ₹0.</p>
-              <p>• All 20 subscribers pay the full base installment: ₹5,000.</p>
+              <h4 className="font-semibold text-emerald-400">{t('month1Title')}</h4>
+              <p>• {t('month1Point1')}</p>
+              <p>• {t('month1Point2')}</p>
+              <p>• {t('month1Point3')}</p>
             </div>
 
             <div className="space-y-1.5 p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-              <h4 className="font-semibold text-blue-400">Month 2: 25% Ceiling Auction</h4>
-              <p>• Winning bid reaches 1/4 ceiling: D = ₹25,000. Prize Money P = ₹75,000.</p>
-              <p>• Foreman Commission: 4% of ₹1L = ₹4,000 retained by Kumaran Finance.</p>
-              <p>• Total Member Dividend: ₹25,000 - ₹4,000 = ₹21,000.</p>
-              <p>• Dividend Per Ticket: ₹21,000 ÷ 20 = ₹1,050 for ALL members.</p>
-              <p>• Month 3 Net Due: ₹5,000 - ₹1,050 = ₹3,950 payable by everyone.</p>
+              <h4 className="font-semibold text-blue-400">{t('month2Title')}</h4>
+              <p>• {t('month2Point1')}</p>
+              <p>• {t('month2Point2')}</p>
+              <p>• {t('month2Point3')}</p>
+              <p>• {t('month2Point4')}</p>
+              <p>• {t('month2Point5')}</p>
             </div>
           </div>
         </div>

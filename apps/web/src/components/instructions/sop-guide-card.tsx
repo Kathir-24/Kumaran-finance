@@ -80,22 +80,22 @@ export function SopGuideCard() {
         return (
           <Card key={idx} className="border-slate-800 bg-slate-900/60 shadow-sm flex flex-col justify-between">
             <CardHeader className="pb-3 border-b border-slate-800/80">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg border ${sop.color}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${sop.color}`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <CardTitle className="text-sm font-semibold text-white">
                       {sop.role}
                     </CardTitle>
                     <CardDescription className="text-xs text-slate-400">
-                      Standard Operating Checklist
+                      {t('checklistSubtitle')}
                     </CardDescription>
                   </div>
                 </div>
 
-                <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-300">
+                <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-300 shrink-0">
                   {sop.badge}
                 </Badge>
               </div>

@@ -48,8 +48,8 @@ export default function InstructionsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 mb-1">
-            <BookCheck className="h-4 w-4" />
-            <span>குமரன் சிட்ஸ் • பணியாளர் வழிகாட்டி</span>
+            <BookCheck className="h-4 w-4 shrink-0" />
+            <span>{t('staffGuideBadge')}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             {t('pageTitle')}
@@ -59,13 +59,13 @@ export default function InstructionsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="paid" className="gap-1.5 py-1">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>10 Invariant Guardrails</span>
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span>{t('guardrailsBadge')}</span>
           </Badge>
           <Badge variant="neutral" className="py-1">
-            Tamil Nadu Chit Funds Act 1982
+            {t('actBadge')}
           </Badge>
         </div>
       </div>
@@ -93,39 +93,41 @@ export default function InstructionsPage() {
 
       {/* 3. Segmented Navigation Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex-wrap h-auto gap-1">
-          <TabsTrigger
-            value="guardrails"
-            className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>{t('tabs.guardrails')}</span>
-          </TabsTrigger>
+        <div className="overflow-x-auto scrollbar-none pb-1">
+          <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl inline-flex w-max min-w-full justify-start h-auto gap-1">
+            <TabsTrigger
+              value="guardrails"
+              className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5 shrink-0 whitespace-nowrap"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>{t('tabs.guardrails')}</span>
+            </TabsTrigger>
 
-          <TabsTrigger
-            value="formulas"
-            className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5"
-          >
-            <Calculator className="h-3.5 w-3.5" />
-            <span>{t('tabs.formulas')}</span>
-          </TabsTrigger>
+            <TabsTrigger
+              value="formulas"
+              className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5 shrink-0 whitespace-nowrap"
+            >
+              <Calculator className="h-3.5 w-3.5 shrink-0" />
+              <span>{t('tabs.formulas')}</span>
+            </TabsTrigger>
 
-          <TabsTrigger
-            value="sops"
-            className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5"
-          >
-            <Briefcase className="h-3.5 w-3.5" />
-            <span>{t('tabs.sops')}</span>
-          </TabsTrigger>
+            <TabsTrigger
+              value="sops"
+              className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5 shrink-0 whitespace-nowrap"
+            >
+              <Briefcase className="h-3.5 w-3.5 shrink-0" />
+              <span>{t('tabs.sops')}</span>
+            </TabsTrigger>
 
-          <TabsTrigger
-            value="statutory"
-            className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5"
-          >
-            <Scale className="h-3.5 w-3.5" />
-            <span>{t('tabs.statutory')}</span>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger
+              value="statutory"
+              className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 gap-1.5 py-2 px-3.5 shrink-0 whitespace-nowrap"
+            >
+              <Scale className="h-3.5 w-3.5 shrink-0" />
+              <span>{t('tabs.statutory')}</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Tab 1: The 10 Invariant Guardrails */}
         <TabsContent value="guardrails" className="space-y-4">
@@ -160,7 +162,7 @@ export default function InstructionsPage() {
               {t('tabs.sops')}
             </h2>
             <p className="text-xs text-slate-400">
-              Role-tailored daily checklists enforcing discrete collections, safe cash balances, and dual control
+              {t('sopsSubtitle')}
             </p>
           </div>
 
@@ -191,7 +193,7 @@ export default function InstructionsPage() {
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-slate-400">
                   <span className="flex items-center gap-1 font-mono text-[11px]">
                     <Clock className="h-3.5 w-3.5 text-amber-400" />
-                    Limit: 21 Days
+                    {t('limit21Days')}
                   </span>
                   <Badge variant="paid" className="text-[10px]">
                     Sec. 17
@@ -212,7 +214,7 @@ export default function InstructionsPage() {
               <CardContent className="p-4 space-y-2 text-xs text-slate-300">
                 <p className="leading-relaxed">{t('formXxiDesc')}</p>
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-slate-400">
-                  <span className="font-mono text-[11px]">Continuous Ledger</span>
+                  <span className="font-mono text-[11px]">{t('continuousLedger')}</span>
                   <Badge variant="paid" className="text-[10px]">
                     Sec. 23
                   </Badge>
@@ -232,7 +234,7 @@ export default function InstructionsPage() {
               <CardContent className="p-4 space-y-2 text-xs text-slate-300">
                 <p className="leading-relaxed">{t('formXxiiDesc')}</p>
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-slate-400">
-                  <span className="font-mono text-[11px]">Daily Vault Safe</span>
+                  <span className="font-mono text-[11px]">{t('dailyVaultSafe')}</span>
                   <Badge variant="paid" className="text-[10px]">
                     Sec. 24
                   </Badge>
