@@ -95,7 +95,7 @@ Configured specifically for cashiers and accountants:
 
 ```
 ✔ ApiClient: getApiBaseUrl falls back to localhost when env is unset (3.44ms)
-✔ ApiClient: Token storage bridge handles SSR environment safely (1.18ms)
+✔ ApiClient: Token storage bridge enforces zero secret tokens in client storage under BFF architecture (1.18ms)
 ✔ ApiClient: Token storage bridge operates correctly when window/localStorage are present (1.00ms)
 ✔ ApiClient: unwrapApiResponse successfully unwraps standard NestJS data envelopes (3.11ms)
 ✔ ApiClient: unwrapApiResponse transforms 401 error into KumaranApiError (2.77ms)

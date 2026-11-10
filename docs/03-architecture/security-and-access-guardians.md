@@ -260,3 +260,16 @@ flowchart TD
 - **18-Minute Warning**: Displays a non-intrusive warning modal showing a live 120-second countdown with an "I'm Still Here" button.
 - **20-Minute Hard Logout**: Automatically purges client state and redirects to `/login?reason=timeout`.
 - **Multi-Tab Sync**: Synchronized via `localStorage` storage events and broadcast channels so active work in one tab keeps all tabs alive.
+
+### 7.5 XSS Token Exfiltration Immunity via BFF & HttpOnly Cookies (ADR-20)
+- **Elimination of Client-Side Token Storage**: Storing JWT access and refresh tokens in browser `localStorage` or `sessionStorage` has been completely eliminated. `localStorage.getItem('kc_access_token')` returns `null`.
+- **HttpOnly Cookie Enclosure**:
+  - `kc_access_token` (15-minute TTL) and `kc_refresh_token` (7-day TTL) are issued with `HttpOnly; SameSite=Lax; Path=/; Secure`.
+  - Browser JavaScript (`document.cookie`) has zero programmatic access to these cookies, guaranteeing complete immunity against token exfiltration via XSS or compromised npm dependencies.
+- **Edge Navigation Guarding (0ms FOUC Elimination)**:
+  - [`apps/web/src/middleware.ts`](file:///u:/Kumaran-finance/apps/web/src/middleware.ts) runs at the Edge prior to page rendering.
+  - Any request targeting `/(dashboard)/*` without valid session cookies is immediately redirected via HTTP 307 to `/login?redirect=...`.
+- **Transparent Server-Side API Proxy & Silent Token Rotation**:
+  - Web client requests are dispatched to relative `/api/v1/*` endpoints.
+  - The Next.js BFF proxy ([`route.ts`](file:///u:/Kumaran-finance/apps/web/src/app/api/v1/[...path]/route.ts)) reads the `HttpOnly` cookie, injects `Authorization: Bearer <token>`, and forwards the request to NestJS.
+  - On 401 Unauthorized responses from NestJS, the BFF proxy silently executes refresh token rotation using `kc_refresh_token` on the server, retries the request, and sets updated `HttpOnly` cookies on the browser response without client disruption.

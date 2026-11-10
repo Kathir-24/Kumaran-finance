@@ -3,6 +3,7 @@
 // ==============================================================================
 // Kumaran Chits — Staff Phone & Password Login Form
 // Phone-only architecture (ADR-18), zero email fields, 2FA fork & inactivity notice.
+// BFF + HttpOnly Cookie Architecture: zero secret tokens handled in client JS.
 // ==============================================================================
 
 import * as React from 'react';
@@ -23,7 +24,6 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 
 export function LoginForm() {
@@ -92,16 +92,28 @@ export function LoginForm() {
     setServerError(null);
 
     try {
-      // Call live backend: POST /api/v1/auth/web/login
-      const response = await unwrapApiResponse<any>(
-        apiClient.POST('/api/v1/auth/web/login', {
-          body: {
-            phone: values.phone,
-            password: values.password,
-            clientType: 'WEB',
-          },
+      // Call Next.js BFF login handler which verifies credentials & sets HttpOnly cookies
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: values.phone,
+          password: values.password,
         }),
-      );
+      });
+
+      const response = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          setServerError(t('invalidCredentials'));
+        } else if (res.status === 429) {
+          setServerError(t('rateLimited'));
+        } else {
+          setServerError(response?.message || t('invalidCredentials'));
+        }
+        return;
+      }
 
       // Branch 1: Staff user requires Microsoft Authenticator 2FA
       if (response?.requireTotp && response?.tempToken) {
@@ -110,12 +122,9 @@ export function LoginForm() {
         return;
       }
 
-      // Branch 2: Direct Authentication (Tokens issued)
-      if (response?.accessToken && response?.user) {
-        setAuth(response.user, {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-        });
+      // Branch 2: Direct Authentication (HttpOnly session established)
+      if (response?.success && response?.user) {
+        setAuth(response.user);
         router.push(redirectUrl);
         return;
       }
@@ -123,17 +132,8 @@ export function LoginForm() {
       // Unexpected payload fallback
       setServerError(t('invalidCredentials'));
     } catch (err: unknown) {
-      if (err instanceof KumaranApiError) {
-        if (err.statusCode === 401) {
-          setServerError(t('invalidCredentials'));
-        } else if (err.statusCode === 429) {
-          setServerError(t('rateLimited'));
-        } else {
-          setServerError(err.message || t('invalidCredentials'));
-        }
-      } else {
-        setServerError(t('invalidCredentials'));
-      }
+      console.error('[LoginForm] Submission error:', err);
+      setServerError(t('invalidCredentials'));
     } finally {
       setIsLoading(false);
     }

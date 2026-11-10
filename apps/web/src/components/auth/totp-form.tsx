@@ -3,6 +3,7 @@
 // ==============================================================================
 // Kumaran Chits — Microsoft Authenticator 2FA Verification Form
 // RFC 6238 6-digit TOTP with auto-advancing cells, clipboard paste & auto-submit.
+// BFF + HttpOnly Cookie Architecture: zero secret tokens handled in client JS.
 // ==============================================================================
 
 import * as React from 'react';
@@ -19,7 +20,6 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 
 export function TotpForm() {
@@ -76,20 +76,34 @@ export function TotpForm() {
       setServerError(null);
 
       try {
-        const response = await unwrapApiResponse<any>(
-          apiClient.POST('/api/v1/auth/web/verify-totp', {
-            body: {
-              tempToken: activeToken,
-              totpCode: codeToSubmit,
-            },
+        // Call Next.js BFF verify-totp handler which validates 2FA & sets HttpOnly cookies
+        const res = await fetch('/api/auth/verify-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tempToken: activeToken,
+            totpCode: codeToSubmit,
           }),
-        );
+        });
 
-        if (response?.accessToken && response?.user) {
-          setAuth(response.user, {
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken,
-          });
+        const response = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            setServerError(t('invalidTotpCode'));
+            // Clear cells and return focus to first box on failure
+            setDigits(['', '', '', '', '', '']);
+            inputRefs.current[0]?.focus();
+          } else if (res.status === 429) {
+            setServerError(t('rateLimited'));
+          } else {
+            setServerError(response?.message || t('invalidTotpCode'));
+          }
+          return;
+        }
+
+        if (response?.success && response?.user) {
+          setAuth(response.user);
           setTempToken(null);
           router.push(redirectUrl);
           return;
@@ -97,20 +111,8 @@ export function TotpForm() {
 
         setServerError(t('invalidTotpCode'));
       } catch (err: unknown) {
-        if (err instanceof KumaranApiError) {
-          if (err.statusCode === 401) {
-            setServerError(t('invalidTotpCode'));
-            // Clear cells and return focus to first box on failure
-            setDigits(['', '', '', '', '', '']);
-            inputRefs.current[0]?.focus();
-          } else if (err.statusCode === 429) {
-            setServerError(t('rateLimited'));
-          } else {
-            setServerError(err.message || t('invalidTotpCode'));
-          }
-        } else {
-          setServerError(t('invalidTotpCode'));
-        }
+        console.error('[TotpForm] Verification error:', err);
+        setServerError(t('invalidTotpCode'));
       } finally {
         setIsLoading(false);
       }

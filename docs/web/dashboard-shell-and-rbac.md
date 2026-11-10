@@ -46,6 +46,10 @@ Phase 3 transforms the authenticated desktop experience into an authoritative, t
 
 ---
 
+### 3.0 Two-Tier Navigation Guarding (BFF + Edge Middleware)
+1. **Tier 1 (Server Edge Middleware - `src/middleware.ts`)**: Inspects `kc_access_token` and `kc_refresh_token` cookies before rendering HTML. Unauthenticated visitors are redirected via HTTP 307 at 0ms latency with zero FOUC.
+2. **Tier 2 (Client Route Guardian - `apps/web/src/app/(dashboard)/layout.tsx`)**: Matches current route against `MAIN_NAV_ITEMS.allowedRoles` using longest-prefix matching. Unauthorized authenticated staff view an localized `AccessDeniedView` preventing unauthorized API requests.
+
 ## 3. Dynamic RBAC Permissions & Navigation Matrix
 
 In accordance with [`permissions-matrix.md`](../01-business/permissions-matrix.md), sidebar navigation items are dynamically filtered based on the authenticated user's real roles from `useAuthStore` (`user.roles`):

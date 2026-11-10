@@ -245,7 +245,8 @@ To eliminate duplicate business logic between the Web Portal (TypeScript) and Mo
 
 | Guardian | Web Portal (`apps/web`) | Mobile App (`apps/mobile`) |
 |---|---|---|
-| **Authentication Token** | Stored in secure `HttpOnly`, `SameSite=Strict`, `Secure` cookies. | Stored in encrypted Android Keystore via `flutter_secure_storage`. |
+| **Authentication Token** | **BFF + HttpOnly Cookie Architecture (ADR-20)**: Stored in secure `HttpOnly`, `SameSite=Lax`, `Secure` cookies (`kc_access_token`, `kc_refresh_token`). **Zero secret tokens in client-accessible JavaScript or localStorage**, completely eliminating XSS token theft. | Stored in encrypted Android Keystore via `flutter_secure_storage`. |
+| **Server-Side Edge Guard** | **Next.js 15 Edge Middleware** (`src/middleware.ts`): Intercepts requests before HTML generation. Unauthenticated visitors to `/(dashboard)/*` are redirected via HTTP 307 with 0ms latency and **zero Flash of Unauthenticated Content (FOUC)**. | Native Android splash check & biometric prompt before rendering dashboard activity. |
 | **Two-Factor Authentication** | Mandatory RFC 6238 TOTP via **Microsoft Authenticator** for office staff. | 6-digit cryptographic MPIN + Android BiometricPrompt (Fingerprint). |
 | **Session Inactivity** | 20-minute client-side inactivity timer with automatic session termination. | App backgrounding locks screen; requires biometric touch to resume. |
 | **Maker-Checker UI Guard** | Buttons for "Finalize Auction", "Authorize Payout", and "Approve Reversal" are disabled if `current_user_id == maker_user_id`. | Approval cards display *"You initiated this action (Maker) — awaiting another partner's authorization"*. |

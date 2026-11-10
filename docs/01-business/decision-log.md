@@ -200,3 +200,23 @@
      - Maker != Checker is enforced: the user who submitted the claim cannot verify it.
      - Verification transitions payment to `SUCCESS`, generates sequential bilingual receipt (`KC-REC-PRD-YYYY-XXXXX`), marks due `PAID`, and dispatches push receipt to the subscriber.
 
+
+---
+
+### ADR-20: Backend-For-Frontend (BFF) & HttpOnly Cookie Architecture for Web Operations Portal (`CONFIRMED-BY-DEVELOPER`)
+
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-10
+- **Context**:
+  1. The Web Operations Portal (`apps/web`) is used by office staff, branch managers, partners, and auditors to manage high-volume financial transactions.
+  2. Storing raw JWT access and refresh tokens in browser `localStorage` exposes them to XSS exfiltration if any malicious third-party script runs in the window, and lacks native expiration.
+  3. Furthermore, Next.js 15 Server Components and Edge Middleware (`middleware.ts`) execute on the server before client JavaScript hydrates. `localStorage` is inaccessible to the server, creating Flash of Unauthenticated Content (FOUC) and requiring client-side loading skeletons.
+- **Decision & Architecture**:
+  1. **Strict BFF Pattern**: The Next.js 15 web application acts as a Backend-For-Frontend proxy. Raw JWTs are strictly prohibited from client storage (`localStorage` / `sessionStorage`).
+  2. **HttpOnly Cookie Storage**:
+     - `kc_access_token`: `HttpOnly`, `SameSite=Lax`, `Secure` (production), `Path=/`, `Max-Age=900` (15 minutes).
+     - `kc_refresh_token`: `HttpOnly`, `SameSite=Lax`, `Secure` (production), `Path=/`, `Max-Age=604800` (7 days).
+     - `kc_session_active`: Non-HttpOnly flag (`Max-Age=604800`) for client UI awareness with zero secret credentials.
+  3. **Zero FOUC Edge Middleware (`src/middleware.ts`)**: Next.js Edge Middleware inspects cookie presence on incoming requests to `/(dashboard)/*`. Unauthenticated users receive an immediate HTTP 307 redirect to `/login` with 0ms latency.
+  4. **Transparent API Proxying (`/api/v1/[...path]`)**: Browser client calls target the current origin (`/api/v1/*`); the Next.js server proxy extracts `kc_access_token` from the cookie, attaches `Authorization: Bearer <token>`, forwards the call to NestJS, and automatically executes silent 401 refresh token rotation when needed.
+  5. **Cross-Platform Decoupling**: The NestJS backend API (`apps/api`) remains 100% decoupled and accepts standard Bearer tokens, maintaining full architectural parity with the Flutter Mobile App (`apps/mobile`), which stores tokens in the Android Keystore (`flutter_secure_storage`).

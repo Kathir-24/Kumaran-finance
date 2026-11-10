@@ -1,17 +1,12 @@
 // ==============================================================================
 // Kumaran Chits — Client-Side Auth Store (Zustand)
-// Manages authenticated staff identity, active branch context & session lifecycle.
+// BFF + HttpOnly Cookie Architecture: zero secret tokens in client state.
 // ==============================================================================
 
 import { create } from 'zustand';
 import {
-  apiClient,
-  unwrapApiResponse,
-  getStoredAccessToken,
-  getStoredRefreshToken,
   getStoredUserProfile,
   setStoredUserProfile,
-  setStoredTokens,
   clearStoredTokens,
 } from '../lib/api-client.ts';
 
@@ -42,7 +37,7 @@ export interface AuthState {
 }
 
 export interface AuthActions {
-  setAuth: (user: AuthUser, tokens: { accessToken: string; refreshToken?: string }) => void;
+  setAuth: (user: AuthUser, tokens?: { accessToken?: string; refreshToken?: string }) => void;
   setTempToken: (token: string | null) => void;
   updateUser: (partial: Partial<AuthUser>) => void;
   setActiveBranchId: (branchId: string | null) => void;
@@ -78,12 +73,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   setAuth: (user, tokens) => {
-    // 1. Persist tokens and user profile in local storage bridge
-    setStoredTokens(tokens);
     const activeBranchId = user.activeBranchId || user.branchId || null;
-    setStoredUserProfile({ ...user, activeBranchId });
+    const fullUser = { ...user, activeBranchId };
 
-    // 2. Clear temporary 2FA challenge token from sessionStorage
+    // Persist non-sensitive cached user profile for fast initial paint
+    setStoredUserProfile(fullUser);
+
+    // Clear temporary 2FA challenge token from sessionStorage
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('kc_temp_token');
@@ -93,9 +89,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     }
 
     set({
-      user: { ...user, activeBranchId },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken || null,
+      user: fullUser,
+      accessToken: tokens?.accessToken || null,
+      refreshToken: tokens?.refreshToken || null,
       tempToken: null,
       isAuthenticated: true,
       isLoading: false,
@@ -130,19 +126,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   logout: async (reason = 'manual') => {
-    const hasToken = get().accessToken || getStoredAccessToken();
-
-    // 1. Revoke active refresh token session in PostgreSQL backend
-    if (hasToken) {
-      try {
-        await apiClient.POST('/api/v1/auth/logout');
-      } catch (err) {
-        // Network or timeout errors should not prevent local session termination
-        console.warn('[AuthStore] Backend logout request failed, proceeding with local cleanup', err);
+    // 1. Notify Next.js BFF logout handler (which revokes tokens in NestJS & Redis and clears HttpOnly cookies)
+    try {
+      if (typeof window !== 'undefined') {
+        await fetch('/api/auth/logout', { method: 'POST' });
       }
+    } catch (err) {
+      console.warn('[AuthStore] BFF logout request failed, proceeding with local cleanup', err);
     }
 
-    // 2. Purge local storage tokens & temporary challenge tokens
+    // 2. Purge local profile cache & temporary challenge tokens
     clearStoredTokens();
     if (typeof window !== 'undefined') {
       try {
@@ -174,22 +167,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   hydrate: async () => {
-    const token = getStoredAccessToken();
-    const refreshToken = getStoredRefreshToken();
     const cachedProfile = getStoredUserProfile<AuthUser>();
 
-    if (!token) {
-      set({ isLoading: false, isAuthenticated: false, isHydrated: true, user: null });
-      return;
-    }
-
-    // Immediately restore cached session from localStorage on client mount (0ms delay)
+    // Immediately restore cached non-sensitive user profile on client mount for 0ms visual render
     if (cachedProfile) {
       const activeBranchId = cachedProfile.activeBranchId || cachedProfile.branchId || null;
       set({
         user: cachedProfile,
-        accessToken: token,
-        refreshToken: refreshToken || null,
         isAuthenticated: true,
         isHydrated: true,
         isLoading: false,
@@ -197,36 +181,35 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       });
     }
 
-    const state = get();
-    if (state.isLoading) return;
-
-    if (!cachedProfile) {
-      set({ isLoading: true });
+    // In non-browser environments, conclude hydration
+    if (typeof window === 'undefined') {
+      set({ isHydrated: true, isLoading: false });
+      return;
     }
 
     try {
-      // Fetch authenticated user profile from backend
-      const profile = await unwrapApiResponse<AuthUser>(
-        apiClient.GET('/api/v1/auth/me'),
-      );
+      // Validate session with Next.js BFF session handler
+      const res = await fetch('/api/auth/session');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          const activeBranchId = data.user.activeBranchId || data.user.branchId || null;
+          const fullProfile = { ...data.user, activeBranchId };
+          setStoredUserProfile(fullProfile);
 
-      const activeBranchId = profile.activeBranchId || profile.branchId || null;
-      const fullProfile = { ...profile, activeBranchId };
+          set({
+            user: fullProfile,
+            isAuthenticated: true,
+            isLoading: false,
+            isHydrated: true,
+            activeBranchId,
+            lastActivity: Date.now(),
+          });
+          return;
+        }
+      }
 
-      setStoredUserProfile(fullProfile);
-
-      set({
-        user: fullProfile,
-        accessToken: token,
-        refreshToken: refreshToken || null,
-        isAuthenticated: true,
-        isLoading: false,
-        isHydrated: true,
-        activeBranchId,
-        lastActivity: Date.now(),
-      });
-    } catch (err) {
-      console.warn('[AuthStore] Session hydration failed, clearing session', err);
+      // Session is not valid
       clearStoredTokens();
       set({
         user: null,
@@ -236,6 +219,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         isLoading: false,
         isHydrated: true,
         activeBranchId: null,
+      });
+    } catch (err) {
+      console.warn('[AuthStore] Session hydration failed', err);
+      set({
+        isLoading: false,
+        isHydrated: true,
       });
     }
   },
@@ -247,13 +236,8 @@ if (typeof window !== 'undefined') {
     useAuthStore.getState().logout('revoked');
   });
 
-  window.addEventListener('kumaran:auth_change', (event: any) => {
-    const detail = event?.detail;
-    if (detail?.accessToken) {
-      useAuthStore.setState({
-        accessToken: detail.accessToken,
-        refreshToken: detail.refreshToken || useAuthStore.getState().refreshToken,
-      });
-    }
+  window.addEventListener('kumaran:auth_change', () => {
+    // Re-verify session on auth change event
+    useAuthStore.getState().hydrate();
   });
 }

@@ -1,6 +1,6 @@
 // ==============================================================================
 // Kumaran Chits — Web API Client & Query Keys Test Suite
-// Verifies token storage bridge, response unwrapper, error taxonomy, and queryKeys.
+// Verifies BFF cookie bridge, zero client token persistence, unwrapper & queryKeys.
 // ==============================================================================
 
 import test from 'node:test';
@@ -21,9 +21,9 @@ import {
 } from '../src/lib/api-client.ts';
 import { queryKeys } from '../src/lib/query-keys.ts';
 
-test('ApiClient: getApiBaseUrl falls back to localhost when env is unset', () => {
+test('ApiClient: getApiBaseUrl falls back to localhost when env is unset in SSR', () => {
   const url = getApiBaseUrl();
-  assert.ok(url.startsWith('http'), 'Base URL must start with http');
+  assert.ok(url.startsWith('http'), 'Base URL in Node SSR must start with http');
 });
 
 test('ApiClient: Token storage bridge handles SSR environment safely', () => {
@@ -37,7 +37,7 @@ test('ApiClient: Token storage bridge handles SSR environment safely', () => {
   assert.doesNotThrow(() => clearStoredTokens());
 });
 
-test('ApiClient: Token storage bridge operates correctly when window/localStorage are present', () => {
+test('ApiClient: Token storage bridge enforces zero secret tokens in client storage under BFF architecture', () => {
   const mockStorage = new Map<string, string>();
   let dispatchedEvent: string | null = null;
 
@@ -62,14 +62,19 @@ test('ApiClient: Token storage bridge operates correctly when window/localStorag
   };
 
   try {
+    // In browser environment, getApiBaseUrl returns empty string for relative BFF proxy calls
+    assert.equal(getApiBaseUrl(), '', 'Browser base URL must be empty for transparent Next.js BFF proxying');
+
     // 1. Set tokens & profile
     setStoredTokens({ accessToken: 'access-abc', refreshToken: 'refresh-xyz' });
     setStoredUserProfile({ id: 'user-001', name: 'Tester' });
-    assert.equal(mockStorage.get(ACCESS_TOKEN_KEY), 'access-abc');
-    assert.equal(mockStorage.get(REFRESH_TOKEN_KEY), 'refresh-xyz');
+
+    // Under BFF standard: tokens are NEVER stored in localStorage
+    assert.equal(mockStorage.has(ACCESS_TOKEN_KEY), false, 'Access token must never be stored in localStorage');
+    assert.equal(mockStorage.has(REFRESH_TOKEN_KEY), false, 'Refresh token must never be stored in localStorage');
     assert.deepEqual(getStoredUserProfile(), { id: 'user-001', name: 'Tester' });
-    assert.equal(getStoredAccessToken(), 'access-abc');
-    assert.equal(getStoredRefreshToken(), 'refresh-xyz');
+    assert.equal(getStoredAccessToken(), null, 'Stored access token getter must return null');
+    assert.equal(getStoredRefreshToken(), null, 'Stored refresh token getter must return null');
     assert.equal(dispatchedEvent, 'kumaran:auth_change');
 
     // 2. Clear tokens & profile

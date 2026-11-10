@@ -1,6 +1,6 @@
 // ==============================================================================
-// Kumaran Chits — API Client Integration (Real Backend Connection)
-// Connects to NestJS 12 backend with Bearer JWT, Idempotency-Key & Mutex Refresh.
+// Kumaran Chits — API Client Integration (BFF + HttpOnly Cookie Architecture)
+// Zero tokens in client-accessible storage; transparent Next.js BFF proxying.
 // ==============================================================================
 
 import {
@@ -10,44 +10,43 @@ import {
   type ApiErrorPayload,
 } from '@kumaran/api-client';
 
-// Storage keys for authentication tokens and profile
+// Storage key strictly for cached non-sensitive user profile
+export const USER_PROFILE_KEY = 'kc_user_profile';
+// Deprecated legacy token keys retained for clean migration purges
 export const ACCESS_TOKEN_KEY = 'kc_access_token';
 export const REFRESH_TOKEN_KEY = 'kc_refresh_token';
-export const USER_PROFILE_KEY = 'kc_user_profile';
 
 /**
  * Returns the configured backend API base URL.
- * Priority: NEXT_PUBLIC_API_URL -> http://localhost:3000
+ * In browser environments, returns empty string ('') so calls target the current
+ * Next.js origin and route through the transparent BFF proxy (/api/v1/...).
+ * In server/SSR environments, routes directly to the internal NestJS API.
  */
 export function getApiBaseUrl(): string {
-  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    return '';
+  }
+  if (typeof process !== 'undefined') {
+    if (process.env?.INTERNAL_API_URL) return process.env.INTERNAL_API_URL;
+    if (process.env?.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   }
   return 'http://localhost:3000';
 }
 
 /**
  * SSR-safe getter for stored JWT access token.
+ * Under BFF architecture, returns null to guarantee zero tokens in client storage.
  */
 export function getStoredAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
  * SSR-safe getter for stored JWT refresh token.
+ * Under BFF architecture, returns null to guarantee zero tokens in client storage.
  */
 export function getStoredRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
@@ -80,23 +79,23 @@ export function setStoredUserProfile<T = any>(user: T | null): void {
 }
 
 /**
- * SSR-safe setter for auth tokens.
+ * Backward-compatible setter. Under BFF architecture, tokens are managed strictly via
+ * HttpOnly cookies; this method purges any legacy tokens from localStorage.
  */
-export function setStoredTokens(tokens: { accessToken: string; refreshToken?: string }): void {
+export function setStoredTokens(_tokens: { accessToken?: string; refreshToken?: string }): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    if (tokens.refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    }
-    window.dispatchEvent(new CustomEvent('kumaran:auth_change', { detail: tokens }));
+    // Actively purge any legacy tokens that may have existed in older sessions
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    window.dispatchEvent(new CustomEvent('kumaran:auth_change'));
   } catch (err) {
-    console.error('[ApiClient] Failed to store auth tokens in localStorage', err);
+    console.error('[ApiClient] Error cleaning legacy tokens', err);
   }
 }
 
 /**
- * SSR-safe clearer for auth tokens on logout or session expiration.
+ * SSR-safe clearer for auth session state on logout or session expiration.
  */
 export function clearStoredTokens(): void {
   if (typeof window === 'undefined') return;
@@ -106,21 +105,20 @@ export function clearStoredTokens(): void {
     localStorage.removeItem(USER_PROFILE_KEY);
     window.dispatchEvent(new CustomEvent('kumaran:unauthorized'));
   } catch (err) {
-    console.error('[ApiClient] Failed to clear auth tokens', err);
+    console.error('[ApiClient] Failed to clear session state', err);
   }
 }
 
 /**
  * Factory creating configured Kumaran API Client instance.
+ * Transparently sends requests to Next.js BFF proxy with automatic credentials.
  */
 export function createWebApiClient(): KumaranApiClient {
   return createKumaranClient({
     baseUrl: getApiBaseUrl(),
-    getAccessToken: () => getStoredAccessToken(),
-    getRefreshToken: () => getStoredRefreshToken(),
-    onTokenRefreshed: (tokens) => {
-      setStoredTokens(tokens);
-    },
+    getAccessToken: () => null,
+    getRefreshToken: () => null,
+    onTokenRefreshed: () => {},
     onUnauthorized: () => {
       clearStoredTokens();
     },
@@ -133,9 +131,6 @@ export const apiClient: KumaranApiClient = createWebApiClient();
 /**
  * Helper to unwrap responses from openapi-fetch calls, automatically extracting
  * the inner `data` payload or throwing a typed `KumaranApiError`.
- *
- * @example
- * const me = await unwrapApiResponse(apiClient.GET('/api/v1/auth/me'));
  */
 export async function unwrapApiResponse<T>(
   responsePromise: Promise<{
