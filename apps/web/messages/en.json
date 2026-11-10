@@ -35,7 +35,9 @@
     "filter": "Filter",
     "refresh": "Refresh",
     "rupeesOnly": "Rupees Only",
-    "workspaceInitializing": "Initializing Kumaran Chits workspace..."
+    "workspaceInitializing": "Initializing Kumaran Chits workspace...",
+    "home": "Home",
+    "reports": "Reports"
   },
   "auth": {
     "loginTitle": "Office Staff Login",
@@ -1016,6 +1018,17 @@
     "title": "Statutory Registers & Reports",
     "subtitle": "Mandatory Tamil Nadu Chit Funds registers, daily cash books, and CA audit journals",
     "hubDescription": "Official statutory records maintained under Tamil Nadu Chit Funds Rules and Kumaran Finance audit standards",
+    "tamilNaduRulesBadge": "Tamil Nadu Chit Funds Rules",
+    "tagFormXxii": "Statutory Form XXII & Day Book",
+    "tagRegistrar": "Registrar Compliance",
+    "tagSubscriberPassbooks": "Subscriber Passbooks",
+    "tagRiskRecovery": "Risk & Recovery",
+    "tagAudit": "CA Forensic Audit",
+    "formXviiCardDesc": "Auction minutes, 4% commission, dividends & 21-day Registrar filing window",
+    "formXxiCardDesc": "Continuous 20-month schedule of base dues, dividend credits, payments & arrears",
+    "defaultersCardTitle": "Defaulters & Arrears Register",
+    "defaultersCardDesc": "Arrears aging analysis, recovery tracking, and ADR-07 3-month removal candidates",
+    "auditLogsCardDesc": "Append-only forensic audit trail of dual-control approvals, handovers & reversals",
     "formXxii": "Form XXII Chit Cash Book (12-Column Daily Ledger)",
     "formXvii": "Form XVII Auction Minutes",
     "formXxi": "Form XXI Subscribers' Ledger",
@@ -1076,7 +1089,9 @@
       "noTransactions": "No transactions recorded for this date",
       "totalReceipts": "Total Receipts",
       "totalDisbursements": "Total Disbursements",
-      "totalAmount": "Total Amount"
+      "totalAmount": "Total Amount",
+      "docNo": "Doc #",
+      "monthPayout": "Month {month} Payout"
     },
     "dayBook": {
       "methodBreakdown": "Inflow Breakdown by Payment Mode",
@@ -1202,6 +1217,7 @@
       "kpiTotalArrears": "Total Overdue Arrears",
       "removalWarning": "ADR-07 Removal Alert: {count} subscriber(s) have 3+ consecutive unpaid months. Company holds statutory removal rights with 4% damages exit settlement.",
       "filterBranch": "Filter Branch",
+      "allBranches": "All Branches",
       "filterScheme": "Filter Scheme",
       "allSchemes": "All Active Schemes",
       "colCustomer": "Subscriber",

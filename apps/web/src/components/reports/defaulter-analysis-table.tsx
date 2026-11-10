@@ -43,17 +43,17 @@ export function DefaulterAnalysisTable({ defaulters }: DefaulterAnalysisTablePro
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
-      <table className="w-full text-left text-xs border-collapse">
+    <div className="overflow-x-auto scrollbar-thin rounded-xl border border-slate-800 print:border-slate-300">
+      <table className="w-full min-w-[800px] text-left text-xs border-collapse">
         <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800 print:bg-slate-100 print:text-black print:border-slate-300">
           <tr>
-            <th className="py-3 px-3.5">{t('colCustomer')}</th>
-            <th className="py-3 px-3.5">{t('colScheme')}</th>
-            <th className="py-3 px-3.5 text-center">{t('colUnpaidMonths')}</th>
-            <th className="py-3 px-3.5 text-center">{t('colRisk')}</th>
-            <th className="py-3 px-3.5 text-right">{t('colArrears')}</th>
-            <th className="py-3 px-3.5">{t('colUnpaidDues')}</th>
-            <th className="py-3 px-3.5 text-right print:hidden">{t('colActions')}</th>
+            <th className="py-3 px-3.5 whitespace-nowrap">{t('colCustomer')}</th>
+            <th className="py-3 px-3.5 whitespace-nowrap">{t('colScheme')}</th>
+            <th className="py-3 px-3.5 text-center whitespace-nowrap">{t('colUnpaidMonths')}</th>
+            <th className="py-3 px-3.5 text-center whitespace-nowrap">{t('colRisk')}</th>
+            <th className="py-3 px-3.5 text-right whitespace-nowrap">{t('colArrears')}</th>
+            <th className="py-3 px-3.5 whitespace-nowrap">{t('colUnpaidDues')}</th>
+            <th className="py-3 px-3.5 text-right print:hidden whitespace-nowrap">{t('colActions')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800/60 print:divide-slate-200">

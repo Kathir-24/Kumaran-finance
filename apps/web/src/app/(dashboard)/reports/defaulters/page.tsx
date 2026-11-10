@@ -163,14 +163,14 @@ export default function DefaultersRegisterPage() {
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-400 print:hidden">
         <Link href="/" className="hover:text-slate-200 transition-colors">
-          Home
+          {tCommon('home')}
         </Link>
         <span>/</span>
         <Link href="/reports" className="hover:text-slate-200 transition-colors">
-          Reports
+          {tCommon('reports')}
         </Link>
         <span>/</span>
-        <span className="text-white font-medium">Defaulters & Arrears Register</span>
+        <span className="text-white font-medium">{t('title')}</span>
       </nav>
 
       {/* Header & Controls */}
@@ -199,7 +199,7 @@ export default function DefaultersRegisterPage() {
                 }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
               >
-                <option value="">All Branches</option>
+                <option value="">{t('allBranches')}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name} ({b.code})

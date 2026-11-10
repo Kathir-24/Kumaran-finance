@@ -120,20 +120,20 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
           />
 
           {/* 20-Month Schedule Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto scrollbar-thin rounded-xl border border-slate-800 print:border-slate-300">
+            <table className="w-full min-w-[860px] text-left text-xs border-collapse">
               <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800 print:bg-slate-100 print:text-black print:border-slate-300">
                 <tr>
-                  <th className="py-2.5 px-3">{t('tableMonth')}</th>
-                  <th className="py-2.5 px-3">{t('tableDueDate')}</th>
-                  <th className="py-2.5 px-3 text-right">{t('tableGross')}</th>
-                  <th className="py-2.5 px-3 text-right">{t('tableDividend')}</th>
-                  <th className="py-2.5 px-3 text-right">{t('tableNet')}</th>
-                  <th className="py-2.5 px-3 text-right">{t('tablePaid')}</th>
-                  <th className="py-2.5 px-3 text-right">{t('tableBalance')}</th>
-                  <th className="py-2.5 px-3 text-center">{t('tableStatus')}</th>
-                  <th className="py-2.5 px-3">{t('tableReceipt')}</th>
-                  <th className="py-2.5 px-3">{t('tableMethod')}</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('tableMonth')}</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('tableDueDate')}</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('tableGross')}</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('tableDividend')}</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('tableNet')}</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('tablePaid')}</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('tableBalance')}</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">{t('tableStatus')}</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('tableReceipt')}</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('tableMethod')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 print:divide-slate-200">

@@ -211,7 +211,7 @@ export default function FormXxiiCashBookPage() {
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-400 print:hidden">
         <Link href="/" className="hover:text-slate-200 transition-colors">
-          Home
+          {tCommon('home')}
         </Link>
         <span>/</span>
         <Link href="/reports" className="hover:text-slate-200 transition-colors">
@@ -233,13 +233,13 @@ export default function FormXxiiCashBookPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 print:hidden">
+        <div className="flex flex-wrap items-center gap-2 print:hidden w-full sm:w-auto">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleExportCsv}
-            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-9 gap-1.5"
+            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-9 gap-1.5 shrink-0"
           >
             <Download className="h-3.5 w-3.5 text-emerald-400" />
             <span>{t('export.csv')}</span>
@@ -250,7 +250,7 @@ export default function FormXxiiCashBookPage() {
             variant="outline"
             size="sm"
             onClick={handlePrint}
-            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-9 gap-1.5"
+            className="border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-9 gap-1.5 shrink-0"
           >
             <Printer className="h-3.5 w-3.5 text-sky-400" />
             <span>{t('export.print')}</span>
@@ -272,16 +272,18 @@ export default function FormXxiiCashBookPage() {
 
       {/* Main Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6">
-        <TabsList className="bg-slate-900/80 border border-slate-800 p-1 print:hidden">
-          <TabsTrigger value="form-xxii" className="text-xs gap-1.5">
-            <Vault className="h-3.5 w-3.5 text-emerald-400" />
-            {t('tabs.formXxii')}
-          </TabsTrigger>
-          <TabsTrigger value="day-book" className="text-xs gap-1.5">
-            <FileCheck className="h-3.5 w-3.5 text-indigo-400" />
-            {t('tabs.dayBook')}
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-none">
+          <TabsList className="inline-flex min-w-full sm:min-w-0 bg-slate-900/80 border border-slate-800 p-1 print:hidden">
+            <TabsTrigger value="form-xxii" className="text-xs gap-1.5 shrink-0 whitespace-nowrap">
+              <Vault className="h-3.5 w-3.5 text-emerald-400" />
+              {t('tabs.formXxii')}
+            </TabsTrigger>
+            <TabsTrigger value="day-book" className="text-xs gap-1.5 shrink-0 whitespace-nowrap">
+              <FileCheck className="h-3.5 w-3.5 text-indigo-400" />
+              {t('tabs.dayBook')}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Tab 1: Form XXII Statutory Cash Book */}
         <TabsContent value="form-xxii" className="space-y-6">

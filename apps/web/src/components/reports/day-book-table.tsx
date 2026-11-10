@@ -247,18 +247,18 @@ export function DayBookTable({ summary, inflows, outflows, isLoading }: DayBookT
               {t('table.noTransactions')}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full min-w-[780px] text-left text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800">
                   <tr>
-                    <th className="py-2.5 px-3">{t('table.time')}</th>
-                    <th className="py-2.5 px-3">Doc #</th>
-                    <th className="py-2.5 px-3">{t('table.paymentMethod')}</th>
-                    <th className="py-2.5 px-3">{t('table.transactionRef')}</th>
-                    <th className="py-2.5 px-3">{t('table.customer')}</th>
-                    <th className="py-2.5 px-3">{t('table.groupTicket')}</th>
-                    <th className="py-2.5 px-3">{t('dayBook.collectedBy')}</th>
-                    <th className="py-2.5 px-3 text-right">{t('table.amount')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.time')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.docNo')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.paymentMethod')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.transactionRef')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.customer')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('table.groupTicket')}</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">{t('dayBook.collectedBy')}</th>
+                    <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('table.amount')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">

@@ -131,16 +131,16 @@ export function AuditLogTable({
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full min-w-[820px] text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400">
-                <th className="py-3 px-4 font-semibold">{t('colTimestamp')}</th>
-                <th className="py-3 px-4 font-semibold">{t('colAction')}</th>
-                <th className="py-3 px-4 font-semibold">{t('colEntity')}</th>
-                <th className="py-3 px-4 font-semibold">{t('colActor')}</th>
-                <th className="py-3 px-4 font-semibold">{t('colIpAddress')}</th>
-                <th className="py-3 px-4 font-semibold text-right">{t('colDiff')}</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('colTimestamp')}</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('colAction')}</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('colEntity')}</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('colActor')}</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('colIpAddress')}</th>
+                <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">{t('colDiff')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">

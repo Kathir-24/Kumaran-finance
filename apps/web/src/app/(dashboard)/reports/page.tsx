@@ -56,45 +56,45 @@ export default function ReportsHubPage() {
       description: t('cashBookSubtitle'),
       href: '/reports/cash-book',
       icon: Vault,
-      badgeText: 'Active',
+      badgeText: tCommon('active'),
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: 'Statutory Form XXII & Day Book',
+      tag: t('tagFormXxii'),
     },
     {
       title: t('formXvii'),
-      description: 'Auction minutes, 4% commission, dividends & 21-day Registrar filing window',
+      description: t('formXviiCardDesc'),
       href: '/reports/minutes',
       icon: FileCheck,
-      badgeText: 'Active',
+      badgeText: tCommon('active'),
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: 'Registrar Compliance',
+      tag: t('tagRegistrar'),
     },
     {
       title: t('formXxi'),
-      description: 'Continuous 20-month schedule of base dues, dividend credits, payments & arrears',
+      description: t('formXxiCardDesc'),
       href: '/reports/ledger',
       icon: BookOpen,
-      badgeText: 'Active',
+      badgeText: tCommon('active'),
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: 'Subscriber Passbooks',
+      tag: t('tagSubscriberPassbooks'),
     },
     {
-      title: 'Defaulters & Arrears Register',
-      description: 'Arrears aging analysis, recovery tracking, and ADR-07 3-month removal candidates',
+      title: t('defaultersCardTitle'),
+      description: t('defaultersCardDesc'),
       href: '/reports/defaulters',
       icon: AlertTriangle,
-      badgeText: 'Active',
+      badgeText: tCommon('active'),
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: 'Risk & Recovery',
+      tag: t('tagRiskRecovery'),
     },
     {
       title: t('auditLogs'),
-      description: 'Append-only forensic audit trail of dual-control approvals, handovers & reversals',
+      description: t('auditLogsCardDesc'),
       href: '/reports/audit-logs',
       icon: ShieldCheck,
-      badgeText: 'Active',
+      badgeText: tCommon('active'),
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: 'CA Forensic Audit',
+      tag: t('tagAudit'),
     },
   ];
 
@@ -113,7 +113,7 @@ export default function ReportsHubPage() {
         </div>
 
         <Badge variant="outline" className="text-xs font-mono border-slate-800 text-slate-300 self-start sm:self-auto">
-          Tamil Nadu Chit Funds Rules
+          {t('tamilNaduRulesBadge')}
         </Badge>
       </div>
 
@@ -145,7 +145,7 @@ export default function ReportsHubPage() {
                     <Icon className="h-5 w-5 text-emerald-400 shrink-0" />
                     <span>{card.title}</span>
                   </CardTitle>
-                  <CardDescription className="text-xs text-slate-400 mt-1 line-clamp-2">
+                  <CardDescription className="text-xs text-slate-400 mt-1 leading-relaxed">
                     {card.description}
                   </CardDescription>
                 </CardHeader>

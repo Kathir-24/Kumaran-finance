@@ -212,14 +212,14 @@ export default function FormXviiMinutesPage() {
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-400 print:hidden">
         <Link href="/" className="hover:text-slate-200 transition-colors">
-          Home
+          {tCommon('home')}
         </Link>
         <span>/</span>
         <Link href="/reports" className="hover:text-slate-200 transition-colors">
-          Reports
+          {tCommon('reports')}
         </Link>
         <span>/</span>
-        <span className="text-white font-medium">Form XVII Auction Minutes</span>
+        <span className="text-white font-medium">{t('title')}</span>
       </nav>
 
       {/* Header & Controls */}

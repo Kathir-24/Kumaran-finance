@@ -110,16 +110,16 @@ export function FormXxiiTable({ inflows, outflows, isLoading }: FormXxiiTablePro
                   {t('table.noInflows')}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto scrollbar-thin">
+                  <table className="w-full min-w-[560px] text-left text-xs">
                     <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800">
                       <tr>
-                        <th className="py-2.5 px-3">{t('table.receiptNo')}</th>
-                        <th className="py-2.5 px-3">{t('table.time')}</th>
-                        <th className="py-2.5 px-3">{t('table.customer')}</th>
-                        <th className="py-2.5 px-3">{t('table.groupTicket')}</th>
-                        <th className="py-2.5 px-3">{t('table.source')}</th>
-                        <th className="py-2.5 px-3 text-right">{t('table.amount')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.receiptNo')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.time')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.customer')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.groupTicket')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.source')}</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('table.amount')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
@@ -212,16 +212,16 @@ export function FormXxiiTable({ inflows, outflows, isLoading }: FormXxiiTablePro
                   {t('table.noOutflows')}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto scrollbar-thin">
+                  <table className="w-full min-w-[560px] text-left text-xs">
                     <thead className="bg-slate-950/80 text-slate-400 font-medium border-b border-slate-800">
                       <tr>
-                        <th className="py-2.5 px-3">{t('table.voucherNo')}</th>
-                        <th className="py-2.5 px-3">{t('table.time')}</th>
-                        <th className="py-2.5 px-3">{t('table.winner')}</th>
-                        <th className="py-2.5 px-3">{t('table.groupTicket')}</th>
-                        <th className="py-2.5 px-3">{t('table.particulars')}</th>
-                        <th className="py-2.5 px-3 text-right">{t('table.amount')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.voucherNo')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.time')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.winner')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.groupTicket')}</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">{t('table.particulars')}</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">{t('table.amount')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
@@ -245,7 +245,7 @@ export function FormXxiiTable({ inflows, outflows, isLoading }: FormXxiiTablePro
                             {item.groupCode} / #{item.ticketNumber}
                           </td>
                           <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
-                            Month {item.installmentMonth} Payout
+                            {t('table.monthPayout', { month: item.installmentMonth })}
                           </td>
                           <td className="py-2 px-3 text-right font-mono font-bold text-rose-400 whitespace-nowrap">
                             -{formatRupee(item.amount)}
