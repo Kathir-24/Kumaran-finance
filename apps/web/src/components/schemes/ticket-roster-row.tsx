@@ -39,7 +39,7 @@ export function TicketRosterRow({
       )}
     >
       {/* Ticket Slot Number */}
-      <TableCell className="font-mono text-xs font-bold text-slate-200">
+      <TableCell className="font-mono text-xs font-bold text-slate-200 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300">
             {slotNumber}
@@ -76,12 +76,12 @@ export function TicketRosterRow({
       </TableCell>
 
       {/* Contact Phone */}
-      <TableCell className="font-mono text-xs text-slate-300">
+      <TableCell className="font-mono text-xs text-slate-300 whitespace-nowrap">
         {ticket?.customer?.phone ? `+91 ${ticket.customer.phone}` : '—'}
       </TableCell>
 
       {/* Prized Status */}
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         {ticket ? (
           ticket.isPrized ? (
             <Badge variant="success" className="text-[10px] font-bold py-0.5">
@@ -99,7 +99,7 @@ export function TicketRosterRow({
       </TableCell>
 
       {/* Arrears Aging & ADR-07 Warning */}
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         {ticket ? (
           ticket.consecutiveUnpaidMonths >= 3 ? (
             <Badge variant="destructive" className="text-[10px] font-bold py-0.5">
@@ -119,7 +119,7 @@ export function TicketRosterRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell className="text-right">
+      <TableCell className="text-right whitespace-nowrap">
         {ticket ? (
           isDraft && canManageTickets ? (
             <Button

@@ -350,7 +350,18 @@
     "printVoucher": "Print Voucher",
     "close": "Close",
     "noDefaultersTitle": "No Arrears or Defaulters",
-    "noDefaultersDesc": "All subscribers in this chit group are up to date on installments."
+    "noDefaultersDesc": "All subscribers in this chit group are up to date on installments.",
+    "subscriptionStatus": "Subscription Status",
+    "colTicketNumber": "#",
+    "colSubscriber": "Subscriber",
+    "colContact": "Contact",
+    "colPrizedStatus": "Prized Status",
+    "colArrears": "Arrears",
+    "colAction": "Action",
+    "filterAllSlots": "All Slots",
+    "filterAssignedSlots": "Assigned ({count})",
+    "filterVacantSlots": "Vacant ({count})",
+    "filterPrizedSlots": "Prized"
   },
   "customers": {
     "title": "Customer Directory",

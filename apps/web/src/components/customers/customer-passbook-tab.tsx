@@ -198,7 +198,7 @@ export function CustomerPassbookTab({
       {passbook && (
         <>
           {/* 5 Financial Summary KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 space-y-1">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                 {t('totalScheduled')}
@@ -235,7 +235,7 @@ export function CustomerPassbookTab({
               </div>
             </div>
 
-            <div className="col-span-2 md:col-span-1 rounded-xl border border-slate-800 bg-slate-900/80 p-3 space-y-1">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 space-y-1">
               <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">
                 {t('outstandingDue')}
               </span>
@@ -252,87 +252,89 @@ export function CustomerPassbookTab({
                 <h3 className="text-sm font-semibold text-white">{t('passbookTitle')}</h3>
                 <p className="text-xs text-slate-400">{t('passbookSubtitle')}</p>
               </div>
-              <Badge variant="outline" className="border-slate-700 bg-slate-800 font-mono text-[11px] text-slate-300">
+              <Badge variant="outline" className="border-slate-700 bg-slate-800 font-mono text-[11px] text-slate-300 shrink-0">
                 Form XXI
               </Badge>
             </div>
 
-            <Table>
-              <TableHeader className="bg-slate-950/60 text-slate-400 text-xs">
-                <TableRow className="border-slate-800 hover:bg-transparent">
-                  <TableHead className="w-16">{t('colMonth')}</TableHead>
-                  <TableHead>{t('colDueDate')}</TableHead>
-                  <TableHead className="text-right">{t('colGross')}</TableHead>
-                  <TableHead className="text-right">{t('colDividend')}</TableHead>
-                  <TableHead className="text-right">{t('colNetPayable')}</TableHead>
-                  <TableHead className="text-right">{t('colPaidAmount')}</TableHead>
-                  <TableHead className="text-center">{t('colStatus')}</TableHead>
-                  <TableHead>{t('colReceipt')}</TableHead>
-                  <TableHead>{t('colPaidDate')}</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto scrollbar-thin">
+              <Table className="min-w-[760px]">
+                <TableHeader className="bg-slate-950/60 text-slate-400 text-xs">
+                  <TableRow className="border-slate-800 hover:bg-transparent">
+                    <TableHead className="w-16 whitespace-nowrap">{t('colMonth')}</TableHead>
+                    <TableHead className="whitespace-nowrap">{t('colDueDate')}</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">{t('colGross')}</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">{t('colDividend')}</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">{t('colNetPayable')}</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">{t('colPaidAmount')}</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">{t('colStatus')}</TableHead>
+                    <TableHead className="whitespace-nowrap">{t('colReceipt')}</TableHead>
+                    <TableHead className="whitespace-nowrap">{t('colPaidDate')}</TableHead>
+                  </TableRow>
+                </TableHeader>
 
-              <TableBody>
-                {passbook.ledgerEntries.map((row) => {
-                  const isPaid = row.status === 'PAID';
-                  const isOverdue = row.status === 'OVERDUE';
-                  const formattedPaidDate = row.paidDate
-                    ? new Date(row.paidDate).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—';
-                  const formattedDueDate = row.dueDate
-                    ? new Date(row.dueDate).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—';
+                <TableBody>
+                  {passbook.ledgerEntries.map((row) => {
+                    const isPaid = row.status === 'PAID';
+                    const isOverdue = row.status === 'OVERDUE';
+                    const formattedPaidDate = row.paidDate
+                      ? new Date(row.paidDate).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : '—';
+                    const formattedDueDate = row.dueDate
+                      ? new Date(row.dueDate).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : '—';
 
-                  return (
-                    <TableRow key={row.month} className="border-slate-800/80 hover:bg-slate-850/50 text-xs">
-                      <TableCell className="font-mono font-bold text-slate-300">
-                        M{row.month}
-                      </TableCell>
-                      <TableCell className="text-slate-400">{formattedDueDate}</TableCell>
-                      <TableCell className="text-right font-mono text-slate-300">
-                        {formatRupee(row.grossAmount)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-indigo-400">
-                        {Number(row.dividendDeduction) > 0 ? formatRupee(row.dividendDeduction) : '—'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold text-slate-100">
-                        {formatRupee(row.netPayableAmount)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold text-emerald-400">
-                        {Number(row.paidAmount) > 0 ? formatRupee(row.paidAmount) : '—'}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isPaid ? (
-                          <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[10px] py-0 px-1.5">
-                            <ShieldCheck className="h-3 w-3 mr-1 inline" /> PAID
-                          </Badge>
-                        ) : isOverdue ? (
-                          <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-300 text-[10px] py-0 px-1.5">
-                            <AlertTriangle className="h-3 w-3 mr-1 inline" /> OVERDUE
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] py-0 px-1.5">
-                            <Clock className="h-3 w-3 mr-1 inline" /> UNPAID
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-[11px] text-slate-400">
-                        {row.receiptNumber || '—'}
-                      </TableCell>
-                      <TableCell className="text-slate-400">{formattedPaidDate}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    return (
+                      <TableRow key={row.month} className="border-slate-800/80 hover:bg-slate-850/50 text-xs">
+                        <TableCell className="font-mono font-bold text-slate-300 whitespace-nowrap">
+                          M{row.month}
+                        </TableCell>
+                        <TableCell className="text-slate-400 whitespace-nowrap">{formattedDueDate}</TableCell>
+                        <TableCell className="text-right font-mono text-slate-300 whitespace-nowrap">
+                          {formatRupee(row.grossAmount)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-indigo-400 whitespace-nowrap">
+                          {Number(row.dividendDeduction) > 0 ? formatRupee(row.dividendDeduction) : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-slate-100 whitespace-nowrap">
+                          {formatRupee(row.netPayableAmount)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-emerald-400 whitespace-nowrap">
+                          {Number(row.paidAmount) > 0 ? formatRupee(row.paidAmount) : '—'}
+                        </TableCell>
+                        <TableCell className="text-center whitespace-nowrap">
+                          {isPaid ? (
+                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[10px] py-0 px-1.5">
+                              <ShieldCheck className="h-3 w-3 mr-1 inline" /> PAID
+                            </Badge>
+                          ) : isOverdue ? (
+                            <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-300 text-[10px] py-0 px-1.5">
+                              <AlertTriangle className="h-3 w-3 mr-1 inline" /> OVERDUE
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] py-0 px-1.5">
+                              <Clock className="h-3 w-3 mr-1 inline" /> UNPAID
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                          {row.receiptNumber || '—'}
+                        </TableCell>
+                        <TableCell className="text-slate-400 whitespace-nowrap">{formattedPaidDate}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </>
       )}

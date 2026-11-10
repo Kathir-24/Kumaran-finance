@@ -93,58 +93,60 @@ export function DefaultersTable({
   return (
     <div className="space-y-4">
       {/* Sub-Tabs / Filters */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab('all')}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
-            activeTab === 'all'
-              ? 'bg-slate-800 text-slate-100 border border-slate-700'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900',
-          )}
-        >
-          {t('tabAllDefaulters', { count: tickets.length })}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('active_arrears')}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'active_arrears'
-              ? 'bg-amber-950/60 text-amber-300 border border-amber-600/50'
-              : 'text-slate-400 hover:text-amber-300 hover:bg-slate-900',
-          )}
-        >
-          <Clock className="h-3.5 w-3.5 text-amber-400" />
-          <span>{t('tabActiveDefaulters', { count: countActiveArrears })}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('removal_eligible')}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'removal_eligible'
-              ? 'bg-rose-950/60 text-rose-300 border border-rose-600/50'
-              : 'text-slate-400 hover:text-rose-300 hover:bg-slate-900',
-          )}
-        >
-          <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-          <span>{t('tabEligibleRemoval', { count: countEligible })}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('removed')}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
-            activeTab === 'removed'
-              ? 'bg-purple-950/60 text-purple-300 border border-purple-600/50'
-              : 'text-slate-400 hover:text-purple-300 hover:bg-slate-900',
-          )}
-        >
-          <Ban className="h-3.5 w-3.5 text-purple-400" />
-          <span>{t('tabRemoved', { count: countRemoved })}</span>
-        </button>
+      <div className="overflow-x-auto scrollbar-none pb-1 border-b border-slate-800">
+        <div className="flex items-center gap-2 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 whitespace-nowrap',
+              activeTab === 'all'
+                ? 'bg-slate-800 text-slate-100 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900',
+            )}
+          >
+            {t('tabAllDefaulters', { count: tickets.length })}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('active_arrears')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap',
+              activeTab === 'active_arrears'
+                ? 'bg-amber-950/60 text-amber-300 border border-amber-600/50'
+                : 'text-slate-400 hover:text-amber-300 hover:bg-slate-900',
+            )}
+          >
+            <Clock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span>{t('tabActiveDefaulters', { count: countActiveArrears })}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('removal_eligible')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap',
+              activeTab === 'removal_eligible'
+                ? 'bg-rose-950/60 text-rose-300 border border-rose-600/50'
+                : 'text-slate-400 hover:text-rose-300 hover:bg-slate-900',
+            )}
+          >
+            <AlertTriangle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+            <span>{t('tabEligibleRemoval', { count: countEligible })}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('removed')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap',
+              activeTab === 'removed'
+                ? 'bg-purple-950/60 text-purple-300 border border-purple-600/50'
+                : 'text-slate-400 hover:text-purple-300 hover:bg-slate-900',
+            )}
+          >
+            <Ban className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+            <span>{t('tabRemoved', { count: countRemoved })}</span>
+          </button>
+        </div>
       </div>
 
       {/* Table Content */}
@@ -155,16 +157,16 @@ export function DefaultersTable({
           <p className="text-xs text-slate-400">{t('noDefaultersDesc')}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto scrollbar-thin rounded-xl border border-slate-800 bg-slate-900/60">
+          <table className="w-full min-w-[720px] text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Ticket</th>
-                <th className="py-3 px-4">Subscriber</th>
-                <th className="py-3 px-4">Arrears Status</th>
-                <th className="py-3 px-4">Unpaid Months</th>
-                <th className="py-3 px-4">Total Arrears</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-4 whitespace-nowrap">Ticket</th>
+                <th className="py-3 px-4 whitespace-nowrap">Subscriber</th>
+                <th className="py-3 px-4 whitespace-nowrap">Arrears Status</th>
+                <th className="py-3 px-4 whitespace-nowrap">Unpaid Months</th>
+                <th className="py-3 px-4 whitespace-nowrap">Total Arrears</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
@@ -188,7 +190,7 @@ export function DefaultersTable({
                 return (
                   <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
                     {/* Ticket # */}
-                    <td className="py-3 px-4 font-mono font-bold text-slate-200">
+                    <td className="py-3 px-4 font-mono font-bold text-slate-200 whitespace-nowrap">
                       #{item.ticketNumber}
                     </td>
 
@@ -205,7 +207,7 @@ export function DefaultersTable({
                     </td>
 
                     {/* Status Badge */}
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       {isRemoved ? (
                         <Badge variant="outline" className="text-[10px] bg-purple-950/40 text-purple-300 border-purple-500/40 font-bold">
                           {t('statusRemovedDefaulter')}
@@ -226,7 +228,7 @@ export function DefaultersTable({
                     </td>
 
                     {/* Unpaid Months */}
-                    <td className="py-3 px-4 font-mono">
+                    <td className="py-3 px-4 font-mono whitespace-nowrap">
                       {item.consecutiveUnpaidMonths > 0 ? (
                         <span className={isEligibleForRemoval ? 'text-rose-400 font-bold' : 'text-amber-400'}>
                           {t('consecutiveMonthsUnpaid', { months: item.consecutiveUnpaidMonths })}
@@ -237,12 +239,12 @@ export function DefaultersTable({
                     </td>
 
                     {/* Total Arrears Amount */}
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-200">
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-200 whitespace-nowrap">
                       {duesInfo.totalOverdue > 0n ? formatRupee(duesInfo.totalOverdue) : '₹0'}
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         {isRemoved ? (
                           <>

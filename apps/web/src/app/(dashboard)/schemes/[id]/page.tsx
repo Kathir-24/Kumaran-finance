@@ -169,7 +169,7 @@ export default function SchemeDetailPage() {
       />
 
       {/* 6-Column Key Financial & Operational Metric Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-1">
           <span className="text-[11px] text-slate-400">{t('chitValue')}</span>
           <p className="font-mono text-base font-bold text-slate-100">
@@ -199,7 +199,7 @@ export default function SchemeDetailPage() {
           </p>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-1">
-          <span className="text-[11px] text-slate-400">Subscription Status</span>
+          <span className="text-[11px] text-slate-400">{t('subscriptionStatus')}</span>
           <p
             className={cn(
               'font-mono text-base font-bold',
@@ -213,20 +213,22 @@ export default function SchemeDetailPage() {
 
       {/* Tabbed Management View: Tab 1 = Subscriber Roster | Tab 2 = Monthly Installments */}
       <Tabs defaultValue="roster" className="space-y-4">
-        <TabsList className="bg-slate-900 border border-slate-800 p-1">
-          <TabsTrigger
-            value="roster"
-            className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer"
-          >
-            {tInstallments('tabRoster', { total: totalTickets })}
-          </TabsTrigger>
-          <TabsTrigger
-            value="installments"
-            className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer"
-          >
-            {tInstallments('tabInstallments')}
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-none pb-1">
+          <TabsList className="bg-slate-900 border border-slate-800 p-1 inline-flex w-max min-w-full sm:min-w-0 sm:w-auto">
+            <TabsTrigger
+              value="roster"
+              className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              {tInstallments('tabRoster', { total: totalTickets })}
+            </TabsTrigger>
+            <TabsTrigger
+              value="installments"
+              className="text-xs font-semibold data-[state=active]:bg-emerald-600 data-[state=active]:text-white cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              {tInstallments('tabInstallments')}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Tab 1: Subscriber Roster */}
         <TabsContent value="roster" className="space-y-3 outline-none mt-2">

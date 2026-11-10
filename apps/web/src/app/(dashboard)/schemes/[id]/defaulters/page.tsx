@@ -172,7 +172,7 @@ export default function SchemeDefaultersPage() {
       />
 
       {/* 5-Metric Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-1">
           <span className="text-[11px] text-slate-400">{t('totalSchemeTickets')}</span>
           <p className="font-mono text-base font-bold text-slate-100">

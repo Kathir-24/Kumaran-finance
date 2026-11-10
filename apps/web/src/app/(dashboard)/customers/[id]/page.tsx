@@ -112,52 +112,52 @@ export default function CustomerProfilePage({
       <CustomerProfileHeader customer={customer} />
 
       {/* Profile Tabs Navigation */}
-      <div className="border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
+      <div className="border-b border-slate-800 flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('passbook')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 whitespace-nowrap ${
             activeTab === 'passbook'
               ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
           }`}
         >
-          <Receipt className="h-3.5 w-3.5" />
+          <Receipt className="h-3.5 w-3.5 shrink-0" />
           <span>{t('tabPassbook')}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('tickets')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 whitespace-nowrap ${
             activeTab === 'tickets'
               ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
           }`}
         >
-          <Ticket className="h-3.5 w-3.5" />
+          <Ticket className="h-3.5 w-3.5 shrink-0" />
           <span>{t('tabTickets', { count: tickets.length })}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('nominees')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 whitespace-nowrap ${
             activeTab === 'nominees'
               ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
           }`}
         >
-          <Users2 className="h-3.5 w-3.5" />
+          <Users2 className="h-3.5 w-3.5 shrink-0" />
           <span>{t('tabNominees', { count: nominees.length })}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('documents')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 whitespace-nowrap ${
             activeTab === 'documents'
               ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
           }`}
         >
-          <FileText className="h-3.5 w-3.5" />
+          <FileText className="h-3.5 w-3.5 shrink-0" />
           <span>{t('tabDocuments', { count: documents.length })}</span>
         </button>
       </div>

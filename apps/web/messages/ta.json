@@ -350,7 +350,18 @@
     "printVoucher": "சீட்டை அச்சிடு",
     "close": "மூடு",
     "noDefaultersTitle": "தவணை நிலுவைகள் ஏதுமில்லை",
-    "noDefaultersDesc": "இந்த சீட்டு குழுவில் உள்ள அனைத்து சந்தாதாரர்களும் தவணைகளை சரியாக செலுத்தியுள்ளனர்."
+    "noDefaultersDesc": "இந்த சீட்டு குழுவில் உள்ள அனைத்து சந்தாதாரர்களும் தவணைகளை சரியாக செலுத்தியுள்ளனர்.",
+    "subscriptionStatus": "சந்தா நிலை",
+    "colTicketNumber": "#",
+    "colSubscriber": "சந்தாதாரர்",
+    "colContact": "தொடர்பு",
+    "colPrizedStatus": "பரிசு நிலை",
+    "colArrears": "நிலுவை",
+    "colAction": "செயல்",
+    "filterAllSlots": "அனைத்து இடங்கள்",
+    "filterAssignedSlots": "ஒதுக்கப்பட்டவை ({count})",
+    "filterVacantSlots": "காலியிடங்கள் ({count})",
+    "filterPrizedSlots": "பரிசு பெற்றவை"
   },
   "customers": {
     "title": "சந்தாதாரர் பட்டியல்",

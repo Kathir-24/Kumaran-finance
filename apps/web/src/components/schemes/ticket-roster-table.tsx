@@ -148,64 +148,68 @@ export function TicketRosterTable({
           />
         </div>
 
-        <div className="flex items-center gap-1 self-start sm:self-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1 text-xs">
-          {(['ALL', 'ASSIGNED', 'VACANT', 'PRIZED'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setFilterMode(mode)}
-              className={cn(
-                'rounded px-2.5 py-1 text-xs font-semibold transition-colors',
-                filterMode === mode
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              {mode === 'ALL' && 'All Slots'}
-              {mode === 'ASSIGNED' && `Assigned (${tickets.length})`}
-              {mode === 'VACANT' && `Vacant (${totalTickets - tickets.length})`}
-              {mode === 'PRIZED' && 'Prized'}
-            </button>
-          ))}
+        <div className="overflow-x-auto scrollbar-none w-full sm:w-auto">
+          <div className="inline-flex items-center gap-1 self-start sm:self-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1 text-xs">
+            {(['ALL', 'ASSIGNED', 'VACANT', 'PRIZED'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setFilterMode(mode)}
+                className={cn(
+                  'rounded px-2.5 py-1 text-xs font-semibold transition-colors shrink-0 whitespace-nowrap',
+                  filterMode === mode
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                )}
+              >
+                {mode === 'ALL' && t('filterAllSlots')}
+                {mode === 'ASSIGNED' && t('filterAssignedSlots', { count: tickets.length })}
+                {mode === 'VACANT' && t('filterVacantSlots', { count: totalTickets - tickets.length })}
+                {mode === 'PRIZED' && t('filterPrizedSlots')}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Roster Table */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/90 overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader className="bg-slate-950/60">
-            <TableRow className="border-slate-800 hover:bg-transparent">
-              <TableHead className="w-20 text-xs font-semibold text-slate-400">#</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-400">Subscriber</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-400">Contact</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-400">Prized Status</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-400">Arrears</TableHead>
-              <TableHead className="text-right text-xs font-semibold text-slate-400">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="divide-y divide-slate-800/80">
-            {filteredSlots.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-xs text-slate-500">
-                  {t('emptyDesc')}
-                </TableCell>
+        <div className="overflow-x-auto scrollbar-thin">
+          <Table className="min-w-[680px]">
+            <TableHeader className="bg-slate-950/60">
+              <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableHead className="w-20 text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colTicketNumber')}</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colSubscriber')}</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colContact')}</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colPrizedStatus')}</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colArrears')}</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-slate-400 whitespace-nowrap">{t('colAction')}</TableHead>
               </TableRow>
-            ) : (
-              filteredSlots.map(({ slotNumber, ticket }) => (
-                <TicketRosterRow
-                  key={slotNumber}
-                  slotNumber={slotNumber}
-                  ticket={ticket}
-                  isDraft={isDraft}
-                  canManageTickets={canManageTickets}
-                  isUnassigning={unassigningTicketNum === slotNumber}
-                  onAssignClick={onAssignClick}
-                  onUnassignClick={handleUnassign}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-800/80">
+              {filteredSlots.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-xs text-slate-500">
+                    {t('emptyDesc')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredSlots.map(({ slotNumber, ticket }) => (
+                  <TicketRosterRow
+                    key={slotNumber}
+                    slotNumber={slotNumber}
+                    ticket={ticket}
+                    isDraft={isDraft}
+                    canManageTickets={canManageTickets}
+                    isUnassigning={unassigningTicketNum === slotNumber}
+                    onAssignClick={onAssignClick}
+                    onUnassignClick={handleUnassign}
+                  />
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
