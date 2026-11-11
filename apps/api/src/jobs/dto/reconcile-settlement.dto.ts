@@ -1,15 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
   IsIn,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsPositive,
   IsString,
+  Max,
   ValidateNested,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class SettlementRecordDto {
   @ApiProperty({
@@ -29,13 +34,19 @@ export class SettlementRecordDto {
   gatewayPaymentId: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 3750,
     description: 'Settlement amount in whole integer Rupees',
   })
   @IsNotEmpty({ message: 'amount is required' })
-  @Type(() => Number)
-  @IsNumber()
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
+  @IsInt({
+    message: 'amount must be a whole Rupee integer amount (zero paise/decimals)',
+  })
   @IsPositive({ message: 'amount must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'amount exceeds maximum safe whole-Rupee integer limit',
+  })
   amount: number;
 
   @ApiProperty({

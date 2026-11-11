@@ -18,6 +18,7 @@ import {
   MasterCacheKeys,
 } from '../common/constants';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
@@ -57,7 +58,7 @@ export class ChitService {
    * Helper: validates whole-rupee math and returns calculated financial properties
    */
   private calculateSchemeMath(chitValueNum: number, durationMonths: number) {
-    const chitValue = BigInt(Math.floor(chitValueNum));
+    const chitValue = toWholeRupeeBigInt(chitValueNum, 'Chit value', { min: 1n });
     const duration = BigInt(durationMonths);
 
     if (chitValue % duration !== 0n) {
@@ -231,7 +232,10 @@ export class ChitService {
           chitGroupId: chit.id,
           customerId: alloc.customerId,
           ticketNumber: alloc.ticketNumber,
-          openingBalance: BigInt(alloc.openingBalance || 0),
+          openingBalance:
+            alloc.openingBalance !== undefined && alloc.openingBalance !== null
+              ? toWholeRupeeBigInt(alloc.openingBalance, 'Opening balance', { min: 0n })
+              : 0n,
         })),
       });
 
@@ -253,7 +257,7 @@ export class ChitService {
           );
         }
 
-        const bidDiscount = BigInt(hw.bidDiscount);
+        const bidDiscount = toWholeRupeeBigInt(hw.bidDiscount, 'Bid discount', { min: 1n });
         const commission =
           (math.chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
         const totalDividend = bidDiscount - commission;
@@ -356,7 +360,10 @@ export class ChitService {
         chitGroupId,
         customerId: dto.customerId,
         ticketNumber: dto.ticketNumber,
-        openingBalance: BigInt(dto.openingBalance || 0),
+        openingBalance:
+          dto.openingBalance !== undefined && dto.openingBalance !== null
+            ? toWholeRupeeBigInt(dto.openingBalance, 'Opening balance', { min: 0n })
+            : 0n,
       },
       include: {
         customer: {

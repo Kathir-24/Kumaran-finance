@@ -1,12 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsInt,
   IsNotEmpty,
   IsPositive,
   IsString,
+  Max,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class RecordBidDto {
   @ApiProperty({
@@ -18,14 +23,18 @@ export class RecordBidDto {
   ticketId: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 22000,
     description:
       'Winning auction bid discount in whole integer Rupees (must be between 4% commission and 1/4 ceiling)',
   })
   @IsNotEmpty({ message: 'Bid discount is required' })
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Bid discount must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Bid discount exceeds maximum safe whole-Rupee integer limit',
+  })
   bidDiscount: number;
 
   @ApiProperty({

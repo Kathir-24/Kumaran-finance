@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -8,7 +8,12 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Max,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class AcknowledgeHandoverDto {
   @ApiProperty({
@@ -21,14 +26,18 @@ export class AcknowledgeHandoverDto {
   collectorUserId: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 45000,
     description:
       'Physically counted cash currency notes amount received into branch vault (must match total of specified paymentIds)',
   })
   @IsNotEmpty({ message: 'Acknowledged cash amount is required' })
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Acknowledged amount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Acknowledged amount must be a positive number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Acknowledged amount exceeds maximum safe whole-Rupee integer limit',
+  })
   acknowledgedAmount: number;
 
   @ApiProperty({

@@ -1,14 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DisbursementMode } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsEnum,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  Max,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class AuthorizePayoutDto {
   @ApiProperty({
@@ -22,14 +27,20 @@ export class AuthorizePayoutDto {
   disbursementMode: DisbursementMode;
 
   @ApiPropertyOptional({
+    type: 'integer',
     example: 75000,
     description:
       'Whole-rupee prize money amount to authorize (defaults to calculated auction prize money: chitValue - bidDiscount)',
   })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @IsPositive()
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
+  @IsInt({
+    message: 'disbursedAmount must be a whole Rupee integer amount (zero paise/decimals)',
+  })
+  @IsPositive({ message: 'disbursedAmount must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'disbursedAmount exceeds maximum safe whole-Rupee integer limit',
+  })
   disbursedAmount?: number;
 
   @ApiPropertyOptional({

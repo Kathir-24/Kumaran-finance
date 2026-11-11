@@ -1,17 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class HistoricalWinnerDto {
   @ApiProperty({
@@ -35,13 +39,17 @@ export class HistoricalWinnerDto {
   ticketNumber: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 22000,
     description: 'Winning bid discount in whole integer Rupees (must be <= chitValue / 4)',
   })
   @IsNotEmpty()
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive()
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Bid discount exceeds maximum safe whole-Rupee integer limit',
+  })
   bidDiscount: number;
 
   @ApiProperty({
@@ -73,13 +81,18 @@ export class OngoingMemberAllocationDto {
   customerId: string;
 
   @ApiPropertyOptional({
+    type: 'integer',
     example: 0,
     description: 'Opening balance in whole Rupees transcribed from paper notebook',
     default: 0,
   })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Opening balance must be a whole Rupee integer amount (zero paise/decimals)' })
+  @Min(0, { message: 'Opening balance cannot be negative' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Opening balance exceeds maximum safe whole-Rupee integer limit',
+  })
   openingBalance?: number = 0;
 }
 
@@ -108,13 +121,17 @@ export class OnboardOngoingChitDto {
   groupNameTamil?: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 100000,
     description: 'Total chit value in whole integer Rupees',
   })
   @IsNotEmpty()
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Chit value must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive()
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Chit value exceeds maximum safe whole-Rupee integer limit',
+  })
   chitValue: number;
 
   @ApiProperty({

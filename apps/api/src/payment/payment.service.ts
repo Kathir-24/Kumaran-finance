@@ -26,6 +26,7 @@ import {
 } from '../common/utils/receipt-sequence.util';
 import { lockPaymentAndReversalRows } from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { QueryPaymentDto } from './dto/query-payment.dto';
@@ -157,7 +158,7 @@ export class PaymentService {
     }
 
     // 5. ADR-07 Invariant Guard: Zero Partial Payments (Exact Inet Matching)
-    const paymentAmount = BigInt(Math.floor(dto.amount));
+    const paymentAmount = toWholeRupeeBigInt(dto.amount, 'Payment amount', { min: 1n });
     if (paymentAmount !== due.netPayableAmount) {
       throw new BadRequestException(
         `PARTIAL_PAYMENTS_NOT_ALLOWED: Payment must exactly match the net installment due of ₹${due.netPayableAmount.toString()} (received: ₹${paymentAmount.toString()})`,

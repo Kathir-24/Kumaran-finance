@@ -15,6 +15,7 @@ import {
   lockSubscriberTicketRow,
 } from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { StorageService } from '../storage/storage.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -530,9 +531,10 @@ export class DisbursementService {
       );
     }
 
-    const amountToDisburse = dto.disbursedAmount
-      ? BigInt(Math.floor(dto.disbursedAmount))
-      : auction.prizeMoney || 0n;
+    const amountToDisburse =
+      dto.disbursedAmount !== undefined && dto.disbursedAmount !== null
+        ? toWholeRupeeBigInt(dto.disbursedAmount, 'disbursedAmount', { min: 1n })
+        : auction.prizeMoney || 0n;
 
     const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate authorization

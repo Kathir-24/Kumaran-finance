@@ -15,6 +15,7 @@ import {
   PAYMENT_TRANSACTION_OPTIONS,
 } from '../common/utils/receipt-sequence.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import {
   JOB_DISPATCH_PAYMENT_RECEIPT,
@@ -142,7 +143,7 @@ export class CollectionService {
     }
 
     // 5. ADR-07 Invariant Guard: Zero Partial Payments (Exact Inet Matching)
-    const collectionAmount = BigInt(Math.floor(dto.amount));
+    const collectionAmount = toWholeRupeeBigInt(dto.amount, 'Collection amount', { min: 1n });
     if (collectionAmount !== due.netPayableAmount) {
       throw new BadRequestException(
         `PARTIAL_PAYMENTS_NOT_ALLOWED: Payment must exactly match the net installment due of ₹${due.netPayableAmount.toString()} (received: ₹${collectionAmount.toString()})`,
@@ -437,7 +438,9 @@ export class CollectionService {
 
       // 3. Verify Physically Counted Amount Against Total Payments Sum
       const totalBatchSum = payments.reduce((sum: bigint, p: any) => sum + p.amount, 0n);
-      const countedAmount = BigInt(Math.floor(dto.acknowledgedAmount));
+      const countedAmount = toWholeRupeeBigInt(dto.acknowledgedAmount, 'Acknowledged amount', {
+        min: 1n,
+      });
 
       if (totalBatchSum !== countedAmount) {
         throw new BadRequestException(

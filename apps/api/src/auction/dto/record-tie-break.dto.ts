@@ -1,17 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class TiedTicketDto {
   @ApiProperty({
@@ -54,13 +58,17 @@ export class RecordTieBreakDto {
   winningTicketId: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 25000,
     description: 'Tied bid discount (must equal exact 1/4 ceiling: chitValue / 4)',
   })
   @IsNotEmpty({ message: 'Bid discount is required' })
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Bid discount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Bid discount must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Bid discount exceeds maximum safe whole-Rupee integer limit',
+  })
   bidDiscount: number;
 
   @ApiProperty({

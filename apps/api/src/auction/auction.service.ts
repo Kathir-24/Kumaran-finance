@@ -13,6 +13,7 @@ import {
   lockChitGroupRow,
 } from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -129,7 +130,7 @@ export class AuctionService {
       );
     }
 
-    const bidDiscount = BigInt(Math.floor(dto.bidDiscount));
+    const bidDiscount = toWholeRupeeBigInt(dto.bidDiscount, 'Bid discount', { min: 1n });
 
     // 1. ADR-06: Fixed 1/4 (25%) Ceiling Enforcement
     if (bidDiscount > chit.maxDiscountCeiling) {
@@ -284,7 +285,7 @@ export class AuctionService {
       throw new BadRequestException('At least 2 tied tickets are required to conduct a tie-break draw');
     }
 
-    const bidDiscount = BigInt(Math.floor(dto.bidDiscount));
+    const bidDiscount = toWholeRupeeBigInt(dto.bidDiscount, 'Bid discount', { min: 1n });
 
     // In Option A, tie-break happens exclusively when members bid the maximum 1/4 ceiling
     if (bidDiscount !== chit.maxDiscountCeiling) {

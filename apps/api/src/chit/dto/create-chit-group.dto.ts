@@ -1,15 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class CreateChitGroupDto {
   @ApiProperty({
@@ -37,13 +41,17 @@ export class CreateChitGroupDto {
   groupNameTamil?: string;
 
   @ApiProperty({
+    type: 'integer',
     example: 100000,
     description: 'Total chit value in whole integer Rupees (e.g., 100000 for ₹1 Lakh)',
   })
   @IsNotEmpty({ message: 'Chit value is required' })
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Chit value must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Chit value must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Chit value exceeds maximum safe whole-Rupee integer limit',
+  })
   chitValue: number;
 
   @ApiProperty({

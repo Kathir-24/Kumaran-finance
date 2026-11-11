@@ -1,17 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
 } from 'class-validator';
+import {
+  MAX_SAFE_WHOLE_RUPEE,
+  parseStrictWholeRupeeValue,
+} from '../../common/utils/whole-rupee.util';
 
 export class RecordCollectionDto {
   @ApiProperty({
@@ -33,14 +37,18 @@ export class RecordCollectionDto {
   installmentMonth: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 3950,
     description:
       'Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)',
   })
   @IsNotEmpty({ message: 'Collection amount is required' })
-  @Type(() => Number)
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
   @IsInt({ message: 'Collection amount must be a whole Rupee integer amount (zero paise/decimals)' })
   @IsPositive({ message: 'Collection amount must be a positive whole number' })
+  @Max(MAX_SAFE_WHOLE_RUPEE, {
+    message: 'Collection amount exceeds maximum safe whole-Rupee integer limit',
+  })
   amount: number;
 
   @ApiProperty({

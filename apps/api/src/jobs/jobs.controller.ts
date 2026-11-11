@@ -22,6 +22,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import {
   DAILY_MAINTENANCE_QUEUE,
   JOB_DISPATCH_AUCTION_REMINDER,
@@ -111,7 +112,7 @@ export class JobsController {
     const records = (dto.records || []).map((r) => ({
       gatewayOrderId: r.gatewayOrderId,
       gatewayPaymentId: r.gatewayPaymentId,
-      amount: BigInt(r.amount),
+      amount: toWholeRupeeBigInt(r.amount, 'amount', { min: 1n }),
       status: r.status,
       settledAt: new Date(r.settledAt),
     }));
@@ -126,8 +127,12 @@ export class JobsController {
   })
   @ApiOkResponseEnvelope(EnqueuedJobResponseDto, { description: 'Reconciliation job enqueued to BullMQ' })
   async enqueueReconciliation(@Body() dto: ReconcileSettlementDto) {
+    const records = (dto.records || []).map((r) => {
+      toWholeRupeeBigInt(r.amount, 'amount', { min: 1n });
+      return r;
+    });
     return this.queueProvider.addJob(RECONCILIATION_QUEUE, JOB_RUN_DAILY_RECONCILIATION, {
-      records: dto.records || [],
+      records,
     });
   }
 
