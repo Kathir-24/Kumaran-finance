@@ -220,20 +220,30 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
   });
 
   describe('2. Auction Finalization Pessimistic Locking', () => {
-    it('should reject duplicate auction finalization when locked row reveals COMPLETED status', async () => {
-      prismaMock.$queryRaw.mockResolvedValueOnce([
-        { id: mockAuctionId, status: AuctionStatus.COMPLETED },
-      ]);
+    it('should acquire ChitGroup -> Auction locks in DAG order and reject duplicate finalization when locked row reveals COMPLETED status', async () => {
+      const lockOrder: string[] = [];
+      prismaMock.$queryRaw.mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"ChitGroup"')) {
+          lockOrder.push('ChitGroup');
+          return [{ id: 'chit-group-uuid-001', status: 'ACTIVE' }];
+        }
+        if (sql.includes('"Auction"')) {
+          lockOrder.push('Auction');
+          return [{ id: mockAuctionId, status: AuctionStatus.COMPLETED }];
+        }
+        return [];
+      });
 
       await expect(
         auctionService.finalizeAuction(
           mockAuctionId,
-          { subscribersPresent: 5, signedByForeman: true },
           mockCheckerId,
+          { subscribersPresent: 5, signedByForeman: true },
         ),
       ).rejects.toThrow(BadRequestException);
 
-      expect(prismaMock.$queryRaw).toHaveBeenCalled();
+      expect(lockOrder).toEqual(['ChitGroup', 'Auction']);
       expect(prismaMock.auction.update).not.toHaveBeenCalled();
     });
   });

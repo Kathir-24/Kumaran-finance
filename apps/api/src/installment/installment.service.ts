@@ -11,7 +11,10 @@ import {
   CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
 } from '../common/constants';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { lockSubscriberTicketRow } from '../common/utils/state-transition-lock.util';
+import {
+  lockChitGroupRow,
+  lockSubscriberTicketRow,
+} from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
@@ -130,6 +133,9 @@ export class InstallmentService {
     }
 
     return withTransactionRetry(this.prisma, async (tx) => {
+      // 0. Lock owning ChitGroup row to serialize concurrent monthly due scheduling (zero P2002 crashes)
+      await lockChitGroupRow(tx, chitGroupId);
+
       // 1. Fetch all existing dues for all tickets in 1 single SQL query (Eliminates N+1 query pattern)
       const ticketIds = chit.tickets.map((t) => t.id);
       const existingDues: any[] = await tx.installmentDue.findMany({

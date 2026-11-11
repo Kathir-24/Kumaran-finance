@@ -142,22 +142,61 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
       },
     );
 
-    it('DEF-DB-02: finalizeAuction fails fast in 1 attempt on domain validation errors', async () => {
-      prismaMock.$queryRaw.mockResolvedValue([{ id: 'auc-001', status: AuctionStatus.COMPLETED }]);
+    it('DEF-DB-02: finalizeAuction acquires ChitGroup -> Auction locks in order and fails fast on domain validation errors', async () => {
+      const lockOrder: string[] = [];
+      prismaMock.$queryRaw.mockImplementation(async (q: any) => {
+        const sql = Array.isArray(q) ? q.join('') : String(q);
+        if (sql.includes('"ChitGroup"')) {
+          lockOrder.push('ChitGroup');
+          return [{ id: 'chit-001', status: ChitStatus.ACTIVE }];
+        }
+        if (sql.includes('"Auction"')) {
+          lockOrder.push('Auction');
+          return [{ id: 'auc-001', status: AuctionStatus.COMPLETED }];
+        }
+        return [];
+      });
       prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
 
       await expect(
         auctionService.finalizeAuction('auc-001', 'checker-002', {}),
       ).rejects.toThrow('AUCTION_ALREADY_FINALIZED');
+      expect(lockOrder).toEqual(['ChitGroup', 'Auction']);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     });
 
-    it('DEF-DB-02: recordBid & markMinutesFiled recover from 40P01 deadlocks cleanly', async () => {
+    it('DEF-DB-02: recordBid, recordTieBreak & markMinutesFiled recover from 40P01/40001/P2034 deadlocks cleanly', async () => {
       prismaMock.$transaction = createTransientThenSucceedTx('40P01');
       await auctionService.recordBid(
         'chit-001',
         3,
         { ticketId: 'tkt-001', bidDiscount: 20000, auctionDate: '2026-10-15' },
+        'maker-001',
+      );
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: 'tkt-001',
+        chitGroupId: 'chit-001',
+        ticketNumber: 5,
+        isPrized: false,
+        consecutiveUnpaidMonths: 0,
+        status: 'ACTIVE',
+        customer: { fullName: 'M. Palanisamy' },
+      });
+      prismaMock.$transaction = createTransientThenSucceedTx('40001');
+      await auctionService.recordTieBreak(
+        'chit-001',
+        3,
+        {
+          winningTicketId: 'tkt-001',
+          bidDiscount: 25000,
+          auctionDate: '2026-10-15',
+          tiedTickets: [
+            { ticketId: 'tkt-001', tokenNumber: 1 },
+            { ticketId: 'tkt-002', tokenNumber: 2 },
+          ],
+        },
         'maker-001',
       );
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
@@ -426,12 +465,26 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
       installmentService = new InstallmentService(prismaMock as unknown as PrismaService);
     });
 
-    it('DEF-DB-02: generateMonthlyDues & substituteSubscriber recover from transient 40P01 deadlocks', async () => {
+    it('DEF-DB-02: generateMonthlyDues & substituteSubscriber recover from transient 40P01 deadlocks and lock ChitGroup first', async () => {
+      const dueOrder: string[] = [];
+      prismaMock.$queryRaw.mockImplementation(async (q: any) => {
+        const sql = Array.isArray(q) ? q.join('') : String(q);
+        if (sql.includes('"ChitGroup"')) dueOrder.push('lock:ChitGroup');
+        return [{ id: 'chit-001', status: ChitStatus.ACTIVE }];
+      });
+      prismaMock.installmentDue.findMany.mockImplementation(async () => {
+        dueOrder.push('read:installmentDue');
+        return [];
+      });
       prismaMock.$transaction = createTransientThenSucceedTx('40P01');
       const duesRes = await installmentService.generateMonthlyDues('chit-001', 2, {});
       expect(duesRes.totalDuesScheduled).toBe(1);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+      expect(dueOrder).toEqual(['lock:ChitGroup', 'read:installmentDue']);
 
+      prismaMock.$queryRaw.mockResolvedValue([
+        { id: 'tkt-vacated', status: 'REMOVED_DEF_3M', isPrized: false },
+      ]);
       prismaMock.$transaction = createTransientThenSucceedTx('40001');
       const subRes = await installmentService.substituteSubscriber('tkt-vacated', 'admin-001', {
         newCustomerId: 'cust-new',

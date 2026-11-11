@@ -468,8 +468,13 @@ export class AuctionService {
       );
     }
 
+    let committedAuction = auction;
+
     const result = await withTransactionRetry(this.prisma, async (tx) => {
-      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate finalization
+      // 0. Pessimistic Acyclic Row Locks ("ChitGroup" -> "Auction") to eliminate split-brain vs recordBid/recordTieBreak and duplicate finalizations
+      if (auction.chitGroupId) {
+        await lockChitGroupRow(tx, auction.chitGroupId);
+      }
       const lockedAuction = await lockAuctionRow(tx, auctionId);
       if (
         lockedAuction &&
@@ -478,6 +483,33 @@ export class AuctionService {
       ) {
         throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
       }
+
+      const currentAuction =
+        typeof tx.$queryRaw === 'function' && typeof tx.auction?.findUnique === 'function'
+          ? (await tx.auction.findUnique({
+              where: { id: auctionId },
+              include: {
+                chitGroup: true,
+                winner: { include: { ticket: { include: { customer: true } } } },
+              },
+            })) || auction
+          : auction;
+
+      if (
+        currentAuction.status === AuctionStatus.COMPLETED ||
+        currentAuction.status === AuctionStatus.MINUTES_FILED
+      ) {
+        throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
+      }
+      if (!currentAuction.winner) {
+        throw new BadRequestException('Cannot finalize auction: winning ticket has not been recorded');
+      }
+      if (currentAuction.conductedByUserId === checkerUserId) {
+        throw new ForbiddenException(
+          'Maker-Checker Separation of Duties Violated: The staff who recorded the auction bids cannot finalize and commit the auction result',
+        );
+      }
+      committedAuction = currentAuction;
 
       // 1. Commit Auction
       const finalized = await tx.auction.update({
@@ -490,7 +522,7 @@ export class AuctionService {
 
       // 2. Mark Winner Ticket as Prized
       await tx.subscriberTicket.update({
-        where: { id: auction.winner!.ticketId },
+        where: { id: currentAuction.winner.ticketId },
         data: {
           isPrized: true,
           prizedAuctionId: auction.id,
@@ -498,21 +530,21 @@ export class AuctionService {
       });
 
       // 3. Generate Statutory Auction Minutes
-      const winnerName = auction.winner!.ticket.customer.fullName;
-      const ticketNo = auction.winner!.ticket.ticketNumber;
-      const discount = auction.bidDiscount?.toString() || '0';
-      const dividend = auction.dividendPerTicket?.toString() || '0';
+      const winnerName = currentAuction.winner.ticket.customer.fullName;
+      const ticketNo = currentAuction.winner.ticket.ticketNumber;
+      const discount = currentAuction.bidDiscount?.toString() || '0';
+      const dividend = currentAuction.dividendPerTicket?.toString() || '0';
 
       const minutesText =
-        `KUMARAN FINANCE — STATUTORY AUCTION PROCEEDINGS (MONTH ${auction.installmentMonth})\n` +
-        `Group: ${auction.chitGroup.groupName} (${auction.chitGroup.groupCode})\n` +
-        `Auction Date: ${auction.auctionDate.toISOString().split('T')[0]}\n` +
+        `KUMARAN FINANCE — STATUTORY AUCTION PROCEEDINGS (MONTH ${currentAuction.installmentMonth})\n` +
+        `Group: ${currentAuction.chitGroup.groupName} (${currentAuction.chitGroup.groupCode})\n` +
+        `Auction Date: ${currentAuction.auctionDate.toISOString().split('T')[0]}\n` +
         `Subscribers Present: ${dto?.subscribersPresent || 1}\n` +
         `Winning Ticket: #${ticketNo} (${winnerName})\n` +
         `Winning Bid Discount: ₹${discount}\n` +
-        `Foreman Commission (4.00%): ₹${auction.foremanCommissionAmount?.toString() || '0'}\n` +
+        `Foreman Commission (4.00%): ₹${currentAuction.foremanCommissionAmount?.toString() || '0'}\n` +
         `Universal Dividend Per Member: ₹${dividend}\n` +
-        `Prize Money Payable: ₹${auction.prizeMoney?.toString() || '0'}\n` +
+        `Prize Money Payable: ₹${currentAuction.prizeMoney?.toString() || '0'}\n` +
         `Observations: ${dto?.notes || 'Auction conducted in accordance with Tamil Nadu Chit Funds Rules.'}`;
 
       await tx.auctionMinutes.upsert({
@@ -538,12 +570,12 @@ export class AuctionService {
           entityType: 'Auction',
           entityId: auctionId,
           newValue: {
-            installmentMonth: auction.installmentMonth,
-            winnerTicketId: auction.winner!.ticketId,
+            installmentMonth: currentAuction.installmentMonth,
+            winnerTicketId: currentAuction.winner.ticketId,
             winnerTicketNumber: ticketNo,
             bidDiscount: discount,
             dividendPerTicket: dividend,
-            prizeMoney: auction.prizeMoney?.toString() || '0',
+            prizeMoney: currentAuction.prizeMoney?.toString() || '0',
             finalizedByUserId: checkerUserId,
           },
         },
@@ -566,11 +598,11 @@ export class AuctionService {
 
     // Post-commit: Broadcast auction results to chit group subscribers (Non-blocking)
     const queue = this.queueProvider;
-    if (queue && auction && auction.chitGroup) {
+    if (queue && committedAuction && committedAuction.chitGroup) {
       try {
         const tickets = await this.prisma.subscriberTicket.findMany({
           where: {
-            chitGroupId: auction.chitGroupId,
+            chitGroupId: committedAuction.chitGroupId,
             status: 'ACTIVE',
           },
           include: {
@@ -584,15 +616,15 @@ export class AuctionService {
           },
         });
 
-        const dividendPerTicket = auction.dividendPerTicket ?? BigInt(0);
-        const nextMonthNetPayable = (auction.chitGroup.baseInstallment - dividendPerTicket).toString();
+        const dividendPerTicket = committedAuction.dividendPerTicket ?? BigInt(0);
+        const nextMonthNetPayable = (committedAuction.chitGroup.baseInstallment - dividendPerTicket).toString();
 
         const payload: AuctionResultNotificationJobPayload = {
-          chitGroupId: auction.chitGroupId,
-          chitCode: auction.chitGroup.groupCode,
-          installmentMonth: auction.installmentMonth,
-          winningTicketNumber: auction.winner!.ticket.ticketNumber,
-          winningDiscountAmount: (auction.bidDiscount ?? BigInt(0)).toString(),
+          chitGroupId: committedAuction.chitGroupId,
+          chitCode: committedAuction.chitGroup.groupCode,
+          installmentMonth: committedAuction.installmentMonth,
+          winningTicketNumber: committedAuction.winner!.ticket.ticketNumber,
+          winningDiscountAmount: (committedAuction.bidDiscount ?? BigInt(0)).toString(),
           dividendPerTicket: dividendPerTicket.toString(),
           nextMonthNetPayable,
           subscribers: tickets.map((t) => ({
@@ -607,12 +639,12 @@ export class AuctionService {
           JOB_DISPATCH_AUCTION_RESULT,
           payload,
           {
-            jobId: `auction-result:${auction.id}:m${auction.installmentMonth}`,
+            jobId: `auction-result:${committedAuction.id}:m${committedAuction.installmentMonth}`,
             priority: 5,
           },
         );
         this.logger.log(
-          `Enqueued auction result notification for group ${auction.chitGroup.groupCode} Month ${auction.installmentMonth} (${tickets.length} subscribers)`,
+          `Enqueued auction result notification for group ${committedAuction.chitGroup.groupCode} Month ${committedAuction.installmentMonth} (${tickets.length} subscribers)`,
         );
       } catch (err: any) {
         this.logger.warn(`Failed to enqueue auction result notification: ${err.message}`);
@@ -623,7 +655,7 @@ export class AuctionService {
     const redis = this.redisProvider?.getClient();
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
-        const branchId = auction.chitGroup?.branchId;
+        const branchId = committedAuction.chitGroup?.branchId;
         const targetDate = new Date().toISOString().split('T')[0];
         const keys = [
           `report:daybook:ALL:${targetDate}`,
