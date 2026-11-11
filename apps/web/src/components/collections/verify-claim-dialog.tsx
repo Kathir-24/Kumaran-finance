@@ -159,7 +159,7 @@ export function VerifyClaimDialog({
 
             {claim.notes && (
               <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
-                Subscriber Remark: <span className="text-slate-300 italic">"{claim.notes}"</span>
+                Subscriber Remark: <span className="text-slate-300 italic">&ldquo;{claim.notes}&rdquo;</span>
               </div>
             )}
           </div>

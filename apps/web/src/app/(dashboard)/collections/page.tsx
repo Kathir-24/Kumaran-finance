@@ -176,39 +176,39 @@ export default function CollectionsPage() {
           {/* 4 Daily Pulse Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs gap-1">
-                <span className="truncate">{t('totalCollectionsToday')}</span>
-                <FileCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+              <div className="flex items-start justify-between text-slate-400 text-xs gap-1.5">
+                <span className="leading-snug">{t('totalCollectionsToday')}</span>
+                <FileCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               </div>
               <div className="text-xl sm:text-2xl font-bold font-mono text-slate-100">{totalCollectionsToday}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Discrete receipts issued</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-snug">Discrete receipts issued</p>
             </div>
 
             <div className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs gap-1">
-                <span className="truncate">{t('totalCashToday')}</span>
-                <Banknote className="h-4 w-4 text-emerald-400 shrink-0" />
+              <div className="flex items-start justify-between text-slate-400 text-xs gap-1.5">
+                <span className="leading-snug">{t('totalCashToday')}</span>
+                <Banknote className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               </div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 truncate">{formatRupee(totalCashToday)}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">In counter drawer / safe</p>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 leading-tight break-words">{formatRupee(totalCashToday)}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-snug">In counter drawer / safe</p>
             </div>
 
             <div className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs gap-1">
-                <span className="truncate">{t('totalUpiToday')}</span>
-                <QrCode className="h-4 w-4 text-sky-400 shrink-0" />
+              <div className="flex items-start justify-between text-slate-400 text-xs gap-1.5">
+                <span className="leading-snug">{t('totalUpiToday')}</span>
+                <QrCode className="h-4 w-4 text-sky-400 shrink-0 mt-0.5" />
               </div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-sky-400 truncate">{formatRupee(totalUpiToday)}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">NPCI Dynamic QR settlements</p>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-sky-400 leading-tight break-words">{formatRupee(totalUpiToday)}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-snug">NPCI Dynamic QR settlements</p>
             </div>
 
             <div className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs gap-1">
-                <span className="truncate">{t('totalChequeToday')}</span>
-                <CreditCard className="h-4 w-4 text-amber-400 shrink-0" />
+              <div className="flex items-start justify-between text-slate-400 text-xs gap-1.5">
+                <span className="leading-snug">{t('totalChequeToday')}</span>
+                <CreditCard className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
               </div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-400 truncate">{formatRupee(totalChequeToday)}</div>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Cheques in clearance</p>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-400 leading-tight break-words">{formatRupee(totalChequeToday)}</div>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-snug">Cheques in clearance</p>
             </div>
           </div>
 

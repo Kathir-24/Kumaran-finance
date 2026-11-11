@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const playwrightPort = process.env.PLAYWRIGHT_PORT || '3001';
+const playwrightBaseUrl =
+  process.env.PLAYWRIGHT_TEST_BASE_URL || `http://localhost:${playwrightPort}`;
+
 /**
  * Kumaran Chits — Playwright End-to-End Test Configuration
  * Targets live Next.js 15 web application connected to NestJS 12 API and PostgreSQL 17.
@@ -20,7 +24,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
-    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3001',
+    baseURL: playwrightBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -35,9 +39,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm run start',
-    url: 'http://localhost:3001',
-    reuseExistingServer: !process.env.CI,
+    command: `pnpm exec next start -p ${playwrightPort}`,
+    url: `http://localhost:${playwrightPort}`,
+    reuseExistingServer: !process.env.CI && !process.env.PLAYWRIGHT_PORT,
     timeout: 120_000,
   },
 });

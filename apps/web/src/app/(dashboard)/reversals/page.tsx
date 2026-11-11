@@ -141,9 +141,9 @@ export default function PaymentReversalsPage() {
       {/* 4 Pulse KPI Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-1">
-          <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Clock className="h-4 w-4 shrink-0" />
-            <span className="truncate">{t('kpiPendingRequests')}</span>
+          <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider flex items-start gap-1.5 leading-snug">
+            <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{t('kpiPendingRequests')}</span>
           </span>
           <p className="text-2xl font-black text-rose-300 font-mono tracking-tight">
             {pendingReversals.length}
@@ -154,9 +154,9 @@ export default function PaymentReversalsPage() {
         </div>
 
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-1">
-          <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Ban className="h-4 w-4 shrink-0" />
-            <span className="truncate">{t('kpiVoidedReceipts')}</span>
+          <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-start gap-1.5 leading-snug">
+            <Ban className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{t('kpiVoidedReceipts')}</span>
           </span>
           <p className="text-2xl font-black text-amber-300 font-mono tracking-tight">
             {reversedPayments.length}
@@ -165,9 +165,9 @@ export default function PaymentReversalsPage() {
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <RotateCcw className="h-4 w-4 shrink-0" />
-            <span className="truncate">{t('kpiTotalReversed')}</span>
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-start gap-1.5 leading-snug">
+            <RotateCcw className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{t('kpiTotalReversed')}</span>
           </span>
           <p className="text-2xl font-black text-slate-100 font-mono tracking-tight">
             {formatRupee(reversedTotal)}
@@ -176,11 +176,11 @@ export default function PaymentReversalsPage() {
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 shrink-0" />
-            <span className="truncate">{t('kpiCheckerStatus')}</span>
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-start gap-1.5 leading-snug">
+            <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{t('kpiCheckerStatus')}</span>
           </span>
-          <p className="text-sm font-bold text-slate-200 pt-1 truncate">
+          <p className="text-sm font-bold text-slate-200 pt-1 leading-snug">
             {isSuperAdmin ? t('partnerAuthorized') : t('deskStaffMakerOnly')}
           </p>
           <p className="text-[10px] text-slate-400">{t('guardrail10Label')}</p>

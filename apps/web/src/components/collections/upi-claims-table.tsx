@@ -190,7 +190,7 @@ export function UpiClaimsTable({
                   </div>
                   {claim.notes && (
                     <div className="text-[10px] text-slate-400 mt-0.5 italic max-w-xs truncate">
-                      "{claim.notes}"
+                      &ldquo;{claim.notes}&rdquo;
                     </div>
                   )}
                 </TableCell>

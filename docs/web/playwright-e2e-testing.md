@@ -82,7 +82,10 @@ All E2E tests utilize deterministic staff personas seeded in [`apps/api/prisma/s
 | Command | Description |
 |---|---|
 | `pnpm --filter web test:e2e` | Run all E2E tests headlessly in Chromium |
+| `pnpm --filter web test:visual` | Run bilingual (`en` / `ta`) Desktop + Mobile visual overflow and key-leak audit (`0` anomalies required) |
 | `pnpm --filter web test:e2e:headed` | Run tests with visible browser window |
 | `pnpm --filter web test:e2e:ui` | Open interactive Playwright Test UI runner |
 | `pnpm --filter web test:e2e:report` | Open HTML test execution report and traces |
 | `pnpm test:web:e2e` | Run all E2E tests from workspace root |
+
+> **Port Isolation**: `playwright.config.ts` supports `PLAYWRIGHT_PORT` (default `3001`) and `PLAYWRIGHT_TEST_BASE_URL` so isolated test runs against `chitflow_test` never collide with a running Docker `chitflow-web` container on `:3001`.

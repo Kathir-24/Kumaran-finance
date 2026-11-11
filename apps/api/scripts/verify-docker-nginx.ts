@@ -47,6 +47,105 @@ function httpGet(options: http.RequestOptions): Promise<{ statusCode: number; he
   });
 }
 
+function httpsRequest(
+  method: string,
+  path: string,
+  headers: Record<string, string | number> = {},
+  bodyObj?: Record<string, unknown>,
+): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; body: string }> {
+  return new Promise((resolve, reject) => {
+    const payload = bodyObj ? JSON.stringify(bodyObj) : undefined;
+    const reqHeaders: http.OutgoingHttpHeaders = {
+      Host: 'localhost',
+      ...headers,
+    };
+    if (payload) {
+      reqHeaders['Content-Type'] = 'application/json';
+      reqHeaders['Content-Length'] = Buffer.byteLength(payload);
+    }
+
+    const req = https.request(
+      {
+        host: HOST,
+        port: HTTPS_PORT,
+        path,
+        method,
+        headers: reqHeaders,
+        agent: insecureAgent,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode || 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.setTimeout(5000, () => {
+      req.destroy();
+      reject(new Error(`HTTPS ${method} ${path} timed out after 5000ms`));
+    });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+function readHttpsFirstSseEvent(
+  path: string,
+  cookieHeader: string,
+  timeoutMs = 6000,
+): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; chunk: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        host: HOST,
+        port: HTTPS_PORT,
+        path,
+        method: 'GET',
+        headers: {
+          Host: 'localhost',
+          Accept: 'text/event-stream',
+          Cookie: cookieHeader,
+        },
+        agent: insecureAgent,
+      },
+      (res) => {
+        let buffer = '';
+        const timer = setTimeout(() => {
+          req.destroy();
+          reject(new Error(`Timed out reading SSE data after ${timeoutMs}ms`));
+        }, timeoutMs);
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString('utf8');
+          if (buffer.includes('data:')) {
+            clearTimeout(timer);
+            req.destroy();
+            resolve({
+              statusCode: res.statusCode || 0,
+              headers: res.headers,
+              chunk: buffer,
+            });
+          }
+        });
+        res.on('error', (err) => {
+          clearTimeout(timer);
+          if (!buffer.includes('data:')) reject(err);
+        });
+      },
+    );
+    req.on('error', (err: any) => {
+      if (err?.code !== 'ECONNRESET') reject(err);
+    });
+    req.end();
+  });
+}
+
 function httpsGet(options: https.RequestOptions): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; body: string }> {
   return new Promise((resolve, reject) => {
     const req = https.get({ ...options, agent: insecureAgent }, (res) => {
@@ -250,6 +349,69 @@ export async function runIngressVerification(): Promise<boolean> {
       '/metrics and /admin/queues are reverse proxied over HTTPS',
       false,
       `Error checking observability endpoints: ${err.message}`,
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Step 7: ING-7 — Web BFF Isolation, Unbuffered SSE & Symmetric Cookie Clearing
+  // --------------------------------------------------------------------------
+  console.log(`\n--- [7/7] ING-7: HTTPS Web BFF Isolation & Unbuffered SSE ---`);
+  try {
+    const loginPageRes = await httpsRequest('GET', '/login');
+    const loginRes = await httpsRequest('POST', '/api/auth/login', {}, {
+      phone: process.env.INGRESS_TEST_PHONE || '9876543210',
+      password: process.env.INGRESS_TEST_PASSWORD || 'Admin@Kumaran2026',
+    });
+
+    const setCookies = loginRes.headers['set-cookie'] || [];
+    const accessCookie = setCookies.find((c) => c.startsWith('kc_access_token='));
+    const cookieHeader = setCookies.map((c) => c.split(';')[0]).join('; ');
+    const accessToken = accessCookie
+      ? decodeURIComponent(accessCookie.split(';')[0].split('=')[1] || '')
+      : '';
+
+    const bffChitsRes = await httpsRequest('GET', '/bff/api/v1/chits?page=1&limit=20', {
+      Cookie: cookieHeader,
+    });
+    const cookieOnlyApiRes = await httpsRequest('GET', '/api/v1/chits?page=1&limit=20', {
+      Cookie: cookieHeader,
+    });
+    const bearerApiRes = await httpsRequest('GET', '/api/v1/chits?page=1&limit=20', {
+      Authorization: `Bearer ${accessToken}`,
+    });
+    const sseRes = await readHttpsFirstSseEvent('/bff/api/v1/reports/approvals-stream', cookieHeader);
+    const logoutRes = await httpsRequest('POST', '/api/auth/logout', {
+      Cookie: cookieHeader,
+    });
+    const clearedCookies = logoutRes.headers['set-cookie'] || [];
+    const symmetricClear = clearedCookies.some(
+      (c) => c.startsWith('kc_access_token=;') && c.includes('Secure') && /SameSite=lax/i.test(c),
+    );
+
+    const passed =
+      loginPageRes.statusCode === 200 &&
+      loginRes.statusCode === 200 &&
+      Boolean(accessToken) &&
+      bffChitsRes.statusCode === 200 &&
+      cookieOnlyApiRes.statusCode === 401 &&
+      bearerApiRes.statusCode === 200 &&
+      sseRes.statusCode === 200 &&
+      sseRes.chunk.includes('APPROVALS_UPDATE') &&
+      logoutRes.statusCode === 200 &&
+      symmetricClear;
+
+    recordAssertion(
+      'ING-7: HTTPS Web BFF Isolation & Unbuffered SSE',
+      'Nginx routes /bff/* to Next.js BFF and /api/v1/* strictly to NestJS Bearer API with unbuffered SSE and symmetric cookies',
+      passed,
+      `/login=${loginPageRes.statusCode}, /bff/chits=${bffChitsRes.statusCode}, cookie-only /api/v1=${cookieOnlyApiRes.statusCode}, bearer /api/v1=${bearerApiRes.statusCode}, SSE=${sseRes.statusCode} (${sseRes.chunk.includes('APPROVALS_UPDATE')}), symmetricClear=${symmetricClear}`,
+    );
+  } catch (err: any) {
+    recordAssertion(
+      'ING-7: HTTPS Web BFF Isolation & Unbuffered SSE',
+      'Nginx BFF/REST isolation & SSE stream verification',
+      false,
+      `Error verifying BFF/SSE ingress: ${err.message}`,
     );
   }
 

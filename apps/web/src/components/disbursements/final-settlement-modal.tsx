@@ -115,7 +115,9 @@ export function FinalSettlementModal({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.schemes.detail(chitGroup?.id!) });
+      if (chitGroup?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.schemes.detail(chitGroup.id) });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.disbursements.all });
       onSuccess?.();
       onClose();

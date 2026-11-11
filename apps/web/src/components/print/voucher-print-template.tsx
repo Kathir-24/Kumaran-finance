@@ -260,7 +260,7 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
             {t('voucher.acknowledgementTitle')}:
           </p>
           <p className="text-slate-700 italic">
-            "{t('voucher.acknowledgementText')}"
+            &ldquo;{t('voucher.acknowledgementText')}&rdquo;
           </p>
           <div className="pt-6 flex justify-between items-end">
             <p className="text-[10px] text-slate-500">Date: {formattedDate}</p>

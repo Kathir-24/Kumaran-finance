@@ -29,9 +29,9 @@ export default function AuthLayout({
                   Head Office
                 </span>
               </div>
-              <p className="flex items-center text-xs text-slate-400 truncate">
-                <Building2 className="mr-1 h-3 w-3 shrink-0 text-slate-500" />
-                Kumaran Finance — Perundurai, Erode
+              <p className="flex items-start sm:items-center text-xs text-slate-400 leading-snug">
+                <Building2 className="mr-1 mt-0.5 sm:mt-0 h-3 w-3 shrink-0 text-slate-500" />
+                <span>Kumaran Finance — Perundurai, Erode</span>
               </p>
             </div>
           </div>

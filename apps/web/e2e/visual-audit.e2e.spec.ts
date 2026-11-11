@@ -201,5 +201,10 @@ test.describe('Bilingual UI Automated Visual Audit', () => {
     console.log(`[VisualAudit] Completed crawl! Total anomalies detected: ${anomalies.length}`);
     console.log(`[VisualAudit] Summary report: ${summaryFile}`);
     console.log(`======================================================\n`);
+    if (anomalies.length > 0) {
+      throw new Error(
+        `Visual audit detected ${anomalies.length} UI anomaly(ies); inspect ${summaryFile}`,
+      );
+    }
   });
 });

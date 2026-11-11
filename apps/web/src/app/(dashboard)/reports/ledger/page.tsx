@@ -266,7 +266,7 @@ export default function FormXxiLedgerPage() {
       {/* Form XXI Subscriber Ledgers List */}
       {isLoadingLedger ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-slate-400 text-sm">
-          Loading Form XXI subscribers' ledger...
+          Loading Form XXI subscribers&apos; ledger...
         </div>
       ) : ledgers.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-slate-400 text-sm">

@@ -179,9 +179,9 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-              <span className="truncate">{t('cashInSafe')}</span>
-              <Badge variant="neutral" className="text-[10px] py-0 px-1.5">
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs text-slate-400">
+              <span className="leading-snug">{t('cashInSafe')}</span>
+              <Badge variant="neutral" className="text-[10px] py-0 px-1.5 shrink-0">
                 Form XXII
               </Badge>
             </div>

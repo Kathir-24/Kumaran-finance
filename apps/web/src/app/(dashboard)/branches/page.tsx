@@ -143,10 +143,10 @@ export default function BranchesPage() {
 
         {/* Head Office Anchor */}
         <Card className="border-slate-800 bg-slate-900/80 shadow-md">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
+          <CardContent className="p-4 flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <p className="text-[11px] font-medium text-slate-400">{t('kpiHeadOffice')}</p>
-              <h3 className="text-xs font-bold text-amber-300 mt-1 truncate max-w-[130px]">
+              <h3 className="text-xs font-bold text-amber-300 mt-1 leading-snug break-words">
                 {headOffice ? headOffice.name : t('defaultHeadOffice')}
               </h3>
               <p className="text-[10px] text-slate-500 mt-0.5">{t('kpiHeadOfficeDesc')}</p>

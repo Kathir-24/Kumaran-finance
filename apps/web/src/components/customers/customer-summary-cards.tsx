@@ -74,13 +74,13 @@ export function CustomerSummaryCards({
             className="border-slate-800 bg-slate-900/60 shadow-sm transition-all hover:border-slate-700/80"
           >
             <CardContent className="p-3.5 sm:p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-400 truncate">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-xs font-medium text-slate-400 leading-snug">
                   {card.title}
                 </span>
                 <div
                   className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-lg border p-1',
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border p-1',
                     card.iconBg
                   )}
                 >
@@ -96,7 +96,7 @@ export function CustomerSummaryCards({
                     {card.value.toLocaleString()}
                   </p>
                 )}
-                <p className="text-[11px] text-slate-400 truncate" title={card.subtext}>
+                <p className="text-[11px] text-slate-400 leading-snug">
                   {card.subtext}
                 </p>
               </div>
