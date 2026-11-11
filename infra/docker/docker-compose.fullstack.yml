@@ -85,8 +85,8 @@ services:
   api:
     logging: *default-logging
     build:
-      context: ../../apps/api
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/api/Dockerfile
     container_name: chitflow-api
     restart: unless-stopped
     mem_limit: 1280m
@@ -136,8 +136,8 @@ services:
   worker:
     logging: *default-logging
     build:
-      context: ../../apps/api
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/api/Dockerfile
     container_name: chitflow-worker
     restart: unless-stopped
     mem_limit: 1280m

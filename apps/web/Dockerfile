@@ -2,18 +2,19 @@
 # Kumaran Chits — Production Multi-Stage Dockerfile (Next.js 15 Standalone)
 # Subsystem: Web Operations Portal (apps/web/)
 # Company: Kumaran Finance (Head Office: Perundurai, Erode, Tamil Nadu)
-# Base Image: Node.js 22 LTS Alpine Linux + pnpm 12+ via Corepack
+# Base Image: Node.js 24 LTS Alpine Linux + pnpm via Corepack
 # Security: Non-root execution (UID 1001: nextjs), minimal runtime (~100 MB)
 # ==============================================================================
 
 # -------------------------------------------------------------
 # Stage 1: Base Alpine Environment & Package Manager Setup
 # -------------------------------------------------------------
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
 
 # -------------------------------------------------------------
 # Stage 2: Monorepo Workspace Dependencies Installation
@@ -23,13 +24,15 @@ FROM base AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
-# Copy root monorepo manifests and workspace package manifests
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# Copy root monorepo manifests and all workspace package manifests
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY apps/api/package.json ./apps/api/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY apps/web/package.json ./apps/web/
 
-# Install dependencies using frozen lockfile
-RUN pnpm install --frozen-lockfile
+# Install dependencies using frozen lockfile scoped to web and its workspace deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+  pnpm install --frozen-lockfile --filter web...
 
 # -------------------------------------------------------------
 # Stage 3: TypeScript Compilation & Next.js Standalone Build
@@ -44,7 +47,7 @@ COPY --from=deps /app/packages/api-client/node_modules ./packages/api-client/nod
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 
 # Copy workspace source files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig*.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY packages/api-client ./packages/api-client
 COPY apps/web ./apps/web
 
@@ -68,7 +71,7 @@ RUN pnpm --filter web build
 # -------------------------------------------------------------
 # Stage 4: Minimal Production Runtime
 # -------------------------------------------------------------
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 

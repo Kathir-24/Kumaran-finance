@@ -1,49 +1,61 @@
-# Git & VCS
-.git
-.gitignore
-.github
+# ==============================================================================
+# Kumaran Chits — Allow-List Root .dockerignore
+# Deny everything by default so secrets, .env files, keys, backups, docs,
+# screenshots, and unrelated workspaces can never enter Docker build contexts.
+# ==============================================================================
+*
 
-# Dependencies & Lockfiles (installed during Docker build)
-node_modules
-apps/*/node_modules
-packages/*/node_modules
+# Root workspace manifests
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
 
-# Build Outputs & Caches
-.next
-apps/*/.next
-dist
-apps/*/dist
-packages/*/dist
-*.tsbuildinfo
+# Allowed workspace packages (parent directories must be un-ignored before descendants)
+!apps
+apps/*
+!apps/api
+!apps/web
 
-# Test Outputs, Reports & Traces
-test-results
-apps/*/test-results
-playwright-report
-apps/*/playwright-report
+!packages
+packages/*
+!packages/api-client
 
-# Environment Files (injected via Docker Compose / runtime)
-.env
-.env.local
-.env.*.local
-apps/*/.env
-apps/*/.env.local
-apps/*/.env.*.local
-!.env.example
-!apps/*/.env.example
+# Dependencies, build outputs, caches, and logs
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
 
-# IDE & Editor Artifacts
-.vscode
-.idea
-.gemini
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# Secrets, backups, keys, and local runtime storage
+**/.env
+**/.env.*
+!**/.env.example
+**/*.dump
+**/*.pem
+**/*.key
+**/*.pfx
+**/backups
+apps/api/storage
 
-# Documentation & Non-Code Assets
-docs
-**/backups/
-*.dump
-scripts/*.ps1
+# Non-runtime test suites, scripts, and internal package metadata
+apps/api/test
+apps/api/scripts
+apps/api/**/*.spec.ts
+apps/api/README.md
+apps/api/.oxlintrc.json
+apps/api/.prettierrc
+apps/api/.gitattributes
+apps/web/test
+apps/web/e2e
+apps/web/scripts
+apps/web/test-results
+apps/web/playwright-report
+apps/web/visual-audit-results
+apps/web/playwright.config.ts
+packages/api-client/test

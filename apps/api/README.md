@@ -95,7 +95,7 @@ Environment variables are validated fail-fast at server startup via [`src/config
 
 Build the production multi-stage Docker image from the monorepo root:
 ```bash
-docker build -t kumaran-chits-api -f apps/api/Dockerfile apps/api
+docker build -t kumaran-chits-api -f apps/api/Dockerfile .
 ```
 
 Run the container in production:
