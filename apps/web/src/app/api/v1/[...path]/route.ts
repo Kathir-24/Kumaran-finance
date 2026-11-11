@@ -1,18 +1,22 @@
 // ==============================================================================
 // Kumaran Chits — BFF Transparent Backend API Proxy (/api/v1/[...path])
 // Automatically translates HttpOnly cookies to Authorization Bearer headers,
-// streams request/response payloads, and performs silent server-side 401 token refresh.
+// deduplicates silent token refreshes via shared BFF mutex (DEF-FE-01), and
+// clears expired session cookies on terminal 401 failures.
 // ==============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
-  getAccessTokenCookieOptions,
-  getRefreshTokenCookieOptions,
-  getSessionActiveCookieOptions,
   getBackendApiUrl,
 } from '@/lib/auth-cookies';
+import {
+  applyRefreshedCookies,
+  clearAuthCookies,
+  executeBffRefresh,
+  type BffRefreshedTokens,
+} from '@/lib/bff-token-refresh';
 
 async function handleProxyRequest(
   request: NextRequest,
@@ -45,6 +49,23 @@ async function handleProxyRequest(
       }
     }
 
+    let refreshedTokens: BffRefreshedTokens | null = null;
+
+    // Proactive refresh if browser already evicted expired 15-min kc_access_token
+    if (!accessToken && refreshToken) {
+      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken);
+      if (refreshedTokens?.accessToken) {
+        accessToken = refreshedTokens.accessToken;
+      } else {
+        const expiredRes = NextResponse.json(
+          { success: false, code: 'UNAUTHORIZED', message: 'Session expired. Please sign in again.' },
+          { status: 401 },
+        );
+        clearAuthCookies(expiredRes);
+        return expiredRes;
+      }
+    }
+
     if (accessToken) {
       forwardHeaders.set('Authorization', `Bearer ${accessToken}`);
     }
@@ -63,41 +84,16 @@ async function handleProxyRequest(
       body: requestBody,
     });
 
-    let refreshedTokens: { accessToken: string; refreshToken?: string } | null = null;
-
-    // If 401 Unauthorized and refresh token is available, attempt silent server-side refresh
-    if (backendRes.status === 401 && refreshToken) {
-      try {
-        const refreshRes = await fetch(`${backendUrl}/api/v1/auth/refresh-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            refreshToken,
-            clientType: 'WEB',
-          }),
+    // If 401 Unauthorized and we haven't already refreshed this call, deduplicate refresh and retry
+    if (backendRes.status === 401 && refreshToken && !refreshedTokens) {
+      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken);
+      if (refreshedTokens?.accessToken) {
+        forwardHeaders.set('Authorization', `Bearer ${refreshedTokens.accessToken}`);
+        backendRes = await fetch(targetUrl, {
+          method: request.method,
+          headers: forwardHeaders,
+          body: requestBody,
         });
-
-        if (refreshRes.ok) {
-          const refreshPayload = await refreshRes.json();
-          const authData = refreshPayload.data || refreshPayload;
-
-          if (authData?.accessToken) {
-            refreshedTokens = {
-              accessToken: authData.accessToken,
-              refreshToken: authData.refreshToken,
-            };
-
-            // Retry original request with the new access token
-            forwardHeaders.set('Authorization', `Bearer ${authData.accessToken}`);
-            backendRes = await fetch(targetUrl, {
-              method: request.method,
-              headers: forwardHeaders,
-              body: requestBody,
-            });
-          }
-        }
-      } catch (refreshErr) {
-        console.warn('[BFF Proxy] Silent refresh attempt failed:', refreshErr);
       }
     }
 
@@ -114,17 +110,11 @@ async function handleProxyRequest(
       clientResponse.headers.set('content-type', contentType);
     }
 
-    // If tokens were silently refreshed, attach updated HttpOnly cookies
     if (refreshedTokens) {
-      const accessOpts = getAccessTokenCookieOptions();
-      const refreshOpts = getRefreshTokenCookieOptions();
-      const sessionActiveOpts = getSessionActiveCookieOptions();
-
-      clientResponse.cookies.set(accessOpts.name, refreshedTokens.accessToken, accessOpts);
-      if (refreshedTokens.refreshToken) {
-        clientResponse.cookies.set(refreshOpts.name, refreshedTokens.refreshToken, refreshOpts);
-      }
-      clientResponse.cookies.set(sessionActiveOpts.name, '1', sessionActiveOpts);
+      applyRefreshedCookies(clientResponse, refreshedTokens);
+    } else if (backendRes.status === 401) {
+      // Terminal unauthorized session: purge stale cookies to prevent Edge Middleware loops
+      clearAuthCookies(clientResponse);
     }
 
     return clientResponse;

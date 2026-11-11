@@ -42,6 +42,13 @@ apps/web/src/
 │   ├── layout.tsx                              # Auth workstation layout with monograms & locale switch
 │   ├── login/page.tsx                          # /login entrypoint wrapped in Suspense boundary
 │   └── 2fa/page.tsx                            # /2fa entrypoint wrapped in Suspense boundary
+├── app/api/auth/
+│   ├── login/route.ts                          # BFF login handler setting HttpOnly session cookies
+│   ├── verify-totp/route.ts                    # BFF 2FA TOTP verification handler setting HttpOnly cookies
+│   ├── session/route.ts                        # BFF session hydration sharing coalesced refresh helper
+│   └── logout/route.ts                         # BFF logout handler invalidating Redis/BFF caches & cookies
+├── lib/
+│   └── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
 ├── components/auth/
 │   ├── login-form.tsx                          # Phone+Password form, 2FA fork & active session redirect
 │   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste & guards
@@ -66,24 +73,28 @@ sequenceDiagram
     autonumber
     actor Staff as Office Staff / Partner
     participant Web as Web Portal (/login)
+    participant BFF as Next.js 15 BFF (/api/auth)
     participant API as NestJS 12 API (/auth)
     participant DB as PostgreSQL 17
 
     Staff->>Web: Enter 10-digit mobile & password
-    Web->>API: POST /api/v1/auth/web/login { phone, password }
+    Web->>BFF: POST /api/auth/login { phone, password }
+    BFF->>API: POST /api/v1/auth/web/login
     API->>DB: Verify bcrypt password hash
     alt Staff has 2FA enabled
-        API-->>Web: 200 OK { requireTotp: true, tempToken: "jwt..." }
-        Web->>Web: Store tempToken & navigate to /2fa
+        API-->>BFF: 200 OK { requireTotp: true, tempToken: "jwt..." }
+        BFF-->>Web: { requireTotp: true, tempToken }
+        Web->>Web: Navigate to /2fa
         Staff->>Web: Enter 6-digit code from Microsoft Authenticator
-        Web->>API: POST /api/v1/auth/web/verify-totp { tempToken, totpCode }
-        API-->>Web: 200 OK { accessToken, refreshToken, user }
-        Web->>Web: setAuth(user, tokens) & clear tempToken
-        Web->>Staff: Navigate to /dashboard
+        Web->>BFF: POST /api/auth/verify-totp { tempToken, totpCode }
+        BFF->>API: POST /api/v1/auth/web/verify-totp
+        API-->>BFF: 200 OK { accessToken, refreshToken, user }
+        BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + { user }
+        Web->>Staff: setAuth(user) & Navigate to /dashboard
     else Direct Authentication (2FA not required)
-        API-->>Web: 200 OK { accessToken, refreshToken, user }
-        Web->>Web: setAuth(user, tokens)
-        Web->>Staff: Navigate to /dashboard
+        API-->>BFF: 200 OK { accessToken, refreshToken, user }
+        BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + { user }
+        Web->>Staff: setAuth(user) & Navigate to /dashboard
     end
 ```
 

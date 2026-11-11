@@ -818,4 +818,288 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       });
     });
   });
+
+  // =========================================================================
+  // 10. CONCURRENT REFRESH MUTEX & DISTRIBUTED COALESCING (DEF-FE-01)
+  // =========================================================================
+  describe('10. Concurrent Refresh Mutex & Distributed Coalescing (DEF-FE-01)', () => {
+    const createAtomicRedisMock = (store: Map<string, string>) => {
+      const client: any = {
+        get: jest.fn(async (key: string) => store.get(key) ?? null),
+        set: jest.fn(async (key: string, val: string, ...args: any[]) => {
+          if (args.includes('NX') && store.has(key)) {
+            return null;
+          }
+          store.set(key, val);
+          return 'OK';
+        }),
+        del: jest.fn(async (...keys: string[]) => {
+          let count = 0;
+          for (const k of keys) {
+            if (store.delete(k)) count++;
+          }
+          return count;
+        }),
+        incr: jest.fn(async (key: string) => {
+          const next = parseInt(store.get(key) || '0', 10) + 1;
+          store.set(key, String(next));
+          return next;
+        }),
+        decr: jest.fn(async (key: string) => {
+          const next = parseInt(store.get(key) || '0', 10) - 1;
+          store.set(key, String(next));
+          return next;
+        }),
+        expire: jest.fn(async () => 1),
+        eval: jest.fn(async (_lua: string, _numKeys: number, key: string, token: string) => {
+          if (store.get(key) === token) {
+            store.delete(key);
+            return 1;
+          }
+          return 0;
+        }),
+      };
+
+      const provider: any = {
+        getClient: jest.fn(() => client),
+        getIsConnected: jest.fn(() => true),
+      };
+
+      return { client, provider };
+    };
+
+    it('AUTH-COALESCE-01: same-process Redis-offline concurrent bursts share 1 rotation without triggering theft trap', async () => {
+      const staffRefresh = jwtService.sign(
+        {
+          sub: mockUserId,
+          phone: mockUserPhone,
+          roles: [Role.SUPER_ADMIN],
+          branchId: mockBranchId,
+          tokenType: 'refresh',
+          jti: 'jti-same-proc-1',
+        },
+        { expiresIn: '7d' },
+      );
+      const initialHash = await bcrypt.hash(preHash(staffRefresh), 10);
+
+      const userRecord = {
+        id: mockUserId,
+        name: 'Partner Admin',
+        phone: mockUserPhone,
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        mpinHash: null,
+        refreshTokenHash: initialHash,
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue(userRecord);
+      prismaMock.user.update.mockImplementation(async (args: any) => ({
+        ...userRecord,
+        refreshTokenHash: args.data.refreshTokenHash,
+      }));
+
+      const [res1, res2, res3] = await Promise.all([
+        authService.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+        authService.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+        authService.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+      ]);
+
+      expect(res1.accessToken).toBeDefined();
+      expect(res2.accessToken).toBe(res1.accessToken);
+      expect(res3.accessToken).toBe(res1.accessToken);
+      expect(prismaMock.user.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('AUTH-COALESCE-02 & 03: multi-replica Redis lock coalesces concurrent Staff bursts while strictly rejecting sequential replay', async () => {
+      const store = new Map<string, string>();
+      const { provider: sharedRedisProvider } = createAtomicRedisMock(store);
+
+      const replicaA = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+      const replicaB = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+
+      const staffRefresh = jwtService.sign(
+        {
+          sub: mockUserId,
+          phone: mockUserPhone,
+          roles: [Role.SUPER_ADMIN],
+          branchId: mockBranchId,
+          tokenType: 'refresh',
+          jti: 'jti-multi-replica-1',
+        },
+        { expiresIn: '7d' },
+      );
+      const initialHash = await bcrypt.hash(preHash(staffRefresh), 10);
+      store.set(`auth:session:${mockUserId}:WEB`, initialHash);
+
+      const userRecord: any = {
+        id: mockUserId,
+        name: 'Partner Admin',
+        phone: mockUserPhone,
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        mpinHash: null,
+        refreshTokenHash: initialHash,
+      };
+
+      prismaMock.user.findUnique.mockImplementation(async () => ({ ...userRecord }));
+      prismaMock.user.update.mockImplementation(async (args: any) => {
+        userRecord.refreshTokenHash = args.data.refreshTokenHash;
+        return { ...userRecord };
+      });
+
+      const [resA, resB] = await Promise.all([
+        replicaA.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+        replicaB.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+      ]);
+
+      expect(resA.accessToken).toBeDefined();
+      expect(resB.accessToken).toBe(resA.accessToken);
+      expect(resB.refreshToken).toBe(resA.refreshToken);
+      expect(prismaMock.user.update).toHaveBeenCalledTimes(1);
+
+      // AUTH-COALESCE-03: Sequential attacker replay AFTER burst completes MUST STILL trip RFC 6819 trap!
+      await expect(
+        replicaA.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' }),
+      ).rejects.toThrow(
+        new UnauthorizedException(
+          'Token reuse detected. Active session revoked for security. Please sign in again.',
+        ),
+      );
+      expect(store.has(`auth:session:${mockUserId}:WEB`)).toBe(false);
+    }, 15000);
+
+    it('AUTH-COALESCE-04: multi-replica Redis lock coalesces concurrent Customer bursts cleanly', async () => {
+      const store = new Map<string, string>();
+      const { provider: sharedRedisProvider } = createAtomicRedisMock(store);
+
+      const replicaA = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+      const replicaB = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+
+      const custRefresh = jwtService.sign(
+        {
+          sub: mockCustomerId,
+          phone: mockCustomerPhone,
+          roles: [Role.CUSTOMER],
+          branchId: mockBranchId,
+          tokenType: 'refresh',
+          jti: 'jti-cust-concurrent-1',
+        },
+        { expiresIn: '7d' },
+      );
+      const initialHash = await bcrypt.hash(preHash(custRefresh), 10);
+      store.set(`auth:session:${mockCustomerId}:MOBILE`, initialHash);
+
+      const customerRecord: any = {
+        id: mockCustomerId,
+        fullName: 'Sundaram S',
+        phone: mockCustomerPhone,
+        branchId: mockBranchId,
+        refreshTokenHash: initialHash,
+      };
+
+      prismaMock.customer.findUnique.mockImplementation(async () => ({ ...customerRecord }));
+      prismaMock.customer.update.mockImplementation(async (args: any) => {
+        customerRecord.refreshTokenHash = args.data.refreshTokenHash;
+        return { ...customerRecord };
+      });
+
+      const [resA, resB] = await Promise.all([
+        replicaA.refreshToken({ refreshToken: custRefresh, clientType: 'MOBILE' }),
+        replicaB.refreshToken({ refreshToken: custRefresh, clientType: 'MOBILE' }),
+      ]);
+
+      expect(resA.accessToken).toBeDefined();
+      expect(resB.accessToken).toBe(resA.accessToken);
+      expect(prismaMock.customer.update).toHaveBeenCalledTimes(1);
+    }, 15000);
+
+    it('AUTH-COALESCE-05: follower rejects coalesced result if logout destroyed active session mid-rotation', async () => {
+      const store = new Map<string, string>();
+      const { provider: sharedRedisProvider } = createAtomicRedisMock(store);
+
+      const replicaA = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+      const replicaB = new AuthService(
+        prismaMock as unknown as PrismaService,
+        jwtService,
+        configService,
+        smsServiceMock as unknown as SmsService,
+        sharedRedisProvider,
+      );
+
+      const staffRefresh = jwtService.sign(
+        {
+          sub: mockUserId,
+          phone: mockUserPhone,
+          roles: [Role.SUPER_ADMIN],
+          branchId: mockBranchId,
+          tokenType: 'refresh',
+          jti: 'jti-logout-race-1',
+        },
+        { expiresIn: '7d' },
+      );
+      const initialHash = await bcrypt.hash(preHash(staffRefresh), 10);
+      store.set(`auth:session:${mockUserId}:WEB`, initialHash);
+
+      const userRecord: any = {
+        id: mockUserId,
+        name: 'Partner Admin',
+        phone: mockUserPhone,
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        mpinHash: null,
+        refreshTokenHash: initialHash,
+      };
+
+      prismaMock.user.findUnique.mockImplementation(async () => ({ ...userRecord }));
+      prismaMock.user.update.mockImplementation(async (args: any) => {
+        userRecord.refreshTokenHash = args.data.refreshTokenHash;
+        store.delete(`auth:session:${mockUserId}:WEB`);
+        return { ...userRecord };
+      });
+
+      const promiseA = replicaA.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' });
+      const promiseB = replicaB.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' });
+
+      await promiseA;
+      await expect(promiseB).rejects.toThrow(
+        new UnauthorizedException('Session revoked or logged out'),
+      );
+    }, 15000);
+  });
 });

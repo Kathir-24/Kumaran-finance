@@ -269,7 +269,8 @@ flowchart TD
 - **Edge Navigation Guarding (0ms FOUC Elimination)**:
   - [`apps/web/src/middleware.ts`](file:///u:/Kumaran-finance/apps/web/src/middleware.ts) runs at the Edge prior to page rendering.
   - Any request targeting `/(dashboard)/*` without valid session cookies is immediately redirected via HTTP 307 to `/login?redirect=...`.
-- **Transparent Server-Side API Proxy & Silent Token Rotation**:
+- **Transparent Server-Side API Proxy & Coalesced Silent Token Rotation (DEF-FE-01 Fixed)**:
   - Web client requests are dispatched to relative `/api/v1/*` endpoints.
-  - The Next.js BFF proxy ([`route.ts`](file:///u:/Kumaran-finance/apps/web/src/app/api/v1/[...path]/route.ts)) reads the `HttpOnly` cookie, injects `Authorization: Bearer <token>`, and forwards the request to NestJS.
-  - On 401 Unauthorized responses from NestJS, the BFF proxy silently executes refresh token rotation using `kc_refresh_token` on the server, retries the request, and sets updated `HttpOnly` cookies on the browser response without client disruption.
+  - The Next.js BFF proxy ([`route.ts`](file:///u:/Kumaran-finance/apps/web/src/app/api/v1/[...path]/route.ts)) reads `kc_access_token` (or proactively refreshes if expired while `kc_refresh_token` exists), injects `Authorization: Bearer <token>`, and forwards to NestJS.
+  - Concurrent 401 bursts across `/api/v1/*`, `/api/auth/session`, and `/api/auth/logout` are deduplicated via [`bff-token-refresh.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-token-refresh.ts) (SHA-256 in-flight promise coalescing + 2s cookie-handoff micro-cache purged immediately on logout), paired with contention-scoped distributed Redis lock coalescing in [`AuthService.refreshToken`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts).
+  - Sequential token replays continue to trigger immediate RFC 6819 session family revocation, while permanent 401 expiry clears dead browser cookies cleanly to avoid redirect loops.

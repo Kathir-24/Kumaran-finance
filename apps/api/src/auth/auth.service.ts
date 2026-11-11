@@ -71,6 +71,9 @@ export class AuthService {
   private readonly cooldownStore = new Map<string, number>();
   private readonly lockoutStore = new Map<string, number>();
   private readonly dailyQuotaStore = new Map<string, { count: number; expiresAt: number }>();
+  private readonly inFlightRefreshes = new Map<string, Promise<any>>();
+  private readonly releaseLockLua =
+    'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -922,7 +925,8 @@ export class AuthService {
   }
 
   /**
-   * Rotates access and refresh tokens
+   * Rotates access and refresh tokens with single-flight coalescing across concurrent requests.
+   * Preserves immediate RFC 6819 theft revocation on sequential replays of rotated tokens.
    */
   async refreshToken(dto: RefreshTokenDto) {
     let payload: JwtPayload;
@@ -939,7 +943,145 @@ export class AuthService {
     const clientType = dto.clientType || 'WEB';
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    const tokenDigest = crypto.createHash('sha256').update(dto.refreshToken).digest('hex');
+    const inFlightKey = `${tokenDigest}:${clientType}`;
 
+    const existingPromise = this.inFlightRefreshes.get(inFlightKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const rotationPromise = (async () => {
+      try {
+        if (useRedis && redis) {
+          return await this.refreshWithRedisCoalescing(
+            dto,
+            payload,
+            clientType,
+            tokenDigest,
+            redis,
+          );
+        }
+        return await this.executeTokenRotation(dto, payload, clientType, redis, false);
+      } finally {
+        this.inFlightRefreshes.delete(inFlightKey);
+      }
+    })();
+
+    this.inFlightRefreshes.set(inFlightKey, rotationPromise);
+    return rotationPromise;
+  }
+
+  /**
+   * Coordinates distributed concurrent refresh bursts via Redis mutex + contention-scoped result sharing.
+   */
+  private async refreshWithRedisCoalescing(
+    dto: RefreshTokenDto,
+    payload: JwtPayload,
+    clientType: string,
+    tokenDigest: string,
+    redis: any,
+  ) {
+    const lockKey = `lock:auth:refresh:${tokenDigest}`;
+    const waitersKey = `auth:refresh_waiters:${tokenDigest}`;
+    const resultKey = `auth:refresh_inflight_result:${tokenDigest}`;
+    const lockToken = crypto.randomUUID();
+
+    const acquired = await redis.set(lockKey, lockToken, 'PX', 4000, 'NX');
+    if (acquired === 'OK') {
+      try {
+        const result = await this.executeTokenRotation(dto, payload, clientType, redis, true);
+        const waiterCountRaw = await redis.get(waitersKey);
+        if (waiterCountRaw && parseInt(waiterCountRaw, 10) > 0) {
+          await redis.set(resultKey, JSON.stringify(result), 'EX', 4);
+        }
+        return result;
+      } finally {
+        if (typeof redis.eval === 'function') {
+          await redis.eval(this.releaseLockLua, 1, lockKey, lockToken).catch(() => {});
+        } else if ((await redis.get(lockKey)) === lockToken) {
+          await redis.del(lockKey).catch(() => {});
+        }
+      }
+    }
+
+    let registeredWaiter = false;
+    try {
+      if (typeof redis.incr === 'function') {
+        await redis.incr(waitersKey);
+        if (typeof redis.expire === 'function') {
+          await redis.expire(waitersKey, 5);
+        }
+      } else {
+        await redis.set(waitersKey, '1', 'EX', 5);
+      }
+      registeredWaiter = true;
+
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const sharedRaw = await redis.get(resultKey);
+        if (sharedRaw) {
+          const activeSession = await redis.get(`auth:session:${payload.sub}:${clientType}`);
+          const revokedBeforeStr = await redis.get(`auth:revoked_before:${payload.sub}`);
+          const isRevokedByTimestamp =
+            Boolean(revokedBeforeStr) &&
+            Boolean(payload.iat) &&
+            payload.iat! <= parseInt(revokedBeforeStr, 10);
+
+          if (!activeSession || isRevokedByTimestamp) {
+            throw new UnauthorizedException('Session revoked or logged out');
+          }
+
+          if (typeof redis.decr === 'function') {
+            const remaining = await redis.decr(waitersKey);
+            registeredWaiter = false;
+            if (remaining <= 0) {
+              await redis.del(waitersKey, resultKey);
+            }
+          } else {
+            registeredWaiter = false;
+            await redis.del(waitersKey, resultKey);
+          }
+
+          return JSON.parse(sharedRaw);
+        }
+
+        const lockStillHeld = await redis.get(lockKey);
+        if (!lockStillHeld) {
+          const lateResult = await redis.get(resultKey);
+          if (lateResult) {
+            continue;
+          }
+          break;
+        }
+      }
+    } finally {
+      if (registeredWaiter) {
+        if (typeof redis.decr === 'function') {
+          const remaining = await redis.decr(waitersKey).catch(() => 0);
+          if (remaining <= 0) {
+            await redis.del(waitersKey, resultKey).catch(() => {});
+          }
+        } else {
+          await redis.del(waitersKey, resultKey).catch(() => {});
+        }
+      }
+    }
+
+    return this.executeTokenRotation(dto, payload, clientType, redis, true);
+  }
+
+  /**
+   * Executes hash verification, RFC 6819 reuse detection, and fresh token issuance.
+   */
+  private async executeTokenRotation(
+    dto: RefreshTokenDto,
+    payload: JwtPayload,
+    clientType: string,
+    redis: any,
+    useRedis: boolean,
+  ) {
     // Role-based handling for Chit Subscribers (Role.CUSTOMER)
     if (payload.roles?.includes(Role.CUSTOMER)) {
       const customer = await this.prisma.customer.findUnique({

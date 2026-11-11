@@ -57,10 +57,10 @@ To completely eliminate sticky session dependencies and session loss across inst
 1. **Stateless JWT Tokens**:
    - Access tokens have a 15-minute lifespan and are cryptographically verified using `JWT_SECRET` (HMAC SHA-256) on every incoming request without querying the database or local memory.
    - Any API replica holding the identical `JWT_SECRET` validates requests interchangeably.
-2. **PostgreSQL Refresh Token Rotation (RFC 6819)**:
-   - Refresh tokens are hashed via `crypto.scryptSync` and stored in PostgreSQL (`User.refreshTokenHash` / `Customer.refreshTokenHash`).
-   - Token refresh requests can land on any instance; all validate against the shared database row.
-   - Logout immediately sets `refreshTokenHash = null`, revoking access across all replicas simultaneously.
+2. **Distributed Refresh Token Rotation & Coalescing (RFC 6819)**:
+   - Refresh tokens are pre-hashed via SHA-256 and hashed via `bcrypt` before storage in Redis (`auth:session:<userId>:<clientType>`) and PostgreSQL (`User.refreshTokenHash` / `Customer.refreshTokenHash`).
+   - Concurrent bursts landing across horizontal replicas synchronize via transient Redis lock `lock:auth:refresh:<sha256>` and contention-only handoff keys, preventing false RFC 6819 session revocations without exposing sequential replays.
+   - Logout immediately deletes client session keys, sets `auth:revoked_before:<userId>`, and clears PostgreSQL `refreshTokenHash`, revoking access across all replicas simultaneously.
 3. **Distributed OTP Authentication**:
    - OTP state during customer and field agent logins is stored exclusively in Redis (`auth:otp:<phone>` and `auth:otp:cooldown:<phone>`) with atomic Lua operations and strict TTL expiration. Zero OTP state exists on local server disks.
 
