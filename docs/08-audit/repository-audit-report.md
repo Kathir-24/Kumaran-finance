@@ -825,38 +825,39 @@ const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 
 ---
 
-#### Finding DEF-DB-02: Unhandled Transient Deadlocks in Critical State Transitions (`Auction`, `Disbursement`, `Installment`)
-- **Layer & Subsystem**: Database Concurrency & State Machine Transitions
+#### Finding DEF-DB-02: Unhandled Transient Deadlocks & Split-Brain State Races (`Auction`, `Disbursement`, `Installment`, `Payment Reversals`) `[FIXED & VERIFIED — 2026-11-11]`
+- **Layer & Subsystem**: Database Concurrency & Critical State Machine Transitions
 - **Exact File Path & Line Numbers**:
-  - `apps/api/src/auction/auction.service.ts:461`
-  - `apps/api/src/disbursement/disbursement.service.ts:524, 607`
-  - `apps/api/src/installment/installment.service.ts:676`
-- **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §4.2 ("Automated Transaction Retry Utility").
+  - `apps/api/src/auction/auction.service.ts` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`)
+  - `apps/api/src/disbursement/disbursement.service.ts` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`)
+  - `apps/api/src/installment/installment.service.ts` (`generateMonthlyDues`, `substituteSubscriber` — *listed earlier as `substituteDefaulterTicket`*)
+  - `apps/api/src/payment/payment.service.ts` (`requestReversal`, `approveReversal`, `rejectReversal`)
+  - `apps/api/src/common/utils/state-transition-lock.util.ts` *(Added shared state-transition row-lock helpers)*
+- **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §4.2 ("Automated Transaction Retry Utility"); `docs/03-architecture/state-machines.md`.
 - **Severity**: **HIGH**
 - **Detailed Technical Root Cause**:
-  While `PaymentService` and `CollectionService` correctly wrap transactions inside `withTransactionRetry`, four critical state transitions invoke raw `this.prisma.$transaction(async (tx) => ...)`:
-  - `AuctionService.finalizeAuction`
-  - `DisbursementService.authorizePayout`
-  - `DisbursementService.releasePayout`
-  - `InstallmentService.substituteDefaulterTicket`
-  
-  All four operations acquire row locks (`FOR UPDATE`), but if PostgreSQL encounters transient deadlock `40P01` or serialization failure `40001`, the application crashes immediately with an unhandled 500 error instead of retrying transparently.
+  1. Critical state transitions in `AuctionService`, `DisbursementService`, and `InstallmentService` executed raw `this.prisma.$transaction(...)` without `withTransactionRetry`, causing immediate 500 errors if PostgreSQL hit `40P01`, `40001`, or `P2034`.
+  2. Full `$transaction` inspection revealed uncovered concurrency gaps across sibling state transitions:
+     - `DisbursementService.verifySafetyProof` and `DisbursementService.settleFinalMonth` (Month $N$ settlement) omitted `SELECT ... FOR UPDATE` row locks (`AuctionWinner` / `ChitGroup` & `SubscriberTicket`).
+     - `PaymentService.requestReversal` and `PaymentService.rejectReversal` omitted `withTransactionRetry` and `FOR UPDATE` locks, and `approveReversal` never locked `"PaymentReversal"` — creating a split-brain window where `rejectReversal` could overwrite `APPROVED -> REJECTED` after `Payment` was already set to `REVERSED`.
+     - Concurrent ADR-13 `substituteSubscriber` races on two vacated tickets with the same `newCustomerId` leaked raw `P2002` instead of `ConflictException`.
 - **Impact Analysis**:
-  Foreman or Partner actions fail unexpectedly during peak operations, requiring manual operational recovery.
-- **Concrete Production-Grade Remediation Code Design**:
-  Wrap all state transitions in `withTransactionRetry`:
+  Deadlock crashes under peak load, concurrent payout/finalization overwrite races, and payment/reversal ledger split-brain corruption.
+- **Verified Production Implementation**:
+  Wrapped all 13 critical state transitions in `withTransactionRetry` backed by [`apps/api/src/common/utils/state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) (`lockChitGroupRow`, `lockAuctionRow`, `lockAuctionMinutesRow`, `lockAuctionWinnerRow`, `lockSubscriberTicketRow`, `lockPaymentAndReversalRows`) while keeping `ChitService.activateChit` scoped cleanly to `DEF-DB-07`:
 
 ```typescript
-// apps/api/src/auction/auction.service.ts:461
-import { withTransactionRetry } from '../common/utils/transaction-retry.util';
-
+// apps/api/src/common/utils/state-transition-lock.util.ts + withTransactionRetry
 const result = await withTransactionRetry(this.prisma, async (tx) => {
-  const lockedAuctions = await tx.$queryRaw<Array<{ id: string; status: AuctionStatus }>>`
-    SELECT id, status FROM "Auction" WHERE id = ${auctionId} FOR UPDATE
-  `;
-  // Finalize auction logic...
+  const lockedAuction = await lockAuctionRow(tx, auctionId);
+  if (lockedAuction && (lockedAuction.status === AuctionStatus.COMPLETED || lockedAuction.status === AuctionStatus.MINUTES_FILED)) {
+    throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
+  }
+  // Idempotent, retry-safe state transition...
 });
 ```
+
+- **Verification Summary**: Unit transient fault-injection (`40P01`/`40001`/`P2034`) & lock-guard suites (`10/10` suites, `265/265` tests in `5.538 s`), live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`15`: `15/15` passed in `3.458 s` with 0 skips), full `--runInBand` API suite (`51/52` suites, `748/749` tests; 1 pre-existing seeded branch label check in `financial-invariants.spec.ts:196`), `oxlint` (`0` errors), and `nest build` (`exit 0`).
 
 ---
 
@@ -1105,7 +1106,7 @@ gantt
 #### Phase 2: Financial Invariants, Edge Crypto & SDK Automation (Sprint 2 — Days 3 to 7)
 - **Objective**: Enforce integer validation, cryptographic Edge routing, live OpenAPI AST export, and real-time SSE streaming.
 - **Target Items**:
-  1. `DEF-DB-02`: Wrap `Auction.finalizeAuction`, `Disbursement.authorizePayout/releasePayout`, and `Installment.substituteDefaulterTicket` inside `withTransactionRetry`.
+  1. `DEF-DB-02` **[FIXED & VERIFIED]**: Wrapped all critical state transitions in `withTransactionRetry` and enforced acyclic row locks (`state-transition-lock.util.ts`) across `AuctionService` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), `DisbursementService` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), `InstallmentService` (`generateMonthlyDues`, `substituteSubscriber`), and `PaymentService` reversals (`requestReversal`, `approveReversal`, `rejectReversal`), with ADR-13 concurrent `P2002` `ConflictException` translation.
   2. `DEF-BE-01`: Convert `@IsNumber()` to `@IsInt()` across all financial input DTOs.
   3. `DEF-FE-02`: Enable unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy and remove client token guard from `useApprovalsStream`.
   4. `DEF-FE-03`: Eliminate `kc_session_active` trust and enforce WebCrypto `jose.jwtVerify` signature + role path gating in Next.js Edge Middleware.

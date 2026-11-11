@@ -122,7 +122,7 @@ $$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{
 
 3. **Tier 3 & Tier 4 — InstallmentDue & Payment Locks (Double-Settlement Prevention)**:
    - **Tier 3 (`"InstallmentDue"`)**: Locked before status mutation; counter cash, field collections, UPI claim verification, and ghost-drop reconciliation all re-verify locked `status !== 'PAID'` inside the transaction to prevent double settlements.
-   - **Tier 4 (`"Payment"`)**: Locked in deterministic sorted order (`ORDER BY id`) during `verifyUpiClaim`, `executeReconcileSettlement`, and evening cash handover acknowledgment (`CollectionService.acknowledgeHandover`):
+   - **Tier 4 (`"Payment"`) & Tier 5 (`"PaymentReversal"`)**: Locked in strict order (`"Payment"` $\to$ `"PaymentReversal"` via [`lockPaymentAndReversalRows`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) — or after Tier 2 `"SubscriberTicket"` inside `PaymentService.approveReversal`), preventing duplicate reversal requests and split-brain state overwrites when `approveReversal` and `rejectReversal` race simultaneously:
    ```typescript
    // apps/api/src/collection/collection.service.ts (acknowledgeHandover)
    const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
@@ -134,6 +134,15 @@ $$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{
      ORDER BY id FOR UPDATE
    `;
    ```
+
+4. **State Machine Lock Hierarchy (Auction, Disbursement & Subscriber Substitution)**:
+   Shared helpers in [`state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) enforce monotonic locking across critical lifecycle transitions without conflicting with payment paths:
+   $$\texttt{"ChitGroup"} \;\longrightarrow\; \texttt{"Auction"} \;\longrightarrow\; \texttt{"AuctionMinutes"} \;/\; \texttt{"AuctionWinner"} \;\longrightarrow\; \texttt{"SubscriberTicket"}$$
+   - `AuctionService.recordBid` / `recordTieBreak`: lock `"ChitGroup" FOR UPDATE` before upserting Auction/Winner.
+   - `AuctionService.finalizeAuction` / `markMinutesFiled`: lock `"Auction"` / `"AuctionMinutes"` `FOR UPDATE` before committing state.
+   - `DisbursementService.verifySafetyProof` / `authorizePayout` / `releasePayout`: lock `"AuctionWinner" FOR UPDATE`.
+   - `DisbursementService.settleFinalMonth` (Month $N$ maturity): lock `"ChitGroup" FOR UPDATE` then `"SubscriberTicket" FOR UPDATE`.
+   - `InstallmentService.substituteSubscriber`: lock `"SubscriberTicket" FOR UPDATE` and translate concurrent duplicate-customer `P2002` (`@@unique([chitGroupId, customerId])`) cleanly into `ConflictException` (ADR-13).
 
 ### 4.2 Automated Transaction Retry Utility
 Transient deadlocks (`40P01`), serialization failures (`40001`), Prisma write conflicts (`P2034`), or edge-case receipt number conflicts are transparently retried using exponential backoff with randomized jitter:
@@ -148,8 +157,11 @@ export async function withTransactionRetry<T>(
 ```
 - **Max Retries**: 3 attempts (default).
 - **Backoff Algorithm**: $(50\text{ms} \times 2^{\text{attempt}}) + \text{rand}(0, 50\text{ms})$ capped at 1,000ms.
-- **Classification Filter**: `isTransientTransactionError` catches `40P01`, `40001`, `P2034`, write conflicts, and `P2002` on `receiptNumber` (matching both message substrings and `err.meta.target`). Application validation errors (`BadRequestException`, `ForbiddenException`, `P2025`) fail fast on the first attempt without unnecessary retries.
-- **Integration Points**: Wired into [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.approveReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`CollectionService.acknowledgeHandover`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts).
+- **Classification Filter**: `isTransientTransactionError` catches `40P01`, `40001`, `P2034`, write conflicts, and `P2002` on `receiptNumber` (matching both message substrings and `err.meta.target`). Application validation errors (`BadRequestException`, `ForbiddenException`, `P2025`, non-receipt `P2002`) fail fast on the first attempt without unnecessary retries.
+- **Integration Points**:
+  - **Payment, Collections & Reconciliation**: [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`CollectionService.acknowledgeHandover`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts).
+  - **Reversals**: [`PaymentService.requestReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.approveReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`PaymentService.rejectReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts).
+  - **Auction, Disbursement & Installment State Machines**: [`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), and [`InstallmentService`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts) (`generateMonthlyDues`, `substituteSubscriber`).
 
 ---
 
