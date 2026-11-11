@@ -36,9 +36,13 @@ infra/docker/nginx/ssl/live/*.key
 infra/docker/nginx/ssl/live/*.pfx
 !infra/docker/nginx/ssl/live/.gitkeep
 
-# AI Agent scratchpads, proofs, and teamwork logs
-.agents/
-.agents/teamwork/
+# Local runtime upload storage (dev/test)
+apps/api/storage/
+
+# AI Agent scratchpads, proofs, and teamwork logs (keep reusable rules & workflows tracked)
+.agents/*
+!.agents/rules/
+!.agents/workflows/
 
 # Playwright test artifacts
 test-results/
