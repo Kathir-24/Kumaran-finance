@@ -93,9 +93,11 @@ export class SyncOfflineCollectionItemDto {
   @Min(1)
   installmentMonth: number; // Installment month (1 to N)
 
-  @IsNumber()
+  @Transform(({ value }) => parseStrictWholeRupeeValue(value))
+  @IsInt()
   @IsPositive()
-  amount: number; // Exact net payable rupees (e.g. 3950)
+  @Max(MAX_SAFE_WHOLE_RUPEE)
+  amount: number; // Exact net payable whole rupees (e.g. 3950)
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod; // CASH, UPI, CHEQUE, BANK_TRANSFER

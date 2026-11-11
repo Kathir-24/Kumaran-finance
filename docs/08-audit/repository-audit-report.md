@@ -79,7 +79,7 @@ The 10 Invariant Architectural Guardrails defined in `AGENTS.md` and confirmed b
 | # | Guardrail Name | Primary Spec | Backend (`apps/api/`) | Database (`prisma/`) | Frontend (`apps/web/`) | SDK (`@kumaran/api-client`) | Verdict |
 |---|---|---|---|---|---|---|---|
 | **1** | **Single Company Tenancy** | ADR-01 | **Verified**: Zero multi-tenant `company_id` filters; branch scoping only (`branch.service.ts:1-120`). | **Verified**: Zero `company_id` columns across all 12 models in `schema.prisma:1-440`. | **Verified**: Zero company switcher components or headers. | **Verified**: No company context in API client. | **PASS** |
-| **2** | **Pure Whole Rupee Math** | Guardrail 2, `financial-rules.md` §1 | **Verified**: Financial formulas strictly use BigInt literals (`* 4n / 100n`). *Finding DEF-BE-01 on DTO `@IsNumber`*. | **Verified**: All currency columns are 64-bit `BigInt` (`schema.prisma:147-150, 187, 219, 252-255`). | **Verified**: Zero paise/floats; `formatRupee` uses `maximumFractionDigits: 0` (`lib/currency.ts:22-72`). | **Verified**: `assertWholeRupee` throws `RangeError` on decimals. *Finding DEF-FE-10 on parsing*. | **PASS (With Fixes)** |
+| **2** | **Pure Whole Rupee Math** | Guardrail 2, `financial-rules.md` §1 | **Verified (`DEF-BE-01` Fixed)**: All financial DTOs enforce `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE`; services enforce fail-closed [`toWholeRupeeBigInt`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts) (`0` `Math.floor()` paise truncation) and BigInt formulas (`* 4n / 100n`). | **Verified**: All currency columns are 64-bit `BigInt` (`schema.prisma:147-150, 187, 219, 252-255`). | **Verified**: Zero paise/floats; `formatRupee` uses `maximumFractionDigits: 0` (`lib/currency.ts:22-72`). | **Verified**: `assertWholeRupee` throws `RangeError` on decimals. *Finding DEF-FE-10 on parsing*. | **PASS (With SDK Fix Pending)** |
 | **3** | **Commission Freeze (4.00%)** | ADR-04 | **Verified**: 4.00% commission permanently frozen upon group activation (`chit.service.ts:453-455`). | **Verified**: Frozen rate stored in `ChitGroup.foremanCommissionRate Decimal(5,2)`. | **Verified**: Displayed as locked 4% in scheme preview (`scheme-math-preview.tsx:28-35`). | **Verified**: SDK constants lock 4% minimum floor. | **PASS** |
 | **4** | **Universal Equal Dividend Deduction** | Guardrail 4, `financial-rules.md` §2 | **Verified**: Dividend distributed equally to ALL members including winner & prized (`installment.service.ts:162-171`). | **Verified**: `InstallmentDue` generated uniformly for all active tickets in chit group. | **Verified**: `notebook-entry-grid.tsx:89-111` applies identical $I_{net} = I_{base} - Div$ to all members. | **Verified**: Invariant math verified in test suites. | **PASS** |
 | **5** | **Month 1 & Month N Rules** | Guardrail 5, `financial-rules.md` §3 | **Verified**: Month 1 assigned to company Ticket #1 (₹0 div); Month N settled directly with 4% comm (`disbursement.service.ts:771-929`). Auctions blocked for $m=1$ and $m=N$ (`auction.service.ts:74`). | **Verified**: `Auction_chitGroupId_installmentMonth_key` protects sequence; Month 1 recorded as company take. | **Verified**: UI locks bidding console for Month 1 and Month N; routes to direct settlement modal. | **Verified**: SDK types distinguish settlement vouchers. | **PASS** |
@@ -212,46 +212,34 @@ A total of **21 defects** were identified across the repository (4 Backend, 10 F
 
 ### 4.1 Backend Modular Monolith Findings
 
-#### Finding DEF-BE-01: Financial Input DTOs Use `@IsNumber()` Instead of `@IsInt()` (Zero-Paise Guard Bypass)
+#### Finding DEF-BE-01: Financial Input DTOs Use `@IsNumber()` Instead of `@IsInt()` (Zero-Paise Guard Bypass) `[FIXED & VERIFIED — 2026-11-11]`
 - **Layer & Subsystem**: Backend Financial Engine & Ingress DTO Validation
 - **Exact File Path & Line Numbers**:
-  1. `apps/api/src/disbursement/dto/authorize-payout.dto.ts:31-33`
-  2. `apps/api/src/collection/dto/sync-offline-collection.dto.ts:55-57`
-  3. `apps/api/src/chit/dto/assign-ticket.dto.ts:31-32`
-  4. `apps/api/src/jobs/dto/reconcile-settlement.dto.ts:37-39`
+  1. [`apps/api/src/disbursement/dto/authorize-payout.dto.ts`](file:///u:/Kumaran-finance/apps/api/src/disbursement/dto/authorize-payout.dto.ts) (`disbursedAmount`)
+  2. [`apps/api/src/collection/dto/sync-offline-collection.dto.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/dto/sync-offline-collection.dto.ts) (`SyncOfflineCollectionItemDto.amount`)
+  3. [`apps/api/src/chit/dto/assign-ticket.dto.ts`](file:///u:/Kumaran-finance/apps/api/src/chit/dto/assign-ticket.dto.ts) (`openingBalance`, adding `@Min(0)`)
+  4. [`apps/api/src/jobs/dto/reconcile-settlement.dto.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/dto/reconcile-settlement.dto.ts) (`SettlementRecordDto.amount`)
+  5. [`apps/api/src/chit/dto/onboard-ongoing-chit.dto.ts`](file:///u:/Kumaran-finance/apps/api/src/chit/dto/onboard-ongoing-chit.dto.ts) (`OngoingMemberAllocationDto.openingBalance` `@Min(0)` parity + stale `IsNumber` import cleanup across 5 sibling DTOs)
+  6. [`apps/api/src/common/utils/whole-rupee.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts) *(Shared `parseStrictWholeRupeeValue` & fail-closed `toWholeRupeeBigInt` eliminating `Math.floor()` paise truncation across `AuctionService`, `ChitService`, `CollectionService`, `DisbursementService`, `PaymentService`, and `JobsController`)*
 - **Violated Specification**: `AGENTS.md` Guardrail 2 ("Pure Whole Rupee Math"); `docs/01-business/financial-rules.md` §1 & §9.1.
 - **Severity**: **HIGH**
 - **Detailed Technical Root Cause**:
-  In NestJS, `@IsNumber()` from `class-validator` accepts floating-point numbers with decimal fractions (e.g. `75000.50`, `3950.25`). While service layers convert amounts via `BigInt()`, the ingress `ValidationPipe` permits fractional amounts to penetrate the API boundary. This violates the rule: *"Paise, decimal fractions (.00), and IEEE 754 floating-point numbers are strictly prohibited in financial code."*
-- **Impact Analysis**:
-  External API clients, mobile devices, or malicious actors can submit fractional rupee values. While `BigInt()` conversion may truncate decimals, truncation leads to subtle rounding discrepancies and violates strict financial contract validation.
-- **Concrete Production-Grade Remediation Code Design**:
-  Replace `@IsNumber()` with `@IsInt()` across all financial DTOs:
+  1. Four financial DTOs used `@IsNumber()`, letting fractional paise pass `ValidationPipe` into services (where `AssignTicketDto` and `ReconcileSettlementDto` threw uncaught `BigInt` `RangeError` HTTP 500s and `AuthorizePayoutDto` / `SyncOfflineCollectionItemDto` silently truncated via `Math.floor()`).
+  2. `AssignTicketDto.openingBalance` and `OngoingMemberAllocationDto.openingBalance` omitted `@Min(0)`, while `@Type(() => Number)` allowed boolean/empty-string coercion (`true -> 1`, `""/false -> 0`) and unsafe `> MAX_SAFE_INTEGER` numbers, and 7 service call sites still used `BigInt(Math.floor(...))`.
+- **Verified Production Implementation**:
+  Enforced `@Transform(({ value }) => parseStrictWholeRupeeValue(value))`, `@IsInt()`, `@Max(MAX_SAFE_WHOLE_RUPEE)`, and `@IsPositive()`/`@Min(0)` uniformly across all 11 monetary DTO files (preserving optional `null`/`undefined` compatibility for Flutter `toJson()`), cleaned all unused `IsNumber` imports (`0` remaining), and replaced all `BigInt(Math.floor(...))` calls with fail-closed `toWholeRupeeBigInt(...)`:
 
 ```typescript
-// apps/api/src/disbursement/dto/authorize-payout.dto.ts
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
-
-export class AuthorizePayoutDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'disbursedAmount must be a whole Rupee integer amount (zero paise/decimals)' })
-  @IsPositive({ message: 'disbursedAmount must be a positive whole number' })
-  disbursedAmount?: number;
-}
+// apps/api/src/common/utils/whole-rupee.util.ts + DTOs
+@IsOptional()
+@Transform(({ value }) => parseStrictWholeRupeeValue(value))
+@IsInt({ message: 'disbursedAmount must be a whole Rupee integer amount (zero paise/decimals)' })
+@IsPositive({ message: 'disbursedAmount must be a positive whole number' })
+@Max(MAX_SAFE_WHOLE_RUPEE)
+disbursedAmount?: number;
 ```
 
-```typescript
-// apps/api/src/collection/dto/sync-offline-collection.dto.ts
-export class OfflineCollectionItemDto {
-  @IsNotEmpty({ message: 'Collection amount is required' })
-  @Type(() => Number)
-  @IsInt({ message: 'amount must be a whole Rupee integer amount (zero paise/decimals)' })
-  @IsPositive({ message: 'amount must be a positive whole number' })
-  amount: number;
-}
-```
+- **Verification Summary**: `financial-boundary-fuzz.spec.ts` (`30/30` passed in `3.382 s`, covering DTO floats/negatives/coercion & direct service fail-closed `toWholeRupeeBigInt`), `8/8` targeted financial suites (`152/152` tests), full `--runInBand` backend suite against live PostgreSQL 17 & Redis 7 (`52/52` suites, `759/759` tests in `79.811 s`, `0` skips), `oxlint` (`0` errors, `11` pre-existing test warnings), `nest build` (exit `0`), `@kumaran/api-client` (`typecheck` clean, `5/5` tests), and `apps/web` (`typecheck` clean, `13/13` suites / `304/304` tests). *(OpenAPI / SDK regeneration remains tracked under `DEF-FE-04`.)*
 
 ---
 
@@ -1108,7 +1096,7 @@ gantt
 - **Objective**: Enforce integer validation, cryptographic Edge routing, live OpenAPI AST export, and real-time SSE streaming.
 - **Target Items**:
   1. `DEF-DB-02` **[FIXED & VERIFIED]**: Wrapped all critical state transitions in `withTransactionRetry` and enforced acyclic row locks (`state-transition-lock.util.ts`) across `AuctionService` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), `DisbursementService` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), `InstallmentService` (`generateMonthlyDues`, `substituteSubscriber`), and `PaymentService` reversals (`requestReversal`, `approveReversal`, `rejectReversal`), with monotonic `"ChitGroup" -> "Auction"` alignment and 19/19 verified live PostgreSQL 17 concurrency tests.
-  2. `DEF-BE-01`: Convert `@IsNumber()` to `@IsInt()` across all financial input DTOs.
+  2. `DEF-BE-01` **[FIXED & VERIFIED]**: Enforced `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE` (plus `@Min(0)` on `openingBalance`) across all 11 monetary DTOs and eliminated silent `Math.floor()` paise truncation via shared [`whole-rupee.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts).
   3. `DEF-FE-02`: Enable unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy and remove client token guard from `useApprovalsStream`.
   4. `DEF-FE-03`: Eliminate `kc_session_active` trust and enforce WebCrypto `jose.jwtVerify` signature + role path gating in Next.js Edge Middleware.
   5. `DEF-FE-04`: Add explicit `@ApiProperty({ type: String })` annotations on nullable/union NestJS DTOs and run `pnpm run codegen:spec && pnpm run codegen:ts`.

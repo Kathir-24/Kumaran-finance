@@ -522,14 +522,20 @@ This section provides granular contract specifications (request bodies, response
 ---
 
 ### 3.11 Financial Input DTO Invariants & Zero-Paise Enforcement (Rule 2 in AGENTS.md)
-All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validation via NestJS `ValidationPipe`. Any request containing fractional decimals (e.g. `3950.50`, `22000.25`), negative numbers, zero (on positive endpoints), or non-numeric types is rejected immediately with `HTTP 400 Bad Request`:
-- `CreatePaymentDto.amount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
-- `RecordCollectionDto.amount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
-- `AcknowledgeHandoverDto.acknowledgedAmount`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
-- `RecordBidDto.bidDiscount`: `@IsInt()`, `@IsPositive()` ($C_f \le D \le V/4$)
-- `RecordTieBreakDto.bidDiscount`: `@IsInt()`, `@IsPositive()` (Exact $V/4$ ceiling)
-- `CreateChitGroupDto.chitValue`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
-- `OnboardOngoingChitDto.chitValue`: `@IsInt()`, `@IsPositive()` (Whole Rupees)
+All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validation via NestJS `ValidationPipe`, combined with shared `parseStrictWholeRupeeValue` normalization and `MAX_SAFE_WHOLE_RUPEE` bounds in [`whole-rupee.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts). Any request containing fractional decimals (e.g. `3950.50`, `22000.25`), negative numbers, zero (on positive endpoints), booleans (`true`/`false`), empty strings (`""`), precision-unsafe floats (`> Number.MAX_SAFE_INTEGER`), or non-numeric types is rejected immediately with `HTTP 400 Bad Request` (and service layers enforce fail-closed `toWholeRupeeBigInt` without silent `Math.floor()` truncation):
+- `CreatePaymentDto.amount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `RecordCollectionDto.amount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `SyncOfflineCollectionItemDto.amount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `AcknowledgeHandoverDto.acknowledgedAmount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `AuthorizePayoutDto.disbursedAmount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Optional Whole Rupees; `null`/`undefined` defaults to calculated prize money)
+- `RecordBidDto.bidDiscount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` ($C_f \le D \le V/4$)
+- `RecordTieBreakDto.bidDiscount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Exact $V/4$ ceiling)
+- `CreateChitGroupDto.chitValue`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `OnboardOngoingChitDto.chitValue`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `HistoricalWinnerDto.bidDiscount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+- `OngoingMemberAllocationDto.openingBalance`: `@IsInt()`, `@Min(0)`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees; defaults to `0`)
+- `AssignTicketDto.openingBalance`: `@IsInt()`, `@Min(0)`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees; defaults to `0`)
+- `SettlementRecordDto.amount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
 
 ---
 
