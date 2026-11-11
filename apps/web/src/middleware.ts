@@ -14,10 +14,11 @@ import {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Skip static assets, Next.js internal bundles, and API routes
+  // 1. Skip static assets, Next.js internal bundles, and BFF/API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/bff') ||
     pathname.startsWith('/print') ||
     pathname.includes('.')
   ) {

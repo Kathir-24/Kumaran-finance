@@ -287,12 +287,12 @@ Under high load and bursty end-of-month collections, BullMQ queues enforce 3 ope
 * **Stalled Job Protection**: Workers enforce `lockDuration: 30000` (30s) and `stalledInterval: 30000` (30s) to reclaim orphaned tasks if a container restarts mid-execution.
 
 ### 7.2 Deterministic `jobId` Deduplication (At-Least-Once Delivery Safety)
-All enqueued jobs pass explicit deterministic `jobId` keys via `BullMqQueueProvider.addJob(..., { jobId })`. BullMQ drops or skips identical job IDs if already queued:
-* **Payment Receipts**: `jobId: receipt:${receiptNumber}`
-* **Reversal Alerts**: `jobId: approval-alert:reversal:${reversalId}`
-* **Disbursement Alerts**: `jobId: approval-alert:disbursement:${auctionId}`
-* **Auction Results**: `jobId: auction-result:${auctionId}:m${installmentMonth}`
-* **Pre-Auction Broadcasts**: `jobId: auction-reminder:${chitGroupId}:m${month}`
+All enqueued jobs pass explicit deterministic `jobId` keys via `BullMqQueueProvider.addJob(..., { jobId })` using hyphenated identifiers (since BullMQ v6 forbids `:` inside custom job IDs; `BullMqQueueProvider` also normalizes any colons automatically). BullMQ drops or skips identical job IDs if already queued:
+* **Payment Receipts**: `jobId: receipt-${receiptNumber}`
+* **Reversal Alerts**: `jobId: approval-alert-reversal-${reversalId}`
+* **Disbursement Alerts**: `jobId: approval-alert-disbursement-${auctionId}`
+* **Auction Results**: `jobId: auction-result-${auctionId}-m${installmentMonth}`
+* **Pre-Auction Broadcasts**: `jobId: auction-reminder-${chitGroupId}-m${month}`
 
 ### 7.3 3-Tier Priority Scheduling (Starvation Prevention)
 BullMQ prioritizes jobs with lower numerical priority values (`1` runs before `10`):

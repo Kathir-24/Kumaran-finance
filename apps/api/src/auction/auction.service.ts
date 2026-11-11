@@ -640,7 +640,7 @@ export class AuctionService {
           JOB_DISPATCH_AUCTION_RESULT,
           payload,
           {
-            jobId: `auction-result:${committedAuction.id}:m${committedAuction.installmentMonth}`,
+            jobId: `auction-result-${committedAuction.id}-m${committedAuction.installmentMonth}`,
             priority: 5,
           },
         );

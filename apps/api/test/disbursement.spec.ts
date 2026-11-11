@@ -235,7 +235,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           }),
         }),
         expect.objectContaining({
-          jobId: 'approval-alert:disbursement:auction-uuid-001',
+          jobId: 'approval-alert-disbursement-auction-uuid-001',
           priority: 1,
         }),
       );

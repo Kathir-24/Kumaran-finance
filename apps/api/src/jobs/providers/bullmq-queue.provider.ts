@@ -270,6 +270,14 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Normalizes custom BullMQ job IDs so Redis namespace colons (`:`) never fail
+   * BullMQ's `Custom Id cannot contain :` validation guard.
+   */
+  private sanitizeJobId(jobId?: string): string | undefined {
+    return jobId ? jobId.replace(/:/g, '-') : undefined;
+  }
+
+  /**
    * Adds a job to a BullMQ queue, or executes immediately if Redis is offline.
    * Supports deterministic jobId deduplication and priority weighting (1=high, 10=low).
    */
@@ -279,6 +287,7 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     data: any,
     options?: JobEnqueueOptions,
   ): Promise<{ jobId: string; status: string }> {
+    const safeJobId = this.sanitizeJobId(options?.jobId);
     const isConnected = this.redisProvider.getIsConnected();
 
     if (isConnected) {
@@ -289,13 +298,13 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
 
       if (targetQueue) {
         const job = await targetQueue.add(jobName, data, {
-          jobId: options?.jobId,
+          jobId: safeJobId,
           priority: options?.priority,
           attempts: options?.attempts ?? 3,
           backoff: options?.backoff ?? { type: 'exponential', delay: 1000 },
           removeOnComplete: true,
         });
-        return { jobId: job?.id || options?.jobId || `job-${Date.now()}`, status: 'ENQUEUED' };
+        return { jobId: job?.id || safeJobId || `job-${Date.now()}`, status: 'ENQUEUED' };
       }
     }
 
@@ -322,7 +331,7 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return { jobId: options?.jobId || `direct-${Date.now()}`, status: 'EXECUTED_DIRECT' };
+    return { jobId: safeJobId || `direct-${Date.now()}`, status: 'EXECUTED_DIRECT' };
   }
 
   /**

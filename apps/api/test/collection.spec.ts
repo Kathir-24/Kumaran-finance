@@ -664,7 +664,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
           ticketNumber: mockTicket.ticketNumber,
         }),
         expect.objectContaining({
-          jobId: 'receipt:KC-REC-PRD-2026-00011',
+          jobId: 'receipt-KC-REC-PRD-2026-00011',
           priority: 1,
         }),
       );

@@ -18,7 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notification/services/sms.service';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { decryptAesGcm, encryptAesGcm } from '../common/crypto/aes-gcm.util';
-import { isTokenIssuedBeforeRevocation } from './utils/token-revocation.util';
+import { isTokenRevokedInRedis } from './utils/token-revocation.util';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
@@ -870,6 +870,7 @@ export class AuthService {
       roles: [Role.CUSTOMER],
       branchId: customer.branchId,
       tokenType: 'access',
+      clientType,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -880,6 +881,7 @@ export class AuthService {
       roles: [Role.CUSTOMER],
       branchId: customer.branchId,
       tokenType: 'refresh',
+      clientType,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1027,8 +1029,7 @@ export class AuthService {
         const sharedRaw = await redis.get(resultKey);
         if (sharedRaw) {
           const activeSession = await redis.get(`auth:session:${payload.sub}:${clientType}`);
-          const revokedBeforeStr = await redis.get(`auth:revoked_before:${payload.sub}`);
-          const isRevokedByTimestamp = isTokenIssuedBeforeRevocation(payload, revokedBeforeStr);
+          const isRevokedByTimestamp = await isTokenRevokedInRedis(redis, { ...payload, clientType });
 
           if (!activeSession || isRevokedByTimestamp) {
             throw new UnauthorizedException('Session revoked or logged out');
@@ -1083,6 +1084,10 @@ export class AuthService {
     redis: any,
     useRedis: boolean,
   ) {
+    if (useRedis && redis && (await isTokenRevokedInRedis(redis, { ...payload, clientType }))) {
+      throw new UnauthorizedException('Session revoked or logged out');
+    }
+
     // Role-based handling for Chit Subscribers (Role.CUSTOMER)
     if (payload.roles?.includes(Role.CUSTOMER)) {
       const customer = await this.prisma.customer.findUnique({
@@ -1178,22 +1183,24 @@ export class AuthService {
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
     if (useRedis && redis) {
+      const revokedAtMs = Date.now().toString();
       if (clientType && clientType !== 'ALL') {
         await redis.del(`auth:session:${userId}:${clientType}`);
+        await redis.set(
+          `auth:revoked_before:${userId}:${clientType}`,
+          revokedAtMs,
+          'EX',
+          900,
+        );
       } else {
         await redis.del(
           `auth:session:${userId}:WEB`,
           `auth:session:${userId}:MOBILE`,
           `auth:session:${userId}:DESKTOP`,
         );
+        // Instant Stateless Token Invalidation across all client families (15m TTL)
+        await redis.set(`auth:revoked_before:${userId}`, revokedAtMs, 'EX', 900);
       }
-      // Instant Stateless Token Invalidation: Invalidate all access tokens issued before this millisecond cutoff (15m TTL)
-      await redis.set(
-        `auth:revoked_before:${userId}`,
-        Date.now().toString(),
-        'EX',
-        900,
-      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -1343,6 +1350,7 @@ export class AuthService {
         `auth:session:${userId}:MOBILE`,
         `auth:session:${userId}:DESKTOP`,
       );
+      await redis.set(`auth:revoked_before:${userId}`, Date.now().toString(), 'EX', 900);
     }
 
     await this.prisma.user.update({
@@ -1370,6 +1378,7 @@ export class AuthService {
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'access',
+      clientType,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1380,6 +1389,7 @@ export class AuthService {
       roles: user.roles,
       branchId: user.branchId,
       tokenType: 'refresh',
+      clientType,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };

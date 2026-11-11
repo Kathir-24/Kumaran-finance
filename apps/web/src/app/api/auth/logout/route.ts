@@ -8,6 +8,7 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   getBackendApiUrl,
+  shouldUseSecureCookies,
 } from '@/lib/auth-cookies';
 import {
   clearAuthCookies,
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       message: 'Logged out successfully',
     });
 
-    clearAuthCookies(response);
+    clearAuthCookies(response, shouldUseSecureCookies(request));
     return response;
   } catch (error: any) {
     console.error('[BFF Logout] Error during logout:', error);
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       { success: false, message: error?.message || 'Logout encountered an issue' },
       { status: 500 },
     );
-    clearAuthCookies(errorResponse);
+    clearAuthCookies(errorResponse, shouldUseSecureCookies(request));
     return errorResponse;
   }
 }

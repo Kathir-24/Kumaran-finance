@@ -82,6 +82,7 @@ Environment variables are validated fail-fast at server startup via [`src/config
 | `S3_FORCE_PATH_STYLE` | `boolean`| Optional | `false` | Required true for local MinIO compatibility. |
 | `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ background queues and distributed OTP storage. |
 | `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues and distributed OTP storage. |
+| `REDIS_DB` | `number` | Optional | `0` | Redis logical database index (`0`–`15`; use `1` for isolated test runs). |
 | `BULL_BOARD_USER` | `string` | Optional | `admin` | HTTP Basic Auth user for Bull Board at `/admin/queues`. |
 | `BULL_BOARD_PASSWORD` | `string` | Optional | `chitflow_secret` | HTTP Basic Auth password for Bull Board. |
 | `SMS_DRIVER` | `string` | Optional | `mock` | SMS gateway driver (`mock` for dev/test, `msg91` for production DLT). |

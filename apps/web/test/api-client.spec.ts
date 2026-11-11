@@ -63,8 +63,12 @@ test('ApiClient: Token storage bridge enforces zero secret tokens in client stor
   };
 
   try {
-    // In browser environment, getApiBaseUrl returns empty string for relative BFF proxy calls
-    assert.equal(getApiBaseUrl(), '', 'Browser base URL must be empty for transparent Next.js BFF proxying');
+    // In browser environment, getApiBaseUrl returns '/bff' for isolated Next.js BFF proxy calls
+    assert.equal(
+      getApiBaseUrl(),
+      '/bff',
+      'Browser base URL must target /bff for Nginx-isolated Next.js BFF proxying',
+    );
 
     // 1. Set tokens & profile
     setStoredTokens({ accessToken: 'access-abc', refreshToken: 'refresh-xyz' });

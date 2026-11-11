@@ -163,7 +163,7 @@ export class JobsController {
         subscribers: dto.subscribers || [],
       },
       {
-        jobId: `auction-reminder:${chitGroupId}:m${month}`,
+        jobId: `auction-reminder-${chitGroupId}-m${month}`,
         priority: 10,
       },
     );

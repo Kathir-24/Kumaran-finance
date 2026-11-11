@@ -705,7 +705,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           ticketNumber: mockTicket.ticketNumber,
         }),
         expect.objectContaining({
-          jobId: 'receipt:KC-REC-PRD-2026-00412',
+          jobId: 'receipt-KC-REC-PRD-2026-00412',
           priority: 1,
         }),
       );
@@ -811,7 +811,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           }),
         }),
         expect.objectContaining({
-          jobId: 'approval-alert:reversal:rev-01',
+          jobId: 'approval-alert-reversal-rev-01',
           priority: 1,
         }),
       );

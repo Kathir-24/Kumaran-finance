@@ -6,7 +6,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RedisConnectionProvider } from '../../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
-import { isTokenIssuedBeforeRevocation } from '../utils/token-revocation.util';
+import { isTokenRevokedInRedis } from '../utils/token-revocation.util';
 
 const USER_STATUS_CACHE_TTL_SECONDS = 120; // 2 minutes
 
@@ -38,11 +38,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
     const cacheKey = `user:status:${payload.sub}`;
 
-    // Fast Path 1: Check if user session has been revoked upon logout
+    // Fast Path 1: Check if user or client-family session has been revoked
     if (useRedis && redis) {
       try {
-        const revokedBeforeStr = await redis.get(`auth:revoked_before:${payload.sub}`);
-        if (isTokenIssuedBeforeRevocation(payload, revokedBeforeStr)) {
+        if (await isTokenRevokedInRedis(redis, payload)) {
           throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
         }
       } catch (err: any) {

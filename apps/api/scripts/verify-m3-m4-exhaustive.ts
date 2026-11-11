@@ -34,7 +34,8 @@ function queryDb(sql: string): string {
 
 function queryRedis(cmd: string[]): string {
   try {
-    return execFileSync('docker', ['exec', 'chitflow-redis', 'redis-cli', ...cmd], { encoding: 'utf-8' }).trim();
+    const db = process.env.REDIS_DB || '0';
+    return execFileSync('docker', ['exec', 'chitflow-redis', 'redis-cli', '-n', db, ...cmd], { encoding: 'utf-8' }).trim();
   } catch (err: any) {
     return `[REDIS ERROR]: ${err.message}`;
   }
@@ -100,10 +101,11 @@ async function login(phone: string, password = 'Admin@Kumaran2026') {
 }
 
 async function loginCustomer(phone = '9842100101') {
-  queryRedis(['DEL', `auth:otp:${phone}`, `auth:otp:cooldown:${phone}`, `auth:otp:lockout:${phone}`]);
+  queryRedis(['DEL', `auth:otp:${phone}`, `auth:otp:cooldown:${phone}`, `auth:otp:lockout:${phone}`, `auth:otp:daily:${phone}`]);
   const reqRes = await request('POST', '/auth/mobile/request-otp', { phone });
   let otp = reqRes.json?.data?.debugOtp;
   if (!otp) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
     try {
       const logs = API_LOG_FILE
         ? fs.readFileSync(API_LOG_FILE, 'utf-8').slice(-8000)
@@ -192,10 +194,46 @@ async function run() {
   console.log(`   Auditor: ${auditor.userId}`);
   console.log(`   Customer: ${customer.userId}`);
 
-  // Fetch or Setup Test Chit Scheme in chitflow_dev
-  const chitGroupId = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-LIVE-20M-01';`);
+  // Fetch or Setup Test Chit Scheme in TARGET_DB (bootstraps KC-LIVE-20M-01 on clean test seed)
+  let chitGroupId = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-LIVE-20M-01';`);
   if (!chitGroupId || chitGroupId.startsWith('[DB ERROR]')) {
-    throw new Error('Prerequisite group KC-LIVE-20M-01 not found.');
+    console.log(`   Bootstrapping KC-LIVE-20M-01 via REST API on clean ${TARGET_DB}...`);
+    const createRes = await request('POST', '/chits/new', {
+      groupCode: 'KC-LIVE-20M-01',
+      groupName: '₹1 Lakh 20 Months Test Group',
+      groupNameTamil: '₹1 லட்சம் 20 மாதங்கள் நேரலை குழு',
+      chitValue: 100000,
+      durationMonths: 20,
+      totalTickets: 20,
+      startDate: '2026-11-01T00:00:00.000Z',
+      endDate: '2028-06-30T00:00:00.000Z',
+      sanctionOrderNumber: 'ROC/ERD/CHIT/2026/099',
+      sanctionDate: '2026-10-01T00:00:00.000Z',
+    }, superAdminA.token);
+    if (createRes.status !== 201 || !createRes.json?.data?.id) {
+      throw new Error(`Failed to bootstrap KC-LIVE-20M-01: ${JSON.stringify(createRes.json)}`);
+    }
+    chitGroupId = createRes.json.data.id;
+
+    const rawCustomerIds = queryDb(`SELECT id FROM public."Customer" WHERE id != '${customer.userId}' ORDER BY "createdAt" ASC LIMIT 19;`);
+    const otherCustomerIds = rawCustomerIds.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (otherCustomerIds.length < 19) {
+      throw new Error(`Not enough seeded customers to bootstrap KC-LIVE-20M-01 (found ${otherCustomerIds.length + 1}/20)`);
+    }
+    const ticketCustomers = [customer.userId, ...otherCustomerIds.slice(0, 19)];
+    for (let i = 0; i < 20; i++) {
+      const assignRes = await request('POST', `/chits/${chitGroupId}/tickets/assign`, {
+        ticketNumber: i + 1,
+        customerId: ticketCustomers[i],
+      }, superAdminA.token);
+      if (assignRes.status !== 201) {
+        throw new Error(`Failed assigning bootstrap Ticket #${i + 1}: ${JSON.stringify(assignRes.json)}`);
+      }
+    }
+    const activateRes = await request('POST', `/chits/${chitGroupId}/activate`, {}, superAdminA.token);
+    if (activateRes.status !== 200 && activateRes.status !== 201) {
+      throw new Error(`Failed activating bootstrap KC-LIVE-20M-01: ${JSON.stringify(activateRes.json)}`);
+    }
   }
   console.log(`   Using Chit Group ID: ${chitGroupId}`);
 

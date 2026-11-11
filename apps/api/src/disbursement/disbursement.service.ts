@@ -366,7 +366,7 @@ export class DisbursementService {
           JOB_DISPATCH_APPROVAL_ALERT,
           payload,
           {
-            jobId: `approval-alert:disbursement:${auctionId}`,
+            jobId: `approval-alert-disbursement-${auctionId}`,
             priority: 1,
           },
         );

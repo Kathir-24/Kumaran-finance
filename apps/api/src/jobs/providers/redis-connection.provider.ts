@@ -15,11 +15,13 @@ export class RedisConnectionProvider implements OnModuleDestroy {
   private initClient(): void {
     const host = this.configService.get<string>('REDIS_HOST', '127.0.0.1');
     const port = this.configService.get<number>('REDIS_PORT', 6379);
+    const db = Number(this.configService.get<number>('REDIS_DB', 0)) || 0;
 
     try {
       this.client = new Redis({
         host,
         port,
+        db,
         maxRetriesPerRequest: null, // Required by BullMQ
         enableReadyCheck: false,
         retryStrategy: (times) => {
@@ -36,7 +38,7 @@ export class RedisConnectionProvider implements OnModuleDestroy {
 
       this.client.on('connect', () => {
         this.isConnected = true;
-        this.logger.log(`Connected to Redis at ${host}:${port}`);
+        this.logger.log(`Connected to Redis at ${host}:${port} (db ${db})`);
       });
 
       this.client.on('error', (err) => {

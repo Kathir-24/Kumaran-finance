@@ -11,6 +11,7 @@ import {
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
   getAccessTokenCookieOptions,
+  getClearedCookieOptions,
   getRefreshTokenCookieOptions,
   getSessionActiveCookieOptions,
 } from './auth-cookies.ts';
@@ -155,20 +156,8 @@ export function applyRefreshedCookies(
 /**
  * Expires all web authentication cookies immediately (Max-Age=0) on logout or invalid session.
  */
-export function clearAuthCookies(response: NextResponse): void {
-  response.cookies.set(COOKIE_ACCESS_TOKEN, '', {
-    path: '/',
-    maxAge: 0,
-    httpOnly: true,
-  });
-  response.cookies.set(COOKIE_REFRESH_TOKEN, '', {
-    path: '/',
-    maxAge: 0,
-    httpOnly: true,
-  });
-  response.cookies.set(COOKIE_SESSION_ACTIVE, '', {
-    path: '/',
-    maxAge: 0,
-    httpOnly: false,
-  });
+export function clearAuthCookies(response: NextResponse, isSecure?: boolean): void {
+  response.cookies.set(COOKIE_ACCESS_TOKEN, '', getClearedCookieOptions(true, isSecure));
+  response.cookies.set(COOKIE_REFRESH_TOKEN, '', getClearedCookieOptions(true, isSecure));
+  response.cookies.set(COOKIE_SESSION_ACTIVE, '', getClearedCookieOptions(false, isSecure));
 }

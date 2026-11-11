@@ -165,10 +165,10 @@ powershell -ExecutionPolicy Bypass -File infra/scripts/cert-monitor.ps1
 
 ## 5. Server-Sent Events (SSE) Reverse Proxy Verification
 
-The live Maker-Checker Approvals stream (`/api/v1/reports/approvals-stream`) requires zero buffering. Verify that the Nginx reverse proxy streams without buffering or timeouts:
+The live Maker-Checker Approvals stream (`/api/v1/reports/approvals-stream` for Bearer API/Mobile clients and `/bff/api/v1/reports/approvals-stream` for HttpOnly-cookie Web BFF sessions) requires zero buffering. Verify that the Nginx reverse proxy streams without buffering or timeouts:
 
 ```bash
-# Test SSE stream using curl (with -N to disable client buffering)
+# Test direct API SSE stream using curl (with -N to disable client buffering)
 curl -N -k -H "Authorization: Bearer <SUPER_ADMIN_JWT_TOKEN>" https://localhost/api/v1/reports/approvals-stream
 ```
 
@@ -225,11 +225,11 @@ To prevent race conditions where Nginx sends a request on an idle connection tha
 
 ### 8.2 Payload Limits & Bulkhead Isolation
 - **Global API Body Size**: Restricted to `1 MB` (`client_max_body_size 1M;` in Nginx and Express JSON parser) to prevent memory exhaustion and payload flood attacks.
-- **Document & Safety Proof Scoped Uploads**: Extended to `25 MB` strictly for KYC documents (`/api/v1/customers/:id/documents`) and loan safety proof uploads (`/api/v1/disbursements/auction/:auctionId/upload-safety-proof`).
+- **Document & Safety Proof Scoped Uploads**: Extended to `25 MB` strictly for KYC documents (`/api/v1/customers/:id/documents`, `/bff/api/v1/customers/:id/documents`) and loan safety proof uploads (`/api/v1/disbursements/auction/:auctionId/upload-safety-proof`, `/bff/api/v1/disbursements/auction/:auctionId/upload-safety-proof`).
 
 ### 8.3 Ingress Rate Limiting & Retry-After Contract
-- **Auth Limits**: `3 req/s` with burst 5 on `/api/v1/auth/`
-- **General API Limits**: `30 req/s` with burst 30 on `/api/`
+- **Auth Limits**: `3 req/s` (`burst=5` on `/api/v1/auth/`, `burst=10` on Web BFF `/api/auth/`)
+- **General API Limits**: `30 req/s` with `burst=30` on `/api/` and Web BFF `/bff/`
 - **Rejection Behavior**: Returns HTTP `429 Too Many Requests` with a standard JSON envelope and `Retry-After: 60` response header at both Nginx edge and application layers.
 
 ### 8.4 Libuv Thread Pool Sizing (Zero Starvation on Bcrypt Operations)

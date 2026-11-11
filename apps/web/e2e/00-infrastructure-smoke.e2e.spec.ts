@@ -89,4 +89,40 @@ test.describe('Task 12.1: Playwright Test Infrastructure & Zero-Mock Smoke Tests
     await expect(reversalsLink).toHaveCount(0);
     await expect(branchesLink).toHaveCount(0);
   });
+
+  test('7. BFF SSE Streaming: Live approvals stream delivers first chunk unbuffered through /bff/api/v1', async ({
+    managingPartnerPage,
+  }) => {
+    await managingPartnerPage.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const streamProbe = await managingPartnerPage.evaluate(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
+        const res = await fetch('/bff/api/v1/reports/approvals-stream', {
+          headers: { Accept: 'text/event-stream' },
+          signal: controller.signal,
+        });
+        const contentType = res.headers.get('content-type') || '';
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let text = '';
+        while (reader && !text.includes('data:')) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          if (chunk.value) {
+            text += decoder.decode(chunk.value, { stream: true });
+          }
+        }
+        controller.abort();
+        return { ok: res.ok, status: res.status, contentType, text };
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+
+    expect(streamProbe.status).toBe(200);
+    expect(streamProbe.contentType).toContain('text/event-stream');
+    expect(streamProbe.text).toContain('data:');
+  });
 });

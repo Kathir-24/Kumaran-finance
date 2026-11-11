@@ -70,4 +70,15 @@ describe('Environment Configuration Validation (validateEnv)', () => {
 
     expect(() => validateEnv(weakJwtProd)).toThrow(/minimum 32 characters/i);
   });
+
+  it('defaults REDIS_DB to 0 and rejects out-of-range database indices', () => {
+    expect(validateEnv(baseValidDevConfig).REDIS_DB).toBe(0);
+    expect(validateEnv({ ...baseValidDevConfig, REDIS_DB: '1' }).REDIS_DB).toBe(1);
+    expect(() => validateEnv({ ...baseValidDevConfig, REDIS_DB: '16' })).toThrow(
+      /Invalid REDIS_DB/i,
+    );
+    expect(() => validateEnv({ ...baseValidDevConfig, REDIS_DB: '-1' })).toThrow(
+      /Invalid REDIS_DB/i,
+    );
+  });
 });

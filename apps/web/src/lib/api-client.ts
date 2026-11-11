@@ -18,13 +18,14 @@ export const REFRESH_TOKEN_KEY = 'kc_refresh_token';
 
 /**
  * Returns the configured backend API base URL.
- * In browser environments, returns empty string ('') so calls target the current
- * Next.js origin and route through the transparent BFF proxy (/api/v1/...).
+ * In browser environments, returns '/bff' so calls target the current
+ * Next.js origin and route through the dedicated BFF proxy (/bff/api/v1/...)
+ * without colliding with Nginx /api/v1/* Mobile REST routing.
  * In server/SSR environments, routes directly to the internal NestJS API.
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    return '';
+    return '/bff';
   }
   if (typeof process !== 'undefined') {
     if (process.env?.INTERNAL_API_URL) return process.env.INTERNAL_API_URL;

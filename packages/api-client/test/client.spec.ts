@@ -205,3 +205,17 @@ test('Client Factory: empty string baseUrl preserves relative Next.js BFF path i
     assert.equal(err?.cause?.input, '/api/v1/chits');
   }
 });
+
+test('Client Factory: /bff baseUrl builds /bff/api/v1/* path for Nginx BFF isolation', async () => {
+  const client = createKumaranClient({
+    baseUrl: '/bff',
+    fetch: async () => new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }),
+  });
+
+  try {
+    await client.GET('/api/v1/chits' as any);
+  } catch (err: any) {
+    assert.equal(err?.cause?.code, 'ERR_INVALID_URL');
+    assert.equal(err?.cause?.input, '/bff/api/v1/chits');
+  }
+});

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 import { downloadCsv } from '@/lib/csv-export';
 import { FormXviiKpiBar } from '@/components/reports/form-xvii-kpi-bar';
@@ -158,7 +158,7 @@ export default function FormXviiMinutesPage() {
 
   const handleDownloadPdf = (auctionId: string) => {
     if (typeof window !== 'undefined') {
-      window.open(`/api/v1/auctions/${auctionId}/minutes/pdf`, '_blank');
+      window.open(`${getApiBaseUrl()}/api/v1/auctions/${auctionId}/minutes/pdf`, '_blank');
     }
   };
 

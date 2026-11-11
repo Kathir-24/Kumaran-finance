@@ -3,7 +3,7 @@
 > **Subsystem**: Web Operations Portal (`apps/web/`)  
 > **Test Framework**: Playwright Test (`@playwright/test`)  
 > **Execution Strategy**: 100% Real API, Real PostgreSQL 17 Database & Real S3 Scans — ZERO Mock Pages or Dummy Data.  
-> **Test Coverage**: 42 Live E2E Assertions across 12 Test Suites (Suites 00 through 11) Passing (100% Green).
+> **Test Coverage**: 43 Live E2E Assertions across 12 Test Suites (Suites 00 through 11) Passing (100% Green).
 
 ---
 
@@ -62,7 +62,7 @@ All E2E tests utilize deterministic staff personas seeded in [`apps/api/prisma/s
 
 | Suite | File | Tests | Key Invariants Verified |
 |---|---|---|---|
-| **Suite 00** | `00-infrastructure-smoke.e2e.spec.ts` | 6 | Web server health, bilingual rendering, UI login, BFF cookie session injection, Maker $\ne$ Checker separation, RBAC barrier |
+| **Suite 00** | `00-infrastructure-smoke.e2e.spec.ts` | 7 | Web server health, bilingual rendering, UI login, BFF cookie session injection, Maker $\ne$ Checker separation, RBAC barrier, unbuffered BFF SSE streaming |
 | **Suite 01** | `01-auth-lifecycle.e2e.spec.ts` | 4 | Invalid login rejection, valid login session hydration, session persistence on reload, logout session invalidation |
 | **Suite 02** | `02-schemes-onboard.e2e.spec.ts` | 3 | Scheme directory rendering, Guardrail 3 (4% commission floor) & Guardrail 6 (1/4 ceiling discount), 400-cell onboarding grid |
 | **Suite 03** | `03-customer-passbook.e2e.spec.ts` | 3 | Customer search & filters, Customer 360 profile & KYC checklist, Form XXI continuous passbook & whole-rupee math |

@@ -169,10 +169,19 @@ test('DEF-FE-01: applyRefreshedCookies and clearAuthCookies enforce HttpOnly coo
   assert.equal(actSet.options.httpOnly, false);
 
   cookieCalls.length = 0;
-  clearAuthCookies(mockResponse);
+  clearAuthCookies(mockResponse, true);
   assert.equal(cookieCalls.length, 3);
   for (const call of cookieCalls) {
     assert.equal(call.value, '');
     assert.equal(call.options.maxAge, 0);
+    assert.equal(call.options.sameSite, 'lax');
+    assert.equal(call.options.secure, true);
+  }
+
+  cookieCalls.length = 0;
+  clearAuthCookies(mockResponse, false);
+  for (const call of cookieCalls) {
+    assert.equal(call.options.sameSite, 'lax');
+    assert.equal(call.options.secure, false);
   }
 });

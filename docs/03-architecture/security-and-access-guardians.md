@@ -264,13 +264,13 @@ flowchart TD
 ### 7.5 XSS Token Exfiltration Immunity via BFF & HttpOnly Cookies (ADR-20)
 - **Elimination of Client-Side Token Storage**: Storing JWT access and refresh tokens in browser `localStorage` or `sessionStorage` has been completely eliminated. `localStorage.getItem('kc_access_token')` returns `null`.
 - **HttpOnly Cookie Enclosure**:
-  - `kc_access_token` (15-minute TTL) and `kc_refresh_token` (7-day TTL) are issued with `HttpOnly; SameSite=Lax; Path=/; Secure`.
+  - `kc_access_token` (15-minute TTL) and `kc_refresh_token` (7-day TTL) are issued with `HttpOnly; SameSite=Lax; Path=/` and protocol-aware `Secure` (`COOKIE_SECURE` env or HTTPS / `X-Forwarded-Proto: https`).
   - Browser JavaScript (`document.cookie`) has zero programmatic access to these cookies, guaranteeing complete immunity against token exfiltration via XSS or compromised npm dependencies.
 - **Edge Navigation Guarding (0ms FOUC Elimination)**:
-  - [`apps/web/src/middleware.ts`](file:///u:/Kumaran-finance/apps/web/src/middleware.ts) runs at the Edge prior to page rendering.
+  - [`apps/web/src/middleware.ts`](file:///u:/Kumaran-finance/apps/web/src/middleware.ts) runs at the Edge prior to page rendering (bypassing `/_next`, `/api`, `/bff`, `/print`).
   - Any request targeting `/(dashboard)/*` without valid session cookies is immediately redirected via HTTP 307 to `/login?redirect=...`.
-- **Transparent Server-Side API Proxy & Coalesced Silent Token Rotation (DEF-FE-01 Fixed)**:
-  - Web client requests are dispatched to relative `/api/v1/*` endpoints.
-  - The Next.js BFF proxy ([`route.ts`](file:///u:/Kumaran-finance/apps/web/src/app/api/v1/[...path]/route.ts)) reads `kc_access_token` (or proactively refreshes if expired while `kc_refresh_token` exists), injects `Authorization: Bearer <token>`, and forwards to NestJS.
+- **Transparent Server-Side API Proxy, Unbuffered SSE & Coalesced Silent Token Rotation (DEF-FE-01 Fixed)**:
+  - Web client requests target the isolated Next.js BFF prefix (`/bff/api/v1/*`), separating cookie-authenticated browser traffic from Bearer-authenticated Mobile `/api/v1/*` ingress in Nginx.
+  - The shared Next.js BFF proxy ([`bff-api-proxy.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-api-proxy.ts), mounted at [`/bff/api/v1/[...path]/route.ts`](file:///u:/Kumaran-finance/apps/web/src/app/bff/api/v1/[...path]/route.ts)) reads `kc_access_token` (or proactively refreshes if expired while `kc_refresh_token` exists), injects `Authorization: Bearer <token>`, forwards `text/event-stream` SSE responses without buffering (`arrayBuffer` bypass + abort propagation), and mirrors `SameSite`/`Secure` flags when clearing expired cookies.
   - Concurrent 401 bursts across `/api/v1/*`, `/api/auth/session`, and `/api/auth/logout` are deduplicated via [`bff-token-refresh.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-token-refresh.ts) (SHA-256 in-flight promise coalescing + 2s cookie-handoff micro-cache purged immediately on logout), paired with contention-scoped distributed Redis lock coalescing in [`AuthService.refreshToken`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts).
   - Sequential token replays continue to trigger immediate RFC 6819 session family revocation, while permanent 401 expiry clears dead browser cookies cleanly to avoid redirect loops.

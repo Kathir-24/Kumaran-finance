@@ -42,13 +42,16 @@ apps/web/src/
 │   ├── layout.tsx                              # Auth workstation layout with monograms & locale switch
 │   ├── login/page.tsx                          # /login entrypoint wrapped in Suspense boundary
 │   └── 2fa/page.tsx                            # /2fa entrypoint wrapped in Suspense boundary
-├── app/api/auth/
-│   ├── login/route.ts                          # BFF login handler setting HttpOnly session cookies
-│   ├── verify-totp/route.ts                    # BFF 2FA TOTP verification handler setting HttpOnly cookies
-│   ├── session/route.ts                        # BFF session hydration sharing coalesced refresh helper
-│   └── logout/route.ts                         # BFF logout handler invalidating Redis/BFF caches & cookies
+├── app/
+│   ├── api/auth/
+│   │   ├── login/route.ts                      # BFF login handler setting HttpOnly session cookies
+│   │   ├── verify-totp/route.ts                # BFF 2FA TOTP verification handler setting HttpOnly cookies
+│   │   ├── session/route.ts                    # BFF session hydration sharing coalesced refresh helper
+│   │   └── logout/route.ts                     # BFF logout handler invalidating Redis/BFF caches & cookies
+│   └── bff/api/v1/[...path]/route.ts           # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
 ├── lib/
 │   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto)
+│   ├── bff-api-proxy.ts                        # Shared BFF proxy handler with unbuffered SSE pass-through
 │   └── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
 ├── stores/
 │   └── auth-store.ts                           # Re-entrancy-guarded logout & non-looping unauthenticated hydration

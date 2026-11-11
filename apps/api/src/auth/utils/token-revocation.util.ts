@@ -33,3 +33,29 @@ export function isTokenIssuedBeforeRevocation(
   }
   return typeof payload.iat === 'number' && payload.iat <= revokedBefore;
 }
+
+/**
+ * Checks both global and client-scoped Redis revocation cutoffs so a scoped logout
+ * (`WEB` vs `MOBILE`) invalidates only that device family's active access tokens while
+ * global logout/password changes invalidate every client family.
+ */
+export async function isTokenRevokedInRedis(
+  redis: { get(key: string): Promise<string | null> },
+  payload: Pick<JwtPayload, 'sub' | 'iat' | 'issuedAtMs' | 'clientType'>,
+): Promise<boolean> {
+  const globalCutoff = await redis.get(`auth:revoked_before:${payload.sub}`);
+  if (isTokenIssuedBeforeRevocation(payload, globalCutoff)) {
+    return true;
+  }
+
+  if (payload.clientType) {
+    const clientCutoff = await redis.get(
+      `auth:revoked_before:${payload.sub}:${payload.clientType}`,
+    );
+    if (isTokenIssuedBeforeRevocation(payload, clientCutoff)) {
+      return true;
+    }
+  }
+
+  return false;
+}

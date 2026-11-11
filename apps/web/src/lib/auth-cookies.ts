@@ -94,6 +94,20 @@ export function getSessionActiveCookieOptions(isSecure?: boolean) {
 }
 
 /**
+ * Cookie deletion options mirroring active session attributes (`sameSite`, `secure`)
+ * so strict browsers expire HTTPS/Lax cookies cleanly across all environments.
+ */
+export function getClearedCookieOptions(httpOnly: boolean, isSecure?: boolean) {
+  return {
+    path: '/',
+    maxAge: 0,
+    httpOnly,
+    sameSite: 'lax' as const,
+    secure: isSecure ?? shouldUseSecureCookies(),
+  };
+}
+
+/**
  * Returns backend API base URL for server-to-server calls from Next.js BFF.
  */
 export function getBackendApiUrl(): string {

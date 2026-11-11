@@ -195,8 +195,10 @@ services:
       NODE_ENV: production
       PORT: 3001
       NODE_OPTIONS: "--max-old-space-size=512"
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       NEXT_PUBLIC_BULL_BOARD_URL: ${NEXT_PUBLIC_BULL_BOARD_URL:-http://localhost:3000/admin/queues}
+      # COOKIE_SECURE: "true" # Optional explicit override; otherwise driven by X-Forwarded-Proto https
       NEXT_TELEMETRY_DISABLED: "1"
     ports:
       - "127.0.0.1:${WEB_PORT:-3001}:3001"

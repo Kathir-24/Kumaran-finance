@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CustomerSearchPicker, type CustomerSearchResult } from './customer-search-picker';
+import { getApiBaseUrl } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 export interface HistoricalAuctionState {
@@ -120,7 +121,9 @@ export function NotebookEntryGrid({
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const res = await fetch(`/api/v1/customers?search=${encodeURIComponent(searchTerm)}&limit=10`);
+        const res = await fetch(
+          `${getApiBaseUrl()}/api/v1/customers?search=${encodeURIComponent(searchTerm)}&limit=10`,
+        );
         if (res.ok) {
           const json = await res.json();
           const items = json?.data?.data || json?.data?.items || json?.data || [];

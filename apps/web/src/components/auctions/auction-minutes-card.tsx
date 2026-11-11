@@ -19,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
 
 export interface AuctionMinutesData {
   id: string;
@@ -95,13 +95,13 @@ export function AuctionMinutesCard({
       if (response?.presignedUrl) {
         window.open(response.presignedUrl, '_blank', 'noopener,noreferrer');
       } else {
-        // Fallback: direct streaming URL
-        const streamUrl = `/api/v1/pdf/minutes/${auctionId}`;
+        // Fallback: direct streaming URL via BFF
+        const streamUrl = `${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`;
         window.open(streamUrl, '_blank', 'noopener,noreferrer');
       }
     } catch (err: any) {
-      // Direct stream fallback
-      window.open(`/api/v1/pdf/minutes/${auctionId}`, '_blank', 'noopener,noreferrer');
+      // Direct stream fallback via BFF
+      window.open(`${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`, '_blank', 'noopener,noreferrer');
     } finally {
       setIsDownloading(false);
     }

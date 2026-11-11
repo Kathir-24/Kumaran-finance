@@ -25,6 +25,7 @@ export interface EnvironmentVariables {
   S3_FORCE_PATH_STYLE?: boolean;
   REDIS_HOST: string;
   REDIS_PORT: number;
+  REDIS_DB: number;
   BULL_BOARD_USER?: string;
   BULL_BOARD_PASSWORD?: string;
   METRICS_USER?: string;
@@ -109,6 +110,16 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     errors.push("Missing mandatory MSG91 variable when SMS_DRIVER is 'msg91': MSG91_AUTH_KEY");
   }
 
+  const redisDb =
+    config.REDIS_DB !== undefined && config.REDIS_DB !== ''
+      ? Number(config.REDIS_DB)
+      : 0;
+  if (!Number.isInteger(redisDb) || redisDb < 0 || redisDb > 15) {
+    errors.push(
+      `Invalid REDIS_DB: ${String(config.REDIS_DB)}. Must be an integer between 0 and 15`,
+    );
+  }
+
   const tracesRate =
     config.SENTRY_TRACES_SAMPLE_RATE !== undefined
       ? Number(config.SENTRY_TRACES_SAMPLE_RATE)
@@ -183,6 +194,7 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     S3_FORCE_PATH_STYLE: s3ForcePathStyle,
     REDIS_HOST: (config.REDIS_HOST as string) ?? '127.0.0.1',
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
+    REDIS_DB: redisDb,
     BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',
     BULL_BOARD_PASSWORD: (config.BULL_BOARD_PASSWORD as string) ?? 'chitflow_secret',
     METRICS_USER: (config.METRICS_USER as string) ?? (config.BULL_BOARD_USER as string) ?? 'admin',

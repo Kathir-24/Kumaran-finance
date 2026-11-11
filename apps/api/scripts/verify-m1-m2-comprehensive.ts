@@ -43,7 +43,8 @@ function queryDb(sql: string): string {
 
 function queryRedis(cmd: string): string {
   try {
-    return execSync(`docker exec chitflow-redis redis-cli ${cmd}`, { encoding: 'utf-8' }).replace(/\r/g, '').trim();
+    const db = process.env.REDIS_DB || '0';
+    return execSync(`docker exec chitflow-redis redis-cli -n ${db} ${cmd}`, { encoding: 'utf-8' }).replace(/\r/g, '').trim();
   } catch (err: any) {
     return `[REDIS ERROR]: ${err.message}`;
   }
@@ -184,7 +185,7 @@ async function main() {
 
   // Reset Super Admin TOTP and MPIN for clean execution
   queryDb(`UPDATE public."User" SET "isTotpEnabled" = false, "totpSecret" = NULL WHERE phone = '9876543210'`);
-  queryRedis('DEL auth:otp:9876543210 auth:otp:lockout:9876543210 auth:otp:cooldown:9876543210');
+  queryRedis('DEL auth:otp:9876543210 auth:otp:lockout:9876543210 auth:otp:cooldown:9876543210 auth:otp:daily:9876543210');
   cleanChitGroup('KC-E2E-20M-01');
   cleanChitGroup('KC-E2E-20M-02');
   cleanChitGroup('KC-FLOAT-TEST');
@@ -214,8 +215,11 @@ async function main() {
   const agentToken = agentLogin.json?.data?.accessToken;
 
   // Customer (K. Thangavel, KC-CUST-00101, phone: 9842100101)
-  queryRedis('DEL auth:otp:9842100101 auth:otp:lockout:9842100101 auth:otp:cooldown:9842100101');
+  queryRedis('DEL auth:otp:9842100101 auth:otp:lockout:9842100101 auth:otp:cooldown:9842100101 auth:otp:daily:9842100101');
   const custOtpReq = await request('POST', '/api/v1/auth/mobile/request-otp', { phone: '9842100101' });
+  if (!custOtpReq.json?.data?.debugOtp) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
   let custOtp = custOtpReq.json?.data?.debugOtp || extractRecentOtpFromLogs() || '123456';
   const custVerify = await request('POST', '/api/v1/auth/mobile/verify-otp', {
     phone: '9842100101',
@@ -223,6 +227,9 @@ async function main() {
   });
   const customerToken = custVerify.json?.data?.accessToken;
   const customerId = custVerify.json?.data?.user?.id;
+  if (!customerToken || !customerId) {
+    throw new Error(`Customer OTP verification failed (requestOtp=${custOtpReq.status}, verifyOtp=${custVerify.status}): ${JSON.stringify(custVerify.json)}`);
+  }
 
   console.log('✅ Tokens acquired for: SUPER_ADMIN, BRANCH_MANAGER, COLLECTION_AGENT, CUSTOMER\n');
 
@@ -596,7 +603,7 @@ async function main() {
 
   // Re-acquire active admin token after logout
   const relogin = await request('POST', '/api/v1/auth/web/login', { phone: '9876543210', password: 'Admin@Kumaran2026' });
-  const adminToken = relogin.json?.data?.accessToken;
+  let adminToken = relogin.json?.data?.accessToken;
 
   // --- 17. Staff Device FCM Push Token Update (Spec #9) ---
   {
@@ -653,11 +660,28 @@ async function main() {
       currentPassword: 'Admin@Kumaran2026',
       newPassword: 'TempAdminPass@2026',
     }, adminToken);
+    // Changing password globally revokes prior access tokens via Redis auth:revoked_before:<userId>
+    const revokedTokenRes = await request('GET', '/api/v1/auth/me', undefined, adminToken);
+    const tempLogin = await request('POST', '/api/v1/auth/web/login', {
+      phone: '9876543210',
+      password: 'TempAdminPass@2026',
+    });
+    const tempToken = tempLogin.json?.data?.accessToken;
     const revertRes = await request('POST', '/api/v1/auth/change-password', {
       currentPassword: 'TempAdminPass@2026',
       newPassword: 'Admin@Kumaran2026',
-    }, adminToken);
-    const pass = neg401.status === 401 && posRes.status === 200 && revertRes.status === 200;
+    }, tempToken);
+    const restoredLogin = await request('POST', '/api/v1/auth/web/login', {
+      phone: '9876543210',
+      password: 'Admin@Kumaran2026',
+    });
+    adminToken = restoredLogin.json?.data?.accessToken;
+    const pass =
+      neg401.status === 401 &&
+      posRes.status === 200 &&
+      revokedTokenRes.status === 401 &&
+      revertRes.status === 200 &&
+      Boolean(adminToken);
     proofs.push({
       endpointNum: 19,
       featureName: 'Staff Self Password Change',
@@ -670,8 +694,8 @@ async function main() {
       expectedStatus: 200,
       envelopeFields: 'success, statusCode, timestamp, data: { success: true, message }',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
-      negativeCase: `Wrong current password rejected with 401 Unauthorized (observed: ${neg401.status})`,
-      invariantProof: 'Bcrypt hashes new password (salt 12) and invalidates active refresh tokens',
+      negativeCase: `Wrong current password rejected with 401 Unauthorized (observed: ${neg401.status}); Prior JWT revoked with 401 post-change (observed: ${revokedTokenRes.status})`,
+      invariantProof: 'Bcrypt hashes new password (salt 12), clears refreshTokenHash, and globally revokes active JWTs via auth:revoked_before',
     });
   }
 
@@ -705,6 +729,9 @@ async function main() {
 
   // --- 21. Mobile SMS OTP Verification (Spec #4) ---
   {
+    if (!step20DebugOtp) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
     const realOtp = step20DebugOtp || extractRecentOtpFromLogs() || '123456';
 
     const neg400 = await request('POST', '/api/v1/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });

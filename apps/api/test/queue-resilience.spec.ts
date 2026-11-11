@@ -89,7 +89,7 @@ describe('Background Processing & Queue Resilience Suite', () => {
       };
 
       const options: JobEnqueueOptions = {
-        jobId: 'receipt:KC-REC-PRD-2026-00412',
+        jobId: 'receipt-KC-REC-PRD-2026-00412',
         priority: 1,
       };
 
@@ -101,12 +101,12 @@ describe('Background Processing & Queue Resilience Suite', () => {
       );
 
       expect(result.status).toBe('ENQUEUED');
-      expect(result.jobId).toBe('receipt:KC-REC-PRD-2026-00412');
+      expect(result.jobId).toBe('receipt-KC-REC-PRD-2026-00412');
       expect(mockTargetQueue.add).toHaveBeenCalledWith(
         'dispatch-payment-receipt',
         receiptPayload,
         expect.objectContaining({
-          jobId: 'receipt:KC-REC-PRD-2026-00412',
+          jobId: 'receipt-KC-REC-PRD-2026-00412',
           priority: 1,
           attempts: 3,
           backoff: { type: 'exponential', delay: 1000 },
@@ -119,7 +119,7 @@ describe('Background Processing & Queue Resilience Suite', () => {
       (queueProvider as any).notificationQueue = mockTargetQueue;
 
       const options: JobEnqueueOptions = {
-        jobId: 'receipt:KC-REC-PRD-2026-00412',
+        jobId: 'receipt-KC-REC-PRD-2026-00412',
         priority: 1,
       };
 
@@ -140,7 +140,27 @@ describe('Background Processing & Queue Resilience Suite', () => {
       );
 
       expect(res1.jobId).toBe(res2.jobId);
-      expect(res2.jobId).toBe('receipt:KC-REC-PRD-2026-00412');
+      expect(res2.jobId).toBe('receipt-KC-REC-PRD-2026-00412');
+    });
+
+    it('JOB-DEDUP-3: Normalizes colon delimiters in custom jobIds so BullMQ v6 never rejects Custom Id', async () => {
+      (queueProvider as any).notificationQueue = mockTargetQueue;
+
+      const result = await queueProvider.addJob(
+        NOTIFICATION_QUEUE,
+        'dispatch-payment-receipt',
+        { receiptNumber: 'KC-REC-PRD-2026-00412' },
+        { jobId: 'receipt-KC-REC-PRD-2026-00412', priority: 1 },
+      );
+
+      expect(result.jobId).toBe('receipt-KC-REC-PRD-2026-00412');
+      expect(mockTargetQueue.add).toHaveBeenCalledWith(
+        'dispatch-payment-receipt',
+        expect.anything(),
+        expect.objectContaining({
+          jobId: 'receipt-KC-REC-PRD-2026-00412',
+        }),
+      );
     });
   });
 
@@ -152,7 +172,7 @@ describe('Background Processing & Queue Resilience Suite', () => {
         NOTIFICATION_QUEUE,
         'dispatch-payment-receipt',
         { receiptNumber: 'KC-REC-PRD-2026-00412' },
-        { jobId: 'receipt:KC-REC-PRD-2026-00412', priority: 1 },
+        { jobId: 'receipt-KC-REC-PRD-2026-00412', priority: 1 },
       );
 
       expect(mockTargetQueue.add).toHaveBeenCalledWith(
@@ -169,7 +189,7 @@ describe('Background Processing & Queue Resilience Suite', () => {
         NOTIFICATION_QUEUE,
         'dispatch-auction-result',
         { chitCode: 'KCA-1L-20M-01', month: 2 },
-        { jobId: 'auction-result:auc-01:m2', priority: 5 },
+        { jobId: 'auction-result-auc-01-m2', priority: 5 },
       );
 
       expect(mockTargetQueue.add).toHaveBeenCalledWith(
@@ -186,7 +206,7 @@ describe('Background Processing & Queue Resilience Suite', () => {
         NOTIFICATION_QUEUE,
         'dispatch-auction-reminder',
         { chitCode: 'KCA-1L-20M-01' },
-        { jobId: 'auction-reminder:grp-01:m4', priority: 10 },
+        { jobId: 'auction-reminder-grp-01-m4', priority: 10 },
       );
 
       expect(mockTargetQueue.add).toHaveBeenCalledWith(
@@ -211,11 +231,11 @@ describe('Background Processing & Queue Resilience Suite', () => {
         NOTIFICATION_QUEUE,
         'dispatch-payment-receipt',
         payload,
-        { jobId: 'receipt:KC-REC-PRD-2026-00999', priority: 1 },
+        { jobId: 'receipt-KC-REC-PRD-2026-00999', priority: 1 },
       );
 
       expect(result.status).toBe('EXECUTED_DIRECT');
-      expect(result.jobId).toBe('receipt:KC-REC-PRD-2026-00999');
+      expect(result.jobId).toBe('receipt-KC-REC-PRD-2026-00999');
       expect(mockNotificationService.dispatchPaymentReceipt).toHaveBeenCalledWith(payload);
       expect(mockTargetQueue.add).not.toHaveBeenCalled();
     });
@@ -227,11 +247,11 @@ describe('Background Processing & Queue Resilience Suite', () => {
         DAILY_MAINTENANCE_QUEUE,
         'process-daily-arrears',
         { cutoffDate: '2026-11-01T00:00:00.000Z' },
-        { jobId: 'arrears:2026-11-01' },
+        { jobId: 'arrears-2026-11-01' },
       );
 
       expect(result.status).toBe('EXECUTED_DIRECT');
-      expect(result.jobId).toBe('arrears:2026-11-01');
+      expect(result.jobId).toBe('arrears-2026-11-01');
       expect(mockDailyArrearsService.processDailyOverdueAndArrears).toHaveBeenCalledWith(
         new Date('2026-11-01T00:00:00.000Z'),
       );

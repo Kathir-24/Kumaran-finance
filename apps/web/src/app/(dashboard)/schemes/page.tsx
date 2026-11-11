@@ -12,10 +12,12 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CustomerPagination } from '@/components/customers/customer-pagination';
 import { SchemeCard, type SchemeSummary } from '@/components/schemes/scheme-card';
 import { cn } from '@/lib/utils';
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'DRAFT' | 'COMPLETED';
+const SCHEMES_PAGE_LIMIT = 20;
 
 export default function SchemesDirectoryPage() {
   const t = useTranslations('schemes');
@@ -23,10 +25,18 @@ export default function SchemesDirectoryPage() {
 
   const [activeTab, setActiveTab] = React.useState<FilterTab>('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [page, setPage] = React.useState(1);
   const debouncedSearch = useDebounce(searchTerm.trim(), 300);
 
+  React.useEffect(() => {
+    setPage(1);
+  }, [activeTab, debouncedSearch]);
+
   const queryParams = React.useMemo(() => {
-    const params: { status?: any; search?: string; limit: number } = { limit: 50 };
+    const params: { status?: any; search?: string; page: number; limit: number } = {
+      page,
+      limit: SCHEMES_PAGE_LIMIT,
+    };
     if (activeTab !== 'ALL') {
       params.status = activeTab;
     }
@@ -34,9 +44,9 @@ export default function SchemesDirectoryPage() {
       params.search = debouncedSearch;
     }
     return params;
-  }, [activeTab, debouncedSearch]);
+  }, [activeTab, debouncedSearch, page]);
 
-  const { data: schemesResponse, isLoading } = useQuery({
+  const { data: schemesResponse, isLoading, isFetching } = useQuery({
     queryKey: queryKeys.schemes.list(queryParams),
     queryFn: async ({ signal }) => {
       return unwrapApiResponse<{
@@ -44,6 +54,7 @@ export default function SchemesDirectoryPage() {
         total: number;
         page: number;
         limit: number;
+        totalPages?: number;
       }>(
         apiClient.GET('/api/v1/chits', {
           params: { query: queryParams },
@@ -55,6 +66,10 @@ export default function SchemesDirectoryPage() {
   });
 
   const schemes = schemesResponse?.data || [];
+  const totalSchemes = Number(schemesResponse?.total ?? schemes.length);
+  const totalPages = Number(
+    schemesResponse?.totalPages ?? Math.max(1, Math.ceil(totalSchemes / SCHEMES_PAGE_LIMIT)),
+  );
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
 
   return (
@@ -189,10 +204,21 @@ export default function SchemesDirectoryPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {schemes.map((scheme) => (
-            <SchemeCard key={scheme.id} scheme={scheme} />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {schemes.map((scheme) => (
+              <SchemeCard key={scheme.id} scheme={scheme} />
+            ))}
+          </div>
+
+          <CustomerPagination
+            page={page}
+            totalPages={totalPages}
+            limit={SCHEMES_PAGE_LIMIT}
+            total={totalSchemes}
+            onPageChange={setPage}
+            isLoading={isFetching}
+          />
         </div>
       )}
     </div>

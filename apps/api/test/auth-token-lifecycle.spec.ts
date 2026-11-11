@@ -854,6 +854,63 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         data: { refreshTokenHash: null, fcmToken: null },
       });
     });
+
+    it('AUTH-MULTI-05: scoped logout(WEB) revokes WEB access token in JwtStrategy while preserving concurrent MOBILE access token', async () => {
+      const mockStaffUser = {
+        id: mockUserId,
+        phone: mockUserPhone,
+        passwordHash: await bcrypt.hash('CorrectPass@123', 10),
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        isActive: true,
+        isTotpEnabled: false,
+        totpSecret: null,
+        mpinHash: null,
+        refreshTokenHash: null,
+      };
+      prismaMock.user.findFirst.mockResolvedValue(mockStaffUser);
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue(mockStaffUser);
+
+      const webLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'WEB',
+      });
+      const mobileLogin = await authServiceWithRedis.login({
+        phone: mockUserPhone,
+        password: 'CorrectPass@123',
+        clientType: 'MOBILE',
+      });
+
+      const webPayload = jwtService.verify(webLogin.accessToken) as any;
+      const mobilePayload = jwtService.verify(mobileLogin.accessToken) as any;
+      expect(webPayload.clientType).toBe('WEB');
+      expect(mobilePayload.clientType).toBe('MOBILE');
+
+      const strategy = new JwtStrategy(
+        configService,
+        prismaMock as unknown as PrismaService,
+        redisProviderMock as any,
+      );
+
+      await authServiceWithRedis.logout(mockUserId, 'WEB');
+
+      await expect(strategy.validate(webPayload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or token revoked. Please sign in again.'),
+      );
+      await expect(strategy.validate(mobilePayload)).resolves.toBe(mobilePayload);
+
+      // Global password change revokes remaining client families immediately
+      await authServiceWithRedis.changePassword(mockUserId, {
+        currentPassword: 'CorrectPass@123',
+        newPassword: 'UpdatedPass@123',
+      });
+
+      await expect(strategy.validate(mobilePayload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or token revoked. Please sign in again.'),
+      );
+    }, 15000);
   });
 
   // =========================================================================

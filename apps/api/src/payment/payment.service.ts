@@ -328,7 +328,7 @@ export class PaymentService {
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
           {
-            jobId: `receipt:${result.receipt.receiptNumber}`,
+            jobId: `receipt-${result.receipt.receiptNumber}`,
             priority: 1,
           },
         );
@@ -685,7 +685,7 @@ export class PaymentService {
           JOB_DISPATCH_APPROVAL_ALERT,
           payload,
           {
-            jobId: `approval-alert:reversal:${result.reversal.id}`,
+            jobId: `approval-alert-reversal-${result.reversal.id}`,
             priority: 1,
           },
         );
@@ -1265,7 +1265,7 @@ export class PaymentService {
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
           {
-            jobId: `receipt:${result.receipt.receiptNumber}`,
+            jobId: `receipt-${result.receipt.receiptNumber}`,
             priority: 1,
           },
         );

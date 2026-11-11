@@ -313,7 +313,7 @@ export class CollectionService {
             passbookAppUrl: `https://app.kumaranfinance.in/passbook/${ticket.id}`,
           },
           {
-            jobId: `receipt:${result.receiptNumber}`,
+            jobId: `receipt-${result.receiptNumber}`,
             priority: 1,
           },
         );
