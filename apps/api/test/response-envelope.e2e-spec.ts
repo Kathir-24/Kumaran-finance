@@ -11,6 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
@@ -40,6 +41,7 @@ class SampleController {
       groupCode: 'KCA-1L-20M-01',
       chitValue: 100000n,
       commissionAmount: 4000n,
+      foremanCommissionRate: new Prisma.Decimal('4.00'),
     };
   }
 
@@ -115,6 +117,7 @@ describe('Standardized Response Envelope & Global Exception Filter (e2e)', () =>
         groupCode: 'KCA-1L-20M-01',
         chitValue: 100000,
         commissionAmount: 4000,
+        foremanCommissionRate: 4,
       });
     });
   });

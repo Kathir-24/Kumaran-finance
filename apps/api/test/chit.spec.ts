@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { ChitStatus, InitializationMode, Role } from '@prisma/client';
+import { ChitStatus, InitializationMode, Prisma, Role } from '@prisma/client';
 import { ChitService } from '../src/chit/chit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -445,6 +445,67 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       const result = await chitService.findOne('chit-group-privacy-test', staffPayload);
       expect(result.tickets[0].customer.fullName).toBe('K. Customer A');
       expect(result.tickets[0].customer.phone).toBe('9876500001');
+    });
+  });
+
+  describe('7. Decimal Serialization & Redis Catalog Cache Consistency', () => {
+    it('serializes foremanCommissionRate as finite JS number on cache miss and coerces cached strings on cache hit', async () => {
+      const redisMock = {
+        get: jest.fn().mockResolvedValueOnce(null),
+        set: jest.fn().mockResolvedValue('OK'),
+      };
+      const redisProviderMock = {
+        getClient: jest.fn().mockReturnValue(redisMock),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+      const cachedChitService = new ChitService(
+        prismaMock as unknown as PrismaService,
+        redisProviderMock as any,
+      );
+
+      prismaMock.chitGroup.findMany.mockResolvedValue([
+        {
+          id: 'chit-1',
+          groupCode: 'KCA-1L-20M-01',
+          chitValue: 100000n,
+          baseInstallment: 5000n,
+          maxDiscountCeiling: 25000n,
+          foremanCommissionRate: new Prisma.Decimal('4.00'),
+        },
+      ]);
+      prismaMock.chitGroup.count.mockResolvedValue(1);
+
+      const missResult = await cachedChitService.findAll({});
+      expect(typeof missResult.data[0].foremanCommissionRate).toBe('number');
+      expect(missResult.data[0].foremanCommissionRate).toBe(4);
+      expect(redisMock.set).toHaveBeenCalledTimes(1);
+      const cachedJson = JSON.parse(redisMock.set.mock.calls[0][1]);
+      expect(typeof cachedJson.data[0].foremanCommissionRate).toBe('number');
+      expect(cachedJson.data[0].foremanCommissionRate).toBe(4);
+
+      // Simulate legacy Redis entry where Decimal was previously stored as string "4"
+      redisMock.get.mockResolvedValueOnce(
+        JSON.stringify({
+          data: [
+            {
+              id: 'chit-1',
+              groupCode: 'KCA-1L-20M-01',
+              chitValue: 100000,
+              baseInstallment: 5000,
+              maxDiscountCeiling: 25000,
+              foremanCommissionRate: '4',
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        }),
+      );
+
+      const hitResult = await cachedChitService.findAll({});
+      expect(typeof hitResult.data[0].foremanCommissionRate).toBe('number');
+      expect(hitResult.data[0].foremanCommissionRate).toBe(4);
     });
   });
 });

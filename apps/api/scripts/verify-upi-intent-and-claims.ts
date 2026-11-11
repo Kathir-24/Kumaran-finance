@@ -177,7 +177,14 @@ async function main() {
 
   // Check pending claims list
   const pendingRes = await request('GET', '/payments/pending-upi-claims', undefined, admin.token);
-  const pendingCount = pendingRes.json?.data?.length ?? (Array.isArray(pendingRes.json) ? pendingRes.json.length : 0);
+  const claimsList = Array.isArray(pendingRes.json?.data?.data)
+    ? pendingRes.json.data.data
+    : Array.isArray(pendingRes.json?.data)
+      ? pendingRes.json.data
+      : Array.isArray(pendingRes.json)
+        ? pendingRes.json
+        : [];
+  const pendingCount = claimsList.length;
   console.log(`   Pending Claims Count: ${pendingCount}`);
 
   // 6. Test Staff Verification of UPI Claim (Enforcing Maker != Checker)

@@ -275,7 +275,7 @@ static sanitizeKey(key: string): string {
 | `GET` | `/api/v1/pdf/voucher/:auctionId` | Stream binary A5 voucher or get 15-min S3 URL (`?download=true`) | Staff (excl. Agents), Customer (Winner), Auditor | `application/pdf` or `JSON` |
 | `GET` | `/api/v1/pdf/minutes/:auctionId` | Stream binary A4 Form XVII or get S3 URL (`?download=true`) | Staff (Branch-scoped), Auditor | `application/pdf` or `JSON` |
 | `GET` | `/api/v1/pdf/passbook/:ticketId` | Stream binary A4 Form XXI or get S3 URL (`?download=true`) | Staff, Customer (Self), Auditor | `application/pdf` or `JSON` |
-| `GET` | `/api/v1/storage/file/*key` | Authenticated stream for local storage driver fallback | Staff, Customer (Self), Auditor | `application/octet-stream` |
+| `GET` | `/api/v1/storage/file/*key` | Authenticated file download (`302` presigned S3/CDN redirect under `STORAGE_DRIVER=s3` or `?redirect=true`; raw binary stream via `?stream=true` or `local` driver) | Staff, Customer, Auditor | `302` Redirect or `application/octet-stream` |
 
 ---
 

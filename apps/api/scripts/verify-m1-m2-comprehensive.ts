@@ -967,7 +967,7 @@ async function main() {
   {
     const neg401 = await request('GET', '/api/v1/storage/file/kyc/test/aadhaar.jpg');
     const neg400 = await request('GET', '/api/v1/storage/file/kyc/..%2F..%2Fetc/passwd', undefined, adminToken);
-    const neg404 = await request('GET', '/api/v1/storage/file/kyc/non-existent-uuid/doc.jpg', undefined, adminToken);
+    const neg404 = await request('GET', '/api/v1/storage/file/kyc/non-existent-uuid/doc.jpg?stream=true', undefined, adminToken);
     const pass = neg401.status === 401 && (neg400.status === 400 || neg400.status === 404) && neg404.status === 404;
     proofs.push({
       endpointNum: 31,

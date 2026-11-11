@@ -667,7 +667,7 @@ Content-Type: image/jpeg
     "totalTickets": 20,
     "baseInstallment": 5000,
     "maxDiscountCeiling": 25000,
-    "foremanCommissionRate": "4.00",
+    "foremanCommissionRate": 4,
     "status": "DRAFT",
     "auctionDayOfMonth": 10
   }
@@ -1216,61 +1216,58 @@ Content-Type: image/jpeg
 ---
 
 ### 7.5 `GET /api/v1/payments/pending-upi-claims`
-**Description**: Fetches pending customer UPI claims (`paymentStatus: INITIATED`, `paymentMethod: UPI`) for Accounting Desk verification against Karur Vysya Bank physical statements.  
+**Description**: Fetches paginated pending customer UPI claims (`paymentStatus: INITIATED`, `paymentMethod: UPI`) for Accounting Desk verification against Karur Vysya Bank physical statements.  
 **Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
 
 #### Query Parameters
-- `branchId` *(optional, UUID)*: Filter claims by operating branch.
+- `branchId` *(optional, UUID)*: Filter claims by operating branch (`SUPER_ADMIN` only; non-super-admins are branch-scoped automatically).
+- `page` *(optional, integer, default `1`)*: Page number for paginated results.
+- `limit` *(optional, integer, default `20`, max `100`)*: Number of claims per page.
 
-#### Success Response (HTTP 200)
+#### Success Response (HTTP 200 — `ApiPaginatedResponseEnvelope`)
 ```json
 {
   "success": true,
   "statusCode": 200,
   "timestamp": "2026-10-27T10:10:00.000Z",
-  "data": [
-    {
-      "id": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
-      "amount": "3950",
-      "paymentMethod": "UPI",
-      "paymentStatus": "INITIATED",
-      "transactionRef": "429812345678",
-      "notes": "Customer UPI Claim: Paid via Google Pay to kumaranfinance@kvb",
-      "createdAt": "2026-10-27T10:05:00.000Z",
-      "recordedByUser": {
-        "id": "user-cust-001",
-        "name": "Sundaram S",
-        "phone": "+919876543210",
-        "roles": ["CUSTOMER"]
-      },
-      "allocations": [
-        {
-          "id": "alloc-uuid-001",
-          "amountAllocated": "3950",
-          "due": {
-            "id": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
-            "installmentMonth": 4,
-            "netPayableAmount": "3950",
-            "status": "UNPAID"
-          },
-          "ticket": {
-            "id": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
-            "ticketNumber": 4,
-            "customer": {
-              "id": "cust-uuid-001",
-              "fullName": "Sundaram S",
-              "phone": "+919876543210"
-            },
-            "chitGroup": {
-              "id": "group-uuid-001",
-              "groupCode": "KCA-1L-20M-01",
-              "branchId": "branch-uuid-001"
-            }
-          }
+  "data": {
+    "data": [
+      {
+        "claimId": "e42f9b23-6b7f-47dc-9fa1-c0efbe8f1a23",
+        "amount": 3950,
+        "utrNumber": "429812345678",
+        "notes": "Customer UPI Claim: Paid via Google Pay to kumaranfinance@kvb",
+        "createdAt": "2026-10-27T10:05:00.000Z",
+        "submittedByUser": {
+          "id": "user-cust-001",
+          "name": "Sundaram S",
+          "phone": "9876543210",
+          "roles": ["CUSTOMER"]
+        },
+        "customer": {
+          "id": "cust-uuid-001",
+          "customerCode": "KC-CUST-00001",
+          "fullName": "Sundaram S",
+          "phone": "9876543210"
+        },
+        "ticket": {
+          "id": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
+          "ticketNumber": 4,
+          "groupCode": "KCA-1L-20M-01"
+        },
+        "due": {
+          "id": "c5f590bb-85bb-4a58-8be4-8a4db2bfdbf1",
+          "installmentMonth": 4,
+          "netPayableAmount": 3950,
+          "status": "UNPAID"
         }
-      ]
-    }
-  ]
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
 }
 ```
 

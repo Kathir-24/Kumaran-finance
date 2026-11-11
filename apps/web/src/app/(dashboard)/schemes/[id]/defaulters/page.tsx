@@ -26,7 +26,7 @@ import {
 import { DefaulterSubstitutionModal } from '@/components/schemes/defaulter-substitution-modal';
 import { DefaulterSettlementDialog } from '@/components/schemes/defaulter-settlement-dialog';
 import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatRupee } from '@/lib/currency';
 
@@ -68,13 +68,14 @@ export default function SchemeDefaultersPage() {
 
   // 2. Fetch Defaulters with Arrears Dues Breakdown
   const { data: defaultersList } = useQuery({
-    queryKey: queryKeys.tickets.defaulters(),
+    queryKey: queryKeys.tickets.defaulters({ minConsecutiveMonths: 1 }),
     queryFn: async () => {
-      return unwrapApiResponse<any[]>(
+      const payload = await unwrapApiResponse<any>(
         apiClient.GET('/api/v1/tickets/defaulters' as any, {
-          params: { query: { minConsecutiveMonths: 1 } },
+          params: { query: { minConsecutiveMonths: 1, limit: 100 } },
         }),
       );
+      return unwrapPaginatedList(payload);
     },
     staleTime: 30_000,
   });
@@ -84,14 +85,12 @@ export default function SchemeDefaultersPage() {
   // Map arrears and total overdue per ticket
   const duesMap = React.useMemo(() => {
     const map: Record<string, { totalOverdue: bigint | number; unpaidCount: number }> = {};
-    if (defaultersList && Array.isArray(defaultersList)) {
-      for (const item of defaultersList) {
-        if (item.chitGroup?.id === id || item.ticketId) {
-          map[item.ticketId] = {
-            totalOverdue: BigInt(item.totalOverdueAmount || 0),
-            unpaidCount: item.consecutiveUnpaidMonths || 0,
-          };
-        }
+    for (const item of unwrapPaginatedList(defaultersList)) {
+      if (item.chitGroup?.id === id || item.ticketId) {
+        map[item.ticketId] = {
+          totalOverdue: BigInt(item.totalOverdueAmount || 0),
+          unpaidCount: item.consecutiveUnpaidMonths || 0,
+        };
       }
     }
     return map;

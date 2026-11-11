@@ -279,10 +279,10 @@ async function run() {
   // --------------------------------------------------------------------------
   console.log(`\n--- [5/5] GET /storage/file/*key (Encrypted File Streaming & Security) ---`);
 
-  // 5A: Stream Real Stored S3 Document
+  // 5A: Stream Real Stored S3 Document (?stream=true forces raw binary egress in S3 mode)
   if (uploadedReceiptKey) {
-    console.log(`   [5A: Authenticated S3 Document Stream] Requesting /storage/file/${uploadedReceiptKey} ...`);
-    const fileRes = await request('GET', `/storage/file/${uploadedReceiptKey}`, undefined, admin.token);
+    console.log(`   [5A: Authenticated S3 Document Stream] Requesting /storage/file/${uploadedReceiptKey}?stream=true ...`);
+    const fileRes = await request('GET', `/storage/file/${uploadedReceiptKey}?stream=true`, undefined, admin.token);
     console.log(`   Status: ${fileRes.status}`);
     console.log(`   Content-Type: ${fileRes.contentType}`);
     console.log(`   Buffer Size: ${fileRes.buffer?.length} bytes`);

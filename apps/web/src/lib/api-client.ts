@@ -166,4 +166,22 @@ export async function unwrapApiResponse<T>(
   return data as T;
 }
 
+/**
+ * Safely extracts array items from either a direct array (`T[]`) or an
+ * `ApiPaginatedResponseEnvelope` payload (`{ data: T[], total, page, limit, totalPages }`).
+ */
+export function unwrapPaginatedList<T = any>(payload: unknown): T[] {
+  if (Array.isArray(payload)) {
+    return payload as T[];
+  }
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
 export { KumaranApiError, type KumaranApiClient };

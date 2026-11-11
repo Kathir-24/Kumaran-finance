@@ -132,7 +132,7 @@ All files strictly comply with the $\le 300\text{--}350$ lines limit per **AGENT
 - **`GET /api/v1/pdf/receipt/:paymentId`**: Streams pixel-accurate A5 bilingual printable PDF.
 - **`GET /api/v1/installments/:dueId/upi-intent`**: Returns NPCI UPI deep-link URI with locked $I_{net}$ amount.
 - **`GET /api/v1/installments/group/:chitGroupId/month/:month`**: Returns member dues for selected scheme and month.
-- **`GET /api/v1/payments/pending-upi-claims`**: Lists all pending self-reported UPI claims in `INITIATED` status.
+- **`GET /api/v1/payments/pending-upi-claims`**: Lists paginated pending self-reported UPI claims in `INITIATED` status (`ApiPaginatedResponseEnvelope` `{ data, total, page, limit, totalPages }`, unwrapped safely via `unwrapPaginatedList` in `apps/web/src/app/(dashboard)/collections/page.tsx`).
 - **`POST /api/v1/payments/:id/verify-upi-claim`**: Verifies bank statement credit, transitions payment to `SUCCESS`, and issues sequential receipt (`maker != checker`).
 - **`GET /api/v1/collections/daily-summary`**: Queries daily collections totals, pending agent cash batches, and vault deposits.
 - **`POST /api/v1/collections/cash-handover/acknowledge`**: Acknowledges physical cash deposit into branch vault (`collector_user_id != acknowledger_user_id`).

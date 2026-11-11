@@ -188,7 +188,7 @@
 ### 2.11 Component 1: Encrypted Storage Service (`/api/v1/storage`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/storage/file/:key` | Authenticated stream of stored files (Local driver fallback with 15-minute presigned lifespan) | Staff, Customer, Auditor |
+| `GET`  | `/storage/file/:key` | Authenticated file download (`302` presigned S3/CDN redirect under S3 mode or `?redirect=true`; raw binary stream via `?stream=true` or local driver) | Staff, Customer, Auditor |
 
 ### 2.12 Component 2: Bilingual PDF Canvas Engine (`/api/v1/pdf`)
 | Method | Endpoint | Description | Allowed Roles |

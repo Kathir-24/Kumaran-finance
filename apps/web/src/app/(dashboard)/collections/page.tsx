@@ -14,7 +14,7 @@ import { BilingualReceiptModal } from '@/components/collections/bilingual-receip
 import { UpiClaimsTable, type PendingUpiClaimItem } from '@/components/collections/upi-claims-table';
 import { VerifyClaimDialog } from '@/components/collections/verify-claim-dialog';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { getApiBaseUrl, getStoredAccessToken, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export default function CollectionsPage() {
@@ -71,19 +71,22 @@ export default function CollectionsPage() {
     queryKey: queryKeys.payments.pendingUpiClaims(),
     queryFn: async ({ signal }) => {
       const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments/pending-upi-claims`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments/pending-upi-claims?limit=100`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal,
       });
       if (!res.ok) return [];
       const json = await res.json();
-      return json?.data ?? [];
+      return json?.data ?? json ?? [];
     },
   });
 
-  const allItems: any[] = useMemo(() => Array.isArray(globalData?.data || globalData) ? (globalData?.data || globalData) : [], [globalData]);
-  const currentItems: any[] = useMemo(() => Array.isArray(paymentsData?.data || paymentsData) ? (paymentsData?.data || paymentsData) : [], [paymentsData]);
-  const pendingClaims: PendingUpiClaimItem[] = useMemo(() => Array.isArray(claimsData) ? claimsData : [], [claimsData]);
+  const allItems: any[] = useMemo(() => unwrapPaginatedList(globalData), [globalData]);
+  const currentItems: any[] = useMemo(() => unwrapPaginatedList(paymentsData), [paymentsData]);
+  const pendingClaims: PendingUpiClaimItem[] = useMemo(
+    () => unwrapPaginatedList<PendingUpiClaimItem>(claimsData),
+    [claimsData],
+  );
 
   const totalCollectionsToday = allItems.length;
   const totalCashToday = useMemo(() => allItems.filter((p) => p.paymentMethod === 'CASH' && p.paymentStatus !== 'REVERSED').reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n), [allItems]);

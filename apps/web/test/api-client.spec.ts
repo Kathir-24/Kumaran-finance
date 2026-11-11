@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   unwrapApiResponse,
+  unwrapPaginatedList,
   KumaranApiError,
   ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -188,4 +189,28 @@ test('QueryKeys: Registry guarantees deterministic keys matching cache invalidat
   ]);
   assert.deepEqual(queryKeys.approvals.pending(), ['approvals', 'pending']);
   assert.deepEqual(queryKeys.disbursements.list(), ['disbursements', 'list']);
+});
+
+test('ApiClient: unwrapPaginatedList unwraps paginated envelopes, plain arrays, and invalid inputs safely', () => {
+  const claim = { claimId: 'claim-1', amount: 3750, utrNumber: 'UTR123456' };
+
+  // ApiPaginatedResponseEnvelope inner payload (current /payments/pending-upi-claims & /tickets/defaulters)
+  assert.deepEqual(
+    unwrapPaginatedList({
+      data: [claim],
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    }),
+    [claim],
+  );
+
+  // Direct array fallback
+  assert.deepEqual(unwrapPaginatedList([claim]), [claim]);
+
+  // Empty/malformed/nullish payloads
+  assert.deepEqual(unwrapPaginatedList(null), []);
+  assert.deepEqual(unwrapPaginatedList(undefined), []);
+  assert.deepEqual(unwrapPaginatedList({ total: 0 }), []);
 });

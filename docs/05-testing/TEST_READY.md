@@ -3,10 +3,10 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Target Subsystem**: NestJS 12 Modular Monolith (`apps/api/`)  
-> **Execution Status**: ✅ **100% PASS (10/10 Test Suites, 88/88 Tests Passing, Exit Code 0)**  
+> **Execution Status**: ✅ **100% PASS (10/10 Test Suites, 92/92 Tests Passing, Exit Code 0)**  
 > **Execution Mode**: In-Process Harness via Supertest 7 + NestJS TestingModule (`--runInBand`)  
 > **Verified Database**: Isolated Test Sandbox `chitflow_test` on `127.0.0.1:5433` (PostgreSQL 17)  
-> **Generated At**: 2026-10-30T10:42:00Z  
+> **Generated At**: 2026-11-11T14:28:35Z  
 
 ---
 
@@ -35,17 +35,17 @@ pnpm --filter api run test:e2e:fresh
 
 | # | Test Suite | Path | Tests | Passing | Failing | Duration | Status |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|
-| 1 | API Versioning & Routing | `test/app.e2e-spec.ts` | 3 | 3 | 0 | 0.8s | ✅ PASS |
-| 2 | Standardized Response Envelope | `test/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 1.1s | ✅ PASS |
-| 3 | Security Headers & Strict CORS | `test/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 0.9s | ✅ PASS |
-| 4 | Throttler & Rate Limiting | `test/throttler.e2e-spec.ts` | 3 | 3 | 0 | 4.5s | ✅ PASS |
-| 5 | Authentication & Session Protocol | `test/evidence/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 4.2s | ✅ PASS |
-| 6 | Customer Intake, KYC & Anti-BOLA | `test/evidence/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 3.8s | ✅ PASS |
-| 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/evidence/03-chits-auctions.e2e-spec.ts` | 9 | 9 | 0 | 3.5s | ✅ PASS |
-| 8 | Payments, Discrete Math & UPI | `test/evidence/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 9.1s | ✅ PASS |
-| 9 | Disbursements, Safety & Jobs | `test/evidence/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 6.5s | ✅ PASS |
-| 10 | Storage & Document Streaming | `test/evidence/06-storage-documents.e2e-spec.ts` | 5 | 5 | 0 | 1.8s | ✅ PASS |
-| **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **89** | **89** | **0** | **40.46s** | ✅ **100% PASS** |
+| 1 | API Versioning & Routing | `test/app.e2e-spec.ts` | 3 | 3 | 0 | 2.46s | ✅ PASS |
+| 2 | Standardized Response Envelope | `test/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 2.89s | ✅ PASS |
+| 3 | Security Headers & Strict CORS | `test/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 2.28s | ✅ PASS |
+| 4 | Throttler & Rate Limiting | `test/throttler.e2e-spec.ts` | 4 | 4 | 0 | 2.73s | ✅ PASS |
+| 5 | Authentication & Session Protocol | `test/evidence/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 7.88s | ✅ PASS |
+| 6 | Customer Intake, KYC & Anti-BOLA | `test/evidence/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 6.32s | ✅ PASS |
+| 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/evidence/03-chits-auctions.e2e-spec.ts` | 10 | 10 | 0 | 5.92s | ✅ PASS |
+| 8 | Payments, Discrete Math & UPI | `test/evidence/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 11.71s | ✅ PASS |
+| 9 | Disbursements, Safety & Jobs | `test/evidence/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 7.62s | ✅ PASS |
+| 10 | Storage & Document Streaming | `test/evidence/06-storage-documents.e2e-spec.ts` | 6 | 6 | 0 | 6.42s | ✅ PASS |
+| **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **92** | **92** | **0** | **32.59s** *(fresh)* | ✅ **100% PASS** |
 
 ---
 
@@ -166,7 +166,7 @@ Exercises complex end-to-end multi-step operational journeys:
 
 ---
 
-## 4. Complete Test Inventory (88 Test Cases)
+## 4. Complete Test Inventory (92 E2E Tests + Unit Rate Checks)
 
 | Test ID | Test Suite | Description | Tier | Status |
 |---|---|---|:---:|:---:|
@@ -218,7 +218,8 @@ Exercises complex end-to-end multi-step operational journeys:
 | `TC-QRY-01` | `02-customer-kyc.e2e-spec.ts` | Returns paginated subscriber list with metadata and whole-rupee amounts | Tier 1 | ✅ PASS |
 | `TC-QRY-02` | `02-customer-kyc.e2e-spec.ts` | Returns 404 Not Found for non-existent customer UUID query | Tier 2 | ✅ PASS |
 | `TC-REG-01` | `02-customer-kyc.e2e-spec.ts` | DEF-01 Fix - Customer FCM token updates query phone: true in Prisma | Tier 4 | ✅ PASS |
-| `TC-HP-01` | `03-chits-auctions.e2e-spec.ts` | Lists active chit schemes with locked 4.00% foreman commission | Tier 1 | ✅ PASS |
+| `TC-HP-01` | `03-chits-auctions.e2e-spec.ts` | Lists active chit schemes with numeric 4.00% foreman commission (`foremanCommissionRate === 4`) | Tier 1 | ✅ PASS |
+| `TC-HP-01B` | `03-chits-auctions.e2e-spec.ts` | Unfiltered catalog cache miss and Redis cache hit both return numeric `foremanCommissionRate` | Tier 1 | ✅ PASS |
 | `TC-HP-02` | `03-chits-auctions.e2e-spec.ts` | Retrieves single chit scheme details including branch and ticket limits | Tier 1 | ✅ PASS |
 | `TC-HP-03` | `03-chits-auctions.e2e-spec.ts` | Lists assigned subscriber ticket roster (1..N) with customer mapping | Tier 1 | ✅ PASS |
 | `TC-VAL-01` | `03-chits-auctions.e2e-spec.ts` | Rejects auction bid recording with missing ticketId | Tier 2 | ✅ PASS |
@@ -238,7 +239,7 @@ Exercises complex end-to-end multi-step operational journeys:
 | `TC-UPI-01` | `04-payments-reversals.e2e-spec.ts` | Generates valid NPCI `upi://pay` intent with whole-rupee amount and KVB VPA | Tier 1 | ✅ PASS |
 | `TC-UPI-02` | `04-payments-reversals.e2e-spec.ts` | Submits customer UPI claim and registers Payment in `INITIATED` status | Tier 1 | ✅ PASS |
 | `TC-UPI-03` | `04-payments-reversals.e2e-spec.ts` | Blocks duplicate Bank UTR claims under PostgreSQL 17 unique constraint (409) | Tier 2 | ✅ PASS |
-| `TC-UPI-04` | `04-payments-reversals.e2e-spec.ts` | Lists pending UPI claims for Accounting Desk verification | Tier 1 | ✅ PASS |
+| `TC-UPI-04` | `04-payments-reversals.e2e-spec.ts` | Lists paginated pending UPI claims (`ApiPaginatedResponseEnvelope`) for Accounting Desk verification | Tier 1 | ✅ PASS |
 | `TC-UPI-05` | `04-payments-reversals.e2e-spec.ts` | Enforces Maker != Checker hard guard on UPI claim verification (403) | Tier 3 | ✅ PASS |
 | `TC-UPI-06` | `04-payments-reversals.e2e-spec.ts` | Checker verifies UPI claim, marks due `PAID` and generates receipt | Tier 1 | ✅ PASS |
 | `TC-HP-01` | `05-disbursements-jobs.e2e-spec.ts` | Authorizes and releases prize money disbursement under dual control | Tier 1 | ✅ PASS |
@@ -256,10 +257,11 @@ Exercises complex end-to-end multi-step operational journeys:
 | `TC-JOB-05` | `05-disbursements-jobs.e2e-spec.ts` | Enqueues daily arrears to BullMQ queue (`POST /jobs/enqueue-daily-arrears`) | Tier 1 | ✅ PASS |
 | `TC-JOB-06` | `05-disbursements-jobs.e2e-spec.ts` | Enqueues reconciliation to BullMQ queue (`POST /jobs/enqueue-reconciliation`) | Tier 1 | ✅ PASS |
 | `TC-HP-02` | `05-disbursements-jobs.e2e-spec.ts` | Settles final non-prized subscriber in Month N without auction | Tier 1 | ✅ PASS |
-| `TC-STO-01` | `06-storage-documents.e2e-spec.ts` | Streams multi-segment KYC document with correct binary headers | Tier 1 | ✅ PASS |
+| `TC-STO-01` | `06-storage-documents.e2e-spec.ts` | Streams multi-segment KYC document with correct binary headers (`?stream=true`) | Tier 1 | ✅ PASS |
+| `TC-STO-06` | `06-storage-documents.e2e-spec.ts` | Presigned redirect mode issues HTTP 302 with signed `Location` URL | Tier 1 | ✅ PASS |
 | `TC-STO-02` | `06-storage-documents.e2e-spec.ts` | Missing Bearer token is rejected with 401 Unauthorized | Tier 2 | ✅ PASS |
 | `TC-STO-03` | `06-storage-documents.e2e-spec.ts` | Field Agent is forbidden from accessing customer KYC scans (403 BOLA Guard)| Tier 3 | ✅ PASS |
-| `TC-STO-04` | `06-storage-documents.e2e-spec.ts` | Non-existent storage key returns 404 Not Found | Tier 2 | ✅ PASS |
+| `TC-STO-04` | `06-storage-documents.e2e-spec.ts` | Non-existent storage key returns 404 Not Found (`?stream=true`) | Tier 2 | ✅ PASS |
 | `TC-STO-05` | `06-storage-documents.e2e-spec.ts` | Path traversal attempt (`..%2F..%2Fetc/passwd`) is rejected (400/404) | Tier 2 | ✅ PASS |
 
 ---
@@ -285,4 +287,4 @@ All 10 Invariant Architectural Guardrails confirmed by developer in `AGENTS.md` 
 
 ## 6. Conclusion
 
-The full backend E2E verification test suite is complete, fully reproducible, and green with **100% pass rate (88/88 test cases across 10 test suites in 36.76s)**. All 10 Invariant Architectural Guardrails and all operational personas (Super Admin Maker/Checker, Branch Manager, Desk Accountant, Field Agents, Customers, Auditor) are comprehensively verified.
+The full backend E2E verification test suite is complete, reproducible (verified on both `test:e2e:fresh` and repeat warm-cache `test:e2e`), and green with **100% pass rate (92/92 test cases across 10 test suites)**. All 10 Invariant Architectural Guardrails and all operational personas (Super Admin Maker/Checker, Branch Manager, Desk Accountant, Field Agents, Customers, Auditor) are comprehensively verified.

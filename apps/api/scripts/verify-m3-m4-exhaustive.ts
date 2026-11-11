@@ -1239,7 +1239,14 @@ async function run() {
   // 75. GET /payments/pending-upi-claims (Pending UPI Claims Queue)
   {
     const res = await request('GET', '/payments/pending-upi-claims', undefined, accountant.token);
-    const pass = res.status === 200 && Array.isArray(res.json?.data || res.json);
+    const claimsList = Array.isArray(res.json?.data)
+      ? res.json.data
+      : Array.isArray(res.json?.data?.data)
+        ? res.json.data.data
+        : Array.isArray(res.json)
+          ? res.json
+          : null;
+    const pass = res.status === 200 && Array.isArray(claimsList);
     recordProof({
       featureNum: 75,
       operationId: 'getPendingUpiClaims',
@@ -1253,7 +1260,7 @@ async function run() {
       envelopeVerified: res.json?.success === true,
       invariantChecked: 'Accounting Desk pending bank credit verification queue',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
-      details: `Pending UPI claims retrieved: ${(res.json?.data || res.json)?.length}.`,
+      details: `Pending UPI claims retrieved: ${claimsList?.length ?? 0}.`,
     });
   }
 

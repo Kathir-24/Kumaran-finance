@@ -207,7 +207,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/payments/:id` | Get single payment details & history | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Payment Only** | **Read-Only (Global)** |
 | `GET` | `/payments/:id/receipt` | Generate bilingual receipt (EN + தமிழ்) | **All** | **Branch Scope** | **Company-wide** | **Own Recorded** | **Own Receipt Only** | **Read-Only (Global)** |
 | `POST` | `/payments/upi-claim` | Customer self-submits bank UTR claim (`INITIATED`) | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Ticket Only** | 🚫 **Blocked** |
-| `GET` | `/payments/pending-upi-claims` | List pending UPI claims for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked (Desk Workbench)** |
+| `GET` | `/payments/pending-upi-claims` | List paginated pending UPI claims (`?page=1&limit=20`, max `100`) for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked (Desk Workbench)** |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify UTR credit & issue receipt (`maker != checker`) | **Allowed (Checker)** | **Allowed (Branch)** | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Commit reversal (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
@@ -268,7 +268,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 ### 11.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|:---:|
-| `GET` | `/storage/file/:key` | Authenticated stream of stored files (Local driver fallback) | Staff, Customer, Auditor |
+| `GET` | `/storage/file/:key` | Authenticated file retrieval: `302` presigned S3/CDN redirect when `STORAGE_DRIVER=s3` (or `?redirect=true`), or raw binary stream (`200` / `404`) when `?stream=true` or local driver | Staff, Customer, Auditor |
 
 ---
 

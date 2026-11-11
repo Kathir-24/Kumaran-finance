@@ -18,6 +18,7 @@ import {
   MasterCacheKeys,
 } from '../common/constants';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
+import { serializePrismaPrimitives } from '../common/interceptors/bigint.interceptor';
 import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
@@ -487,7 +488,18 @@ export class ChitService {
       try {
         const cached = await redis.get(MasterCacheKeys.schemesAll);
         if (cached) {
-          return JSON.parse(cached);
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed?.data)) {
+            for (const item of parsed.data) {
+              if (typeof item?.foremanCommissionRate === 'string') {
+                const numericRate = Number(item.foremanCommissionRate);
+                if (Number.isFinite(numericRate)) {
+                  item.foremanCommissionRate = numericRate;
+                }
+              }
+            }
+          }
+          return parsed;
         }
       } catch (err: any) {
         this.logger.warn(`Redis scheme cache read error: ${err.message}`);
@@ -526,13 +538,13 @@ export class ChitService {
       this.prisma.chitGroup.count({ where }),
     ]);
 
-    const result = {
+    const result = serializePrismaPrimitives({
       data,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    };
+    });
 
     if (isDefaultQuery && redis && this.redisProvider?.getIsConnected()) {
       try {

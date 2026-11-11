@@ -101,7 +101,38 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
 
       const target = res.body.data.data.find((g: any) => g.groupCode === 'KCA-1L-20M-01');
       expect(target).toBeDefined();
-      expect(target.foremanCommissionRate.d[0]).toBe(4);
+      expect(typeof target.foremanCommissionRate).toBe('number');
+      expect(target.foremanCommissionRate).toBe(4);
+    });
+
+    it('TC-HP-01B: Unfiltered catalog cache miss and Redis cache hit both return numeric foremanCommissionRate', async () => {
+      const firstRes = await request(app.getHttpServer())
+        .get('/api/v1/chits')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.body.data.data.length).toBeGreaterThan(0);
+      for (const scheme of firstRes.body.data.data) {
+        expect(typeof scheme.foremanCommissionRate).toBe('number');
+      }
+      const firstTarget =
+        firstRes.body.data.data.find((g: any) => g.groupCode === 'KCA-1L-20M-01') ??
+        firstRes.body.data.data[0];
+      expect(firstTarget.foremanCommissionRate).toBe(4);
+
+      const secondRes = await request(app.getHttpServer())
+        .get('/api/v1/chits')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.data.data.length).toBeGreaterThan(0);
+      for (const scheme of secondRes.body.data.data) {
+        expect(typeof scheme.foremanCommissionRate).toBe('number');
+      }
+      const secondTarget =
+        secondRes.body.data.data.find((g: any) => g.groupCode === 'KCA-1L-20M-01') ??
+        secondRes.body.data.data[0];
+      expect(secondTarget.foremanCommissionRate).toBe(4);
     });
 
     it('TC-HP-02: Retrieves single chit scheme details including branch and ticket limits', async () => {

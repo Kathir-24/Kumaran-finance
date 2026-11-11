@@ -80,7 +80,7 @@ When launched on Android, the payment app does not allow the subscriber to edit 
 |---|---|---|
 | `GET /installments/:dueId/upi-intent` | `CUSTOMER`, All Staff | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
 | `POST /payments/upi-claim` | `CUSTOMER`, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
-| `GET /payments/pending-upi-claims` | `ACCOUNTANT`, `SUPER_ADMIN` | Lists all pending UPI claims for Accounting Desk statement matching. |
+| `GET /payments/pending-upi-claims` | `ACCOUNTANT`, `SUPER_ADMIN` | Lists paginated (`?page=1&limit=20`, max `100`) pending UPI claims via `ApiPaginatedResponseEnvelope` for Accounting Desk statement matching. |
 | `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
 
 ---

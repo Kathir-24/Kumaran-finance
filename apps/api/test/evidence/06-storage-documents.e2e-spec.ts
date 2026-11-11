@@ -30,7 +30,6 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
     process.env.DATABASE_URL =
       process.env.TEST_DATABASE_URL ||
       'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_test?schema=public';
-    process.env.STORAGE_DRIVER = 'local';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -82,6 +81,11 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
   }, 30000);
 
   afterAll(async () => {
+    if (storageService) {
+      await storageService
+        .deleteFile('kyc/test-cust-uuid/aadhaar-front.jpg')
+        .catch(() => undefined);
+    }
     if (app) {
       await app.close();
     }
@@ -91,9 +95,9 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
   // 1. HAPPY PATH & HTTP CONTRACT
   // ===========================================================================
   describe('1. Happy Path & HTTP Contract', () => {
-    it('TC-STO-01: Super Admin streams multi-segment KYC document with correct binary headers', async () => {
+    it('TC-STO-01: Super Admin streams multi-segment KYC document with correct binary headers (?stream=true)', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/storage/file/kyc/test-cust-uuid/aadhaar-front.jpg')
+        .get('/api/v1/storage/file/kyc/test-cust-uuid/aadhaar-front.jpg?stream=true')
         .set('Authorization', `Bearer ${superAdminToken}`);
 
       expect(res.status).toBe(200);
@@ -101,6 +105,16 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
       expect(res.headers['content-length']).toBe(String(Buffer.from('MOCK_KYC_AADHAAR_BINARY_BYTES').length));
       expect(res.headers['content-disposition']).toBe('inline; filename="aadhaar-front.jpg"');
       expect(res.body.toString()).toBe('MOCK_KYC_AADHAAR_BINARY_BYTES');
+    });
+
+    it('TC-STO-06: Presigned redirect mode issues HTTP 302 with signed Location URL', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/storage/file/kyc/test-cust-uuid/aadhaar-front.jpg?redirect=true')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(302);
+      expect(typeof res.headers.location).toBe('string');
+      expect(res.headers.location).toContain('kyc/test-cust-uuid/aadhaar-front.jpg');
     });
   });
 
@@ -131,9 +145,9 @@ describe('Evidence Suite 06: Storage & Document Streaming (POS-01 / DEF-04)', ()
   // 3. SECURITY & ERROR CONTRACTS
   // ===========================================================================
   describe('3. Security & Error Contracts', () => {
-    it('TC-STO-04: Non-existent storage key returns 404 Not Found', async () => {
+    it('TC-STO-04: Non-existent storage key returns 404 Not Found (?stream=true)', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/storage/file/kyc/test-cust-uuid/non-existent.jpg')
+        .get('/api/v1/storage/file/kyc/test-cust-uuid/non-existent.jpg?stream=true')
         .set('Authorization', `Bearer ${superAdminToken}`);
 
       expect(res.status).toBe(404);

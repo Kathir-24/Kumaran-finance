@@ -358,6 +358,13 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
       upiDue = await prisma.installmentDue.findFirst({
         where: {
           status: { in: ['UNPAID', 'OVERDUE'] },
+          allocations: {
+            none: {
+              payment: {
+                paymentStatus: PaymentStatus.INITIATED,
+              },
+            },
+          },
           ticket: {
             chitGroup: { branchId: headBranch?.id, status: 'ACTIVE' },
           },
@@ -447,8 +454,12 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.data)).toBe(true);
-      const claim = res.body.data.find((c: any) => c.claimId === createdClaimId);
+      expect(Array.isArray(res.body.data?.data)).toBe(true);
+      expect(typeof res.body.data.total).toBe('number');
+      expect(res.body.data.page).toBe(1);
+      expect(res.body.data.limit).toBe(20);
+      expect(res.body.data.totalPages).toBeGreaterThanOrEqual(1);
+      const claim = res.body.data.data.find((c: any) => c.claimId === createdClaimId);
       expect(claim).toBeDefined();
       expect(claim.utrNumber).toBe(upiUtr);
     });
