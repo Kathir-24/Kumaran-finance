@@ -96,32 +96,35 @@ Transaction B: Locks Payment #2 -> Waits for Payment #1
 ===> PostgreSQL detects deadlock and aborts one transaction
 ```
 
-To eliminate deadlocks and guarantee serializability across high-concurrency write paths, Kumaran Chits enforces 3 row-locking guardrails:
+To eliminate deadlocks and guarantee serializability across high-concurrency write paths, Kumaran Chits enforces a strict **4-Tier Global Lock Ordering DAG** implemented cleanly in [`receipt-sequence.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) (`acquirePaymentConcurrencyLocks` + `generateNextReceiptNumber`):
 
-1. **Branch Row Lock for Collision-Free Sequential Receipts**:
-   In `PaymentService.recordPayment`, the active branch row is locked at the start of the transaction:
+$$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{"SubscriberTicket"} \;\longrightarrow\; \text{Tier 3: } \texttt{"InstallmentDue"} \;\longrightarrow\; \text{Tier 4: } \texttt{"Payment"}$$
+
+1. **Tier 1 — Branch Row Lock for Collision-Free Sequential Receipts**:
+   All 4 receipt-minting paths ([`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts)) lock the chit group's owning `"Branch"` row FIRST (`chitGroup.branchId`, matching the branch code prefix `KC-REC-{BRANCH}-{YYYY}-`), then compute the next sequence **strictly inside the locked transaction** via `generateNextReceiptNumber(tx, prefix)`:
    ```typescript
    await tx.$queryRaw`SELECT id FROM "Branch" WHERE id = ${branchId} FOR UPDATE`;
+   const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
    ```
-   This serializes receipt number generation (`KC-REC-PRD-YYYY-XXXXX`) strictly per branch without requiring table-wide locks or external sequence generators, completely eliminating unique constraint collisions (`P2002`).
+   Inside PostgreSQL, `generateNextReceiptNumber` executes an $O(1)$ numeric aggregate (`MAX(CAST(substr("receiptNumber", startPos) AS BIGINT))` restricted by regex `^[0-9]{1,18}$`) rather than naive ASCII `ORDER BY "receiptNumber" DESC`, ensuring legacy prefixed formats (`-REV-`, `-PEN-`, `-FLD-`, `-1L-M1-`) or >5-digit overflows never poison sequence sorting or cause repeated `findUnique` probes while holding the Branch lock. Running under `PAYMENT_TRANSACTION_OPTIONS` (`{ maxWait: 10000, timeout: 15000 }`) prevents premature 5s timeout expiry under burst serialization.
 
-2. **Subscriber Ticket Row Lock for Arrears Serialization**:
-   Consecutive arrears updates (`consecutiveUnpaidMonths`) are protected by locking the specific `SubscriberTicket` row:
+2. **Tier 2 — Subscriber Ticket Row Lock for Arrears Serialization**:
+   Consecutive arrears updates (`consecutiveUnpaidMonths`) lock affected `"SubscriberTicket"` rows immediately after `"Branch"`. Multi-ticket paths deduplicate and sort IDs lexicographically (`ORDER BY id`):
    ```typescript
-   // PaymentService.recordPayment:
+   // Single-ticket paths (recordPayment, recordCollection):
    await tx.$queryRaw`SELECT id FROM "SubscriberTicket" WHERE id = ${ticket.id} FOR UPDATE`;
 
-   // PaymentService.approveReversal (Deterministic Multi-Ticket Sort):
-   const ticketIds = [...new Set(payment.allocations.map((a) => a.ticketId))].sort();
+   // Multi-ticket paths (verifyUpiClaim, executeReconcileSettlement, approveReversal):
    await tx.$queryRaw`
-     SELECT id FROM "SubscriberTicket" WHERE id = ANY(${ticketIds}::text[]) ORDER BY id FOR UPDATE
+     SELECT id FROM "SubscriberTicket" WHERE id = ANY(${sortedTicketIds}::text[]) ORDER BY id FOR UPDATE
    `;
    ```
 
-3. **Deterministic Multi-Row Sorting on Batch Handover**:
-   Every batch lock operation (e.g. evening cash handover acknowledgment) sorts IDs alphabetically before issuing `SELECT ... FOR UPDATE`:
+3. **Tier 3 & Tier 4 — InstallmentDue & Payment Locks (Double-Settlement Prevention)**:
+   - **Tier 3 (`"InstallmentDue"`)**: Locked before status mutation; counter cash, field collections, UPI claim verification, and ghost-drop reconciliation all re-verify locked `status !== 'PAID'` inside the transaction to prevent double settlements.
+   - **Tier 4 (`"Payment"`)**: Locked in deterministic sorted order (`ORDER BY id`) during `verifyUpiClaim`, `executeReconcileSettlement`, and evening cash handover acknowledgment (`CollectionService.acknowledgeHandover`):
    ```typescript
-   // apps/api/src/collection/collection.service.ts
+   // apps/api/src/collection/collection.service.ts (acknowledgeHandover)
    const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
 
    const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
@@ -145,8 +148,8 @@ export async function withTransactionRetry<T>(
 ```
 - **Max Retries**: 3 attempts (default).
 - **Backoff Algorithm**: $(50\text{ms} \times 2^{\text{attempt}}) + \text{rand}(0, 50\text{ms})$ capped at 1,000ms.
-- **Classification Filter**: `isTransientTransactionError` catches `40P01`, `40001`, `P2034`, write conflicts, and `P2002` on `receiptNumber`. Application validation errors (`BadRequestException`, `ForbiddenException`, `P2025`) fail fast on the first attempt without unnecessary retries.
-- **Integration Points**: Wired into `PaymentService.recordPayment`, `PaymentService.approveReversal`, `PaymentService.verifyUpiPaymentClaim`, `CollectionService.collectPayment`, and `CollectionService.acknowledgeHandover`.
+- **Classification Filter**: `isTransientTransactionError` catches `40P01`, `40001`, `P2034`, write conflicts, and `P2002` on `receiptNumber` (matching both message substrings and `err.meta.target`). Application validation errors (`BadRequestException`, `ForbiddenException`, `P2025`) fail fast on the first attempt without unnecessary retries.
+- **Integration Points**: Wired into [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.approveReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`CollectionService.acknowledgeHandover`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts).
 
 ---
 

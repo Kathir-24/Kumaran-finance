@@ -129,7 +129,7 @@ sequenceDiagram
 Receipts follow the mandated format:
 $$\text{KC-REC-}\{\text{BranchCode}\}\text{-}\{\text{YYYY}\}\text{-}\{\text{Sequence: 5 digits}\}$$
 Example: `KC-REC-PRD-2026-00045`.
-Every collection immediately issues a receipt record linked to the discrete `Payment` and `PaymentAllocation`. Upon database commit, a `JOB_DISPATCH_PAYMENT_RECEIPT` job is enqueued onto BullMQ's `notification-queue` (fire-and-forget, with Redis offline safety) to notify the subscriber via Mobile Push (free) or Indian Telecom DLT SMS fallback for keypad phones.
+Every collection runs inside `withTransactionRetry`, acquires strict hierarchical pessimistic locks (`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue`) via [`receipt-sequence.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts), and mints the sequential receipt inside the locked transaction before releasing `Branch`. Upon database commit, a `JOB_DISPATCH_PAYMENT_RECEIPT` job is enqueued onto BullMQ's `notification-queue` (fire-and-forget, with Redis offline safety) to notify the subscriber via Mobile Push (free) or Indian Telecom DLT SMS fallback for keypad phones.
 
 ---
 

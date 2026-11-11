@@ -210,6 +210,9 @@ async syncOfflineQueue(
 }
 ```
 
+> [!NOTE]
+> **Database Concurrency Protection**: Every item inside `syncOfflineQueue` delegates directly to `this.recordCollection(...)`, which runs under `withTransactionRetry` and acquires strict 3-tier pessimistic locks via [`acquirePaymentConcurrencyLocks`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) (`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue`) before generating sequential `KC-REC-` receipts inside the locked transaction (`generateNextReceiptNumber`). Parallel field-agent sync batches and office counter payments therefore serialize cleanly with zero `40P01` deadlocks or `P2002` receipt collisions.
+
 ---
 
 ## 4. Evening Dual-Control Cash Handover

@@ -791,58 +791,37 @@ export function parseWholeRupees(value: string | number): number {
 
 ### 4.3 Database, Concurrency & Infrastructure Findings
 
-#### Finding DEF-DB-01: Uncoordinated Row Locking in `CollectionService.recordCollection` (Receipt Collisions & Inversion Deadlock)
-- **Layer & Subsystem**: Database Concurrency & Field Collection Subsystem
-- **Exact File Path & Line Numbers**: `apps/api/src/collection/collection.service.ts:181-228, 249-264`
+#### Finding DEF-DB-01: Uncoordinated Row Locking in `CollectionService.recordCollection`, `PaymentService.verifyUpiClaim`, & `ReconciliationService` (Receipt Collisions & Inversion Deadlock) `[FIXED & VERIFIED — 2026-11-11]`
+- **Layer & Subsystem**: Database Concurrency, Field Collections, UPI Verification & Settlement Reconciliation
+- **Exact File Path & Line Numbers**:
+  - `apps/api/src/collection/collection.service.ts` (`recordCollection`)
+  - `apps/api/src/payment/payment.service.ts` (`recordPayment`, `verifyUpiClaim`)
+  - `apps/api/src/jobs/services/reconciliation.service.ts` (`executeReconcileSettlement`)
+  - `apps/api/src/common/utils/receipt-sequence.util.ts` *(Added shared lock & sequence helper)*
 - **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §4.1 ("Deadlock Prevention & Lock Ordering").
 - **Severity**: **HIGH**
 - **Detailed Technical Root Cause**:
-  `PaymentService.recordPayment` acquires locks in strict sequence:
-  1. `Branch` (`FOR UPDATE`) — serializes sequential receipt numbers.
-  2. `SubscriberTicket` (`FOR UPDATE`) — serializes consecutive arrears updates.
-  3. `InstallmentDue` (`FOR UPDATE`) — prevents duplicate payment.
-  
-  In contrast, `CollectionService.recordCollection`:
-  1. Only locks `InstallmentDue`.
-  2. Does not lock `Branch`, attempting to avoid collisions via a non-locked while loop (`while (await tx.receipt.findUnique ...)`). Under concurrent requests, two transactions generate identical receipt numbers and fail with `P2002`.
-  3. Does not lock `SubscriberTicket`.
-  4. **Lock Inversion Deadlock**: When counter payment (`PaymentService`) locks `SubscriberTicket` and waits for `InstallmentDue`, while field collection (`CollectionService`) locks `InstallmentDue` and attempts to update `SubscriberTicket`, PostgreSQL detects an immediate cyclic wait deadlock (`40P01`).
+  1. `CollectionService.recordCollection` queried `receipt.findFirst` outside `withTransactionRetry` and locked only `InstallmentDue` (omitting `Branch` and `SubscriberTicket`), causing receipt collisions (`P2002`) and cyclic `40P01` lock inversion against `PaymentService.recordPayment` (`Branch -> SubscriberTicket -> InstallmentDue`).
+  2. During implementation inspection, two uncovered sibling gaps and one latent indexing bug were discovered and resolved together:
+     - `PaymentService.verifyUpiClaim` and `ReconciliationService.executeReconcileSettlement` executed receipt minting with zero `FOR UPDATE` locks (and `ReconciliationService` used raw `this.prisma.$transaction` instead of `withTransactionRetry`), risking `40P01`, `P2002`, and cash-vs-UPI double settlement on the same `InstallmentDue`.
+     - Naive ASCII `ORDER BY "receiptNumber" DESC` selected legacy suffixed receipts (e.g., `KC-REC-PRD-2026-REV-00012`) ahead of numeric receipts (`KC-REC-PRD-2026-00415`), forcing 400+ sequential `findUnique` loops inside `"Branch" FOR UPDATE`.
 - **Impact Analysis**:
-  High probability of transaction deadlocks and unique receipt constraint crashes during simultaneous counter and field collection operations.
-- **Concrete Production-Grade Remediation Code Design**:
-  Align lock ordering in `CollectionService.recordCollection`:
+  Transaction deadlocks, unique receipt constraint crashes (`P2002`), double-settlement risks across concurrent counter/field/UPI/reconciliation paths, and inflated Branch lock hold times under burst traffic.
+- **Verified Production Implementation**:
+  Extracted shared DAG lock and O(1) numeric sequence helpers into [`apps/api/src/common/utils/receipt-sequence.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) (`acquirePaymentConcurrencyLocks`, `generateNextReceiptNumber`, `PAYMENT_TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 15000 }`):
 
 ```typescript
-// apps/api/src/collection/collection.service.ts:151-238
-result = await withTransactionRetry(this.prisma, async (tx) => {
-  if (typeof tx.$queryRaw === 'function') {
-    // 1. Lock Branch first (serializes receipt sequence across all staff & agents)
-    await tx.$queryRaw`SELECT id FROM "Branch" WHERE id = ${branchId} FOR UPDATE`;
-    // 2. Lock SubscriberTicket second (serializes consecutive unpaid arrears)
-    await tx.$queryRaw`SELECT id FROM "SubscriberTicket" WHERE id = ${ticket.id} FOR UPDATE`;
-    // 3. Lock InstallmentDue third (prevents double payment)
-    const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus }>>`
-      SELECT id, status FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
-    `;
-    if (lockedDues[0]?.status === DueStatus.PAID) {
-      throw new BadRequestException('Installment has already been paid');
-    }
-  }
-
-  // CRITICAL: Query last receipt INSIDE the locked transaction AFTER locking Branch FOR UPDATE
-  const lastReceipt = await tx.receipt.findFirst({
-    where: { branchId, receiptNumber: { startsWith: prefix } },
-    orderBy: { receiptNumber: 'desc' },
-    select: { receiptNumber: true },
-  });
-  let nextSeq = lastReceipt?.receiptNumber
-    ? (parseInt(lastReceipt.receiptNumber.split('-').pop() || '0', 10) || 0) + 1
-    : 1;
-  const finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-
-  // Proceed with Payment, PaymentAllocation, Receipt, and InstallmentDue creation...
+// apps/api/src/common/utils/receipt-sequence.util.ts (Unified 4-Tier Lock DAG & O(1) Sequence)
+const { lockedDues, lockedPayments } = await acquirePaymentConcurrencyLocks(tx, {
+  branchId: lockBranchId,     // Tier 1: Owning Branch (chitGroup.branchId) FOR UPDATE
+  ticketIds,                  // Tier 2: Sorted SubscriberTicket IDs ORDER BY id FOR UPDATE
+  dueIds,                     // Tier 3: Sorted InstallmentDue IDs ORDER BY id FOR UPDATE
+  paymentIds,                 // Tier 4: Sorted Payment IDs ORDER BY id FOR UPDATE (UPI/Recon)
 });
+const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 ```
+
+- **Verification Summary**: Live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`10`: `10/10` passed in `2.797s`), targeted concurrency/payment/collection/reconciliation suites (`8/8` suites, `224/224` tests), `oxlint` (`0` errors), and `nest build` (`exit 0`).
 
 ---
 
@@ -1121,7 +1100,7 @@ gantt
 - **Objective**: Prevent multi-instance session revocations and eliminate collection receipt collisions/deadlocks.
 - **Target Items**:
   1. `DEF-FE-01` **[FIXED & VERIFIED]**: Unified BFF deduplication (`bff-token-refresh.ts` shared across proxy/session/logout) + NestJS `AuthService` distributed Redis lock & contention-only handoff.
-  2. `DEF-DB-01`: Synchronize lock acquisition order (`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue`) and move `lastReceipt` sequence query inside `withTransactionRetry` in `CollectionService`.
+  2. `DEF-DB-01` **[FIXED & VERIFIED]**: Unified 4-tier lock DAG (`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` $\to$ `Payment`) and O(1) numeric TX-internal receipt sequence helper (`receipt-sequence.util.ts`) across `CollectionService.recordCollection`, `PaymentService.recordPayment`, `PaymentService.verifyUpiClaim`, and `ReconciliationService.executeReconcileSettlement`.
 
 #### Phase 2: Financial Invariants, Edge Crypto & SDK Automation (Sprint 2 — Days 3 to 7)
 - **Objective**: Enforce integer validation, cryptographic Edge routing, live OpenAPI AST export, and real-time SSE streaming.

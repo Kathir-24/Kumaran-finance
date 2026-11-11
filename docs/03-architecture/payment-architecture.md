@@ -346,14 +346,15 @@ if (dto.collectorUserId === acknowledgerUserId) {
 }
 ```
 
-### Proof 4: Pessimistic Row Locking on Cash Handover (SELECT FOR UPDATE)
-From [`apps/api/src/collection/collection.service.ts#L406-L422`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L406-L422):
+### Proof 4: Pessimistic Row Locking on Cash Handover (Deterministic `ORDER BY id FOR UPDATE`)
+From [`apps/api/src/collection/collection.service.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts):
 
 ```typescript
-// 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate vault handovers
+// 0. Pessimistic Row Lock (SELECT FOR UPDATE) with deterministic ID sorting to eliminate deadlocks (40P01)
 if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
+  const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
   const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
-    SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${dto.paymentIds}::text[]) FOR UPDATE
+    SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${sortedPaymentIds}::text[]) ORDER BY id FOR UPDATE
   `;
   if (lockedPayments && lockedPayments.length > 0) {
     for (const lp of lockedPayments) {
@@ -366,6 +367,10 @@ if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.lengt
   }
 }
 ```
+
+### Proof 5: Unified 4-Tier Lock DAG & Transactional Receipt Sequence
+All 4 receipt-generating paths ([`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts)) share [`acquirePaymentConcurrencyLocks` & `generateNextReceiptNumber`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) inside `withTransactionRetry`:
+- Locks strictly follow **`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` ($\to$ `Payment`)** before generating receipts inside the transaction, eliminating `40P01` cyclic lock inversions, `P2002` receipt collisions, and duplicate `verifyUpiClaim` / cash double-settlements.
 
 ---
 
