@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStore } from '@/stores/approvals-store';
-import { apiClient, getApiBaseUrl, getStoredAccessToken, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
 
 interface SseApprovalsMessage {
   type: string;
@@ -124,9 +124,6 @@ export function useApprovalsStream() {
     async function connectStream() {
       if (isCancelled) return;
 
-      const token = getStoredAccessToken();
-      if (!token) return;
-
       // Clean up previous controller & watchdog
       abortControllerRef.current?.abort();
       clearWatchdog();
@@ -142,13 +139,11 @@ export function useApprovalsStream() {
         const headers: Record<string, string> = {
           Accept: 'text/event-stream',
         };
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
 
         const response = await fetch(url, {
           method: 'GET',
           headers,
+          credentials: 'same-origin',
           signal: abortController.signal,
         });
 
@@ -161,9 +156,12 @@ export function useApprovalsStream() {
             return;
           }
 
-          // If 401 Unauthorized, re-hydrate auth state
+          // If 401 Unauthorized, re-hydrate auth state and halt reconnects if logged out
           if (response.status === 401) {
-            useAuthStore.getState().hydrate().catch(() => {});
+            await useAuthStore.getState().hydrate().catch(() => {});
+            if (!useAuthStore.getState().isAuthenticated) {
+              return;
+            }
           }
 
           scheduleReconnect(false);

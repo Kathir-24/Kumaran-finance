@@ -453,7 +453,7 @@ async function getOrExecuteTokenRefresh(
 
 ---
 
-#### Finding DEF-FE-02: Approvals Real-Time SSE Stream Completely Disabled and Hangs BFF Proxy
+#### Finding DEF-FE-02: Approvals Real-Time SSE Stream Completely Disabled and Hangs BFF Proxy `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Web Real-Time Approvals & BFF Proxy Streaming
 - **Exact File Path & Line Numbers**:
   1. `apps/web/src/hooks/use-approvals-stream.ts:127-128`
@@ -503,7 +503,7 @@ async function getOrExecuteTokenRefresh(
 
 ---
 
-#### Finding DEF-FE-03: Next.js Edge Middleware Lacks Role Path Gating & Authentication Bypassed via Non-HttpOnly `kc_session_active` Cookie
+#### Finding DEF-FE-03: Next.js Edge Middleware Lacks Role Path Gating & Authentication Bypassed via Non-HttpOnly `kc_session_active` Cookie `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Next.js Edge Middleware & Session Boundary
 - **Exact File Path & Line Numbers**: `apps/web/src/middleware.ts:28-42`
 - **Violated Specification**: ADR-20 Decision 3; `docs/03-architecture/security-and-access-guardians.md` §7.5.
@@ -724,7 +724,7 @@ if (forwardedFor) {
 
 ---
 
-#### Finding DEF-FE-09: Playwright E2E Test Suite Broken Due to Legacy `localStorage` Token Assumptions
+#### Finding DEF-FE-09: Playwright E2E Test Suite Broken Due to Legacy `localStorage` Token Assumptions `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Automated End-to-End Testing Suite
 - **Exact File Path & Line Numbers**:
   - `apps/web/e2e/fixtures/auth-fixtures.ts:68-75, 134-135`
@@ -1097,8 +1097,8 @@ gantt
 - **Target Items**:
   1. `DEF-DB-02` **[FIXED & VERIFIED]**: Wrapped all critical state transitions in `withTransactionRetry` and enforced acyclic row locks (`state-transition-lock.util.ts`) across `AuctionService` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), `DisbursementService` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), `InstallmentService` (`generateMonthlyDues`, `substituteSubscriber`), and `PaymentService` reversals (`requestReversal`, `approveReversal`, `rejectReversal`), with monotonic `"ChitGroup" -> "Auction"` alignment and 19/19 verified live PostgreSQL 17 concurrency tests.
   2. `DEF-BE-01` **[FIXED & VERIFIED]**: Enforced `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE` (plus `@Min(0)` on `openingBalance`) across all 11 monetary DTOs and eliminated silent `Math.floor()` paise truncation via shared [`whole-rupee.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts).
-  3. `DEF-FE-02`: Enable unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy and remove client token guard from `useApprovalsStream`.
-  4. `DEF-FE-03`: Eliminate `kc_session_active` trust and enforce WebCrypto `jose.jwtVerify` signature + role path gating in Next.js Edge Middleware.
+  3. `DEF-FE-02` **[FIXED & VERIFIED]**: Enabled unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy & Nginx, passed `shouldUseSecureCookies` symmetrically into `/api/auth/session`, and removed the legacy `getStoredAccessToken()` guard in `useApprovalsStream` (`credentials: 'same-origin'`).
+  4. `DEF-FE-03` **[FIXED & VERIFIED]**: Eliminated `kc_session_active` trust in Edge Middleware, enforced WebCrypto `jose.jwtVerify` (HS256 + `tokenType` validation) and fail-closed `JWT_SECRET` handling in `edge-auth.ts`, sanitized open redirects, and wired single-source-of-truth RBAC gates via `route-permissions.ts`.
   5. `DEF-FE-04`: Add explicit `@ApiProperty({ type: String })` annotations on nullable/union NestJS DTOs and run `pnpm run codegen:spec && pnpm run codegen:ts`.
 
 #### Phase 3: Security, Caching, Storage & Observability Optimization (Sprint 3 — Week 2)
@@ -1117,7 +1117,7 @@ gantt
 - **Objective**: Eliminate component raw fetch boilerplate, update automated E2E tests, and add declarative guards.
 - **Target Items**:
   1. `DEF-FE-05`: Refactor 25+ UI components to use typed `apiClient` and `unwrapApiResponse()`.
-  2. `DEF-FE-09`: Update Playwright E2E fixtures to inject HttpOnly session cookies.
+  2. `DEF-FE-09` **[FIXED & VERIFIED]**: Updated Playwright E2E fixtures (`auth-fixtures.ts` `buildSessionCookies`/`injectSession`) to inject HttpOnly BFF session cookies cleanly across isolated `chitflow_test` runs.
   3. `DEF-FE-10`: Update `parseWholeRupees` in SDK to split on decimal points.
   4. `DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.
   5. `DEF-BE-04`: Introduce declarative `@RequireDualControl()` decorator and `MakerCheckerGuard`.

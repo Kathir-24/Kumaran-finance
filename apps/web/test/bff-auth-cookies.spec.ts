@@ -15,6 +15,10 @@ import {
   getBackendApiUrl,
   shouldUseSecureCookies,
 } from '../src/lib/auth-cookies.ts';
+import {
+  applyRefreshedCookies,
+  clearAuthCookies,
+} from '../src/lib/bff-token-refresh.ts';
 
 test('BFF Cookies: Access token cookie enforces HttpOnly and 15-minute TTL', () => {
   const opts = getAccessTokenCookieOptions();
@@ -103,4 +107,50 @@ test('BFF Cookies: shouldUseSecureCookies honors HTTPS transport and HTTP produc
     if (originalCookieSecure !== undefined) env.COOKIE_SECURE = originalCookieSecure;
     else delete env.COOKIE_SECURE;
   }
+});
+
+test('BFF Cookies: clearAuthCookies mirrors applyRefreshedCookies Secure attributes symmetrically', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { resolve } = await import('node:path');
+
+  const createMockCookieResponse = () => {
+    const setCalls: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    return {
+      setCalls,
+      cookies: {
+        set(name: string, value: string, options: Record<string, unknown>) {
+          setCalls.push({ name, value, options });
+        },
+      },
+    };
+  };
+
+  const httpsRes = createMockCookieResponse();
+  applyRefreshedCookies(
+    httpsRes as any,
+    { accessToken: 'acc.jwt', refreshToken: 'ref.jwt' },
+    true,
+  );
+  assert.equal(httpsRes.setCalls.every((c) => c.options.secure === true), true);
+
+  const httpsClearRes = createMockCookieResponse();
+  clearAuthCookies(httpsClearRes as any, true);
+  assert.equal(httpsClearRes.setCalls.length, 3);
+  assert.equal(httpsClearRes.setCalls.every((c) => c.options.secure === true && c.options.maxAge === 0), true);
+
+  const httpClearRes = createMockCookieResponse();
+  clearAuthCookies(httpClearRes as any, false);
+  assert.equal(httpClearRes.setCalls.length, 3);
+  assert.equal(httpClearRes.setCalls.every((c) => c.options.secure === false && c.options.maxAge === 0), true);
+
+  const sessionRouteSrc = readFileSync(
+    resolve(process.cwd(), 'src/app/api/auth/session/route.ts'),
+    'utf8',
+  );
+  assert.match(sessionRouteSrc, /shouldUseSecureCookies\(request\)/);
+  assert.doesNotMatch(
+    sessionRouteSrc,
+    /clearAuthCookies\([^,)]+\)/,
+    '/api/auth/session must never call clearAuthCookies without symmetric isSecure flag',
+  );
 });

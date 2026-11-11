@@ -172,7 +172,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 1: ING-1 — Port 80 HTTP -> HTTPS 301 Permanent Redirect
   // --------------------------------------------------------------------------
-  console.log(`--- [1/6] ING-1: Plain HTTP Port 80 Redirect ---`);
+  console.log(`--- [1/7] ING-1: Plain HTTP Port 80 Redirect ---`);
   try {
     const res = await httpGet({
       host: HOST,
@@ -200,7 +200,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 2: ING-2 — Port 80 Health Probe Bypass
   // --------------------------------------------------------------------------
-  console.log(`\n--- [2/6] ING-2: Plain HTTP /health Liveness Bypass ---`);
+  console.log(`\n--- [2/7] ING-2: Plain HTTP /health Liveness Bypass ---`);
   try {
     const res = await httpGet({
       host: HOST,
@@ -227,7 +227,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 3: ING-3 — Port 443 HTTPS TLS Handshake & Health Probe
   // --------------------------------------------------------------------------
-  console.log(`\n--- [3/6] ING-3: Port 443 HTTPS TLS Handshake & Health ---`);
+  console.log(`\n--- [3/7] ING-3: Port 443 HTTPS TLS Handshake & Health ---`);
   try {
     const res = await httpsGet({
       host: HOST,
@@ -254,7 +254,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 4: ING-4 — Port 443 HTTPS API Reverse Proxying
   // --------------------------------------------------------------------------
-  console.log(`\n--- [4/6] ING-4: HTTPS API Reverse Proxying (/api/v1/chits) ---`);
+  console.log(`\n--- [4/7] ING-4: HTTPS API Reverse Proxying (/api/v1/chits) ---`);
   try {
     const res = await httpsGet({
       host: HOST,
@@ -282,7 +282,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 5: ING-5 — OWASP Top 10 Security Headers
   // --------------------------------------------------------------------------
-  console.log(`\n--- [5/6] ING-5: OWASP Security Headers Ingress Check ---`);
+  console.log(`\n--- [5/7] ING-5: OWASP Security Headers Ingress Check ---`);
   try {
     const res = await httpsGet({
       host: HOST,
@@ -317,7 +317,7 @@ export async function runIngressVerification(): Promise<boolean> {
   // --------------------------------------------------------------------------
   // Step 6: ING-6 — Special Endpoints Ingress (Bull Board & Metrics)
   // --------------------------------------------------------------------------
-  console.log(`\n--- [6/6] ING-6: Internal Observability Endpoints Ingress ---`);
+  console.log(`\n--- [6/7] ING-6: Internal Observability Endpoints Ingress ---`);
   try {
     const metricsRes = await httpsGet({
       host: HOST,

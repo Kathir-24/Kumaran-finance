@@ -90,39 +90,57 @@ test.describe('Task 12.1: Playwright Test Infrastructure & Zero-Mock Smoke Tests
     await expect(branchesLink).toHaveCount(0);
   });
 
-  test('7. BFF SSE Streaming: Live approvals stream delivers first chunk unbuffered through /bff/api/v1', async ({
+  test('7. BFF SSE Streaming: Live dashboard useApprovalsStream connects unbuffered via HttpOnly cookies', async ({
     managingPartnerPage,
   }) => {
+    const streamResponsePromise = managingPartnerPage.waitForResponse(
+      (res) =>
+        res.url().includes('/bff/api/v1/reports/approvals-stream') &&
+        res.status() === 200,
+    );
+
     await managingPartnerPage.goto('/', { waitUntil: 'domcontentloaded' });
 
-    const streamProbe = await managingPartnerPage.evaluate(async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      try {
-        const res = await fetch('/bff/api/v1/reports/approvals-stream', {
-          headers: { Accept: 'text/event-stream' },
-          signal: controller.signal,
-        });
-        const contentType = res.headers.get('content-type') || '';
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let text = '';
-        while (reader && !text.includes('data:')) {
-          const chunk = await reader.read();
-          if (chunk.done) break;
-          if (chunk.value) {
-            text += decoder.decode(chunk.value, { stream: true });
-          }
-        }
-        controller.abort();
-        return { ok: res.ok, status: res.status, contentType, text };
-      } finally {
-        clearTimeout(timeout);
-      }
-    });
+    const streamResponse = await streamResponsePromise;
+    expect(streamResponse.status()).toBe(200);
+    expect(streamResponse.headers()['content-type'] || '').toContain('text/event-stream');
 
-    expect(streamProbe.status).toBe(200);
-    expect(streamProbe.contentType).toContain('text/event-stream');
-    expect(streamProbe.text).toContain('data:');
+    // Open Bell dropdown and verify Topbar live SSE indicator flips to connected (en or ta default locale)
+    const bellButton = managingPartnerPage.getByRole('button', {
+      name: /Pending Approvals|நிலுவை ஒப்புதல்கள்/i,
+    });
+    await expect(bellButton).toBeVisible();
+    await bellButton.click();
+
+    const liveStatusDot = managingPartnerPage.locator('[title="Live SSE Stream Connected"]');
+    await expect(liveStatusDot).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('8. Edge JWT & RBAC Guardrails: Rejects spoofed kc_session_active cookie and enforces role gates at Edge', async ({
+    browser,
+    auditorPage,
+  }) => {
+    const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3001';
+    const spoofContext = await browser.newContext();
+    try {
+      await spoofContext.addCookies([
+        {
+          name: 'kc_session_active',
+          value: '1',
+          url: baseUrl,
+          httpOnly: false,
+          sameSite: 'Lax',
+        },
+      ]);
+
+      const spoofPage = await spoofContext.newPage();
+      await spoofPage.goto('/branches', { waitUntil: 'domcontentloaded' });
+      await expect(spoofPage).toHaveURL(/\/login(\?|$)/);
+    } finally {
+      await spoofContext.close();
+    }
+
+    await auditorPage.goto('/branches', { waitUntil: 'domcontentloaded' });
+    await expect(auditorPage).toHaveURL(/\/\?error=forbidden/);
   });
 });

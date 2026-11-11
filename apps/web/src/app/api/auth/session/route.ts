@@ -18,6 +18,8 @@ import {
 } from '@/lib/bff-token-refresh';
 
 export async function GET(request: NextRequest) {
+  const isSecure = shouldUseSecureCookies(request);
+
   try {
     const backendUrl = getBackendApiUrl();
     const accessToken = request.cookies.get(COOKIE_ACCESS_TOKEN)?.value;
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
       // If non-401 or no refresh token available, clear stale cookies and conclude unauthenticated
       if (profileRes.status !== 401 || !refreshToken) {
         const res = NextResponse.json({ authenticated: false, user: null });
-        clearAuthCookies(res);
+        clearAuthCookies(res, isSecure);
         return res;
       }
     }
@@ -58,7 +60,7 @@ export async function GET(request: NextRequest) {
           const user = payload.data || payload;
 
           const response = NextResponse.json({ authenticated: true, user });
-          applyRefreshedCookies(response, refreshData, shouldUseSecureCookies(request));
+          applyRefreshedCookies(response, refreshData, isSecure);
           return response;
         }
       }
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // Case 3: No valid session
     const emptyResponse = NextResponse.json({ authenticated: false, user: null });
-    clearAuthCookies(emptyResponse);
+    clearAuthCookies(emptyResponse, isSecure);
     return emptyResponse;
   } catch (error: any) {
     console.error('[BFF Session] Hydration error:', error);

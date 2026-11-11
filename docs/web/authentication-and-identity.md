@@ -38,6 +38,7 @@ The Authentication & Identity module governs office staff access to the **Kumara
 
 ```
 apps/web/src/
+├── middleware.ts                                 # Next.js Edge JWT (jose HS256) & canonical RBAC route barrier
 ├── app/(auth)/
 │   ├── layout.tsx                              # Auth workstation layout with monograms & locale switch
 │   ├── login/page.tsx                          # /login entrypoint wrapped in Suspense boundary
@@ -46,13 +47,15 @@ apps/web/src/
 │   ├── api/auth/
 │   │   ├── login/route.ts                      # BFF login handler setting HttpOnly session cookies
 │   │   ├── verify-totp/route.ts                # BFF 2FA TOTP verification handler setting HttpOnly cookies
-│   │   ├── session/route.ts                    # BFF session hydration sharing coalesced refresh helper
+│   │   ├── session/route.ts                    # BFF session hydration sharing coalesced refresh & symmetric cookie clearing
 │   │   └── logout/route.ts                     # BFF logout handler invalidating Redis/BFF caches & cookies
 │   └── bff/api/v1/[...path]/route.ts           # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
 ├── lib/
 │   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto)
 │   ├── bff-api-proxy.ts                        # Shared BFF proxy handler with unbuffered SSE pass-through
-│   └── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
+│   ├── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
+│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT verifier & open-redirect sanitizer
+│   └── route-permissions.ts                    # Single canonical RBAC route permissions source of truth
 ├── stores/
 │   └── auth-store.ts                           # Re-entrancy-guarded logout & non-looping unauthenticated hydration
 ├── components/auth/
@@ -65,7 +68,8 @@ apps/web/src/
     ├── login-validation.spec.ts                # ADR-18 10-digit regex, password length & 2FA fork tests
     ├── totp-validation.spec.ts                 # RFC 6238 6-digit validation, paste extraction & guard tests
     ├── totp-enrollment.spec.ts                 # Base32 formatting, SVG QR, enable/disable & store sync tests
-    └── change-password.spec.ts                 # Current/new password validation, DTO matching & i18n parity tests
+    ├── change-password.spec.ts                 # Current/new password validation, DTO matching & i18n parity tests
+    └── edge-auth-middleware.spec.ts            # Edge jose HS256, tokenType, fail-closed secret & RBAC gate tests
 ```
 
 ---
@@ -147,7 +151,7 @@ sequenceDiagram
 ✔ Clipboard Paste Extraction: Cleans dirty inputs and limits to 6 digits (0.83ms)
 ✔ 2FA State Guard: Verification requires valid tempToken (0.61ms)
 -----------------------------------------------------------------------------------------
-Authentication Tests: 16 passing, 0 failing
+Authentication Tests: 16 passing + 9 Edge JWT/RBAC tests passing (`edge-auth-middleware.spec.ts`), 0 failing
 TypeScript:           tsc --noEmit passed with 0 errors
-Next.js Build:        Dynamic /login and /2fa routes generated cleanly
+Next.js Build:        Dynamic /login, /2fa, and Edge Middleware routes generated cleanly
 ```

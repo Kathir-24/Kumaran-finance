@@ -16,13 +16,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-export type UserRole =
-  | 'SUPER_ADMIN'
-  | 'BRANCH_MANAGER'
-  | 'ACCOUNTANT'
-  | 'COLLECTION_AGENT'
-  | 'AUDITOR'
-  | 'CUSTOMER';
+import {
+  ROUTE_PERMISSIONS_BY_HREF,
+  type UserRole,
+} from '../../lib/route-permissions.ts';
+
+export type { UserRole };
 
 export interface NavItem {
   href: string;
@@ -38,88 +37,88 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     href: '/',
     labelKey: 'nav.dashboard',
     icon: LayoutDashboard,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/'],
   },
   {
     href: '/schemes',
     labelKey: 'nav.schemes',
     icon: Landmark,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/schemes'],
   },
   {
     href: '/schemes/onboard',
     labelKey: 'nav.onboardGrid',
     icon: BookOpen,
-    allowedRoles: ['SUPER_ADMIN', 'ACCOUNTANT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/schemes/onboard'],
   },
   {
     href: '/customers',
     labelKey: 'nav.customers',
     icon: Users,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/customers'],
   },
   {
     href: '/auctions',
     labelKey: 'nav.auctions',
     icon: Gavel,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'AUDITOR'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/auctions'],
   },
   {
     href: '/disbursements',
     labelKey: 'nav.disbursements',
     icon: Award,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/disbursements'],
     badgeKey: 'disbursements',
   },
   {
     href: '/collections',
     labelKey: 'nav.collections',
     icon: Receipt,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/collections'],
   },
   {
     href: '/collections/handover',
     labelKey: 'nav.handover',
     icon: Banknote,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/collections/handover'],
     badgeKey: 'cashHandovers',
   },
   {
     href: '/reversals',
     labelKey: 'nav.reversals',
     icon: RefreshCw,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/reversals'],
     badgeKey: 'reversals',
   },
   {
     href: '/reports',
     labelKey: 'nav.reports',
     icon: FileSpreadsheet,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/reports'],
   },
   {
     href: '/instructions',
     labelKey: 'nav.instructions',
     icon: BookCheck,
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/instructions'],
   },
   {
     href: '/branches',
     labelKey: 'nav.branches',
     icon: Building2,
-    allowedRoles: ['SUPER_ADMIN'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/branches'],
   },
   {
     href: '/users',
     labelKey: 'nav.users',
     icon: UserCog,
-    allowedRoles: ['SUPER_ADMIN'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/users'],
   },
   {
     href: '/admin/jobs',
     labelKey: 'nav.jobs',
     icon: Activity,
-    allowedRoles: ['SUPER_ADMIN'],
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/admin/jobs'],
   },
 ];
 

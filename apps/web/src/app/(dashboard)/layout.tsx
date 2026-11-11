@@ -6,7 +6,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStream } from '@/hooks/use-approvals-stream';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
-import { MAIN_NAV_ITEMS } from '@/components/layout/nav-items';
+import {
+  DASHBOARD_STAFF_ROLES,
+  isRoleAuthorizedForPath,
+  resolveRoutePermission,
+} from '@/lib/route-permissions';
 import { AccessDeniedView } from '@/components/security/access-denied-view';
 
 export default function DashboardLayout({
@@ -60,16 +64,10 @@ export default function DashboardLayout({
     return null;
   }
 
-  // Match current route against navigation permissions (longest matching path first)
+  // Match current route against canonical permissions registry (longest matching path first)
   const userRoles = user?.roles || [];
-  const matchedRoute = (() => {
-    const sorted = [...MAIN_NAV_ITEMS].sort((a, b) => b.href.length - a.href.length);
-    return sorted.find((item) =>
-      item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-    );
-  })();
-
-  const isRoleAuthorized = !matchedRoute || matchedRoute.allowedRoles.some((role) => userRoles.includes(role));
+  const matchedRoute = pathname ? resolveRoutePermission(pathname) : undefined;
+  const isRoleAuthorized = pathname ? isRoleAuthorizedForPath(pathname, userRoles) : true;
 
   return (
     <div className="flex min-h-screen w-full bg-slate-950 text-slate-100 antialiased">
@@ -93,7 +91,7 @@ export default function DashboardLayout({
               children
             ) : (
               <AccessDeniedView
-                requiredRoles={matchedRoute.allowedRoles}
+                requiredRoles={matchedRoute?.allowedRoles ?? [...DASHBOARD_STAFF_ROLES]}
                 userRoles={userRoles}
               />
             )}

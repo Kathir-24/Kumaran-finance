@@ -1,55 +1,44 @@
 // ==============================================================================
-// Kumaran Chits — Next.js 15 Edge Authentication Middleware (src/middleware.ts)
-// Enforces instant server-side HTTP 307 redirects for unauthenticated routes,
-// eliminating Flash of Unauthenticated Content (FOUC) at zero millisecond latency.
+// Kumaran Chits — Edge Authentication & RBAC Middleware (DEF-FE-03)
+// Cryptographically verifies HttpOnly BFF JWT cookies via Web Crypto (jose HS256),
+// enforces canonical role-based route gates, and ignores spoofable JS presence flags.
 // ==============================================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
-} from './lib/auth-cookies';
+  getClearedCookieOptions,
+  shouldUseSecureCookies,
+} from './lib/auth-cookies.ts';
+import { evaluateEdgeAuth } from './lib/edge-auth.ts';
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export async function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
 
-  // 1. Skip static assets, Next.js internal bundles, and BFF/API routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/bff') ||
-    pathname.startsWith('/print') ||
-    pathname.includes('.')
-  ) {
+  const decision = await evaluateEdgeAuth({
+    pathname,
+    redirectParam: searchParams.get('redirect'),
+    errorParam: searchParams.get('error'),
+    accessToken: request.cookies.get(COOKIE_ACCESS_TOKEN)?.value,
+    refreshToken: request.cookies.get(COOKIE_REFRESH_TOKEN)?.value,
+  });
+
+  if (decision.action === 'next') {
     return NextResponse.next();
   }
 
-  // 2. Check for active session cookies
-  const hasAccessToken = request.cookies.has(COOKIE_ACCESS_TOKEN);
-  const hasRefreshToken = request.cookies.has(COOKIE_REFRESH_TOKEN);
-  const hasSessionActive = request.cookies.has(COOKIE_SESSION_ACTIVE);
-  const isAuthenticated = hasAccessToken || hasRefreshToken || hasSessionActive;
+  const response = NextResponse.redirect(new URL(decision.location, request.url));
 
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/2fa');
-
-  // Case A: Unauthenticated user trying to access protected dashboard routes
-  if (!isAuthenticated && !isAuthPage) {
-    const loginUrl = new URL('/login', request.url);
-    if (pathname !== '/') {
-      loginUrl.searchParams.set('redirect', pathname);
-    }
-    return NextResponse.redirect(loginUrl);
+  if (decision.clearStaleCookies) {
+    const isSecure = shouldUseSecureCookies(request);
+    response.cookies.set(COOKIE_ACCESS_TOKEN, '', getClearedCookieOptions(true, isSecure));
+    response.cookies.set(COOKIE_REFRESH_TOKEN, '', getClearedCookieOptions(true, isSecure));
+    response.cookies.set(COOKIE_SESSION_ACTIVE, '', getClearedCookieOptions(false, isSecure));
   }
 
-  // Case B: Authenticated user trying to access login/2fa pages
-  if (isAuthenticated && isAuthPage) {
-    const redirectParam = request.nextUrl.searchParams.get('redirect');
-    const destinationUrl = new URL(redirectParam || '/', request.url);
-    return NextResponse.redirect(destinationUrl);
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {

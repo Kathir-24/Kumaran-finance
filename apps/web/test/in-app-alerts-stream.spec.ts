@@ -172,3 +172,44 @@ describe('In-App Alerts & Real-Time Stream Unit Tests', () => {
     assert.ok(routes.includes('/reversals'));
   });
 });
+
+describe('BFF Cookie SSE Stream Contract (DEF-FE-02)', () => {
+  it('9. Resolves /bff/api/v1/reports/approvals-stream with same-origin HttpOnly cookies and zero getStoredAccessToken gating', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { getApiBaseUrl } = await import('../src/lib/api-client.ts');
+
+    const originalWindow = (globalThis as any).window;
+    try {
+      (globalThis as any).window = {};
+      const streamUrl = `${getApiBaseUrl()}/api/v1/reports/approvals-stream`;
+      assert.equal(streamUrl, '/bff/api/v1/reports/approvals-stream');
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as any).window;
+      } else {
+        (globalThis as any).window = originalWindow;
+      }
+    }
+
+    const hookSource = readFileSync(
+      resolve(process.cwd(), 'src/hooks/use-approvals-stream.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(
+      hookSource,
+      /getStoredAccessToken/,
+      'useApprovalsStream must not abort SSE connection when client storage token is null under BFF auth',
+    );
+    assert.match(
+      hookSource,
+      /credentials:\s*['"]same-origin['"]/,
+      'useApprovalsStream must forward HttpOnly cookies via same-origin fetch credentials',
+    );
+    assert.match(
+      hookSource,
+      /useAuthStore\.getState\(\)\.hydrate\(\)/,
+      'useApprovalsStream must re-hydrate BFF session state on 401 before reconnecting',
+    );
+  });
+});
