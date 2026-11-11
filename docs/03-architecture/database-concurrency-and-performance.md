@@ -137,11 +137,13 @@ $$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{
 
 4. **State Machine Lock Hierarchy (Auction, Disbursement & Subscriber Substitution)**:
    Shared helpers in [`state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) enforce monotonic locking across critical lifecycle transitions without conflicting with payment paths:
-   $$\texttt{"ChitGroup"} \;\longrightarrow\; \texttt{"Auction"} \;\longrightarrow\; \texttt{"AuctionMinutes"} \;/\; \texttt{"AuctionWinner"} \;\longrightarrow\; \texttt{"SubscriberTicket"}$$
+   $$\texttt{"ChitGroup"} \;\longrightarrow\; \texttt{"Auction"} \;\longrightarrow\; \texttt{"AuctionMinutes"} \;/\; \texttt{"AuctionWinner"} \;\longrightarrow\; \texttt{"SubscriberTicket"} \;\longrightarrow\; \texttt{"InstallmentDue"}$$
    - `AuctionService.recordBid` / `recordTieBreak`: lock `"ChitGroup" FOR UPDATE` before upserting Auction/Winner.
-   - `AuctionService.finalizeAuction` / `markMinutesFiled`: lock `"Auction"` / `"AuctionMinutes"` `FOR UPDATE` before committing state.
+   - `AuctionService.finalizeAuction`: locks `"ChitGroup" FOR UPDATE` strictly *before* `"Auction" FOR UPDATE` (monotonic `"ChitGroup" -> "Auction"` DAG alignment) and refreshes state snapshot under both locks, eliminating `COMPLETED -> SCHEDULED` regressions against concurrent bids.
+   - `AuctionService.markMinutesFiled`: locks `"AuctionMinutes" FOR UPDATE` before committing filing status (`filedAtRegistrar === true -> MINUTES_ALREADY_FILED`).
    - `DisbursementService.verifySafetyProof` / `authorizePayout` / `releasePayout`: lock `"AuctionWinner" FOR UPDATE`.
    - `DisbursementService.settleFinalMonth` (Month $N$ maturity): lock `"ChitGroup" FOR UPDATE` then `"SubscriberTicket" FOR UPDATE`.
+   - `InstallmentService.generateMonthlyDues`: locks `"ChitGroup" FOR UPDATE` before querying/creating dues, serializing concurrent schedule runs and eliminating `P2002` collisions on `@@unique([ticketId, installmentMonth])`.
    - `InstallmentService.substituteSubscriber`: lock `"SubscriberTicket" FOR UPDATE` and translate concurrent duplicate-customer `P2002` (`@@unique([chitGroupId, customerId])`) cleanly into `ConflictException` (ADR-13).
 
 ### 4.2 Automated Transaction Retry Utility

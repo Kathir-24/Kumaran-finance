@@ -844,20 +844,21 @@ const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 - **Impact Analysis**:
   Deadlock crashes under peak load, concurrent payout/finalization overwrite races, and payment/reversal ledger split-brain corruption.
 - **Verified Production Implementation**:
-  Wrapped all 13 critical state transitions in `withTransactionRetry` backed by [`apps/api/src/common/utils/state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) (`lockChitGroupRow`, `lockAuctionRow`, `lockAuctionMinutesRow`, `lockAuctionWinnerRow`, `lockSubscriberTicketRow`, `lockPaymentAndReversalRows`) while keeping `ChitService.activateChit` scoped cleanly to `DEF-DB-07`:
+  Wrapped all 13 critical state transitions in `withTransactionRetry` backed by [`apps/api/src/common/utils/state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) (`lockChitGroupRow`, `lockAuctionRow`, `lockAuctionMinutesRow`, `lockAuctionWinnerRow`, `lockSubscriberTicketRow`, `lockPaymentAndReversalRows`) while keeping `ChitService.activateChit` scoped cleanly to `DEF-DB-07`. Enforced monotonic `"ChitGroup" -> "Auction"` locking in `AuctionService.finalizeAuction` and `"ChitGroup"` row locking in `InstallmentService.generateMonthlyDues` to eliminate `COMPLETED -> SCHEDULED` regressions and concurrent due generation `P2002` collisions:
 
 ```typescript
 // apps/api/src/common/utils/state-transition-lock.util.ts + withTransactionRetry
 const result = await withTransactionRetry(this.prisma, async (tx) => {
+  if (auction.chitGroupId) await lockChitGroupRow(tx, auction.chitGroupId);
   const lockedAuction = await lockAuctionRow(tx, auctionId);
   if (lockedAuction && (lockedAuction.status === AuctionStatus.COMPLETED || lockedAuction.status === AuctionStatus.MINUTES_FILED)) {
     throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
   }
-  // Idempotent, retry-safe state transition...
+  // Idempotent, retry-safe state transition under post-lock snapshot...
 });
 ```
 
-- **Verification Summary**: Unit transient fault-injection (`40P01`/`40001`/`P2034`) & lock-guard suites (`10/10` suites, `265/265` tests in `5.538 s`), live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`15`: `15/15` passed in `3.458 s` with 0 skips), full `--runInBand` API suite (`51/52` suites, `748/749` tests; 1 pre-existing seeded branch label check in `financial-invariants.spec.ts:196`), `oxlint` (`0` errors), and `nest build` (`exit 0`).
+- **Verification Summary**: Unit transient fault-injection (`40P01`/`40001`/`P2034`) & lock-guard suites (`10/10` suites, `265/265` tests in `7.178 s`), live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`19`: `19/19` passed in `5.104 s` with 0 skips, covering `finalizeAuction` vs `recordBid`/`recordTieBreak`, `markMinutesFiled`, `generateMonthlyDues`, and `requestReversal`), full `--runInBand` API suite (`52/52` suites, `753/753` tests passed in `76.556 s`), `oxlint` (`0` errors, `18` pre-existing warnings), and `nest build` (`exit 0`).
 
 ---
 
@@ -1106,7 +1107,7 @@ gantt
 #### Phase 2: Financial Invariants, Edge Crypto & SDK Automation (Sprint 2 — Days 3 to 7)
 - **Objective**: Enforce integer validation, cryptographic Edge routing, live OpenAPI AST export, and real-time SSE streaming.
 - **Target Items**:
-  1. `DEF-DB-02` **[FIXED & VERIFIED]**: Wrapped all critical state transitions in `withTransactionRetry` and enforced acyclic row locks (`state-transition-lock.util.ts`) across `AuctionService` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), `DisbursementService` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), `InstallmentService` (`generateMonthlyDues`, `substituteSubscriber`), and `PaymentService` reversals (`requestReversal`, `approveReversal`, `rejectReversal`), with ADR-13 concurrent `P2002` `ConflictException` translation.
+  1. `DEF-DB-02` **[FIXED & VERIFIED]**: Wrapped all critical state transitions in `withTransactionRetry` and enforced acyclic row locks (`state-transition-lock.util.ts`) across `AuctionService` (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), `DisbursementService` (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), `InstallmentService` (`generateMonthlyDues`, `substituteSubscriber`), and `PaymentService` reversals (`requestReversal`, `approveReversal`, `rejectReversal`), with monotonic `"ChitGroup" -> "Auction"` alignment and 19/19 verified live PostgreSQL 17 concurrency tests.
   2. `DEF-BE-01`: Convert `@IsNumber()` to `@IsInt()` across all financial input DTOs.
   3. `DEF-FE-02`: Enable unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy and remove client token guard from `useApprovalsStream`.
   4. `DEF-FE-03`: Eliminate `kc_session_active` trust and enforce WebCrypto `jose.jwtVerify` signature + role path gating in Next.js Edge Middleware.
