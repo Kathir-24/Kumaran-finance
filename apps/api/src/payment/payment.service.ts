@@ -19,6 +19,11 @@ import {
 } from '../jobs/constants/queue-names.constant';
 import type { ApprovalAlertJobPayload } from '../jobs/dto/job-payloads.dto';
 import { formatBilingualReceiptText, ReceiptDataInput } from './bilingual-receipt.helper';
+import {
+  acquirePaymentConcurrencyLocks,
+  generateNextReceiptNumber,
+  PAYMENT_TRANSACTION_OPTIONS,
+} from '../common/utils/receipt-sequence.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -159,28 +164,12 @@ export class PaymentService {
     }
 
     const branchId = staffBranchId || ticket.chitGroup.branchId;
+    const lockBranchId = ticket.chitGroup.branchId || branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
     const year = new Date().getFullYear();
 
-    // 6. Generate Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
+    // 6. Prefix for Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
     const prefix = `KC-REC-${branchCode}-${year}-`;
-    const lastReceipt = await this.prisma.receipt.findFirst({
-      where: {
-        receiptNumber: { startsWith: prefix },
-      },
-      orderBy: { receiptNumber: 'desc' },
-      select: { receiptNumber: true },
-    });
-
-    let nextSeq = 1;
-    if (lastReceipt?.receiptNumber) {
-      const parts = lastReceipt.receiptNumber.split('-');
-      const lastNumStr = parts[parts.length - 1];
-      const parsed = parseInt(lastNumStr, 10);
-      if (!isNaN(parsed)) {
-        nextSeq = parsed + 1;
-      }
-    }
 
     const cashHandoverStatus =
       dto.paymentMethod === PaymentMethod.CASH
@@ -192,24 +181,17 @@ export class PaymentService {
     let result: any;
     try {
       result = await withTransactionRetry(this.prisma, async (tx) => {
-        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments and serialize receipt/arrears
-        if (typeof tx.$queryRaw === 'function') {
-          // A. Lock Branch row to serialize sequential receipt generation per branch without table-level locking
-          await tx.$queryRaw`SELECT id FROM "Branch" WHERE id = ${branchId} FOR UPDATE`;
-
-          // B. Lock SubscriberTicket row to serialize consecutive arrears calculations
-          await tx.$queryRaw`SELECT id FROM "SubscriberTicket" WHERE id = ${ticket.id} FOR UPDATE`;
-
-          // C. Lock InstallmentDue row to prevent double payment on the same installment
-          const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
-            SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
-          `;
-          const lockedDue = lockedDues && lockedDues[0];
-          if (lockedDue && lockedDue.status === DueStatus.PAID) {
-            throw new BadRequestException(
-              `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
-            );
-          }
+        // 0. Pessimistic Row Lock (Branch -> SubscriberTicket -> InstallmentDue) to serialize receipt/arrears & block duplicates
+        const { lockedDues } = await acquirePaymentConcurrencyLocks(tx, {
+          branchId: lockBranchId,
+          ticketIds: [ticket.id],
+          dueIds: [due.id],
+        });
+        const lockedDue = lockedDues[0];
+        if (lockedDue && lockedDue.status === DueStatus.PAID) {
+          throw new BadRequestException(
+            `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
+          );
         }
 
         // 1. Create Payment
@@ -239,30 +221,8 @@ export class PaymentService {
           },
         });
 
-        // 3. Create Bilingual Receipt (with collision-proof sequence guarantee)
-        let seq = nextSeq;
-        if (typeof tx.receipt?.findFirst === 'function') {
-          const txLastReceipt = await tx.receipt.findFirst({
-            where: { receiptNumber: { startsWith: prefix } },
-            orderBy: { receiptNumber: 'desc' },
-            select: { receiptNumber: true },
-          });
-          if (txLastReceipt?.receiptNumber) {
-            const parts = txLastReceipt.receiptNumber.split('-');
-            const lastNum = parseInt(parts[parts.length - 1], 10);
-            if (!isNaN(lastNum) && lastNum >= seq) {
-              seq = lastNum + 1;
-            }
-          }
-        }
-
-        let finalReceiptNumber = `${prefix}${String(seq).padStart(5, '0')}`;
-        if (typeof tx.receipt?.findUnique === 'function') {
-          while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
-            seq++;
-            finalReceiptNumber = `${prefix}${String(seq).padStart(5, '0')}`;
-          }
-        }
+        // 3. Create Bilingual Receipt strictly inside the locked Branch transaction
+        const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 
         const receipt = await tx.receipt.create({
           data: {
@@ -320,7 +280,7 @@ export class PaymentService {
         paidAmount: paymentAmount,
         netPayableAmount: due.netPayableAmount,
       };
-    });
+    }, undefined, PAYMENT_TRANSACTION_OPTIONS);
     } catch (err: any) {
       if (err.code === 'P2002') {
         const targetStr = String(err.meta?.target || '');
@@ -1138,28 +1098,13 @@ export class PaymentService {
     }
 
     const branchId = ticket.chitGroup.branchId;
+    const lockBranchId = ticket.chitGroup.branchId || branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
     const year = new Date().getFullYear();
 
     const prefix = `KC-REC-${branchCode}-${year}-`;
-    const lastReceipt = await this.prisma.receipt.findFirst({
-      where: {
-        branchId,
-        receiptNumber: { startsWith: prefix },
-      },
-      orderBy: { receiptNumber: 'desc' },
-      select: { receiptNumber: true },
-    });
-
-    let nextSeq = 1;
-    if (lastReceipt?.receiptNumber) {
-      const parts = lastReceipt.receiptNumber.split('-');
-      const lastNumStr = parts[parts.length - 1];
-      const parsed = parseInt(lastNumStr, 10);
-      if (!isNaN(parsed)) {
-        nextSeq = parsed + 1;
-      }
-    }
+    const ticketIds = payment.allocations.map((a) => a.ticketId || ticket.id);
+    const dueIds = payment.allocations.map((a) => a.installmentDueId || due.id);
 
     const verificationDate = new Date();
     const updatedNotes = dto?.verificationNotes
@@ -1167,6 +1112,28 @@ export class PaymentService {
       : `${payment.notes || ''} | Verified by ${checkerUserId}`;
 
     const result = await withTransactionRetry(this.prisma, async (tx) => {
+      // 0. Pessimistic 4-tier DAG Locks (Branch -> SubscriberTicket -> InstallmentDue -> Payment)
+      const { lockedDues, lockedPayments } = await acquirePaymentConcurrencyLocks(tx, {
+        branchId: lockBranchId,
+        ticketIds,
+        dueIds,
+        paymentIds: [payment.id],
+      });
+
+      const lockedPayment = lockedPayments[0];
+      if (lockedPayment && lockedPayment.paymentStatus !== PaymentStatus.INITIATED) {
+        throw new BadRequestException(
+          `PAYMENT_ALREADY_PROCESSED: Payment claim has already been processed (status: ${lockedPayment.paymentStatus})`,
+        );
+      }
+
+      const settledDue = lockedDues.find((d) => d.status === DueStatus.PAID);
+      if (settledDue) {
+        throw new BadRequestException(
+          'INSTALLMENT_ALREADY_PAID: Target installment due has already been settled in full by another payment',
+        );
+      }
+
       // 1. Update Payment to SUCCESS
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
@@ -1176,14 +1143,8 @@ export class PaymentService {
         },
       });
 
-      // 2. Generate Collision-Proof Sequential Bilingual Receipt
-      let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-      if (typeof tx.receipt?.findUnique === 'function') {
-        while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
-          nextSeq++;
-          finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-        }
-      }
+      // 2. Generate Sequential Bilingual Receipt strictly inside the locked Branch transaction
+      const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 
       const receipt = await tx.receipt.create({
         data: {
@@ -1257,7 +1218,7 @@ export class PaymentService {
         paidAmount: payment.amount,
         netPayableAmount: due.netPayableAmount,
       };
-    });
+    }, undefined, PAYMENT_TRANSACTION_OPTIONS);
 
     if (this.queueProvider) {
       try {

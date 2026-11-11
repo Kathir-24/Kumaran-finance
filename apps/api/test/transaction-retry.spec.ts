@@ -34,6 +34,15 @@ describe('TransactionRetryUtil (Deadlock & Transient Conflict Recovery)', () => 
       expect(isTransientTransactionError(err)).toBe(true);
     });
 
+    it('RETRY-04B: identifies P2002 via Prisma meta.target containing receiptNumber', () => {
+      const err = {
+        code: 'P2002',
+        meta: { target: ['receiptNumber'] },
+        message: 'Unique constraint failed',
+      };
+      expect(isTransientTransactionError(err)).toBe(true);
+    });
+
     it('RETRY-05: rejects P2002 on idempotencyKey or transactionRef from retry', () => {
       const err1 = {
         code: 'P2002',

@@ -9,6 +9,11 @@ import {
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  acquirePaymentConcurrencyLocks,
+  generateNextReceiptNumber,
+  PAYMENT_TRANSACTION_OPTIONS,
+} from '../common/utils/receipt-sequence.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import {
@@ -145,29 +150,12 @@ export class CollectionService {
     }
 
     const branchId = staffBranchId || ticket.chitGroup.branchId;
+    const lockBranchId = ticket.chitGroup.branchId || branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
     const year = new Date().getFullYear();
 
-    // 6. Generate Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
+    // 6. Prefix for Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
     const prefix = `KC-REC-${branchCode}-${year}-`;
-    const lastReceipt = await this.prisma.receipt.findFirst({
-      where: {
-        branchId,
-        receiptNumber: { startsWith: prefix },
-      },
-      orderBy: { receiptNumber: 'desc' },
-      select: { receiptNumber: true },
-    });
-
-    let nextSeq = 1;
-    if (lastReceipt?.receiptNumber) {
-      const parts = lastReceipt.receiptNumber.split('-');
-      const lastNumStr = parts[parts.length - 1];
-      const parsed = parseInt(lastNumStr, 10);
-      if (!isNaN(parsed)) {
-        nextSeq = parsed + 1;
-      }
-    }
 
     const cashHandoverStatus =
       dto.paymentMethod === PaymentMethod.CASH
@@ -179,17 +167,17 @@ export class CollectionService {
     let result: any;
     try {
       result = await withTransactionRetry(this.prisma, async (tx) => {
-        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate payments
-        if (typeof tx.$queryRaw === 'function') {
-          const lockedDues = await tx.$queryRaw<Array<{ id: string; status: DueStatus; netPayableAmount: bigint }>>`
-            SELECT id, status, "netPayableAmount" FROM "InstallmentDue" WHERE id = ${due.id} FOR UPDATE
-          `;
-          const lockedDue = lockedDues && lockedDues[0];
-          if (lockedDue && lockedDue.status === DueStatus.PAID) {
-            throw new BadRequestException(
-              `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
-            );
-          }
+        // 0. Acquire strict DAG locks (Branch -> SubscriberTicket -> InstallmentDue) to prevent receipt collisions & 40P01 deadlocks
+        const { lockedDues } = await acquirePaymentConcurrencyLocks(tx, {
+          branchId: lockBranchId,
+          ticketIds: [ticket.id],
+          dueIds: [due.id],
+        });
+        const lockedDue = lockedDues[0];
+        if (lockedDue && lockedDue.status === DueStatus.PAID) {
+          throw new BadRequestException(
+            `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
+          );
         }
 
         // 1. Create Payment
@@ -218,14 +206,8 @@ export class CollectionService {
           },
         });
 
-        // 3. Create Bilingual Receipt (with collision-proof sequence guarantee)
-        let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-        if (typeof tx.receipt?.findUnique === 'function') {
-          while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
-            nextSeq++;
-            finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-          }
-        }
+        // 3. Create Bilingual Receipt strictly inside the locked Branch transaction
+        const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 
         const receipt = await tx.receipt.create({
           data: {
@@ -281,7 +263,7 @@ export class CollectionService {
         allocationId: allocation.id,
         collectedAt: payment.createdAt,
       };
-    });
+    }, undefined, PAYMENT_TRANSACTION_OPTIONS);
     } catch (err: any) {
       if (err.code === 'P2002') {
         const targetStr = String(err.meta?.target || '');

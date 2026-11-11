@@ -1,6 +1,12 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  acquirePaymentConcurrencyLocks,
+  generateNextReceiptNumber,
+  PAYMENT_TRANSACTION_OPTIONS,
+} from '../../common/utils/receipt-sequence.util';
+import { withTransactionRetry } from '../../common/utils/transaction-retry.util';
 import { DistributedLockService } from './distributed-lock.service';
 import { NotificationService } from './notification.service';
 import type { ReconciliationJobResult } from '../dto/job-payloads.dto';
@@ -100,19 +106,47 @@ export class ReconciliationService {
         payment.amount === record.amount
       ) {
         const branchId = payment.branchId;
+        const lockBranchId =
+          payment.allocations[0]?.ticket?.chitGroup?.branchId || branchId;
         const branchCode = payment.allocations[0]?.ticket?.chitGroup?.branch?.code || 'PRD';
         const year = new Date().getFullYear();
         const prefix = `KC-REC-${branchCode}-${year}-`;
+        const ticketIds = payment.allocations.map((a) => a.ticketId);
+        const dueIds = payment.allocations.map((a) => a.installmentDueId);
 
-        const txResult = await this.prisma.$transaction(async (tx) => {
-          // 1. Re-verify payment still INITIATED under transaction
+        const txResult = await withTransactionRetry(this.prisma, async (tx) => {
+          // 0. Acquire 4-tier DAG locks (Branch -> SubscriberTicket -> InstallmentDue -> Payment)
+          const { lockedDues, lockedPayments } = await acquirePaymentConcurrencyLocks(tx, {
+            branchId: lockBranchId,
+            ticketIds,
+            dueIds,
+            paymentIds: [payment.id],
+          });
+
+          // 1. Re-verify locked Payment & InstallmentDue states inside transaction
           const current = await tx.payment.findUnique({
             where: { id: payment.id },
             select: { id: true, paymentStatus: true },
           });
+          const effectiveStatus = lockedPayments[0]?.paymentStatus ?? current?.paymentStatus;
 
-          if (!current || current.paymentStatus !== PaymentStatus.INITIATED) {
+          if (!effectiveStatus) {
             return null;
+          }
+
+          if (effectiveStatus === PaymentStatus.SUCCESS && payment.amount === record.amount) {
+            return { matchedConcurrently: true } as const;
+          }
+
+          if (effectiveStatus !== PaymentStatus.INITIATED) {
+            return null;
+          }
+
+          const settledDue = lockedDues.find((d) => d.status === DueStatus.PAID);
+          if (settledDue) {
+            return {
+              conflictReason: `CONFLICT_DUE_ALREADY_PAID: Installment due ${settledDue.id} was already settled by another payment for Gateway Order ${record.gatewayOrderId}. Manual refund review required.`,
+            } as const;
           }
 
           // 2. Update Payment to SUCCESS with audit notes
@@ -168,35 +202,10 @@ export class ReconciliationService {
             });
           }
 
-          // 4. Collision-Proof Sequential Bilingual Receipt Generation
+          // 4. Sequential Bilingual Receipt Generation strictly inside locked Branch transaction
           let receipt = await tx.receipt.findUnique({ where: { paymentId: payment.id } });
           if (!receipt) {
-            const lastReceipt = await tx.receipt.findFirst({
-              where: {
-                branchId,
-                receiptNumber: { startsWith: prefix },
-              },
-              orderBy: { receiptNumber: 'desc' },
-              select: { receiptNumber: true },
-            });
-
-            let nextSeq = 1;
-            if (lastReceipt?.receiptNumber) {
-              const parts = lastReceipt.receiptNumber.split('-');
-              const lastNumStr = parts[parts.length - 1];
-              const parsed = parseInt(lastNumStr, 10);
-              if (!isNaN(parsed)) {
-                nextSeq = parsed + 1;
-              }
-            }
-
-            let finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-            if (typeof tx.receipt?.findUnique === 'function') {
-              while (await tx.receipt.findUnique({ where: { receiptNumber: finalReceiptNumber } })) {
-                nextSeq++;
-                finalReceiptNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-              }
-            }
+            const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 
             receipt = await tx.receipt.create({
               data: {
@@ -210,7 +219,23 @@ export class ReconciliationService {
           }
 
           return { payment: updatedPayment, receipt };
-        });
+        }, undefined, PAYMENT_TRANSACTION_OPTIONS);
+
+        if (
+          txResult &&
+          'conflictReason' in txResult &&
+          typeof txResult.conflictReason === 'string'
+        ) {
+          exceptionCount++;
+          details.push(txResult.conflictReason);
+          this.logger.warn(txResult.conflictReason);
+          continue;
+        }
+
+        if (txResult && 'matchedConcurrently' in txResult && txResult.matchedConcurrently) {
+          matchedCount++;
+          continue;
+        }
 
         if (txResult) {
           autoResolvedGhostDropsCount++;

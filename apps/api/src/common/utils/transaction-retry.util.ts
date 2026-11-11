@@ -22,12 +22,18 @@ export function isTransientTransactionError(err: any): boolean {
 
   const message = String(err.message || '');
   const code = String(err.code || '');
+  const metaTarget = Array.isArray(err.meta?.target)
+    ? err.meta.target.join(',')
+    : String(err.meta?.target || '');
 
   return (
     code === 'P2034' || // Prisma transaction conflict / deadlock
     code === '40P01' || // PostgreSQL deadlock_detected
     code === '40001' || // PostgreSQL serialization_failure
-    (code === 'P2002' && (message.includes('receiptNumber') || message.includes('Receipt_receiptNumber_key'))) || // Sequential receipt generation collision retry
+    (code === 'P2002' &&
+      (message.includes('receiptNumber') ||
+        message.includes('Receipt_receiptNumber_key') ||
+        metaTarget.includes('receiptNumber'))) || // Sequential receipt generation collision retry
     message.includes('deadlock detected') ||
     message.includes('could not serialize access') ||
     message.includes('Transaction failed due to a write conflict')
