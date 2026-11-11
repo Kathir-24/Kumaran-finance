@@ -63,12 +63,13 @@ test('BFF Cookies: getBackendApiUrl resolves environment correctly', () => {
 });
 
 test('BFF Cookies: shouldUseSecureCookies honors HTTPS transport and HTTP production loopback cleanly', () => {
-  const originalEnv = process.env.NODE_ENV;
-  const originalCookieSecure = process.env.COOKIE_SECURE;
+  const env = process.env as Record<string, string | undefined>;
+  const originalEnv = env.NODE_ENV;
+  const originalCookieSecure = env.COOKIE_SECURE;
 
   try {
-    process.env.NODE_ENV = 'production';
-    delete process.env.COOKIE_SECURE;
+    env.NODE_ENV = 'production';
+    delete env.COOKIE_SECURE;
 
     // Plain HTTP next start on localhost must NOT emit Secure so Chromium preserves HttpOnly cookies
     assert.equal(
@@ -92,13 +93,14 @@ test('BFF Cookies: shouldUseSecureCookies honors HTTPS transport and HTTP produc
     );
 
     // Explicit COOKIE_SECURE override wins regardless of request scheme
-    process.env.COOKIE_SECURE = 'true';
+    env.COOKIE_SECURE = 'true';
     assert.equal(shouldUseSecureCookies({ url: 'http://localhost:3001/api/auth/login' }), true);
-    process.env.COOKIE_SECURE = 'false';
+    env.COOKIE_SECURE = 'false';
     assert.equal(shouldUseSecureCookies({ url: 'https://chits.kumaranfinance.in/api/auth/login' }), false);
   } finally {
-    process.env.NODE_ENV = originalEnv;
-    if (originalCookieSecure !== undefined) process.env.COOKIE_SECURE = originalCookieSecure;
-    else delete process.env.COOKIE_SECURE;
+    if (originalEnv !== undefined) env.NODE_ENV = originalEnv;
+    else delete env.NODE_ENV;
+    if (originalCookieSecure !== undefined) env.COOKIE_SECURE = originalCookieSecure;
+    else delete env.COOKIE_SECURE;
   }
 });

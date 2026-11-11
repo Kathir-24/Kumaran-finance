@@ -15,7 +15,7 @@
     "test:e2e:report": "playwright show-report",
     "test:visual": "playwright test e2e/visual-audit.e2e.spec.ts",
     "report:visual": "node scripts/generate-visual-gallery.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",

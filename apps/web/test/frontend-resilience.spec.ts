@@ -163,11 +163,13 @@ test('3. Request Debouncing: Delays search query dispatch and integrates AbortSi
   const promise = mockQueryFn(controller.signal);
 
   assert.equal(callCount, 1);
-  assert.equal(activeSignal?.aborted, false);
+  const capturedSignal = activeSignal as AbortSignal | null;
+  assert.ok(capturedSignal, 'Must capture AbortSignal');
+  assert.equal(capturedSignal.aborted, false);
 
   // Abort on rapid user typing
   controller.abort();
-  assert.equal(activeSignal?.aborted, true);
+  assert.equal(capturedSignal.aborted, true);
   await assert.rejects(async () => {
     if (controller.signal.aborted) throw new Error('Query aborted');
   }, /Query aborted/);

@@ -81,11 +81,14 @@ test('BFF Proxy: streams text/event-stream responses immediately without bufferi
     const decoded = new TextDecoder().decode(firstChunk.value);
     assert.ok(decoded.includes('"type":"connected"'));
 
-    streamController?.enqueue(new TextEncoder().encode('data: {"type":"update"}\n\n'));
+    const activeController = streamController as ReadableStreamDefaultController<Uint8Array> | null;
+    assert.ok(activeController, 'SSE stream controller must be initialized');
+
+    activeController.enqueue(new TextEncoder().encode('data: {"type":"update"}\n\n'));
     const secondChunk = await reader.read();
     assert.ok(new TextDecoder().decode(secondChunk.value).includes('"type":"update"'));
 
-    streamController?.close();
+    activeController.close();
     const endChunk = await reader.read();
     assert.equal(endChunk.done, true);
   } finally {
