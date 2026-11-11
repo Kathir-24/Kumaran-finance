@@ -9,8 +9,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateSync } from 'otplib';
 
-const BASE_URL = 'http://127.0.0.1:3000';
+const BASE_URL = (process.env.API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
 const API_V1 = `${BASE_URL}/api/v1`;
+const TARGET_DB = process.env.TARGET_DB || 'chitflow_dev';
+const API_LOG_FILE = process.env.API_LOG_FILE;
 
 export interface VerificationProof {
   endpointNum: number;
@@ -32,7 +34,7 @@ const proofs: VerificationProof[] = [];
 
 function queryDb(sql: string): string {
   try {
-    const cmd = `docker exec chitflow-db psql -U chitflow -d chitflow_dev -t -A -c "${sql.replace(/"/g, '\\"')}"`;
+    const cmd = `docker exec chitflow-db psql -U chitflow -d ${TARGET_DB} -t -A -c "${sql.replace(/"/g, '\\"')}"`;
     return execSync(cmd, { encoding: 'utf-8' }).replace(/\r/g, '').trim();
   } catch (err: any) {
     return `[DB ERROR]: ${err.message}`;
@@ -44,6 +46,18 @@ function queryRedis(cmd: string): string {
     return execSync(`docker exec chitflow-redis redis-cli ${cmd}`, { encoding: 'utf-8' }).replace(/\r/g, '').trim();
   } catch (err: any) {
     return `[REDIS ERROR]: ${err.message}`;
+  }
+}
+
+function extractRecentOtpFromLogs(): string | undefined {
+  try {
+    const logs = API_LOG_FILE
+      ? fs.readFileSync(API_LOG_FILE, 'utf-8').slice(-8000)
+      : execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
+    const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
+    return matches.length > 0 ? matches[matches.length - 1][1] : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -202,14 +216,7 @@ async function main() {
   // Customer (K. Thangavel, KC-CUST-00101, phone: 9842100101)
   queryRedis('DEL auth:otp:9842100101 auth:otp:lockout:9842100101 auth:otp:cooldown:9842100101');
   const custOtpReq = await request('POST', '/api/v1/auth/mobile/request-otp', { phone: '9842100101' });
-  let custOtp = custOtpReq.json?.data?.debugOtp || '123456';
-  if (!custOtpReq.json?.data?.debugOtp) {
-    try {
-      const logs = execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
-      const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
-      if (matches.length > 0) custOtp = matches[matches.length - 1][1];
-    } catch {}
-  }
+  let custOtp = custOtpReq.json?.data?.debugOtp || extractRecentOtpFromLogs() || '123456';
   const custVerify = await request('POST', '/api/v1/auth/mobile/verify-otp', {
     phone: '9842100101',
     otp: custOtp,
@@ -544,9 +551,9 @@ async function main() {
 
   // --- 15. Token Pair Refresh & RFC 6819 Rotation (Spec #7) ---
   {
-    const neg401 = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: 'invalid.jwt.token' });
-    const posRes = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: mpinRefreshToken });
-    const replayRes = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: mpinRefreshToken });
+    const neg401 = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: 'invalid.jwt.token', clientType: 'MOBILE' });
+    const posRes = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: mpinRefreshToken, clientType: 'MOBILE' });
+    const replayRes = await request('POST', '/api/v1/auth/refresh-token', { refreshToken: mpinRefreshToken, clientType: 'MOBILE' });
     const pass = neg401.status === 401 && posRes.status === 200 && replayRes.status === 401;
     proofs.push({
       endpointNum: 15,
@@ -668,10 +675,13 @@ async function main() {
     });
   }
 
+  let step20DebugOtp: string | undefined;
+
   // --- 20. Mobile SMS OTP Request (Spec #3) ---
   {
     const neg400 = await request('POST', '/api/v1/auth/mobile/request-otp', { phone: 'invalid' });
     const posRes = await request('POST', '/api/v1/auth/mobile/request-otp', { phone: '9876543210' });
+    step20DebugOtp = posRes.json?.data?.debugOtp;
     const cooldownRes = await request('POST', '/api/v1/auth/mobile/request-otp', { phone: '9876543210' });
     const pass = neg400.status === 400 && posRes.status === 200 && cooldownRes.status === 429;
     proofs.push({
@@ -695,12 +705,7 @@ async function main() {
 
   // --- 21. Mobile SMS OTP Verification (Spec #4) ---
   {
-    let realOtp = '123456';
-    try {
-      const logs = execSync('docker logs --tail 30 chitflow-api', { encoding: 'utf-8' });
-      const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
-      if (matches.length > 0) realOtp = matches[matches.length - 1][1];
-    } catch {}
+    const realOtp = step20DebugOtp || extractRecentOtpFromLogs() || '123456';
 
     const neg400 = await request('POST', '/api/v1/auth/mobile/verify-otp', { phone: '9876543210', otp: '000000' });
     const posRes = await request('POST', '/api/v1/auth/mobile/verify-otp', { phone: '9876543210', otp: realOtp });
@@ -1611,7 +1616,7 @@ async function main() {
   let md = `# Milestone 1 & Milestone 2 Comprehensive API Verification Proofs Report
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Erode, Tamil Nadu)  
-> **Target Environment**: Live Server \`http://127.0.0.1:3000\` backed by PostgreSQL 17 (\`chitflow_dev\`, Port 5433), Redis 7 (Port 6379), and MinIO S3 (Port 9000)  
+> **Target Environment**: Live Server \`${BASE_URL}\` backed by PostgreSQL 17 (\`${TARGET_DB}\`, Port 5433), Redis 7 (Port 6379), and MinIO S3 (Port 9000)  
 > **Verification Date**: ${new Date().toISOString()}  
 > **Total Operations Verified**: **${proofs.length} Endpoints** across **7 Controller Classes**  
 > **Outcome**: **${passCount}/${proofs.length} PASSED (${failCount === 0 ? '100% Pass Rate, ZERO Discrepancies' : `${failCount} Failures`})**  
@@ -1693,10 +1698,15 @@ ${failCount === 0
   : `Testing identified ${failCount} discrepancy issues as detailed in the granular evidence log.`}
 `;
 
-  const outputPath = path.resolve(__dirname, '..', '..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
+  const outputPath =
+    process.env.VERIFY_PROOFS_FILE ||
+    path.resolve(__dirname, '..', '..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, md, 'utf-8');
   console.log(`📄 Verification proof table successfully written to: ${outputPath}`);
+  if (failCount > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

@@ -8,6 +8,11 @@ test.describe('Suite 02: Chit Schemes Creation & Mid-Cycle Onboarding', () => {
     const heading = managingPartnerPage.locator('h1, h2').filter({ hasText: /Chit Schemes|சீட்டு திட்டங்கள்/i }).first();
     await expect(heading).toBeVisible();
 
+    // Switch to Active Schemes tab so seeded active groups are listed ahead of test drafts
+    const activeTab = managingPartnerPage.getByRole('button', { name: /Active|நடப்பு/i }).first();
+    await expect(activeTab).toBeVisible();
+    await activeTab.click();
+
     // Verify seeded schemes are present in table or grid
     const scheme1L = managingPartnerPage.locator('text=KCA-1L-20M-01').first();
     await expect(scheme1L).toBeVisible({ timeout: 15_000 });

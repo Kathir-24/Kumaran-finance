@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
 import { AUTH_PERSONAS } from './fixtures/auth-personas.ts';
-import { loginViaApi, injectSession } from './fixtures/auth-fixtures.ts';
+import { loginViaApi, buildSessionCookies } from './fixtures/auth-fixtures.ts';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -93,23 +93,12 @@ test.describe('Bilingual UI Automated Visual Audit', () => {
 
         for (const route of AUDIT_ROUTES) {
           if (route.authRequired && authSession) {
-            await page.addInitScript(
-              ({ accessToken, refreshToken }) => {
-                window.localStorage.setItem('kc_access_token', accessToken);
-                if (refreshToken) {
-                  window.localStorage.setItem('kc_refresh_token', refreshToken);
-                }
-              },
-              {
-                accessToken: authSession.accessToken,
-                refreshToken: authSession.refreshToken || '',
-              },
-            );
+            const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3001';
+            await context.addCookies(buildSessionCookies(authSession, baseUrl));
           } else if (!route.authRequired) {
-            await page.addInitScript(() => {
-              window.localStorage.removeItem('kc_access_token');
-              window.localStorage.removeItem('kc_refresh_token');
-            });
+            await context.clearCookies({ name: 'kc_access_token' });
+            await context.clearCookies({ name: 'kc_refresh_token' });
+            await context.clearCookies({ name: 'kc_session_active' });
           }
 
           try {

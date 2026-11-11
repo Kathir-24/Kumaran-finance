@@ -8,11 +8,11 @@ test.describe('Suite 08: Dual-Control Payment Reversals Desk', () => {
     await expect(accountantPage.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
 
     // Verify 4 KPI cards render
-    await expect(accountantPage.locator('text=Total').first()).toBeVisible();
-    await expect(accountantPage.locator('text=Voided').first()).toBeVisible();
+    await expect(accountantPage.locator('text=/Total|மொத்தம்/i').first()).toBeVisible();
+    await expect(accountantPage.locator('text=/Voided|ரத்து/i').first()).toBeVisible();
 
     // Verify Accountant role is marked as Maker Only under Dual Control
-    const makerNotice = accountantPage.locator('text=Desk Staff (Maker Only)');
+    const makerNotice = accountantPage.locator('text=/Desk Staff \\(Maker Only\\)|மேசை பணியாளர் \\(செய்பவர் மட்டும்\\)/i');
     await expect(makerNotice).toBeVisible();
 
     // Request Reversal action button is accessible for Desk Accountant
@@ -29,7 +29,7 @@ test.describe('Suite 08: Dual-Control Payment Reversals Desk', () => {
     await expect(checkerPartnerPage.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
 
     // Verify Super Admin / Checker Partner has Partner Authorized status
-    const partnerNotice = checkerPartnerPage.locator('text=Partner Authorized');
+    const partnerNotice = checkerPartnerPage.locator('text=/Partner Authorized|கூட்டாளர் அதிகாரம் பெற்றது/i');
     await expect(partnerNotice).toBeVisible();
 
     // Verify segmented tabs (Pending Reversals and Voided Receipts History)

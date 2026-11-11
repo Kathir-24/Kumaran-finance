@@ -151,3 +151,51 @@ test('AuthStore: setTempToken securely stores 2FA challenge token in sessionStor
     delete (globalThis as any).localStorage;
   }
 });
+
+test('AuthStore: unauthenticated hydrate() and logout() do not trigger infinite kumaran:unauthorized logout loops', async () => {
+  const originalFetch = globalThis.fetch;
+  let logoutCalls = 0;
+  let unauthorizedEvents = 0;
+
+  (globalThis as any).window = {
+    location: { pathname: '/login', href: 'http://localhost:3001/login' },
+    dispatchEvent: (ev: any) => {
+      if (ev?.type === 'kumaran:unauthorized') unauthorizedEvents++;
+    },
+  };
+  (globalThis as any).CustomEvent = class CustomEvent {
+    type: string;
+    constructor(type: string) {
+      this.type = type;
+    }
+  };
+
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/api/auth/session')) {
+      return new Response(JSON.stringify({ authenticated: false, user: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.includes('/api/auth/logout')) {
+      logoutCalls++;
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response(JSON.stringify({}), { status: 200 });
+  };
+
+  try {
+    await useAuthStore.getState().hydrate();
+    assert.equal(logoutCalls, 0, 'Unauthenticated hydrate must NOT call POST /api/auth/logout');
+    assert.equal(unauthorizedEvents, 0, 'Unauthenticated hydrate must NOT emit kumaran:unauthorized');
+
+    await useAuthStore.getState().logout('manual');
+    assert.equal(logoutCalls, 1, 'logout() must call POST /api/auth/logout exactly once');
+    assert.equal(unauthorizedEvents, 0, 'logout() must NOT re-emit kumaran:unauthorized');
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete (globalThis as any).window;
+    delete (globalThis as any).CustomEvent;
+  }
+});

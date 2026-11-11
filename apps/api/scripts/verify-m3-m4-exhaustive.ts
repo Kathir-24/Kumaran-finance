@@ -10,15 +10,21 @@ import { execFileSync } from 'child_process';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 
-const BASE_URL = 'http://127.0.0.1:3000/api/v1';
-const PROOFS_FILE = 'u:\\Kumaran-finance\\.agents\\teamwork\\worker_m3_m4_1\\m3_m4_verification_proofs.md';
-const PROOFS_FILE_REMEDIATION = 'u:\\Kumaran-finance\\.agents\\teamwork\\worker_m3_m4_remediation_1\\m3_m4_verification_proofs.md';
+const ORIGIN = (process.env.API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
+const BASE_URL = ORIGIN.endsWith('/api/v1') ? ORIGIN : `${ORIGIN}/api/v1`;
+const TARGET_DB = process.env.TARGET_DB || 'chitflow_dev';
+const API_LOG_FILE = process.env.API_LOG_FILE;
+const PROOFS_FILE =
+  process.env.VERIFY_PROOFS_FILE || 'u:\\Kumaran-finance\\.agents\\teamwork\\worker_m3_m4_1\\m3_m4_verification_proofs.md';
+const PROOFS_FILE_REMEDIATION =
+  process.env.VERIFY_PROOFS_REMEDIATION_FILE ||
+  (process.env.VERIFY_PROOFS_FILE ? '' : 'u:\\Kumaran-finance\\.agents\\teamwork\\worker_m3_m4_remediation_1\\m3_m4_verification_proofs.md');
 
 function queryDb(sql: string): string {
   try {
     return execFileSync(
       'docker',
-      ['exec', 'chitflow-db', 'psql', '-U', 'chitflow', '-d', 'chitflow_dev', '-t', '-A', '-c', sql],
+      ['exec', 'chitflow-db', 'psql', '-U', 'chitflow', '-d', TARGET_DB, '-t', '-A', '-c', sql],
       { encoding: 'utf-8' }
     ).trim();
   } catch (err: any) {
@@ -99,7 +105,9 @@ async function loginCustomer(phone = '9842100101') {
   let otp = reqRes.json?.data?.debugOtp;
   if (!otp) {
     try {
-      const logs = execFileSync('docker', ['logs', '--tail', '20', 'chitflow-api'], { encoding: 'utf-8' });
+      const logs = API_LOG_FILE
+        ? fs.readFileSync(API_LOG_FILE, 'utf-8').slice(-8000)
+        : execFileSync('docker', ['logs', '--tail', '20', 'chitflow-api'], { encoding: 'utf-8' });
       const matches = [...logs.matchAll(/verification code is (\d{6})/g)];
       if (matches.length > 0) otp = matches[matches.length - 1][1];
     } catch {
@@ -570,7 +578,8 @@ async function run() {
   {
     const res = await request('GET', `/installments/defaulters?minConsecutiveMonths=1`, undefined, branchManager.token);
     const negRes = await request('GET', `/installments/defaulters`, undefined, customer.token);
-    const pass = res.status === 200 && Array.isArray(res.json?.data) && negRes.status === 403;
+    const defaulterItems = Array.isArray(res.json?.data) ? res.json.data : res.json?.data?.data;
+    const pass = res.status === 200 && Array.isArray(defaulterItems) && negRes.status === 403;
     recordProof({
       featureNum: 57,
       operationId: 'getDefaultersAlias',
@@ -584,7 +593,7 @@ async function run() {
       envelopeVerified: res.json?.success === true,
       invariantChecked: 'Defaulters report query & RBAC blocking customer persona',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
-      details: `Defaulters retrieved: ${res.json?.data?.length}. Customer persona blocked with 403.`,
+      details: `Defaulters retrieved: ${defaulterItems?.length}. Customer persona blocked with 403.`,
     });
   }
 
@@ -621,7 +630,8 @@ async function run() {
   // 56. GET /tickets/defaulters (Defaulters List Discovery)
   {
     const res = await request('GET', `/tickets/defaulters?minConsecutiveMonths=1`, undefined, accountant.token);
-    const pass = res.status === 200 && Array.isArray(res.json?.data);
+    const defaulterItems = Array.isArray(res.json?.data) ? res.json.data : res.json?.data?.data;
+    const pass = res.status === 200 && Array.isArray(defaulterItems);
     recordProof({
       featureNum: 56,
       operationId: 'getDefaulters',
@@ -635,7 +645,7 @@ async function run() {
       envelopeVerified: res.json?.success === true,
       invariantChecked: 'Ticket defaulter query highlighting consecutive arrears',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
-      details: `Defaulter tickets found: ${res.json?.data?.length}.`,
+      details: `Defaulter tickets found: ${defaulterItems?.length}.`,
     });
   }
 
@@ -1495,7 +1505,7 @@ async function run() {
       envelopeVerified: res.json?.success === true,
       invariantChecked: 'Bilingual payout voucher (English + தமிழ்) with whole-rupee math breakdown',
       assertionOutcome: pass ? 'PASS' : 'FAIL',
-      details: `Voucher ${res.json?.data?.voucherNumber} generated: Gross ₹${res.json?.data?.data?.grossChitValue || res.json?.data?.grossChitValue}, Net ₹${res.json?.data?.data?.netPrizeAmount || res.json?.data?.netPrizeAmount}`,
+      details: `Voucher ${res.json?.data?.voucherNumber} generated: Gross ₹${res.json?.data?.data?.chitValue ?? res.json?.data?.data?.grossChitValue}, Net ₹${res.json?.data?.data?.prizeMoney ?? res.json?.data?.data?.netPrizeAmount}`,
     });
   }
 
@@ -1627,8 +1637,8 @@ All ${proofs.length} operations across the 6 controllers behaved strictly in acc
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Erode, Tamil Nadu)  
 > **Verification Run Date**: ${new Date().toISOString()}  
-> **Target Subsystem**: NestJS 12 Modular Monolith (\`http://127.0.0.1:3000/api/v1\`)  
-> **Database**: PostgreSQL 17 (\`chitflow_dev\` on port 5433)  
+> **Target Subsystem**: NestJS 12 Modular Monolith (\`${BASE_URL}\`)  
+> **Database**: PostgreSQL 17 (\`${TARGET_DB}\` on port 5433)  
 > **Cache & Queues**: Redis 7 (\`chitflow-redis\` on port 6379)  
 > **Storage**: MinIO S3 (\`chitflow-minio\` on port 9000)  
 > **Scope**: 45 Endpoints across 6 Controllers (M3: Features 44-53; M4: Features 54-88)  
@@ -1695,10 +1705,14 @@ ${discrepancyCatalog}
 `;
 
   fs.mkdirSync(require('path').dirname(PROOFS_FILE), { recursive: true });
-  fs.mkdirSync(require('path').dirname(PROOFS_FILE_REMEDIATION), { recursive: true });
   fs.writeFileSync(PROOFS_FILE, mdContent, 'utf-8');
-  fs.writeFileSync(PROOFS_FILE_REMEDIATION, mdContent, 'utf-8');
-  console.log(`✅ Verification proofs table written to ${PROOFS_FILE} and ${PROOFS_FILE_REMEDIATION}`);
+  if (PROOFS_FILE_REMEDIATION) {
+    fs.mkdirSync(require('path').dirname(PROOFS_FILE_REMEDIATION), { recursive: true });
+    fs.writeFileSync(PROOFS_FILE_REMEDIATION, mdContent, 'utf-8');
+    console.log(`✅ Verification proofs table written to ${PROOFS_FILE} and ${PROOFS_FILE_REMEDIATION}`);
+  } else {
+    console.log(`✅ Verification proofs table written to ${PROOFS_FILE}`);
+  }
   console.log(`\n🎉 Verification Completed: ${passedCount} / ${proofs.length} PASSED!`);
   if (failedCount > 0) {
     process.exit(1);

@@ -46,6 +46,8 @@ export interface AuthActions {
   hydrate: () => Promise<void>;
 }
 
+let isLoggingOut = false;
+
 export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
@@ -126,43 +128,52 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   logout: async (reason = 'manual') => {
-    // 1. Notify Next.js BFF logout handler (which revokes tokens in NestJS & Redis and clears HttpOnly cookies)
+    if (isLoggingOut) {
+      return;
+    }
+    isLoggingOut = true;
+
     try {
-      if (typeof window !== 'undefined') {
-        await fetch('/api/auth/logout', { method: 'POST' });
-      }
-    } catch (err) {
-      console.warn('[AuthStore] BFF logout request failed, proceeding with local cleanup', err);
-    }
-
-    // 2. Purge local profile cache & temporary challenge tokens
-    clearStoredTokens();
-    if (typeof window !== 'undefined') {
+      // 1. Notify Next.js BFF logout handler (which revokes tokens in NestJS & Redis and clears HttpOnly cookies)
       try {
-        sessionStorage.removeItem('kc_temp_token');
-      } catch {
-        // Safe fallback in restricted environments
+        if (typeof window !== 'undefined') {
+          await fetch('/api/auth/logout', { method: 'POST' });
+        }
+      } catch (err) {
+        console.warn('[AuthStore] BFF logout request failed, proceeding with local cleanup', err);
       }
-    }
 
-    // 3. Reset store state
-    set({
-      user: null,
-      accessToken: null,
-      refreshToken: null,
-      tempToken: null,
-      isAuthenticated: false,
-      isLoading: false,
-      isHydrated: true,
-      activeBranchId: null,
-    });
-
-    // 4. In browser, navigate to login with query reason if not already there
-    if (typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login')) {
-        window.location.href = `/login?reason=${reason}`;
+      // 2. Purge local profile cache & temporary challenge tokens WITHOUT re-dispatching kumaran:unauthorized
+      clearStoredTokens({ notify: false });
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('kc_temp_token');
+        } catch {
+          // Safe fallback in restricted environments
+        }
       }
+
+      // 3. Reset store state
+      set({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        tempToken: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isHydrated: true,
+        activeBranchId: null,
+      });
+
+      // 4. In browser, navigate to login with query reason if not already there
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/login')) {
+          window.location.href = `/login?reason=${reason}`;
+        }
+      }
+    } finally {
+      isLoggingOut = false;
     }
   },
 
@@ -209,8 +220,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         }
       }
 
-      // Session is not valid
-      clearStoredTokens();
+      // Session is not valid: clear cached profile quietly without triggering logout storm
+      clearStoredTokens({ notify: false });
       set({
         user: null,
         accessToken: null,
@@ -233,7 +244,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 // Initialize browser-side event listeners for multi-tab sync & unauthorized events
 if (typeof window !== 'undefined') {
   window.addEventListener('kumaran:unauthorized', () => {
-    useAuthStore.getState().logout('revoked');
+    const state = useAuthStore.getState();
+    if (state.isAuthenticated && !isLoggingOut) {
+      void state.logout('revoked');
+    }
   });
 
   window.addEventListener('kumaran:auth_change', () => {

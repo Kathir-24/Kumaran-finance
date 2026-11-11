@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notification/services/sms.service';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { decryptAesGcm, encryptAesGcm } from '../common/crypto/aes-gcm.util';
+import { isTokenIssuedBeforeRevocation } from './utils/token-revocation.util';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_JWT_ACCESS_EXPIRES_IN,
@@ -862,6 +863,7 @@ export class AuthService {
     },
     clientType: string = 'MOBILE',
   ) {
+    const issuedAtMs = Date.now();
     const accessPayload: JwtPayload = {
       sub: customer.id,
       phone: customer.phone,
@@ -869,6 +871,7 @@ export class AuthService {
       branchId: customer.branchId,
       tokenType: 'access',
       jti: crypto.randomUUID(),
+      issuedAtMs,
     };
 
     const refreshPayload: JwtPayload = {
@@ -878,6 +881,7 @@ export class AuthService {
       branchId: customer.branchId,
       tokenType: 'refresh',
       jti: crypto.randomUUID(),
+      issuedAtMs,
     };
 
     const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??
@@ -1024,10 +1028,7 @@ export class AuthService {
         if (sharedRaw) {
           const activeSession = await redis.get(`auth:session:${payload.sub}:${clientType}`);
           const revokedBeforeStr = await redis.get(`auth:revoked_before:${payload.sub}`);
-          const isRevokedByTimestamp =
-            Boolean(revokedBeforeStr) &&
-            Boolean(payload.iat) &&
-            payload.iat! <= parseInt(revokedBeforeStr, 10);
+          const isRevokedByTimestamp = isTokenIssuedBeforeRevocation(payload, revokedBeforeStr);
 
           if (!activeSession || isRevokedByTimestamp) {
             throw new UnauthorizedException('Session revoked or logged out');
@@ -1186,10 +1187,10 @@ export class AuthService {
           `auth:session:${userId}:DESKTOP`,
         );
       }
-      // Instant Stateless Token Invalidation: Invalidate all access tokens issued before this moment (15m TTL)
+      // Instant Stateless Token Invalidation: Invalidate all access tokens issued before this millisecond cutoff (15m TTL)
       await redis.set(
         `auth:revoked_before:${userId}`,
-        Math.floor(Date.now() / 1000).toString(),
+        Date.now().toString(),
         'EX',
         900,
       );
@@ -1362,6 +1363,7 @@ export class AuthService {
    * Helper to sign JWT access & refresh tokens and update DB state
    */
   private async generateAuthTokens(user: User, clientType: string = 'WEB') {
+    const issuedAtMs = Date.now();
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
@@ -1369,6 +1371,7 @@ export class AuthService {
       branchId: user.branchId,
       tokenType: 'access',
       jti: crypto.randomUUID(),
+      issuedAtMs,
     };
 
     const refreshPayload: JwtPayload = {
@@ -1378,6 +1381,7 @@ export class AuthService {
       branchId: user.branchId,
       tokenType: 'refresh',
       jti: crypto.randomUUID(),
+      issuedAtMs,
     };
 
     const jwtExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ??

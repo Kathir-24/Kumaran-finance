@@ -56,26 +56,70 @@ export async function loginViaApi(
   };
 }
 
+export function buildSessionCookies(session: AuthSession, baseUrl: string) {
+  const secure = baseUrl.startsWith('https://');
+  const cookies: Array<{
+    name: string;
+    value: string;
+    url: string;
+    httpOnly: boolean;
+    sameSite: 'Lax';
+    secure: boolean;
+  }> = [
+    {
+      name: 'kc_access_token',
+      value: session.accessToken,
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure,
+    },
+    {
+      name: 'kc_session_active',
+      value: '1',
+      url: baseUrl,
+      httpOnly: false,
+      sameSite: 'Lax',
+      secure,
+    },
+  ];
+
+  if (session.refreshToken) {
+    cookies.push({
+      name: 'kc_refresh_token',
+      value: session.refreshToken,
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure,
+    });
+  }
+
+  return cookies;
+}
+
 /**
- * Injects authenticated JWT session into browser context before page initialization.
- * Synchronizes with Zustand auth store's localStorage keys ('kc_access_token', 'kc_refresh_token').
+ * Injects authenticated BFF HttpOnly session cookies into the browser context before navigation.
+ * Aligns with Edge Middleware (`kc_access_token`, `kc_refresh_token`, `kc_session_active`)
+ * while storing zero secret JWTs in `localStorage` (ADR-20).
  */
 export async function injectSession(
   page: Page,
   session: AuthSession,
   targetPath: string = '/',
 ): Promise<void> {
+  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3001';
+  await page.context().addCookies(buildSessionCookies(session, baseUrl));
+
   await page.addInitScript(
-    ({ accessToken, refreshToken }) => {
-      window.localStorage.setItem('kc_access_token', accessToken);
-      if (refreshToken) {
-        window.localStorage.setItem('kc_refresh_token', refreshToken);
+    ({ user }) => {
+      if (user) {
+        window.localStorage.setItem('kc_user_profile', JSON.stringify(user));
       }
+      window.localStorage.removeItem('kc_access_token');
+      window.localStorage.removeItem('kc_refresh_token');
     },
-    {
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken || '',
-    },
+    { user: session.user },
   );
 
   await page.goto(targetPath, { waitUntil: 'domcontentloaded' });
@@ -129,8 +173,10 @@ export async function logoutViaUi(page: Page): Promise<void> {
       await logoutBtn.click();
     }
   } else {
-    // Fallback: direct navigation to logout or clear tokens
-    await page.evaluate(() => {
+    // Fallback: call BFF logout endpoint to revoke cookies/tokens cleanly and navigate to /login
+    await page.evaluate(async () => {
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+      window.localStorage.removeItem('kc_user_profile');
       window.localStorage.removeItem('kc_access_token');
       window.localStorage.removeItem('kc_refresh_token');
       window.location.href = '/login';

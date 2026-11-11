@@ -9,6 +9,7 @@ export interface JwtPayload {
   branchId: string | null;
   tokenType: TokenType;
   jti?: string;
+  issuedAtMs?: number;
   iat?: number;
   exp?: number;
 }

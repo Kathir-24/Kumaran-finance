@@ -6,13 +6,15 @@
 
 import { execFileSync } from 'child_process';
 
-const BASE_URL = 'http://127.0.0.1:3000/api/v1';
+const ORIGIN = (process.env.API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
+const BASE_URL = ORIGIN.endsWith('/api/v1') ? ORIGIN : `${ORIGIN}/api/v1`;
+const TARGET_DB = process.env.TARGET_DB || 'chitflow_dev';
 
 function queryDb(sql: string): string {
   try {
     return execFileSync(
       'docker',
-      ['exec', 'chitflow-db', 'psql', '-U', 'chitflow', '-d', 'chitflow_dev', '-t', '-A', '-c', sql],
+      ['exec', 'chitflow-db', 'psql', '-U', 'chitflow', '-d', TARGET_DB, '-t', '-A', '-c', sql],
       { encoding: 'utf-8' }
     ).trim();
   } catch (err: any) {
@@ -72,7 +74,7 @@ async function run() {
   console.log(`   ENCRYPTED STORAGE & BILINGUAL PDF CANVAS`);
   console.log(`   Target Server: ${BASE_URL}`);
   console.log(`   Storage Engine: MinIO S3 (Port 9000, kumaran-chits-private)`);
-  console.log(`   Live Database: chitflow_dev (Port 5433)`);
+  console.log(`   Live Database: ${TARGET_DB} (Port 5433)`);
   console.log(`======================================================\n`);
 
   // Step 0: Authenticate Personas

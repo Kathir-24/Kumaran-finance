@@ -552,6 +552,43 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
     });
 
+    it('JWT-CACHE-02B: allows freshly issued token within the same Unix second as logout while rejecting pre-logout token', async () => {
+      const sameSecondBaseMs = 1_794_410_857_200;
+      const sameSecondUnixSec = Math.floor(sameSecondBaseMs / 1000);
+      const logoutCutoffMs = sameSecondBaseMs;
+
+      redisClientMock.get.mockImplementation(async (key: string) => {
+        if (key === 'auth:revoked_before:user-001') return String(logoutCutoffMs);
+        if (key === 'user:status:user-001') return 'ACTIVE';
+        return null;
+      });
+
+      const oldTokenPayload = {
+        sub: 'user-001',
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        tokenType: 'access' as const,
+        iat: sameSecondUnixSec,
+        issuedAtMs: sameSecondBaseMs - 50,
+      };
+
+      const freshReloginPayload = {
+        sub: 'user-001',
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        tokenType: 'access' as const,
+        iat: sameSecondUnixSec,
+        issuedAtMs: sameSecondBaseMs + 50,
+      };
+
+      await expect(jwtStrategy.validate(oldTokenPayload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or token revoked. Please sign in again.'),
+      );
+
+      const accepted = await jwtStrategy.validate(freshReloginPayload);
+      expect(accepted).toBe(freshReloginPayload);
+    });
+
     it('JWT-CACHE-03: should query DB and cache ACTIVE in Redis for 120s on cache miss', async () => {
       redisClientMock.get.mockResolvedValue(null);
       prismaMock.user.findUnique.mockResolvedValue({

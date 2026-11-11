@@ -139,10 +139,11 @@ export function resetBffRefreshStateForTesting(): void {
 export function applyRefreshedCookies(
   response: NextResponse,
   tokens: BffRefreshedTokens,
+  isSecure?: boolean,
 ): void {
-  const accessOpts = getAccessTokenCookieOptions();
-  const refreshOpts = getRefreshTokenCookieOptions();
-  const sessionActiveOpts = getSessionActiveCookieOptions();
+  const accessOpts = getAccessTokenCookieOptions(isSecure);
+  const refreshOpts = getRefreshTokenCookieOptions(isSecure);
+  const sessionActiveOpts = getSessionActiveCookieOptions(isSecure);
 
   response.cookies.set(accessOpts.name, tokens.accessToken, accessOpts);
   if (tokens.refreshToken) {

@@ -37,7 +37,7 @@ function generateUuidV4(): string {
  * Creates a strongly typed Kumaran Chits API client.
  */
 export function createKumaranClient(config: KumaranClientConfig = {}): KumaranApiClient {
-  const baseUrl = config.baseUrl || 'http://localhost:3000';
+  const baseUrl = config.baseUrl ?? 'http://localhost:3000';
   const client = createClient<paths>({
     baseUrl,
     fetch: config.fetch,

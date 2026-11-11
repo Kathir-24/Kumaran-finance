@@ -10,6 +10,7 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   getBackendApiUrl,
+  shouldUseSecureCookies,
 } from '@/lib/auth-cookies';
 import {
   applyRefreshedCookies,
@@ -111,7 +112,7 @@ async function handleProxyRequest(
     }
 
     if (refreshedTokens) {
-      applyRefreshedCookies(clientResponse, refreshedTokens);
+      applyRefreshedCookies(clientResponse, refreshedTokens, shouldUseSecureCookies(request));
     } else if (backendRes.status === 401) {
       // Terminal unauthorized session: purge stale cookies to prevent Edge Middleware loops
       clearAuthCookies(clientResponse);

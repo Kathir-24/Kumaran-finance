@@ -139,12 +139,16 @@ export function useApprovalsStream() {
         const branchParam = activeBranchId ? `?branchId=${encodeURIComponent(activeBranchId)}` : '';
         const url = `${baseUrl}/api/v1/reports/approvals-stream${branchParam}`;
 
+        const headers: Record<string, string> = {
+          Accept: 'text/event-stream',
+        };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
         const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'text/event-stream',
-          },
+          headers,
           signal: abortController.signal,
         });
 

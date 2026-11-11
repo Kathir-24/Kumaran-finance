@@ -97,13 +97,15 @@ export function setStoredTokens(_tokens: { accessToken?: string; refreshToken?: 
 /**
  * SSR-safe clearer for auth session state on logout or session expiration.
  */
-export function clearStoredTokens(): void {
+export function clearStoredTokens(options: { notify?: boolean } = {}): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_PROFILE_KEY);
-    window.dispatchEvent(new CustomEvent('kumaran:unauthorized'));
+    if (options.notify !== false) {
+      window.dispatchEvent(new CustomEvent('kumaran:unauthorized'));
+    }
   } catch (err) {
     console.error('[ApiClient] Failed to clear session state', err);
   }

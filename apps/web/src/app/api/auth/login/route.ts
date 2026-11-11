@@ -5,11 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getAccessTokenCookieOptions,
-  getRefreshTokenCookieOptions,
-  getSessionActiveCookieOptions,
   getBackendApiUrl,
+  shouldUseSecureCookies,
 } from '@/lib/auth-cookies';
+import { applyRefreshedCookies } from '@/lib/bff-token-refresh';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,16 +55,11 @@ export async function POST(request: NextRequest) {
         user: authData.user,
       });
 
-      // Set HttpOnly, SameSite=Lax, Secure cookies
-      const accessOpts = getAccessTokenCookieOptions();
-      const refreshOpts = getRefreshTokenCookieOptions();
-      const sessionActiveOpts = getSessionActiveCookieOptions();
-
-      response.cookies.set(accessOpts.name, authData.accessToken, accessOpts);
-      if (authData.refreshToken) {
-        response.cookies.set(refreshOpts.name, authData.refreshToken, refreshOpts);
-      }
-      response.cookies.set(sessionActiveOpts.name, '1', sessionActiveOpts);
+      applyRefreshedCookies(
+        response,
+        { accessToken: authData.accessToken, refreshToken: authData.refreshToken },
+        shouldUseSecureCookies(request),
+      );
 
       return response;
     }

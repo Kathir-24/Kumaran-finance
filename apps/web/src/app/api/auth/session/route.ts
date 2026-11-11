@@ -9,6 +9,7 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   getBackendApiUrl,
+  shouldUseSecureCookies,
 } from '@/lib/auth-cookies';
 import {
   applyRefreshedCookies,
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
           const user = payload.data || payload;
 
           const response = NextResponse.json({ authenticated: true, user });
-          applyRefreshedCookies(response, refreshData);
+          applyRefreshedCookies(response, refreshData, shouldUseSecureCookies(request));
           return response;
         }
       }

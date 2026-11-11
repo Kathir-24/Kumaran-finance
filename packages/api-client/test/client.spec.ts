@@ -178,3 +178,30 @@ test('Client Factory: 401 retry on POST request with body succeeds using unconsu
   assert.equal(activeToken, 'refreshed-jwt-access-token-99999');
   assert.ok(retriedBodyReceived.includes('10000'), 'Retried body should contain original payload');
 });
+
+test('Client Factory: empty string baseUrl preserves relative Next.js BFF path instead of falling back to localhost:3000', async () => {
+  let capturedUrl = '';
+  const mockFetch = async (req: Request) => {
+    capturedUrl = req.url;
+    return new Response(JSON.stringify({ success: true, data: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  const client = createKumaranClient({
+    baseUrl: '',
+    fetch: mockFetch,
+  });
+
+  try {
+    await client.GET('/api/v1/chits' as any);
+    assert.ok(!capturedUrl.includes('localhost:3000'), `Expected relative BFF URL, got: ${capturedUrl}`);
+    assert.ok(capturedUrl.endsWith('/api/v1/chits'));
+  } catch (err: any) {
+    // In Node without browser document origin, Request('/api/v1/chits') fails with input === '/api/v1/chits',
+    // proving baseUrl stayed empty instead of falling back to http://localhost:3000.
+    assert.equal(err?.cause?.code, 'ERR_INVALID_URL');
+    assert.equal(err?.cause?.input, '/api/v1/chits');
+  }
+});

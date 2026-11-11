@@ -31,9 +31,12 @@ test.describe('Suite 01: Staff Authentication & Inactivity Lifecycle', () => {
     const greeting = page.locator('h1, h2, h3, header').filter({ hasText: /Kumaran/i }).first();
     await expect(greeting).toBeVisible();
 
-    // Verify auth tokens exist in localStorage
-    const token = await page.evaluate(() => window.localStorage.getItem('kc_access_token'));
-    expect(token).toBeTruthy();
+    // Verify auth tokens are kept out of localStorage while BFF cookies are active
+    const localToken = await page.evaluate(() => window.localStorage.getItem('kc_access_token'));
+    expect(localToken).toBeNull();
+    const cookies = await page.context().cookies();
+    expect(cookies.some((c) => c.name === 'kc_session_active' && c.value === '1')).toBe(true);
+    expect(cookies.some((c) => c.name === 'kc_access_token' && c.httpOnly)).toBe(true);
   });
 
   test('3. Session persists across page reloads without re-authentication', async ({ managingPartnerPage }) => {
@@ -58,8 +61,9 @@ test.describe('Suite 01: Staff Authentication & Inactivity Lifecycle', () => {
     // URL is now /login
     expect(page.url()).toContain('/login');
 
-    // Tokens are purged from localStorage
-    const tokenAfter = await page.evaluate(() => window.localStorage.getItem('kc_access_token'));
-    expect(tokenAfter).toBeNull();
+    // BFF session cookies are purged on logout
+    const cookiesAfter = await page.context().cookies();
+    expect(cookiesAfter.some((c) => c.name === 'kc_session_active')).toBe(false);
+    expect(cookiesAfter.some((c) => c.name === 'kc_access_token')).toBe(false);
   });
 });

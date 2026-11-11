@@ -46,15 +46,16 @@ test.describe('Task 12.1: Playwright Test Infrastructure & Zero-Mock Smoke Tests
   });
 
   test('4. API Session Injection: Fast hydration without UI login boilerplate', async ({ managingPartnerPage }) => {
-    // Page was initialized with pre-injected session
+    // Page was initialized with pre-injected BFF cookies
     await expect(managingPartnerPage).toHaveURL(/\/(#.*)?$/);
 
-    // Verify session persistence in localStorage
-    const accessToken = await managingPartnerPage.evaluate(() =>
+    // Verify zero secret JWTs in client storage while BFF cookies are present
+    const localToken = await managingPartnerPage.evaluate(() =>
       window.localStorage.getItem('kc_access_token'),
     );
-    expect(accessToken).toBeTruthy();
-    expect(typeof accessToken).toBe('string');
+    expect(localToken).toBeNull();
+    const cookies = await managingPartnerPage.context().cookies();
+    expect(cookies.some((c) => c.name === 'kc_session_active' && c.value === '1')).toBe(true);
 
     // Verify authenticated main container is rendered
     const mainContainer = managingPartnerPage.locator('main');
@@ -76,12 +77,11 @@ test.describe('Task 12.1: Playwright Test Infrastructure & Zero-Mock Smoke Tests
 
   test('6. RBAC Role Barrier: Statutory Auditor persona lacks admin write navigation', async ({ auditorPage }) => {
     await auditorPage.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(auditorPage).toHaveURL(/\/(#.*)?$/);
 
-    // Verify auditor session is active
-    const token = await auditorPage.evaluate(() =>
-      window.localStorage.getItem('kc_access_token'),
-    );
-    expect(token).toBeTruthy();
+    // Verify auditor BFF session cookie is active
+    const cookies = await auditorPage.context().cookies();
+    expect(cookies.some((c) => c.name === 'kc_session_active' && c.value === '1')).toBe(true);
 
     // Verify auditor sidebar does NOT display sensitive write paths
     const reversalsLink = auditorPage.locator('aside a[href*="/reversals"]');

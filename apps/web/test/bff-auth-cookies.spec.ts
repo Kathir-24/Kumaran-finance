@@ -13,6 +13,7 @@ import {
   getRefreshTokenCookieOptions,
   getSessionActiveCookieOptions,
   getBackendApiUrl,
+  shouldUseSecureCookies,
 } from '../src/lib/auth-cookies.ts';
 
 test('BFF Cookies: Access token cookie enforces HttpOnly and 15-minute TTL', () => {
@@ -58,5 +59,46 @@ test('BFF Cookies: getBackendApiUrl resolves environment correctly', () => {
     else delete process.env.INTERNAL_API_URL;
     if (originalPublic) process.env.NEXT_PUBLIC_API_URL = originalPublic;
     else delete process.env.NEXT_PUBLIC_API_URL;
+  }
+});
+
+test('BFF Cookies: shouldUseSecureCookies honors HTTPS transport and HTTP production loopback cleanly', () => {
+  const originalEnv = process.env.NODE_ENV;
+  const originalCookieSecure = process.env.COOKIE_SECURE;
+
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.COOKIE_SECURE;
+
+    // Plain HTTP next start on localhost must NOT emit Secure so Chromium preserves HttpOnly cookies
+    assert.equal(
+      shouldUseSecureCookies({ url: 'http://localhost:3001/api/auth/login', nextUrl: { protocol: 'http:' } }),
+      false,
+    );
+
+    // Reverse-proxied HTTPS production (Nginx X-Forwarded-Proto: https) MUST emit Secure
+    assert.equal(
+      shouldUseSecureCookies({
+        url: 'http://web:3001/api/auth/login',
+        headers: new Headers({ 'x-forwarded-proto': 'https' }),
+      }),
+      true,
+    );
+
+    // Direct HTTPS URL MUST emit Secure
+    assert.equal(
+      shouldUseSecureCookies({ url: 'https://chits.kumaranfinance.in/api/auth/login', nextUrl: { protocol: 'https:' } }),
+      true,
+    );
+
+    // Explicit COOKIE_SECURE override wins regardless of request scheme
+    process.env.COOKIE_SECURE = 'true';
+    assert.equal(shouldUseSecureCookies({ url: 'http://localhost:3001/api/auth/login' }), true);
+    process.env.COOKIE_SECURE = 'false';
+    assert.equal(shouldUseSecureCookies({ url: 'https://chits.kumaranfinance.in/api/auth/login' }), false);
+  } finally {
+    process.env.NODE_ENV = originalEnv;
+    if (originalCookieSecure !== undefined) process.env.COOKIE_SECURE = originalCookieSecure;
+    else delete process.env.COOKIE_SECURE;
   }
 });

@@ -3,7 +3,7 @@
 > **Subsystem**: Web Operations Portal (`apps/web/`)  
 > **Test Framework**: Playwright Test (`@playwright/test`)  
 > **Execution Strategy**: 100% Real API, Real PostgreSQL 17 Database & Real S3 Scans — ZERO Mock Pages or Dummy Data.  
-> **Test Coverage**: 40 Live E2E Assertions across 11 Test Suites (Suites 00 through 10) Passing (100% Green).
+> **Test Coverage**: 42 Live E2E Assertions across 12 Test Suites (Suites 00 through 11) Passing (100% Green).
 
 ---
 
@@ -14,14 +14,14 @@ Kumaran Chits strictly enforces a **Zero-Mock Policy** for end-to-end tests:
 ```mermaid
 flowchart LR
     subgraph E2E_Runner["Playwright Test Runner (apps/web/e2e)"]
-        Spec["00-10 E2E Test Suites"]
+        Spec["00-11 E2E Test Suites"]
         Base["fixtures/test-base.ts"]
         Fixtures["fixtures/auth-fixtures.ts"]
     end
 
     subgraph Web_App["apps/web (Next.js 15 :3001)"]
         UI["React 19 Components"]
-        Zustand["auth-store.ts (localStorage)"]
+        Cookies["HttpOnly BFF Cookies + auth-store.ts"]
     end
 
     subgraph Backend["apps/api (NestJS 12 :3000)"]
@@ -32,7 +32,7 @@ flowchart LR
     Spec --> Base --> Fixtures
     Fixtures -->|Direct API Login| AuthCtrl
     AuthCtrl --> DB
-    Fixtures -->|Inject JWT Tokens| Zustand
+    Fixtures -->|Inject BFF HttpOnly Cookies| Cookies
     Spec -->|Browser Interaction| UI
     UI --> AuthCtrl
 ```
@@ -58,11 +58,11 @@ All E2E tests utilize deterministic staff personas seeded in [`apps/api/prisma/s
 
 ---
 
-## 3. The 10 End-to-End Journey Suites
+## 3. The 12 End-to-End Journey Suites
 
 | Suite | File | Tests | Key Invariants Verified |
 |---|---|---|---|
-| **Suite 00** | `00-infrastructure-smoke.e2e.spec.ts` | 6 | Web server health, bilingual rendering, UI login, JWT session injection, Maker $\ne$ Checker separation, RBAC barrier |
+| **Suite 00** | `00-infrastructure-smoke.e2e.spec.ts` | 6 | Web server health, bilingual rendering, UI login, BFF cookie session injection, Maker $\ne$ Checker separation, RBAC barrier |
 | **Suite 01** | `01-auth-lifecycle.e2e.spec.ts` | 4 | Invalid login rejection, valid login session hydration, session persistence on reload, logout session invalidation |
 | **Suite 02** | `02-schemes-onboard.e2e.spec.ts` | 3 | Scheme directory rendering, Guardrail 3 (4% commission floor) & Guardrail 6 (1/4 ceiling discount), 400-cell onboarding grid |
 | **Suite 03** | `03-customer-passbook.e2e.spec.ts` | 3 | Customer search & filters, Customer 360 profile & KYC checklist, Form XXI continuous passbook & whole-rupee math |
@@ -73,6 +73,7 @@ All E2E tests utilize deterministic staff personas seeded in [`apps/api/prisma/s
 | **Suite 08** | `08-payment-reversals.e2e.spec.ts` | 3 | Desk Accountant Maker-only authorization status, Checker Partner dual-control approval rights, justification request modal |
 | **Suite 09** | `09-reports-registers.e2e.spec.ts` | 5 | Reports hub & Form XXII 12-column cash book, Form XVII auction minutes & 21-day filing window, Form XXI continuous ledger, Defaulters register, CA forensic audit trail |
 | **Suite 10** | `10-bilingual-i18n.e2e.spec.ts` | 4 | Topbar language toggle (English $\leftrightarrow$ தமிழ்), authentic Tamil terminology across navigation, zero raw translation token leaks, restore English typography |
+| **Suite 11** | `11-claims-and-defaulters.e2e.spec.ts` | 2 | Collections Pending UPI Claims tab & Scheme Defaulters Desk (`/schemes/[id]/defaulters`) rendering cleanly |
 
 ---
 

@@ -6,12 +6,14 @@
 
 import { execSync } from 'child_process';
 
-const BASE_URL = 'http://127.0.0.1:3000/api/v1';
+const ORIGIN = (process.env.API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
+const BASE_URL = ORIGIN.endsWith('/api/v1') ? ORIGIN : `${ORIGIN}/api/v1`;
+const TARGET_DB = process.env.TARGET_DB || 'chitflow_dev';
 
 function queryDb(sql: string): string {
   try {
     const singleLineSql = sql.replace(/\r?\n/g, ' ').trim();
-    const cmd = `docker exec chitflow-db psql -U chitflow -d chitflow_dev -t -A -c "${singleLineSql.replace(/"/g, '\\"')}"`;
+    const cmd = `docker exec chitflow-db psql -U chitflow -d ${TARGET_DB} -t -A -c "${singleLineSql.replace(/"/g, '\\"')}"`;
     return execSync(cmd, { encoding: 'utf-8' }).trim();
   } catch (err: any) {
     return `[DB ERROR]: ${err.message}`;

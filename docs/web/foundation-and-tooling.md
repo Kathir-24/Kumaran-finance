@@ -86,8 +86,8 @@ Configured specifically for cashiers and accountants:
 ### 3.4 20-Minute Inactivity Guardian (`apps/web/src/components/security/session-inactivity-guard.tsx`)
 - **Activity Listeners**: Throttled (500ms) event listeners on `mousemove`, `mousedown`, `keydown`, `scroll`, and `touchstart`.
 - **18-Minute Warning**: Triggers amber warning modal with live seconds countdown.
-- **20-Minute Auto-Logout**: Purges active tokens and navigates to `/login?reason=timeout`.
-- **Client Boot Auto-Hydration**: Calls `useAuthStore.getState().hydrate()` on mount to restore existing sessions from `localStorage`.
+- **Auto-Logout on 20-Minute Idle**: Purges BFF HttpOnly session cookies via `logout('timeout')` and navigates to `/login?reason=timeout`.
+- **Client Boot Auto-Hydration**: Calls `useAuthStore.getState().hydrate()` on mount to check session state via `GET /api/auth/session` without triggering redundant logout broadcasts when unauthenticated.
 
 ---
 

@@ -48,7 +48,10 @@ apps/web/src/
 │   ├── session/route.ts                        # BFF session hydration sharing coalesced refresh helper
 │   └── logout/route.ts                         # BFF logout handler invalidating Redis/BFF caches & cookies
 ├── lib/
+│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto)
 │   └── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
+├── stores/
+│   └── auth-store.ts                           # Re-entrancy-guarded logout & non-looping unauthenticated hydration
 ├── components/auth/
 │   ├── login-form.tsx                          # Phone+Password form, 2FA fork & active session redirect
 │   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste & guards
