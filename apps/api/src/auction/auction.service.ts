@@ -7,6 +7,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import { AuctionStatus, Prisma } from '@prisma/client';
+import {
+  lockAuctionMinutesRow,
+  lockAuctionRow,
+  lockChitGroupRow,
+} from '../common/utils/state-transition-lock.util';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -169,7 +175,9 @@ export class AuctionService {
       bidDiscount,
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    return withTransactionRetry(this.prisma, async (tx) => {
+      await lockChitGroupRow(tx, chitGroupId);
+
       // 0. State Guard: Verify existing auction is not already completed or filed
       const existingAuction = await tx.auction.findUnique({
         where: {
@@ -297,7 +305,9 @@ export class AuctionService {
       bidDiscount,
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    return withTransactionRetry(this.prisma, async (tx) => {
+      await lockChitGroupRow(tx, chitGroupId);
+
       // 0. State Guard: Verify existing auction is not already completed or filed
       const existingAuction = await tx.auction.findUnique({
         where: {
@@ -458,20 +468,15 @@ export class AuctionService {
       );
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate finalization
-      if (typeof tx.$queryRaw === 'function') {
-        const lockedAuctions = await tx.$queryRaw<Array<{ id: string; status: AuctionStatus }>>`
-          SELECT id, status FROM "Auction" WHERE id = ${auctionId} FOR UPDATE
-        `;
-        const lockedAuction = lockedAuctions && lockedAuctions[0];
-        if (
-          lockedAuction &&
-          (lockedAuction.status === AuctionStatus.COMPLETED ||
-            lockedAuction.status === AuctionStatus.MINUTES_FILED)
-        ) {
-          throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
-        }
+      const lockedAuction = await lockAuctionRow(tx, auctionId);
+      if (
+        lockedAuction &&
+        (lockedAuction.status === AuctionStatus.COMPLETED ||
+          lockedAuction.status === AuctionStatus.MINUTES_FILED)
+      ) {
+        throw new BadRequestException('AUCTION_ALREADY_FINALIZED: Auction has already been finalized and committed');
       }
 
       // 1. Commit Auction
@@ -849,7 +854,14 @@ export class AuctionService {
 
     const filedDate = dto.filedDate ? new Date(dto.filedDate) : new Date();
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      const lockedMinute = await lockAuctionMinutesRow(tx, auctionId);
+      if (lockedMinute?.filedAtRegistrar === true) {
+        throw new BadRequestException(
+          'MINUTES_ALREADY_FILED: Statutory auction minutes have already been filed with the Registrar',
+        );
+      }
+
       const minutes = await tx.auctionMinutes.update({
         where: { auctionId },
         data: {

@@ -1,11 +1,13 @@
 import {
   AuctionStatus,
+  DisbursementMode,
   DueStatus,
   PaymentMethod,
   PaymentStatus,
   PrismaClient,
   Role,
 } from '@prisma/client';
+import { ConflictException } from '@nestjs/common';
 import { AuctionService } from '../src/auction/auction.service';
 import { CollectionService } from '../src/collection/collection.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
@@ -1077,6 +1079,441 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       await prisma.paymentAllocation.deleteMany({ where: { paymentId: ghostPayment.id } });
       await prisma.payment.deleteMany({ where: { id: ghostPayment.id } });
       await prisma.installmentDue.deleteMany({ where: { id: due.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 11: Concurrent Safety Proof Verification Stampede (Disbursement)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-11: 5 parallel workers racing verifySafetyProof MUST result in strictly 1 VERIFIED_BY_MAKER and 4 rejected (DEF-DB-02)', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-11: DB or required seed data not present');
+      return;
+    }
+
+    const testAuction = await prisma.auction.create({
+      data: {
+        chitGroupId: activeTicket.chitGroupId,
+        installmentMonth: 981,
+        auctionDate: new Date(),
+        status: AuctionStatus.COMPLETED,
+        bidDiscount: 20000n,
+        foremanCommissionRate: 4.0,
+        foremanCommissionAmount: 4000n,
+        totalDividend: 16000n,
+        dividendPerTicket: 800n,
+        prizeMoney: 80000n,
+        conductedByUserId: makerUserId,
+        finalizedByUserId: checkerUserId || makerUserId,
+        winner: {
+          create: {
+            ticketId: activeTicket.id,
+            wasTieBreakWinner: false,
+            disbursementStatus: 'PENDING_VERIFICATION',
+          },
+        },
+      },
+      include: { winner: true },
+    });
+
+    try {
+      const promises = Array.from({ length: 5 }).map((_, idx) =>
+        disbursementService.verifySafetyProof(
+          testAuction.id,
+          {
+            isSecurityRequired: false,
+            agreementSigned: true,
+            nomineeSigned: true,
+            notes: `Parallel safety verify #${idx + 1}`,
+          },
+          makerUserId,
+        ),
+      );
+
+      const results = await Promise.allSettled(promises);
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(4);
+
+      const dbWinner = await prisma.auctionWinner.findUnique({
+        where: { id: testAuction.winner!.id },
+      });
+      expect(dbWinner?.disbursementStatus).toBe('VERIFIED_BY_MAKER');
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: { action: 'SAFETY_PROOF_VERIFIED', entityId: testAuction.winner!.id },
+      });
+      await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
+      await prisma.auction.delete({ where: { id: testAuction.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 12: Concurrent Payout Authorization Stampede (Disbursement)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-12: 5 parallel Checkers racing authorizePayout MUST result in strictly 1 AUTHORIZED_BY_CHECKER and 4 rejected (DEF-DB-02)', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-12: DB or required seed data not present');
+      return;
+    }
+
+    const testAuction = await prisma.auction.create({
+      data: {
+        chitGroupId: activeTicket.chitGroupId,
+        installmentMonth: 982,
+        auctionDate: new Date(),
+        status: AuctionStatus.COMPLETED,
+        bidDiscount: 20000n,
+        foremanCommissionRate: 4.0,
+        foremanCommissionAmount: 4000n,
+        totalDividend: 16000n,
+        dividendPerTicket: 800n,
+        prizeMoney: 80000n,
+        conductedByUserId: makerUserId,
+        finalizedByUserId: checkerUserId,
+        winner: {
+          create: {
+            ticketId: activeTicket.id,
+            wasTieBreakWinner: false,
+            disbursementStatus: 'VERIFIED_BY_MAKER',
+            agreementSigned: true,
+            nomineeSigned: true,
+            verifiedByUserId: makerUserId,
+          },
+        },
+      },
+      include: { winner: true },
+    });
+
+    try {
+      const promises = Array.from({ length: 5 }).map((_, idx) =>
+        disbursementService.authorizePayout(
+          testAuction.id,
+          {
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+            notes: `Concurrent auth #${idx + 1}`,
+          },
+          checkerUserId,
+          [Role.SUPER_ADMIN],
+        ),
+      );
+
+      const results = await Promise.allSettled(promises);
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(4);
+      for (const rej of rejected) {
+        if (rej.status === 'rejected') {
+          expect(rej.reason.message).toMatch(/PRIZE_ALREADY_AUTHORIZED|VERIFIED_BY_MAKER/);
+        }
+      }
+
+      const dbWinner = await prisma.auctionWinner.findUnique({
+        where: { id: testAuction.winner!.id },
+      });
+      expect(dbWinner?.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: { action: 'PRIZE_PAYOUT_AUTHORIZED', entityId: testAuction.winner!.id },
+      });
+      await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
+      await prisma.auction.delete({ where: { id: testAuction.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 13: Concurrent Final Month N Settlement Stampede (Disbursement)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-13: 3 parallel Super Admins racing settleFinalMonth MUST result in strictly 1 COMPLETED settlement and clean rejections', async () => {
+    if (!isDbConnected || !activeTicket || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-13: DB or required seed data not present');
+      return;
+    }
+
+    const ts = Date.now();
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `KC-RACE-MN-${ts}`,
+        groupName: 'Final Settlement Race Test Scheme',
+        chitValue: 100000n,
+        durationMonths: 20,
+        totalTickets: 20,
+        baseInstallment: 5000n,
+        maxDiscountCeiling: 25000n,
+        status: 'ACTIVE',
+        startDate: new Date('2025-01-01T00:00:00Z'),
+        endDate: new Date('2026-08-31T00:00:00Z'),
+      },
+    });
+
+    const tempTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: tempChit.id,
+        customerId: activeTicket.customerId,
+        ticketNumber: 20,
+        isPrized: false,
+        status: 'ACTIVE',
+      },
+    });
+
+    try {
+      const promises = Array.from({ length: 3 }).map((_, idx) =>
+        disbursementService.settleFinalMonth(
+          tempChit.id,
+          {
+            ticketId: tempTicket.id,
+            disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT,
+            paymentReference: `MN-REF-${ts}-${idx + 1}`,
+          },
+          checkerUserId,
+          [Role.SUPER_ADMIN],
+        ),
+      );
+
+      const results = await Promise.allSettled(promises);
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(2);
+      for (const rej of rejected) {
+        if (rej.status === 'rejected') {
+          expect(rej.reason.message).toMatch(
+            /FINAL_SETTLEMENT_ALREADY_EXECUTED|already prized|Final settlement can only be executed for ACTIVE/,
+          );
+        }
+      }
+
+      const finalChit = await prisma.chitGroup.findUnique({ where: { id: tempChit.id } });
+      expect(finalChit?.status).toBe('COMPLETED');
+      expect(await prisma.auction.count({ where: { chitGroupId: tempChit.id } })).toBe(1);
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: { action: 'FINAL_MONTH_SETTLEMENT_EXECUTED', entityId: tempChit.id },
+      });
+      await prisma.auctionWinner.deleteMany({ where: { ticketId: tempTicket.id } });
+      await prisma.auction.deleteMany({ where: { chitGroupId: tempChit.id } });
+      await prisma.subscriberTicket.deleteMany({ where: { id: tempTicket.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 14: Concurrent Reversal Approve vs Reject Split-Brain Prevention
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-14: simultaneous approveReversal and rejectReversal MUST result in 1 winner, 1 rejection, and zero ledger split-brain', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-14: DB or required seed data not present');
+      return;
+    }
+
+    const testDue = await prisma.installmentDue.create({
+      data: {
+        ticketId: activeTicket.id,
+        chitGroupId: activeTicket.chitGroupId,
+        installmentMonth: 983,
+        grossAmount: 5000n,
+        dividendDeduction: 1000n,
+        netPayableAmount: 4000n,
+        dueDate: new Date(),
+        paidAmount: 4000n,
+        status: DueStatus.PAID,
+      },
+    });
+
+    const testPayment = await prisma.payment.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        recordedByUserId: makerUserId,
+        customerId: activeTicket.customerId,
+        amount: 4000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.SUCCESS,
+        cashHandoverStatus: 'ACKNOWLEDGED',
+      },
+    });
+
+    await prisma.paymentAllocation.create({
+      data: {
+        paymentId: testPayment.id,
+        ticketId: activeTicket.id,
+        installmentDueId: testDue.id,
+        amountAllocated: 4000n,
+      },
+    });
+
+    await prisma.paymentReversal.create({
+      data: {
+        paymentId: testPayment.id,
+        reason: 'CONCURR_SPLIT_BRAIN_TEST',
+        status: 'REQUESTED',
+        initiatedByUserId: makerUserId,
+      },
+    });
+
+    try {
+      const results = await Promise.allSettled([
+        paymentService.approveReversal(
+          testPayment.id,
+          { notes: 'Approve race' },
+          checkerUserId,
+          [Role.SUPER_ADMIN],
+        ),
+        paymentService.rejectReversal(
+          testPayment.id,
+          { rejectionReason: 'Reject race' },
+          checkerUserId,
+          [Role.SUPER_ADMIN],
+        ),
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+
+      const finalPayment = await prisma.payment.findUnique({
+        where: { id: testPayment.id },
+        include: { reversal: true },
+      });
+      const finalDue = await prisma.installmentDue.findUnique({ where: { id: testDue.id } });
+
+      // Atomic consistency invariant: no split-brain between Payment, PaymentReversal, and InstallmentDue!
+      if (finalPayment?.paymentStatus === PaymentStatus.REVERSED) {
+        expect(finalPayment.reversal?.status).toBe('APPROVED');
+        expect(finalDue?.status).toBe(DueStatus.UNPAID);
+        expect(finalDue?.paidAmount).toBe(0n);
+      } else {
+        expect(finalPayment?.paymentStatus).toBe(PaymentStatus.SUCCESS);
+        expect(finalPayment?.reversal?.status).toBe('REJECTED');
+        expect(finalDue?.status).toBe(DueStatus.PAID);
+        expect(finalDue?.paidAmount).toBe(4000n);
+      }
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: { in: ['PAYMENT_REVERSED', 'PAYMENT_REVERSAL_REJECTED'] },
+          entityId: testPayment.id,
+        },
+      });
+      await prisma.paymentReversal.deleteMany({ where: { paymentId: testPayment.id } });
+      await prisma.paymentAllocation.deleteMany({ where: { paymentId: testPayment.id } });
+      await prisma.payment.deleteMany({ where: { id: testPayment.id } });
+      await prisma.installmentDue.deleteMany({ where: { id: testDue.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 15: ADR-13 Concurrent Duplicate-Customer Substitution Race
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-15: simultaneous substituteSubscriber onto 2 vacated tickets in the SAME chitGroup with the SAME customerId MUST reject 1 with ConflictException (ADR-13)', async () => {
+    if (!isDbConnected || !activeTicket || !checkerUserId) {
+      console.warn('Skipping CONCURR-INV-15: DB or required seed data not present');
+      return;
+    }
+
+    const branchId = activeTicket.customer.branchId;
+    const ts = Date.now();
+
+    const [def1, def2, candidate] = await Promise.all([
+      prisma.customer.create({
+        data: {
+          customerCode: `KC-DEF1-${ts}`,
+          fullName: 'Vacated One',
+          phone: `91811${String(ts).slice(-5)}1`,
+          addressLine1: 'Perundurai',
+          city: 'Erode',
+          pincode: '638052',
+          isKycVerified: true,
+          branchId,
+        },
+      }),
+      prisma.customer.create({
+        data: {
+          customerCode: `KC-DEF2-${ts}`,
+          fullName: 'Vacated Two',
+          phone: `91812${String(ts).slice(-5)}2`,
+          addressLine1: 'Perundurai',
+          city: 'Erode',
+          pincode: '638052',
+          isKycVerified: true,
+          branchId,
+        },
+      }),
+      prisma.customer.create({
+        data: {
+          customerCode: `KC-CAND-${ts}`,
+          fullName: 'Single Candidate Subscriber',
+          phone: `91813${String(ts).slice(-5)}3`,
+          addressLine1: 'Perundurai',
+          city: 'Erode',
+          pincode: '638052',
+          isKycVerified: true,
+          branchId,
+        },
+      }),
+    ]);
+
+    const [tkt1, tkt2] = await Promise.all([
+      prisma.subscriberTicket.create({
+        data: {
+          chitGroupId: activeTicket.chitGroupId,
+          customerId: def1.id,
+          ticketNumber: 9997,
+          status: 'REMOVED_DEF_3M',
+          consecutiveUnpaidMonths: 3,
+          removedAt: new Date(),
+          removedByUserId: checkerUserId,
+        },
+      }),
+      prisma.subscriberTicket.create({
+        data: {
+          chitGroupId: activeTicket.chitGroupId,
+          customerId: def2.id,
+          ticketNumber: 9998,
+          status: 'REMOVED_DEF_3M',
+          consecutiveUnpaidMonths: 3,
+          removedAt: new Date(),
+          removedByUserId: checkerUserId,
+        },
+      }),
+    ]);
+
+    try {
+      const results = await Promise.allSettled([
+        installmentService.substituteSubscriber(tkt1.id, checkerUserId, {
+          newCustomerId: candidate.id,
+          reason: 'Race sub 1',
+        }),
+        installmentService.substituteSubscriber(tkt2.id, checkerUserId, {
+          newCustomerId: candidate.id,
+          reason: 'Race sub 2',
+        }),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      if (rejected[0]?.status === 'rejected') {
+        expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+        expect(rejected[0].reason.message).toContain('ADR-13 Violation');
+      }
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
+          entityId: { in: [tkt1.id, tkt2.id] },
+        },
+      });
+      await prisma.subscriberTicket.deleteMany({ where: { id: { in: [tkt1.id, tkt2.id] } } });
+      await prisma.customer.deleteMany({
+        where: { id: { in: [def1.id, def2.id, candidate.id] } },
+      });
     }
   }, 20000);
 });

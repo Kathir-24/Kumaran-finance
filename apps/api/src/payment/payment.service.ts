@@ -24,6 +24,7 @@ import {
   generateNextReceiptNumber,
   PAYMENT_TRANSACTION_OPTIONS,
 } from '../common/utils/receipt-sequence.util';
+import { lockPaymentAndReversalRows } from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { ApproveReversalDto } from './dto/approve-reversal.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -605,9 +606,20 @@ export class PaymentService {
       );
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
+      const { lockedPayment, lockedReversal } = await lockPaymentAndReversalRows(tx, paymentId);
+      if (lockedPayment && lockedPayment.paymentStatus !== PaymentStatus.SUCCESS) {
+        throw new BadRequestException('Only successful payments can be reversed');
+      }
+      if (lockedReversal && lockedReversal.status === 'REQUESTED') {
+        throw new BadRequestException(
+          'A reversal request is already pending for this payment',
+        );
+      }
+
+      const activeReversal = lockedReversal || payment.reversal;
       let reversal;
-      if (payment.reversal) {
+      if (activeReversal) {
         reversal = await tx.paymentReversal.update({
           where: { paymentId },
           data: {
@@ -731,13 +743,22 @@ export class PaymentService {
     const now = new Date();
 
     const result = await withTransactionRetry(this.prisma, async (tx) => {
-      // 0. Pessimistic Row Lock on affected Subscriber Tickets (deterministic sort) to serialize arrears updates
+      // 0. Pessimistic Row Lock on SubscriberTicket(s) (Tier 2) then Payment/PaymentReversal (Tier 4 -> 5)
       if (typeof tx.$queryRaw === 'function') {
         const ticketIds = [...new Set(payment.allocations.map((a) => a.ticketId))].sort();
         if (ticketIds.length > 0) {
           await tx.$queryRaw`
             SELECT id FROM "SubscriberTicket" WHERE id = ANY(${ticketIds}::text[]) ORDER BY id FOR UPDATE
           `;
+        }
+        const { lockedPayment, lockedReversal } = await lockPaymentAndReversalRows(tx, paymentId);
+        if (lockedPayment && lockedPayment.paymentStatus === PaymentStatus.REVERSED) {
+          throw new BadRequestException('Payment has already been reversed');
+        }
+        if (lockedReversal && lockedReversal.status !== 'REQUESTED') {
+          throw new BadRequestException(
+            'No pending reversal request found for this payment',
+          );
         }
       }
 
@@ -861,7 +882,14 @@ export class PaymentService {
 
     const rejectionNotes = `${payment.reversal.notes || ''} | Rejection: ${dto.rejectionReason}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    return withTransactionRetry(this.prisma, async (tx) => {
+      const { lockedReversal } = await lockPaymentAndReversalRows(tx, paymentId);
+      if (lockedReversal && lockedReversal.status !== 'REQUESTED') {
+        throw new BadRequestException(
+          'No pending reversal request found for this payment',
+        );
+      }
+
       const reversal = await tx.paymentReversal.update({
         where: { paymentId },
         data: {

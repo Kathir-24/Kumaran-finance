@@ -9,6 +9,12 @@ import {
 import { Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  lockAuctionWinnerRow,
+  lockChitGroupRow,
+  lockSubscriberTicketRow,
+} from '../common/utils/state-transition-lock.util';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { StorageService } from '../storage/storage.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -286,7 +292,14 @@ export class DisbursementService {
       );
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
+      const lockedWinner = await lockAuctionWinnerRow(tx, auction.winner!.id);
+      if (lockedWinner && lockedWinner.disbursementStatus !== 'PENDING_VERIFICATION') {
+        throw new BadRequestException(
+          `SAFETY_PROOF_ALREADY_VERIFIED: Safety proof has already been verified or status has changed (current: ${lockedWinner.disbursementStatus})`,
+        );
+      }
+
       const updated = await tx.auctionWinner.update({
         where: { id: auction.winner!.id },
         data: {
@@ -521,21 +534,13 @@ export class DisbursementService {
       ? BigInt(Math.floor(dto.disbursedAmount))
       : auction.prizeMoney || 0n;
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate authorization
-      if (typeof tx.$queryRaw === 'function') {
-        const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
-          SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${auction.winner!.id} FOR UPDATE
-        `;
-        const lockedWinner = lockedWinners && lockedWinners[0];
-        if (
-          lockedWinner &&
-          (lockedWinner.disbursementStatus !== 'VERIFIED_BY_MAKER')
-        ) {
-          throw new BadRequestException(
-            'PRIZE_ALREADY_AUTHORIZED: Prize payout has already been authorized or status has changed',
-          );
-        }
+      const lockedWinner = await lockAuctionWinnerRow(tx, auction.winner!.id);
+      if (lockedWinner && lockedWinner.disbursementStatus !== 'VERIFIED_BY_MAKER') {
+        throw new BadRequestException(
+          'PRIZE_ALREADY_AUTHORIZED: Prize payout has already been authorized or status has changed',
+        );
       }
 
       const updated = await tx.auctionWinner.update({
@@ -604,22 +609,17 @@ export class DisbursementService {
 
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate disbursement release
-      if (typeof tx.$queryRaw === 'function') {
-        const lockedWinners = await tx.$queryRaw<Array<{ id: string; disbursementStatus: string }>>`
-          SELECT id, "disbursementStatus" FROM "AuctionWinner" WHERE id = ${auction.winner!.id} FOR UPDATE
-        `;
-        const lockedWinner = lockedWinners && lockedWinners[0];
-        if (
-          lockedWinner &&
-          (lockedWinner.disbursementStatus === 'DISBURSED' ||
-            lockedWinner.disbursementStatus !== 'AUTHORIZED_BY_CHECKER')
-        ) {
-          throw new BadRequestException(
-            'PRIZE_ALREADY_DISBURSED: Prize payout has already been released or status has changed',
-          );
-        }
+      const lockedWinner = await lockAuctionWinnerRow(tx, auction.winner!.id);
+      if (
+        lockedWinner &&
+        (lockedWinner.disbursementStatus === 'DISBURSED' ||
+          lockedWinner.disbursementStatus !== 'AUTHORIZED_BY_CHECKER')
+      ) {
+        throw new BadRequestException(
+          'PRIZE_ALREADY_DISBURSED: Prize payout has already been released or status has changed',
+        );
       }
 
       const updated = await tx.auctionWinner.update({
@@ -830,7 +830,21 @@ export class DisbursementService {
     const prizeMoney = chit.chitValue - commissionAmount;
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
+      const lockedGroup = await lockChitGroupRow(tx, chitGroupId);
+      if (lockedGroup && lockedGroup.status !== 'ACTIVE') {
+        throw new BadRequestException(
+          `FINAL_SETTLEMENT_ALREADY_EXECUTED: Chit scheme is no longer ACTIVE (current: ${lockedGroup.status})`,
+        );
+      }
+
+      const lockedTicket = await lockSubscriberTicketRow(tx, ticket.id);
+      if (lockedTicket && lockedTicket.isPrized) {
+        throw new BadRequestException(
+          `FINAL_SETTLEMENT_ALREADY_EXECUTED: Ticket #${ticket.ticketNumber} is already prized`,
+        );
+      }
+
       // Create settlement auction record for Month N
       const settlementAuction = await tx.auction.create({
         data: {

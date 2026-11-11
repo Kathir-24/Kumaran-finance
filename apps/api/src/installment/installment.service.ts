@@ -11,6 +11,8 @@ import {
   CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
 } from '../common/constants';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { lockSubscriberTicketRow } from '../common/utils/state-transition-lock.util';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateDuesDto } from './dto/generate-dues.dto';
 import { QueryDuesDto } from './dto/query-dues.dto';
@@ -127,20 +129,22 @@ export class InstallmentService {
       dueDate = new Date(cycleEndDate);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return withTransactionRetry(this.prisma, async (tx) => {
       // 1. Fetch all existing dues for all tickets in 1 single SQL query (Eliminates N+1 query pattern)
       const ticketIds = chit.tickets.map((t) => t.id);
-      const existingDues = await tx.installmentDue.findMany({
+      const existingDues: any[] = await tx.installmentDue.findMany({
         where: {
           ticketId: { in: ticketIds },
           installmentMonth: month,
         },
       });
-      const existingDueMap = new Map((existingDues || []).map((d) => [d.ticketId, d]));
+      const existingDueMap = new Map<string, any>(
+        (existingDues || []).map((d: any) => [d.ticketId, d]),
+      );
 
-      const generatedDues = [];
-      const duesToUpdate = [];
-      const duesToCreate = [];
+      const generatedDues: any[] = [];
+      const duesToUpdate: any[] = [];
+      const duesToCreate: any[] = [];
 
       for (const ticket of chit.tickets) {
         const existingDue = existingDueMap.get(ticket.id);
@@ -673,54 +677,59 @@ export class InstallmentService {
     const previousCustomerId = ticket.customerId;
     const previousCustomerName = ticket.customer.fullName;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate substitution
-      if (typeof tx.$queryRaw === 'function') {
-        const lockedTickets = await tx.$queryRaw<Array<{ id: string; status: string }>>`
-          SELECT id, status FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE
-        `;
-        const lockedTicket = lockedTickets && lockedTickets[0];
+    let updated: any;
+    try {
+      updated = await withTransactionRetry(this.prisma, async (tx) => {
+        // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate substitution
+        const lockedTicket = await lockSubscriberTicketRow(tx, ticketId);
         if (lockedTicket && lockedTicket.status !== 'REMOVED_DEF_3M') {
           throw new BadRequestException(
             `Subscriber substitution failed: Ticket ${ticketId} is no longer in REMOVED_DEF_3M status (current status: ${lockedTicket.status})`,
           );
         }
-      }
 
-      const subTicket = await tx.subscriberTicket.update({
-        where: { id: ticketId },
-        data: {
-          customerId: dto.newCustomerId,
-          status: 'ACTIVE',
-          consecutiveUnpaidMonths: 0,
-          removedAt: null,
-          removedByUserId: null,
-        },
-        include: { customer: true, chitGroup: true },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          userId: adminUserId,
-          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
-          entityType: 'SubscriberTicket',
-          entityId: ticketId,
-          oldValue: {
-            customerId: previousCustomerId,
-            customerName: previousCustomerName,
-            status: 'REMOVED_DEF_3M',
-          },
-          newValue: {
+        const subTicket = await tx.subscriberTicket.update({
+          where: { id: ticketId },
+          data: {
             customerId: dto.newCustomerId,
-            customerName: newCustomer.fullName,
             status: 'ACTIVE',
-            reason: dto.reason,
+            consecutiveUnpaidMonths: 0,
+            removedAt: null,
+            removedByUserId: null,
           },
-        },
-      });
+          include: { customer: true, chitGroup: true },
+        });
 
-      return subTicket;
-    });
+        await tx.auditLog.create({
+          data: {
+            userId: adminUserId,
+            action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
+            entityType: 'SubscriberTicket',
+            entityId: ticketId,
+            oldValue: {
+              customerId: previousCustomerId,
+              customerName: previousCustomerName,
+              status: 'REMOVED_DEF_3M',
+            },
+            newValue: {
+              customerId: dto.newCustomerId,
+              customerName: newCustomer.fullName,
+              status: 'ACTIVE',
+              reason: dto.reason,
+            },
+          },
+        });
+
+        return subTicket;
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new ConflictException(
+          `ADR-13 Violation: Customer ${newCustomer.fullName} already holds a ticket in Chit Group ${ticket.chitGroup.groupCode}. A customer cannot hold 2 or more tickets in the same scheme.`,
+        );
+      }
+      throw err;
+    }
 
     return {
       success: true,
