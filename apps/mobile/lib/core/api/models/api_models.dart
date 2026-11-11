@@ -218,7 +218,7 @@ class SettlementRecordDto {
   /// External gateway payment transaction ID
   final String gatewayPaymentId;
   /// Settlement amount in whole integer Rupees
-  final double amount;
+  final int amount;
   /// Gateway settlement transaction status
   final String status;
   /// Gateway settlement timestamp
@@ -236,7 +236,7 @@ class SettlementRecordDto {
     return SettlementRecordDto(
       gatewayOrderId: json['gatewayOrderId']?.toString() ?? '',
       gatewayPaymentId: json['gatewayPaymentId']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
       status: json['status']?.toString() ?? '',
       settledAt: json['settledAt']?.toString() ?? '',
     );
@@ -2488,7 +2488,7 @@ class CreateChitGroupDto {
   /// Scheme name in Tamil for bilingual receipt rendering
   final String? groupNameTamil;
   /// Total chit value in whole integer Rupees (e.g., 100000 for ₹1 Lakh)
-  final double chitValue;
+  final int chitValue;
   /// Duration of the chit scheme in months (e.g., 20, 25, 40)
   final double durationMonths;
   /// Total number of subscriber tickets (must match durationMonths in standard chits)
@@ -2523,7 +2523,7 @@ class CreateChitGroupDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
+      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toInt() : null) ?? 0,
       durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
       totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
       sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
@@ -2557,7 +2557,7 @@ class HistoricalWinnerDto {
   /// Ticket number that won the past auction
   final double ticketNumber;
   /// Winning bid discount in whole integer Rupees (must be <= chitValue / 4)
-  final double bidDiscount;
+  final int bidDiscount;
   /// Date the past physical auction took place
   final String auctionDate;
 
@@ -2572,7 +2572,7 @@ class HistoricalWinnerDto {
     return HistoricalWinnerDto(
       month: (json['month'] != null ? (json['month'] as num).toDouble() : null) ?? 0.0,
       ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null) ?? 0.0,
+      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
       auctionDate: json['auctionDate']?.toString() ?? '',
     );
   }
@@ -2593,7 +2593,7 @@ class OngoingMemberAllocationDto {
   /// Customer ID for this ticket
   final String customerId;
   /// Opening balance in whole Rupees transcribed from paper notebook
-  final double? openingBalance;
+  final int? openingBalance;
 
   const OngoingMemberAllocationDto({
     required this.ticketNumber,
@@ -2605,7 +2605,7 @@ class OngoingMemberAllocationDto {
     return OngoingMemberAllocationDto(
       ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
       customerId: json['customerId']?.toString() ?? '',
-      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toDouble() : null,
+      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toInt() : null,
     );
   }
 
@@ -2625,7 +2625,7 @@ class OnboardOngoingChitDto {
   final String groupName;
   final String? groupNameTamil;
   /// Total chit value in whole integer Rupees
-  final double chitValue;
+  final int chitValue;
   /// Total scheme duration in months
   final double durationMonths;
   /// Total tickets in the scheme
@@ -2665,7 +2665,7 @@ class OnboardOngoingChitDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
+      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toInt() : null) ?? 0,
       durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
       totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
       onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
@@ -2943,7 +2943,7 @@ class AssignTicketDto {
   /// Verified customer UUID (Enforces ADR-13: max 1 ticket per customer in this group)
   final String customerId;
   /// Opening balance in whole Rupees (used for mid-cycle intake adjustments)
-  final double? openingBalance;
+  final int? openingBalance;
 
   const AssignTicketDto({
     required this.ticketNumber,
@@ -2955,7 +2955,7 @@ class AssignTicketDto {
     return AssignTicketDto(
       ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
       customerId: json['customerId']?.toString() ?? '',
-      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toDouble() : null,
+      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toInt() : null,
     );
   }
 
@@ -3369,7 +3369,7 @@ class RecordBidDto {
   /// UUID of the winning subscriber ticket (must be non-prized and with zero arrears)
   final String ticketId;
   /// Winning auction bid discount in whole integer Rupees (must be between 4% commission and 1/4 ceiling)
-  final double bidDiscount;
+  final int bidDiscount;
   /// Date the physical auction was conducted at the branch
   final String auctionDate;
 
@@ -3382,7 +3382,7 @@ class RecordBidDto {
   factory RecordBidDto.fromJson(Map<String, dynamic> json) {
     return RecordBidDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null) ?? 0.0,
+      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
       auctionDate: json['auctionDate']?.toString() ?? '',
     );
   }
@@ -3428,7 +3428,7 @@ class RecordTieBreakDto {
   /// UUID of the winning ticket drawn by the Foreman via physical paper token draw (Option A)
   final String winningTicketId;
   /// Tied bid discount (must equal exact 1/4 ceiling: chitValue / 4)
-  final double bidDiscount;
+  final int bidDiscount;
   /// Date the physical lot draw took place at the branch in front of members
   final String auctionDate;
   /// Names of attending subscribers who witnessed the physical token draw
@@ -3446,7 +3446,7 @@ class RecordTieBreakDto {
     return RecordTieBreakDto(
       tiedTickets: ((json['tiedTickets'] as List<dynamic>?)?.map((e) => TiedTicketDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       winningTicketId: json['winningTicketId']?.toString() ?? '',
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null) ?? 0.0,
+      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
       auctionDate: json['auctionDate']?.toString() ?? '',
       witnessNames: (json['witnessNames'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
     );
@@ -4313,7 +4313,7 @@ class RecordCollectionDto {
   /// Installment month number (1 to N) being collected
   final double installmentMonth;
   /// Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)
-  final double amount;
+  final int amount;
   /// Payment method (CASH, UPI, CHEQUE, BANK_TRANSFER)
   final String paymentMethod;
   /// Unique UUID generated by mobile app at point of physical collection for offline sync deduplication
@@ -4337,7 +4337,7 @@ class RecordCollectionDto {
     return RecordCollectionDto(
       ticketId: json['ticketId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       idempotencyKey: json['idempotencyKey']?.toString(),
       transactionRef: json['transactionRef']?.toString(),
@@ -4474,7 +4474,7 @@ class SyncOfflineCollectionItemDto {
   /// Installment month number (1 to N) being collected
   final double installmentMonth;
   /// Exact net installment amount in whole integer Rupees (must match due.netPayableAmount)
-  final double amount;
+  final int amount;
   /// Payment method (CASH, UPI, CHEQUE, BANK_TRANSFER)
   final String paymentMethod;
   /// Exact ISO-8601 timestamp recorded by mobile device at physical collection point
@@ -4497,7 +4497,7 @@ class SyncOfflineCollectionItemDto {
       idempotencyKey: json['idempotencyKey']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       collectedAt: json['collectedAt']?.toString() ?? '',
       transactionRef: json['transactionRef']?.toString(),
@@ -4727,7 +4727,7 @@ class AcknowledgeHandoverDto {
   /// UUID of the field collection agent who collected the physical cash in the field
   final String collectorUserId;
   /// Physically counted cash currency notes amount received into branch vault (must match total of specified paymentIds)
-  final double acknowledgedAmount;
+  final int acknowledgedAmount;
   /// List of Payment UUIDs included in the physical cash batch being acknowledged
   final List<String> paymentIds;
   /// Physical denomination breakdown and verification notes by Partner/Super Admin
@@ -4743,7 +4743,7 @@ class AcknowledgeHandoverDto {
   factory AcknowledgeHandoverDto.fromJson(Map<String, dynamic> json) {
     return AcknowledgeHandoverDto(
       collectorUserId: json['collectorUserId']?.toString() ?? '',
-      acknowledgedAmount: (json['acknowledgedAmount'] != null ? (json['acknowledgedAmount'] as num).toDouble() : null) ?? 0.0,
+      acknowledgedAmount: (json['acknowledgedAmount'] != null ? (json['acknowledgedAmount'] as num).toInt() : null) ?? 0,
       paymentIds: ((json['paymentIds'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       notes: json['notes']?.toString(),
     );
@@ -4913,7 +4913,7 @@ class CreatePaymentDto {
   /// Installment month number (1 to N) being paid
   final double installmentMonth;
   /// Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)
-  final double amount;
+  final int amount;
   /// Payment method (CASH, UPI, BANK_TRANSFER, CHEQUE)
   final String paymentMethod;
   /// Optional transaction reference (UPI UTR, Cheque number, Bank transfer UTR)
@@ -4940,7 +4940,7 @@ class CreatePaymentDto {
     return CreatePaymentDto(
       ticketId: json['ticketId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
+      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       transactionRef: json['transactionRef']?.toString(),
       idempotencyKey: json['idempotencyKey']?.toString(),
@@ -5730,7 +5730,7 @@ class AuthorizePayoutDto {
   /// Payment mode for prize money release (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS, CASH)
   final String disbursementMode;
   /// Whole-rupee prize money amount to authorize (defaults to calculated auction prize money: chitValue - bidDiscount)
-  final double? disbursedAmount;
+  final int? disbursedAmount;
   /// Checker authorization remarks and conditions
   final String? notes;
 
@@ -5743,7 +5743,7 @@ class AuthorizePayoutDto {
   factory AuthorizePayoutDto.fromJson(Map<String, dynamic> json) {
     return AuthorizePayoutDto(
       disbursementMode: json['disbursementMode']?.toString() ?? '',
-      disbursedAmount: json['disbursedAmount'] != null ? (json['disbursedAmount'] as num).toDouble() : null,
+      disbursedAmount: json['disbursedAmount'] != null ? (json['disbursedAmount'] as num).toInt() : null,
       notes: json['notes']?.toString(),
     );
   }

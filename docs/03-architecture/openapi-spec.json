@@ -9313,7 +9313,7 @@
             "description": "External gateway payment transaction ID"
           },
           "amount": {
-            "type": "number",
+            "type": "integer",
             "example": 3750,
             "description": "Settlement amount in whole integer Rupees"
           },
@@ -11551,7 +11551,7 @@
             "description": "Scheme name in Tamil for bilingual receipt rendering"
           },
           "chitValue": {
-            "type": "number",
+            "type": "integer",
             "example": 100000,
             "description": "Total chit value in whole integer Rupees (e.g., 100000 for ₹1 Lakh)"
           },
@@ -11615,7 +11615,7 @@
             "description": "Ticket number that won the past auction"
           },
           "bidDiscount": {
-            "type": "number",
+            "type": "integer",
             "example": 22000,
             "description": "Winning bid discount in whole integer Rupees (must be <= chitValue / 4)"
           },
@@ -11646,7 +11646,7 @@
             "description": "Customer ID for this ticket"
           },
           "openingBalance": {
-            "type": "number",
+            "type": "integer",
             "example": 0,
             "description": "Opening balance in whole Rupees transcribed from paper notebook",
             "default": 0
@@ -11675,7 +11675,7 @@
             "example": "₹1 லட்சம் 20 மாதங்கள் நடைமுறை குழு"
           },
           "chitValue": {
-            "type": "number",
+            "type": "integer",
             "example": 100000,
             "description": "Total chit value in whole integer Rupees"
           },
@@ -12026,7 +12026,7 @@
             "description": "Verified customer UUID (Enforces ADR-13: max 1 ticket per customer in this group)"
           },
           "openingBalance": {
-            "type": "number",
+            "type": "integer",
             "example": 0,
             "description": "Opening balance in whole Rupees (used for mid-cycle intake adjustments)",
             "default": 0
@@ -12479,7 +12479,7 @@
             "description": "UUID of the winning subscriber ticket (must be non-prized and with zero arrears)"
           },
           "bidDiscount": {
-            "type": "number",
+            "type": "integer",
             "example": 22000,
             "description": "Winning auction bid discount in whole integer Rupees (must be between 4% commission and 1/4 ceiling)"
           },
@@ -12529,7 +12529,7 @@
             "description": "UUID of the winning ticket drawn by the Foreman via physical paper token draw (Option A)"
           },
           "bidDiscount": {
-            "type": "number",
+            "type": "integer",
             "example": 25000,
             "description": "Tied bid discount (must equal exact 1/4 ceiling: chitValue / 4)"
           },
@@ -13378,7 +13378,7 @@
             "description": "Installment month number (1 to N) being collected"
           },
           "amount": {
-            "type": "number",
+            "type": "integer",
             "example": 3950,
             "description": "Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)"
           },
@@ -13532,7 +13532,7 @@
             "description": "Installment month number (1 to N) being collected"
           },
           "amount": {
-            "type": "number",
+            "type": "integer",
             "example": 3950,
             "description": "Exact net installment amount in whole integer Rupees (must match due.netPayableAmount)"
           },
@@ -13758,7 +13758,7 @@
             "description": "UUID of the field collection agent who collected the physical cash in the field"
           },
           "acknowledgedAmount": {
-            "type": "number",
+            "type": "integer",
             "example": 45000,
             "description": "Physically counted cash currency notes amount received into branch vault (must match total of specified paymentIds)"
           },
@@ -13966,7 +13966,7 @@
             "description": "Installment month number (1 to N) being paid"
           },
           "amount": {
-            "type": "number",
+            "type": "integer",
             "example": 3750,
             "description": "Exact net installment amount in whole integer Rupees (must identically match due.netPayableAmount)"
           },
@@ -14759,7 +14759,7 @@
             "description": "Payment mode for prize money release (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS, CASH)"
           },
           "disbursedAmount": {
-            "type": "number",
+            "type": "integer",
             "example": 75000,
             "description": "Whole-rupee prize money amount to authorize (defaults to calculated auction prize money: chitValue - bidDiscount)"
           },
