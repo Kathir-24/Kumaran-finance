@@ -134,8 +134,8 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
   const backupFileName = `kumaran_chits_backup_${timestamp}.dump`;
   const s3Key = `backups/db/${year}/${month}/${backupFileName}`;
 
-  // Local temporary directory
-  const tempDir = path.resolve(__dirname, '../../infra/backups');
+  // Local temporary directory (repo root infra/backups/)
+  const tempDir = path.resolve(__dirname, '../../../infra/backups');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
@@ -145,90 +145,98 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
   console.log(`[BACKUP] Target S3 Bucket: ${config.bucket}`);
   console.log(`[BACKUP] S3 Destination Key: ${s3Key}`);
 
-  // 1. Generate pg_dump in custom binary format (-F c)
-  const isDirectPgDump =
-    process.env.DIRECT_PG_DUMP === 'true' ||
-    (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@db:'));
+  let fileSizeBytes = 0;
 
-  const isDockerRunning =
-    !isDirectPgDump &&
-    (() => {
-      try {
-        const output = execSync(
-          'docker ps --filter "name=chitflow-db" --format "{{.Names}}"',
-          {
-            encoding: 'utf-8',
-          },
-        );
-        return output.includes('chitflow-db');
-      } catch {
-        return false;
-      }
-    })();
-
-  if (isDockerRunning) {
-    console.log(`[BACKUP] Detected running Docker container 'chitflow-db'. Dumping via container...`);
-    execSync(
-      `docker exec chitflow-db pg_dump -U chitflow -d chitflow_dev -F c -f "/tmp/${backupFileName}"`,
-      { stdio: 'inherit' },
-    );
-    execSync(`docker cp "chitflow-db:/tmp/${backupFileName}" "${localFilePath}"`, {
-      stdio: 'inherit',
-    });
-    execSync(`docker exec chitflow-db rm "/tmp/${backupFileName}"`, {
-      stdio: 'ignore',
-    });
-  } else {
-    // Attempt local pg_dump connection via DATABASE_URL
-    const dbUrl =
-      process.env.DATABASE_URL ||
-      'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
-    console.log(`[BACKUP] Executing host pg_dump with connection string...`);
-    execSync(`pg_dump "${dbUrl}" -F c -f "${localFilePath}"`, { stdio: 'inherit' });
-  }
-
-  if (!fs.existsSync(localFilePath)) {
-    throw new Error(`[ERROR] pg_dump failed to produce output at ${localFilePath}`);
-  }
-
-  const fileStats = fs.statSync(localFilePath);
-  const fileBuffer = fs.readFileSync(localFilePath);
-
-  console.log(`[BACKUP] Local dump created successfully (${fileStats.size} bytes).`);
-  console.log(`[BACKUP] Ensuring S3 bucket '${config.bucket}' exists...`);
-
-  // Ensure bucket exists on S3 / MinIO
   try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: config.bucket }));
-  } catch {
+    // 1. Generate pg_dump in custom binary format (-F c)
+    const isDirectPgDump =
+      process.env.DIRECT_PG_DUMP === 'true' ||
+      (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@db:'));
+
+    const isDockerRunning =
+      !isDirectPgDump &&
+      (() => {
+        try {
+          const output = execSync(
+            'docker ps --filter "name=chitflow-db" --format "{{.Names}}"',
+            {
+              encoding: 'utf-8',
+            },
+          );
+          return output.includes('chitflow-db');
+        } catch {
+          return false;
+        }
+      })();
+
+    if (isDockerRunning) {
+      console.log(`[BACKUP] Detected running Docker container 'chitflow-db'. Dumping via container...`);
+      execSync(
+        `docker exec chitflow-db pg_dump -U chitflow -d chitflow_dev -F c -f "/tmp/${backupFileName}"`,
+        { stdio: 'inherit' },
+      );
+      execSync(`docker cp "chitflow-db:/tmp/${backupFileName}" "${localFilePath}"`, {
+        stdio: 'inherit',
+      });
+      execSync(`docker exec chitflow-db rm "/tmp/${backupFileName}"`, {
+        stdio: 'ignore',
+      });
+    } else {
+      // Attempt local pg_dump connection via DATABASE_URL
+      const dbUrl =
+        process.env.DATABASE_URL ||
+        'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
+      console.log(`[BACKUP] Executing host pg_dump with connection string...`);
+      execSync(`pg_dump "${dbUrl}" -F c -f "${localFilePath}"`, { stdio: 'inherit' });
+    }
+
+    if (!fs.existsSync(localFilePath)) {
+      throw new Error(`[ERROR] pg_dump failed to produce output at ${localFilePath}`);
+    }
+
+    const fileStats = fs.statSync(localFilePath);
+    fileSizeBytes = fileStats.size;
+    const fileBuffer = fs.readFileSync(localFilePath);
+
+    console.log(`[BACKUP] Local dump created successfully (${fileSizeBytes} bytes).`);
+    console.log(`[BACKUP] Ensuring S3 bucket '${config.bucket}' exists...`);
+
+    // Ensure bucket exists on S3 / MinIO
     try {
-      await s3Client.send(new CreateBucketCommand({ Bucket: config.bucket }));
-      console.log(`[BACKUP] Created bucket '${config.bucket}' in S3 storage.`);
+      await s3Client.send(new HeadBucketCommand({ Bucket: config.bucket }));
     } catch {
-      // Ignore if exists
+      try {
+        await s3Client.send(new CreateBucketCommand({ Bucket: config.bucket }));
+        console.log(`[BACKUP] Created bucket '${config.bucket}' in S3 storage.`);
+      } catch {
+        // Ignore if exists
+      }
+    }
+
+    console.log(
+      config.endpoint
+        ? `[BACKUP] Uploading to S3/MinIO storage...`
+        : `[BACKUP] Uploading to S3-compatible storage with AES256 server-side encryption...`,
+    );
+
+    // 2. Upload to S3 storage (AES256 SSE on S3-compatible cloud storage; standard on local MinIO)
+    const putParams: any = {
+      Bucket: config.bucket,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: 'application/octet-stream',
+    };
+    if (!config.endpoint) {
+      putParams.ServerSideEncryption = 'AES256';
+    }
+
+    await s3Client.send(new PutObjectCommand(putParams));
+    console.log(`[SUCCESS] Database backup uploaded to S3: s3://${config.bucket}/${s3Key}`);
+  } finally {
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath);
     }
   }
-
-  console.log(
-    config.endpoint
-      ? `[BACKUP] Uploading to S3/MinIO storage...`
-      : `[BACKUP] Uploading to S3-compatible storage with AES256 server-side encryption...`,
-  );
-
-  // 2. Upload to S3 storage (AES256 SSE on S3-compatible cloud storage; standard on local MinIO)
-  const putParams: any = {
-    Bucket: config.bucket,
-    Key: s3Key,
-    Body: fileBuffer,
-    ContentType: 'application/octet-stream',
-  };
-  if (!config.endpoint) {
-    putParams.ServerSideEncryption = 'AES256';
-  }
-
-  await s3Client.send(new PutObjectCommand(putParams));
-
-  console.log(`[SUCCESS] Database backup uploaded to S3: s3://${config.bucket}/${s3Key}`);
 
   // 3. Prune snapshots older than 30 days per docs/06-devops/infrastructure-and-drp.md §3.2
   const prunedCount = await pruneOldBackups(s3Client, config);
@@ -236,7 +244,7 @@ export async function runBackup(): Promise<{ s3Key: string; sizeBytes: number; p
 
   return {
     s3Key,
-    sizeBytes: fileStats.size,
+    sizeBytes: fileSizeBytes,
     prunedCount,
   };
 }

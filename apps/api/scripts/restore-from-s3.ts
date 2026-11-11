@@ -132,42 +132,49 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
 
   const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
 
-  // Write temporary local file
-  const tempDir = path.resolve(__dirname, '../../infra/backups');
+  // Write temporary local file (repo root infra/backups/)
+  const tempDir = path.resolve(__dirname, '../../../infra/backups');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
 
   const fileName = path.basename(keyToRestore);
   const localFilePath = path.join(tempDir, fileName);
-  fs.writeFileSync(localFilePath, dumpBuffer);
-  console.log(`[RESTORE] Downloaded ${dumpBuffer.length} bytes to ${localFilePath}`);
 
-  // Restore into Postgres
-  const isDockerRunning = (() => {
-    try {
-      const output = execSync('docker ps --filter "name=chitflow-db" --format "{{.Names}}"', {
-        encoding: 'utf-8',
-      });
-      return output.includes('chitflow-db');
-    } catch {
-      return false;
+  try {
+    fs.writeFileSync(localFilePath, dumpBuffer);
+    console.log(`[RESTORE] Downloaded ${dumpBuffer.length} bytes to ${localFilePath}`);
+
+    // Restore into Postgres
+    const isDockerRunning = (() => {
+      try {
+        const output = execSync('docker ps --filter "name=chitflow-db" --format "{{.Names}}"', {
+          encoding: 'utf-8',
+        });
+        return output.includes('chitflow-db');
+      } catch {
+        return false;
+      }
+    })();
+
+    console.log(`[RESTORE] Executing pg_restore --clean...`);
+    if (isDockerRunning) {
+      execSync(`docker cp "${localFilePath}" "chitflow-db:/tmp/${fileName}"`, { stdio: 'inherit' });
+      execSync(
+        `docker exec chitflow-db pg_restore -U chitflow -d chitflow_dev --clean --if-exists "/tmp/${fileName}"`,
+        { stdio: 'inherit' },
+      );
+      execSync(`docker exec chitflow-db rm "/tmp/${fileName}"`, { stdio: 'ignore' });
+    } else {
+      const dbUrl =
+        process.env.DATABASE_URL ||
+        'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
+      execSync(`pg_restore -d "${dbUrl}" --clean --if-exists "${localFilePath}"`, { stdio: 'inherit' });
     }
-  })();
-
-  console.log(`[RESTORE] Executing pg_restore --clean...`);
-  if (isDockerRunning) {
-    execSync(`docker cp "${localFilePath}" "chitflow-db:/tmp/${fileName}"`, { stdio: 'inherit' });
-    execSync(
-      `docker exec chitflow-db pg_restore -U chitflow -d chitflow_dev --clean --if-exists "/tmp/${fileName}"`,
-      { stdio: 'inherit' },
-    );
-    execSync(`docker exec chitflow-db rm "/tmp/${fileName}"`, { stdio: 'ignore' });
-  } else {
-    const dbUrl =
-      process.env.DATABASE_URL ||
-      'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
-    execSync(`pg_restore -d "${dbUrl}" --clean --if-exists "${localFilePath}"`, { stdio: 'inherit' });
+  } finally {
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath);
+    }
   }
 
   console.log(`[SUCCESS] Database successfully restored from ${keyToRestore}!`);

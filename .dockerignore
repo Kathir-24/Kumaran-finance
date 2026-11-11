@@ -44,5 +44,6 @@ pnpm-debug.log*
 
 # Documentation & Non-Code Assets
 docs
-backups
+**/backups/
+*.dump
 scripts/*.ps1
