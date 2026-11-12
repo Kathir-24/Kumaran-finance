@@ -87,7 +87,7 @@ The 10 Invariant Architectural Guardrails defined in `AGENTS.md` and confirmed b
 | **7** | **Ticket Limit Constraint** | ADR-13 | **Verified**: Pre-assignment check throws `ConflictException` (`chit.service.ts:173-179, 337-344`). | **Verified**: Database unique constraint `@@unique([chitGroupId, customerId])` (`schema.prisma:202`). | **Verified**: Customer ticket selector filters out already-enrolled subscribers. | **Verified**: DTOs prevent duplicate assignment payloads. | **PASS** |
 | **8** | **Defaulter & Discrete Single Payment** | ADR-07 | **Verified**: Outstanding dues strictly block auction bidding (`auction.service.ts:80-87`). Single discrete payment matching exact $I_{net}$; zero double/partial/advance (`payment.service.ts:147-159`). 3-month removal rights (`daily-arrears.service.ts:89-122`). | **Verified**: `DueStatus` enum is strictly `UNPAID`, `PAID`, `OVERDUE`. | **Verified**: `defaulter-eligibility-roster.tsx:68-95` marks overdue subscribers ineligible. Counter payment requires exact rupee match. | **Verified**: SDK rejects non-matching payment amounts. | **PASS** |
 | **9** | **Company Safety Proof Checklist** | ADR-15 | **Verified**: Property docs eliminated. Signed agreements, blank cheques, and promissory notes verified before payout authorization (`disbursement.service.ts:250-324`). | **Verified**: JSON metadata array `safetyProofDocuments` and cheque tracking in `AuctionWinner`. | **Verified**: Flexible checklist UI (`safety-proof-upload-box.tsx`). *Finding DEF-FE-07 on direct S3 upload*. | **Verified**: Storage key helpers generate presigned metadata. | **PASS (With Fixes)** |
-| **10** | **Maker != Checker Dual Control** | ADR-10, ADR-11 | **Verified**: Programmatically enforced on reversals, auction finalization, prize payouts, cash handovers, and UPI verification (`payment.service.ts:765`, `auction.service.ts:455`, `disbursement.service.ts:514`, `collection.service.ts:404`). *Finding DEF-BE-04 on declarative Guard*. | **Verified**: Audit logs capture distinct `maker_user_id` and `checker_user_id`. | **Verified**: Buttons disabled and warnings displayed if `currentUser.id === makerId` (`isSelfApproval()` in all approval components). | **Verified**: `maker-checker.ts:18-48` exposes `isSelfApproval()` utility. | **PASS** |
+| **10** | **Maker != Checker Dual Control** | ADR-10, ADR-11 | **Verified**: Programmatically enforced on reversals, auction finalization, prize payouts, cash handovers, and UPI verification (`payment.service.ts:765`, `auction.service.ts:455`, `disbursement.service.ts:514`, `collection.service.ts:404`). *`DEF-BE-04` closed as Over-Engineered — transactional enforcement kept authoritative*. | **Verified**: Audit logs capture distinct `maker_user_id` and `checker_user_id`. | **Verified**: Buttons disabled and warnings displayed if `currentUser.id === makerId` (`isSelfApproval()` in all approval components). | **Verified**: `maker-checker.ts:18-48` exposes `isSelfApproval()` utility. | **PASS** |
 
 ---
 
@@ -297,68 +297,19 @@ if (req.user) {
 
 ---
 
-#### Finding DEF-BE-04: Architectural Absence of Declarative `@UseGuards(MakerCheckerGuard)`
+#### Finding DEF-BE-04: Architectural Absence of Declarative `@UseGuards(MakerCheckerGuard)` `[WONTFIX / OVER-ENGINEERED — 2026-11-12]`
 - **Layer & Subsystem**: Authorization & Dual-Control Architecture
-- **Exact File Path & Line Numbers**:
+- **Original Audit Locations**:
   - `apps/api/src/auction/auction.service.ts:455-459`
   - `apps/api/src/payment/payment.service.ts:765, 896, 1122`
   - `apps/api/src/disbursement/disbursement.service.ts:514`
   - `apps/api/src/collection/collection.service.ts:404`
-- **Violated Specification**: `AGENTS.md` Guardrail 10; `docs/02-requirements/prd.md` §4.10.
-- **Severity**: **LOW (Suboptimal Architecture)**
-- **Detailed Technical Root Cause**:
-  Dual-control validation is correctly executed via programmatic checks inside domain services (`if (payment.reversal.initiatedByUserId === checkerUserId) throw new ForbiddenException(...)`). However, the controller layer lacks a declarative NestJS guard (`MakerCheckerGuard`) and `@RequireDualControl()` decorator.
-- **Impact Analysis**:
-  Maker-Checker enforcement is coupled to procedural service logic rather than being declaratively visible on controller routes. New sensitive endpoints could accidentally omit the check if a developer fails to copy the service check pattern.
-- **Concrete Production-Grade Remediation Code Design**:
-  Create a declarative guard and decorator in `apps/api/src/common/guards/maker-checker.guard.ts`:
-
-```typescript
-// apps/api/src/common/guards/maker-checker.guard.ts
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../prisma/prisma.service';
-
-export const MAKER_CHECKER_KEY = 'MAKER_CHECKER_KEY';
-
-@Injectable()
-export class MakerCheckerGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector, private readonly prisma: PrismaService) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const options = this.reflector.get<{ entityIdParam: string; entityType: string }>(
-      MAKER_CHECKER_KEY,
-      context.getHandler(),
-    );
-    if (!options) return true;
-
-    const request = context.switchToHttp().getRequest();
-    const checkerUserId = request.user?.sub;
-    const entityId = request.params[options.entityIdParam] || request.body[options.entityIdParam];
-    if (!checkerUserId || !entityId) return true;
-
-    let makerUserId: string | null = null;
-    if (options.entityType === 'payment_reversal') {
-      const payment = await this.prisma.payment.findUnique({
-        where: { id: entityId },
-        select: { reversal: { select: { initiatedByUserId: true } } },
-      });
-      makerUserId = payment?.reversal?.initiatedByUserId || null;
-    } else if (options.entityType === 'auction') {
-      const auction = await this.prisma.auction.findUnique({
-        where: { id: entityId },
-        select: { conductedByUserId: true },
-      });
-      makerUserId = auction?.conductedByUserId || null;
-    }
-
-    if (makerUserId && makerUserId === checkerUserId) {
-      throw new ForbiddenException(`Maker-Checker violation: Cannot approve or finalize your own transaction.`);
-    }
-    return true;
-  }
-}
-```
+- **Violated Specification**: None functionally (`AGENTS.md` Guardrail 10 is enforced inside transactions).
+- **Severity**: **LOW (Architectural / Closed — Over-Engineered)**
+- **Architectural Determination (`2026-11-12`)**:
+  - Dual-control validation (`maker_user_id != checker_user_id`) is already enforced inside atomic Prisma `$transaction` boundaries across all sensitive services (`AuctionService`, `PaymentService`, `DisbursementService`, `CollectionService`), backed by `isSelfApproval()` UI guards and E2E/unit security tests.
+  - Adding a pre-controller `MakerCheckerGuard` introduces extra non-transactional Prisma round-trips and brittle entity-switching boilerplate while still requiring the exact same inside-transaction check to prevent concurrency races.
+  - **Resolution**: Closed as **Won't Fix (Over-Engineered)** to keep domain dual-control validation atomic, explicit, and free of redundant controller guard queries.
 
 ---
 
@@ -1099,7 +1050,7 @@ gantt
   2. `DEF-FE-09` **[FIXED & VERIFIED]**: Updated Playwright E2E fixtures (`auth-fixtures.ts` `buildSessionCookies`/`injectSession`) to inject HttpOnly BFF session cookies cleanly across isolated `chitflow_test` runs.
   3. `DEF-FE-10`: Update `parseWholeRupees` in SDK to split on decimal points.
   4. `DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.
-  5. `DEF-BE-04`: Introduce declarative `@RequireDualControl()` decorator and `MakerCheckerGuard`.
+  5. `DEF-BE-04` **[WONTFIX / OVER-ENGINEERED]**: Pre-controller `MakerCheckerGuard` closed to avoid redundant non-transactional DB lookups; existing atomic in-transaction `maker_user_id != checker_user_id` checks remain authoritative.
   6. `DEF-DB-07`: Add pessimistic row lock on `ChitGroup` activation.
 
 ---
