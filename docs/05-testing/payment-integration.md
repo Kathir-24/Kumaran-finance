@@ -87,7 +87,7 @@ When launched on Android, the payment app does not allow the subscriber to edit 
 
 ## 4. Automated Tests & Live Verification Proofs
 
-- **Unit Test Suite**: [`apps/api/test/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/payment.spec.ts)
+- **Unit Test Suite**: [`apps/api/test/unit/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/payment.spec.ts)
   - Bank UTR anti-duplication collision rejection (`ConflictException 409`)
   - Customer UPI claim submission in `INITIATED` status
   - Duplicate pending claim prevention on same due

@@ -440,10 +440,10 @@ All components are verified via automated unit test suites and live server E2E e
 ### 7.1 Automated Jest Unit Tests (**42 / 42 Tests Passing**)
 
 ```text
-PASS test/metrics.spec.ts     (13 tests)
-PASS test/sentry.spec.ts      (10 tests)
-PASS test/bull-board.spec.ts  (6 tests)
-PASS test/report.spec.ts      (13 tests, including Section 7 AuditLog)
+PASS test/unit/metrics.spec.ts     (13 tests)
+PASS test/unit/sentry.spec.ts      (10 tests)
+PASS test/unit/bull-board.spec.ts  (6 tests)
+PASS test/unit/report.spec.ts      (13 tests, including Section 7 AuditLog)
 
 Test Suites: 4 passed, 4 total
 Tests:       42 passed, 42 total

@@ -548,6 +548,6 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 - **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) (`115` paths, `121` operations exported via [`apps/api/scripts/codegen/export-openapi.ts`](../../apps/api/scripts/codegen/export-openapi.ts))
 - **TypeScript Client SDK Types**: [`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts) (regenerated via `pnpm run codegen:ts`)
 - **Flutter / Dart Client Models**: [`apps/mobile/lib/core/api/models/api_models.dart`](../../apps/mobile/lib/core/api/models/api_models.dart) (regenerated via `pnpm run codegen:dart` / [`scripts/generate-dart-api.ts`](../../scripts/generate-dart-api.ts))
-- **Monorepo Contract Sync Command**: Run `pnpm run codegen:all` after any NestJS DTO or controller route change; verified by [`apps/api/test/client-contract.spec.ts`](../../apps/api/test/client-contract.spec.ts) (`0` bare object schemas, `0` untyped/double arrays)
+- **Monorepo Contract Sync Command**: Run `pnpm run codegen:all` after any NestJS DTO or controller route change; verified by [`apps/api/test/unit/client-contract.spec.ts`](../../apps/api/test/unit/client-contract.spec.ts) (`0` bare object schemas, `0` untyped/double arrays)
 - **Complete Payload Specimen Catalog**: [`docs/03-architecture/api-request-response-catalog.md`](api-request-response-catalog.md)
 - **Granular 6-Persona Access Registry**: [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)

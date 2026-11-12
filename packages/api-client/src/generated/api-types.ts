@@ -24,86 +24,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * System readiness health check
-         * @description Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.
-         */
-        get: operations["HealthController_check"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/health/readiness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Explicit container readiness probe
-         * @description Probes database and cache connectivity; returns 503 if service cannot process requests.
-         */
-        get: operations["HealthController_readiness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/health/liveness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Container process liveness probe
-         * @description Verifies the Node.js event loop and HTTP server are responsive.
-         */
-        get: operations["HealthController_liveness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/health/sentry-test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Sentry crash diagnostic test
-         * @description Triggers an intentional 500 error to verify Sentry event capture.
-         */
-        get: operations["HealthController_triggerSentryTest"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/jobs/run-daily-arrears": {
         parameters: {
             query?: never;
@@ -2316,59 +2236,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System readiness health check
+         * @description Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.
+         */
+        get: operations["HealthController_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explicit container readiness probe
+         * @description Probes database and cache connectivity; returns 503 if service cannot process requests.
+         */
+        get: operations["HealthController_readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/liveness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Container process liveness probe
+         * @description Verifies the Node.js event loop and HTTP server are responsive.
+         */
+        get: operations["HealthController_liveness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/sentry-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sentry crash diagnostic test
+         * @description Triggers an intentional 500 error to verify Sentry event capture.
+         */
+        get: operations["HealthController_triggerSentryTest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        HealthCheckResponseDto: {
-            /**
-             * @description System health status
-             * @example ok
-             */
-            status: string;
-            /**
-             * @description Service identifier
-             * @example chitflow-api
-             */
-            service: string;
-            /**
-             * @description Database connectivity status
-             * @example connected
-             */
-            database?: string;
-            /**
-             * @description Redis connectivity status
-             * @example connected
-             */
-            redis?: string;
-            /**
-             * @description Whether Sentry APM is active
-             * @example false
-             */
-            sentryActive: boolean;
-            /**
-             * @description Server timestamp
-             * @example 2026-10-22T07:28:14.000Z
-             */
-            time: string;
-        };
-        LivenessResponseDto: {
-            /**
-             * @description Process liveness status
-             * @example alive
-             */
-            status: string;
-            /**
-             * @description Service identifier
-             * @example chitflow-api
-             */
-            service: string;
-            /**
-             * @description Server timestamp
-             * @example 2026-10-22T07:28:14.000Z
-             */
-            time: string;
-        };
         DailyArrearsExecutionResultDto: {
             /**
              * @description Total installment dues checked
@@ -6599,6 +6550,55 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        HealthCheckResponseDto: {
+            /**
+             * @description System health status
+             * @example ok
+             */
+            status: string;
+            /**
+             * @description Service identifier
+             * @example chitflow-api
+             */
+            service: string;
+            /**
+             * @description Database connectivity status
+             * @example connected
+             */
+            database?: string;
+            /**
+             * @description Redis connectivity status
+             * @example connected
+             */
+            redis?: string;
+            /**
+             * @description Whether Sentry APM is active
+             * @example false
+             */
+            sentryActive: boolean;
+            /**
+             * @description Server timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            time: string;
+        };
+        LivenessResponseDto: {
+            /**
+             * @description Process liveness status
+             * @example alive
+             */
+            status: string;
+            /**
+             * @description Service identifier
+             * @example chitflow-api
+             */
+            service: string;
+            /**
+             * @description Server timestamp
+             * @example 2026-10-22T07:28:14.000Z
+             */
+            time: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6624,91 +6624,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": string;
-                };
-            };
-        };
-    };
-    HealthController_check: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description System and critical backing services are fully healthy and ready */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthCheckResponseDto"];
-                };
-            };
-        };
-    };
-    HealthController_readiness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description System readiness health check status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthCheckResponseDto"];
-                };
-            };
-        };
-    };
-    HealthController_liveness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Container process liveness confirmation */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LivenessResponseDto"];
-                };
-            };
-        };
-    };
-    HealthController_triggerSentryTest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Intentional internal server error thrown for Sentry APM verification */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example 500 */
-                        statusCode?: number;
-                        /** @example Sentry Verification Diagnostic Test Error */
-                        message?: string;
-                    };
                 };
             };
         };
@@ -12671,6 +12586,91 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    HealthController_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description System and critical backing services are fully healthy and ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthCheckResponseDto"];
+                };
+            };
+        };
+    };
+    HealthController_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description System readiness health check status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthCheckResponseDto"];
+                };
+            };
+        };
+    };
+    HealthController_liveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Container process liveness confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LivenessResponseDto"];
+                };
+            };
+        };
+    };
+    HealthController_triggerSentryTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Intentional internal server error thrown for Sentry APM verification */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 500 */
+                        statusCode?: number;
+                        /** @example Sentry Verification Diagnostic Test Error */
+                        message?: string;
+                    };
+                };
             };
         };
     };

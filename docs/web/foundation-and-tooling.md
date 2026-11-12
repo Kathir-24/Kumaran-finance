@@ -69,7 +69,7 @@ In accordance with **Guardrail 2**, all monetary amounts in the user interface s
 - Decimal fractions and paise (`.00`) are strictly eliminated.
 - Handled via `formatRupee(val)` from `@kumaran/api-client`:
   $$\text{formatRupee}(100000n) \implies \text{"₹1,00,000"}$$
-- Verified by 7 dedicated automated tests in `test/financial-guardrail2.spec.ts`.
+- Verified by 7 dedicated automated tests in `test/unit/financial-guardrail2.spec.ts`.
 
 ### 3.2 Bank-Grade Server State Caching (`apps/web/src/providers/query-provider.tsx`)
 Configured specifically for cashiers and accountants:

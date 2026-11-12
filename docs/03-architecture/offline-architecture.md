@@ -276,13 +276,13 @@ flowchart TD
 
 ## 6. Live Server Verification & Automated Test Proofs
 
-### 6.1 Unit Test Proof ([`apps/api/test/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/collection.spec.ts))
+### 6.1 Unit Test Proof ([`apps/api/test/unit/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/collection.spec.ts))
 
 Ran 16 tests covering the entire collection module with **100% pass rate**:
 ```bash
-$ pnpm --filter api test test/collection.spec.ts
+$ pnpm --filter api test test/unit/collection.spec.ts
 
-PASS apps/api/test/collection.spec.ts
+PASS apps/api/test/unit/collection.spec.ts
   CollectionService
     ✓ 1. Doorstep Cash Collection Recording (POST /collections/record)
     ✓ 2. Invariant Guard: Exact Net Installment Matching (ADR-07)

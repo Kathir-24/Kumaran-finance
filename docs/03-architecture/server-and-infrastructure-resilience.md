@@ -175,7 +175,7 @@ flowchart TD
 docker compose -f infra/docker/docker-compose.fullstack.yml config
 
 # Verify API and worker tests
-pnpm --filter api test test/jobs.spec.ts test/bull-board.spec.ts
+pnpm --filter api test test/unit/jobs.spec.ts test/unit/bull-board.spec.ts
 ```
 
 ### 3.2 Running Storage and SSL Expiration Probes

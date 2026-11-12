@@ -7,83 +7,6 @@
 
 // ignore_for_file: unused_import, non_constant_identifier_names, unnecessary_null_comparison, unnecessary_non_null_assertion
 
-class HealthCheckResponseDto {
-  /// System health status
-  final String status;
-  /// Service identifier
-  final String service;
-  /// Database connectivity status
-  final String? database;
-  /// Redis connectivity status
-  final String? redis;
-  /// Whether Sentry APM is active
-  final bool sentryActive;
-  /// Server timestamp
-  final String time;
-
-  const HealthCheckResponseDto({
-    required this.status,
-    required this.service,
-    this.database,
-    this.redis,
-    required this.sentryActive,
-    required this.time,
-  });
-
-  factory HealthCheckResponseDto.fromJson(Map<String, dynamic> json) {
-    return HealthCheckResponseDto(
-      status: json['status']?.toString() ?? '',
-      service: json['service']?.toString() ?? '',
-      database: json['database']?.toString(),
-      redis: json['redis']?.toString(),
-      sentryActive: json['sentryActive'] as bool? ?? false,
-      time: json['time']?.toString() ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['status'] = status;
-    data['service'] = service;
-    data['database'] = database;
-    data['redis'] = redis;
-    data['sentryActive'] = sentryActive;
-    data['time'] = time;
-    return data;
-  }
-}
-
-class LivenessResponseDto {
-  /// Process liveness status
-  final String status;
-  /// Service identifier
-  final String service;
-  /// Server timestamp
-  final String time;
-
-  const LivenessResponseDto({
-    required this.status,
-    required this.service,
-    required this.time,
-  });
-
-  factory LivenessResponseDto.fromJson(Map<String, dynamic> json) {
-    return LivenessResponseDto(
-      status: json['status']?.toString() ?? '',
-      service: json['service']?.toString() ?? '',
-      time: json['time']?.toString() ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['status'] = status;
-    data['service'] = service;
-    data['time'] = time;
-    return data;
-  }
-}
-
 class DailyArrearsExecutionResultDto {
   /// Total installment dues checked
   final double totalDuesChecked;
@@ -6504,6 +6427,83 @@ class AuditLogsReportResponseDto {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['pagination'] = pagination;
     data['logs'] = logs;
+    return data;
+  }
+}
+
+class HealthCheckResponseDto {
+  /// System health status
+  final String status;
+  /// Service identifier
+  final String service;
+  /// Database connectivity status
+  final String? database;
+  /// Redis connectivity status
+  final String? redis;
+  /// Whether Sentry APM is active
+  final bool sentryActive;
+  /// Server timestamp
+  final String time;
+
+  const HealthCheckResponseDto({
+    required this.status,
+    required this.service,
+    this.database,
+    this.redis,
+    required this.sentryActive,
+    required this.time,
+  });
+
+  factory HealthCheckResponseDto.fromJson(Map<String, dynamic> json) {
+    return HealthCheckResponseDto(
+      status: json['status']?.toString() ?? '',
+      service: json['service']?.toString() ?? '',
+      database: json['database']?.toString(),
+      redis: json['redis']?.toString(),
+      sentryActive: json['sentryActive'] as bool? ?? false,
+      time: json['time']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['status'] = status;
+    data['service'] = service;
+    data['database'] = database;
+    data['redis'] = redis;
+    data['sentryActive'] = sentryActive;
+    data['time'] = time;
+    return data;
+  }
+}
+
+class LivenessResponseDto {
+  /// Process liveness status
+  final String status;
+  /// Service identifier
+  final String service;
+  /// Server timestamp
+  final String time;
+
+  const LivenessResponseDto({
+    required this.status,
+    required this.service,
+    required this.time,
+  });
+
+  factory LivenessResponseDto.fromJson(Map<String, dynamic> json) {
+    return LivenessResponseDto(
+      status: json['status']?.toString() ?? '',
+      service: json['service']?.toString() ?? '',
+      time: json['time']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['status'] = status;
+    data['service'] = service;
+    data['time'] = time;
     return data;
   }
 }

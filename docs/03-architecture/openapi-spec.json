@@ -25,108 +25,6 @@
         ]
       }
     },
-    "/health": {
-      "get": {
-        "description": "Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.",
-        "operationId": "HealthController_check",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "System and critical backing services are fully healthy and ready",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthCheckResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "System readiness health check",
-        "tags": [
-          "Health"
-        ]
-      }
-    },
-    "/health/readiness": {
-      "get": {
-        "description": "Probes database and cache connectivity; returns 503 if service cannot process requests.",
-        "operationId": "HealthController_readiness",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "System readiness health check status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthCheckResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Explicit container readiness probe",
-        "tags": [
-          "Health"
-        ]
-      }
-    },
-    "/health/liveness": {
-      "get": {
-        "description": "Verifies the Node.js event loop and HTTP server are responsive.",
-        "operationId": "HealthController_liveness",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Container process liveness confirmation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LivenessResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Container process liveness probe",
-        "tags": [
-          "Health"
-        ]
-      }
-    },
-    "/health/sentry-test": {
-      "get": {
-        "description": "Triggers an intentional 500 error to verify Sentry event capture.",
-        "operationId": "HealthController_triggerSentryTest",
-        "parameters": [],
-        "responses": {
-          "500": {
-            "description": "Intentional internal server error thrown for Sentry APM verification",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 500
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Sentry Verification Diagnostic Test Error"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Sentry crash diagnostic test",
-        "tags": [
-          "Health"
-        ]
-      }
-    },
     "/api/v1/jobs/run-daily-arrears": {
       "post": {
         "description": "Scans for overdue unpaid installments, recalculates consecutive unpaid months, tags 3-month defaults (ADR-07), and sends warning notices.",
@@ -9266,6 +9164,108 @@
           "Observability & Metrics"
         ]
       }
+    },
+    "/health": {
+      "get": {
+        "description": "Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.",
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "System and critical backing services are fully healthy and ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "System readiness health check",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/readiness": {
+      "get": {
+        "description": "Probes database and cache connectivity; returns 503 if service cannot process requests.",
+        "operationId": "HealthController_readiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "System readiness health check status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Explicit container readiness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/liveness": {
+      "get": {
+        "description": "Verifies the Node.js event loop and HTTP server are responsive.",
+        "operationId": "HealthController_liveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Container process liveness confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Container process liveness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/sentry-test": {
+      "get": {
+        "description": "Triggers an intentional 500 error to verify Sentry event capture.",
+        "operationId": "HealthController_triggerSentryTest",
+        "parameters": [],
+        "responses": {
+          "500": {
+            "description": "Intentional internal server error thrown for Sentry APM verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Sentry Verification Diagnostic Test Error"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sentry crash diagnostic test",
+        "tags": [
+          "Health"
+        ]
+      }
     }
   },
   "info": {
@@ -9367,72 +9367,6 @@
       }
     },
     "schemas": {
-      "HealthCheckResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "example": "ok",
-            "description": "System health status"
-          },
-          "service": {
-            "type": "string",
-            "example": "chitflow-api",
-            "description": "Service identifier"
-          },
-          "database": {
-            "type": "string",
-            "example": "connected",
-            "description": "Database connectivity status"
-          },
-          "redis": {
-            "type": "string",
-            "example": "connected",
-            "description": "Redis connectivity status"
-          },
-          "sentryActive": {
-            "type": "boolean",
-            "example": false,
-            "description": "Whether Sentry APM is active"
-          },
-          "time": {
-            "type": "string",
-            "example": "2026-10-22T07:28:14.000Z",
-            "description": "Server timestamp"
-          }
-        },
-        "required": [
-          "status",
-          "service",
-          "sentryActive",
-          "time"
-        ]
-      },
-      "LivenessResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "example": "alive",
-            "description": "Process liveness status"
-          },
-          "service": {
-            "type": "string",
-            "example": "chitflow-api",
-            "description": "Service identifier"
-          },
-          "time": {
-            "type": "string",
-            "example": "2026-10-22T07:28:14.000Z",
-            "description": "Server timestamp"
-          }
-        },
-        "required": [
-          "status",
-          "service",
-          "time"
-        ]
-      },
       "DailyArrearsExecutionResultDto": {
         "type": "object",
         "properties": {
@@ -15842,6 +15776,72 @@
         "required": [
           "pagination",
           "logs"
+        ]
+      },
+      "HealthCheckResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok",
+            "description": "System health status"
+          },
+          "service": {
+            "type": "string",
+            "example": "chitflow-api",
+            "description": "Service identifier"
+          },
+          "database": {
+            "type": "string",
+            "example": "connected",
+            "description": "Database connectivity status"
+          },
+          "redis": {
+            "type": "string",
+            "example": "connected",
+            "description": "Redis connectivity status"
+          },
+          "sentryActive": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether Sentry APM is active"
+          },
+          "time": {
+            "type": "string",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Server timestamp"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "sentryActive",
+          "time"
+        ]
+      },
+      "LivenessResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "alive",
+            "description": "Process liveness status"
+          },
+          "service": {
+            "type": "string",
+            "example": "chitflow-api",
+            "description": "Service identifier"
+          },
+          "time": {
+            "type": "string",
+            "example": "2026-10-22T07:28:14.000Z",
+            "description": "Server timestamp"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "time"
         ]
       }
     }

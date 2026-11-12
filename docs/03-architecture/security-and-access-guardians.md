@@ -187,18 +187,18 @@ flowchart LR
 
 Every rule documented above is backed by automated negative and positive test assertions:
 
-1. **[`apps/api/test/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/pdf.spec.ts)**:
+1. **[`apps/api/test/unit/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/pdf.spec.ts)**:
    - Section 4: Customer downloading own receipt (`PASS`), Customer downloading another customer receipt throws `ForbiddenException` (`PASS`), Agent downloading own collection (`PASS`), Agent downloading another agent's collection throws `ForbiddenException` (`PASS`), Branch Manager cross-branch receipt throws `ForbiddenException` (`PASS`).
    - Section 5: Winner customer accessing voucher (`PASS`), Non-winner customer throws `ForbiddenException` (`PASS`), Field agent accessing voucher throws `ForbiddenException` (`PASS`).
    - Section 6: Branch Manager accessing minutes (`PASS`), Customer accessing minutes throws `ForbiddenException` (`PASS`), Field agent accessing minutes throws `ForbiddenException` (`PASS`).
    - Section 7: Customer accessing own passbook (`PASS`), Customer accessing another passbook throws `ForbiddenException` (`PASS`), Field agent accessing passbook throws `ForbiddenException` (`PASS`).
    - Section 8: Direct storage key access rules (`PASS` across all personas).
-2. **[`apps/api/test/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/jobs.spec.ts)**:
+2. **[`apps/api/test/unit/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/jobs.spec.ts)**:
    - Section 1: Daily arrears state machine and 3-month default tagging with warning notification (`PASS`).
    - Section 2: Smart Notification Router (Push-first for app users, DLT SMS fallback for keypad phones across payments, auctions, dividends, and defaults) verification (`PASS`).
    - Section 3: 06:00 AM settlement reconciliation, ghost drop auto-resolution, and discrepancy flagging (`PASS`).
    - Section 4: BullMQ queue health and administrative controller endpoint execution (`PASS`).
-3. **[`apps/api/test/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/auth-token-lifecycle.spec.ts)**:
+3. **[`apps/api/test/unit/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth-token-lifecycle.spec.ts)**:
    - Section 1-7: Token issuance, rotation, logout, phone mutation revocation, and RFC 6819 reuse trap (`PASS`).
    - Section 8: High-throughput JWT validation caching (120s TTL) and proactive cache eviction on status mutation (`PASS`).
    - Section 9: Multi-device concurrent session isolation (`WEB` + `MOBILE`) without cross-device refresh collision (`PASS`).

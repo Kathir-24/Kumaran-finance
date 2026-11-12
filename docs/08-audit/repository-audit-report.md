@@ -255,7 +255,7 @@ disbursedAmount?: number;
 - **Implemented Remediation**:
   - Replaced both UUID `.split('-').pop()` calls in `PdfService` with `this.resolveBranchCode(chit.branch)` (`branch?.code || 'PRD'`), preserving self-healing fallback from legacy `receipt.pdfS3Key`.
   - Added `StorageKeyHelper.sanitizeBranchCode()` (`trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'PRD'`) in both `receiptPdf` and `voucherPdf`.
-  - Synced `docs/03-architecture/document-and-storage-architecture.md` Domain 3 examples (`receipts/PRD/2026/...`, `vouchers/PRD/2026/...`) and added `N1`–`N5` tests in `apps/api/test/pdf.spec.ts` and `apps/api/test/storage.spec.ts` (`86/86` targeted across 3 suites; `819/819` API, `8/8` `@kumaran/api-client`, `341/341` Web).
+  - Synced `docs/03-architecture/document-and-storage-architecture.md` Domain 3 examples (`receipts/PRD/2026/...`, `vouchers/PRD/2026/...`) and added `N1`–`N5` tests in `apps/api/test/unit/pdf.spec.ts` and `apps/api/test/unit/storage.spec.ts` (`86/86` targeted across 3 suites; `819/819` API, `8/8` `@kumaran/api-client`, `341/341` Web).
 
 ---
 
@@ -270,7 +270,7 @@ disbursedAmount?: number;
 - **Implemented Remediation**:
   - Added shared `buildSafeSentryUserContext(user)` and `withSentryScope` helpers in `apps/api/src/common/sentry/sentry.config.ts` to map `sub ?? id ?? userId` to Sentry `user.id`, preserve non-PII `username`, `roles`, `branchId`, and `clientType`, strip DPDP Act PII (`phone`, `email`, `ip_address`), and omit `user` completely when no safe attributes are present.
   - Updated `beforeSend`, `GlobalExceptionFilter` (also adding `req.requestId` fallback for `requestId` tag normalization), and `SentryService.captureException` to share `buildSafeSentryUserContext` + `withSentryScope`.
-  - Verified with `N1`–`N5` tests in `apps/api/test/sentry.spec.ts` (16/16 passing) and full monorepo gate.
+  - Verified with `N1`–`N5` tests in `apps/api/test/unit/sentry.spec.ts` (16/16 passing) and full monorepo gate.
 
 ---
 
@@ -538,7 +538,7 @@ export async function middleware(request: NextRequest) {
 - **Remediation Implemented**:
   1. Updated all 17 affected DTO files (`76` union/nullable primitive declarations -> `115` schema properties typed with `type: String`/`Number`/`Boolean`, `format: 'date-time'`, `nullable: true`; `34` object properties typed with nested DTO refs including new `ReportPaginationDto` and `PaymentRecordDto`/`ReceiptDto` on `VerifyUpiClaimResponseDto`, or `type: 'object', additionalProperties: true`; and `19` array properties typed with `type: 'array', items: { type: 'object', additionalProperties: true }`).
   2. Regenerated all monorepo contracts cleanly via `pnpm run codegen:all` (`112` paths, `118` HTTP operations, `146` OpenAPI schemas and Dart models) and `pnpm run codegen:types`.
-  3. Hardened `apps/api/test/client-contract.spec.ts` (updated `/api/v1/...` path keys & sample request DTO shapes, added `Section 2B` OpenAPI AST & TS zero-defect checks) and `packages/api-client/test/client.spec.ts` (verified `Schema<...>` resolution).
+  3. Hardened `apps/api/test/unit/client-contract.spec.ts` (updated `/api/v1/...` path keys & sample request DTO shapes, added `Section 2B` OpenAPI AST & TS zero-defect checks) and `packages/api-client/test/client.spec.ts` (verified `Schema<...>` resolution).
 - **Verification Summary**: OpenAPI AST audit verified `0` bare object fields, `0` untyped/double arrays, `0` property-level `Record<string, never>`, and `0` `unknown[][]` occurrences across generated types; `@kumaran/api-client` (`typecheck` clean, `8/8` tests), `apps/api` (`oxlint` `0` errors, `nest build` exit `0`, `53/53` suites / `770/770` tests in `18.813 s`), `apps/web` (`typecheck` clean, `next build` clean, `14/14` suites / `321/321` tests), and `apps/mobile` (`dart analyze` `0` issues, `dart run test/offline_sync_test.dart` passed).
 
 ---
@@ -687,7 +687,7 @@ const { lockedDues, lockedPayments } = await acquirePaymentConcurrencyLocks(tx, 
 const finalReceiptNumber = await generateNextReceiptNumber(tx, prefix);
 ```
 
-- **Verification Summary**: Live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`10`: `10/10` passed in `2.797s`), targeted concurrency/payment/collection/reconciliation suites (`8/8` suites, `224/224` tests), `oxlint` (`0` errors), and `nest build` (`exit 0`).
+- **Verification Summary**: Live PostgreSQL 17 (`test/unit/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`10`: `10/10` passed in `2.797s`), targeted concurrency/payment/collection/reconciliation suites (`8/8` suites, `224/224` tests), `oxlint` (`0` errors), and `nest build` (`exit 0`).
 
 ---
 
@@ -724,7 +724,7 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
 });
 ```
 
-- **Verification Summary**: Unit transient fault-injection (`40P01`/`40001`/`P2034`) & lock-guard suites (`10/10` suites, `265/265` tests in `7.178 s`), live PostgreSQL 17 (`test/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`19`: `19/19` passed in `5.104 s` with 0 skips, covering `finalizeAuction` vs `recordBid`/`recordTieBreak`, `markMinutesFiled`, `generateMonthlyDues`, and `requestReversal`), full `--runInBand` API suite (`52/52` suites, `753/753` tests passed in `76.556 s`), `oxlint` (`0` errors, `18` pre-existing warnings), and `nest build` (`exit 0`).
+- **Verification Summary**: Unit transient fault-injection (`40P01`/`40001`/`P2034`) & lock-guard suites (`10/10` suites, `265/265` tests in `7.178 s`), live PostgreSQL 17 (`test/unit/concurrency-postgres.spec.ts` `CONCURR-INV-1`–`19`: `19/19` passed in `5.104 s` with 0 skips, covering `finalizeAuction` vs `recordBid`/`recordTieBreak`, `markMinutesFiled`, `generateMonthlyDues`, and `requestReversal`), full `--runInBand` API suite (`52/52` suites, `753/753` tests passed in `76.556 s`), `oxlint` (`0` errors, `18` pre-existing warnings), and `nest build` (`exit 0`).
 
 ---
 
@@ -735,7 +735,7 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
   2. `apps/api/src/common/utils/bigint-json.util.ts` *(Added `bigintSafeJsonReplacer`, `stringifyBigIntSafe`, `parseBigIntField`)*
   3. `apps/api/src/common/interceptors/bigint.interceptor.ts` & `apps/api/src/main.ts` *(Removed global `BigInt.prototype.toJSON` mutation)*
   4. `apps/api/src/common/interceptors/report-etag.interceptor.ts` *(Switched ETag hashing to `stringifyBigIntSafe`)*
-  5. `apps/api/test/chit-cache.spec.ts`, `apps/api/test/chit.spec.ts`, `apps/api/test/bigint-interceptor.spec.ts`, `apps/api/test/report-etag.spec.ts`
+  5. `apps/api/test/unit/chit-cache.spec.ts`, `apps/api/test/unit/chit.spec.ts`, `apps/api/test/unit/bigint-interceptor.spec.ts`, `apps/api/test/unit/report-etag.spec.ts`
 - **Violated Specification**: `docs/03-architecture/caching-architecture.md` §3.1 ("Explicit BigInt Serialization"); Guardrail 2.
 - **Severity**: **MEDIUM** *(Architectural Fragility & Cache Type Mismatch)*
 - **Detailed Technical Root Cause**:
@@ -743,7 +743,7 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
   1. Importing `BigIntInterceptor` or running `main.ts` globally patched `(BigInt.prototype as any).toJSON = () => Number(this)`, masking missing `JSON.stringify` replacers and coercing 64-bit `BigInt` values into lossy numbers.
   2. `ChitService.findAll` called HTTP-layer `serializePrismaPrimitives(...)` before writing to Redis, causing both cache misses and cache hits (`JSON.parse`) to return plain JS `number`s instead of native `bigint`s.
   3. `ReportEtagInterceptor` called raw `JSON.stringify(data)` prior to global `BigIntInterceptor`, creating an implicit runtime dependency on `BigInt.prototype.toJSON`.
-  4. `apps/api/test/chit-cache.spec.ts` mocked `chitValue` / `baseInstallment` as plain numbers instead of native `bigint`s (`2000000n` / `100000n`).
+  4. `apps/api/test/unit/chit-cache.spec.ts` mocked `chitValue` / `baseInstallment` as plain numbers instead of native `bigint`s (`2000000n` / `100000n`).
 - **Verified Production Implementation**:
   - Removed both global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`.
   - Created [`apps/api/src/common/utils/bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts) with explicit `bigintSafeJsonReplacer`, `stringifyBigIntSafe`, and `parseBigIntField` (supporting exact digit strings and legacy safe-integer rollout payloads).
@@ -777,7 +777,7 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
   1. `apps/api/prisma/schema.prisma` (`AuctionTieBidder` & `PaymentAllocation`)
   2. `apps/api/prisma/migrations/20261112115900_add_allocation_and_tie_bidder_indexes/migration.sql`
   3. `apps/api/src/auction/auction.service.ts` (`recordTieBreak` distinct `ticketId` validation)
-  4. `apps/api/test/auction.spec.ts` & `apps/api/test/concurrency-postgres.spec.ts` (`CONCURR-INV-20`–`23`)
+  4. `apps/api/test/unit/auction.spec.ts` & `apps/api/test/unit/concurrency-postgres.spec.ts` (`CONCURR-INV-20`–`23`)
 - **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §3 ("Indexing Strategy").
 - **Severity**: **MEDIUM**
 - **Detailed Technical Root Cause**:
@@ -821,7 +821,7 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
   - Wrapped `ChitService.activate`, `assignTicket`, `unassignTicket`, and `update` in `withTransactionRetry` acquiring exclusive `"ChitGroup" FOR UPDATE` via shared `lockChitGroupRow(tx, id)` at the root of the State Machine Lock DAG (zero deadlock cycles with downstream `Auction` / `AuctionWinner` / `SubscriberTicket` locks).
   - Extracted DRY helpers (`assertLockedChitGroupStatus`, `mapTicketUniqueConstraintError`) to validate locked `ChitGroup` status (`DRAFT` | `REGISTERED` for `activate`/`assignTicket`; `DRAFT` for `unassignTicket`/`update`), re-read authoritative `ChitGroup` + `tickets` inside `activate()` to block `TOCTOU` races against `unassignTicket`, map concurrent `P2002` ticket conflicts cleanly to `ConflictException`, and invalidate Redis scheme caches post-commit.
 - **Verification Summary**:
-  - Added `N1`–`N3` unit/deadlock recovery tests in [`state-transition-retry.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/state-transition-retry.spec.ts) and live PostgreSQL 17 parallel contention tests (`CONCURR-INV-24`, `CONCURR-INV-25`) in [`concurrency-postgres.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/concurrency-postgres.spec.ts).
+  - Added `N1`–`N3` unit/deadlock recovery tests in [`state-transition-retry.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/state-transition-retry.spec.ts) and live PostgreSQL 17 parallel contention tests (`CONCURR-INV-24`, `CONCURR-INV-25`) in [`concurrency-postgres.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/concurrency-postgres.spec.ts).
   - Passed targeted suites (`5/5` suites / `185/185` tests), `oxlint` (`0` warnings / `0` errors on modified files), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), `pnpm run build` (`exit 0`), and full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `828/828` tests, `web`: `14/14` suites / `347/347` tests).
 
 ---
@@ -955,12 +955,12 @@ pnpm --filter web test
 pnpm --filter api test
 
 # 5. Execute Backend Concurrency & Financial Invariant Test Suites
-pnpm --filter api test -- test/concurrency-postgres.spec.ts
-pnpm --filter api test -- test/concurrency-locking.spec.ts
-pnpm --filter api test -- test/transaction-retry.spec.ts
-pnpm --filter api test -- test/chit-cache.spec.ts
-pnpm --filter api test -- test/storage.spec.ts
-pnpm --filter api test -- test/auth.spec.ts
+pnpm --filter api test -- test/unit/concurrency-postgres.spec.ts
+pnpm --filter api test -- test/unit/concurrency-locking.spec.ts
+pnpm --filter api test -- test/unit/transaction-retry.spec.ts
+pnpm --filter api test -- test/unit/chit-cache.spec.ts
+pnpm --filter api test -- test/unit/storage.spec.ts
+pnpm --filter api test -- test/unit/auth.spec.ts
 ```
 
 ### 6.2 Defect Reproduction Procedures
@@ -994,7 +994,7 @@ node -e 'JSON.stringify({ chitValue: 100000n })'
 # Throws: TypeError: Do not know how to serialize a BigInt
 
 # 2. Observe that importing BigIntInterceptor masks it by mutating BigInt.prototype.toJSON -> Number,
-#    losing bigint type fidelity on JSON.parse(cached) and masked in test/chit-cache.spec.ts (lines 20,23) via number mocks.
+#    losing bigint type fidelity on JSON.parse(cached) and masked in test/unit/chit-cache.spec.ts (lines 20,23) via number mocks.
 ```
 
 #### Reproducing DEF-FE-02 (Approvals SSE Stream Hang in BFF Proxy)

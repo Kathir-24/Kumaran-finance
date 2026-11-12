@@ -246,10 +246,10 @@ When a rate limit is exceeded, standard HTTP 429 responses include:
 The rate limiting architecture is validated by automated unit and E2E test suites with a **100% pass rate**.
 
 ### 8.1 Proof 1: Redis Distributed Storage & Memory Fallback
-- **File**: [`apps/api/test/redis-throttler-storage.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/redis-throttler-storage.spec.ts)
+- **File**: [`apps/api/test/unit/redis-throttler-storage.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/redis-throttler-storage.spec.ts)
 - **Results**:
   ```
-  PASS test/redis-throttler-storage.spec.ts
+  PASS test/unit/redis-throttler-storage.spec.ts
     RedisThrottlerStorage Unit Tests (Resilient Distributed + Memory Fallback)
       Part 1: Redis Distributed Mode
         √ THROT-REDIS-1: should call redis.eval and return parsed record when below limit (10 ms)
@@ -261,10 +261,10 @@ The rate limiting architecture is validated by automated unit and E2E test suite
   ```
 
 ### 8.2 Proof 2: NAT Isolation & E2E Route Throttling
-- **File**: [`apps/api/test/throttler.e2e-spec.ts`](file:///u:/Kumaran-finance/apps/api/test/throttler.e2e-spec.ts)
+- **File**: [`apps/api/test/e2e/throttler.e2e-spec.ts`](file:///u:/Kumaran-finance/apps/api/test/e2e/throttler.e2e-spec.ts)
 - **Results**:
   ```
-  PASS test/throttler.e2e-spec.ts
+  PASS test/e2e/throttler.e2e-spec.ts
     Throttler & Rate Limiting (e2e)
       √ /health (GET) - should be exempt from throttling via @SkipThrottle() (570 ms)
       √ /api/v1/test-auth/login (POST) - should enforce limit of 3 and return 429 with Retry-After on 4th request (39 ms)
@@ -272,10 +272,10 @@ The rate limiting architecture is validated by automated unit and E2E test suite
   ```
 
 ### 8.3 Proof 3: OTP Cooldown & Brute-Force Lockout
-- **File**: [`apps/api/test/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/otp-cooldown-lockout.spec.ts)
+- **File**: [`apps/api/test/unit/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/otp-cooldown-lockout.spec.ts)
 - **Results**:
   ```
-  PASS test/otp-cooldown-lockout.spec.ts (8 tests passed)
+  PASS test/unit/otp-cooldown-lockout.spec.ts (8 tests passed)
     √ OTP-RATE-1: Immediate second requestOtp within 60s MUST fail closed with HTTP 429
     √ OTP-RATE-2: requestOtp after cooldown window expiration MUST succeed cleanly
     √ OTP-RATE-3: 3 consecutive incorrect OTP entries MUST trigger 5-minute temporary lockout

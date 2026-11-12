@@ -9,9 +9,9 @@
 > - Bilingual PDF Canvas: [`apps/api/src/pdf/`](file:///u:/Kumaran-finance/apps/api/src/pdf/)  
 > - Background Queues: [`apps/api/src/jobs/`](file:///u:/Kumaran-finance/apps/api/src/jobs/)  
 > **Verified Automated Tests**:  
-> - [`apps/api/test/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/payment.spec.ts) (20/20 PASS)  
-> - [`apps/api/test/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/collection.spec.ts) (16/16 PASS)  
-> - [`apps/api/test/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/pdf.spec.ts) (28/28 PASS)  
+> - [`apps/api/test/unit/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/payment.spec.ts) (20/20 PASS)  
+> - [`apps/api/test/unit/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/collection.spec.ts) (16/16 PASS)  
+> - [`apps/api/test/unit/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/pdf.spec.ts) (28/28 PASS)  
 > **Live E2E Verification Scripts**:  
 > - [`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts) (Lifecycle 6: Collections & Vault Handover)  
 > - [`apps/api/scripts/lifecycle/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts) (Lifecycle 7: Counter Payments & Dual-Control Reversals)
@@ -383,9 +383,9 @@ All 4 receipt-generating paths ([`PaymentService.recordPayment`](file:///u:/Kuma
 ### 7.1 Automated Jest Unit Tests (64 / 64 Tests Passing)
 
 ```text
-PASS test/collection.spec.ts
-PASS test/payment.spec.ts
-PASS test/pdf.spec.ts
+PASS test/unit/collection.spec.ts
+PASS test/unit/payment.spec.ts
+PASS test/unit/pdf.spec.ts
 
 Test Suites: 3 passed, 3 total
 Tests:       64 passed, 64 total

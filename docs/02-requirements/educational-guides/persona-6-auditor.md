@@ -296,7 +296,7 @@ To verify that automated background jobs execute according to statutory rules wi
 | **Auditor looks for paise (.00) in ledgers** | All numbers are whole integer Rupees (e.g., `₹4,100`). | Kumaran Finance operates strictly in whole integer Rupees (`BigInt`). Explain in audit report that paise are not used per company charter. |
 | **Auditor suspects an unrecorded cash collection** | Check receipt number sequence (`KC-REC-PRD-2026-XXXXX`). | The sequential number generator ensures zero missing numbers. If a gap exists, it immediately triggers an internal audit investigation. |
 | **Auditor checks if any winner was exempt from safety proof** | Safety proof is evaluated case-by-case (ADR-15). | If checklist shows `Safety Proof Required? [No]`, the auditor verifies that the Partners formally documented their business waiver reasoning. |
-| **Auditor tests if Maker could have approved their own entry** | System unit and e2e test suite asserts `maker_user_id !== checker_user_id` on 100% of sensitive endpoints. | Inspect the automated invariant test report (`test/financial-invariants.spec.ts`) showing 248 passing assertions. |
+| **Auditor tests if Maker could have approved their own entry** | System unit and e2e test suite asserts `maker_user_id !== checker_user_id` on 100% of sensitive endpoints. | Inspect the automated invariant test report (`test/unit/financial-invariants.spec.ts`) showing 248 passing assertions. |
 
 ---
 

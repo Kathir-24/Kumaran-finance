@@ -18,7 +18,7 @@ import { AppThrottlerGuard, RedisThrottlerStorage } from './common/throttler';
 import { validateEnv } from './config/env.validation';
 import { CustomerModule } from './customer/customer.module';
 import { DisbursementModule } from './disbursement/disbursement.module';
-import { HealthController } from './health/health.controller';
+import { HealthModule } from './health/health.module';
 import { InstallmentModule } from './installment/installment.module';
 import { JobsModule } from './jobs/jobs.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -28,7 +28,7 @@ import { PaymentModule } from './payment/payment.module';
 import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReportModule } from './report/report.module';
-import { SentryService } from './common/sentry/sentry.service';
+import { SentryModule } from './common/sentry/sentry.module';
 import { StorageModule } from './storage/storage.module';
 import { UserModule } from './user/user.module';
 
@@ -52,6 +52,7 @@ import { UserModule } from './user/user.module';
       }),
     }),
     PrismaModule,
+    SentryModule,
     AuthModule,
     BranchModule,
     UserModule,
@@ -68,11 +69,11 @@ import { UserModule } from './user/user.module';
     JobsModule,
     MetricsModule,
     NotificationModule,
+    HealthModule,
   ],
-  controllers: [AppController, HealthController],
+  controllers: [AppController],
   providers: [
     AppService,
-    SentryService,
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard,
@@ -82,7 +83,6 @@ import { UserModule } from './user/user.module';
       useClass: HttpMetricsInterceptor,
     },
   ],
-  exports: [SentryService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

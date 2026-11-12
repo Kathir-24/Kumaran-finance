@@ -171,16 +171,16 @@ MSG91_DLT_DEFAULT_TEMPLATE_ID=1407169823412093850
 
 ## 6. Verification Proofs (100% Tested)
 
-### 6.1 Unit & Integration Test Suite ([`test/sms.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/sms.spec.ts))
+### 6.1 Unit & Integration Test Suite ([`test/unit/sms.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/sms.spec.ts))
 
 Run command:
 ```bash
-$ pnpm --filter api test test/sms.spec.ts
+$ pnpm --filter api test test/unit/sms.spec.ts
 ```
 
 Output:
 ```text
-PASS test/sms.spec.ts
+PASS test/unit/sms.spec.ts
   Component 3: Pluggable SMS Drivers & DLT Notification Suite
     1. PhoneHelper (MSISDN Normalization & DPDP Masking)
       ✓ should format 10-digit Indian numbers to 12-digit MSISDN (91XXXXXXXXXX) (3 ms)
@@ -243,7 +243,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
 3. **Zero-Cost Primary Channel**: Customers with registered `fcmToken` receive free Mobile App Push Notifications (`PushService`), completely bypassing external telecom SMSC routes.
 
 ### 7.3 Chaos Test & Live Probe Proofs
-- **Automated Chaos Integration Spec ([`test/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/chaos-network-disconnect.spec.ts))**:
+- **Automated Chaos Integration Spec ([`test/unit/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/chaos-network-disconnect.spec.ts))**:
   * `CHAOS-SMS-1`: Telecom 504 timeout simulated $\to$ Transaction commits in **<500ms**, `InstallmentDue` verified `PAID`, `Receipt` generated, zero rollback.
   * `CHAOS-SMS-2`: Driver exponential backoff verified $\to$ 2 timeouts followed by successful 3rd attempt, returns `success: true`.
   * `CHAOS-SMS-3`: Mobile App Push fallback verified $\to$ Dispatches cleanly via FCM when SMS carrier is offline.
@@ -275,7 +275,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
 3. **Atomic Purge on Success**: When a subscriber or staff member successfully verifies their OTP, all three keys (`auth:otp:<phone>`, `auth:otp:cooldown:<phone>`, `auth:otp:lockout:<phone>`) are atomically purged via `redis.del`.
 
 ### 8.3 Verification & Live Penetration Proofs
-- **Automated Integration Spec ([`test/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/otp-cooldown-lockout.spec.ts))**:
+- **Automated Integration Spec ([`test/unit/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/otp-cooldown-lockout.spec.ts))**:
   * `OTP-RATE-1`: Immediate second request within 60s rejected with HTTP 429.
   * `OTP-RATE-2`: Request after 60s cooldown passes succeeds cleanly.
   * `OTP-RATE-3`: 3rd invalid attempt triggers 5-minute lockout.

@@ -35,16 +35,16 @@ pnpm --filter api run test:e2e:fresh
 
 | # | Test Suite | Path | Tests | Passing | Failing | Duration | Status |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|
-| 1 | API Versioning & Routing | `test/app.e2e-spec.ts` | 3 | 3 | 0 | 2.46s | ✅ PASS |
-| 2 | Standardized Response Envelope | `test/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 2.89s | ✅ PASS |
-| 3 | Security Headers & Strict CORS | `test/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 2.28s | ✅ PASS |
-| 4 | Throttler & Rate Limiting | `test/throttler.e2e-spec.ts` | 4 | 4 | 0 | 2.73s | ✅ PASS |
-| 5 | Authentication & Session Protocol | `test/evidence/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 7.88s | ✅ PASS |
-| 6 | Customer Intake, KYC & Anti-BOLA | `test/evidence/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 6.32s | ✅ PASS |
-| 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/evidence/03-chits-auctions.e2e-spec.ts` | 10 | 10 | 0 | 5.92s | ✅ PASS |
-| 8 | Payments, Discrete Math & UPI | `test/evidence/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 11.71s | ✅ PASS |
-| 9 | Disbursements, Safety & Jobs | `test/evidence/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 7.62s | ✅ PASS |
-| 10 | Storage & Document Streaming | `test/evidence/06-storage-documents.e2e-spec.ts` | 6 | 6 | 0 | 6.42s | ✅ PASS |
+| 1 | API Versioning & Routing | `test/e2e/app.e2e-spec.ts` | 3 | 3 | 0 | 2.46s | ✅ PASS |
+| 2 | Standardized Response Envelope | `test/e2e/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 2.89s | ✅ PASS |
+| 3 | Security Headers & Strict CORS | `test/e2e/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 2.28s | ✅ PASS |
+| 4 | Throttler & Rate Limiting | `test/e2e/throttler.e2e-spec.ts` | 4 | 4 | 0 | 2.73s | ✅ PASS |
+| 5 | Authentication & Session Protocol | `test/e2e/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 7.88s | ✅ PASS |
+| 6 | Customer Intake, KYC & Anti-BOLA | `test/e2e/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 6.32s | ✅ PASS |
+| 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/e2e/03-chits-auctions.e2e-spec.ts` | 10 | 10 | 0 | 5.92s | ✅ PASS |
+| 8 | Payments, Discrete Math & UPI | `test/e2e/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 11.71s | ✅ PASS |
+| 9 | Disbursements, Safety & Jobs | `test/e2e/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 7.62s | ✅ PASS |
+| 10 | Storage & Document Streaming | `test/e2e/06-storage-documents.e2e-spec.ts` | 6 | 6 | 0 | 6.42s | ✅ PASS |
 | **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **92** | **92** | **0** | **32.59s** *(fresh)* | ✅ **100% PASS** |
 
 ---
@@ -109,7 +109,7 @@ Enforces strict mathematical, validation, security, and statutory boundaries:
   - Rejection of duplicate Bank UTR claims under PostgreSQL unique index constraint with HTTP 409 `DUPLICATE_TRANSACTION_REF` (`TC-UPI-03`)
   - Network retry protection: repeated requests with identical `Idempotency-Key` return identical payment record without double processing (`TC-REL-01`)
 - **Rate Limiting & Throttling (Redis Distributed Store)**:
-  - Enforces rate limit of 3 requests per minute on login endpoint, returning HTTP 429 Too Many Requests on 4th attempt (`test/throttler.e2e-spec.ts`)
+  - Enforces rate limit of 3 requests per minute on login endpoint, returning HTTP 429 Too Many Requests on 4th attempt (`test/e2e/throttler.e2e-spec.ts`)
   - Verifies `/health` is explicitly exempt from rate limiting via `@SkipThrottle()`
 - **DPDP Act 2023 Data Minimization**:
   - Rejection of full 12-digit Aadhaar input with HTTP 400 Bad Request; enforces strictly 4-digit masked Aadhaar (`TC-VAL-03` in Customer KYC)

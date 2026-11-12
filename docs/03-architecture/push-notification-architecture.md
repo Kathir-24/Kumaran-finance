@@ -298,10 +298,10 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
 
 ### 7.1 Unit & Service Test Proofs
 
-- **Dedicated Push Test Suite** ([`apps/api/test/push.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/push.spec.ts)):
+- **Dedicated Push Test Suite** ([`apps/api/test/unit/push.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/push.spec.ts)):
   ```bash
-  $ pnpm --filter api test test/push.spec.ts
-  PASS apps/api/test/push.spec.ts
+  $ pnpm --filter api test test/unit/push.spec.ts
+  PASS apps/api/test/unit/push.spec.ts
     Firebase Cloud Messaging (FCM) Push Driver & PushService Tests
       1. MockPushDriver (Default / CI Mode)
         ✓ should return simulated messageId with token masking
@@ -313,30 +313,30 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
         ✓ should automatically prune stale fcmToken on User record when tokenInvalid is returned
         ✓ should automatically prune stale fcmToken on Customer record when tokenInvalid is returned
   ```
-- **Auth & Logout Token Clearance** ([`apps/api/test/auth.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/auth.spec.ts)):
+- **Auth & Logout Token Clearance** ([`apps/api/test/unit/auth.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth.spec.ts)):
   ```text
   ✓ User Device FCM Push Token Registration: should register a valid FCM token for the user
   ✓ User Device FCM Push Token Registration: should deregister/clear the FCM token when token is null
   ✓ Session Management: should clear refresh token and fcmToken on logout
   ```
-- **Anti-BOLA Customer Token Protection** ([`apps/api/test/customer.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/customer.spec.ts)):
+- **Anti-BOLA Customer Token Protection** ([`apps/api/test/unit/customer.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/customer.spec.ts)):
   ```text
   ✓ Customer Device FCM Push Token: should allow customer to update their own FCM token
   ✓ Customer Device FCM Push Token: should allow staff to update customer FCM token
   ✓ Customer Device FCM Push Token: should reject customer attempting to update another customer's FCM token (HTTP 403)
   ```
-- **BullMQ Background Notification & Approval Alerts** ([`apps/api/test/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/jobs.spec.ts)):
+- **BullMQ Background Notification & Approval Alerts** ([`apps/api/test/unit/jobs.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/jobs.spec.ts)):
   ```text
   ✓ NotificationService: should broadcast auction result and dividend credit to subscribers via Push and SMS fallback
   ✓ NotificationService: should dispatch high-priority approval push alerts to active partners and exclude maker user
   ✓ BullMqQueueProvider: should execute JOB_DISPATCH_AUCTION_RESULT and JOB_DISPATCH_APPROVAL_ALERT directly in fallback mode
   ```
-- **Auction Results Post-Commit Enqueue** ([`apps/api/test/auction.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/auction.spec.ts)):
+- **Auction Results Post-Commit Enqueue** ([`apps/api/test/unit/auction.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auction.spec.ts)):
   ```text
   ✓ Maker-Checker Duties: should enqueue auction result broadcast to notification-queue upon finalization
   ✓ Maker-Checker Duties: should not fail auction finalization if queueProvider.addJob throws an error (fire-and-forget resilience)
   ```
-- **Maker-Checker Approval Alert Enqueues** ([`apps/api/test/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/payment.spec.ts) & [`apps/api/test/disbursement.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/disbursement.spec.ts)):
+- **Maker-Checker Approval Alert Enqueues** ([`apps/api/test/unit/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/payment.spec.ts) & [`apps/api/test/unit/disbursement.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/disbursement.spec.ts)):
   ```text
   ✓ PaymentService: should enqueue reversal approval alert to notification-queue when reversal is requested
   ✓ DisbursementService: should enqueue disbursement approval alert to notification-queue upon safety proof verification

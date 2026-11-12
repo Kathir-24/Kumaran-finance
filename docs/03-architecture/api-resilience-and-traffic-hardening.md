@@ -175,7 +175,7 @@ Response format adheres strictly to `ApiPaginatedResponseEnvelope`:
 ## 8. Verification & Performance Benchmarking
 
 All resilience mechanisms are continuously verified through automated test suites:
-- **Circuit Breaker Tests**: `apps/api/test/circuit-breaker.spec.ts` (100% pass)
-- **Network Chaos & Timeout Recovery**: `apps/api/test/chaos-network-disconnect.spec.ts` (100% pass)
-- **High Concurrency & Stress Drills**: `apps/api/test/concurrency-postgres.spec.ts` & `test/distributed-lock.spec.ts` (100% pass)
+- **Circuit Breaker Tests**: `apps/api/test/unit/circuit-breaker.spec.ts` (100% pass)
+- **Network Chaos & Timeout Recovery**: `apps/api/test/unit/chaos-network-disconnect.spec.ts` (100% pass)
+- **High Concurrency & Stress Drills**: `apps/api/test/unit/concurrency-postgres.spec.ts` & `test/unit/distributed-lock.spec.ts` (100% pass)
 - **Full Test Suite Status**: 609 passing tests across 40 suites.

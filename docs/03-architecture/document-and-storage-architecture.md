@@ -286,10 +286,10 @@ All document and storage features have been executed and verified across automat
 ### 6.1 Automated Jest Unit Tests (**94 / 94 Tests Passing**)
 
 ```text
-PASS test/storage.spec.ts (15 tests)
-PASS test/customer.spec.ts (28 tests)
-PASS test/disbursement.spec.ts (26 tests)
-PASS test/pdf.spec.ts (25 tests)
+PASS test/unit/storage.spec.ts (15 tests)
+PASS test/unit/customer.spec.ts (28 tests)
+PASS test/unit/disbursement.spec.ts (26 tests)
+PASS test/unit/pdf.spec.ts (25 tests)
 
 Test Suites: 4 passed, 4 total
 Tests:       94 passed, 94 total
@@ -374,7 +374,7 @@ return this.prisma.customerDocument.create({ ... });
 ```
 
 ### 8.2 Chaos Test & Live Probe Verification
-1. **Automated Chaos Integration Spec ([`test/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/chaos-network-disconnect.spec.ts))**:
+1. **Automated Chaos Integration Spec ([`test/unit/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/chaos-network-disconnect.spec.ts))**:
    - `CHAOS-S3-1`: KYC upload socket disconnect (`ETIMEDOUT`) simulated $\to$ Throws exception, database assertion confirms `SELECT COUNT(*) FROM "CustomerDocument"` is strictly **0**.
    - `CHAOS-S3-2`: Blank cheque upload disconnect simulated $\to$ Throws exception, database assertion confirms `AuctionWinner.securityDocS3Key` remains strictly **null** and `AuditLog` count is **0**.
 2. **Live Docker Container Probe ([`scripts/probes/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-chaos-network-disconnect.ps1))**:
