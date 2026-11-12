@@ -35,12 +35,25 @@ export class StorageKeyHelper {
   }
 
   /**
+   * Normalizes and sanitizes a branch code for S3 storage path segments.
+   * Defaults to 'PRD' when empty or stripped to empty.
+   */
+  private static sanitizeBranchCode(branchCode?: string): string {
+    const cleaned = (branchCode || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '');
+    return cleaned || 'PRD';
+  }
+
+  /**
    * Generates a storage key for bilingual subscription receipts.
    * Path: receipts/{branchCode}/{year}/{receiptNumber}.pdf
    */
   static receiptPdf(branchCode: string, year: number | string, receiptNumber: string): string {
+    const cleanBranch = StorageKeyHelper.sanitizeBranchCode(branchCode);
     const cleanReceipt = receiptNumber.replace(/[^a-zA-Z0-9-_]/g, '');
-    return `receipts/${branchCode}/${year}/${cleanReceipt}.pdf`;
+    return `receipts/${cleanBranch}/${year}/${cleanReceipt}.pdf`;
   }
 
   /**
@@ -48,8 +61,9 @@ export class StorageKeyHelper {
    * Path: vouchers/{branchCode}/{year}/{voucherNumber}.pdf
    */
   static voucherPdf(branchCode: string, year: number | string, voucherNumber: string): string {
+    const cleanBranch = StorageKeyHelper.sanitizeBranchCode(branchCode);
     const cleanVoucher = voucherNumber.replace(/[^a-zA-Z0-9-_]/g, '');
-    return `vouchers/${branchCode}/${year}/${cleanVoucher}.pdf`;
+    return `vouchers/${cleanBranch}/${year}/${cleanVoucher}.pdf`;
   }
 
   /**

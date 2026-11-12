@@ -62,6 +62,24 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       const key = StorageKeyHelper.auctionMinutesPdf('chit-001', 4);
       expect(key).toBe('minutes/chit-001/month-4.pdf');
     });
+
+    it('N4: should normalize and defend receipt/voucher branch codes against casing and path traversal', () => {
+      expect(StorageKeyHelper.receiptPdf('prd', 2026, 'KC-REC-01')).toBe(
+        'receipts/PRD/2026/KC-REC-01.pdf',
+      );
+      expect(StorageKeyHelper.voucherPdf('  cbe_1 ', 2026, 'KC-VOU-01')).toBe(
+        'vouchers/CBE_1/2026/KC-VOU-01.pdf',
+      );
+      expect(StorageKeyHelper.receiptPdf('../erd', 2026, 'KC-REC-02')).toBe(
+        'receipts/ERD/2026/KC-REC-02.pdf',
+      );
+      expect(StorageKeyHelper.voucherPdf('///..', 2026, 'KC-VOU-02')).toBe(
+        'vouchers/PRD/2026/KC-VOU-02.pdf',
+      );
+      expect(StorageKeyHelper.receiptPdf('', 2026, 'KC-REC-03')).toBe(
+        'receipts/PRD/2026/KC-REC-03.pdf',
+      );
+    });
   });
 
   describe('2. LocalStorageDriver (Developer Machine Fallback)', () => {
@@ -96,6 +114,22 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       expect(downloaded.buffer.toString()).toBe('KYC_AADHAAR_IMAGE_BYTES');
       expect(downloaded.mimeType).toBe('image/jpeg');
       expect(downloaded.sizeBytes).toBe(testBuffer.length);
+    });
+
+    it('N5: should roundtrip receipt and voucher keys built with non-PRD branch codes on disk', async () => {
+      const receiptKey = StorageKeyHelper.receiptPdf('ERD', 2026, 'KC-REC-ERD-2026-00001');
+      const voucherKey = StorageKeyHelper.voucherPdf('ERD', 2026, 'KC-VOU-ERD-2026-00001');
+      const receiptBytes = Buffer.from('%PDF-1.4-ERD-RECEIPT');
+      const voucherBytes = Buffer.from('%PDF-1.4-ERD-VOUCHER');
+
+      await driver.upload(receiptKey, receiptBytes, 'application/pdf');
+      await driver.upload(voucherKey, voucherBytes, 'application/pdf');
+
+      const downloadedReceipt = await driver.get(receiptKey);
+      const downloadedVoucher = await driver.get(voucherKey);
+
+      expect(downloadedReceipt.buffer.toString()).toBe('%PDF-1.4-ERD-RECEIPT');
+      expect(downloadedVoucher.buffer.toString()).toBe('%PDF-1.4-ERD-VOUCHER');
     });
 
     it('should return local streaming URL for presigned access', async () => {

@@ -94,12 +94,14 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     };
 
     storageMock = {
-      uploadFile: jest.fn().mockResolvedValue({
-        key: 'receipts/PRD/2026/KC-REC-001.pdf',
-        url: '/api/v1/storage/file/receipts/PRD/2026/KC-REC-001.pdf',
-        sizeBytes: 1024,
-        mimeType: 'application/pdf',
-      }),
+      uploadFile: jest.fn().mockImplementation(
+        async (key: string, buffer: Buffer, mimeType = 'application/pdf') => ({
+          key,
+          url: `/api/v1/storage/file/${key}`,
+          sizeBytes: buffer?.length ?? 1024,
+          mimeType,
+        }),
+      ),
       getFile: jest.fn().mockResolvedValue({
         buffer: Buffer.from('%PDF-1.4 pre-rendered-receipt-content'),
         mimeType: 'application/pdf',
@@ -300,7 +302,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
             chitGroup: {
               groupCode: 'KCA-1L-20M-01',
               durationMonths: 20,
-              branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai', phone: '9876543210' },
+              branch: { id: 'branch-PRD', code: 'PRD', name: 'Head Office', address: 'Perundurai', phone: '9876543210' },
             },
           },
         },
@@ -421,7 +423,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
           groupCode: 'KCA-1L-20M-01',
           chitValue: 100000n,
           branchId: 'branch-PRD',
-          branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai' },
+          branch: { id: 'branch-PRD', code: 'PRD', name: 'Head Office', address: 'Perundurai' },
         },
       },
       ticket: {
@@ -675,7 +677,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
             chitGroup: {
               groupCode: 'KCA-1L-20M-01',
               durationMonths: 20,
-              branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai', phone: '9876543210' },
+              branch: { id: 'branch-PRD', code: 'PRD', name: 'Head Office', address: 'Perundurai', phone: '9876543210' },
             },
           },
         },
@@ -702,7 +704,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
           groupCode: 'KCA-1L-20M-01',
           chitValue: 100000n,
           branchId: 'branch-PRD',
-          branch: { id: 'branch-PRD', name: 'Head Office', address: 'Perundurai' },
+          branch: { id: 'branch-PRD', code: 'PRD', name: 'Head Office', address: 'Perundurai' },
         },
       },
       ticket: {
@@ -861,6 +863,207 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
       expect(mockRes.redirect).toHaveBeenCalledWith(
         'https://storage.kumaranfinance.in/signed-url?exp=900',
       );
+    });
+  });
+
+  describe('7. DEF-BE-02: Canonical Branch.code Storage Key Generation & Self-Healing', () => {
+    const uuidBranchId = '07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c';
+
+    const buildReceiptPayment = (
+      branch: { id: string; code?: string | null; name: string; address: string; phone: string },
+      pdfS3Key?: string,
+    ) => ({
+      id: 'pay-be02-001',
+      branchId: branch.id,
+      amount: 3750n,
+      paymentMethod: 'CASH',
+      createdAt: new Date('2026-10-18T10:00:00Z'),
+      recordedByUserId: 'usr-agent-1',
+      recordedByUser: { name: 'M. Kathiresan' },
+      receipt: {
+        id: 'rec-be02-001',
+        receiptNumber: 'KC-REC-PRD-2026-00014',
+        ...(pdfS3Key ? { pdfS3Key } : {}),
+      },
+      allocations: [
+        {
+          due: {
+            installmentMonth: 4,
+            grossAmount: 5000n,
+            dividendDeduction: 1250n,
+            netPayableAmount: 3750n,
+          },
+          ticket: {
+            ticketNumber: 7,
+            customer: {
+              fullName: 'S. Sundaram',
+              fullNameTamil: 'சுந்தரம்',
+              addressLine1: '14, Netaji Road',
+              city: 'Perundurai',
+              phone: '9842143210',
+            },
+            chitGroup: {
+              groupCode: 'KCA-1L-20M-01',
+              durationMonths: 20,
+              branch,
+            },
+          },
+        },
+      ],
+    });
+
+    const buildVoucherWinner = (
+      branch: { id: string; code?: string | null; name: string; address: string },
+      paymentReference = 'KC-VOU-PRD-2026-00004',
+    ) => ({
+      auctionId: 'auc-be02-001',
+      disbursementStatus: 'DISBURSED',
+      disbursedAmount: 75000n,
+      disbursementMode: 'CASH',
+      paymentReference,
+      agreementSigned: true,
+      nomineeSigned: true,
+      isSecurityRequired: false,
+      disbursedAt: new Date('2026-10-18T10:00:00Z'),
+      verifiedByUserId: 'usr-bm-1',
+      authorizedByUserId: 'usr-admin-1',
+      auction: {
+        installmentMonth: 4,
+        auctionDate: new Date('2026-10-10T10:00:00Z'),
+        bidDiscount: 25000n,
+        chitGroup: {
+          groupCode: 'KCA-1L-20M-01',
+          chitValue: 100000n,
+          branchId: branch.id,
+          branch,
+        },
+      },
+      ticket: {
+        ticketNumber: 7,
+        customer: {
+          customerCode: 'KC-CUST-00007',
+          fullName: 'S. Sundaram',
+          fullNameTamil: 'சுந்தரம்',
+          phone: '9842143210',
+        },
+      },
+    });
+
+    it.each(['PRD', 'ERD', 'CBE-01'])(
+      'N1: should store receipt and payout voucher under Branch.code "%s" instead of UUID tail',
+      async (branchCode) => {
+        const payment = buildReceiptPayment({
+          id: uuidBranchId,
+          code: branchCode,
+          name: `Branch ${branchCode}`,
+          address: 'Tamil Nadu',
+          phone: '9876543210',
+        });
+        const expectedReceiptKey = `receipts/${branchCode}/2026/KC-REC-PRD-2026-00014.pdf`;
+        prismaMock.payment.findUnique.mockResolvedValue(payment);
+
+        const receiptRes = await pdfService.generateReceiptPdf('pay-be02-001', superAdminUser);
+
+        expect(receiptRes.key).toBe(expectedReceiptKey);
+        expect(receiptRes.key).not.toContain('15a2dd0cc88c');
+        expect(storageMock.uploadFile).toHaveBeenCalledWith(
+          expectedReceiptKey,
+          expect.any(Buffer),
+          'application/pdf',
+        );
+        expect(prismaMock.receipt.update).toHaveBeenCalledWith({
+          where: { id: 'rec-be02-001' },
+          data: { pdfS3Key: expectedReceiptKey },
+        });
+
+        const winner = buildVoucherWinner(
+          {
+            id: uuidBranchId,
+            code: branchCode,
+            name: `Branch ${branchCode}`,
+            address: 'Tamil Nadu',
+          },
+          `KC-VOU-${branchCode}-2026-00004`,
+        );
+        const expectedVoucherKey = `vouchers/${branchCode}/2026/KC-VOU-${branchCode}-2026-00004.pdf`;
+        prismaMock.auctionWinner.findUnique.mockResolvedValue(winner);
+        prismaMock.user.findUnique.mockResolvedValue({ name: 'Staff' });
+
+        const voucherRes = await pdfService.generatePayoutVoucherPdf('auc-be02-001', superAdminUser);
+
+        expect(voucherRes.key).toBe(expectedVoucherKey);
+        expect(voucherRes.key).not.toContain('15a2dd0cc88c');
+        expect(storageMock.uploadFile).toHaveBeenCalledWith(
+          expectedVoucherKey,
+          expect.any(Buffer),
+          'application/pdf',
+        );
+      },
+    );
+
+    it('N2: should fall back strictly to PRD when branch.code is omitted or null', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(
+        buildReceiptPayment({
+          id: uuidBranchId,
+          code: undefined,
+          name: 'Legacy Branch',
+          address: 'Perundurai',
+          phone: '9876543210',
+        }),
+      );
+
+      const receiptRes = await pdfService.generateReceiptPdf('pay-be02-001', superAdminUser);
+      expect(receiptRes.key).toBe('receipts/PRD/2026/KC-REC-PRD-2026-00014.pdf');
+      expect(receiptRes.key).not.toContain('undefined');
+      expect(receiptRes.key).not.toContain('15a2dd0cc88c');
+
+      prismaMock.auctionWinner.findUnique.mockResolvedValue(
+        buildVoucherWinner({
+          id: uuidBranchId,
+          code: null,
+          name: 'Legacy Branch',
+          address: 'Perundurai',
+        }),
+      );
+      prismaMock.user.findUnique.mockResolvedValue({ name: 'Staff' });
+
+      const voucherRes = await pdfService.generatePayoutVoucherPdf('auc-be02-001', superAdminUser);
+      expect(voucherRes.key).toBe('vouchers/PRD/2026/KC-VOU-PRD-2026-00004.pdf');
+      expect(voucherRes.key).not.toContain('null');
+      expect(voucherRes.key).not.toContain('15a2dd0cc88c');
+    });
+
+    it('N3: should self-heal legacy UUID-keyed receipt to canonical Branch.code path when missing from storage', async () => {
+      const legacyKey = 'receipts/15a2dd0cc88c/2026/KC-REC-PRD-2026-00014.pdf';
+      const canonicalKey = 'receipts/PRD/2026/KC-REC-PRD-2026-00014.pdf';
+
+      prismaMock.payment.findUnique.mockResolvedValue(
+        buildReceiptPayment(
+          {
+            id: uuidBranchId,
+            code: 'PRD',
+            name: 'Head Office',
+            address: 'Perundurai',
+            phone: '9876543210',
+          },
+          legacyKey,
+        ),
+      );
+      storageMock.getFile.mockRejectedValueOnce(new Error('NoSuchKey'));
+
+      const result = await pdfService.generateReceiptPdf('pay-be02-001', superAdminUser);
+
+      expect(storageMock.getFile).toHaveBeenCalledWith(legacyKey);
+      expect(result.key).toBe(canonicalKey);
+      expect(storageMock.uploadFile).toHaveBeenCalledWith(
+        canonicalKey,
+        expect.any(Buffer),
+        'application/pdf',
+      );
+      expect(prismaMock.receipt.update).toHaveBeenCalledWith({
+        where: { id: 'rec-be02-001' },
+        data: { pdfS3Key: canonicalKey },
+      });
     });
   });
 });

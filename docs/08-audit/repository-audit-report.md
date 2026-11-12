@@ -243,29 +243,19 @@ disbursedAmount?: number;
 
 ---
 
-#### Finding DEF-BE-02: UUID Slicing Used Instead of Branch Code in PDF S3 Storage Keys
+#### Finding DEF-BE-02: UUID Slicing Used Instead of Branch Code in PDF S3 Storage Keys **[FIXED & VERIFIED]**
 - **Layer & Subsystem**: Storage & PDF Generation Subsystem
 - **Exact File Path & Line Numbers**:
-  1. `apps/api/src/pdf/pdf.service.ts:116`
-  2. `apps/api/src/pdf/pdf.service.ts:208`
+  1. `apps/api/src/pdf/pdf.service.ts` (`resolveBranchCode`, `generateReceiptPdf`, `generatePayoutVoucherPdf`)
+  2. `apps/api/src/storage/helpers/storage-key.helper.ts` (`sanitizeBranchCode`, `receiptPdf`, `voucherPdf`)
 - **Violated Specification**: `docs/03-architecture/document-and-storage-architecture.md` §2.1; `docs/03-architecture/security-and-access-guardians.md` §2.1 (`receipts/{branchCode}/{year}/*`).
 - **Severity**: **MEDIUM**
 - **Detailed Technical Root Cause**:
-  In `PdfService.generateReceiptPdf` and `generatePayoutVoucherPdf`, the branch code is derived via:
-  ```typescript
-  const branchCode = chit.branch.id.split('-').pop() || 'PRD';
-  ```
-  Instead of utilizing the dedicated alphanumeric branch code property (`chit.branch.code`, e.g. `'PRD'`), the code splits the UUID string on hyphens and extracts the trailing segment (e.g. `'ef1234567890'`).
-- **Impact Analysis**:
-  Generated PDF receipts and vouchers are saved under non-standard S3 keys: `receipts/ef1234567890/2026/...` instead of `receipts/PRD/2026/...`. This breaks cross-system S3 bucket lifecycle policies and complicates manual audit inspections.
-- **Concrete Production-Grade Remediation Code Design**:
-
-```typescript
-// apps/api/src/pdf/pdf.service.ts:116 & 208
-// Replace UUID slicing with direct branch code lookup:
-const branchCode = chit.branch.code || 'PRD';
-const key = StorageKeyHelper.receiptPdf(branchCode, year, payment.receipt.receiptNumber);
-```
+  In `PdfService.generateReceiptPdf` and `generatePayoutVoucherPdf`, the branch code was derived via `chit.branch.id.split('-').pop() || 'PRD'`, extracting the trailing 12 hex characters of the UUID v4 instead of `chit.branch.code`, while `StorageKeyHelper.receiptPdf` and `voucherPdf` interpolated `branchCode` without sanitization or uppercase normalization, and `pdf.spec.ts` used a static hardcoded `uploadFile` mock key that hid the defect.
+- **Implemented Remediation**:
+  - Replaced both UUID `.split('-').pop()` calls in `PdfService` with `this.resolveBranchCode(chit.branch)` (`branch?.code || 'PRD'`), preserving self-healing fallback from legacy `receipt.pdfS3Key`.
+  - Added `StorageKeyHelper.sanitizeBranchCode()` (`trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'PRD'`) in both `receiptPdf` and `voucherPdf`.
+  - Synced `docs/03-architecture/document-and-storage-architecture.md` Domain 3 examples (`receipts/PRD/2026/...`, `vouchers/PRD/2026/...`) and added `N1`–`N5` tests in `apps/api/test/pdf.spec.ts` and `apps/api/test/storage.spec.ts` (`86/86` targeted across 3 suites; `819/819` API, `8/8` `@kumaran/api-client`, `341/341` Web).
 
 ---
 
@@ -981,7 +971,7 @@ gantt
   5. `DEF-DB-05` **[FIXED & VERIFIED]**: Added non-unique B-Tree indexes on `PaymentAllocation` (`paymentId`, `ticketId`, `installmentDueId`), composite `@@unique([auctionId, ticketId])` + `@@index([ticketId])` on `AuctionTieBidder` (`20261112115900_add_allocation_and_tie_bidder_indexes`), distinct-`ticketId` pre-check in `AuctionService.recordTieBreak`, and unit + live PostgreSQL 17 `pg_indexes`/`P2002`/append-only/`EXPLAIN` tests (`auction.spec.ts` & `CONCURR-INV-20`–`23`).
   6. `DEF-DB-06` **[FIXED & VERIFIED]**: Centralized BullMQ failed-job retention (`removeOnFail: { count: 500, age: 604800 }`) and `defaultJobOptions` (`attempts: 3`, exponential backoff, `removeOnComplete: true`) across all 3 Queues (`createManagedQueue` covering repeatable IST `upsertJobScheduler` crons + `addJob`), added Worker `.on('failed')` `[DLQ]` terminal logging (`createManagedWorker`/`handleWorkerJobFailure`), and verified with unit + live Redis 7 `N=4 -> 2` pruning tests (`queue-resilience.spec.ts`, `44/44` targeted queue tests, `806/806` API tests).
   7. `DEF-DB-04` **[FIXED & VERIFIED]**: Extracted canonical `REDIS_RELEASE_LOCK_LUA` + `acquireRedisMutexLock()` (`redis-lock.util.ts`), reused across `DistributedLockService`, `AuthService`, and `ReportService.readCacheOrAcquireStampedeLock`, wrapped all `getExecutiveDashboard` and `getDayBook` PostgreSQL queries inside `try/finally` with awaited `releaseLock()` & `activeFallbackDashboardQueries` cleanup, and verified across `4/4` suites / `34/34` lock/report tests (including live Redis 7) and `812/812` API tests.
-  8. `DEF-BE-02`: Correct PDF storage key generation to use `branch.code`.
+  8. `DEF-BE-02` **[FIXED & VERIFIED]**: Replaced `chit.branch.id.split('-').pop()` in `PdfService.generateReceiptPdf` & `generatePayoutVoucherPdf` with `resolveBranchCode(chit.branch)` (`branch?.code || 'PRD'`), added `StorageKeyHelper.sanitizeBranchCode()` normalization and traversal defense in `receiptPdf` & `voucherPdf`, synced `document-and-storage-architecture.md` Domain 3 examples, and verified with echoing storage mocks and `N1`–`N5` tests in `pdf.spec.ts` & `storage.spec.ts` (`3/3` suites / `86/86` targeted, `54/54` suites / `819/819` API, `8/8` `@kumaran/api-client`, `14/14` suites / `341/341` Web).
 
 #### Phase 4: Reliability, Testing & Architectural Polish (Sprint 4 — Week 3)
 - **Objective**: Eliminate component raw fetch boilerplate, update automated E2E tests, and add declarative guards.

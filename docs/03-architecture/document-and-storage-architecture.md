@@ -130,12 +130,12 @@ Generated dynamically in-memory using PDFKit and cached in private S3 storage.
   - Format: **ISO A5 Portrait** ($148 \times 210\text{ mm}$ / $419.53 \times 595.28\text{ pt}$).
   - Typography: Embedded `NotoSansTamil-Regular.ttf` and `NotoSansTamil-Bold.ttf`.
   - Words Helper: Legal currency words in English (*"Three Thousand Nine Hundred Fifty Rupees Only"*) and Tamil (*"ரூபாய் மூன்றாயிரத்து தொளாயிரத்து ஐம்பது மட்டும்"*).
-  - Storage Key: `receipts/07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c/2026/KC-REC-PRD-2026-00014.pdf`
+  - Storage Key: `receipts/PRD/2026/KC-REC-PRD-2026-00014.pdf`
 
 * **Prize Payout Voucher**:
   - Format: **ISO A5 Landscape** ($210 \times 148\text{ mm}$ / $595.28 \times 419.53\text{ pt}$).
   - Key Elements: Chit value, winning discount, foreman commission (4%), net prize amount, safety checklist stamps, and physical signature lines for Subscriber, Nominee, Cashier, and Partner.
-  - Storage Key: `vouchers/07c70d9d-a8aa-45d3-b34e-15a2dd0cc88c/2026/KC-VOU-PRD-2026-00004.pdf`
+  - Storage Key: `vouchers/PRD/2026/KC-VOU-PRD-2026-00004.pdf`
 
 ---
 

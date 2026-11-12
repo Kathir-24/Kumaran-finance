@@ -28,6 +28,13 @@ export class PdfService {
   ) {}
 
   /**
+   * Resolves the canonical Branch.code for storage paths, defaulting to 'PRD' for legacy/partial fixtures.
+   */
+  private resolveBranchCode(branch?: { code?: string | null }): string {
+    return branch?.code || 'PRD';
+  }
+
+  /**
    * Generates a bilingual subscription receipt PDF (A5 document), uploads to storage, and updates receipt.
    */
   async generateReceiptPdf(
@@ -113,7 +120,7 @@ export class PdfService {
     });
 
     const year = payment.createdAt.getFullYear();
-    const branchCode = chit.branch.id.split('-').pop() || 'PRD';
+    const branchCode = this.resolveBranchCode(chit.branch);
     const key = StorageKeyHelper.receiptPdf(branchCode, year, payment.receipt.receiptNumber);
 
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
@@ -205,7 +212,7 @@ export class PdfService {
     });
 
     const year = (winner.disbursedAt || new Date()).getFullYear();
-    const branchCode = chit.branch.id.split('-').pop() || 'PRD';
+    const branchCode = this.resolveBranchCode(chit.branch);
     const key = StorageKeyHelper.voucherPdf(branchCode, year, voucherNumber);
 
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
