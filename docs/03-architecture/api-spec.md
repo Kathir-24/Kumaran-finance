@@ -545,9 +545,9 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 
 ## 4. Related Architecture & Contract Documents
 
-- **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) (`112` paths, `118` operations, `146` component schemas exported via [`apps/api/scripts/export-openapi.ts`](../../apps/api/scripts/export-openapi.ts))
-- **TypeScript Client SDK Types**: [`docs/03-architecture/openapi-types.ts`](openapi-types.ts) & [`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts) (regenerated via `pnpm run codegen:ts` / `pnpm run codegen:types`)
+- **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) (`115` paths, `121` operations exported via [`apps/api/scripts/export-openapi.ts`](../../apps/api/scripts/export-openapi.ts))
+- **TypeScript Client SDK Types**: [`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts) (regenerated via `pnpm run codegen:ts`)
 - **Flutter / Dart Client Models**: [`apps/mobile/lib/core/api/models/api_models.dart`](../../apps/mobile/lib/core/api/models/api_models.dart) (regenerated via `pnpm run codegen:dart` / [`scripts/generate-dart-api.ts`](../../scripts/generate-dart-api.ts))
-- **Monorepo Contract Sync Command**: Run `pnpm run codegen:all` and `pnpm run codegen:types` after any NestJS DTO or controller route change; verified by [`apps/api/test/client-contract.spec.ts`](../../apps/api/test/client-contract.spec.ts) (`0` bare object schemas, `0` untyped/double arrays)
+- **Monorepo Contract Sync Command**: Run `pnpm run codegen:all` after any NestJS DTO or controller route change; verified by [`apps/api/test/client-contract.spec.ts`](../../apps/api/test/client-contract.spec.ts) (`0` bare object schemas, `0` untyped/double arrays)
 - **Complete Payload Specimen Catalog**: [`docs/03-architecture/api-request-response-catalog.md`](api-request-response-catalog.md)
 - **Granular 6-Persona Access Registry**: [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)

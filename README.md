@@ -20,7 +20,7 @@
 The entire project blueprint, architecture, compliance, and operational manual suite is organized under [`docs/`](docs/):
 
 ```text
-u:\Kumaran-finance\docs\
+docs/
 ├── 01-business/
 │   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-19)
 │   ├── financial-rules.md                    # Confirmed financial math (whole-rupee mandate, 4% commission, dividends)
@@ -43,28 +43,46 @@ u:\Kumaran-finance\docs\
 │   ├── completed-modules-api-registry.md     # 6-persona RBAC matrix for Modules 1–9
 │   ├── registrar-filing-protocol.md          # Form XVII Registrar filing protocol
 │   ├── security-and-access-guardians.md      # Anti-BOLA/IDOR & branch scoping defenses
-│   ├── openapi-spec.json                     # Generated OpenAPI 3.0 JSON specification
-│   └── openapi-types.ts                      # Strongly-typed TypeScript client SDK contract
+│   ├── api-resilience-and-traffic-hardening.md
+│   ├── bullmq-architecture.md
+│   ├── caching-architecture.md
+│   ├── database-concurrency-and-performance.md
+│   ├── document-and-storage-architecture.md
+│   ├── horizontal-scaling-and-high-availability.md
+│   ├── observability-and-monitoring-architecture.md
+│   ├── offline-architecture.md
+│   ├── payment-architecture.md
+│   ├── push-notification-architecture.md
+│   ├── rate-limiting-and-abuse-prevention.md
+│   ├── redis-architecture.md
+│   ├── server-and-infrastructure-resilience.md
+│   ├── sms-architecture.md
+│   ├── third-party-integrations-and-resilience.md
+│   └── openapi-spec.json                     # Generated OpenAPI 3.0 JSON specification
 ├── 04-engineering/
 │   ├── setup-and-contributing.md             # Local environment & Docker guide
 │   ├── ai-coding-guidelines.md               # Prompt templates & AI guardrails
 │   ├── ai-agent-development-playbook.md      # Guided coding playbook & task-to-doc map
 │   ├── database-migration-and-seeding-guide.md # Docker, Prisma migrations & BigInt seeding
-│   └── definition-of-done.md                 # 10-gate quality checklist per module
+│   ├── definition-of-done.md                 # 10-gate quality checklist per module
+│   └── troubleshooting-guide.md              # Diagnostics & recovery runbooks
 ├── 05-testing/
 │   ├── financial-tests.md                    # Math invariant & concurrency tests
-│   └── payment-integration.md                # Webhooks, sandbox, & bank reconciliation
+│   ├── payment-integration.md                # Webhooks, sandbox, & bank reconciliation
+│   └── TEST_READY.md                         # Verified test environment checklist
 ├── 06-devops/
-│   ├── infrastructure-and-drp.md             # Production hosting (Any Linux VPS + Cloudflare R2 setup), backups, restore drill
+│   ├── infrastructure-and-drp.md             # Production hosting (Linux VPS + Cloudflare R2), backups, restore drill
 │   ├── ci-cd-pipeline.md                     # GitHub Actions pipeline
 │   └── security-threat-model.md              # Fintech OWASP Top 10, rate limits, audit defense
-└── 07-operations/
-    ├── manual-onboarding-sop.md              # Physical notebook-to-digital onboarding wizard
-    ├── operations-sop.md                     # Daily cash handover & reversal SOP
-    └── user-manuals/
-        ├── admin-foreman-manual.md           # Web dashboard operations manual
-        ├── agent-mobile-manual.md            # Field agent Android app manual
-        └── customer-app-guide.md             # Customer passbook & payment guide
+├── 07-operations/
+│   ├── PRODUCTION-DEPLOYMENT-GUIDE.md        # Authoritative Docker, TLS, BFF/SSE & zero-downtime deployment guide
+│   ├── manual-onboarding-sop.md              # Physical notebook-to-digital onboarding wizard
+│   ├── operations-sop.md                     # Daily cash handover & reversal SOP
+│   └── user-manuals/                         # Role-specific user manuals (Admin, Cashier, Agent, Customer, Manager, Auditor)
+├── 08-audit/
+│   ├── repository-audit-report.md            # Independent defect register & verification proofs
+│   └── remediation-baseline.md               # Audit remediation & controlled execution baseline
+└── web/                                      # Next.js 15 Web Operations Portal module specs (21 files; see docs/web/README.md)
 ```
 
 ---
@@ -80,8 +98,7 @@ pnpm docker:up
 This automatically starts:
 - **PostgreSQL 17 Database** on port `5433` (`chitflow-db`)
 - **Redis 7 In-Memory Queue** on port `6379` (`chitflow-redis`)
-- **MinIO S3 Local Storage** on port `9000` (API) and port `9001` (Web Console)
-- **Bucket Initializer** which auto-creates the private bucket `kumaran-chits-private`
+- **MinIO S3 Local Storage** on port `9000` (API) and port `9001` (Web Console) — create or verify the private bucket `kumaran-chits-private` via the console or `S3_BUCKET` auto-init when uploading.
 
 ### Step 2: Configure Environment & Install Dependencies
 ```powershell
@@ -129,7 +146,7 @@ Open your browser and verify the built-in administrative & observability portals
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
 | **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 105 physical paths (111 operations). |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public in non-prod) | Interactive testing for all 115 physical paths (121 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
 | **Sentry APM & Crash Monitoring**| [http://localhost:3000/health/sentry-test](http://localhost:3000/health/sentry-test) | Config in `apps/api/.env` | `@sentry/nestjs` crash reporting with Indian DPDP Act PII scrubbing and safe bypass. |
@@ -164,22 +181,18 @@ pnpm db:drp:drill
 Run the automated test suite verifying all 10 non-negotiable financial invariants:
 
 ```powershell
-# 1. Run Oxlint linter (0 warnings, 0 errors expected)
+# 1. Run monorepo linters (oxlint for API + ESLint for Web)
 pnpm run lint
 
-# 2. Run backend unit & integration tests (100% pass rate)
-pnpm test
-pnpm test:e2e:fresh
+# 2. Run monorepo TypeScript checks (SDK + Web + API build)
+pnpm run typecheck
 
-# 3. Run frontend unit tests (100% pass rate, 97 tests)
-pnpm --filter web test
+# 3. Run monorepo unit tests (8 SDK + 828 API unit + 347 Web unit tests)
+pnpm run test
+pnpm run test:e2e
 
-# 4. Strict frontend TypeScript typecheck
-pnpm web:typecheck
-
-# 5. Run production compilation check
+# 4. Run full production builds (SDK + API + Web)
 pnpm run build
-pnpm web:build
 ```
 
 ---
@@ -189,7 +202,7 @@ pnpm web:build
 To run the complete production-parity stack containerized behind Nginx reverse proxy:
 
 ```powershell
-# Start PostgreSQL, Redis, MinIO, NestJS API, and Nginx reverse proxy
+# Start all 9 full-stack containers (Postgres, Redis, MinIO, API, Worker, Web, Nginx, Certbot, Backup Cron)
 pnpm docker:fullstack:up
 
 # Inspect logs
@@ -198,7 +211,7 @@ pnpm docker:logs
 # Stop containers
 pnpm docker:fullstack:down
 ```
-When running full-stack, access the system directly through Nginx on [http://localhost](http://localhost) (Port 80).
+When running full-stack behind Nginx, open [https://localhost](https://localhost) (Port `443`; HTTP Port `80` redirects non-health traffic to HTTPS). See [`docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md`](docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md) for TLS and deployment instructions.
 
 ---
 

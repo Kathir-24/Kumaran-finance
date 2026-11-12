@@ -7,7 +7,6 @@
 
 import {
   GetObjectCommand,
-  ListObjectsV2Command,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
@@ -117,113 +116,120 @@ export async function runDrpDrill(): Promise<DrillResult> {
     }
   })();
 
-  // 1. Pre-flight: Query source baseline counts
-  console.log(`[PRE-FLIGHT] Capturing baseline metrics from source database...`);
-  const [
-    sourceUsers,
-    sourceCustomers,
-    sourceGroups,
-    sourceTickets,
-    sourceDues,
-    sourcePayments,
-  ] = await Promise.all([
-    sourcePrisma.user.count(),
-    sourcePrisma.customer.count(),
-    sourcePrisma.chitGroup.count(),
-    sourcePrisma.subscriberTicket.count(),
-    sourcePrisma.installmentDue.count(),
-    sourcePrisma.payment.count(),
-  ]);
-
-  const sourceCounts: Record<string, number> = {
-    users: sourceUsers,
-    customers: sourceCustomers,
-    chitGroups: sourceGroups,
-    tickets: sourceTickets,
-    installmentDues: sourceDues,
-    payments: sourcePayments,
-  };
-
-  console.log(`[PRE-FLIGHT] Baseline record counts:`, sourceCounts);
-
-  // 2. Automated S3 Snapshot (RPO Verification)
-  console.log(`\n[PHASE 1: RPO] Creating fresh database snapshot & uploading to S3...`);
-  const backupResult = await runBackup();
-  console.log(`[PHASE 1: RPO] Backup key generated: ${backupResult.s3Key} (${backupResult.sizeBytes} bytes)`);
-
-  // 3. Isolated Target Database Setup
-  console.log(`\n[PHASE 2: ISOLATION] Preparing isolated target database '${DRILL_DB_NAME}'...`);
-  if (isDockerRunning) {
-    execSync(
-      `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
-      { stdio: 'ignore' },
-    );
-    execSync(
-      `docker exec chitflow-db psql -U chitflow -d postgres -c "CREATE DATABASE ${DRILL_DB_NAME};"`,
-      { stdio: 'inherit' },
-    );
-  } else {
-    execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
-      stdio: 'ignore',
-    });
-    execSync(`psql -U chitflow -d postgres -c "CREATE DATABASE ${DRILL_DB_NAME};"`, {
-      stdio: 'inherit',
-    });
-  }
-
-  // 4. Download Snapshot & Execute Restore (RTO Benchmark)
-  console.log(`\n[PHASE 3: RTO] Downloading snapshot from S3 & benchmarking recovery time...`);
-  const rtoStart = Date.now();
-
-  const getResponse = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: s3Config.bucket,
-      Key: backupResult.s3Key,
-    }),
-  );
-
-  if (!getResponse.Body) {
-    throw new Error(`[ERROR] S3 GetObject returned empty body for key: ${backupResult.s3Key}`);
-  }
-
-  const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
-
-  const tempDir = path.resolve(__dirname, '../../../infra/backups');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-  const drillDumpPath = path.join(tempDir, `drill_${path.basename(backupResult.s3Key)}`);
-  fs.writeFileSync(drillDumpPath, dumpBuffer);
-
-  // Restore into drill database
-  const fileName = path.basename(drillDumpPath);
-  if (isDockerRunning) {
-    execSync(`docker cp "${drillDumpPath}" "chitflow-db:/tmp/${fileName}"`, { stdio: 'inherit' });
-    execSync(
-      `docker exec chitflow-db pg_restore -U chitflow -d ${DRILL_DB_NAME} --clean --if-exists "/tmp/${fileName}"`,
-      { stdio: 'inherit' },
-    );
-    execSync(`docker exec chitflow-db rm "/tmp/${fileName}"`, { stdio: 'ignore' });
-  } else {
-    const drillUrl = sourceDbUrl.replace(/\/chitflow_dev\?/, `/${DRILL_DB_NAME}?`);
-    execSync(`pg_restore -d "${drillUrl}" --clean --if-exists "${drillDumpPath}"`, { stdio: 'inherit' });
-  }
-
-  const rtoEnd = Date.now();
-  const rtoDurationMs = rtoEnd - rtoStart;
-  const rtoDurationSeconds = (rtoDurationMs / 1000).toFixed(2);
-  console.log(`[PHASE 3: RTO] Database restored in ${rtoDurationSeconds}s (Target: < 7200s / 2 hours).`);
-
-  // 5. Connect to Drill Database & Verify Financial Invariants
-  console.log(`\n[PHASE 4: INVARIANTS] Verifying data integrity & financial invariants on restored DB...`);
-  const drillDbUrl = sourceDbUrl.replace(/\/chitflow_dev\?/, `/${DRILL_DB_NAME}?`);
-  const drillPrisma = new PrismaClient({
-    datasources: { db: { url: drillDbUrl } },
-  });
-
-  const assertions: DrillResult['assertions'] = [];
+  let drillPrisma: PrismaClient | undefined;
+  let drillDumpPath: string | undefined;
+  let containerTempFileName: string | undefined;
+  let drillDbCreated = false;
 
   try {
+    // 1. Pre-flight: Query source baseline counts
+    console.log(`[PRE-FLIGHT] Capturing baseline metrics from source database...`);
+    const [
+      sourceUsers,
+      sourceCustomers,
+      sourceGroups,
+      sourceTickets,
+      sourceDues,
+      sourcePayments,
+    ] = await Promise.all([
+      sourcePrisma.user.count(),
+      sourcePrisma.customer.count(),
+      sourcePrisma.chitGroup.count(),
+      sourcePrisma.subscriberTicket.count(),
+      sourcePrisma.installmentDue.count(),
+      sourcePrisma.payment.count(),
+    ]);
+
+    const sourceCounts: Record<string, number> = {
+      users: sourceUsers,
+      customers: sourceCustomers,
+      chitGroups: sourceGroups,
+      tickets: sourceTickets,
+      installmentDues: sourceDues,
+      payments: sourcePayments,
+    };
+
+    console.log(`[PRE-FLIGHT] Baseline record counts:`, sourceCounts);
+
+    // 2. Automated S3 Snapshot (RPO Verification)
+    console.log(`\n[PHASE 1: RPO] Creating fresh database snapshot & uploading to S3...`);
+    const backupResult = await runBackup();
+    console.log(`[PHASE 1: RPO] Backup key generated: ${backupResult.s3Key} (${backupResult.sizeBytes} bytes)`);
+
+    // 3. Isolated Target Database Setup
+    console.log(`\n[PHASE 2: ISOLATION] Preparing isolated target database '${DRILL_DB_NAME}'...`);
+    if (isDockerRunning) {
+      execSync(
+        `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
+        { stdio: 'ignore' },
+      );
+      drillDbCreated = true;
+      execSync(
+        `docker exec chitflow-db psql -U chitflow -d postgres -c "CREATE DATABASE ${DRILL_DB_NAME};"`,
+        { stdio: 'inherit' },
+      );
+    } else {
+      execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
+        stdio: 'ignore',
+      });
+      drillDbCreated = true;
+      execSync(`psql -U chitflow -d postgres -c "CREATE DATABASE ${DRILL_DB_NAME};"`, {
+        stdio: 'inherit',
+      });
+    }
+
+    // 4. Download Snapshot & Execute Restore (RTO Benchmark)
+    console.log(`\n[PHASE 3: RTO] Downloading snapshot from S3 & benchmarking recovery time...`);
+    const rtoStart = Date.now();
+
+    const getResponse = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: s3Config.bucket,
+        Key: backupResult.s3Key,
+      }),
+    );
+
+    if (!getResponse.Body) {
+      throw new Error(`[ERROR] S3 GetObject returned empty body for key: ${backupResult.s3Key}`);
+    }
+
+    const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
+
+    const tempDir = path.resolve(__dirname, '../../../infra/backups');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    drillDumpPath = path.join(tempDir, `drill_${path.basename(backupResult.s3Key)}`);
+    fs.writeFileSync(drillDumpPath, dumpBuffer);
+
+    // Restore into drill database
+    containerTempFileName = path.basename(drillDumpPath);
+    if (isDockerRunning) {
+      execSync(`docker cp "${drillDumpPath}" "chitflow-db:/tmp/${containerTempFileName}"`, { stdio: 'inherit' });
+      execSync(
+        `docker exec chitflow-db pg_restore -U chitflow -d ${DRILL_DB_NAME} --clean --if-exists "/tmp/${containerTempFileName}"`,
+        { stdio: 'inherit' },
+      );
+      execSync(`docker exec chitflow-db rm -f "/tmp/${containerTempFileName}"`, { stdio: 'ignore' });
+      containerTempFileName = undefined;
+    } else {
+      const drillUrl = sourceDbUrl.replace(/\/chitflow_dev\?/, `/${DRILL_DB_NAME}?`);
+      execSync(`pg_restore -d "${drillUrl}" --clean --if-exists "${drillDumpPath}"`, { stdio: 'inherit' });
+    }
+
+    const rtoEnd = Date.now();
+    const rtoDurationMs = rtoEnd - rtoStart;
+    const rtoDurationSeconds = (rtoDurationMs / 1000).toFixed(2);
+    console.log(`[PHASE 3: RTO] Database restored in ${rtoDurationSeconds}s (Target: < 7200s / 2 hours).`);
+
+    // 5. Connect to Drill Database & Verify Financial Invariants
+    console.log(`\n[PHASE 4: INVARIANTS] Verifying data integrity & financial invariants on restored DB...`);
+    const drillDbUrl = sourceDbUrl.replace(/\/chitflow_dev\?/, `/${DRILL_DB_NAME}?`);
+    drillPrisma = new PrismaClient({
+      datasources: { db: { url: drillDbUrl } },
+    });
+
+    const assertions: DrillResult['assertions'] = [];
     // Assertion 1: Row Parity
     const [
       drillUsers,
@@ -344,26 +350,6 @@ export async function runDrpDrill(): Promise<DrillResult> {
         : `Discrepancy: Total=₹${totalDues.toString()}, Sum=₹${(paidDues + outstandingDues).toString()}`,
     });
 
-    // 6. Cleanup & Teardown
-    console.log(`\n[PHASE 5: CLEANUP] Terminating isolated target database and temporary files...`);
-    await drillPrisma.$disconnect();
-    await sourcePrisma.$disconnect();
-
-    if (isDockerRunning) {
-      execSync(
-        `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
-        { stdio: 'ignore' },
-      );
-    } else {
-      execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
-        stdio: 'ignore',
-      });
-    }
-
-    if (fs.existsSync(drillDumpPath)) {
-      fs.unlinkSync(drillDumpPath);
-    }
-
     const allPassed = assertions.every((a) => a.passed);
 
     // 7. Structured Report
@@ -391,19 +377,41 @@ export async function runDrpDrill(): Promise<DrillResult> {
       restoredCounts,
       assertions,
     };
-  } catch (err) {
-    await drillPrisma.$disconnect();
-    await sourcePrisma.$disconnect();
-    if (isDockerRunning) {
-      execSync(
-        `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
-        { stdio: 'ignore' },
-      );
+  } finally {
+    // 6. Guaranteed Cleanup & Teardown (Phase 5)
+    console.log(`\n[PHASE 5: CLEANUP] Terminating isolated target database and temporary files...`);
+    try {
+      await drillPrisma?.$disconnect();
+    } catch {
+      // ignore disconnect errors during teardown
     }
-    if (fs.existsSync(drillDumpPath)) {
+    try {
+      await sourcePrisma.$disconnect();
+    } catch {
+      // ignore disconnect errors during teardown
+    }
+    try {
+      if (isDockerRunning) {
+        if (containerTempFileName) {
+          execSync(`docker exec chitflow-db rm -f "/tmp/${containerTempFileName}"`, { stdio: 'ignore' });
+        }
+        if (drillDbCreated) {
+          execSync(
+            `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
+            { stdio: 'ignore' },
+          );
+        }
+      } else if (drillDbCreated) {
+        execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
+          stdio: 'ignore',
+        });
+      }
+    } catch {
+      // ignore DB teardown errors so local temp dump cleanup still runs
+    }
+    if (drillDumpPath && fs.existsSync(drillDumpPath)) {
       fs.unlinkSync(drillDumpPath);
     }
-    throw err;
   }
 }
 

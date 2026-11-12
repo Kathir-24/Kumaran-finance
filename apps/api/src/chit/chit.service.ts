@@ -358,15 +358,13 @@ export class ChitService {
     throw err;
   }
 
-  /**
-   * Assigns a ticket number to a verified customer under ADR-13 constraints
-   */
-  async assignTicket(chitGroupId: string, dto: AssignTicketDto) {
-    const chit = await this.prisma.chitGroup.findUnique({
-      where: { id: chitGroupId },
-      include: { tickets: true },
-    });
-
+  private assertTicketAssignmentPreconditions<
+    T extends {
+      status: ChitStatus;
+      totalTickets: number;
+      tickets: Array<{ ticketNumber: number; customerId: string }>;
+    },
+  >(chit: T | null | undefined, dto: AssignTicketDto): T {
     if (!chit) {
       throw new NotFoundException('Chit scheme not found');
     }
@@ -383,23 +381,60 @@ export class ChitService {
       );
     }
 
-    // Check if ticket number is already taken
-    const ticketTaken = chit.tickets.some((t) => t.ticketNumber === dto.ticketNumber);
-    if (ticketTaken) {
+    if (chit.tickets.some((t) => t.ticketNumber === dto.ticketNumber)) {
       throw new ConflictException(
         `Ticket #${dto.ticketNumber} is already allocated in this chit group`,
       );
     }
 
     // ADR-13: Prevent customer from holding 2 or more tickets in the same group
-    const customerAlreadyHasTicket = chit.tickets.some(
-      (t) => t.customerId === dto.customerId,
-    );
-    if (customerAlreadyHasTicket) {
+    if (chit.tickets.some((t) => t.customerId === dto.customerId)) {
       throw new ConflictException(
         'ADR-13 Violation: Customer already holds a ticket in this chit group (Max 1 ticket per customer)',
       );
     }
+
+    return chit;
+  }
+
+  private assertActivationPreconditions<
+    T extends {
+      status: ChitStatus;
+      totalTickets: number;
+      tickets: unknown[];
+    },
+  >(chit: T | null | undefined): T {
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    if (chit.status !== ChitStatus.DRAFT && chit.status !== ChitStatus.REGISTERED) {
+      throw new BadRequestException(
+        `Cannot activate chit scheme: Scheme is in ${chit.status} status. Only DRAFT or REGISTERED schemes can be activated.`,
+      );
+    }
+
+    // Verify capacity: all N tickets must be filled before activation
+    if (chit.tickets.length !== chit.totalTickets) {
+      throw new BadRequestException(
+        `Cannot activate chit: ${chit.tickets.length}/${chit.totalTickets} tickets assigned. All tickets must be filled before activation.`,
+      );
+    }
+
+    return chit;
+  }
+
+  /**
+   * Assigns a ticket number to a verified customer under ADR-13 constraints
+   */
+  async assignTicket(chitGroupId: string, dto: AssignTicketDto) {
+    this.assertTicketAssignmentPreconditions(
+      await this.prisma.chitGroup.findUnique({
+        where: { id: chitGroupId },
+        include: { tickets: true },
+      }),
+      dto,
+    );
 
     // Verify customer exists
     const customer = await this.prisma.customer.findUnique({
@@ -427,32 +462,7 @@ export class ChitService {
           where: { id: chitGroupId },
           include: { tickets: true },
         });
-        if (!currentChit) {
-          throw new NotFoundException('Chit scheme not found');
-        }
-        if (
-          currentChit.status !== ChitStatus.DRAFT &&
-          currentChit.status !== ChitStatus.REGISTERED
-        ) {
-          throw new BadRequestException(
-            `Cannot assign tickets: scheme is already in ${currentChit.status} status`,
-          );
-        }
-        if (dto.ticketNumber < 1 || dto.ticketNumber > currentChit.totalTickets) {
-          throw new BadRequestException(
-            `Ticket number must be between 1 and ${currentChit.totalTickets}`,
-          );
-        }
-        if (currentChit.tickets.some((t: any) => t.ticketNumber === dto.ticketNumber)) {
-          throw new ConflictException(
-            `Ticket #${dto.ticketNumber} is already allocated in this chit group`,
-          );
-        }
-        if (currentChit.tickets.some((t: any) => t.customerId === dto.customerId)) {
-          throw new ConflictException(
-            'ADR-13 Violation: Customer already holds a ticket in this chit group (Max 1 ticket per customer)',
-          );
-        }
+        this.assertTicketAssignmentPreconditions(currentChit, dto);
       }
 
       try {
@@ -486,32 +496,17 @@ export class ChitService {
     checkerUserId: string,
     _dto?: ActivateChitDto,
   ) {
-    const chit = await this.prisma.chitGroup.findUnique({
-      where: { id },
-      include: {
-        tickets: {
-          include: { customer: true },
-          orderBy: { ticketNumber: 'asc' },
+    const chit = this.assertActivationPreconditions(
+      await this.prisma.chitGroup.findUnique({
+        where: { id },
+        include: {
+          tickets: {
+            include: { customer: true },
+            orderBy: { ticketNumber: 'asc' },
+          },
         },
-      },
-    });
-
-    if (!chit) {
-      throw new NotFoundException('Chit scheme not found');
-    }
-
-    if (chit.status !== ChitStatus.DRAFT && chit.status !== ChitStatus.REGISTERED) {
-      throw new BadRequestException(
-        `Cannot activate chit scheme: Scheme is in ${chit.status} status. Only DRAFT or REGISTERED schemes can be activated.`,
-      );
-    }
-
-    // 1. Verify capacity: all N tickets must be filled
-    if (chit.tickets.length !== chit.totalTickets) {
-      throw new BadRequestException(
-        `Cannot activate chit: ${chit.tickets.length}/${chit.totalTickets} tickets assigned. All tickets must be filled before activation.`,
-      );
-    }
+      }),
+    );
 
     const activated = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Acquire pessimistic row lock on ChitGroup to serialize concurrent activations & draft mutations
@@ -524,7 +519,7 @@ export class ChitService {
       );
 
       // Re-read authoritative scheme & ticket roster inside lock to prevent TOCTOU races with unassignTicket
-      const currentChit =
+      const currentChit = this.assertActivationPreconditions(
         hasRawLock && typeof tx?.chitGroup?.findUnique === 'function'
           ? await tx.chitGroup.findUnique({
               where: { id },
@@ -535,26 +530,8 @@ export class ChitService {
                 },
               },
             })
-          : chit;
-
-      if (!currentChit) {
-        throw new NotFoundException('Chit scheme not found');
-      }
-
-      if (
-        currentChit.status !== ChitStatus.DRAFT &&
-        currentChit.status !== ChitStatus.REGISTERED
-      ) {
-        throw new BadRequestException(
-          `Cannot activate chit scheme: Scheme is in ${currentChit.status} status. Only DRAFT or REGISTERED schemes can be activated.`,
-        );
-      }
-
-      if (currentChit.tickets.length !== currentChit.totalTickets) {
-        throw new BadRequestException(
-          `Cannot activate chit: ${currentChit.tickets.length}/${currentChit.totalTickets} tickets assigned. All tickets must be filled before activation.`,
-        );
-      }
+          : chit,
+      );
 
       // 2. Month 1 Rule for fresh chits
       if (currentChit.initMode === InitializationMode.NEW_GROUP) {

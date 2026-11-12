@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Phase 12 Complete & Verified** (321/321 passing unit tests, 48/48 Playwright E2E tests passing across Suites 00–11 + Visual Audit, 0 TypeScript errors, Next.js 15 production build verified)
+> **Status**: **Phase 12 Complete & Verified** (347/347 passing unit tests, 48/48 Playwright E2E tests passing across Suites 00–11 + Visual Audit, 0 TypeScript errors, Next.js 15 production build verified)
 
 ---
 
@@ -20,7 +20,7 @@
 | **Phase 7: Prize Disbursements & Safety Proof** | [`prize-disbursements.md`](./prize-disbursements.md) | `/disbursements`, `/disbursements/[id]/voucher` | Super Admin (Maker/Checker) | **COMPLETED** (Tasks 7.1, 7.2 DONE) |
 | **Phase 8: Collections, Handover & Reversals** | [`collections-and-handover.md`](./collections-and-handover.md), [`payment-reversals.md`](./payment-reversals.md) | `/collections`, `/collections/handover`, `/reversals` | Cashier, Field Agent, Partner | **COMPLETED** (Tasks 8.1–8.4 DONE) |
 | **Phase 9: Staff Administration, Branches & Operations** | [`branch-management.md`](./branch-management.md), [`staff-administration.md`](./staff-administration.md), [`background-jobs-admin.md`](./background-jobs-admin.md) | `/branches`, `/branches/new`, `/users`, `/users/new`, `/admin/jobs` | Super Admin | **COMPLETED** (Tasks 9.1, 9.2, 9.3 DONE) |
-| **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`form-xvii-minutes.md`](./form-xvii-minutes.md), [`form-xxi-and-defaulters.md`](./form-xxi-and-defaulters.md), [`audit-logs-report.md`](./audit-logs-report.md), [`statutory-reports-and-admin.md`](./statutory-reports-and-admin.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/ledger`, `/reports/defaulters`, `/reports/audit-logs` | Super Admin, Accountant, Auditor, Branch Manager, Collection Agent | **COMPLETED** (Tasks 10.1–10.4 DONE) |
+| **Phase 10: Statutory Reports & CA Auditor Portal** | [`form-xxii-cash-book.md`](./form-xxii-cash-book.md), [`form-xvii-minutes.md`](./form-xvii-minutes.md), [`form-xxi-and-defaulters.md`](./form-xxi-and-defaulters.md), [`audit-logs-report.md`](./audit-logs-report.md) | `/reports`, `/reports/cash-book`, `/reports/minutes`, `/reports/ledger`, `/reports/defaulters`, `/reports/audit-logs` | Super Admin, Accountant, Auditor, Branch Manager, Collection Agent | **COMPLETED** (Tasks 10.1–10.4 DONE) |
 | **Phase 11: Bilingual Print & Document Engine** | [`print-templates.md`](./print-templates.md) | `/print/receipt/[id]`, `/print/voucher/[id]` | Cashier, Accountant, Super Admin, Customer | **COMPLETED** (Task 11.1 DONE) |
 | **Phase 12: Playwright E2E Tests & Docker Packaging** | [`playwright-e2e-testing.md`](./playwright-e2e-testing.md), [`docker-and-production-spec.md`](./docker-and-production-spec.md) | Full Application | All Personas | **COMPLETED** (Tasks 12.1, 12.2, 12.3 DONE) |
 

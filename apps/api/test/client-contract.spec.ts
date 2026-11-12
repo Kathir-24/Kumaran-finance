@@ -1,12 +1,12 @@
 // ==============================================================================
 // Kumaran Chits — Layer 7 Client Contract & OpenAPI Types Verification Test
 // Product: Kumaran Chits (Kumaran Finance, Perundurai, Tamil Nadu)
-// Verification: docs/03-architecture/openapi-types.ts & openapi-spec.json
+// Verification: packages/api-client/src/generated/api-types.ts & openapi-spec.json
 // ==============================================================================
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { paths } from '../../../docs/03-architecture/openapi-types';
+import type { paths } from '../../../packages/api-client/src/generated/api-types';
 
 describe('Layer 7: Client Contract & Type Safety Verification', () => {
   const specPath = path.resolve(__dirname, '../../../docs/03-architecture/openapi-spec.json');
@@ -160,7 +160,6 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
       const nodePath = require('path') as typeof import('path');
       const targets = [
         nodePath.resolve(__dirname, '../../../packages/api-client/src/generated/api-types.ts'),
-        nodePath.resolve(__dirname, '../../../docs/03-architecture/openapi-types.ts'),
       ];
 
       for (const target of targets) {
@@ -179,7 +178,7 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
     });
 
     it('should verify resolved schema properties on union, nullable, and nested DTOs', () => {
-      type Schemas = import('../../../docs/03-architecture/openapi-types').components['schemas'];
+      type Schemas = import('../../../packages/api-client/src/generated/api-types').components['schemas'];
       type Payment = Schemas['PaymentRecordDto'];
       type Reversal = Schemas['ReversalRecordDto'];
       type Auction = Schemas['AuctionResponseDto'];

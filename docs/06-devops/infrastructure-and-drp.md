@@ -267,7 +267,7 @@ Kumaran Chits deploys Nginx 1.27 as the production edge ingress:
   - The live Maker-Checker Approvals stream (`/api/v1/reports/approvals-stream`) requires zero proxy buffering.
   - Configured with `proxy_buffering off; chunked_transfer_encoding on; proxy_read_timeout 24h;` to eliminate 60-second gateway timeouts.
 - **Automated Certificate Provisioning**: Supports Let's Encrypt / Certbot automated renewals via `/.well-known/acme-challenge/` and local self-signed certificates via `generate-self-signed.sh` / `.ps1`.
-- **Detailed Step-by-Step Guide**: Consult [`infra/docker/PRODUCTION-DEPLOYMENT-GUIDE.md`](../../infra/docker/PRODUCTION-DEPLOYMENT-GUIDE.md).
+- **Detailed Step-by-Step Guide**: Consult [`docs/07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md`](../07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md).
 
 
 
