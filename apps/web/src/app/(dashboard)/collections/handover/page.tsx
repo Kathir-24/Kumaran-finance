@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -43,19 +43,18 @@ export default function EveningCashHandoverPage() {
       date: selectedDate,
       branchId: activeBranchId || undefined,
     }),
-    queryFn: async () => {
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const params = new URLSearchParams();
-      if (selectedDate) params.append('date', selectedDate);
-      if (activeBranchId) params.append('branchId', activeBranchId);
-
-      const res = await fetch(`${baseUrl}/api/v1/collections/daily-summary?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to fetch collections daily summary');
-      const body = await res.json();
-      return body.data || body;
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/collections/daily-summary', {
+          params: {
+            query: {
+              date: selectedDate || undefined,
+              branchId: activeBranchId || undefined,
+            },
+          },
+          signal,
+        }),
+      );
     },
   });
 

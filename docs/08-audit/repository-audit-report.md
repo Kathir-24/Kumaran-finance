@@ -556,35 +556,18 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-05: Direct Bypass of Typed SDK with Untyped Raw `fetch()` in 25+ Components
-- **Layer & Subsystem**: Web Operations Portal UI Mutation Handlers
-- **Exact File Path & Line Numbers**:
-  - `apps/web/src/components/collections/counter-payment-modal.tsx:60, 90, 130`
-  - `apps/web/src/components/collections/handover-verification-card.tsx:113`
-  - `apps/web/src/components/reversals/reversal-action-dialogs.tsx:65, 192`
-  - `apps/web/src/components/reversals/reversal-request-modal.tsx:87, 135`
-  - `apps/web/src/components/disbursements/disbursement-auth-modal.tsx:117`
-  - `apps/web/src/components/disbursements/disbursement-release-modal.tsx:102`
-  - `apps/web/src/components/disbursements/final-settlement-modal.tsx:93`
-  - `apps/web/src/components/schemes/notebook-entry-grid.tsx:123`
-  - `apps/web/src/components/customers/customer-documents-card.tsx:106`
-- **Violated Specification**: `docs/03-architecture/frontend-architecture.md` §6 ("Monorepo Shared Logic Strategy").
+#### Finding DEF-FE-05: Direct Bypass of Typed SDK with Untyped Raw `fetch()` in UI Components **[REMEDIATED]**
+- **Layer & Subsystem**: Web Operations Portal Pages, Action Dialogs & Print Download Handlers
+- **Remediated Files (21 UI modules + shared PDF helper + regression test suite)**:
+  - **Shared PDF Helper & Verification Suite**: [`apps/web/src/lib/pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`triggerBlobDownload`, `downloadReceiptPdf`, `downloadVoucherPdf`), [`apps/web/test/def-fe-05-sdk-migration.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/def-fe-05-sdk-migration.spec.ts) (`N1`–`N5`).
+  - **App Pages (`6` files)**: `collections/page.tsx`, `collections/handover/page.tsx`, `disbursements/page.tsx`, `disbursements/[id]/voucher/page.tsx`, `reversals/page.tsx`, `print/voucher/[id]/page.tsx`.
+  - **UI Components (`15` files)**: `collections/bilingual-receipt-modal.tsx`, `collections/counter-payment-modal.tsx` (also fixed live 404 `/api/v1/chit-groups` -> `GET /api/v1/chits`), `collections/counter-upi-qr.tsx`, `collections/handover-verification-card.tsx`, `collections/payments-table.tsx`, `collections/verify-claim-dialog.tsx`, `disbursements/bilingual-voucher-dialog.tsx`, `disbursements/disbursement-auth-modal.tsx` (also removed out-of-schema `idempotencyKey` from `AuthorizePayoutDto` body, keeping header only), `disbursements/disbursement-release-modal.tsx`, `disbursements/final-settlement-modal.tsx`, `print/receipt-print-template.tsx`, `print/voucher-print-template.tsx`, `reversals/reversal-action-dialogs.tsx`, `reversals/reversal-request-modal.tsx`, `schemes/notebook-entry-grid.tsx`.
+- **Violated Specification**: `docs/03-architecture/frontend-architecture.md` §6 ("Monorepo Shared Logic Strategy & Strict Typed API Client Usage").
 - **Severity**: **MEDIUM**
-- **Detailed Technical Root Cause**:
-  Instead of utilizing `apiClient` (`createWebApiClient()`) and `unwrapApiResponse()`, over 25 components manually call `fetch(`${getApiBaseUrl()}/api/v1/...`)` with redundant header declarations (`headers: token ? { Authorization: ... } : {}`, where `token` is always `null`).
-- **Impact Analysis**:
-  Bypasses centralized error handling, contract typechecking, and automatic retry interceptors.
-- **Concrete Production-Grade Remediation Code Design**:
-  Replace manual `fetch` calls with typed SDK methods:
-  ```typescript
-  import { unwrapApiResponse } from '@kumaran/api-client';
-  import { apiClient } from '@/lib/api-client';
-
-  const res = await apiClient.POST('/api/v1/payments/record', {
-    body: { dueId, amount, paymentMethod },
-  });
-  const data = unwrapApiResponse(res);
-  ```
+- **Implemented Remediation**:
+  - Replaced all **31** raw `/api/v1/` `fetch()` calls and deprecated `getStoredAccessToken()` / `getApiBaseUrl()` boilerplate across the 21 UI files with `apiClient.GET` / `apiClient.POST`, `unwrapApiResponse<T>()`, `unwrapPaginatedList<T>()`, and centralized binary downloads in [`pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`parseAs: 'blob'` + `finally` `URL.revokeObjectURL()` cleanup).
+  - Forwarded TanStack Query `{ signal }` and `AbortController` signals across query/effect fetchers for clean unmount/refetch cancellation.
+  - Verified via 5-point gate: `pnpm run typecheck` (`0`), `pnpm run lint` (`0`), `pnpm run build` (`0`), static `Select-String` guard (`0` violations outside approved auth BFF/SSE callers), and full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819` tests, `web`: `14/14` suites / `346/346` tests including `N1`–`N5`).
 
 ---
 
@@ -976,7 +959,7 @@ gantt
 #### Phase 4: Reliability, Testing & Architectural Polish (Sprint 4 — Week 3)
 - **Objective**: Eliminate component raw fetch boilerplate, update automated E2E tests, and add declarative guards.
 - **Target Items**:
-  1. `DEF-FE-05`: Refactor 25+ UI components to use typed `apiClient` and `unwrapApiResponse()`.
+  1. `DEF-FE-05` **[FIXED & VERIFIED]**: Eliminated all **31** raw `/api/v1/` `fetch()` calls and deprecated `getStoredAccessToken()` imports across **21** Web UI pages/components (`6` pages, `15` components) using `apiClient`, `unwrapApiResponse()`, `unwrapPaginatedList()`, and centralized [`pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`parseAs: 'blob'`), fixed the live 404 `/api/v1/chit-groups` -> `GET /api/v1/chits` endpoint bug and `AuthorizePayoutDto` body, added `AbortSignal` forwarding, synced `frontend-architecture.md`, and verified with `N1`–`N5` static/unit guards (`web`: `14/14` suites / `346/346` tests, `@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819`).
   2. `DEF-FE-09` **[FIXED & VERIFIED]**: Updated Playwright E2E fixtures (`auth-fixtures.ts` `buildSessionCookies`/`injectSession`) to inject HttpOnly BFF session cookies cleanly across isolated `chitflow_test` runs.
   3. `DEF-FE-10`: Update `parseWholeRupees` in SDK to split on decimal points.
   4. `DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.

@@ -26,7 +26,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { downloadReceiptPdf } from '@/lib/pdf-download';
 import { queryKeys } from '@/lib/query-keys';
 
 interface BilingualReceiptModalProps {
@@ -45,20 +46,14 @@ export function BilingualReceiptModal({
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.payments.receipt(paymentId || ''),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!paymentId) return null;
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/payments/${paymentId}/receipt`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/payments/{id}/receipt', {
+          params: { path: { id: paymentId } },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to load bilingual receipt');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
     enabled: isOpen && Boolean(paymentId),
   });
@@ -67,25 +62,10 @@ export function BilingualReceiptModal({
     if (!paymentId) return;
     setDownloadingPdf(true);
     try {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/pdf/receipt/${paymentId}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+      await downloadReceiptPdf(
+        paymentId,
+        `receipt-${data?.receiptNumber || paymentId.slice(0, 8)}.pdf`,
       );
-      if (!res.ok) {
-        throw new Error('Failed to download receipt PDF');
-      }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `receipt-${data?.receiptNumber || paymentId.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       alert(err.message || 'Error downloading PDF receipt');
     } finally {

@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
 import { useAuthStore } from '@/stores/auth-store';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 
@@ -113,30 +113,17 @@ export function DisbursementAuthModal({
         throw new Error('Only Super Admin (Partners) possess financial authority to authorize prize money disbursements');
       }
 
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${winner.auctionId}/authorize-payout`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            disbursementMode,
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/disbursements/auction/{auctionId}/authorize-payout', {
+          params: { path: { auctionId: winner.auctionId } },
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: {
+            disbursementMode: disbursementMode as any,
             disbursedAmount: disbursedAmount ? Number(disbursedAmount) : undefined,
             notes: notes.trim() || undefined,
-            idempotencyKey,
-          }),
-        },
+          },
+        }),
       );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to authorize payout voucher');
-      }
-      return res.json();
     },
     onSuccess: () => {
       resetKey();

@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { downloadReceiptPdf } from '@/lib/pdf-download';
 
 interface PaymentItem {
   id: string;
@@ -66,20 +66,10 @@ export function PaymentsTable({
   const handleDownloadPdf = async (paymentId: string, receiptNumber?: string | null) => {
     setDownloadingId(paymentId);
     try {
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/pdf/receipt/${paymentId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to download receipt PDF');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `receipt-${receiptNumber || paymentId.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      await downloadReceiptPdf(
+        paymentId,
+        `receipt-${receiptNumber || paymentId.slice(0, 8)}.pdf`,
+      );
     } catch (err: any) {
       alert(err.message || 'Error downloading PDF receipt');
     } finally {

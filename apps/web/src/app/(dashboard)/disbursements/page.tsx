@@ -20,7 +20,7 @@ import {
   WinnerDisbursementRow,
 } from '@/components/disbursements/disbursements-table';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export default function DisbursementsPage() {
@@ -31,42 +31,35 @@ export default function DisbursementsPage() {
     queryKey: queryKeys.disbursements.list({
       disbursementStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
     }),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const params = new URLSearchParams();
-      if (selectedStatus !== 'ALL') {
-        params.append('disbursementStatus', selectedStatus);
-      }
-      params.append('limit', '50');
-
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements?${params.toString()}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/disbursements', {
+          params: {
+            query: {
+              disbursementStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
+              limit: 50,
+            },
+          },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to fetch prize disbursements');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
   });
 
   // Query all disbursements without status filter to calculate global metric cards
   const { data: globalData } = useQuery({
     queryKey: queryKeys.disbursements.list(),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements?limit=100`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-      if (!res.ok) return { data: [], total: 0 };
-      const json = await res.json();
-      return json?.data ?? json;
+    queryFn: async ({ signal }) => {
+      try {
+        return await unwrapApiResponse<any>(
+          apiClient.GET('/api/v1/disbursements', {
+            params: { query: { limit: 100 } },
+            signal,
+          }),
+        );
+      } catch {
+        return { data: [], total: 0 };
+      }
     },
   });
 

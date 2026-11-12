@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CustomerSearchPicker, type CustomerSearchResult } from './customer-search-picker';
-import { getApiBaseUrl } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 export interface HistoricalAuctionState {
@@ -118,32 +118,43 @@ export function NotebookEntryGrid({
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const res = await fetch(
-          `${getApiBaseUrl()}/api/v1/customers?search=${encodeURIComponent(searchTerm)}&limit=10`,
+        const result = await unwrapApiResponse<any>(
+          apiClient.GET('/api/v1/customers', {
+            params: {
+              query: {
+                search: searchTerm,
+                limit: 10,
+              },
+            },
+            signal: controller.signal,
+          }),
         );
-        if (res.ok) {
-          const json = await res.json();
-          const items = json?.data?.data || json?.data?.items || json?.data || [];
-          setCustomerResults(
-            items.map((c: any) => ({
-              id: c.id,
-              customerCode: c.customerCode,
-              fullName: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-              phone: c.phone || '',
-            }))
-          );
+        const items = unwrapPaginatedList<any>(result);
+        setCustomerResults(
+          items.map((c: any) => ({
+            id: c.id,
+            customerCode: c.customerCode,
+            fullName: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+            phone: c.phone || '',
+          })),
+        );
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('Customer search error:', err);
         }
-      } catch (err) {
-        console.error('Customer search error:', err);
       } finally {
         setIsSearching(false);
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchTerm, activePickerTicket]);
 
   // Handle keyboard navigation across the grid

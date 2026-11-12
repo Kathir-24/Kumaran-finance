@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 
 export interface PaymentPreview {
   id: string;
@@ -82,14 +82,12 @@ export function ReversalRequestModal({
     setErrorMessage(null);
 
     try {
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/payments?limit=5`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to search payments');
-      const body = await res.json();
-      const list: any[] = body.data?.data || body.data || [];
+      const result = await unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/payments', {
+          params: { query: { limit: 5 } },
+        }),
+      );
+      const list = unwrapPaginatedList<any>(result);
 
       const match = list.find(
         (p) =>
@@ -130,23 +128,15 @@ export function ReversalRequestModal({
         throw new Error('Mandatory justification must be at least 5 characters');
       }
 
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/payments/${selectedPayment.id}/request-reversal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          reason: finalReason,
-          notes: notes.trim() || undefined,
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/payments/{id}/request-reversal', {
+          params: { path: { id: selectedPayment.id } },
+          body: {
+            reason: finalReason,
+            notes: notes.trim() || undefined,
+          },
         }),
-      });
-
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.message || body?.error || 'Failed to request reversal');
-      return body.data || body;
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reversals'] });

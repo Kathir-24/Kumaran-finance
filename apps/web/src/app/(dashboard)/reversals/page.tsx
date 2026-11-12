@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
 import { ReversalRequestModal } from '@/components/reversals/reversal-request-modal';
@@ -46,18 +46,13 @@ export default function PaymentReversalsPage() {
     isFetching: isFetchingPending,
   } = useQuery({
     queryKey: queryKeys.reversals.pending(activeBranchId || undefined),
-    queryFn: async () => {
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const params = new URLSearchParams();
-      if (activeBranchId) params.append('branchId', activeBranchId);
-
-      const res = await fetch(`${baseUrl}/api/v1/reports/pending-approvals?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to fetch pending reversal approvals');
-      const body = await res.json();
-      return body.data || body;
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/reports/pending-approvals', {
+          params: { query: { branchId: activeBranchId || undefined } },
+          signal,
+        }),
+      );
     },
   });
 
@@ -72,15 +67,14 @@ export default function PaymentReversalsPage() {
     refetch: refetchHistory,
   } = useQuery({
     queryKey: queryKeys.reversals.history({ limit: 50 }),
-    queryFn: async () => {
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/payments?paymentStatus=REVERSED&limit=50`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to fetch historical reversals');
-      const body = await res.json();
-      return body.data?.data || body.data || [];
+    queryFn: async ({ signal }) => {
+      const result = await unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/payments', {
+          params: { query: { paymentStatus: 'REVERSED', limit: 50 } },
+          signal,
+        }),
+      );
+      return unwrapPaginatedList(result);
     },
   });
 

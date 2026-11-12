@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 
 export interface PendingReversalItem {
   id: string;
@@ -60,19 +60,12 @@ export function ApproveReversalDialog({
   const approveMutation = useMutation({
     mutationFn: async () => {
       if (!reversal) return;
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/payments/${reversal.paymentId}/approve-reversal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ notes: checkerNotes.trim() || undefined }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.message || body?.error || 'Failed to approve reversal');
-      return body.data || body;
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/payments/{id}/approve-reversal', {
+          params: { path: { id: reversal.paymentId } },
+          body: { notes: checkerNotes.trim() || undefined },
+        }),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reversals'] });
@@ -187,19 +180,12 @@ export function RejectReversalDialog({
       if (rejectionReason.trim().length < 5) {
         throw new Error('Mandatory rejection reason must be at least 5 characters');
       }
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/payments/${reversal.paymentId}/reject-reversal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ rejectionReason: rejectionReason.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.message || body?.error || 'Failed to reject reversal');
-      return body.data || body;
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/payments/{id}/reject-reversal', {
+          params: { path: { id: reversal.paymentId } },
+          body: { rejectionReason: rejectionReason.trim() },
+        }),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reversals'] });

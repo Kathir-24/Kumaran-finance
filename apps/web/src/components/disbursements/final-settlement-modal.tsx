@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export interface FinalSettlementChitTarget {
@@ -89,30 +89,18 @@ export function FinalSettlementModal({
         throw new Error('No unprized subscriber ticket found for final month settlement');
       }
 
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/group/${chitGroup.id}/final-settlement`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/final-settlement', {
+          params: { path: { chitGroupId: chitGroup.id } },
+          body: {
             ticketId: unprizedTicket.id,
-            disbursementMode,
+            disbursementMode: disbursementMode as any,
             paymentReference: paymentReference.trim() || undefined,
             notes: notes.trim() || undefined,
             disbursedAt: disbursedAt ? new Date(disbursedAt).toISOString() : undefined,
-          }),
-        },
+          },
+        }),
       );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to execute final maturity settlement');
-      }
-      return res.json();
     },
     onSuccess: () => {
       if (chitGroup?.id) {

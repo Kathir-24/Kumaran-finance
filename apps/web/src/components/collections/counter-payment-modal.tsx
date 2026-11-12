@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 import { CounterUpiQr } from './counter-upi-qr';
@@ -55,14 +55,14 @@ export function CounterPaymentModal({
   // Fetch active schemes
   const { data: schemesData } = useQuery({
     queryKey: queryKeys.schemes.list(),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/chit-groups?limit=100`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Failed to load schemes');
-      const json = await res.json();
-      return json?.data?.data ?? json?.data ?? [];
+    queryFn: async ({ signal }) => {
+      const res = await unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/chits', {
+          params: { query: { limit: 100 } },
+          signal,
+        }),
+      );
+      return unwrapPaginatedList(res);
     },
     enabled: isOpen,
   });
@@ -84,16 +84,17 @@ export function CounterPaymentModal({
   // Fetch dues for scheme and month
   const { data: duesData, isLoading: duesLoading } = useQuery({
     queryKey: queryKeys.installments.groupMonth(selectedGroupId, selectedMonth),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!selectedGroupId) return [];
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/installments/group/${selectedGroupId}/month/${selectedMonth}`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      const res = await unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/installments/group/{chitGroupId}/month/{month}', {
+          params: {
+            path: { chitGroupId: selectedGroupId, month: selectedMonth },
+          },
+          signal,
+        }),
       );
-      if (!res.ok) throw new Error('Failed to load monthly dues');
-      const json = await res.json();
-      return json?.data ?? [];
+      return res ?? [];
     },
     enabled: isOpen && Boolean(selectedGroupId) && selectedMonth >= 1,
   });
@@ -126,36 +127,27 @@ export function CounterPaymentModal({
     mutationFn: async () => {
       if (!selectedDue) throw new Error('No due selected');
       setErrorMessage(null);
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          ticketId: selectedDue.ticketId,
-          installmentMonth: selectedDue.installmentMonth,
-          amount: Number(selectedDue.netPayableAmount),
-          paymentMethod,
-          transactionRef: transactionRef.trim() || undefined,
-          notes: notes.trim() || undefined,
-          idempotencyKey,
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/payments', {
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: {
+            ticketId: selectedDue.ticketId,
+            installmentMonth: selectedDue.installmentMonth,
+            amount: Number(selectedDue.netPayableAmount),
+            paymentMethod,
+            transactionRef: transactionRef.trim() || undefined,
+            notes: notes.trim() || undefined,
+            idempotencyKey,
+          },
         }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.message || 'Failed to record counter payment');
-      }
-      return res.json();
+      );
     },
     onSuccess: (data) => {
       resetKey();
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['installments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      const paymentId = data?.data?.payment?.id || data?.payment?.id || data?.data?.id;
+      const paymentId = data?.payment?.id || data?.data?.payment?.id || data?.id || data?.data?.id;
       onClose();
       if (paymentId) onPaymentSuccess(paymentId);
     },

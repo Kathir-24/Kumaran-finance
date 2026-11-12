@@ -7,7 +7,7 @@ import { Printer, Download, ArrowLeft, CheckCircle2, AlertTriangle, ShieldCheck 
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { RupeeWords } from '@/lib/rupee-words';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { downloadReceiptPdf } from '@/lib/pdf-download';
 
 export interface ReceiptData {
   receiptNumber: string;
@@ -63,22 +63,7 @@ export function ReceiptPrintTemplate({ paymentId, receipt }: ReceiptPrintTemplat
   const handleDownloadPdf = async () => {
     try {
       setDownloading(true);
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/pdf/receipt/${paymentId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) throw new Error('Failed to download official receipt PDF');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `receipt-${receipt.receiptNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await downloadReceiptPdf(paymentId, `receipt-${receipt.receiptNumber}.pdf`);
     } catch {
       // Fallback
     } finally {

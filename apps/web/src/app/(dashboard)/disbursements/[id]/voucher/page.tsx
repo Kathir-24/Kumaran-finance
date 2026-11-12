@@ -26,7 +26,7 @@ import { DisbursementAuthModal } from '@/components/disbursements/disbursement-a
 import { DisbursementReleaseModal } from '@/components/disbursements/disbursement-release-modal';
 import { BilingualVoucherDialog } from '@/components/disbursements/bilingual-voucher-dialog';
 import { useAuthStore } from '@/stores/auth-store';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export default function PayoutVoucherPage() {
@@ -41,19 +41,13 @@ export default function PayoutVoucherPage() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.disbursements.detail(auctionId),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/disbursements/auction/{auctionId}', {
+          params: { path: { auctionId } },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to load disbursement voucher details');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
     enabled: Boolean(auctionId),
   });

@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { useQuery } from '@tanstack/react-query';
 import { QrCode, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 interface CounterUpiQrProps {
@@ -18,19 +18,13 @@ export function CounterUpiQr({ dueId, netPayableAmount }: CounterUpiQrProps) {
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.installments.upiIntent(dueId),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/installments/${dueId}/upi-intent`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/installments/{dueId}/upi-intent', {
+          params: { path: { dueId } },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to generate counter UPI QR intent');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
     enabled: Boolean(dueId),
   });

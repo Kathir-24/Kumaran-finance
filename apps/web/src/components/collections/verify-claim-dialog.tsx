@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { PendingUpiClaimItem } from './upi-claims-table';
 
@@ -53,28 +53,14 @@ export function VerifyClaimDialog({
     mutationFn: async () => {
       if (!claim) throw new Error('No claim selected');
       setErrorMessage(null);
-      const token = getStoredAccessToken();
-
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/payments/${claim.claimId}/verify-upi-claim`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/payments/{id}/verify-upi-claim', {
+          params: { path: { id: claim.claimId } },
+          body: {
             verificationNotes: verificationNotes.trim() || undefined,
-          }),
-        },
+          },
+        }),
       );
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.message || 'Failed to verify UPI payment claim');
-      }
-
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.pendingUpiClaims() });

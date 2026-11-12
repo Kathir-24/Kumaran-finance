@@ -14,7 +14,7 @@ import { BilingualReceiptModal } from '@/components/collections/bilingual-receip
 import { UpiClaimsTable, type PendingUpiClaimItem } from '@/components/collections/upi-claims-table';
 import { VerifyClaimDialog } from '@/components/collections/verify-claim-dialog';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken, unwrapPaginatedList } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export default function CollectionsPage() {
@@ -35,19 +35,18 @@ export default function CollectionsPage() {
       paymentStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
     }),
     queryFn: async ({ signal }) => {
-      const token = getStoredAccessToken();
-      const params = new URLSearchParams();
-      if (selectedMethod !== 'ALL') params.append('paymentMethod', selectedMethod);
-      if (selectedStatus !== 'ALL') params.append('paymentStatus', selectedStatus);
-      params.append('limit', '100');
-
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        signal,
-      });
-      if (!res.ok) throw new Error('Failed to fetch payments');
-      const json = await res.json();
-      return json?.data ?? json;
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/payments', {
+          params: {
+            query: {
+              paymentMethod: selectedMethod === 'ALL' ? undefined : (selectedMethod as any),
+              paymentStatus: selectedStatus === 'ALL' ? undefined : (selectedStatus as any),
+              limit: 100,
+            },
+          },
+          signal,
+        }),
+      );
     },
   });
 
@@ -55,14 +54,16 @@ export default function CollectionsPage() {
   const { data: globalData } = useQuery({
     queryKey: queryKeys.payments.list(),
     queryFn: async ({ signal }) => {
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments?limit=100`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        signal,
-      });
-      if (!res.ok) return { data: [], total: 0 };
-      const json = await res.json();
-      return json?.data ?? json;
+      try {
+        return await unwrapApiResponse<any>(
+          apiClient.GET('/api/v1/payments', {
+            params: { query: { limit: 100 } },
+            signal,
+          }),
+        );
+      } catch {
+        return { data: [], total: 0 };
+      }
     },
   });
 
@@ -70,14 +71,17 @@ export default function CollectionsPage() {
   const { data: claimsData, isLoading: claimsLoading, refetch: refetchClaims, isFetching: claimsFetching } = useQuery({
     queryKey: queryKeys.payments.pendingUpiClaims(),
     queryFn: async ({ signal }) => {
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments/pending-upi-claims?limit=100`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        signal,
-      });
-      if (!res.ok) return [];
-      const json = await res.json();
-      return json?.data ?? json ?? [];
+      try {
+        const result = await unwrapApiResponse<any>(
+          apiClient.GET('/api/v1/payments/pending-upi-claims', {
+            params: { query: { limit: 100 } },
+            signal,
+          }),
+        );
+        return result ?? [];
+      } catch {
+        return [];
+      }
     },
   });
 

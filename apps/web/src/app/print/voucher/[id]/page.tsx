@@ -3,7 +3,7 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { VoucherPrintTemplate, type VoucherData } from '@/components/print/voucher-print-template';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,19 +15,13 @@ export default function PrintVoucherPage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.disbursements.voucher(auctionId),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}/voucher`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/disbursements/auction/{auctionId}/voucher', {
+          params: { path: { auctionId } },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to load official voucher record');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
     enabled: Boolean(auctionId),
   });

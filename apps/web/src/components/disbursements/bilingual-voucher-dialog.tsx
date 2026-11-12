@@ -24,7 +24,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { downloadVoucherPdf } from '@/lib/pdf-download';
 import { queryKeys } from '@/lib/query-keys';
 
 interface BilingualVoucherDialogProps {
@@ -43,19 +44,13 @@ export function BilingualVoucherDialog({
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.disbursements.voucher(auctionId),
-    queryFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}/voucher`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<any>(
+        apiClient.GET('/api/v1/disbursements/auction/{auctionId}/voucher', {
+          params: { path: { auctionId } },
+          signal,
+        }),
       );
-      if (!res.ok) {
-        throw new Error('Failed to load official voucher record');
-      }
-      const json = await res.json();
-      return json?.data ?? json;
     },
     enabled: isOpen && Boolean(auctionId),
   });
@@ -63,25 +58,7 @@ export function BilingualVoucherDialog({
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/pdf/voucher/${auctionId}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-      if (!res.ok) {
-        throw new Error('Failed to generate PDF voucher');
-      }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `prize-voucher-${auctionId.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      await downloadVoucherPdf(auctionId, `prize-voucher-${auctionId.slice(0, 8)}.pdf`);
     } catch (err: any) {
       alert(err.message || 'Error downloading PDF voucher');
     } finally {

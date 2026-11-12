@@ -7,7 +7,7 @@ import { Printer, Download, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { RupeeWords } from '@/lib/rupee-words';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { downloadVoucherPdf } from '@/lib/pdf-download';
 
 export interface VoucherData {
   voucherNumber: string;
@@ -56,22 +56,7 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
   const handleDownloadPdf = async () => {
     try {
       setDownloading(true);
-      const token = getStoredAccessToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/pdf/voucher/${auctionId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) throw new Error('Failed to download official payout voucher PDF');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payout-voucher-${voucher.voucherNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await downloadVoucherPdf(auctionId, `payout-voucher-${voucher.voucherNumber}.pdf`);
     } catch {
       // Fallback
     } finally {

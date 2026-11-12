@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 
 export interface PendingHandoverCollectionItem {
   paymentId: string;
@@ -108,24 +108,16 @@ export function HandoverVerificationCard({
         ? `${notes.trim()} | Denominations: ${denomSummary}`
         : `Denominations: ${denomSummary}`;
 
-      const baseUrl = getApiBaseUrl();
-      const token = getStoredAccessToken();
-      const res = await fetch(`${baseUrl}/api/v1/collections/cash-handover/acknowledge`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          collectorUserId: batch.collectorUserId,
-          acknowledgedAmount: countedTotal,
-          paymentIds: batch.collections.map((c) => c.paymentId),
-          notes: finalNotes,
+      return unwrapApiResponse<any>(
+        apiClient.POST('/api/v1/collections/cash-handover/acknowledge', {
+          body: {
+            collectorUserId: batch.collectorUserId,
+            acknowledgedAmount: countedTotal,
+            paymentIds: batch.collections.map((c) => c.paymentId),
+            notes: finalNotes,
+          },
         }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.message || body?.error || 'Failed to acknowledge cash handover');
-      return body.data || body;
+      );
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['collections'] });
