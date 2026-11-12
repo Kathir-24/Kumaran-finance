@@ -839,43 +839,24 @@ if (acquired === 'OK') {
 
 ---
 
-#### Finding DEF-DB-05: Missing Database Performance Indexes & Constraints on `PaymentAllocation` and `AuctionTieBidder`
-- **Layer & Subsystem**: PostgreSQL Schema Models & Index Optimization
-- **Exact File Path & Line Numbers**: `apps/api/prisma/schema.prisma:278-287, 381-390`
+#### Finding DEF-DB-05: Missing Database Performance Indexes & Constraints on `PaymentAllocation` and `AuctionTieBidder` `[FIXED & VERIFIED — 2026-11-12]`
+- **Layer & Subsystem**: PostgreSQL Schema Models, Migration & Service Validation
+- **Exact File Path & Line Numbers**:
+  1. `apps/api/prisma/schema.prisma` (`AuctionTieBidder` & `PaymentAllocation`)
+  2. `apps/api/prisma/migrations/20261112115900_add_allocation_and_tie_bidder_indexes/migration.sql`
+  3. `apps/api/src/auction/auction.service.ts` (`recordTieBreak` distinct `ticketId` validation)
+  4. `apps/api/test/auction.spec.ts` & `apps/api/test/concurrency-postgres.spec.ts` (`CONCURR-INV-20`–`23`)
 - **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §3 ("Indexing Strategy").
 - **Severity**: **MEDIUM**
 - **Detailed Technical Root Cause**:
-  1. `PaymentAllocation` defines foreign keys `paymentId`, `ticketId`, and `installmentDueId` without indexes. Joining `Payment` to allocations results in full table sequential disk scans.
-  2. `AuctionTieBidder` lacks a composite unique constraint `@@unique([auctionId, ticketId])`. Nothing prevents duplicate tie-bid entries for the same subscriber ticket.
-- **Impact Analysis**:
-  Progressive query degradation on customer passbook statements and potential integrity anomalies in tie-break token entries.
-- **Concrete Production-Grade Remediation Code Design**:
-  Add missing indexes and constraints in `schema.prisma` and generate an SQL migration:
-
-```prisma
-// apps/api/prisma/schema.prisma
-model AuctionTieBidder {
-  ...
-  @@unique([auctionId, ticketId])
-  @@index([auctionId])
-}
-
-model PaymentAllocation {
-  ...
-  @@index([paymentId])
-  @@index([ticketId])
-  @@index([installmentDueId])
-}
-```
-
-```sql
--- Migration: add_allocation_and_tie_bidder_indexes.sql
-CREATE UNIQUE INDEX "AuctionTieBidder_auctionId_ticketId_key" ON "AuctionTieBidder"("auctionId", "ticketId");
-CREATE INDEX "AuctionTieBidder_auctionId_idx" ON "AuctionTieBidder"("auctionId");
-CREATE INDEX "PaymentAllocation_paymentId_idx" ON "PaymentAllocation"("paymentId");
-CREATE INDEX "PaymentAllocation_ticketId_idx" ON "PaymentAllocation"("ticketId");
-CREATE INDEX "PaymentAllocation_installmentDueId_idx" ON "PaymentAllocation"("installmentDueId");
-```
+  1. `PaymentAllocation` defines foreign keys `paymentId`, `ticketId`, and `installmentDueId` without indexes, causing sequential scans on Daybook allocation joins, defaulter settlement queries (`InstallmentService`), and pending UPI claim lookups (`PaymentService.verifyUpiClaim`).
+  2. `AuctionTieBidder` lacked `@@unique([auctionId, ticketId])` and indexes, and `AuctionService.recordTieBreak` verified only `dto.tiedTickets.length < 2` without validating unique `ticketId`s before DB insertion.
+- **Verified Production Implementation**:
+  - Updated `apps/api/prisma/schema.prisma` and applied migration `20261112115900_add_allocation_and_tie_bidder_indexes`:
+    - `AuctionTieBidder`: added `@@unique([auctionId, ticketId])` (composite unique B-Tree whose leftmost prefix also serves `WHERE "auctionId" = ...` and `ON DELETE CASCADE` without redundant single-column `"auctionId"` index overhead) plus `@@index([ticketId])` for subscriber ticket lookups.
+    - `PaymentAllocation`: added non-unique `@@index([paymentId])`, `@@index([ticketId])`, and `@@index([installmentDueId])`, preserving append-only ledger multiplicity for reversed-and-repaid installments.
+  - Added pre-transaction distinct-`ticketId` validation in `AuctionService.recordTieBreak` (fail-fast `400 BadRequestException` before `$transaction`), eliminating unhandled Prisma `P2002` HTTP 500 leaks while retaining the DB unique constraint as defense-in-depth.
+- **Verification Summary**: Targeted `DEF-DB-05` suites (`auction.spec.ts` + live PostgreSQL 17 `concurrency-postgres.spec.ts` `CONCURR-INV-1`–`23`: `2/2` suites, `47/47` tests verifying `pg_indexes`, `P2002` blocking, append-only reversal multiplicity, and `EXPLAIN` index binding), `prisma validate` & `prisma migrate status` (`14` migrations up-to-date), full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `801/801` tests, `web`: `14/14` suites / `341/341` tests), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), and `pnpm run build` (`exit 0`).
 
 ---
 
@@ -1024,7 +1005,7 @@ gantt
   2. `DEF-FE-07` **[FIXED & VERIFIED]**: Migrated KYC and safety proof uploads to client-direct S3/R2 `POST /api/v1/storage/presigned-upload-url` + direct `PUT` flows with client-side image compression and fail-closed backend confirmation endpoints.
   3. `DEF-FE-08` **[FIXED & VERIFIED]**: Moved 2FA intermediate `tempToken` (`totp_pending`) out of browser JSON and `sessionStorage` into a 5-minute `HttpOnly` cookie (`kc_totp_pending_token`) with strict cookie-only BFF verification, Edge `/2fa` HS256 guard (`edge-auth.ts`), non-secret `pendingTotp` session reload recovery, and Back-to-Login cookie cleanup.
   4. `DEF-DB-03` **[FIXED & VERIFIED]**: Removed global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`, introduced shared [`bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts), refactored `ChitService.findAll` (`serializeCatalog`/`deserializeCatalog`) to store exact decimal strings in Redis while returning native `bigint`s on cache miss & hit, hardened `ReportEtagInterceptor` with `stringifyBigIntSafe`, and expanded `chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, and `report-etag.spec.ts`.
-  5. `DEF-DB-05`: Apply SQL migration adding indexes on `PaymentAllocation` and unique constraint on `AuctionTieBidder`.
+  5. `DEF-DB-05` **[FIXED & VERIFIED]**: Added non-unique B-Tree indexes on `PaymentAllocation` (`paymentId`, `ticketId`, `installmentDueId`), composite `@@unique([auctionId, ticketId])` + `@@index([ticketId])` on `AuctionTieBidder` (`20261112115900_add_allocation_and_tie_bidder_indexes`), distinct-`ticketId` pre-check in `AuctionService.recordTieBreak`, and unit + live PostgreSQL 17 `pg_indexes`/`P2002`/append-only/`EXPLAIN` tests (`auction.spec.ts` & `CONCURR-INV-20`–`23`).
   6. `DEF-DB-06`: Add `removeOnFail: { count: 500, age: 604800 }` to BullMQ queue job configurations.
   7. `DEF-DB-04`: Harden `ReportService` distributed lock fallback with unique token and Lua script.
   8. `DEF-BE-02`: Correct PDF storage key generation to use `branch.code`.

@@ -285,6 +285,13 @@ export class AuctionService {
       throw new BadRequestException('At least 2 tied tickets are required to conduct a tie-break draw');
     }
 
+    const uniqueTicketIds = new Set(dto.tiedTickets.map((t) => t.ticketId));
+    if (uniqueTicketIds.size !== dto.tiedTickets.length) {
+      throw new BadRequestException(
+        'Duplicate ticket entries are not permitted in a tie-break draw',
+      );
+    }
+
     const bidDiscount = toWholeRupeeBigInt(dto.bidDiscount, 'Bid discount', { min: 1n });
 
     // In Option A, tie-break happens exclusively when members bid the maximum 1/4 ceiling

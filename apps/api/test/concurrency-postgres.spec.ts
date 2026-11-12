@@ -7,7 +7,7 @@ import {
   PrismaClient,
   Role,
 } from '@prisma/client';
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AuctionService } from '../src/auction/auction.service';
 import { CollectionService } from '../src/collection/collection.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
@@ -1885,5 +1885,225 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       await prisma.paymentReversal.deleteMany({ where: { paymentId: testPayment.id } });
       await prisma.payment.deleteMany({ where: { id: testPayment.id } });
     }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 20: DEF-DB-05 Live pg_indexes Catalog Verification
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-20: PostgreSQL pg_indexes MUST enforce all PaymentAllocation FK indexes and AuctionTieBidder unique/FK indexes (DEF-DB-05)', async () => {
+    if (!isDbConnected) {
+      console.warn('Skipping CONCURR-INV-20: DB not connected');
+      return;
+    }
+
+    const rows = await prisma.$queryRaw<
+      Array<{ tablename: string; indexname: string; indexdef: string }>
+    >`
+      SELECT tablename, indexname, indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename IN ('PaymentAllocation', 'AuctionTieBidder')
+      ORDER BY tablename, indexname;
+    `;
+
+    const indexMap = new Map(rows.map((r) => [r.indexname, r.indexdef]));
+
+    expect(indexMap.get('AuctionTieBidder_auctionId_ticketId_key')).toContain(
+      'CREATE UNIQUE INDEX',
+    );
+    expect(indexMap.get('AuctionTieBidder_ticketId_idx')).toContain('CREATE INDEX');
+    expect(indexMap.get('AuctionTieBidder_ticketId_idx')).not.toContain('UNIQUE INDEX');
+
+    expect(indexMap.get('PaymentAllocation_paymentId_idx')).toContain('CREATE INDEX');
+    expect(indexMap.get('PaymentAllocation_paymentId_idx')).not.toContain('UNIQUE INDEX');
+    expect(indexMap.get('PaymentAllocation_ticketId_idx')).toContain('CREATE INDEX');
+    expect(indexMap.get('PaymentAllocation_ticketId_idx')).not.toContain('UNIQUE INDEX');
+    expect(indexMap.get('PaymentAllocation_installmentDueId_idx')).toContain('CREATE INDEX');
+    expect(indexMap.get('PaymentAllocation_installmentDueId_idx')).not.toContain('UNIQUE INDEX');
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 21: DEF-DB-05 AuctionTieBidder Duplicate Prevention (App + DB)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-21: AuctionTieBidder MUST block duplicate (auctionId, ticketId) at both service and PostgreSQL unique constraint levels', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-21: DB or required seed data not present');
+      return;
+    }
+
+    const testAuction = await prisma.auction.create({
+      data: {
+        chitGroupId: activeTicket.chitGroupId,
+        installmentMonth: 983,
+        auctionDate: new Date(),
+        status: AuctionStatus.SCHEDULED,
+        bidDiscount: 25000n,
+        conductedByUserId: makerUserId,
+      },
+    });
+
+    try {
+      // 1. Service-level duplicate ticket check fails fast with BadRequestException
+      await expect(
+        auctionService.recordTieBreak(
+          activeTicket.chitGroupId,
+          983,
+          {
+            tiedTickets: [
+              { ticketId: activeTicket.id, tokenNumber: 1 },
+              { ticketId: activeTicket.id, tokenNumber: 2 },
+            ],
+            winningTicketId: activeTicket.id,
+            bidDiscount: 25000,
+            auctionDate: new Date().toISOString(),
+          },
+          makerUserId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      // 2. Direct DB insert of same (auctionId, ticketId) fails with PostgreSQL P2002
+      await prisma.auctionTieBidder.create({
+        data: {
+          auctionId: testAuction.id,
+          ticketId: activeTicket.id,
+          bidDiscount: 25000n,
+          tokenNumber: 1,
+          isWinner: true,
+        },
+      });
+
+      await expect(
+        prisma.auctionTieBidder.create({
+          data: {
+            auctionId: testAuction.id,
+            ticketId: activeTicket.id,
+            bidDiscount: 25000n,
+            tokenNumber: 2,
+            isWinner: false,
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+    } finally {
+      await prisma.auctionTieBidder.deleteMany({ where: { auctionId: testAuction.id } });
+      await prisma.auction.deleteMany({ where: { id: testAuction.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 22: DEF-DB-05 PaymentAllocation Append-Only Multiplicity Invariant
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-22: PaymentAllocation non-unique indexes MUST permit multiple allocations per (ticketId, installmentDueId) across reversed + re-paid payments', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-22: DB or required seed data not present');
+      return;
+    }
+
+    const tempDue = await prisma.installmentDue.create({
+      data: {
+        chitGroupId: activeTicket.chitGroupId,
+        ticketId: activeTicket.id,
+        installmentMonth: 982,
+        dueDate: new Date(),
+        grossAmount: 5000n,
+        dividendDeduction: 0n,
+        netPayableAmount: 5000n,
+        paidAmount: 0n,
+        status: DueStatus.UNPAID,
+      },
+    });
+
+    const pmtReversed = await prisma.payment.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        recordedByUserId: makerUserId,
+        customerId: activeTicket.customerId,
+        amount: 5000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.REVERSED,
+      },
+    });
+
+    const pmtSettled = await prisma.payment.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        recordedByUserId: makerUserId,
+        customerId: activeTicket.customerId,
+        amount: 5000n,
+        paymentMethod: PaymentMethod.CASH,
+        paymentStatus: PaymentStatus.SUCCESS,
+      },
+    });
+
+    try {
+      await prisma.paymentAllocation.create({
+        data: {
+          paymentId: pmtReversed.id,
+          ticketId: activeTicket.id,
+          installmentDueId: tempDue.id,
+          amountAllocated: 5000n,
+        },
+      });
+
+      await prisma.paymentAllocation.create({
+        data: {
+          paymentId: pmtSettled.id,
+          ticketId: activeTicket.id,
+          installmentDueId: tempDue.id,
+          amountAllocated: 5000n,
+        },
+      });
+
+      const allocations = await prisma.paymentAllocation.findMany({
+        where: { ticketId: activeTicket.id, installmentDueId: tempDue.id },
+      });
+      expect(allocations).toHaveLength(2);
+    } finally {
+      await prisma.paymentAllocation.deleteMany({
+        where: { paymentId: { in: [pmtReversed.id, pmtSettled.id] } },
+      });
+      await prisma.payment.deleteMany({
+        where: { id: { in: [pmtReversed.id, pmtSettled.id] } },
+      });
+      await prisma.installmentDue.deleteMany({ where: { id: tempDue.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 23: DEF-DB-05 PostgreSQL Query Planner EXPLAIN Index Binding
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-23: PostgreSQL EXPLAIN planner MUST bind all 5 DEF-DB-05 indexes without requiring Seq Scan', async () => {
+    if (!isDbConnected || !activeTicket) {
+      console.warn('Skipping CONCURR-INV-23: DB not connected or seed missing');
+      return;
+    }
+
+    const probeId = activeTicket.id;
+
+    const plans = await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET LOCAL enable_seqscan = off');
+      return {
+        byPayment: await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': any }>>(
+          `EXPLAIN (FORMAT JSON) SELECT * FROM "PaymentAllocation" WHERE "paymentId" = '${probeId}'`,
+        ),
+        byTicket: await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': any }>>(
+          `EXPLAIN (FORMAT JSON) SELECT * FROM "PaymentAllocation" WHERE "ticketId" = '${probeId}'`,
+        ),
+        byDue: await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': any }>>(
+          `EXPLAIN (FORMAT JSON) SELECT * FROM "PaymentAllocation" WHERE "installmentDueId" = '${probeId}'`,
+        ),
+        tieByAuction: await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': any }>>(
+          `EXPLAIN (FORMAT JSON) SELECT * FROM "AuctionTieBidder" WHERE "auctionId" = '${probeId}'`,
+        ),
+        tieByTicket: await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': any }>>(
+          `EXPLAIN (FORMAT JSON) SELECT * FROM "AuctionTieBidder" WHERE "ticketId" = '${probeId}'`,
+        ),
+      };
+    });
+
+    expect(JSON.stringify(plans.byPayment)).toContain('PaymentAllocation_paymentId_idx');
+    expect(JSON.stringify(plans.byTicket)).toContain('PaymentAllocation_ticketId_idx');
+    expect(JSON.stringify(plans.byDue)).toContain('PaymentAllocation_installmentDueId_idx');
+    expect(JSON.stringify(plans.tieByAuction)).toContain('AuctionTieBidder_auctionId_ticketId_key');
+    expect(JSON.stringify(plans.tieByTicket)).toContain('AuctionTieBidder_ticketId_idx');
   }, 20000);
 });

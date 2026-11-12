@@ -284,6 +284,9 @@ model AuctionTieBidder {
   bidDiscount BigInt           // All tied at ceiling (Whole Rupees)
   tokenNumber Int?             // Physical paper token drawn at branch
   isWinner    Boolean          @default(false)
+
+  @@unique([auctionId, ticketId])
+  @@index([ticketId])
 }
 
 model AuctionMinutes {
@@ -387,6 +390,10 @@ model PaymentAllocation {
   installmentDueId String
   due              InstallmentDue   @relation(fields: [installmentDueId], references: [id])
   amountAllocated  BigInt           // Whole integer Rupees
+
+  @@index([paymentId])
+  @@index([ticketId])
+  @@index([installmentDueId])
 }
 
 model Receipt {

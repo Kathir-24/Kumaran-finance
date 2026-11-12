@@ -378,6 +378,48 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         ),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should reject tie-break when duplicate ticketId entries are submitted (N=2 and N=3)', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+
+      await expect(
+        auctionService.recordTieBreak(
+          mockChitGroupId,
+          2,
+          {
+            tiedTickets: [
+              { ticketId: mockTicketId1, tokenNumber: 1 },
+              { ticketId: mockTicketId1, tokenNumber: 2 },
+            ],
+            winningTicketId: mockTicketId1,
+            bidDiscount: 25000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        auctionService.recordTieBreak(
+          mockChitGroupId,
+          2,
+          {
+            tiedTickets: [
+              { ticketId: mockTicketId1, tokenNumber: 1 },
+              { ticketId: mockTicketId2, tokenNumber: 2 },
+              { ticketId: mockTicketId1, tokenNumber: 3 },
+            ],
+            winningTicketId: mockTicketId2,
+            bidDiscount: 25000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(prismaMock.auctionTieBidder.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('4. Maker-Checker Separation of Duties (ADR-08 & Architectural Rule 10)', () => {

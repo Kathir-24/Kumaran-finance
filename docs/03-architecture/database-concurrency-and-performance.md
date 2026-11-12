@@ -47,7 +47,7 @@ Configured in Docker Compose PostgreSQL startup flags:
 ## 3. Indexing Strategy & EXPLAIN Verification
 
 ### 3.1 Composite & Single-Column B-Tree Indexes
-Missing indexes on high-traffic filtered columns force PostgreSQL to perform sequential disk scans (`Seq Scan`). In Kumaran Chits, two critical indexes protect high-frequency query paths:
+Missing indexes on high-traffic filtered columns force PostgreSQL to perform sequential disk scans (`Seq Scan`). In Kumaran Chits, deterministic B-Tree and composite unique indexes protect high-frequency query paths:
 
 1. **`SubscriberTicket(customerId)` B-Tree Index**:
    - **Query Path**: Mobile passbook query (`prisma.subscriberTicket.findMany({ where: { customerId } })`).
@@ -55,6 +55,12 @@ Missing indexes on high-traffic filtered columns force PostgreSQL to perform seq
 2. **`InstallmentDue(status, dueDate)` Composite B-Tree Index**:
    - **Query Path**: Midnight Arrears & Defaulter Tagging Cron (`WHERE status = 'UNPAID' AND "dueDate" <= $cutoff`).
    - **Benefit**: Allows the daily midnight worker to immediately identify overdue installments without scanning historic paid dues.
+3. **`PaymentAllocation` Foreign-Key B-Tree Indexes (`paymentId`, `ticketId`, `installmentDueId`)**:
+   - **Query Path**: Daybook/receipt allocation joins (`WHERE "paymentId" = ...`), defaulter account settlement sums (`WHERE "ticketId" = ...`), and pending UPI claim checks (`WHERE "installmentDueId" = ...`).
+   - **Invariant**: Strictly non-unique (`@@index`) rather than unique, preserving append-only ledger multiplicity when an earlier payment is reversed (`REVERSED`) and paid again later.
+4. **`AuctionTieBidder` Composite Unique (`auctionId, ticketId`) & Ticket B-Tree (`ticketId`)**:
+   - **Query Path**: Tie-break uniqueness enforcement, cascade cleanup (`WHERE "auctionId" = ...` served by the composite leftmost prefix), and reverse subscriber ticket tie lookups (`WHERE "ticketId" = ...`).
+   - **Benefit**: Eliminates duplicate tie-bid rows for the same subscriber ticket alongside pre-transaction uniqueness validation in [`AuctionService.recordTieBreak`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts).
 
 ### 3.2 Prisma Schema Reference
 ```prisma
@@ -80,6 +86,30 @@ model InstallmentDue {
   @@unique([ticketId, installmentMonth])
   @@index([chitGroupId, installmentMonth])
   @@index([status, dueDate]) // Optimizes midnight arrears and defaulter batch processing
+}
+
+model PaymentAllocation {
+  id               String   @id @default(uuid())
+  paymentId        String
+  ticketId         String
+  installmentDueId String
+  amountAllocated  BigInt
+  ...
+  @@index([paymentId])
+  @@index([ticketId])
+  @@index([installmentDueId])
+}
+
+model AuctionTieBidder {
+  id          String  @id @default(uuid())
+  auctionId   String
+  ticketId    String
+  bidDiscount BigInt
+  tokenNumber Int?
+  isWinner    Boolean @default(false)
+  ...
+  @@unique([auctionId, ticketId])
+  @@index([ticketId])
 }
 ```
 

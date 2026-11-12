@@ -96,6 +96,7 @@ Opens in your browser at `http://localhost:5555`.
 | `20261023095606_add_cycle_date_windows` | 2026-10-23 | Added `cycleStartDate` and `cycleEndDate` to `InstallmentDue` for physical 6-column passbook ledger alignment. | **Applied & Verified** (`289/289` unit tests, `82/82` E2E tests passing) |
 | `20261027065614_add_financial_reporting_indexes` | 2026-10-27 | Added compound B-tree indexes on `Payment`, `Receipt`, and `Customer` for sub-millisecond Day Book & Form XXII Cash Book queries. | **Applied & Verified** |
 | `20261027094809_add_transaction_ref_unique_constraint` | 2026-10-27 | Added `CREATE UNIQUE INDEX "Payment_transactionRef_key"` to enforce bank UTR and cheque reference uniqueness (ADR-19). | **Applied & Verified** (`367/367` unit tests, `88/88` E2E tests passing) |
+| `20261112115900_add_allocation_and_tie_bidder_indexes` | 2026-11-12 | Added `PaymentAllocation` FK B-Tree indexes (`paymentId`, `ticketId`, `installmentDueId`), `AuctionTieBidder` `@@unique([auctionId, ticketId])`, and `@@index([ticketId])` (`DEF-DB-05`). | **Applied & Verified** (`CONCURR-INV-20`–`23` live Postgres `EXPLAIN`, `P2002`, and append-only multiplicity verified) |
 
 ---
 

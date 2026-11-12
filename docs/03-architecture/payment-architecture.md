@@ -216,6 +216,10 @@ model PaymentAllocation {
   installmentDueId String
   due              InstallmentDue   @relation(fields: [installmentDueId], references: [id])
   amountAllocated  BigInt           // Whole integer Rupees
+
+  @@index([paymentId])
+  @@index([ticketId])
+  @@index([installmentDueId])
 }
 
 model Receipt {
