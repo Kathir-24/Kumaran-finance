@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { RequestContextMiddleware } from './common/context/request-context.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuctionModule } from './auction/auction.module';
@@ -83,4 +84,8 @@ import { UserModule } from './user/user.module';
   ],
   exports: [SentryService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes('*');
+  }
+}

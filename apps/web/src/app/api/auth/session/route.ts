@@ -16,20 +16,22 @@ import {
   clearAuthCookies,
   executeBffRefresh,
 } from '@/lib/bff-token-refresh';
+import { buildBffForwardHeaders } from '@/lib/bff-forward-headers';
 
 export async function GET(request: NextRequest) {
   const isSecure = shouldUseSecureCookies(request);
 
   try {
     const backendUrl = getBackendApiUrl();
+    const forwardHeaders = buildBffForwardHeaders(request.headers);
     const accessToken = request.cookies.get(COOKIE_ACCESS_TOKEN)?.value;
     const refreshToken = request.cookies.get(COOKIE_REFRESH_TOKEN)?.value;
 
     const fetchUserProfile = async (token: string) => {
+      const profileHeaders = new Headers(forwardHeaders);
+      profileHeaders.set('Authorization', `Bearer ${token}`);
       return fetch(`${backendUrl}/api/v1/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: profileHeaders,
       });
     };
 
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     // Case 2: Access token missing or expired -> deduplicated silent refresh
     if (refreshToken) {
-      const refreshData = await executeBffRefresh(backendUrl, refreshToken);
+      const refreshData = await executeBffRefresh(backendUrl, refreshToken, forwardHeaders);
       if (refreshData?.accessToken) {
         const profileRes = await fetchUserProfile(refreshData.accessToken);
         if (profileRes.ok) {

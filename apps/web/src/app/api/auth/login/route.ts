@@ -9,6 +9,7 @@ import {
   shouldUseSecureCookies,
 } from '@/lib/auth-cookies';
 import { applyRefreshedCookies } from '@/lib/bff-token-refresh';
+import { buildBffForwardHeaders } from '@/lib/bff-forward-headers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
 
     const backendRes = await fetch(`${backendUrl}/api/v1/auth/web/login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: buildBffForwardHeaders(request.headers, {
+        contentType: 'application/json',
+      }),
       body: JSON.stringify({
         phone: body.phone,
         password: body.password,

@@ -12,6 +12,7 @@ import {
   DEFAULT_CORS_ORIGINS,
 } from './common/constants';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { parseTrustProxySetting } from './common/context/proxy-ip.util';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 import { IdempotencyHeaderInterceptor } from './common/interceptors/idempotency-header.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
@@ -52,10 +53,13 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
 
-  // Bank-Grade Security: Trust upstream Nginx reverse proxy (1 hop)
-  // Ensures req.ip correctly resolves to real client IP via X-Forwarded-For
-  // for independent throttler rate-limiting buckets and fraud audit trails.
-  (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
+  // Bank-Grade Security: Configure Express reverse-proxy trust for multi-hop
+  // Nginx -> Next.js BFF -> API and Mobile -> Nginx -> API topologies without
+  // trusting spoofed public-internet X-Forwarded-For headers (DEF-FE-06).
+  (app.getHttpAdapter().getInstance() as any).set(
+    'trust proxy',
+    parseTrustProxySetting(process.env.TRUST_PROXY),
+  );
 
   // 1. Security Headers via Helmet
   app.use(

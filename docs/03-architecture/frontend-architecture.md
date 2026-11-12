@@ -262,7 +262,7 @@ Before any frontend screen (Web or Mobile) is marked complete, it must satisfy:
 3. [ ] Sensitive Maker-Checker actions disable authorization buttons when `user.id == maker.id`.
 4. [ ] Forms validate input client-side using Zod / Dart validators matching backend DTO schemas.
 5. [ ] Responsive layout adapts cleanly without horizontal overflow or clipped text.
-6. [ ] Audit logs capture user identity, timestamp, and client user-agent for all submitted mutations.
+6. [x] Audit logs capture user identity, timestamp, resolved client IP address (preserved across `Nginx -> Next.js BFF -> NestJS` via `buildBffForwardHeaders` & `TRUST_PROXY`), and client user-agent / `X-Request-ID` across all BFF API and authentication callers (`bff-api-proxy.ts`, `bff-token-refresh.ts`, `login`, `verify-totp`, `logout`, `session`).
 
 
 ---

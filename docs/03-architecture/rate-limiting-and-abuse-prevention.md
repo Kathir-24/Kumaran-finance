@@ -64,34 +64,56 @@ Default NestJS throttlers identify clients exclusively by `req.ip`. If a global 
 In [`apps/api/src/common/throttler/app-throttler.guard.ts`](file:///u:/Kumaran-finance/apps/api/src/common/throttler/app-throttler.guard.ts), Kumaran Chits overrides `getTracker(req)`:
 
 ```typescript
+private async resolveIpTracker(req: Record<string, any>): Promise<string> {
+  const normalizedIp = normalizeClientIp(
+    req.ip || req.ips?.[0] || req.socket?.remoteAddress,
+  );
+  if (normalizedIp) {
+    return `ip:${normalizedIp}`;
+  }
+  return super.getTracker(req);
+}
+
 protected override async getTracker(req: Record<string, any>): Promise<string> {
+  const url = req.originalUrl || req.url || '';
+  const isPublicAuthRoute =
+    url.includes('/auth/web/login') ||
+    url.includes('/auth/web/verify-totp') ||
+    url.includes('/auth/mobile/login-mpin') ||
+    url.includes('/auth/mobile/request-otp') ||
+    url.includes('/auth/mobile/verify-otp');
+
+  if (isPublicAuthRoute) {
+    return this.resolveIpTracker(req);
+  }
+
   // 1. If req.user is already populated
   if (req.user?.sub) {
     return `usr_${req.user.sub}`;
   }
 
-  // 2. Inspect Bearer Authorization header to isolate authenticated staff/customers
+  // 2. Cryptographically verify Bearer token (rejects forged/untrusted tokens)
   const authHeader = req.headers?.authorization;
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ') && this.jwtService) {
     try {
       const token = authHeader.slice(7).trim();
-      const decoded = this.jwtService.decode(token) as { sub?: string } | null;
-      if (decoded?.sub) {
-        return `usr_${decoded.sub}`;
+      const verified = this.jwtService.verify(token) as { sub?: string } | null;
+      if (verified?.sub) {
+        return `usr_${verified.sub}`;
       }
     } catch {
-      // Fall back to IP on invalid / malformed token
+      // Fall back to IP on invalid / forged / expired token
     }
   }
 
-  // 3. Fallback to client IP address (public or unauthenticated calls)
-  return super.getTracker(req);
+  // 3. Fallback to normalized client IP address (public or unauthenticated calls)
+  return this.resolveIpTracker(req);
 }
 ```
 
 #### Dual-Behavior Rules:
 1. **Authenticated Requests (`Bearer <JWT>`)**: Throttled by **User UUID (`usr_<userId>`)**. Each partner, accountant, or field agent has their own independent 60 req/min quota, completely eliminating the shared-IP branch office lockout risk.
-2. **Public / Unauthenticated Requests (`/auth/web/login`, `/auth/mobile/request-otp`)**: Throttled by **Client IP (`ip:<normalizedIp>`)**. An attacker attempting credential stuffing or brute-forcing accounts from a single IP is throttled across all target accounts.
+2. **Public / Unauthenticated Requests (`/auth/web/login`, `/auth/web/verify-totp`, `/auth/mobile/request-otp`)**: Throttled by **normalized Client IP (`ip:<normalizedIp>`)**. All 6 Web BFF callers forward client proxy headers (`buildBffForwardHeaders`) and Express configures `TRUST_PROXY` (`['loopback', 'linklocal', 'uniquelocal']` default), preventing failed logins behind the Next.js BFF from collapsing onto a single loopback container IP while blocking left-injected `X-Forwarded-For` spoofing and `::ffff:` split buckets (`DEF-FE-06`).
 
 ---
 

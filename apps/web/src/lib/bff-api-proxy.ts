@@ -18,6 +18,7 @@ import {
   executeBffRefresh,
   type BffRefreshedTokens,
 } from './bff-token-refresh.ts';
+import { buildBffForwardHeaders } from './bff-forward-headers.ts';
 
 export type ProxyResponseFactory = (
   body: BodyInit | null,
@@ -74,28 +75,16 @@ export async function handleBffProxyRequest(
     let accessToken = request.cookies.get(COOKIE_ACCESS_TOKEN)?.value;
     const refreshToken = request.cookies.get(COOKIE_REFRESH_TOKEN)?.value;
 
-    // Build headers to forward to NestJS
-    const forwardHeaders = new Headers();
-    const headersToForward = [
-      'content-type',
-      'idempotency-key',
-      'accept',
-      'x-branch-id',
-      'user-agent',
-    ];
-
-    for (const headerName of headersToForward) {
-      const val = request.headers.get(headerName);
-      if (val) {
-        forwardHeaders.set(headerName, val);
-      }
-    }
+    // Build proxy + client identity headers to forward to NestJS (DEF-FE-06)
+    const forwardHeaders = buildBffForwardHeaders(request.headers, {
+      includeContentHeaders: true,
+    });
 
     let refreshedTokens: BffRefreshedTokens | null = null;
 
     // Proactive refresh if browser already evicted expired 15-min kc_access_token
     if (!accessToken && refreshToken) {
-      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken);
+      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken, forwardHeaders);
       if (refreshedTokens?.accessToken) {
         accessToken = refreshedTokens.accessToken;
       } else {
@@ -127,7 +116,7 @@ export async function handleBffProxyRequest(
 
     // If 401 Unauthorized and we haven't already refreshed this call, deduplicate refresh and retry
     if (backendRes.status === 401 && refreshToken && !refreshedTokens) {
-      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken);
+      refreshedTokens = await executeBffRefresh(backendUrl, refreshToken, forwardHeaders);
       if (refreshedTokens?.accessToken) {
         forwardHeaders.set('Authorization', `Bearer ${refreshedTokens.accessToken}`);
         backendRes = await fetch(targetUrl, {
@@ -140,6 +129,8 @@ export async function handleBffProxyRequest(
     }
 
     const contentType = backendRes.headers.get('content-type') || '';
+    const responseRequestId =
+      backendRes.headers.get('x-request-id') || forwardHeaders.get('x-request-id');
 
     // Stream Server-Sent Events directly without arrayBuffer() buffering
     if (backendRes.ok && backendRes.body && contentType.toLowerCase().includes('text/event-stream')) {
@@ -148,6 +139,9 @@ export async function handleBffProxyRequest(
       streamHeaders.set('cache-control', 'no-cache, no-transform');
       streamHeaders.set('x-accel-buffering', 'no');
       streamHeaders.set('connection', 'keep-alive');
+      if (responseRequestId) {
+        streamHeaders.set('x-request-id', responseRequestId);
+      }
 
       const sseResponse = createResponse(backendRes.body as BodyInit, {
         status: backendRes.status,
@@ -171,6 +165,9 @@ export async function handleBffProxyRequest(
 
     if (contentType) {
       clientResponse.headers.set('content-type', contentType);
+    }
+    if (responseRequestId) {
+      clientResponse.headers.set('x-request-id', responseRequestId);
     }
 
     if (refreshedTokens) {

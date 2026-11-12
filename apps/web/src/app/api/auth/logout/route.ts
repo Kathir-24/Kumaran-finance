@@ -15,10 +15,12 @@ import {
   executeBffRefresh,
   invalidateBffRefreshCache,
 } from '@/lib/bff-token-refresh';
+import { buildBffForwardHeaders } from '@/lib/bff-forward-headers';
 
 export async function POST(request: NextRequest) {
   try {
     const backendUrl = getBackendApiUrl();
+    const forwardHeaders = buildBffForwardHeaders(request.headers);
     let accessToken = request.cookies.get(COOKIE_ACCESS_TOKEN)?.value;
     const refreshToken = request.cookies.get(COOKIE_REFRESH_TOKEN)?.value;
 
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
     // obtain a short Bearer token cleanly so NestJS always revokes the Redis/DB session family
     if (!accessToken && refreshToken) {
       try {
-        const refreshed = await executeBffRefresh(backendUrl, refreshToken);
+        const refreshed = await executeBffRefresh(backendUrl, refreshToken, forwardHeaders);
         if (refreshed?.accessToken) {
           accessToken = refreshed.accessToken;
           invalidateBffRefreshCache(refreshToken);
@@ -45,11 +47,11 @@ export async function POST(request: NextRequest) {
     // Notify NestJS backend to revoke token family in PostgreSQL and Redis
     if (accessToken) {
       try {
+        const logoutHeaders = new Headers(forwardHeaders);
+        logoutHeaders.set('Authorization', `Bearer ${accessToken}`);
         await fetch(`${backendUrl}/api/v1/auth/logout?clientType=WEB`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: logoutHeaders,
         });
       } catch (err) {
         console.warn('[BFF Logout] Backend logout failed, proceeding with cookie cleanup', err);

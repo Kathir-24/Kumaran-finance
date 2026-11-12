@@ -51,6 +51,7 @@ function pruneExpiredCache(now: number): void {
 export async function executeBffRefresh(
   backendUrl: string,
   refreshToken: string,
+  forwardHeaders?: HeadersInit,
 ): Promise<BffRefreshedTokens | null> {
   if (!refreshToken) {
     return null;
@@ -73,9 +74,13 @@ export async function executeBffRefresh(
 
   const refreshPromise = (async (): Promise<BffRefreshedTokens | null> => {
     try {
+      const headers = new Headers(forwardHeaders);
+      headers.delete('authorization');
+      headers.set('Content-Type', 'application/json');
+
       const refreshRes = await fetch(`${backendUrl}/api/v1/auth/refresh-token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           refreshToken,
           clientType: 'WEB',

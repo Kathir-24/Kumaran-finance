@@ -387,7 +387,7 @@ model AuditLog {
 ```
 
 ### 5.2 Audited Financial & Dual-Control Actions
-Every critical mutation in the codebase automatically writes an append-only entry to `AuditLog`:
+Every critical mutation in the codebase automatically writes an append-only entry to `AuditLog`. [`RequestContextMiddleware`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.middleware.ts) (`AsyncLocalStorage`) captures the Express `TRUST_PROXY`-resolved and normalized client IP address (`::ffff:` stripped) along with `X-Request-ID` before Guards/Controllers run, and [`PrismaService`](file:///u:/Kumaran-finance/apps/api/src/prisma/prisma.service.ts) uses a Prisma `$extends` query hook on `auditLog.create` / `createMany` so both direct and interactive `$transaction` audit records automatically persist `ipAddress` (safely leaving `null` for non-HTTP background jobs) without duplicating IP plumbing across services. (`X-Request-ID` is likewise propagated on Nginx `/api/v1/reports/approvals-stream` SSE ingress and Web BFF headers.)
 
 | Action Code | Triggering Workflow | Maker-Checker Actor Recorded |
 |---|---|---|

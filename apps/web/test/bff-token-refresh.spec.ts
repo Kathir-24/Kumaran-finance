@@ -185,3 +185,42 @@ test('DEF-FE-01: applyRefreshedCookies and clearAuthCookies enforce HttpOnly coo
     assert.equal(call.options.secure, false);
   }
 });
+
+test('DEF-FE-06: executeBffRefresh forwards client IP & trace headers without leaking Bearer token', async () => {
+  resetBffRefreshStateForTesting();
+  const originalFetch = globalThis.fetch;
+  let capturedHeaders: Headers | undefined;
+
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    capturedHeaders = new Headers(init?.headers);
+    return new Response(
+      JSON.stringify({
+        accessToken: 'acc-forwarded',
+        refreshToken: 'ref-forwarded',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }) as typeof fetch;
+
+  try {
+    const forwardHeaders = new Headers({
+      'x-forwarded-for': '103.21.45.9',
+      'x-real-ip': '103.21.45.9',
+      'x-request-id': 'req-refresh-99',
+      'user-agent': 'Firefox/135.0',
+      authorization: 'Bearer stale-token',
+    });
+
+    const tokens = await executeBffRefresh('http://localhost:3000', 'refresh-token-xyz', forwardHeaders);
+    assert.equal(tokens?.accessToken, 'acc-forwarded');
+    assert.equal(capturedHeaders?.get('x-forwarded-for'), '103.21.45.9');
+    assert.equal(capturedHeaders?.get('x-real-ip'), '103.21.45.9');
+    assert.equal(capturedHeaders?.get('x-request-id'), 'req-refresh-99');
+    assert.equal(capturedHeaders?.get('user-agent'), 'Firefox/135.0');
+    assert.equal(capturedHeaders?.get('content-type'), 'application/json');
+    assert.equal(capturedHeaders?.get('authorization'), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    resetBffRefreshStateForTesting();
+  }
+});

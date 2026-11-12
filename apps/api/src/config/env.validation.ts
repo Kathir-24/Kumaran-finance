@@ -4,6 +4,8 @@
 // Fails fast at startup if critical production variables are missing
 // ==============================================================================
 
+import { parseTrustProxySetting } from '../common/context/proxy-ip.util';
+
 export interface EnvironmentVariables {
   PORT: number;
   NODE_ENV: 'development' | 'production' | 'test' | 'staging';
@@ -13,6 +15,7 @@ export interface EnvironmentVariables {
   JWT_EXPIRES_IN: string;
   REFRESH_TOKEN_EXPIRES_IN: string;
   CORS_ALLOWED_ORIGINS?: string;
+  TRUST_PROXY?: string;
   DEFAULT_FOREMAN_COMMISSION_PERCENT: number;
   PRIMARY_BRANCH_CODE: string;
   STORAGE_DRIVER: 'local' | 's3';
@@ -130,6 +133,17 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     );
   }
 
+  const rawTrustProxy = config.TRUST_PROXY;
+  if (rawTrustProxy !== undefined && typeof rawTrustProxy !== 'string') {
+    errors.push('Invalid TRUST_PROXY: must be a string value when provided');
+  } else if (typeof rawTrustProxy === 'string') {
+    try {
+      parseTrustProxySetting(rawTrustProxy);
+    } catch (err: any) {
+      errors.push(err?.message || 'Invalid TRUST_PROXY configuration');
+    }
+  }
+
   // Production Strict Password & Secret Hardening
   if (nodeEnv === 'production') {
     if (storageDriver !== 's3') {
@@ -182,6 +196,10 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     CORS_ALLOWED_ORIGINS:
       (config.CORS_ALLOWED_ORIGINS as string | undefined) ??
       (config.CORS_ORIGINS as string | undefined),
+    TRUST_PROXY:
+      typeof rawTrustProxy === 'string' && rawTrustProxy.trim().length > 0
+        ? rawTrustProxy.trim()
+        : undefined,
     DEFAULT_FOREMAN_COMMISSION_PERCENT: Number(config.DEFAULT_FOREMAN_COMMISSION_PERCENT ?? 4.0),
     PRIMARY_BRANCH_CODE: (config.PRIMARY_BRANCH_CODE as string) ?? 'PRD',
     STORAGE_DRIVER: storageDriver as 'local' | 's3',

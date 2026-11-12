@@ -647,30 +647,23 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-06: Client IP Tracking Stripped by BFF Proxy
-- **Layer & Subsystem**: Web BFF Proxy Route Handler & Audit Logging
-- **Exact File Path & Line Numbers**: `apps/web/src/app/api/v1/[...path]/route.ts:33-46`
-- **Violated Specification**: `docs/03-architecture/frontend-architecture.md` §8.6; `docs/03-architecture/security-and-access-guardians.md` §7.
+#### Finding DEF-FE-06: Client IP Tracking Stripped by BFF Proxy **[REMEDIATED]**
+- **Layer & Subsystem**: Web BFF Proxy + Auth Route Handlers + Express Ingress + Prisma `AuditLog`
+- **Root Paths Remediated**:
+  - Web BFF forwarding: [`apps/web/src/lib/bff-forward-headers.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-forward-headers.ts), [`bff-api-proxy.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-api-proxy.ts), [`bff-token-refresh.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-token-refresh.ts), and auth route handlers (`/api/auth/login`, `/api/auth/verify-totp`, `/api/auth/logout`, `/api/auth/session`)
+  - API proxy & context: [`proxy-ip.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/context/proxy-ip.util.ts), [`request-context.ts`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.ts), [`request-context.middleware.ts`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.middleware.ts), [`env.validation.ts`](file:///u:/Kumaran-finance/apps/api/src/config/env.validation.ts), [`main.ts`](file:///u:/Kumaran-finance/apps/api/src/main.ts), [`app-throttler.guard.ts`](file:///u:/Kumaran-finance/apps/api/src/common/throttler/app-throttler.guard.ts), and [`prisma.service.ts`](file:///u:/Kumaran-finance/apps/api/src/prisma/prisma.service.ts)
+  - Nginx ingress parity: [`infra/docker/nginx/conf.d/chitflow.conf`](file:///u:/Kumaran-finance/infra/docker/nginx/conf.d/chitflow.conf)
+- **Violated Specification**: `docs/03-architecture/frontend-architecture.md` §8 (Item 6); `docs/03-architecture/security-and-access-guardians.md` §7.5; `docs/03-architecture/observability-and-monitoring-architecture.md` §5.
 - **Severity**: **MEDIUM**
-- **Detailed Technical Root Cause**:
-  The BFF proxy forwards a restricted allowlist of headers: `['content-type', 'idempotency-key', 'accept', 'x-branch-id', 'user-agent']`. It does NOT forward `x-forwarded-for` or `x-real-ip`.
-- **Impact Analysis**:
-  NestJS receives the Next.js server's loopback address (`127.0.0.1`). All web audit log entries record `ipAddress = '127.0.0.1'`, destroying workstation forensic trails.
-- **Concrete Production-Grade Remediation Code Design**:
-
-```typescript
-// apps/web/src/app/api/v1/[...path]/route.ts:33-46
-// Note: NextRequest.ip was removed in Next.js 15; extract strictly from HTTP forwarding headers.
-const forwardHeaders = new Headers();
-const forwardedFor = request.headers.get('x-forwarded-for');
-const realIp = request.headers.get('x-real-ip');
-if (forwardedFor) {
-  forwardHeaders.set('x-forwarded-for', forwardedFor);
-} else if (realIp) {
-  forwardHeaders.set('x-forwarded-for', realIp);
-}
-```
-  Also review `apps/api/src/main.ts:58`: Express `trust proxy` is currently set to `1` hop. When production traffic traverses **Nginx -> Next.js BFF -> NestJS** (2 proxy hops), configure `trust proxy` depth accordingly (or pass `X-Real-IP`) so Express resolves the originating browser workstation IP instead of the reverse proxy IP.
+- **Root Cause**:
+  1. `bff-api-proxy.ts` forwarded only a minimal content allowlist and stripped `x-forwarded-for`, `x-real-ip`, `x-forwarded-proto`, `x-forwarded-host`, and `x-request-id`.
+  2. All 5 direct Web BFF → NestJS auth callers (`login`, `verify-totp`, `logout`, `session`, and `executeBffRefresh`) omitted client IP, `User-Agent`, and `X-Request-ID` headers, collapsing unauthenticated login throttling (`AppThrottlerGuard`) onto the Next.js container IP.
+  3. Express hardcoded `.set('trust proxy', 1)` (while a naive fixed hop count of `2` is vulnerable to left-injected `X-Forwarded-For` spoofing).
+  4. Zero `auditLog.create` calls persisted `AuditLog.ipAddress`.
+- **Implemented Resolution**:
+  - Centralized forwarding in `buildBffForwardHeaders` across all 6 Web BFF → NestJS callers and aligned Nginx `X-Forwarded-Host` + SSE `X-Request-ID`.
+  - Replaced hardcoded `trust proxy = 1` with validated `TRUST_PROXY` env configuration defaulting to `['loopback', 'linklocal', 'uniquelocal']`, resisting left-injected spoof headers across direct, 1-hop (`Mobile -> Nginx -> API`), and 2-hop (`Browser -> Nginx -> BFF -> API`) topologies.
+  - Added `AsyncLocalStorage` `RequestContextMiddleware` (executing before Guards/Controllers), IPv4-mapped `::ffff:` normalization in `AppThrottlerGuard`, and a Prisma 6 `$extends` query extension in `PrismaService` to automatically persist `AuditLog.ipAddress` across direct and `$transaction` audit writes.
 
 ---
 
@@ -1091,7 +1084,7 @@ gantt
 #### Phase 3: Security, Caching, Storage & Observability Optimization (Sprint 3 — Week 2)
 - **Objective**: Establish client IP audit trails, direct S3 uploads, explicit BigInt caching, and database index acceleration.
 - **Target Items**:
-  1. `DEF-FE-06`: Forward client IP headers safely in BFF proxy and verify Express `trust proxy` depth.
+  1. `DEF-FE-06` **[FIXED & VERIFIED]**: Added shared `buildBffForwardHeaders` across all 6 Web BFF → NestJS callers, validated `TRUST_PROXY` (`['loopback', 'linklocal', 'uniquelocal']` default) replacing hardcoded `trust proxy = 1`, normalized `::ffff:` client IPs in `AppThrottlerGuard`, added `AsyncLocalStorage` `RequestContextMiddleware` + Prisma 6 `$extends` automatic `AuditLog.ipAddress` persistence, and aligned Nginx `X-Request-ID` / `X-Forwarded-Host` parity (`proxy-client-ip.e2e-spec.ts` + Web/API unit suites verified).
   2. `DEF-FE-07`: Migrate KYC and safety proof uploads to client-direct `POST /api/v1/storage/presigned-upload-url` PUT flows with browser compression.
   3. `DEF-FE-08`: Move 2FA intermediate challenge JWT into a 5-minute HttpOnly cookie.
   4. `DEF-DB-03`: Implement explicit `serializeCatalog` / `deserializeCatalog` BigInt helpers in `ChitService.findAll` and update `chit-cache.spec.ts` to assert `2000000n`.

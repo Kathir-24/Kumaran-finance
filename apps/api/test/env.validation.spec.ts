@@ -81,4 +81,24 @@ describe('Environment Configuration Validation (validateEnv)', () => {
       /Invalid REDIS_DB/i,
     );
   });
+
+  it('validates TRUST_PROXY configurations across valid and malformed values (DEF-FE-06)', () => {
+    expect(validateEnv(baseValidDevConfig).TRUST_PROXY).toBeUndefined();
+    expect(
+      validateEnv({
+        ...baseValidProdConfig,
+        TRUST_PROXY: 'loopback, 172.18.0.0/16',
+      }).TRUST_PROXY,
+    ).toBe('loopback, 172.18.0.0/16');
+    expect(
+      validateEnv({ ...baseValidDevConfig, TRUST_PROXY: '2' }).TRUST_PROXY,
+    ).toBe('2');
+
+    expect(() =>
+      validateEnv({ ...baseValidDevConfig, TRUST_PROXY: '-1' }),
+    ).toThrow(/Invalid TRUST_PROXY/i);
+    expect(() =>
+      validateEnv({ ...baseValidDevConfig, TRUST_PROXY: 'loopback, ' }),
+    ).toThrow(/Invalid TRUST_PROXY/i);
+  });
 });

@@ -13,6 +13,7 @@ function buildMockNextRequest(
   url: string,
   options: {
     method?: string;
+    body?: string;
     cookies?: Record<string, string>;
     headers?: Record<string, string>;
   } = {},
@@ -28,6 +29,7 @@ function buildMockNextRequest(
       headers: reqHeaders,
       nextUrl: new URL(url),
       signal: abortController.signal,
+      arrayBuffer: async () => new TextEncoder().encode(options.body || '').buffer,
       cookies: {
         get: (name: string) => {
           const value = cookieStore.get(name);
@@ -155,6 +157,89 @@ test('BFF Proxy: handles client-aborted SSE/fetch (ResponseAborted / AbortError)
       params: Promise.resolve({ path: ['reports', 'approvals-stream'] }),
     });
     assert.equal(response.status, 499);
+  } finally {
+    globalThis.fetch = originalFetch;
+    resetBffRefreshStateForTesting();
+  }
+});
+
+test('DEF-FE-06: BFF Proxy forwards client IP, proto, host, user-agent & request-id on direct & 401-retry upstream calls', async () => {
+  resetBffRefreshStateForTesting();
+  const originalFetch = globalThis.fetch;
+  const capturedCalls: Array<{ url: string; headers: Headers }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    capturedCalls.push({ url, headers: new Headers(init?.headers) });
+
+    if (url.includes('/api/v1/auth/refresh-token')) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            accessToken: 'refreshed-access-jwt',
+            refreshToken: 'refreshed-refresh-jwt',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+
+    if (capturedCalls.length === 1) {
+      return new Response(JSON.stringify({ success: false }), {
+        status: 401,
+        headers: { 'content-type': 'application/json', 'x-request-id': 'req-trace-xyz' },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true, data: { ok: true } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'req-trace-xyz' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const { request } = buildMockNextRequest(
+      'http://web:3001/bff/api/v1/collections',
+      {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': '106.51.10.22',
+          'x-real-ip': '106.51.10.22',
+          'x-forwarded-proto': 'https',
+          host: 'chits.kumaranfinance.in',
+          'x-request-id': 'req-trace-xyz',
+          'user-agent': 'KumaranBrowser/1.0',
+          'content-type': 'application/json',
+          'idempotency-key': 'idem-key-001',
+        },
+        cookies: {
+          kc_access_token: 'stale-access-jwt',
+          kc_refresh_token: 'valid-refresh-jwt',
+        },
+      },
+    );
+
+    const response = await handleBffProxyRequest(request, {
+      params: Promise.resolve({ path: ['collections'] }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-request-id'), 'req-trace-xyz');
+    // Call 1: initial POST; Call 2: executeBffRefresh; Call 3: retried POST
+    assert.equal(capturedCalls.length, 3);
+
+    for (const call of capturedCalls) {
+      assert.equal(call.headers.get('x-forwarded-for'), '106.51.10.22');
+      assert.equal(call.headers.get('x-real-ip'), '106.51.10.22');
+      assert.equal(call.headers.get('x-forwarded-proto'), 'https');
+      assert.equal(call.headers.get('x-forwarded-host'), 'chits.kumaranfinance.in');
+      assert.equal(call.headers.get('x-request-id'), 'req-trace-xyz');
+      assert.equal(call.headers.get('user-agent'), 'KumaranBrowser/1.0');
+    }
+    assert.equal(capturedCalls[1].headers.get('authorization'), null, 'Refresh call must drop stale Bearer header');
+    assert.equal(capturedCalls[2].headers.get('authorization'), 'Bearer refreshed-access-jwt');
+    assert.equal(capturedCalls[2].headers.get('idempotency-key'), 'idem-key-001');
   } finally {
     globalThis.fetch = originalFetch;
     resetBffRefreshStateForTesting();

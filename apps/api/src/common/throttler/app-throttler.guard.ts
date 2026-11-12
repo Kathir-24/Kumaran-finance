@@ -8,6 +8,7 @@ import {
   type ThrottlerModuleOptions,
   type ThrottlerStorage,
 } from '@nestjs/throttler';
+import { normalizeClientIp } from '../context/proxy-ip.util';
 
 /**
  * Bank-Grade AppThrottlerGuard:
@@ -28,17 +29,28 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     super(options, storageService, reflector);
   }
 
+  private async resolveIpTracker(req: Record<string, any>): Promise<string> {
+    const normalizedIp = normalizeClientIp(
+      req.ip || req.ips?.[0] || req.socket?.remoteAddress,
+    );
+    if (normalizedIp) {
+      return `ip:${normalizedIp}`;
+    }
+    return super.getTracker(req);
+  }
+
   protected override async getTracker(req: Record<string, any>): Promise<string> {
     const url = req.originalUrl || req.url || '';
     const isPublicAuthRoute =
       url.includes('/auth/web/login') ||
+      url.includes('/auth/web/verify-totp') ||
       url.includes('/auth/mobile/login-mpin') ||
       url.includes('/auth/mobile/request-otp') ||
       url.includes('/auth/mobile/verify-otp');
 
     // Public authentication endpoints MUST ALWAYS be throttled by client IP to prevent brute-forcing
     if (isPublicAuthRoute) {
-      return super.getTracker(req);
+      return this.resolveIpTracker(req);
     }
 
     // 1. If req.user is already populated
@@ -61,6 +73,6 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     }
 
     // 3. Fallback to client IP address (public or unauthenticated calls)
-    return super.getTracker(req);
+    return this.resolveIpTracker(req);
   }
 }
