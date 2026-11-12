@@ -1,19 +1,11 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { acquireRedisMutexLock, REDIS_RELEASE_LOCK_LUA } from '../../common/utils/redis-lock.util';
 import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 
 @Injectable()
 export class DistributedLockService {
   private readonly logger = new Logger(DistributedLockService.name);
-
-  // Atomic Lua script: evaluates whether lock still belongs to token before deletion
-  private readonly releaseLockLua = `
-    if redis.call("get", KEYS[1]) == ARGV[1] then
-      return redis.call("del", KEYS[1])
-    else
-      return 0
-    end
-  `;
 
   constructor(private readonly redisProvider: RedisConnectionProvider) {}
 
@@ -30,26 +22,7 @@ export class DistributedLockService {
       return { acquired: true, token: '', release: async () => {} };
     }
 
-    const lockKey = `lock:${resourceKey}`;
-    const token = crypto.randomUUID();
-
-    try {
-      const acquired = await client.set(lockKey, token, 'PX', ttlMs, 'NX');
-      return {
-        acquired: acquired === 'OK',
-        token,
-        release: async () => {
-          try {
-            await client.eval(this.releaseLockLua, 1, lockKey, token);
-          } catch (err: any) {
-            this.logger.warn(`Failed to cleanly release lock [${lockKey}]: ${err.message}`);
-          }
-        },
-      };
-    } catch (err: any) {
-      this.logger.warn(`Failed to acquire lock [${lockKey}]: ${err.message}`);
-      return { acquired: false, token, release: async () => {} };
-    }
+    return acquireRedisMutexLock(client, resourceKey, ttlMs, this.logger);
   }
 
   /**
@@ -89,7 +62,7 @@ export class DistributedLockService {
       return await operation();
     } finally {
       try {
-        await client.eval(this.releaseLockLua, 1, lockKey, token);
+        await client.eval(REDIS_RELEASE_LOCK_LUA, 1, lockKey, token);
       } catch (err: any) {
         this.logger.warn(`Failed to cleanly release distributed lock [${lockKey}]: ${err.message}`);
       }

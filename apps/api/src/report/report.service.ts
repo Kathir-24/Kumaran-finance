@@ -5,6 +5,7 @@ import { RedisConnectionProvider } from '../jobs/providers/redis-connection.prov
 import { DistributedLockService } from '../jobs/services/distributed-lock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
+import { acquireRedisMutexLock } from '../common/utils/redis-lock.util';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 import { QueryCashBookDto } from './dto/query-cash-book.dto';
 import { QueryDashboardDto } from './dto/query-dashboard.dto';
@@ -137,6 +138,59 @@ export class ReportService {
   }
 
   /**
+   * Reads a cached report JSON payload or acquires a 4-second tokenized Redis mutex lock
+   * (atomic Lua release) to prevent cache stampedes across concurrent callers.
+   */
+  private async readCacheOrAcquireStampedeLock(
+    cacheKey: string,
+    waitMs: number,
+    label: string,
+  ): Promise<
+    | { hit: true; data: any }
+    | { hit: false; redis: any; isRedisConnected: boolean; releaseLock: (() => Promise<void>) | null }
+  > {
+    const redis = this.redisProvider?.getClient();
+    const isRedisConnected = Boolean(redis && this.redisProvider?.getIsConnected());
+    let releaseLock: (() => Promise<void>) | null = null;
+
+    if (isRedisConnected && redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return { hit: true, data: this.deserializeReport(cached) };
+        }
+
+        let lockAcquired = false;
+        if (this.distributedLockService) {
+          const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
+          if (lock.acquired) {
+            releaseLock = lock.release;
+            lockAcquired = true;
+          }
+        } else {
+          const lock = await acquireRedisMutexLock(redis, cacheKey, 4000, this.logger);
+          if (lock.acquired) {
+            releaseLock = lock.release;
+            lockAcquired = true;
+          }
+        }
+
+        if (!lockAcquired) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+          const retryCached = await redis.get(cacheKey);
+          if (retryCached) {
+            return { hit: true, data: this.deserializeReport(retryCached) };
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Redis ${label} cache read error: ${err.message}`);
+      }
+    }
+
+    return { hit: false, redis, isRedisConnected, releaseLock };
+  }
+
+  /**
    * Executive Dashboard KPI & Status Summary
    */
   async getExecutiveDashboard(
@@ -150,50 +204,13 @@ export class ReportService {
         : query.branchId;
 
     const cacheKey = `report:dashboard:${branchId || 'ALL'}`;
-    const redis = this.redisProvider?.getClient();
-    let releaseLock: (() => Promise<void>) | null = null;
-    const isRedisConnected = Boolean(redis && this.redisProvider?.getIsConnected());
+    const cacheGuard = await this.readCacheOrAcquireStampedeLock(cacheKey, 250, 'dashboard');
+    if (cacheGuard.hit) {
+      return cacheGuard.data;
+    }
 
-    if (isRedisConnected && redis) {
-      try {
-        const cached = await redis.get(cacheKey);
-        if (cached) {
-          return this.deserializeReport(cached);
-        }
-
-        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
-        let lockAcquired = false;
-        if (this.distributedLockService) {
-          const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
-          if (lock.acquired) {
-            releaseLock = lock.release;
-            lockAcquired = true;
-          }
-        } else {
-          const lockKey = `lock:${cacheKey}`;
-          const acquired = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
-          if (acquired === 'OK' || acquired === true || acquired === 1) {
-            lockAcquired = true;
-            releaseLock = async () => {
-              try {
-                await redis.del(lockKey);
-              } catch {}
-            };
-          }
-        }
-
-        if (!lockAcquired) {
-          // Another concurrent request is actively computing. Wait 250ms and re-check cache.
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          const retryCached = await redis.get(cacheKey);
-          if (retryCached) {
-            return this.deserializeReport(retryCached);
-          }
-        }
-      } catch (err: any) {
-        this.logger.warn(`Redis dashboard cache read error: ${err.message}`);
-      }
-    } else {
+    const { redis, isRedisConnected, releaseLock } = cacheGuard;
+    if (!isRedisConnected) {
       // Fail-Open Concurrency Bulkhead: When Redis is unavailable, limit concurrent heavy computations
       if (this.activeFallbackDashboardQueries >= this.MAX_CONCURRENT_FALLBACK_QUERIES) {
         const fallback = this.lastKnownDashboardSnapshot.get(cacheKey);
@@ -211,6 +228,7 @@ export class ReportService {
       this.activeFallbackDashboardQueries++;
     }
 
+    try {
     const startOfToday = new Date();
     startOfToday.setUTCHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -407,7 +425,6 @@ export class ReportService {
       },
     };
 
-    try {
       if (isRedisConnected && redis) {
         try {
           await redis.setex(cacheKey, withTtlJitter(30), this.serializeReport(result));
@@ -422,7 +439,9 @@ export class ReportService {
         this.activeFallbackDashboardQueries = Math.max(0, this.activeFallbackDashboardQueries - 1);
       }
       if (releaseLock) {
-        releaseLock().catch(() => {});
+        try {
+          await releaseLock();
+        } catch {}
       }
     }
   }
@@ -445,50 +464,14 @@ export class ReportService {
 
     const dateStr = startOfDay.toISOString().split('T')[0];
     const cacheKey = `report:daybook:${branchId || 'ALL'}:${dateStr}`;
-    const redis = this.redisProvider?.getClient();
-    let releaseLock: (() => Promise<void>) | null = null;
-
-    if (redis && this.redisProvider?.getIsConnected()) {
-      try {
-        const cached = await redis.get(cacheKey);
-        if (cached) {
-          return this.deserializeReport(cached);
-        }
-
-        // Cache Stampede Guard: acquire non-blocking 4-second mutex lock with atomic Lua release
-        let lockAcquired = false;
-        if (this.distributedLockService) {
-          const lock = await this.distributedLockService.acquireLock(cacheKey, 4000);
-          if (lock.acquired) {
-            releaseLock = lock.release;
-            lockAcquired = true;
-          }
-        } else {
-          const lockKey = `lock:${cacheKey}`;
-          const acquired = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
-          if (acquired === 'OK' || acquired === true || acquired === 1) {
-            lockAcquired = true;
-            releaseLock = async () => {
-              try {
-                await redis.del(lockKey);
-              } catch {}
-            };
-          }
-        }
-
-        if (!lockAcquired) {
-          // Another concurrent request is actively compiling the daybook. Wait 200ms and re-check cache.
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          const retryCached = await redis.get(cacheKey);
-          if (retryCached) {
-            return this.deserializeReport(retryCached);
-          }
-        }
-      } catch (err: any) {
-        this.logger.warn(`Redis daybook cache read error: ${err.message}`);
-      }
+    const cacheGuard = await this.readCacheOrAcquireStampedeLock(cacheKey, 200, 'daybook');
+    if (cacheGuard.hit) {
+      return cacheGuard.data;
     }
 
+    const { redis, isRedisConnected, releaseLock } = cacheGuard;
+
+    try {
     // 1. Query Collections (Inflows) across all modes
     const payments = await this.prisma.payment.findMany({
       where: {
@@ -603,8 +586,7 @@ export class ReportService {
       outflows: outflowsList,
     };
 
-    try {
-      if (redis && this.redisProvider?.getIsConnected()) {
+      if (isRedisConnected && redis) {
         try {
           await redis.setex(cacheKey, withTtlJitter(60), this.serializeReport(reportResult));
         } catch (err: any) {
@@ -614,7 +596,9 @@ export class ReportService {
       return reportResult;
     } finally {
       if (releaseLock) {
-        releaseLock().catch(() => {});
+        try {
+          await releaseLock();
+        } catch {}
       }
     }
   }

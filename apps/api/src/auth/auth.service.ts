@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notification/services/sms.service';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { decryptAesGcm, encryptAesGcm } from '../common/crypto/aes-gcm.util';
+import { REDIS_RELEASE_LOCK_LUA } from '../common/utils/redis-lock.util';
 import { isTokenRevokedInRedis } from './utils/token-revocation.util';
 import {
   BCRYPT_SALT_ROUNDS,
@@ -73,8 +74,6 @@ export class AuthService {
   private readonly lockoutStore = new Map<string, number>();
   private readonly dailyQuotaStore = new Map<string, { count: number; expiresAt: number }>();
   private readonly inFlightRefreshes = new Map<string, Promise<any>>();
-  private readonly releaseLockLua =
-    'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1004,7 +1003,7 @@ export class AuthService {
         return result;
       } finally {
         if (typeof redis.eval === 'function') {
-          await redis.eval(this.releaseLockLua, 1, lockKey, lockToken).catch(() => {});
+          await redis.eval(REDIS_RELEASE_LOCK_LUA, 1, lockKey, lockToken).catch(() => {});
         } else if ((await redis.get(lockKey)) === lockToken) {
           await redis.del(lockKey).catch(() => {});
         }

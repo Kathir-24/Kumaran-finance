@@ -807,35 +807,19 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
 
 ---
 
-#### Finding DEF-DB-04: Unsafe Non-Atomic Fallback in `ReportService` Mutex Acquisition
-- **Layer & Subsystem**: Distributed Locking & Report Generation
-- **Exact File Path & Line Numbers**: `apps/api/src/report/report.service.ts:172-182, 466-476, 1115-1121`
-- **Violated Specification**: `docs/03-architecture/redis-architecture.md` §1 ("Distributed Locks & Mutexes").
-- **Severity**: **MEDIUM**
+#### Finding DEF-DB-04: Unsafe Non-Atomic Fallback & Exception-Leak in `ReportService` Mutexes `[FIXED & VERIFIED]`
+- **Layer & Subsystem**: Distributed Locking, Report Caching & Fail-Open Bulkhead
+- **Exact File Path & Line Numbers**: [`apps/api/src/common/utils/redis-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/redis-lock.util.ts), [`apps/api/src/report/report.service.ts`](file:///u:/Kumaran-finance/apps/api/src/report/report.service.ts), [`apps/api/src/jobs/services/distributed-lock.service.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/distributed-lock.service.ts), [`apps/api/src/auth/auth.service.ts`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts)
+- **Violated Specification**: [`docs/03-architecture/redis-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/redis-architecture.md) §1 ("Distributed Locks & Mutexes") & [`docs/03-architecture/caching-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/caching-architecture.md) §6
+- **Severity**: **MEDIUM** *(Resolved)*
 - **Detailed Technical Root Cause**:
-  In `ReportService.getDashboardKpis` and `getDayBook`, when `this.distributedLockService` is not resolved, fallback code executes:
-  ```typescript
-  const acquired = await redis.set(lockKey, '1', 'PX', 4000, 'NX');
-  releaseLock = async () => { await redis.del(lockKey); };
-  ```
-  1. Uses static string `'1'` instead of a unique cryptographic token (`crypto.randomUUID()`).
-  2. Releases via unconditional `redis.del(lockKey)`. If report calculation exceeds 4,000ms, the lock expires, another instance acquires it, and the slow instance deletes the active lock of the second instance.
-- **Impact Analysis**:
-  Potential cache stampedes and double execution of expensive aggregate reports.
-- **Concrete Production-Grade Remediation Code Design**:
-  Use tokenized Lua script release in the fallback path:
-
-```typescript
-// apps/api/src/report/report.service.ts:172-182
-const lockToken = crypto.randomUUID();
-const acquired = await redis.set(lockKey, lockToken, 'PX', 4000, 'NX');
-if (acquired === 'OK') {
-  releaseLock = async () => {
-    const lua = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
-    await redis.eval(lua, 1, lockKey, lockToken);
-  };
-}
-```
+  1. In `ReportService.getExecutiveDashboard` and `getDayBook` (previously mis-cited as `getDashboardKpis` and `1115-1121`, where `getPendingApprovals` only runs a 15s `redis.setex`), omitting `@Optional()` `DistributedLockService` fell back to static `'1'` and blind `redis.del(lockKey)`, allowing slow queries (>4,000ms) to delete a newer holder's lock.
+  2. PostgreSQL queries in both `getExecutiveDashboard` and `getDayBook` executed outside `try { ... } finally { ... }`, so mid-query DB errors skipped `releaseLock()` and permanently leaked `activeFallbackDashboardQueries` slots in Redis-offline mode; `releaseLock()` was also unawaited.
+- **Verified Production Implementation**:
+  - Extracted canonical `REDIS_RELEASE_LOCK_LUA` and `acquireRedisMutexLock()` (`crypto.randomUUID()` token + atomic Lua check-and-delete release) into [`redis-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/redis-lock.util.ts) and reused them across [`DistributedLockService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/distributed-lock.service.ts) and [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts).
+  - Extracted DRY `ReportService.readCacheOrAcquireStampedeLock()` and wrapped full PostgreSQL computation + cache writes in `getExecutiveDashboard` and `getDayBook` inside `try { ... } finally { ... }` with awaited `releaseLock()` and fail-open `activeFallbackDashboardQueries` cleanup.
+  - Synced [`caching-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/caching-architecture.md) §6 and [`redis-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/redis-architecture.md) §1.
+- **Verification Summary**: Targeted lock & report suites (`distributed-lock.spec.ts`, `report.spec.ts`, `cache-stampede.spec.ts`, `report-etag.spec.ts`: `4/4` suites / `34/34` tests including live Redis 7 foreign-lock preservation & `0` leaked keys), `oxlint` (`0` warnings / `0` errors across all 7 modified files), full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `812/812` tests, `web`: `14/14` suites / `341/341` tests), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), and `pnpm run build` (`exit 0`).
 
 ---
 
@@ -996,7 +980,7 @@ gantt
   4. `DEF-DB-03` **[FIXED & VERIFIED]**: Removed global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`, introduced shared [`bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts), refactored `ChitService.findAll` (`serializeCatalog`/`deserializeCatalog`) to store exact decimal strings in Redis while returning native `bigint`s on cache miss & hit, hardened `ReportEtagInterceptor` with `stringifyBigIntSafe`, and expanded `chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, and `report-etag.spec.ts`.
   5. `DEF-DB-05` **[FIXED & VERIFIED]**: Added non-unique B-Tree indexes on `PaymentAllocation` (`paymentId`, `ticketId`, `installmentDueId`), composite `@@unique([auctionId, ticketId])` + `@@index([ticketId])` on `AuctionTieBidder` (`20261112115900_add_allocation_and_tie_bidder_indexes`), distinct-`ticketId` pre-check in `AuctionService.recordTieBreak`, and unit + live PostgreSQL 17 `pg_indexes`/`P2002`/append-only/`EXPLAIN` tests (`auction.spec.ts` & `CONCURR-INV-20`–`23`).
   6. `DEF-DB-06` **[FIXED & VERIFIED]**: Centralized BullMQ failed-job retention (`removeOnFail: { count: 500, age: 604800 }`) and `defaultJobOptions` (`attempts: 3`, exponential backoff, `removeOnComplete: true`) across all 3 Queues (`createManagedQueue` covering repeatable IST `upsertJobScheduler` crons + `addJob`), added Worker `.on('failed')` `[DLQ]` terminal logging (`createManagedWorker`/`handleWorkerJobFailure`), and verified with unit + live Redis 7 `N=4 -> 2` pruning tests (`queue-resilience.spec.ts`, `44/44` targeted queue tests, `806/806` API tests).
-  7. `DEF-DB-04`: Harden `ReportService` distributed lock fallback with unique token and Lua script.
+  7. `DEF-DB-04` **[FIXED & VERIFIED]**: Extracted canonical `REDIS_RELEASE_LOCK_LUA` + `acquireRedisMutexLock()` (`redis-lock.util.ts`), reused across `DistributedLockService`, `AuthService`, and `ReportService.readCacheOrAcquireStampedeLock`, wrapped all `getExecutiveDashboard` and `getDayBook` PostgreSQL queries inside `try/finally` with awaited `releaseLock()` & `activeFallbackDashboardQueries` cleanup, and verified across `4/4` suites / `34/34` lock/report tests (including live Redis 7) and `812/812` API tests.
   8. `DEF-BE-02`: Correct PDF storage key generation to use `branch.code`.
 
 #### Phase 4: Reliability, Testing & Architectural Polish (Sprint 4 — Week 3)

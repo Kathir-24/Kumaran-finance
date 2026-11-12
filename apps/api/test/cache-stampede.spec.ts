@@ -32,6 +32,17 @@ describe('Cache Stampede Guard (Thundering Herd) Tests', () => {
       mockRedisStore.delete(key);
       return 1;
     }),
+    eval: jest.fn(async (_script: string, _numKeys: number, key: string, token: string) => {
+      if (key.startsWith('lock:') && activeLock === token) {
+        activeLock = null;
+        return 1;
+      }
+      if (mockRedisStore.get(key) === token) {
+        mockRedisStore.delete(key);
+        return 1;
+      }
+      return 0;
+    }),
   };
 
   const mockRedisProvider = {

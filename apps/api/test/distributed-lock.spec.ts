@@ -1,7 +1,32 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
+import { Redis } from 'ioredis';
+import { acquireRedisMutexLock, REDIS_RELEASE_LOCK_LUA } from '../src/common/utils/redis-lock.util';
 import { DistributedLockService } from '../src/jobs/services/distributed-lock.service';
 import { DailyArrearsService } from '../src/jobs/services/daily-arrears.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+async function createLiveTestRedis(): Promise<Redis | null> {
+  const client = new Redis({
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: Number(process.env.REDIS_PORT || '6379'),
+    db: Number(process.env.REDIS_DB || '0') || 0,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: true,
+    connectTimeout: 1000,
+    retryStrategy: () => null,
+  });
+  try {
+    await client.connect();
+    if ((await client.ping()) === 'PONG') {
+      return client;
+    }
+  } catch {
+    // Redis offline
+  }
+  client.disconnect();
+  return null;
+}
 
 describe('DistributedLockService: Safe Redis Distributed Locking & Token Verification', () => {
   let lockService: DistributedLockService;
@@ -102,5 +127,55 @@ describe('DistributedLockService: Safe Redis Distributed Locking & Token Verific
     expect(result.duesTransitionedToOverdue).toBe(0);
     expect(redisClientMock.set).toHaveBeenCalledWith('lock:daily-arrears', expect.any(String), 'PX', 60000, 'NX');
     expect(redisClientMock.eval).toHaveBeenCalled();
+  });
+
+  it('LOCK-06: acquireRedisMutexLock issues unique tokens and handles eval failures safely', async () => {
+    const logger = new Logger('TestLock');
+    const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const lock1 = await acquireRedisMutexLock(redisClientMock, 'shared-res-a', 4000, logger);
+      expect(lock1.acquired).toBe(true);
+      expect(lock1.token).toMatch(/^[0-9a-f-]{36}$/i);
+
+      redisClientMock.eval.mockRejectedValueOnce(new Error('ETIMEDOUT'));
+      await expect(lock1.release()).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('lock:shared-res-a'));
+      expect(REDIS_RELEASE_LOCK_LUA).toContain('redis.call("get", KEYS[1]) == ARGV[1]');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('LOCK-07: Live Redis 7 atomic Lua preserves foreign holder lock on stale token release', async () => {
+    const redis = await createLiveTestRedis();
+    if (!redis) {
+      return;
+    }
+
+    const resourceKey = `def-db-04-live-${Date.now()}`;
+    const lockKey = `lock:${resourceKey}`;
+
+    try {
+      const staleHolder = await acquireRedisMutexLock(redis, resourceKey, 4000);
+      expect(staleHolder.acquired).toBe(true);
+      expect(await redis.get(lockKey)).toBe(staleHolder.token);
+
+      // Simulate TTL expiry and another worker acquiring the same key with a new token
+      await redis.set(lockKey, 'foreign-worker-token', 'PX', 4000);
+
+      // Stale holder releases -> Lua token check must preserve foreign lock
+      await staleHolder.release();
+      expect(await redis.get(lockKey)).toBe('foreign-worker-token');
+
+      // Now simulate fresh acquisition and normal own-token release
+      await redis.del(lockKey);
+      const owner = await acquireRedisMutexLock(redis, resourceKey, 4000);
+      expect(owner.acquired).toBe(true);
+      await owner.release();
+      expect(await redis.get(lockKey)).toBeNull();
+    } finally {
+      await redis.del(lockKey);
+      await redis.quit();
+    }
   });
 });

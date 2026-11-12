@@ -197,22 +197,22 @@ sequenceDiagram
     Note over Client1,Client2: Cache expired for report:dashboard:ALL
     Client1->>Redis: GET report:dashboard:ALL (MISS)
     Client2->>Redis: GET report:dashboard:ALL (MISS)
-    Client1->>Redis: SET lock:report:dashboard:ALL 1 PX 4000 NX -> OK
-    Client2->>Redis: SET lock:report:dashboard:ALL 1 PX 4000 NX -> NULL (Blocked)
+    Client1->>Redis: SET lock:report:dashboard:ALL <uuid-token> PX 4000 NX -> OK
+    Client2->>Redis: SET lock:report:dashboard:ALL <uuid-token-2> PX 4000 NX -> NULL (Blocked)
     Note over Client2: Waits 250ms coalescing retry
     Client1->>DB: Execute 8 aggregation queries (Sole compute)
     DB-->>Client1: Return raw ledger & group data
     Client1->>Redis: SETEX report:dashboard:ALL 30s (+jitter) JSON
-    Client1->>Redis: DEL lock:report:dashboard:ALL
+    Client1->>Redis: EVAL releaseLockLua lock:report:dashboard:ALL <uuid-token>
     Client1-->>Client1: Render Fresh Dashboard
     Client2->>Redis: GET report:dashboard:ALL (HIT!)
     Client2-->>Client2: Render Dashboard (<5ms)
 ```
 
-### 6.1 Mutex Guard & Coalescing Protocol
-1. **Atomic Lock Acquisition**: `SET lock:<cacheKey> 1 PX 4000 NX` guarantees that exactly one process computes the aggregate from PostgreSQL.
-2. **Wait-and-Retry Coalescing**: Competing requests pause for 250ms and re-query Redis. In over 99% of cases, the freshly computed cache is served without hitting PostgreSQL.
-3. **Guaranteed Release**: Lock keys are released inside `finally` blocks, and carry a 4,000ms safety TTL to prevent deadlocks in case of unexpected process termination.
+### 6.1 Mutex Guard & Coalescing Protocol (`DEF-DB-04`)
+1. **Tokenized Atomic Lock Acquisition**: Both `DistributedLockService.acquireLock` and its standalone `ReportService` fallback (`acquireRedisMutexLock` in [`redis-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/redis-lock.util.ts)) acquire `SET lock:<cacheKey> <randomUUID> PX 4000 NX`, ensuring slow callers past the 4-second expiry cannot accidentally delete another instance's lock.
+2. **Wait-and-Retry Coalescing**: Competing requests pause for 250ms (Dashboard) / 200ms (DayBook) and re-query Redis. In over 99% of cases, the freshly computed cache is served without hitting PostgreSQL.
+3. **Exception-Safe Atomic Lua Release**: All PostgreSQL report computations execute inside `try { ... } finally { await releaseLock(); }`, evaluating `REDIS_RELEASE_LOCK_LUA` (`if get == token then del`) and cleanly decrementing fail-open bulkhead counters (`activeFallbackDashboardQueries`) even when queries error.
 
 ---
 

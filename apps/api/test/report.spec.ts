@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../src/auth/interfaces/jwt-payload.interface';
+import { REDIS_RELEASE_LOCK_LUA } from '../src/common/utils/redis-lock.util';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReportService } from '../src/report/report.service';
 import { StatutoryReportService } from '../src/report/statutory-report.service';
@@ -845,6 +846,204 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('7. Distributed Mutex Fallback & Exception-Safe Cleanup (DEF-DB-04)', () => {
+    const createInMemoryRedisMock = () => {
+      const store = new Map<string, string>();
+      const client = {
+        get: jest.fn().mockImplementation((k: string) => Promise.resolve(store.get(k) ?? null)),
+        set: jest.fn().mockImplementation((k: string, v: string, _px?: string, _ttl?: number, nx?: string) => {
+          if (nx === 'NX' && store.has(k)) return Promise.resolve(null);
+          store.set(k, v);
+          return Promise.resolve('OK');
+        }),
+        setex: jest.fn().mockImplementation((k: string, _ttl: number, v: string) => {
+          store.set(k, v);
+          return Promise.resolve('OK');
+        }),
+        del: jest.fn().mockImplementation((...keys: string[]) => {
+          let count = 0;
+          for (const k of keys) {
+            if (store.delete(k)) count += 1;
+          }
+          return Promise.resolve(count);
+        }),
+        eval: jest.fn().mockImplementation((_lua: string, _numKeys: number, key: string, token: string) => {
+          if (store.get(key) === token) {
+            store.delete(key);
+            return Promise.resolve(1);
+          }
+          return Promise.resolve(0);
+        }),
+      };
+      return { store, client };
+    };
+
+    const seedDashboardPrismaMocks = () => {
+      prismaMock.chitGroup.count.mockResolvedValue(1);
+      prismaMock.customer.count.mockResolvedValue(20);
+      prismaMock.subscriberTicket.count.mockResolvedValue(20);
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      prismaMock.auctionWinner.findMany.mockResolvedValue([]);
+      prismaMock.payment.aggregate.mockResolvedValue({ _sum: { amount: 0n } });
+      prismaMock.auctionWinner.aggregate.mockResolvedValue({ _sum: { disbursedAmount: 0n } });
+      prismaMock.payment.count.mockResolvedValue(0);
+      prismaMock.auctionWinner.count.mockResolvedValue(0);
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([]);
+    };
+
+    it('DEF-DB-04-N1: Dashboard & DayBook fallback acquires UUID token (never "1") and unlocks strictly via Lua eval (never del)', async () => {
+      const { store, client } = createInMemoryRedisMock();
+      const redisProvider = {
+        getClient: () => client,
+        getIsConnected: () => true,
+      } as any;
+
+      // Instantiate ReportService WITHOUT DistributedLockService to exercise fallback lock path
+      const fallbackService = new ReportService(
+        prismaMock as unknown as PrismaService,
+        statutoryReportService,
+        redisProvider,
+        undefined,
+      );
+
+      seedDashboardPrismaMocks();
+      await fallbackService.getExecutiveDashboard({}, superAdminUser);
+
+      expect(client.set).toHaveBeenCalledWith(
+        'lock:report:dashboard:ALL',
+        expect.stringMatching(/^[0-9a-f-]{36}$/i),
+        'PX',
+        4000,
+        'NX',
+      );
+      expect(client.del).not.toHaveBeenCalled();
+      const dashToken = client.set.mock.calls[0][1];
+      expect(dashToken).not.toBe('1');
+      expect(client.eval).toHaveBeenCalledWith(REDIS_RELEASE_LOCK_LUA, 1, 'lock:report:dashboard:ALL', dashToken);
+      expect(store.has('lock:report:dashboard:ALL')).toBe(false);
+
+      // Verify DayBook identically uses tokenized Lua unlock
+      client.set.mockClear();
+      client.eval.mockClear();
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      prismaMock.auctionWinner.findMany.mockResolvedValue([]);
+      await fallbackService.getDayBook({ date: '2026-11-12' }, superAdminUser);
+
+      expect(client.set).toHaveBeenCalledWith(
+        'lock:report:daybook:ALL:2026-11-12',
+        expect.stringMatching(/^[0-9a-f-]{36}$/i),
+        'PX',
+        4000,
+        'NX',
+      );
+      expect(client.del).not.toHaveBeenCalled();
+      const dayToken = client.set.mock.calls[0][1];
+      expect(client.eval).toHaveBeenCalledWith(
+        REDIS_RELEASE_LOCK_LUA,
+        1,
+        'lock:report:daybook:ALL:2026-11-12',
+        dayToken,
+      );
+    });
+
+    it('DEF-DB-04-N2: Slow >4s Dashboard query preserves foreign worker lock on expiry instead of deleting it', async () => {
+      const { store, client } = createInMemoryRedisMock();
+      const redisProvider = {
+        getClient: () => client,
+        getIsConnected: () => true,
+      } as any;
+
+      const fallbackService = new ReportService(
+        prismaMock as unknown as PrismaService,
+        statutoryReportService,
+        redisProvider,
+        undefined,
+      );
+
+      seedDashboardPrismaMocks();
+      // Simulate TTL expiry and foreign worker taking over the lock during slow Prisma query
+      prismaMock.chitGroup.count.mockImplementationOnce(async () => {
+        store.set('lock:report:dashboard:ALL', 'foreign-worker-uuid-2');
+        return 1;
+      });
+
+      await fallbackService.getExecutiveDashboard({}, superAdminUser);
+
+      expect(client.del).not.toHaveBeenCalled();
+      expect(store.get('lock:report:dashboard:ALL')).toBe('foreign-worker-uuid-2');
+    });
+
+    it('DEF-DB-04-N3: Concurrent caller coalesces on cached report without querying PostgreSQL when lock held', async () => {
+      const { store, client } = createInMemoryRedisMock();
+      store.set('lock:report:dashboard:ALL', 'other-worker-token');
+      // On second redis.get after 250ms backoff wait, return fresh cached payload
+      client.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(JSON.stringify({ scope: 'COMPANY_WIDE', activeChitsCount: 5 }));
+
+      const redisProvider = {
+        getClient: () => client,
+        getIsConnected: () => true,
+      } as any;
+
+      const fallbackService = new ReportService(
+        prismaMock as unknown as PrismaService,
+        statutoryReportService,
+        redisProvider,
+        undefined,
+      );
+
+      const res = await fallbackService.getExecutiveDashboard({}, superAdminUser);
+      expect(res.activeChitsCount).toBe(5);
+      expect(prismaMock.chitGroup.count).not.toHaveBeenCalled();
+      expect(client.eval).not.toHaveBeenCalled();
+      expect(store.get('lock:report:dashboard:ALL')).toBe('other-worker-token');
+    });
+
+    it('DEF-DB-04-N4: Mid-query DB exceptions release Redis lock and never leak fail-open bulkhead slots', async () => {
+      const { store, client } = createInMemoryRedisMock();
+      const redisProvider = {
+        getClient: () => client,
+        getIsConnected: () => true,
+      } as any;
+
+      const fallbackService = new ReportService(
+        prismaMock as unknown as PrismaService,
+        statutoryReportService,
+        redisProvider,
+        undefined,
+      );
+
+      prismaMock.chitGroup.count.mockRejectedValueOnce(new Error('DB statement_timeout'));
+      await expect(fallbackService.getExecutiveDashboard({}, superAdminUser)).rejects.toThrow('DB statement_timeout');
+      expect(client.eval).toHaveBeenCalledTimes(1);
+      expect(store.has('lock:report:dashboard:ALL')).toBe(false);
+
+      client.eval.mockClear();
+      prismaMock.payment.findMany.mockRejectedValueOnce(new Error('DayBook query failure'));
+      await expect(fallbackService.getDayBook({ date: '2026-11-12' }, superAdminUser)).rejects.toThrow(
+        'DayBook query failure',
+      );
+      expect(client.eval).toHaveBeenCalledTimes(1);
+      expect(store.has('lock:report:daybook:ALL:2026-11-12')).toBe(false);
+
+      // Redis-offline fallback mode: trigger 4 sequential DB failures (> MAX_CONCURRENT_FALLBACK_QUERIES=3)
+      const offlineService = new ReportService(
+        prismaMock as unknown as PrismaService,
+        statutoryReportService,
+      );
+      for (let i = 0; i < 4; i += 1) {
+        prismaMock.chitGroup.count.mockRejectedValueOnce(new Error(`Offline DB blip ${i}`));
+        await expect(offlineService.getExecutiveDashboard({}, superAdminUser)).rejects.toThrow(`Offline DB blip ${i}`);
+      }
+      expect((offlineService as any).activeFallbackDashboardQueries).toBe(0);
+
+      seedDashboardPrismaMocks();
+      const healthy = await offlineService.getExecutiveDashboard({}, superAdminUser);
+      expect(healthy.activeChitsCount).toBe(1);
     });
   });
 });
