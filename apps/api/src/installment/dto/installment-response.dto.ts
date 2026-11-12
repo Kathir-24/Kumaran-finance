@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DueStatus } from '@prisma/client';
 
 export class InstallmentDueResponseDto {
@@ -14,7 +14,7 @@ export class InstallmentDueResponseDto {
   @ApiProperty({ example: 2, description: 'Installment month 1..N' })
   installmentMonth: number;
 
-  @ApiProperty({ example: '2026-11-15T00:00:00.000Z', description: 'Due payment cutoff date' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-11-15T00:00:00.000Z', description: 'Due payment cutoff date' })
   dueDate: Date | string;
 
   @ApiProperty({ example: 5000, description: 'Base monthly installment gross in whole Rupees' })
@@ -32,7 +32,7 @@ export class InstallmentDueResponseDto {
   @ApiProperty({ enum: DueStatus, example: DueStatus.UNPAID, description: 'Payment status' })
   status: DueStatus;
 
-  @ApiProperty({ description: 'Subscriber ticket details', required: false })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Subscriber ticket details' })
   ticket?: any;
 }
 
@@ -78,10 +78,10 @@ export class DefaulterItemResponseDto {
   @ApiProperty({ example: 11850, description: 'Cumulative unpaid arrears in whole Rupees' })
   totalArrears: number;
 
-  @ApiProperty({ description: 'Subscriber details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Subscriber details' })
   customer: any;
 
-  @ApiProperty({ description: 'Chit group details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Chit group details' })
   chitGroup: any;
 }
 
@@ -89,7 +89,7 @@ export class PassbookEntryDto {
   @ApiProperty({ example: 2, description: 'Installment month' })
   installmentMonth: number;
 
-  @ApiProperty({ example: '2026-11-15T00:00:00.000Z', description: 'Due cutoff date' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-11-15T00:00:00.000Z', description: 'Due cutoff date' })
   dueDate: Date | string;
 
   @ApiProperty({ example: 5000, description: 'Gross installment in whole Rupees' })
@@ -107,24 +107,24 @@ export class PassbookEntryDto {
   @ApiProperty({ enum: DueStatus, example: DueStatus.PAID, description: 'Payment status' })
   status: DueStatus;
 
-  @ApiProperty({ example: '2026-11-12T14:30:00.000Z', description: 'Payment date', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-11-12T14:30:00.000Z', description: 'Payment date', nullable: true })
   paidAt?: Date | string | null;
 
-  @ApiProperty({ example: 'KC-RCPT-202611-00042', description: 'Issued receipt number', nullable: true })
+  @ApiProperty({ type: String, example: 'KC-RCPT-202611-00042', description: 'Issued receipt number', nullable: true })
   receiptNumber?: string | null;
 }
 
 export class PassbookResponseDto {
-  @ApiProperty({ description: 'Ticket details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Ticket details' })
   ticket: any;
 
-  @ApiProperty({ description: 'Chit group parameters' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Chit group parameters' })
   chitGroup: any;
 
-  @ApiProperty({ description: 'Customer details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Customer details' })
   customer: any;
 
-  @ApiProperty({ description: 'Summary statistics' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Summary statistics' })
   summary: {
     totalGrossAmount: number;
     totalDividendEarned: number;
@@ -146,7 +146,7 @@ export class RemoveDefaulterResponseDto {
   @ApiProperty({ example: 'Subscriber successfully removed under 3-month consecutive default rule', description: 'Status message' })
   message: string;
 
-  @ApiProperty({ description: 'Updated subscriber ticket details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Updated subscriber ticket details' })
   ticket: any;
 }
 

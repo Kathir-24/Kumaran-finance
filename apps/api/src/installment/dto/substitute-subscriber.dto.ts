@@ -30,6 +30,8 @@ export class SubstituteSubscriberResponseDto {
   message: string;
 
   @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
     example: {
       id: 'ticket-uuid-001',
       ticketNumber: 5,

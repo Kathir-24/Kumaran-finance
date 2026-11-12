@@ -219,3 +219,35 @@ test('Client Factory: /bff baseUrl builds /bff/api/v1/* path for Nginx BFF isola
     assert.equal(err?.cause?.input, '/bff/api/v1/chits');
   }
 });
+
+test('Contract Schema Types (DEF-FE-04): generated DTO schemas resolve concrete primitive and nested types', () => {
+  type Schema<T extends keyof import('../src/generated/api-types.js').components['schemas']> =
+    import('../src/index.js').Schema<T>;
+
+  type Payment = Schema<'PaymentRecordDto'>;
+  type Customer = Schema<'CustomerResponseDto'>;
+  type Auction = Schema<'AuctionResponseDto'>;
+  type Reversal = Schema<'ReversalRecordDto'>;
+  type VerifyUpiClaim = Schema<'VerifyUpiClaimResponseDto'>;
+  type DefaultersReport = Schema<'DefaultersReportResponseDto'>;
+
+  const samplePaidAt: Payment['paidAt'] = '2026-10-22T07:28:14.000Z';
+  const sampleBranchId: Payment['branchId'] = null;
+  const sampleTamilName: Customer['fullNameTamil'] = 'முருகன்';
+  const sampleCustomerCreatedAt: Customer['createdAt'] = '2026-10-22T07:28:14.000Z';
+  const sampleAuctionDiscount: Auction['bidDiscount'] = 50000;
+  const sampleReversalApproved: Reversal['isApproved'] = false;
+  const sampleVerifyReceiptId: VerifyUpiClaim['receipt']['id'] = 'rcpt-001';
+  const samplePaginationTotal: DefaultersReport['pagination']['totalRecords'] = 42;
+  const sampleDefaultersList: DefaultersReport['defaulters'] = [{ ticketId: 't-1' }];
+
+  assert.equal(samplePaidAt.startsWith('2026'), true);
+  assert.equal(sampleBranchId, null);
+  assert.equal(typeof sampleTamilName, 'string');
+  assert.equal(typeof sampleCustomerCreatedAt, 'string');
+  assert.equal(sampleAuctionDiscount, 50000);
+  assert.equal(sampleReversalApproved, false);
+  assert.equal(sampleVerifyReceiptId, 'rcpt-001');
+  assert.equal(samplePaginationTotal, 42);
+  assert.equal(sampleDefaultersList.length, 1);
+});

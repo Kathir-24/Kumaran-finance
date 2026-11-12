@@ -44,13 +44,25 @@ export class ReconciliationResultDto {
   @ApiProperty({ example: 0, description: 'Count of settlement discrepancies' })
   exceptionsCount: number;
 
-  @ApiProperty({ isArray: true, description: 'Matched orders details' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Matched orders details',
+  })
   matchedOrders: any[];
 
-  @ApiProperty({ isArray: true, description: 'Ghost drop orders details' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Ghost drop orders details',
+  })
   ghostDropOrders: any[];
 
-  @ApiProperty({ isArray: true, description: 'Discrepancy orders details' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Discrepancy orders details',
+  })
   exceptionOrders: any[];
 }
 
@@ -99,7 +111,7 @@ export class NotificationLogItemDto {
   @ApiProperty({ example: 'SENT', description: 'Delivery state' })
   status: string;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Dispatched timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Dispatched timestamp' })
   sentAt: Date | string;
 }
 
@@ -110,7 +122,11 @@ export class PreAuctionScanResultDto {
   @ApiProperty({ example: 20, description: 'Reminders dispatched to subscribers' })
   totalRemindersBroadcasted: number;
 
-  @ApiProperty({ isArray: true, description: 'Auction notification breakdown' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Auction notification breakdown',
+  })
   details: any[];
 }
 
@@ -124,6 +140,6 @@ export class RepeatableScheduleDto {
   @ApiProperty({ example: '0 0 * * *', description: 'Cron expression' })
   cron: string;
 
-  @ApiProperty({ example: 1729641600000, description: 'Next scheduled timestamp', nullable: true })
+  @ApiProperty({ type: Number, example: 1729641600000, description: 'Next scheduled timestamp', nullable: true })
   next?: number | null;
 }

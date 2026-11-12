@@ -2380,11 +2380,17 @@ export interface components {
              */
             exceptionsCount: number;
             /** @description Matched orders details */
-            matchedOrders: unknown[][];
+            matchedOrders: {
+                [key: string]: unknown;
+            }[];
             /** @description Ghost drop orders details */
-            ghostDropOrders: unknown[][];
+            ghostDropOrders: {
+                [key: string]: unknown;
+            }[];
             /** @description Discrepancy orders details */
-            exceptionOrders: unknown[][];
+            exceptionOrders: {
+                [key: string]: unknown;
+            }[];
         };
         SettlementRecordDto: {
             /**
@@ -2543,10 +2549,11 @@ export interface components {
              */
             status: string;
             /**
+             * Format: date-time
              * @description Dispatched timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            sentAt: Record<string, never>;
+            sentAt: string;
         };
         PreAuctionScanResultDto: {
             /**
@@ -2560,7 +2567,9 @@ export interface components {
              */
             totalRemindersBroadcasted: number;
             /** @description Auction notification breakdown */
-            details: unknown[][];
+            details: {
+                [key: string]: unknown;
+            }[];
         };
         RepeatableScheduleDto: {
             /**
@@ -2582,7 +2591,7 @@ export interface components {
              * @description Next scheduled timestamp
              * @example 1729641600000
              */
-            next: Record<string, never> | null;
+            next: number | null;
         };
         RequestPresignedUploadDto: {
             /**
@@ -2675,7 +2684,7 @@ export interface components {
              * @description Assigned branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
@@ -2687,10 +2696,11 @@ export interface components {
              */
             hasMpin: boolean;
             /**
+             * Format: date-time
              * @description Last login timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            lastLoginAt: Record<string, never> | null;
+            lastLoginAt: string | null;
         };
         AuthTokensResponseDto: {
             /**
@@ -2773,14 +2783,14 @@ export interface components {
              * @description Registered device push token
              * @example fcm-device-token-string
              */
-            fcmToken: Record<string, never> | null;
+            fcmToken: string | null;
         };
         UpdateFcmTokenDto: {
             /**
              * @description Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.
              * @example dK9Z...f8Qm:APA91bH7...
              */
-            fcmToken?: Record<string, never>;
+            fcmToken?: string | null;
             /**
              * @description Client device operating system / platform
              * @example ANDROID
@@ -2808,7 +2818,7 @@ export interface components {
              * @description Branch name in Tamil
              * @example தலைமை அலுவலகம் - பெருந்துறை
              */
-            nameTamil: Record<string, never> | null;
+            nameTamil: string | null;
         };
         UserProfileResponseDto: {
             /**
@@ -2837,7 +2847,7 @@ export interface components {
              * @description Assigned branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
@@ -2849,17 +2859,18 @@ export interface components {
              */
             hasMpin: boolean;
             /**
+             * Format: date-time
              * @description Last login timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            lastLoginAt: Record<string, never> | null;
+            lastLoginAt: string | null;
             /** @description Assigned branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
              * @description Full name in Tamil
              * @example கே. செங்கோட்டையன்
              */
-            fullNameTamil?: Record<string, never> | null;
+            fullNameTamil?: string | null;
             /**
              * @description Customer unique registration code (for subscribers)
              * @example KC-CUST-00042
@@ -3069,7 +3080,7 @@ export interface components {
              * @description Branch name in Tamil
              * @example தலைமை கிளை - பெருந்துறை
              */
-            nameTamil: Record<string, never> | null;
+            nameTamil: string | null;
             /**
              * @description Physical address
              * @example 142, Erode Main Road, Perundurai - 638052
@@ -3086,15 +3097,17 @@ export interface components {
              */
             isActive: boolean;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Last update timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
         };
         CreateBranchDto: {
             /**
@@ -3165,24 +3178,27 @@ export interface components {
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /** @description Assigned branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Last login timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            lastLoginAt: Record<string, never> | null;
+            lastLoginAt: string | null;
             /**
+             * Format: date-time
              * @description Account creation timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Last update timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
         };
         CreateUserDto: {
             /**
@@ -3274,7 +3290,7 @@ export interface components {
              * @description Full name in Tamil
              * @example சுந்தரம் சு
              */
-            fullNameTamil: Record<string, never> | null;
+            fullNameTamil: string | null;
             /**
              * @description Primary contact phone
              * @example 9842712345
@@ -3284,7 +3300,7 @@ export interface components {
              * @description Alternate phone number
              * @example 9443212345
              */
-            altPhone: Record<string, never> | null;
+            altPhone: string | null;
             /**
              * @description Address line 1
              * @example 14/2, Gandhi Nagar
@@ -3294,7 +3310,7 @@ export interface components {
              * @description Address line 2
              * @example Near Bus Stand
              */
-            addressLine2: Record<string, never> | null;
+            addressLine2: string | null;
             /**
              * @description Town or city
              * @example Perundurai
@@ -3309,12 +3325,12 @@ export interface components {
              * @description Income Tax PAN
              * @example ABCDE1234F
              */
-            panNumber: Record<string, never> | null;
+            panNumber: string | null;
             /**
              * @description Masked Aadhaar (last 4 digits)
              * @example 4821
              */
-            aadhaarLast4: Record<string, never> | null;
+            aadhaarLast4: string | null;
             /**
              * @description Whether KYC verification is approved
              * @example false
@@ -3324,19 +3340,21 @@ export interface components {
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /** @description Home branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Registration timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Last updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
         };
         CreateCustomerDto: {
             /**
@@ -3432,7 +3450,7 @@ export interface components {
              * @description Full name in Tamil
              * @example சுந்தரம் சு
              */
-            fullNameTamil: Record<string, never> | null;
+            fullNameTamil: string | null;
             /**
              * @description Primary contact phone
              * @example 9842712345
@@ -3442,7 +3460,7 @@ export interface components {
              * @description Alternate phone number
              * @example 9443212345
              */
-            altPhone: Record<string, never> | null;
+            altPhone: string | null;
             /**
              * @description Address line 1
              * @example 14/2, Gandhi Nagar
@@ -3452,7 +3470,7 @@ export interface components {
              * @description Address line 2
              * @example Near Bus Stand
              */
-            addressLine2: Record<string, never> | null;
+            addressLine2: string | null;
             /**
              * @description Town or city
              * @example Perundurai
@@ -3467,12 +3485,12 @@ export interface components {
              * @description Income Tax PAN
              * @example ABCDE1234F
              */
-            panNumber: Record<string, never> | null;
+            panNumber: string | null;
             /**
              * @description Masked Aadhaar (last 4 digits)
              * @example 4821
              */
-            aadhaarLast4: Record<string, never> | null;
+            aadhaarLast4: string | null;
             /**
              * @description Whether KYC verification is approved
              * @example false
@@ -3482,19 +3500,21 @@ export interface components {
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /** @description Home branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Registration timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Last updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
             /** @description Associated entity counts */
             _count: components["schemas"]["CustomerCountsDto"];
         };
@@ -3518,7 +3538,7 @@ export interface components {
              * @description Nominee full name in Tamil
              * @example கவிதா சு
              */
-            nameTamil: Record<string, never> | null;
+            nameTamil: string | null;
             /**
              * @description Relationship with subscriber
              * @example SPOUSE
@@ -3533,12 +3553,13 @@ export interface components {
              * @description Masked Aadhaar (last 4 digits)
              * @example 1234
              */
-            aadhaarLast4: Record<string, never> | null;
+            aadhaarLast4: string | null;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
         };
         CustomerDetailResponseDto: {
             /**
@@ -3560,7 +3581,7 @@ export interface components {
              * @description Full name in Tamil
              * @example சுந்தரம் சு
              */
-            fullNameTamil: Record<string, never> | null;
+            fullNameTamil: string | null;
             /**
              * @description Primary contact phone
              * @example 9842712345
@@ -3570,7 +3591,7 @@ export interface components {
              * @description Alternate phone number
              * @example 9443212345
              */
-            altPhone: Record<string, never> | null;
+            altPhone: string | null;
             /**
              * @description Address line 1
              * @example 14/2, Gandhi Nagar
@@ -3580,7 +3601,7 @@ export interface components {
              * @description Address line 2
              * @example Near Bus Stand
              */
-            addressLine2: Record<string, never> | null;
+            addressLine2: string | null;
             /**
              * @description Town or city
              * @example Perundurai
@@ -3595,12 +3616,12 @@ export interface components {
              * @description Income Tax PAN
              * @example ABCDE1234F
              */
-            panNumber: Record<string, never> | null;
+            panNumber: string | null;
             /**
              * @description Masked Aadhaar (last 4 digits)
              * @example 4821
              */
-            aadhaarLast4: Record<string, never> | null;
+            aadhaarLast4: string | null;
             /**
              * @description Whether KYC verification is approved
              * @example false
@@ -3610,25 +3631,31 @@ export interface components {
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /** @description Home branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Registration timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Last updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
             /** @description List of linked nominees */
             nominees: components["schemas"]["NomineeResponseDto"][];
             /** @description Subscribed chit tickets and group details */
-            tickets: unknown[][];
+            tickets: {
+                [key: string]: unknown;
+            }[];
             /** @description Uploaded KYC and surety documents */
-            documents: unknown[][];
+            documents: {
+                [key: string]: unknown;
+            }[];
         };
         UpdateCustomerDto: {
             /**
@@ -3736,14 +3763,14 @@ export interface components {
              * @description Registered device push token
              * @example fcm-device-token-string
              */
-            fcmToken: Record<string, never> | null;
+            fcmToken: string | null;
         };
         UpdateCustomerFcmTokenDto: {
             /**
              * @description Firebase Cloud Messaging (FCM) device registration token for subscriber mobile passbook push notifications. Pass null to unregister.
              * @example eM3X...k9Lp:APA91bF4...
              */
-            fcmToken?: Record<string, never>;
+            fcmToken?: string | null;
             /**
              * @description Subscriber device platform
              * @example ANDROID
@@ -3778,10 +3805,11 @@ export interface components {
              */
             verified: boolean;
             /**
+             * Format: date-time
              * @description Upload timestamp
              * @example 2026-10-23T10:00:00.000Z
              */
-            uploadedAt: Record<string, never>;
+            uploadedAt: string;
         };
         DocumentPresignedUrlResponseDto: {
             /**
@@ -3815,7 +3843,7 @@ export interface components {
              * @description Chit group name in Tamil
              * @example ரூ 1 லட்சம் 20 மாதங்கள் குழு A
              */
-            groupNameTamil: Record<string, never> | null;
+            groupNameTamil: string | null;
             /**
              * @description Chit total value in whole Rupees
              * @example 100000
@@ -3867,17 +3895,19 @@ export interface components {
              * @description Registrar sanction order number
              * @example DRO/ERD/CHIT/2026/001
              */
-            sanctionOrderNumber: Record<string, never> | null;
+            sanctionOrderNumber: string | null;
             /**
+             * Format: date-time
              * @description Chit commencement start date
              * @example 2026-10-01T00:00:00.000Z
              */
-            startDate: Record<string, never>;
+            startDate: string;
             /**
+             * Format: date-time
              * @description Chit maturity end date
              * @example 2028-05-01T00:00:00.000Z
              */
-            endDate: Record<string, never>;
+            endDate: string;
             /**
              * @description Branch ID
              * @example branch-prd-001
@@ -3886,15 +3916,17 @@ export interface components {
             /** @description Operating branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
         };
         CreateChitGroupDto: {
             /**
@@ -4074,7 +4106,7 @@ export interface components {
              * @description Prized auction ID if won
              * @example null
              */
-            prizedAuctionId: Record<string, never> | null;
+            prizedAuctionId: string | null;
             /**
              * @description Consecutive unpaid installment months count
              * @example 0
@@ -4086,10 +4118,11 @@ export interface components {
              */
             status: string;
             /**
+             * Format: date-time
              * @description Enrollment joining date
              * @example 2026-10-22T07:28:14.000Z
              */
-            joiningDate: Record<string, never>;
+            joiningDate: string;
             /** @description Subscriber profile details */
             customer: components["schemas"]["CustomerResponseDto"] | null;
         };
@@ -4113,7 +4146,7 @@ export interface components {
              * @description Chit group name in Tamil
              * @example ரூ 1 லட்சம் 20 மாதங்கள் குழு A
              */
-            groupNameTamil: Record<string, never> | null;
+            groupNameTamil: string | null;
             /**
              * @description Chit total value in whole Rupees
              * @example 100000
@@ -4165,17 +4198,19 @@ export interface components {
              * @description Registrar sanction order number
              * @example DRO/ERD/CHIT/2026/001
              */
-            sanctionOrderNumber: Record<string, never> | null;
+            sanctionOrderNumber: string | null;
             /**
+             * Format: date-time
              * @description Chit commencement start date
              * @example 2026-10-01T00:00:00.000Z
              */
-            startDate: Record<string, never>;
+            startDate: string;
             /**
+             * Format: date-time
              * @description Chit maturity end date
              * @example 2028-05-01T00:00:00.000Z
              */
-            endDate: Record<string, never>;
+            endDate: string;
             /**
              * @description Branch ID
              * @example branch-prd-001
@@ -4184,19 +4219,23 @@ export interface components {
             /** @description Operating branch details */
             branch: components["schemas"]["BranchSummaryDto"] | null;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
             /** @description List of assigned subscriber tickets */
             tickets: components["schemas"]["TicketResponseDto"][];
             /** @description Conducted or scheduled auction records */
-            auctions: unknown[][];
+            auctions: {
+                [key: string]: unknown;
+            }[];
         };
         UpdateChitGroupDto: {
             /**
@@ -4331,10 +4370,11 @@ export interface components {
              */
             installmentMonth: number;
             /**
+             * Format: date-time
              * @description Scheduled/Conducted auction timestamp
              * @example 2026-11-10T11:00:00.000Z
              */
-            auctionDate: Record<string, never>;
+            auctionDate: string;
             /**
              * @description Auction lifecycle status
              * @example COMPLETED
@@ -4345,42 +4385,42 @@ export interface components {
              * @description Winning bid discount in whole Rupees
              * @example 25000
              */
-            bidDiscount: Record<string, never> | null;
+            bidDiscount: number | null;
             /**
              * @description Foreman commission rate frozen at 4.00%
              * @example 4
              */
-            foremanCommissionRate: Record<string, never> | null;
+            foremanCommissionRate: number | null;
             /**
              * @description Foreman commission in whole Rupees
              * @example 4000
              */
-            foremanCommissionAmount: Record<string, never> | null;
+            foremanCommissionAmount: number | null;
             /**
              * @description Total universal dividend pool in whole Rupees
              * @example 21000
              */
-            totalDividend: Record<string, never> | null;
+            totalDividend: number | null;
             /**
              * @description Dividend allocated per ticket in whole Rupees
              * @example 1050
              */
-            dividendPerTicket: Record<string, never> | null;
+            dividendPerTicket: number | null;
             /**
              * @description Prize money payable to winner in whole Rupees
              * @example 75000
              */
-            prizeMoney: Record<string, never> | null;
+            prizeMoney: number | null;
             /**
              * @description Maker user ID who entered bid
              * @example user-maker-001
              */
-            conductedByUserId: Record<string, never> | null;
+            conductedByUserId: string | null;
             /**
              * @description Checker user ID who finalized auction
              * @example user-checker-001
              */
-            finalizedByUserId: Record<string, never> | null;
+            finalizedByUserId: string | null;
             /** @description Winning ticket record */
             winner: components["schemas"]["AuctionWinnerDto"] | null;
             /** @description List of tied ceiling bidders */
@@ -4416,12 +4456,13 @@ export interface components {
              * @description Government challan or filing reference
              * @example null
              */
-            filingReference: Record<string, never> | null;
+            filingReference: string | null;
             /**
+             * Format: date-time
              * @description Filing date at Registrar office
              * @example null
              */
-            filedDate: Record<string, never> | null;
+            filedDate: string | null;
         };
         AuctionDetailResponseDto: {
             /**
@@ -4440,10 +4481,11 @@ export interface components {
              */
             installmentMonth: number;
             /**
+             * Format: date-time
              * @description Scheduled/Conducted auction timestamp
              * @example 2026-11-10T11:00:00.000Z
              */
-            auctionDate: Record<string, never>;
+            auctionDate: string;
             /**
              * @description Auction lifecycle status
              * @example COMPLETED
@@ -4454,42 +4496,42 @@ export interface components {
              * @description Winning bid discount in whole Rupees
              * @example 25000
              */
-            bidDiscount: Record<string, never> | null;
+            bidDiscount: number | null;
             /**
              * @description Foreman commission rate frozen at 4.00%
              * @example 4
              */
-            foremanCommissionRate: Record<string, never> | null;
+            foremanCommissionRate: number | null;
             /**
              * @description Foreman commission in whole Rupees
              * @example 4000
              */
-            foremanCommissionAmount: Record<string, never> | null;
+            foremanCommissionAmount: number | null;
             /**
              * @description Total universal dividend pool in whole Rupees
              * @example 21000
              */
-            totalDividend: Record<string, never> | null;
+            totalDividend: number | null;
             /**
              * @description Dividend allocated per ticket in whole Rupees
              * @example 1050
              */
-            dividendPerTicket: Record<string, never> | null;
+            dividendPerTicket: number | null;
             /**
              * @description Prize money payable to winner in whole Rupees
              * @example 75000
              */
-            prizeMoney: Record<string, never> | null;
+            prizeMoney: number | null;
             /**
              * @description Maker user ID who entered bid
              * @example user-maker-001
              */
-            conductedByUserId: Record<string, never> | null;
+            conductedByUserId: string | null;
             /**
              * @description Checker user ID who finalized auction
              * @example user-checker-001
              */
-            finalizedByUserId: Record<string, never> | null;
+            finalizedByUserId: string | null;
             /** @description Winning ticket record */
             winner: components["schemas"]["AuctionWinnerDto"] | null;
             /** @description List of tied ceiling bidders */
@@ -4497,7 +4539,9 @@ export interface components {
             /** @description Statutory Form XVII minutes record */
             minutes: components["schemas"]["AuctionMinutesDto"] | null;
             /** @description Parent chit scheme parameters */
-            chitGroup: Record<string, never>;
+            chitGroup?: {
+                [key: string]: unknown;
+            };
         };
         EligibleBidderResponseDto: {
             /**
@@ -4667,10 +4711,11 @@ export interface components {
              */
             installmentMonth: number;
             /**
+             * Format: date-time
              * @description Due payment cutoff date
              * @example 2026-11-15T00:00:00.000Z
              */
-            dueDate: Record<string, never>;
+            dueDate: string;
             /**
              * @description Base monthly installment gross in whole Rupees
              * @example 5000
@@ -4698,7 +4743,9 @@ export interface components {
              */
             status: "UNPAID" | "PAID" | "OVERDUE";
             /** @description Subscriber ticket details */
-            ticket?: Record<string, never>;
+            ticket?: {
+                [key: string]: unknown;
+            };
         };
         GenerateDuesResultResponseDto: {
             /**
@@ -4786,9 +4833,13 @@ export interface components {
              */
             totalArrears: number;
             /** @description Subscriber details */
-            customer: Record<string, never>;
+            customer: {
+                [key: string]: unknown;
+            };
             /** @description Chit group details */
-            chitGroup: Record<string, never>;
+            chitGroup: {
+                [key: string]: unknown;
+            };
         };
         UpiIntentResponseDto: {
             /**
@@ -4849,10 +4900,11 @@ export interface components {
              */
             installmentMonth: number;
             /**
+             * Format: date-time
              * @description Due cutoff date
              * @example 2026-11-15T00:00:00.000Z
              */
-            dueDate: Record<string, never>;
+            dueDate: string;
             /**
              * @description Gross installment in whole Rupees
              * @example 5000
@@ -4880,25 +4932,34 @@ export interface components {
              */
             status: "UNPAID" | "PAID" | "OVERDUE";
             /**
+             * Format: date-time
              * @description Payment date
              * @example 2026-11-12T14:30:00.000Z
              */
-            paidAt: Record<string, never> | null;
+            paidAt: string | null;
             /**
              * @description Issued receipt number
              * @example KC-RCPT-202611-00042
              */
-            receiptNumber: Record<string, never> | null;
+            receiptNumber: string | null;
         };
         PassbookResponseDto: {
             /** @description Ticket details */
-            ticket: Record<string, never>;
+            ticket: {
+                [key: string]: unknown;
+            };
             /** @description Chit group parameters */
-            chitGroup: Record<string, never>;
+            chitGroup: {
+                [key: string]: unknown;
+            };
             /** @description Customer details */
-            customer: Record<string, never>;
+            customer: {
+                [key: string]: unknown;
+            };
             /** @description Summary statistics */
-            summary: Record<string, never>;
+            summary: {
+                [key: string]: unknown;
+            };
             /** @description Chronological installment dues and payment entries */
             passbook: components["schemas"]["PassbookEntryDto"][];
         };
@@ -4914,7 +4975,9 @@ export interface components {
              */
             message: string;
             /** @description Updated subscriber ticket details */
-            ticket: Record<string, never>;
+            ticket: {
+                [key: string]: unknown;
+            };
         };
         RemoveDefaulterDto: {
             /**
@@ -4945,7 +5008,9 @@ export interface components {
              *       "newCustomerName": "Ravi Kumar"
              *     }
              */
-            ticket: Record<string, never>;
+            ticket: {
+                [key: string]: unknown;
+            };
         };
         SubstituteSubscriberDto: {
             /**
@@ -5011,10 +5076,11 @@ export interface components {
              */
             voucherNumber: string;
             /**
+             * Format: date-time
              * @description Settlement timestamp
              * @example 2026-10-23T19:00:00.000Z
              */
-            settledAt: Record<string, never>;
+            settledAt: string;
         };
         SettleRemovalDto: {
             /**
@@ -5134,10 +5200,11 @@ export interface components {
              */
             installmentMonth: number;
             /**
+             * Format: date-time
              * @description Payment recorded timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            paidAt: Record<string, never>;
+            paidAt: string;
         };
         RecordCollectionDto: {
             /**
@@ -5320,7 +5387,9 @@ export interface components {
             /** @description Financial collection totals */
             totals: components["schemas"]["DailyCollectionTotalsDto"];
             /** @description Itemized collections list */
-            payments: unknown[][];
+            payments: {
+                [key: string]: unknown;
+            }[];
         };
         CashHandoverBatchResponseDto: {
             /**
@@ -5341,7 +5410,9 @@ export interface components {
             /** @description List of payment IDs included in handover */
             paymentIds: string[];
             /** @description Itemized collection records */
-            collections: unknown[][];
+            collections: {
+                [key: string]: unknown;
+            }[];
         };
         SubmitHandoverDto: {
             /**
@@ -5436,35 +5507,38 @@ export interface components {
              */
             paymentStatus: "INITIATED" | "SUCCESS" | "FAILED" | "REVERSED";
             /**
+             * Format: date-time
              * @description Payment timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            paidAt: Record<string, never>;
+            paidAt: string;
             /**
              * @description Transaction / Cheque reference
              * @example UPI-REF-9876543210
              */
-            transactionRef: Record<string, never> | null;
+            transactionRef: string | null;
             /**
              * @description Collecting staff ID
              * @example user-agent-001
              */
-            recordedByUserId: Record<string, never> | null;
+            recordedByUserId: string | null;
             /**
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
         };
         ReceiptDto: {
             /**
@@ -5483,10 +5557,11 @@ export interface components {
              */
             amount: number;
             /**
+             * Format: date-time
              * @description Receipt issue timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            issuedAt: Record<string, never>;
+            issuedAt: string;
         };
         RecordPaymentResponseDto: {
             /** @description Payment record */
@@ -5562,16 +5637,27 @@ export interface components {
             utrNumber: string;
             /** @example Paid via PhonePe */
             notes: string;
-            /** @example 2026-10-27T10:00:00.000Z */
-            createdAt: Record<string, never>;
+            /**
+             * Format: date-time
+             * @example 2026-10-27T10:00:00.000Z
+             */
+            createdAt: string;
             /** @description Submitting user */
-            submittedByUser: Record<string, never>;
+            submittedByUser?: {
+                [key: string]: unknown;
+            };
             /** @description Customer details */
-            customer: Record<string, never>;
+            customer?: {
+                [key: string]: unknown;
+            };
             /** @description Subscriber ticket details */
-            ticket: Record<string, never>;
+            ticket?: {
+                [key: string]: unknown;
+            };
             /** @description Installment due details */
-            due: Record<string, never>;
+            due?: {
+                [key: string]: unknown;
+            };
         };
         PaymentDetailResponseDto: {
             /**
@@ -5602,41 +5688,48 @@ export interface components {
              */
             paymentStatus: "INITIATED" | "SUCCESS" | "FAILED" | "REVERSED";
             /**
+             * Format: date-time
              * @description Payment timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            paidAt: Record<string, never>;
+            paidAt: string;
             /**
              * @description Transaction / Cheque reference
              * @example UPI-REF-9876543210
              */
-            transactionRef: Record<string, never> | null;
+            transactionRef: string | null;
             /**
              * @description Collecting staff ID
              * @example user-agent-001
              */
-            recordedByUserId: Record<string, never> | null;
+            recordedByUserId: string | null;
             /**
              * @description Branch ID
              * @example branch-prd-001
              */
-            branchId: Record<string, never> | null;
+            branchId: string | null;
             /**
+             * Format: date-time
              * @description Creation timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            createdAt: Record<string, never>;
+            createdAt: string;
             /**
+             * Format: date-time
              * @description Updated timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            updatedAt: Record<string, never>;
+            updatedAt: string;
             /** @description Receipt details */
             receipt: components["schemas"]["ReceiptDto"] | null;
             /** @description Subscriber ticket details */
-            ticket: Record<string, never>;
+            ticket?: {
+                [key: string]: unknown;
+            };
             /** @description Installment due details */
-            installmentDue: Record<string, never>;
+            installmentDue?: {
+                [key: string]: unknown;
+            };
         };
         BilingualReceiptResponseDto: {
             /**
@@ -5650,17 +5743,20 @@ export interface components {
              */
             isBilingual: boolean;
             /**
+             * Format: date-time
              * @description Receipt issue timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            issuedAt: Record<string, never>;
+            issuedAt: string;
             /**
              * @description Whether the payment is currently reversed
              * @example false
              */
             isReversed: boolean;
             /** @description Structured bilingual digital receipt fields and metadata */
-            data: Record<string, never>;
+            data: {
+                [key: string]: unknown;
+            };
             /** @description Formatted bilingual monospace text receipt layout for digital passbook */
             formattedText: string;
         };
@@ -5689,32 +5785,34 @@ export interface components {
              * @description Maker explanation
              * @example Wrong member account credited by mistake
              */
-            makerNotes: Record<string, never> | null;
+            makerNotes: string | null;
             /**
+             * Format: date-time
              * @description Request timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            requestedAt: Record<string, never>;
+            requestedAt: string;
             /**
              * @description Checker user ID
              * @example user-checker-001
              */
-            checkerUserId: Record<string, never> | null;
+            checkerUserId: string | null;
             /**
              * @description Checker notes
              * @example Verified with physical voucher. Approved.
              */
-            checkerNotes: Record<string, never> | null;
+            checkerNotes: string | null;
             /**
              * @description Reversal approval state
              * @example true
              */
-            isApproved: Record<string, never> | null;
+            isApproved: boolean | null;
             /**
+             * Format: date-time
              * @description Review timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            reviewedAt: Record<string, never> | null;
+            reviewedAt: string | null;
         };
         PaymentReversalResponseDto: {
             /**
@@ -5791,8 +5889,11 @@ export interface components {
             amount: number;
             /** @example INITIATED */
             status: string;
-            /** @example 2026-10-27T10:00:00.000Z */
-            submittedAt: Record<string, never>;
+            /**
+             * Format: date-time
+             * @example 2026-10-27T10:00:00.000Z
+             */
+            submittedAt: string;
         };
         SubmitUpiClaimDto: {
             /**
@@ -5817,9 +5918,9 @@ export interface components {
             /** @example UPI payment claim verified successfully. Official receipt generated and sent to customer. */
             message: string;
             /** @description Verified payment record */
-            payment: Record<string, never>;
+            payment: components["schemas"]["PaymentRecordDto"];
             /** @description Sequential bilingual receipt */
-            receipt: Record<string, never>;
+            receipt: components["schemas"]["ReceiptDto"];
             /**
              * @example PAID
              * @enum {string}
@@ -5864,21 +5965,26 @@ export interface components {
              * @description Prize money amount in whole Rupees
              * @example 75000
              */
-            disbursedAmount: Record<string, never> | null;
+            disbursedAmount: number | null;
             /**
              * @description Bank UTR or Cheque number
              * @example UTR-NEFT-12345678
              */
-            disbursementReference: Record<string, never> | null;
+            disbursementReference: string | null;
             /**
+             * Format: date-time
              * @description Payout release timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            disbursedAt: Record<string, never> | null;
+            disbursedAt: string | null;
             /** @description Auction and scheme details */
-            auction: Record<string, never>;
+            auction?: {
+                [key: string]: unknown;
+            };
             /** @description Subscriber ticket details */
-            ticket: Record<string, never>;
+            ticket?: {
+                [key: string]: unknown;
+            };
         };
         UploadSafetyProofResponseDto: {
             /**
@@ -5907,10 +6013,11 @@ export interface components {
              */
             fileName: string;
             /**
+             * Format: date-time
              * @description Timestamp when document was uploaded
              * @example 2026-10-23T19:00:00.000Z
              */
-            uploadedAt: Record<string, never>;
+            uploadedAt: string;
         };
         SafetyProofUrlResponseDto: {
             /**
@@ -6045,12 +6152,15 @@ export interface components {
              */
             isBilingual: boolean;
             /**
+             * Format: date-time
              * @description Voucher issue timestamp
              * @example 2026-10-22T07:28:14.000Z
              */
-            issuedAt: Record<string, never>;
+            issuedAt: string;
             /** @description Structured voucher parameters */
-            data: Record<string, never>;
+            data: {
+                [key: string]: unknown;
+            };
             /** @description A4 / A5 monospace formatted voucher layout */
             formattedText: string;
         };
@@ -6073,8 +6183,11 @@ export interface components {
             disbursementMode: string;
             /** @example IOB-CHQ-FINAL-998811 */
             paymentReference?: string | null;
-            /** @example 2025-08-22T00:00:00.000Z */
-            disbursedAt: Record<string, never>;
+            /**
+             * Format: date-time
+             * @example 2025-08-22T00:00:00.000Z
+             */
+            disbursedAt: string;
             /** @example a6452114-52d1-4893-a04c-9736a1bee74e */
             auctionId: string;
         };
@@ -6128,13 +6241,21 @@ export interface components {
              */
             activeSubscribersCount: number;
             /** @description Today collection totals breakdown */
-            todayCollections: Record<string, never>;
+            todayCollections: {
+                [key: string]: unknown;
+            };
             /** @description Today disbursement totals */
-            todayDisbursements: Record<string, never>;
+            todayDisbursements: {
+                [key: string]: unknown;
+            };
             /** @description Branch vault cash balance status */
-            vaultBalance: Record<string, never>;
+            vaultBalance: {
+                [key: string]: unknown;
+            };
             /** @description Arrears aging summary */
-            arrearsSummary: Record<string, never>;
+            arrearsSummary: {
+                [key: string]: unknown;
+            };
             /**
              * @description Maker-checker pending signoffs count
              * @example 3
@@ -6177,13 +6298,21 @@ export interface components {
             /** @description Approval queue metrics */
             summary: components["schemas"]["PendingApprovalsSummaryDto"];
             /** @description Unacknowledged cash handover batches */
-            handovers: unknown[][];
+            handovers: {
+                [key: string]: unknown;
+            }[];
             /** @description Pending payment reversals awaiting Checker signoff */
-            reversals: unknown[][];
+            reversals: {
+                [key: string]: unknown;
+            }[];
             /** @description Pending prize payouts awaiting Checker authorization */
-            authorizations: unknown[][];
+            authorizations: {
+                [key: string]: unknown;
+            }[];
             /** @description Pending safety proofs awaiting Maker verification */
-            safetyProofs: unknown[][];
+            safetyProofs: {
+                [key: string]: unknown;
+            }[];
         };
         DayBookReportResponseDto: {
             /**
@@ -6197,15 +6326,25 @@ export interface components {
              */
             scope: string;
             /** @description Opening cash in safe */
-            openingCash: Record<string, never>;
+            openingCash: {
+                [key: string]: unknown;
+            };
             /** @description Total daily collection receipts */
-            totalCollections: Record<string, never>;
+            totalCollections: {
+                [key: string]: unknown;
+            };
             /** @description Total daily disbursements */
-            totalDisbursements: Record<string, never>;
+            totalDisbursements: {
+                [key: string]: unknown;
+            };
             /** @description Closing cash in safe */
-            closingCash: Record<string, never>;
+            closingCash: {
+                [key: string]: unknown;
+            };
             /** @description Itemized receipts and payout voucher records */
-            entries: unknown[][];
+            entries: {
+                [key: string]: unknown;
+            }[];
         };
         FormXxiiReportResponseDto: {
             /**
@@ -6239,7 +6378,9 @@ export interface components {
              */
             closingBalance: number;
             /** @description Chronological cash ledger entries */
-            entries: unknown[][];
+            entries: {
+                [key: string]: unknown;
+            }[];
         };
         FormXviiReportResponseDto: {
             /**
@@ -6258,7 +6399,9 @@ export interface components {
              */
             durationMonths: number;
             /** @description Chronological list of all auctions and minutes proceedings */
-            auctions: unknown[][];
+            auctions: {
+                [key: string]: unknown;
+            }[];
         };
         FormXxiReportResponseDto: {
             /**
@@ -6272,11 +6415,39 @@ export interface components {
              */
             ticketNumber: number;
             /** @description Subscriber details */
-            customer: Record<string, never>;
+            customer: {
+                [key: string]: unknown;
+            };
             /** @description Chit scheme parameters */
-            chitGroup: Record<string, never>;
+            chitGroup: {
+                [key: string]: unknown;
+            };
             /** @description 20-month schedule of dues, dividend credits, payments, and arrears */
-            schedule: unknown[][];
+            schedule: {
+                [key: string]: unknown;
+            }[];
+        };
+        ReportPaginationDto: {
+            /**
+             * @description Current page number
+             * @example 1
+             */
+            page: number;
+            /**
+             * @description Maximum records per page
+             * @example 20
+             */
+            limit: number;
+            /**
+             * @description Total matching records
+             * @example 45
+             */
+            totalRecords: number;
+            /**
+             * @description Total available pages
+             * @example 3
+             */
+            totalPages: number;
         };
         DefaultersReportResponseDto: {
             /**
@@ -6285,15 +6456,19 @@ export interface components {
              */
             scope: string;
             /** @description Pagination details */
-            pagination: Record<string, never>;
+            pagination: components["schemas"]["ReportPaginationDto"];
             /** @description List of defaulting subscribers categorized by arrears buckets */
-            defaulters: unknown[][];
+            defaulters: {
+                [key: string]: unknown;
+            }[];
         };
         AuditLogsReportResponseDto: {
             /** @description Pagination details */
-            pagination: Record<string, never>;
+            pagination: components["schemas"]["ReportPaginationDto"];
             /** @description Append-only audit trail logs */
-            logs: unknown[][];
+            logs: {
+                [key: string]: unknown;
+            }[];
         };
     };
     responses: never;

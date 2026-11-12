@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DisbursementMode } from '@prisma/client';
 
 export class WinnerDisbursementItemDto {
@@ -17,19 +17,19 @@ export class WinnerDisbursementItemDto {
   @ApiProperty({ enum: DisbursementMode, example: DisbursementMode.BANK_TRANSFER_NEFT, description: 'Authorized payment mode', nullable: true })
   disbursementMode?: DisbursementMode | null;
 
-  @ApiProperty({ example: 75000, description: 'Prize money amount in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 75000, description: 'Prize money amount in whole Rupees', nullable: true })
   disbursedAmount?: number | null;
 
-  @ApiProperty({ example: 'UTR-NEFT-12345678', description: 'Bank UTR or Cheque number', nullable: true })
+  @ApiProperty({ type: String, example: 'UTR-NEFT-12345678', description: 'Bank UTR or Cheque number', nullable: true })
   disbursementReference?: string | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Payout release timestamp', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Payout release timestamp', nullable: true })
   disbursedAt?: Date | string | null;
 
-  @ApiProperty({ description: 'Auction and scheme details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Auction and scheme details' })
   auction?: any;
 
-  @ApiProperty({ description: 'Subscriber ticket details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Subscriber ticket details' })
   ticket?: any;
 }
 
@@ -64,10 +64,10 @@ export class BilingualVoucherResponseDto {
   @ApiProperty({ example: true, description: 'Bilingual flag' })
   isBilingual: boolean;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Voucher issue timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Voucher issue timestamp' })
   issuedAt: Date | string;
 
-  @ApiProperty({ description: 'Structured voucher parameters' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Structured voucher parameters' })
   data: any;
 
   @ApiProperty({ description: 'A4 / A5 monospace formatted voucher layout' })
@@ -102,7 +102,7 @@ export class FinalSettlementDataDto {
   @ApiProperty({ example: 'IOB-CHQ-FINAL-998811', required: false, nullable: true })
   paymentReference?: string;
 
-  @ApiProperty({ example: '2025-08-22T00:00:00.000Z' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2025-08-22T00:00:00.000Z' })
   disbursedAt: Date | string;
 
   @ApiProperty({ example: 'a6452114-52d1-4893-a04c-9736a1bee74e' })

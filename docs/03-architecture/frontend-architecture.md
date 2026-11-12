@@ -224,9 +224,9 @@ apps/mobile/lib/
 To eliminate duplicate business logic between the Web Portal (TypeScript) and Mobile App (Dart), the monorepo adheres to **3 sharing principles**:
 
 1. **Backend as the Authoritative Spec**:
-   - [`apps/api/`](../03-architecture/api-spec.md) publishes OpenAPI 3.0 specifications ([`openapi-spec.json`](../03-architecture/openapi-spec.json)).
-   - TypeScript frontend types for `apps/web/` are generated directly from backend DTOs.
-   - Dart models for `apps/mobile/` are generated via OpenAPI generator or mapped from concrete JSON payloads in [`api-request-response-catalog.md`](../03-architecture/api-request-response-catalog.md).
+   - [`apps/api/`](../03-architecture/api-spec.md) publishes live OpenAPI 3.0 specifications ([`openapi-spec.json`](../03-architecture/openapi-spec.json), `112` paths / `118` operations / `146` schemas) directly from NestJS DTOs via `pnpm run codegen:spec` ([`apps/api/scripts/export-openapi.ts`](../../apps/api/scripts/export-openapi.ts)). All union, nullable, dynamic object, and array DTO properties declare explicit `@ApiProperty` / `@ApiPropertyOptional` metadata (`type: String`/`Number`/`Boolean`, nested DTO refs, `{ type: 'object', additionalProperties: true }`, or typed `{ type: 'array', items: ... }`) so generated schemas contain zero bare `Record<string, never>` objects or `unknown[][]` double arrays.
+   - TypeScript frontend types for `@kumaran/api-client` and `apps/web/` are generated directly from `openapi-spec.json` using `openapi-typescript` via `pnpm run codegen:ts` & `pnpm run codegen:types` ([`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts) and [`docs/03-architecture/openapi-types.ts`](../03-architecture/openapi-types.ts)).
+   - Dart models for `apps/mobile/` are generated directly from `openapi-spec.json` using `pnpm run codegen:dart` ([`scripts/generate-dart-api.ts`](../../scripts/generate-dart-api.ts) -> [`apps/mobile/lib/core/api/models/api_models.dart`](../../apps/mobile/lib/core/api/models/api_models.dart)), kept in sync with concrete payloads in [`api-request-response-catalog.md`](../03-architecture/api-request-response-catalog.md), and verified via [`apps/api/test/client-contract.spec.ts`](../../apps/api/test/client-contract.spec.ts).
 2. **Centralized Financial Math & Invariants**:
    - Both Web and Mobile apply the identical validation rules documented in [`financial-rules.md`](../01-business/financial-rules.md):
      - Bid discount ceiling: $D \le \frac{V}{4}$.

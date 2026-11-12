@@ -1,5 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class ReportPaginationDto {
+  @ApiProperty({ example: 1, description: 'Current page number' })
+  page: number;
+
+  @ApiProperty({ example: 20, description: 'Maximum records per page' })
+  limit: number;
+
+  @ApiProperty({ example: 45, description: 'Total matching records' })
+  totalRecords: number;
+
+  @ApiProperty({ example: 3, description: 'Total available pages' })
+  totalPages: number;
+}
+
 export class ExecutiveDashboardKpiResponseDto {
   @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
   scope: string;
@@ -10,16 +24,16 @@ export class ExecutiveDashboardKpiResponseDto {
   @ApiProperty({ example: 80, description: 'Active subscriber count' })
   activeSubscribersCount: number;
 
-  @ApiProperty({ description: 'Today collection totals breakdown' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today collection totals breakdown' })
   todayCollections: any;
 
-  @ApiProperty({ description: 'Today disbursement totals' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today disbursement totals' })
   todayDisbursements: any;
 
-  @ApiProperty({ description: 'Branch vault cash balance status' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Branch vault cash balance status' })
   vaultBalance: any;
 
-  @ApiProperty({ description: 'Arrears aging summary' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Arrears aging summary' })
   arrearsSummary: any;
 
   @ApiProperty({ example: 3, description: 'Maker-checker pending signoffs count' })
@@ -50,16 +64,16 @@ export class PendingApprovalsResponseDto {
   @ApiProperty({ type: PendingApprovalsSummaryDto, description: 'Approval queue metrics' })
   summary: PendingApprovalsSummaryDto;
 
-  @ApiProperty({ isArray: true, description: 'Unacknowledged cash handover batches' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Unacknowledged cash handover batches' })
   handovers: any[];
 
-  @ApiProperty({ isArray: true, description: 'Pending payment reversals awaiting Checker signoff' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending payment reversals awaiting Checker signoff' })
   reversals: any[];
 
-  @ApiProperty({ isArray: true, description: 'Pending prize payouts awaiting Checker authorization' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending prize payouts awaiting Checker authorization' })
   authorizations: any[];
 
-  @ApiProperty({ isArray: true, description: 'Pending safety proofs awaiting Maker verification' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending safety proofs awaiting Maker verification' })
   safetyProofs: any[];
 }
 
@@ -70,19 +84,19 @@ export class DayBookReportResponseDto {
   @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
   scope: string;
 
-  @ApiProperty({ description: 'Opening cash in safe' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Opening cash in safe' })
   openingCash: any;
 
-  @ApiProperty({ description: 'Total daily collection receipts' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Total daily collection receipts' })
   totalCollections: any;
 
-  @ApiProperty({ description: 'Total daily disbursements' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Total daily disbursements' })
   totalDisbursements: any;
 
-  @ApiProperty({ description: 'Closing cash in safe' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Closing cash in safe' })
   closingCash: any;
 
-  @ApiProperty({ isArray: true, description: 'Itemized receipts and payout voucher records' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Itemized receipts and payout voucher records' })
   entries: any[];
 }
 
@@ -105,7 +119,7 @@ export class FormXxiiReportResponseDto {
   @ApiProperty({ example: 65000, description: 'Closing physical cash in safe in whole Rupees' })
   closingBalance: number;
 
-  @ApiProperty({ isArray: true, description: 'Chronological cash ledger entries' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological cash ledger entries' })
   entries: any[];
 }
 
@@ -119,7 +133,7 @@ export class FormXviiReportResponseDto {
   @ApiProperty({ example: 20, description: 'Duration in months' })
   durationMonths: number;
 
-  @ApiProperty({ isArray: true, description: 'Chronological list of all auctions and minutes proceedings' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological list of all auctions and minutes proceedings' })
   auctions: any[];
 }
 
@@ -130,13 +144,13 @@ export class FormXxiReportResponseDto {
   @ApiProperty({ example: 4, description: 'Ticket number 1..N' })
   ticketNumber: number;
 
-  @ApiProperty({ description: 'Subscriber details' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Subscriber details' })
   customer: any;
 
-  @ApiProperty({ description: 'Chit scheme parameters' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Chit scheme parameters' })
   chitGroup: any;
 
-  @ApiProperty({ isArray: true, description: '20-month schedule of dues, dividend credits, payments, and arrears' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: '20-month schedule of dues, dividend credits, payments, and arrears' })
   schedule: any[];
 }
 
@@ -144,17 +158,17 @@ export class DefaultersReportResponseDto {
   @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
   scope: string;
 
-  @ApiProperty({ description: 'Pagination details' })
-  pagination: any;
+  @ApiProperty({ type: () => ReportPaginationDto, description: 'Pagination details' })
+  pagination: ReportPaginationDto;
 
-  @ApiProperty({ isArray: true, description: 'List of defaulting subscribers categorized by arrears buckets' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'List of defaulting subscribers categorized by arrears buckets' })
   defaulters: any[];
 }
 
 export class AuditLogsReportResponseDto {
-  @ApiProperty({ description: 'Pagination details' })
-  pagination: any;
+  @ApiProperty({ type: () => ReportPaginationDto, description: 'Pagination details' })
+  pagination: ReportPaginationDto;
 
-  @ApiProperty({ isArray: true, description: 'Append-only audit trail logs' })
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Append-only audit trail logs' })
   logs: any[];
 }

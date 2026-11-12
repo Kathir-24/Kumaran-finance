@@ -426,7 +426,7 @@ class NotificationLogItemDto {
   /// Delivery state
   final String status;
   /// Dispatched timestamp
-  final dynamic sentAt;
+  final String sentAt;
 
   const NotificationLogItemDto({
     required this.id,
@@ -435,7 +435,7 @@ class NotificationLogItemDto {
     required this.title,
     required this.body,
     required this.status,
-    this.sentAt,
+    required this.sentAt,
   });
 
   factory NotificationLogItemDto.fromJson(Map<String, dynamic> json) {
@@ -446,7 +446,7 @@ class NotificationLogItemDto {
       title: json['title']?.toString() ?? '',
       body: json['body']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      sentAt: json['sentAt'],
+      sentAt: json['sentAt']?.toString() ?? '',
     );
   }
 
@@ -502,7 +502,7 @@ class RepeatableScheduleDto {
   /// Cron expression
   final String cron;
   /// Next scheduled timestamp
-  final dynamic next;
+  final double? next;
 
   const RepeatableScheduleDto({
     required this.key,
@@ -516,7 +516,7 @@ class RepeatableScheduleDto {
       key: json['key']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       cron: json['cron']?.toString() ?? '',
-      next: json['next'],
+      next: json['next'] != null ? (json['next'] as num).toDouble() : null,
     );
   }
 
@@ -627,13 +627,13 @@ class SanitizedUserDto {
   /// Assigned system roles
   final List<String> roles;
   /// Assigned branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Whether Microsoft Authenticator TOTP is enabled
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
   final bool hasMpin;
   /// Last login timestamp
-  final dynamic lastLoginAt;
+  final String? lastLoginAt;
 
   const SanitizedUserDto({
     required this.id,
@@ -652,10 +652,10 @@ class SanitizedUserDto {
       name: json['name']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
-      lastLoginAt: json['lastLoginAt'],
+      lastLoginAt: json['lastLoginAt']?.toString(),
     );
   }
 
@@ -814,7 +814,7 @@ class FcmTokenUpdateResponseDto {
   /// Status message
   final String message;
   /// Registered device push token
-  final dynamic fcmToken;
+  final String? fcmToken;
 
   const FcmTokenUpdateResponseDto({
     required this.success,
@@ -826,7 +826,7 @@ class FcmTokenUpdateResponseDto {
     return FcmTokenUpdateResponseDto(
       success: json['success'] as bool? ?? false,
       message: json['message']?.toString() ?? '',
-      fcmToken: json['fcmToken'],
+      fcmToken: json['fcmToken']?.toString(),
     );
   }
 
@@ -841,7 +841,7 @@ class FcmTokenUpdateResponseDto {
 
 class UpdateFcmTokenDto {
   /// Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.
-  final dynamic fcmToken;
+  final String? fcmToken;
   /// Client device operating system / platform
   final String? deviceType;
 
@@ -852,7 +852,7 @@ class UpdateFcmTokenDto {
 
   factory UpdateFcmTokenDto.fromJson(Map<String, dynamic> json) {
     return UpdateFcmTokenDto(
-      fcmToken: json['fcmToken'],
+      fcmToken: json['fcmToken']?.toString(),
       deviceType: json['deviceType']?.toString(),
     );
   }
@@ -873,7 +873,7 @@ class BranchSummaryDto {
   /// Branch name in English
   final String name;
   /// Branch name in Tamil
-  final dynamic nameTamil;
+  final String? nameTamil;
 
   const BranchSummaryDto({
     required this.id,
@@ -887,7 +887,7 @@ class BranchSummaryDto {
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      nameTamil: json['nameTamil'],
+      nameTamil: json['nameTamil']?.toString(),
     );
   }
 
@@ -911,17 +911,17 @@ class UserProfileResponseDto {
   /// Assigned system roles
   final List<String> roles;
   /// Assigned branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Whether Microsoft Authenticator TOTP is enabled
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
   final bool hasMpin;
   /// Last login timestamp
-  final dynamic lastLoginAt;
+  final String? lastLoginAt;
   /// Assigned branch details
   final dynamic branch;
   /// Full name in Tamil
-  final dynamic fullNameTamil;
+  final String? fullNameTamil;
   /// Customer unique registration code (for subscribers)
   final String? customerCode;
   /// Whether subscriber KYC is verified
@@ -948,12 +948,12 @@ class UserProfileResponseDto {
       name: json['name']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
-      lastLoginAt: json['lastLoginAt'],
+      lastLoginAt: json['lastLoginAt']?.toString(),
       branch: json['branch'],
-      fullNameTamil: json['fullNameTamil'],
+      fullNameTamil: json['fullNameTamil']?.toString(),
       customerCode: json['customerCode']?.toString(),
       isKycVerified: json['isKycVerified'] as bool?,
     );
@@ -1316,7 +1316,7 @@ class BranchResponseDto {
   /// Branch name in English
   final String name;
   /// Branch name in Tamil
-  final dynamic nameTamil;
+  final String? nameTamil;
   /// Physical address
   final String address;
   /// Contact phone
@@ -1324,9 +1324,9 @@ class BranchResponseDto {
   /// Whether branch is active
   final bool isActive;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Last update timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
 
   const BranchResponseDto({
     required this.id,
@@ -1336,8 +1336,8 @@ class BranchResponseDto {
     required this.address,
     required this.phone,
     required this.isActive,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory BranchResponseDto.fromJson(Map<String, dynamic> json) {
@@ -1345,12 +1345,12 @@ class BranchResponseDto {
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      nameTamil: json['nameTamil'],
+      nameTamil: json['nameTamil']?.toString(),
       address: json['address']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       isActive: json['isActive'] as bool? ?? false,
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
     );
   }
 
@@ -1426,15 +1426,15 @@ class UserResponseDto {
   /// Whether 6-digit MPIN is configured
   final bool hasMpin;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Assigned branch details
   final dynamic branch;
   /// Last login timestamp
-  final dynamic lastLoginAt;
+  final String? lastLoginAt;
   /// Account creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Last update timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
 
   const UserResponseDto({
     required this.id,
@@ -1447,8 +1447,8 @@ class UserResponseDto {
     this.branchId,
     this.branch,
     this.lastLoginAt,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory UserResponseDto.fromJson(Map<String, dynamic> json) {
@@ -1460,11 +1460,11 @@ class UserResponseDto {
       isActive: json['isActive'] as bool? ?? false,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       branch: json['branch'],
-      lastLoginAt: json['lastLoginAt'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      lastLoginAt: json['lastLoginAt']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
     );
   }
 
@@ -1629,33 +1629,33 @@ class CustomerResponseDto {
   /// Full name in English
   final String fullName;
   /// Full name in Tamil
-  final dynamic fullNameTamil;
+  final String? fullNameTamil;
   /// Primary contact phone
   final String phone;
   /// Alternate phone number
-  final dynamic altPhone;
+  final String? altPhone;
   /// Address line 1
   final String addressLine1;
   /// Address line 2
-  final dynamic addressLine2;
+  final String? addressLine2;
   /// Town or city
   final String city;
   /// Postal pincode
   final String pincode;
   /// Income Tax PAN
-  final dynamic panNumber;
+  final String? panNumber;
   /// Masked Aadhaar (last 4 digits)
-  final dynamic aadhaarLast4;
+  final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Home branch details
   final dynamic branch;
   /// Registration timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Last updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
 
   const CustomerResponseDto({
     required this.id,
@@ -1673,8 +1673,8 @@ class CustomerResponseDto {
     required this.isKycVerified,
     this.branchId,
     this.branch,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory CustomerResponseDto.fromJson(Map<String, dynamic> json) {
@@ -1682,20 +1682,20 @@ class CustomerResponseDto {
       id: json['id']?.toString() ?? '',
       customerCode: json['customerCode']?.toString() ?? '',
       fullName: json['fullName']?.toString() ?? '',
-      fullNameTamil: json['fullNameTamil'],
+      fullNameTamil: json['fullNameTamil']?.toString(),
       phone: json['phone']?.toString() ?? '',
-      altPhone: json['altPhone'],
+      altPhone: json['altPhone']?.toString(),
       addressLine1: json['addressLine1']?.toString() ?? '',
-      addressLine2: json['addressLine2'],
+      addressLine2: json['addressLine2']?.toString(),
       city: json['city']?.toString() ?? '',
       pincode: json['pincode']?.toString() ?? '',
-      panNumber: json['panNumber'],
-      aadhaarLast4: json['aadhaarLast4'],
+      panNumber: json['panNumber']?.toString(),
+      aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       branch: json['branch'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
     );
   }
 
@@ -1832,33 +1832,33 @@ class CustomerListItemDto {
   /// Full name in English
   final String fullName;
   /// Full name in Tamil
-  final dynamic fullNameTamil;
+  final String? fullNameTamil;
   /// Primary contact phone
   final String phone;
   /// Alternate phone number
-  final dynamic altPhone;
+  final String? altPhone;
   /// Address line 1
   final String addressLine1;
   /// Address line 2
-  final dynamic addressLine2;
+  final String? addressLine2;
   /// Town or city
   final String city;
   /// Postal pincode
   final String pincode;
   /// Income Tax PAN
-  final dynamic panNumber;
+  final String? panNumber;
   /// Masked Aadhaar (last 4 digits)
-  final dynamic aadhaarLast4;
+  final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Home branch details
   final dynamic branch;
   /// Registration timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Last updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
   /// Associated entity counts
   final dynamic count;
 
@@ -1878,8 +1878,8 @@ class CustomerListItemDto {
     required this.isKycVerified,
     this.branchId,
     this.branch,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
     this.count,
   });
 
@@ -1888,20 +1888,20 @@ class CustomerListItemDto {
       id: json['id']?.toString() ?? '',
       customerCode: json['customerCode']?.toString() ?? '',
       fullName: json['fullName']?.toString() ?? '',
-      fullNameTamil: json['fullNameTamil'],
+      fullNameTamil: json['fullNameTamil']?.toString(),
       phone: json['phone']?.toString() ?? '',
-      altPhone: json['altPhone'],
+      altPhone: json['altPhone']?.toString(),
       addressLine1: json['addressLine1']?.toString() ?? '',
-      addressLine2: json['addressLine2'],
+      addressLine2: json['addressLine2']?.toString(),
       city: json['city']?.toString() ?? '',
       pincode: json['pincode']?.toString() ?? '',
-      panNumber: json['panNumber'],
-      aadhaarLast4: json['aadhaarLast4'],
+      panNumber: json['panNumber']?.toString(),
+      aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       branch: json['branch'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
       count: json['_count'],
     );
   }
@@ -1938,15 +1938,15 @@ class NomineeResponseDto {
   /// Nominee full name in English
   final String name;
   /// Nominee full name in Tamil
-  final dynamic nameTamil;
+  final String? nameTamil;
   /// Relationship with subscriber
   final String relationship;
   /// Nominee contact number
   final String phone;
   /// Masked Aadhaar (last 4 digits)
-  final dynamic aadhaarLast4;
+  final String? aadhaarLast4;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
 
   const NomineeResponseDto({
     required this.id,
@@ -1956,7 +1956,7 @@ class NomineeResponseDto {
     required this.relationship,
     required this.phone,
     this.aadhaarLast4,
-    this.createdAt,
+    required this.createdAt,
   });
 
   factory NomineeResponseDto.fromJson(Map<String, dynamic> json) {
@@ -1964,11 +1964,11 @@ class NomineeResponseDto {
       id: json['id']?.toString() ?? '',
       customerId: json['customerId']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      nameTamil: json['nameTamil'],
+      nameTamil: json['nameTamil']?.toString(),
       relationship: json['relationship']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
-      aadhaarLast4: json['aadhaarLast4'],
-      createdAt: json['createdAt'],
+      aadhaarLast4: json['aadhaarLast4']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
     );
   }
 
@@ -1994,33 +1994,33 @@ class CustomerDetailResponseDto {
   /// Full name in English
   final String fullName;
   /// Full name in Tamil
-  final dynamic fullNameTamil;
+  final String? fullNameTamil;
   /// Primary contact phone
   final String phone;
   /// Alternate phone number
-  final dynamic altPhone;
+  final String? altPhone;
   /// Address line 1
   final String addressLine1;
   /// Address line 2
-  final dynamic addressLine2;
+  final String? addressLine2;
   /// Town or city
   final String city;
   /// Postal pincode
   final String pincode;
   /// Income Tax PAN
-  final dynamic panNumber;
+  final String? panNumber;
   /// Masked Aadhaar (last 4 digits)
-  final dynamic aadhaarLast4;
+  final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Home branch details
   final dynamic branch;
   /// Registration timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Last updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
   /// List of linked nominees
   final List<NomineeResponseDto> nominees;
   /// Subscribed chit tickets and group details
@@ -2044,8 +2044,8 @@ class CustomerDetailResponseDto {
     required this.isKycVerified,
     this.branchId,
     this.branch,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
     required this.nominees,
     required this.tickets,
     required this.documents,
@@ -2056,20 +2056,20 @@ class CustomerDetailResponseDto {
       id: json['id']?.toString() ?? '',
       customerCode: json['customerCode']?.toString() ?? '',
       fullName: json['fullName']?.toString() ?? '',
-      fullNameTamil: json['fullNameTamil'],
+      fullNameTamil: json['fullNameTamil']?.toString(),
       phone: json['phone']?.toString() ?? '',
-      altPhone: json['altPhone'],
+      altPhone: json['altPhone']?.toString(),
       addressLine1: json['addressLine1']?.toString() ?? '',
-      addressLine2: json['addressLine2'],
+      addressLine2: json['addressLine2']?.toString(),
       city: json['city']?.toString() ?? '',
       pincode: json['pincode']?.toString() ?? '',
-      panNumber: json['panNumber'],
-      aadhaarLast4: json['aadhaarLast4'],
+      panNumber: json['panNumber']?.toString(),
+      aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      branchId: json['branchId'],
+      branchId: json['branchId']?.toString(),
       branch: json['branch'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
       nominees: ((json['nominees'] as List<dynamic>?)?.map((e) => NomineeResponseDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       tickets: (json['tickets'] as List<dynamic>?) ?? [],
       documents: (json['documents'] as List<dynamic>?) ?? [],
@@ -2238,7 +2238,7 @@ class CustomerFcmUpdateResponseDto {
   /// Customer ID
   final String customerId;
   /// Registered device push token
-  final dynamic fcmToken;
+  final String? fcmToken;
 
   const CustomerFcmUpdateResponseDto({
     required this.success,
@@ -2252,7 +2252,7 @@ class CustomerFcmUpdateResponseDto {
       success: json['success'] as bool? ?? false,
       message: json['message']?.toString() ?? '',
       customerId: json['customerId']?.toString() ?? '',
-      fcmToken: json['fcmToken'],
+      fcmToken: json['fcmToken']?.toString(),
     );
   }
 
@@ -2268,7 +2268,7 @@ class CustomerFcmUpdateResponseDto {
 
 class UpdateCustomerFcmTokenDto {
   /// Firebase Cloud Messaging (FCM) device registration token for subscriber mobile passbook push notifications. Pass null to unregister.
-  final dynamic fcmToken;
+  final String? fcmToken;
   /// Subscriber device platform
   final String? deviceType;
 
@@ -2279,7 +2279,7 @@ class UpdateCustomerFcmTokenDto {
 
   factory UpdateCustomerFcmTokenDto.fromJson(Map<String, dynamic> json) {
     return UpdateCustomerFcmTokenDto(
-      fcmToken: json['fcmToken'],
+      fcmToken: json['fcmToken']?.toString(),
       deviceType: json['deviceType']?.toString(),
     );
   }
@@ -2304,7 +2304,7 @@ class CustomerDocumentResponseDto {
   /// Whether staff verified this document
   final bool verified;
   /// Upload timestamp
-  final dynamic uploadedAt;
+  final String uploadedAt;
 
   const CustomerDocumentResponseDto({
     required this.id,
@@ -2312,7 +2312,7 @@ class CustomerDocumentResponseDto {
     required this.docType,
     required this.fileName,
     required this.verified,
-    this.uploadedAt,
+    required this.uploadedAt,
   });
 
   factory CustomerDocumentResponseDto.fromJson(Map<String, dynamic> json) {
@@ -2322,7 +2322,7 @@ class CustomerDocumentResponseDto {
       docType: json['docType']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
       verified: json['verified'] as bool? ?? false,
-      uploadedAt: json['uploadedAt'],
+      uploadedAt: json['uploadedAt']?.toString() ?? '',
     );
   }
 
@@ -2372,7 +2372,7 @@ class ChitGroupResponseDto {
   /// Chit group name in English
   final String groupName;
   /// Chit group name in Tamil
-  final dynamic groupNameTamil;
+  final String? groupNameTamil;
   /// Chit total value in whole Rupees
   final double chitValue;
   /// Duration in months
@@ -2392,19 +2392,19 @@ class ChitGroupResponseDto {
   /// Chit scheme lifecycle status
   final String status;
   /// Registrar sanction order number
-  final dynamic sanctionOrderNumber;
+  final String? sanctionOrderNumber;
   /// Chit commencement start date
-  final dynamic startDate;
+  final String startDate;
   /// Chit maturity end date
-  final dynamic endDate;
+  final String endDate;
   /// Branch ID
   final String branchId;
   /// Operating branch details
   final dynamic branch;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
 
   const ChitGroupResponseDto({
     required this.id,
@@ -2421,12 +2421,12 @@ class ChitGroupResponseDto {
     required this.onboardedAtMonth,
     required this.status,
     this.sanctionOrderNumber,
-    this.startDate,
-    this.endDate,
+    required this.startDate,
+    required this.endDate,
     required this.branchId,
     this.branch,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory ChitGroupResponseDto.fromJson(Map<String, dynamic> json) {
@@ -2434,7 +2434,7 @@ class ChitGroupResponseDto {
       id: json['id']?.toString() ?? '',
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
-      groupNameTamil: json['groupNameTamil'],
+      groupNameTamil: json['groupNameTamil']?.toString(),
       chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
       durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
       totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
@@ -2444,13 +2444,13 @@ class ChitGroupResponseDto {
       initMode: json['initMode']?.toString() ?? '',
       onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
       status: json['status']?.toString() ?? '',
-      sanctionOrderNumber: json['sanctionOrderNumber'],
-      startDate: json['startDate'],
-      endDate: json['endDate'],
+      sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
+      startDate: json['startDate']?.toString() ?? '',
+      endDate: json['endDate']?.toString() ?? '',
       branchId: json['branchId']?.toString() ?? '',
       branch: json['branch'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
     );
   }
 
@@ -2711,13 +2711,13 @@ class TicketResponseDto {
   /// Whether ticket has won an auction
   final bool isPrized;
   /// Prized auction ID if won
-  final dynamic prizedAuctionId;
+  final String? prizedAuctionId;
   /// Consecutive unpaid installment months count
   final double consecutiveUnpaidMonths;
   /// Ticket enrollment status
   final String status;
   /// Enrollment joining date
-  final dynamic joiningDate;
+  final String joiningDate;
   /// Subscriber profile details
   final dynamic customer;
 
@@ -2730,7 +2730,7 @@ class TicketResponseDto {
     this.prizedAuctionId,
     required this.consecutiveUnpaidMonths,
     required this.status,
-    this.joiningDate,
+    required this.joiningDate,
     this.customer,
   });
 
@@ -2741,10 +2741,10 @@ class TicketResponseDto {
       customerId: json['customerId']?.toString() ?? '',
       ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
       isPrized: json['isPrized'] as bool? ?? false,
-      prizedAuctionId: json['prizedAuctionId'],
+      prizedAuctionId: json['prizedAuctionId']?.toString(),
       consecutiveUnpaidMonths: (json['consecutiveUnpaidMonths'] != null ? (json['consecutiveUnpaidMonths'] as num).toDouble() : null) ?? 0.0,
       status: json['status']?.toString() ?? '',
-      joiningDate: json['joiningDate'],
+      joiningDate: json['joiningDate']?.toString() ?? '',
       customer: json['customer'],
     );
   }
@@ -2773,7 +2773,7 @@ class ChitGroupDetailResponseDto {
   /// Chit group name in English
   final String groupName;
   /// Chit group name in Tamil
-  final dynamic groupNameTamil;
+  final String? groupNameTamil;
   /// Chit total value in whole Rupees
   final double chitValue;
   /// Duration in months
@@ -2793,19 +2793,19 @@ class ChitGroupDetailResponseDto {
   /// Chit scheme lifecycle status
   final String status;
   /// Registrar sanction order number
-  final dynamic sanctionOrderNumber;
+  final String? sanctionOrderNumber;
   /// Chit commencement start date
-  final dynamic startDate;
+  final String startDate;
   /// Chit maturity end date
-  final dynamic endDate;
+  final String endDate;
   /// Branch ID
   final String branchId;
   /// Operating branch details
   final dynamic branch;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
   /// List of assigned subscriber tickets
   final List<TicketResponseDto> tickets;
   /// Conducted or scheduled auction records
@@ -2826,12 +2826,12 @@ class ChitGroupDetailResponseDto {
     required this.onboardedAtMonth,
     required this.status,
     this.sanctionOrderNumber,
-    this.startDate,
-    this.endDate,
+    required this.startDate,
+    required this.endDate,
     required this.branchId,
     this.branch,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
     required this.tickets,
     required this.auctions,
   });
@@ -2841,7 +2841,7 @@ class ChitGroupDetailResponseDto {
       id: json['id']?.toString() ?? '',
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
-      groupNameTamil: json['groupNameTamil'],
+      groupNameTamil: json['groupNameTamil']?.toString(),
       chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
       durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
       totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
@@ -2851,13 +2851,13 @@ class ChitGroupDetailResponseDto {
       initMode: json['initMode']?.toString() ?? '',
       onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
       status: json['status']?.toString() ?? '',
-      sanctionOrderNumber: json['sanctionOrderNumber'],
-      startDate: json['startDate'],
-      endDate: json['endDate'],
+      sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
+      startDate: json['startDate']?.toString() ?? '',
+      endDate: json['endDate']?.toString() ?? '',
       branchId: json['branchId']?.toString() ?? '',
       branch: json['branch'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
       tickets: ((json['tickets'] as List<dynamic>?)?.map((e) => TicketResponseDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       auctions: (json['auctions'] as List<dynamic>?) ?? [],
     );
@@ -3084,25 +3084,25 @@ class AuctionResponseDto {
   /// Installment month 1..N
   final double installmentMonth;
   /// Scheduled/Conducted auction timestamp
-  final dynamic auctionDate;
+  final String auctionDate;
   /// Auction lifecycle status
   final String status;
   /// Winning bid discount in whole Rupees
-  final dynamic bidDiscount;
+  final double? bidDiscount;
   /// Foreman commission rate frozen at 4.00%
-  final dynamic foremanCommissionRate;
+  final double? foremanCommissionRate;
   /// Foreman commission in whole Rupees
-  final dynamic foremanCommissionAmount;
+  final double? foremanCommissionAmount;
   /// Total universal dividend pool in whole Rupees
-  final dynamic totalDividend;
+  final double? totalDividend;
   /// Dividend allocated per ticket in whole Rupees
-  final dynamic dividendPerTicket;
+  final double? dividendPerTicket;
   /// Prize money payable to winner in whole Rupees
-  final dynamic prizeMoney;
+  final double? prizeMoney;
   /// Maker user ID who entered bid
-  final dynamic conductedByUserId;
+  final String? conductedByUserId;
   /// Checker user ID who finalized auction
-  final dynamic finalizedByUserId;
+  final String? finalizedByUserId;
   /// Winning ticket record
   final dynamic winner;
   /// List of tied ceiling bidders
@@ -3112,7 +3112,7 @@ class AuctionResponseDto {
     required this.id,
     required this.chitGroupId,
     required this.installmentMonth,
-    this.auctionDate,
+    required this.auctionDate,
     required this.status,
     this.bidDiscount,
     this.foremanCommissionRate,
@@ -3131,16 +3131,16 @@ class AuctionResponseDto {
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      auctionDate: json['auctionDate'],
+      auctionDate: json['auctionDate']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      bidDiscount: json['bidDiscount'],
-      foremanCommissionRate: json['foremanCommissionRate'],
-      foremanCommissionAmount: json['foremanCommissionAmount'],
-      totalDividend: json['totalDividend'],
-      dividendPerTicket: json['dividendPerTicket'],
-      prizeMoney: json['prizeMoney'],
-      conductedByUserId: json['conductedByUserId'],
-      finalizedByUserId: json['finalizedByUserId'],
+      bidDiscount: json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null,
+      foremanCommissionRate: json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null,
+      foremanCommissionAmount: json['foremanCommissionAmount'] != null ? (json['foremanCommissionAmount'] as num).toDouble() : null,
+      totalDividend: json['totalDividend'] != null ? (json['totalDividend'] as num).toDouble() : null,
+      dividendPerTicket: json['dividendPerTicket'] != null ? (json['dividendPerTicket'] as num).toDouble() : null,
+      prizeMoney: json['prizeMoney'] != null ? (json['prizeMoney'] as num).toDouble() : null,
+      conductedByUserId: json['conductedByUserId']?.toString(),
+      finalizedByUserId: json['finalizedByUserId']?.toString(),
       winner: json['winner'],
       tieBidders: ((json['tieBidders'] as List<dynamic>?)?.map((e) => AuctionTieBidderDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
     );
@@ -3179,9 +3179,9 @@ class AuctionMinutesDto {
   /// Whether filed at Chit Registrar office
   final bool filedAtRegistrar;
   /// Government challan or filing reference
-  final dynamic filingReference;
+  final String? filingReference;
   /// Filing date at Registrar office
-  final dynamic filedDate;
+  final String? filedDate;
 
   const AuctionMinutesDto({
     required this.id,
@@ -3200,8 +3200,8 @@ class AuctionMinutesDto {
       minutesText: json['minutesText']?.toString() ?? '',
       signedByForeman: json['signedByForeman'] as bool? ?? false,
       filedAtRegistrar: json['filedAtRegistrar'] as bool? ?? false,
-      filingReference: json['filingReference'],
-      filedDate: json['filedDate'],
+      filingReference: json['filingReference']?.toString(),
+      filedDate: json['filedDate']?.toString(),
     );
   }
 
@@ -3226,25 +3226,25 @@ class AuctionDetailResponseDto {
   /// Installment month 1..N
   final double installmentMonth;
   /// Scheduled/Conducted auction timestamp
-  final dynamic auctionDate;
+  final String auctionDate;
   /// Auction lifecycle status
   final String status;
   /// Winning bid discount in whole Rupees
-  final dynamic bidDiscount;
+  final double? bidDiscount;
   /// Foreman commission rate frozen at 4.00%
-  final dynamic foremanCommissionRate;
+  final double? foremanCommissionRate;
   /// Foreman commission in whole Rupees
-  final dynamic foremanCommissionAmount;
+  final double? foremanCommissionAmount;
   /// Total universal dividend pool in whole Rupees
-  final dynamic totalDividend;
+  final double? totalDividend;
   /// Dividend allocated per ticket in whole Rupees
-  final dynamic dividendPerTicket;
+  final double? dividendPerTicket;
   /// Prize money payable to winner in whole Rupees
-  final dynamic prizeMoney;
+  final double? prizeMoney;
   /// Maker user ID who entered bid
-  final dynamic conductedByUserId;
+  final String? conductedByUserId;
   /// Checker user ID who finalized auction
-  final dynamic finalizedByUserId;
+  final String? finalizedByUserId;
   /// Winning ticket record
   final dynamic winner;
   /// List of tied ceiling bidders
@@ -3258,7 +3258,7 @@ class AuctionDetailResponseDto {
     required this.id,
     required this.chitGroupId,
     required this.installmentMonth,
-    this.auctionDate,
+    required this.auctionDate,
     required this.status,
     this.bidDiscount,
     this.foremanCommissionRate,
@@ -3279,16 +3279,16 @@ class AuctionDetailResponseDto {
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      auctionDate: json['auctionDate'],
+      auctionDate: json['auctionDate']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      bidDiscount: json['bidDiscount'],
-      foremanCommissionRate: json['foremanCommissionRate'],
-      foremanCommissionAmount: json['foremanCommissionAmount'],
-      totalDividend: json['totalDividend'],
-      dividendPerTicket: json['dividendPerTicket'],
-      prizeMoney: json['prizeMoney'],
-      conductedByUserId: json['conductedByUserId'],
-      finalizedByUserId: json['finalizedByUserId'],
+      bidDiscount: json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null,
+      foremanCommissionRate: json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null,
+      foremanCommissionAmount: json['foremanCommissionAmount'] != null ? (json['foremanCommissionAmount'] as num).toDouble() : null,
+      totalDividend: json['totalDividend'] != null ? (json['totalDividend'] as num).toDouble() : null,
+      dividendPerTicket: json['dividendPerTicket'] != null ? (json['dividendPerTicket'] as num).toDouble() : null,
+      prizeMoney: json['prizeMoney'] != null ? (json['prizeMoney'] as num).toDouble() : null,
+      conductedByUserId: json['conductedByUserId']?.toString(),
+      finalizedByUserId: json['finalizedByUserId']?.toString(),
       winner: json['winner'],
       tieBidders: ((json['tieBidders'] as List<dynamic>?)?.map((e) => AuctionTieBidderDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       minutes: json['minutes'],
@@ -3597,7 +3597,7 @@ class InstallmentDueResponseDto {
   /// Installment month 1..N
   final double installmentMonth;
   /// Due payment cutoff date
-  final dynamic dueDate;
+  final String dueDate;
   /// Base monthly installment gross in whole Rupees
   final double grossAmount;
   /// Universal dividend deduction in whole Rupees
@@ -3616,7 +3616,7 @@ class InstallmentDueResponseDto {
     required this.chitGroupId,
     required this.ticketId,
     required this.installmentMonth,
-    this.dueDate,
+    required this.dueDate,
     required this.grossAmount,
     required this.dividendDeduction,
     required this.netPayableAmount,
@@ -3631,7 +3631,7 @@ class InstallmentDueResponseDto {
       chitGroupId: json['chitGroupId']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      dueDate: json['dueDate'],
+      dueDate: json['dueDate']?.toString() ?? '',
       grossAmount: (json['grossAmount'] != null ? (json['grossAmount'] as num).toDouble() : null) ?? 0.0,
       dividendDeduction: (json['dividendDeduction'] != null ? (json['dividendDeduction'] as num).toDouble() : null) ?? 0.0,
       netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
@@ -3866,7 +3866,7 @@ class PassbookEntryDto {
   /// Installment month
   final double installmentMonth;
   /// Due cutoff date
-  final dynamic dueDate;
+  final String dueDate;
   /// Gross installment in whole Rupees
   final double grossAmount;
   /// Universal dividend in whole Rupees
@@ -3878,13 +3878,13 @@ class PassbookEntryDto {
   /// Payment status
   final String status;
   /// Payment date
-  final dynamic paidAt;
+  final String? paidAt;
   /// Issued receipt number
-  final dynamic receiptNumber;
+  final String? receiptNumber;
 
   const PassbookEntryDto({
     required this.installmentMonth,
-    this.dueDate,
+    required this.dueDate,
     required this.grossAmount,
     required this.dividendDeduction,
     required this.netPayableAmount,
@@ -3897,14 +3897,14 @@ class PassbookEntryDto {
   factory PassbookEntryDto.fromJson(Map<String, dynamic> json) {
     return PassbookEntryDto(
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      dueDate: json['dueDate'],
+      dueDate: json['dueDate']?.toString() ?? '',
       grossAmount: (json['grossAmount'] != null ? (json['grossAmount'] as num).toDouble() : null) ?? 0.0,
       dividendDeduction: (json['dividendDeduction'] != null ? (json['dividendDeduction'] as num).toDouble() : null) ?? 0.0,
       netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
       paidAmount: (json['paidAmount'] != null ? (json['paidAmount'] as num).toDouble() : null) ?? 0.0,
       status: json['status']?.toString() ?? '',
-      paidAt: json['paidAt'],
-      receiptNumber: json['receiptNumber'],
+      paidAt: json['paidAt']?.toString(),
+      receiptNumber: json['receiptNumber']?.toString(),
     );
   }
 
@@ -4095,7 +4095,7 @@ class SettleRemovalResponseDto {
   /// Exit settlement refund voucher number
   final String voucherNumber;
   /// Settlement timestamp
-  final dynamic settledAt;
+  final String settledAt;
 
   const SettleRemovalResponseDto({
     required this.success,
@@ -4108,7 +4108,7 @@ class SettleRemovalResponseDto {
     required this.damagesDeducted,
     required this.refundAmount,
     required this.voucherNumber,
-    this.settledAt,
+    required this.settledAt,
   });
 
   factory SettleRemovalResponseDto.fromJson(Map<String, dynamic> json) {
@@ -4123,7 +4123,7 @@ class SettleRemovalResponseDto {
       damagesDeducted: (json['damagesDeducted'] != null ? (json['damagesDeducted'] as num).toDouble() : null) ?? 0.0,
       refundAmount: (json['refundAmount'] != null ? (json['refundAmount'] as num).toDouble() : null) ?? 0.0,
       voucherNumber: json['voucherNumber']?.toString() ?? '',
-      settledAt: json['settledAt'],
+      settledAt: json['settledAt']?.toString() ?? '',
     );
   }
 
@@ -4258,7 +4258,7 @@ class CollectionRecordResponseDto {
   /// Installment month
   final double installmentMonth;
   /// Payment recorded timestamp
-  final dynamic paidAt;
+  final String paidAt;
 
   const CollectionRecordResponseDto({
     required this.paymentId,
@@ -4271,7 +4271,7 @@ class CollectionRecordResponseDto {
     required this.chitGroupCode,
     required this.ticketNumber,
     required this.installmentMonth,
-    this.paidAt,
+    required this.paidAt,
   });
 
   factory CollectionRecordResponseDto.fromJson(Map<String, dynamic> json) {
@@ -4286,7 +4286,7 @@ class CollectionRecordResponseDto {
       chitGroupCode: json['chitGroupCode']?.toString() ?? '',
       ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
       installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      paidAt: json['paidAt'],
+      paidAt: json['paidAt']?.toString() ?? '',
     );
   }
 
@@ -4771,17 +4771,17 @@ class PaymentRecordDto {
   /// Payment lifecycle status
   final String paymentStatus;
   /// Payment timestamp
-  final dynamic paidAt;
+  final String paidAt;
   /// Transaction / Cheque reference
-  final dynamic transactionRef;
+  final String? transactionRef;
   /// Collecting staff ID
-  final dynamic recordedByUserId;
+  final String? recordedByUserId;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
 
   const PaymentRecordDto({
     required this.id,
@@ -4789,12 +4789,12 @@ class PaymentRecordDto {
     required this.amount,
     required this.paymentMethod,
     required this.paymentStatus,
-    this.paidAt,
+    required this.paidAt,
     this.transactionRef,
     this.recordedByUserId,
     this.branchId,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory PaymentRecordDto.fromJson(Map<String, dynamic> json) {
@@ -4804,12 +4804,12 @@ class PaymentRecordDto {
       amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       paymentStatus: json['paymentStatus']?.toString() ?? '',
-      paidAt: json['paidAt'],
-      transactionRef: json['transactionRef'],
-      recordedByUserId: json['recordedByUserId'],
-      branchId: json['branchId'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      paidAt: json['paidAt']?.toString() ?? '',
+      transactionRef: json['transactionRef']?.toString(),
+      recordedByUserId: json['recordedByUserId']?.toString(),
+      branchId: json['branchId']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
     );
   }
 
@@ -4838,13 +4838,13 @@ class ReceiptDto {
   /// Receipt amount in whole Rupees
   final double amount;
   /// Receipt issue timestamp
-  final dynamic issuedAt;
+  final String issuedAt;
 
   const ReceiptDto({
     required this.id,
     required this.receiptNumber,
     required this.amount,
-    this.issuedAt,
+    required this.issuedAt,
   });
 
   factory ReceiptDto.fromJson(Map<String, dynamic> json) {
@@ -4852,7 +4852,7 @@ class ReceiptDto {
       id: json['id']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
       amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
-      issuedAt: json['issuedAt'],
+      issuedAt: json['issuedAt']?.toString() ?? '',
     );
   }
 
@@ -4968,7 +4968,7 @@ class PendingUpiClaimItemDto {
   final double amount;
   final String utrNumber;
   final String notes;
-  final dynamic createdAt;
+  final String createdAt;
   /// Submitting user
   final dynamic submittedByUser;
   /// Customer details
@@ -4983,7 +4983,7 @@ class PendingUpiClaimItemDto {
     required this.amount,
     required this.utrNumber,
     required this.notes,
-    this.createdAt,
+    required this.createdAt,
     this.submittedByUser,
     this.customer,
     this.ticket,
@@ -4996,7 +4996,7 @@ class PendingUpiClaimItemDto {
       amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
       utrNumber: json['utrNumber']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
-      createdAt: json['createdAt'],
+      createdAt: json['createdAt']?.toString() ?? '',
       submittedByUser: json['submittedByUser'],
       customer: json['customer'],
       ticket: json['ticket'],
@@ -5031,17 +5031,17 @@ class PaymentDetailResponseDto {
   /// Payment lifecycle status
   final String paymentStatus;
   /// Payment timestamp
-  final dynamic paidAt;
+  final String paidAt;
   /// Transaction / Cheque reference
-  final dynamic transactionRef;
+  final String? transactionRef;
   /// Collecting staff ID
-  final dynamic recordedByUserId;
+  final String? recordedByUserId;
   /// Branch ID
-  final dynamic branchId;
+  final String? branchId;
   /// Creation timestamp
-  final dynamic createdAt;
+  final String createdAt;
   /// Updated timestamp
-  final dynamic updatedAt;
+  final String updatedAt;
   /// Receipt details
   final dynamic receipt;
   /// Subscriber ticket details
@@ -5055,12 +5055,12 @@ class PaymentDetailResponseDto {
     required this.amount,
     required this.paymentMethod,
     required this.paymentStatus,
-    this.paidAt,
+    required this.paidAt,
     this.transactionRef,
     this.recordedByUserId,
     this.branchId,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
     this.receipt,
     this.ticket,
     this.installmentDue,
@@ -5073,12 +5073,12 @@ class PaymentDetailResponseDto {
       amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       paymentStatus: json['paymentStatus']?.toString() ?? '',
-      paidAt: json['paidAt'],
-      transactionRef: json['transactionRef'],
-      recordedByUserId: json['recordedByUserId'],
-      branchId: json['branchId'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      paidAt: json['paidAt']?.toString() ?? '',
+      transactionRef: json['transactionRef']?.toString(),
+      recordedByUserId: json['recordedByUserId']?.toString(),
+      branchId: json['branchId']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
       receipt: json['receipt'],
       ticket: json['ticket'],
       installmentDue: json['installmentDue'],
@@ -5111,7 +5111,7 @@ class BilingualReceiptResponseDto {
   /// Indicates receipt supports English and Tamil
   final bool isBilingual;
   /// Receipt issue timestamp
-  final dynamic issuedAt;
+  final String issuedAt;
   /// Whether the payment is currently reversed
   final bool isReversed;
   /// Structured bilingual digital receipt fields and metadata
@@ -5122,7 +5122,7 @@ class BilingualReceiptResponseDto {
   const BilingualReceiptResponseDto({
     required this.receiptNumber,
     required this.isBilingual,
-    this.issuedAt,
+    required this.issuedAt,
     required this.isReversed,
     this.data,
     required this.formattedText,
@@ -5132,7 +5132,7 @@ class BilingualReceiptResponseDto {
     return BilingualReceiptResponseDto(
       receiptNumber: json['receiptNumber']?.toString() ?? '',
       isBilingual: json['isBilingual'] as bool? ?? false,
-      issuedAt: json['issuedAt'],
+      issuedAt: json['issuedAt']?.toString() ?? '',
       isReversed: json['isReversed'] as bool? ?? false,
       data: json['data'],
       formattedText: json['formattedText']?.toString() ?? '',
@@ -5161,17 +5161,17 @@ class ReversalRecordDto {
   /// Maker user ID
   final String makerUserId;
   /// Maker explanation
-  final dynamic makerNotes;
+  final String? makerNotes;
   /// Request timestamp
-  final dynamic requestedAt;
+  final String requestedAt;
   /// Checker user ID
-  final dynamic checkerUserId;
+  final String? checkerUserId;
   /// Checker notes
-  final dynamic checkerNotes;
+  final String? checkerNotes;
   /// Reversal approval state
-  final dynamic isApproved;
+  final bool? isApproved;
   /// Review timestamp
-  final dynamic reviewedAt;
+  final String? reviewedAt;
 
   const ReversalRecordDto({
     required this.id,
@@ -5179,7 +5179,7 @@ class ReversalRecordDto {
     required this.reversalReason,
     required this.makerUserId,
     this.makerNotes,
-    this.requestedAt,
+    required this.requestedAt,
     this.checkerUserId,
     this.checkerNotes,
     this.isApproved,
@@ -5192,12 +5192,12 @@ class ReversalRecordDto {
       paymentId: json['paymentId']?.toString() ?? '',
       reversalReason: json['reversalReason']?.toString() ?? '',
       makerUserId: json['makerUserId']?.toString() ?? '',
-      makerNotes: json['makerNotes'],
-      requestedAt: json['requestedAt'],
-      checkerUserId: json['checkerUserId'],
-      checkerNotes: json['checkerNotes'],
-      isApproved: json['isApproved'],
-      reviewedAt: json['reviewedAt'],
+      makerNotes: json['makerNotes']?.toString(),
+      requestedAt: json['requestedAt']?.toString() ?? '',
+      checkerUserId: json['checkerUserId']?.toString(),
+      checkerNotes: json['checkerNotes']?.toString(),
+      isApproved: json['isApproved'] as bool?,
+      reviewedAt: json['reviewedAt']?.toString(),
     );
   }
 
@@ -5338,7 +5338,7 @@ class SubmitUpiClaimResponseDto {
   final String utrNumber;
   final double amount;
   final String status;
-  final dynamic submittedAt;
+  final String submittedAt;
 
   const SubmitUpiClaimResponseDto({
     required this.success,
@@ -5352,7 +5352,7 @@ class SubmitUpiClaimResponseDto {
     required this.utrNumber,
     required this.amount,
     required this.status,
-    this.submittedAt,
+    required this.submittedAt,
   });
 
   factory SubmitUpiClaimResponseDto.fromJson(Map<String, dynamic> json) {
@@ -5368,7 +5368,7 @@ class SubmitUpiClaimResponseDto {
       utrNumber: json['utrNumber']?.toString() ?? '',
       amount: (json['amount'] != null ? (json['amount'] as num).toDouble() : null) ?? 0.0,
       status: json['status']?.toString() ?? '',
-      submittedAt: json['submittedAt'],
+      submittedAt: json['submittedAt']?.toString() ?? '',
     );
   }
 
@@ -5492,11 +5492,11 @@ class WinnerDisbursementItemDto {
   /// Authorized payment mode
   final String? disbursementMode;
   /// Prize money amount in whole Rupees
-  final dynamic disbursedAmount;
+  final double? disbursedAmount;
   /// Bank UTR or Cheque number
-  final dynamic disbursementReference;
+  final String? disbursementReference;
   /// Payout release timestamp
-  final dynamic disbursedAt;
+  final String? disbursedAt;
   /// Auction and scheme details
   final dynamic auction;
   /// Subscriber ticket details
@@ -5522,9 +5522,9 @@ class WinnerDisbursementItemDto {
       ticketId: json['ticketId']?.toString() ?? '',
       disbursementStatus: json['disbursementStatus']?.toString() ?? '',
       disbursementMode: json['disbursementMode']?.toString(),
-      disbursedAmount: json['disbursedAmount'],
-      disbursementReference: json['disbursementReference'],
-      disbursedAt: json['disbursedAt'],
+      disbursedAmount: json['disbursedAmount'] != null ? (json['disbursedAmount'] as num).toDouble() : null,
+      disbursementReference: json['disbursementReference']?.toString(),
+      disbursedAt: json['disbursedAt']?.toString(),
       auction: json['auction'],
       ticket: json['ticket'],
     );
@@ -5558,7 +5558,7 @@ class UploadSafetyProofResponseDto {
   /// Original uploaded file name
   final String fileName;
   /// Timestamp when document was uploaded
-  final dynamic uploadedAt;
+  final String uploadedAt;
 
   const UploadSafetyProofResponseDto({
     required this.success,
@@ -5566,7 +5566,7 @@ class UploadSafetyProofResponseDto {
     required this.auctionId,
     required this.securityDocS3Key,
     required this.fileName,
-    this.uploadedAt,
+    required this.uploadedAt,
   });
 
   factory UploadSafetyProofResponseDto.fromJson(Map<String, dynamic> json) {
@@ -5576,7 +5576,7 @@ class UploadSafetyProofResponseDto {
       auctionId: json['auctionId']?.toString() ?? '',
       securityDocS3Key: json['securityDocS3Key']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
-      uploadedAt: json['uploadedAt'],
+      uploadedAt: json['uploadedAt']?.toString() ?? '',
     );
   }
 
@@ -5825,7 +5825,7 @@ class BilingualVoucherResponseDto {
   /// Bilingual flag
   final bool isBilingual;
   /// Voucher issue timestamp
-  final dynamic issuedAt;
+  final String issuedAt;
   /// Structured voucher parameters
   final dynamic data;
   /// A4 / A5 monospace formatted voucher layout
@@ -5834,7 +5834,7 @@ class BilingualVoucherResponseDto {
   const BilingualVoucherResponseDto({
     required this.voucherNumber,
     required this.isBilingual,
-    this.issuedAt,
+    required this.issuedAt,
     this.data,
     required this.formattedText,
   });
@@ -5843,7 +5843,7 @@ class BilingualVoucherResponseDto {
     return BilingualVoucherResponseDto(
       voucherNumber: json['voucherNumber']?.toString() ?? '',
       isBilingual: json['isBilingual'] as bool? ?? false,
-      issuedAt: json['issuedAt'],
+      issuedAt: json['issuedAt']?.toString() ?? '',
       data: json['data'],
       formattedText: json['formattedText']?.toString() ?? '',
     );
@@ -5870,7 +5870,7 @@ class FinalSettlementDataDto {
   final double netPrizeMoney;
   final String disbursementMode;
   final String? paymentReference;
-  final dynamic disbursedAt;
+  final String disbursedAt;
   final String auctionId;
 
   const FinalSettlementDataDto({
@@ -5883,7 +5883,7 @@ class FinalSettlementDataDto {
     required this.netPrizeMoney,
     required this.disbursementMode,
     this.paymentReference,
-    this.disbursedAt,
+    required this.disbursedAt,
     required this.auctionId,
   });
 
@@ -5898,7 +5898,7 @@ class FinalSettlementDataDto {
       netPrizeMoney: (json['netPrizeMoney'] != null ? (json['netPrizeMoney'] as num).toDouble() : null) ?? 0.0,
       disbursementMode: json['disbursementMode']?.toString() ?? '',
       paymentReference: json['paymentReference']?.toString(),
-      disbursedAt: json['disbursedAt'],
+      disbursedAt: json['disbursedAt']?.toString() ?? '',
       auctionId: json['auctionId']?.toString() ?? '',
     );
   }
@@ -6303,6 +6303,42 @@ class FormXxiReportResponseDto {
     data['customer'] = customer;
     data['chitGroup'] = chitGroup;
     data['schedule'] = schedule;
+    return data;
+  }
+}
+
+class ReportPaginationDto {
+  /// Current page number
+  final double page;
+  /// Maximum records per page
+  final double limit;
+  /// Total matching records
+  final double totalRecords;
+  /// Total available pages
+  final double totalPages;
+
+  const ReportPaginationDto({
+    required this.page,
+    required this.limit,
+    required this.totalRecords,
+    required this.totalPages,
+  });
+
+  factory ReportPaginationDto.fromJson(Map<String, dynamic> json) {
+    return ReportPaginationDto(
+      page: (json['page'] != null ? (json['page'] as num).toDouble() : null) ?? 0.0,
+      limit: (json['limit'] != null ? (json['limit'] as num).toDouble() : null) ?? 0.0,
+      totalRecords: (json['totalRecords'] != null ? (json['totalRecords'] as num).toDouble() : null) ?? 0.0,
+      totalPages: (json['totalPages'] != null ? (json['totalPages'] as num).toDouble() : null) ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['page'] = page;
+    data['limit'] = limit;
+    data['totalRecords'] = totalRecords;
+    data['totalPages'] = totalPages;
     return data;
   }
 }

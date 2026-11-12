@@ -11,7 +11,7 @@ export class NomineeResponseDto {
   @ApiProperty({ example: 'Kavitha S', description: 'Nominee full name in English' })
   name: string;
 
-  @ApiProperty({ example: 'கவிதா சு', description: 'Nominee full name in Tamil', nullable: true })
+  @ApiProperty({ type: String, example: 'கவிதா சு', description: 'Nominee full name in Tamil', nullable: true })
   nameTamil?: string | null;
 
   @ApiProperty({ example: 'SPOUSE', description: 'Relationship with subscriber' })
@@ -20,10 +20,10 @@ export class NomineeResponseDto {
   @ApiProperty({ example: '9443212345', description: 'Nominee contact number' })
   phone: string;
 
-  @ApiProperty({ example: '1234', description: 'Masked Aadhaar (last 4 digits)', nullable: true })
+  @ApiProperty({ type: String, example: '1234', description: 'Masked Aadhaar (last 4 digits)', nullable: true })
   aadhaarLast4?: string | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
   createdAt: Date | string;
 }
 
@@ -48,19 +48,19 @@ export class CustomerResponseDto {
   @ApiProperty({ example: 'Sundaram S', description: 'Full name in English' })
   fullName: string;
 
-  @ApiProperty({ example: 'சுந்தரம் சு', description: 'Full name in Tamil', nullable: true })
+  @ApiProperty({ type: String, example: 'சுந்தரம் சு', description: 'Full name in Tamil', nullable: true })
   fullNameTamil?: string | null;
 
   @ApiProperty({ example: '9842712345', description: 'Primary contact phone' })
   phone: string;
 
-  @ApiProperty({ example: '9443212345', description: 'Alternate phone number', nullable: true })
+  @ApiProperty({ type: String, example: '9443212345', description: 'Alternate phone number', nullable: true })
   altPhone?: string | null;
 
   @ApiProperty({ example: '14/2, Gandhi Nagar', description: 'Address line 1' })
   addressLine1: string;
 
-  @ApiProperty({ example: 'Near Bus Stand', description: 'Address line 2', nullable: true })
+  @ApiProperty({ type: String, example: 'Near Bus Stand', description: 'Address line 2', nullable: true })
   addressLine2?: string | null;
 
   @ApiProperty({ example: 'Perundurai', description: 'Town or city' })
@@ -69,25 +69,25 @@ export class CustomerResponseDto {
   @ApiProperty({ example: '638052', description: 'Postal pincode' })
   pincode: string;
 
-  @ApiProperty({ example: 'ABCDE1234F', description: 'Income Tax PAN', nullable: true })
+  @ApiProperty({ type: String, example: 'ABCDE1234F', description: 'Income Tax PAN', nullable: true })
   panNumber?: string | null;
 
-  @ApiProperty({ example: '4821', description: 'Masked Aadhaar (last 4 digits)', nullable: true })
+  @ApiProperty({ type: String, example: '4821', description: 'Masked Aadhaar (last 4 digits)', nullable: true })
   aadhaarLast4?: string | null;
 
   @ApiProperty({ example: false, description: 'Whether KYC verification is approved' })
   isKycVerified: boolean;
 
-  @ApiProperty({ example: 'branch-prd-001', description: 'Branch ID', nullable: true })
+  @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Branch ID', nullable: true })
   branchId?: string | null;
 
   @ApiProperty({ type: BranchSummaryDto, nullable: true, description: 'Home branch details' })
   branch?: BranchSummaryDto | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Registration timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Registration timestamp' })
   createdAt: Date | string;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Last updated timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Last updated timestamp' })
   updatedAt: Date | string;
 }
 
@@ -101,10 +101,18 @@ export class CustomerDetailResponseDto extends CustomerResponseDto {
   @ApiProperty({ type: [NomineeResponseDto], description: 'List of linked nominees' })
   nominees: NomineeResponseDto[];
 
-  @ApiProperty({ isArray: true, description: 'Subscribed chit tickets and group details' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Subscribed chit tickets and group details',
+  })
   tickets: any[];
 
-  @ApiProperty({ isArray: true, description: 'Uploaded KYC and surety documents' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Uploaded KYC and surety documents',
+  })
   documents: any[];
 }
 
@@ -118,7 +126,7 @@ export class CustomerFcmUpdateResponseDto {
   @ApiProperty({ example: 'cust-uuid-001', description: 'Customer ID' })
   customerId: string;
 
-  @ApiProperty({ example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
+  @ApiProperty({ type: String, example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
   fcmToken?: string | null;
 }
 
@@ -138,7 +146,7 @@ export class CustomerDocumentResponseDto {
   @ApiProperty({ example: false, description: 'Whether staff verified this document' })
   verified: boolean;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Upload timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Upload timestamp' })
   uploadedAt: Date | string;
 }
 

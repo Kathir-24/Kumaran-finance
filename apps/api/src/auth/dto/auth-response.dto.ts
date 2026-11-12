@@ -11,7 +11,7 @@ export class BranchSummaryDto {
   @ApiProperty({ example: 'Head Office - Perundurai', description: 'Branch name in English' })
   name: string;
 
-  @ApiProperty({ example: 'தலைமை அலுவலகம் - பெருந்துறை', description: 'Branch name in Tamil', nullable: true })
+  @ApiProperty({ type: String, example: 'தலைமை அலுவலகம் - பெருந்துறை', description: 'Branch name in Tamil', nullable: true })
   nameTamil?: string | null;
 }
 
@@ -33,7 +33,7 @@ export class SanitizedUserDto {
   })
   roles: Role[];
 
-  @ApiProperty({ example: 'branch-prd-001', description: 'Assigned branch ID', nullable: true })
+  @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Assigned branch ID', nullable: true })
   branchId?: string | null;
 
   @ApiProperty({ example: false, description: 'Whether Microsoft Authenticator TOTP is enabled' })
@@ -42,7 +42,7 @@ export class SanitizedUserDto {
   @ApiProperty({ example: true, description: 'Whether 6-digit MPIN is configured' })
   hasMpin: boolean;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Last login timestamp', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Last login timestamp', nullable: true })
   lastLoginAt?: Date | string | null;
 }
 
@@ -50,7 +50,7 @@ export class UserProfileResponseDto extends SanitizedUserDto {
   @ApiProperty({ type: BranchSummaryDto, nullable: true, description: 'Assigned branch details' })
   branch?: BranchSummaryDto | null;
 
-  @ApiProperty({ example: 'கே. செங்கோட்டையன்', description: 'Full name in Tamil', nullable: true, required: false })
+  @ApiProperty({ type: String, example: 'கே. செங்கோட்டையன்', description: 'Full name in Tamil', nullable: true, required: false })
   fullNameTamil?: string | null;
 
   @ApiProperty({ example: 'KC-CUST-00042', description: 'Customer unique registration code (for subscribers)', required: false })
@@ -132,7 +132,7 @@ export class FcmTokenUpdateResponseDto {
   @ApiProperty({ example: 'Device FCM token registered successfully.', description: 'Status message' })
   message: string;
 
-  @ApiProperty({ example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
+  @ApiProperty({ type: String, example: 'fcm-device-token-string', description: 'Registered device push token', nullable: true })
   fcmToken?: string | null;
 }
 

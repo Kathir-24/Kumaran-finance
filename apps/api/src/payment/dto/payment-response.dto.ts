@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DueStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 
 export class ReceiptDto {
@@ -11,7 +11,7 @@ export class ReceiptDto {
   @ApiProperty({ example: 4500, description: 'Receipt amount in whole Rupees' })
   amount: number;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Receipt issue timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Receipt issue timestamp' })
   issuedAt: Date | string;
 }
 
@@ -31,22 +31,22 @@ export class PaymentRecordDto {
   @ApiProperty({ enum: PaymentStatus, example: PaymentStatus.SUCCESS, description: 'Payment lifecycle status' })
   paymentStatus: PaymentStatus;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Payment timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Payment timestamp' })
   paidAt: Date | string;
 
-  @ApiProperty({ example: 'UPI-REF-9876543210', description: 'Transaction / Cheque reference', nullable: true })
+  @ApiProperty({ type: String, example: 'UPI-REF-9876543210', description: 'Transaction / Cheque reference', nullable: true })
   transactionRef?: string | null;
 
-  @ApiProperty({ example: 'user-agent-001', description: 'Collecting staff ID', nullable: true })
+  @ApiProperty({ type: String, example: 'user-agent-001', description: 'Collecting staff ID', nullable: true })
   recordedByUserId?: string | null;
 
-  @ApiProperty({ example: 'branch-prd-001', description: 'Branch ID', nullable: true })
+  @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Branch ID', nullable: true })
   branchId?: string | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
   createdAt: Date | string;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Updated timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Updated timestamp' })
   updatedAt: Date | string;
 }
 
@@ -72,10 +72,10 @@ export class PaymentDetailResponseDto extends PaymentRecordDto {
   @ApiProperty({ type: ReceiptDto, nullable: true, description: 'Receipt details' })
   receipt?: ReceiptDto | null;
 
-  @ApiProperty({ description: 'Subscriber ticket details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Subscriber ticket details' })
   ticket?: any;
 
-  @ApiProperty({ description: 'Installment due details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Installment due details' })
   installmentDue?: any;
 }
 
@@ -86,13 +86,13 @@ export class BilingualReceiptResponseDto {
   @ApiProperty({ example: true, description: 'Indicates receipt supports English and Tamil' })
   isBilingual: boolean;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Receipt issue timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Receipt issue timestamp' })
   issuedAt: Date | string;
 
   @ApiProperty({ example: false, description: 'Whether the payment is currently reversed' })
   isReversed: boolean;
 
-  @ApiProperty({ description: 'Structured bilingual digital receipt fields and metadata' })
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Structured bilingual digital receipt fields and metadata' })
   data: any;
 
   @ApiProperty({ description: 'Formatted bilingual monospace text receipt layout for digital passbook' })
@@ -112,22 +112,22 @@ export class ReversalRecordDto {
   @ApiProperty({ example: 'user-maker-001', description: 'Maker user ID' })
   makerUserId: string;
 
-  @ApiProperty({ example: 'Wrong member account credited by mistake', description: 'Maker explanation', nullable: true })
+  @ApiProperty({ type: String, example: 'Wrong member account credited by mistake', description: 'Maker explanation', nullable: true })
   makerNotes?: string | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Request timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Request timestamp' })
   requestedAt: Date | string;
 
-  @ApiProperty({ example: 'user-checker-001', description: 'Checker user ID', nullable: true })
+  @ApiProperty({ type: String, example: 'user-checker-001', description: 'Checker user ID', nullable: true })
   checkerUserId?: string | null;
 
-  @ApiProperty({ example: 'Verified with physical voucher. Approved.', description: 'Checker notes', nullable: true })
+  @ApiProperty({ type: String, example: 'Verified with physical voucher. Approved.', description: 'Checker notes', nullable: true })
   checkerNotes?: string | null;
 
-  @ApiProperty({ example: true, description: 'Reversal approval state', nullable: true })
+  @ApiProperty({ type: Boolean, example: true, description: 'Reversal approval state', nullable: true })
   isApproved?: boolean | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Review timestamp', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Review timestamp', nullable: true })
   reviewedAt?: Date | string | null;
 }
 
@@ -179,7 +179,7 @@ export class SubmitUpiClaimResponseDto {
   @ApiProperty({ example: 'INITIATED' })
   status: string;
 
-  @ApiProperty({ example: '2026-10-27T10:00:00.000Z' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-27T10:00:00.000Z' })
   submittedAt: Date | string;
 }
 
@@ -196,19 +196,19 @@ export class PendingUpiClaimItemDto {
   @ApiProperty({ example: 'Paid via PhonePe' })
   notes?: string;
 
-  @ApiProperty({ example: '2026-10-27T10:00:00.000Z' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-27T10:00:00.000Z' })
   createdAt: Date | string;
 
-  @ApiProperty({ description: 'Submitting user' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Submitting user' })
   submittedByUser?: any;
 
-  @ApiProperty({ description: 'Customer details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Customer details' })
   customer?: any;
 
-  @ApiProperty({ description: 'Subscriber ticket details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Subscriber ticket details' })
   ticket?: any;
 
-  @ApiProperty({ description: 'Installment due details' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Installment due details' })
   due?: any;
 }
 
@@ -219,11 +219,11 @@ export class VerifyUpiClaimResponseDto {
   @ApiProperty({ example: 'UPI payment claim verified successfully. Official receipt generated and sent to customer.' })
   message: string;
 
-  @ApiProperty({ description: 'Verified payment record' })
-  payment: any;
+  @ApiProperty({ type: () => PaymentRecordDto, description: 'Verified payment record' })
+  payment: PaymentRecordDto | any;
 
-  @ApiProperty({ description: 'Sequential bilingual receipt' })
-  receipt: any;
+  @ApiProperty({ type: () => ReceiptDto, description: 'Sequential bilingual receipt' })
+  receipt: ReceiptDto | any;
 
   @ApiProperty({ enum: DueStatus, example: DueStatus.PAID })
   dueStatus: DueStatus;

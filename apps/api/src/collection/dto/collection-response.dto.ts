@@ -64,7 +64,7 @@ export class CollectionRecordResponseDto {
   @ApiProperty({ example: 2, description: 'Installment month' })
   installmentMonth: number;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Payment recorded timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Payment recorded timestamp' })
   paidAt: Date | string;
 }
 
@@ -137,7 +137,11 @@ export class DailyCollectionSummaryResponseDto {
   @ApiProperty({ type: DailyCollectionTotalsDto, description: 'Financial collection totals' })
   totals: DailyCollectionTotalsDto;
 
-  @ApiProperty({ isArray: true, description: 'Itemized collections list' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Itemized collections list',
+  })
   payments: any[];
 }
 
@@ -154,7 +158,11 @@ export class CashHandoverBatchResponseDto {
   @ApiProperty({ type: [String], description: 'List of payment IDs included in handover' })
   paymentIds: string[];
 
-  @ApiProperty({ isArray: true, description: 'Itemized collection records' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Itemized collection records',
+  })
   collections: any[];
 }
 

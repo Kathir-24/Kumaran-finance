@@ -85,37 +85,168 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
     });
   });
 
+  describe('Section 2B: OpenAPI Schema & Type Safety Guards (DEF-FE-04)', () => {
+    it('should contain zero bare object schemas and zero untyped/double-array schemas across OpenAPI spec', () => {
+      const nodeFs = require('fs') as typeof import('fs');
+      const nodePath = require('path') as typeof import('path');
+      const specPath = nodePath.resolve(__dirname, '../../../docs/03-architecture/openapi-spec.json');
+      const spec = JSON.parse(nodeFs.readFileSync(specPath, 'utf8'));
+
+      const bareObjects: string[] = [];
+      const badArrays: string[] = [];
+
+      const checkSchemaNode = (schemaPath: string, node: any): void => {
+        if (!node || typeof node !== 'object') return;
+        if (
+          node.type === 'object' &&
+          !node.properties &&
+          !node.additionalProperties &&
+          !node.$ref &&
+          !node.allOf &&
+          !node.oneOf &&
+          !node.anyOf
+        ) {
+          bareObjects.push(schemaPath);
+        }
+        if (node.type === 'array') {
+          if (!node.items) {
+            badArrays.push(`${schemaPath}: missing items`);
+          } else if (node.items.type === 'array') {
+            badArrays.push(`${schemaPath}: double array`);
+          } else {
+            checkSchemaNode(`${schemaPath}[]`, node.items);
+          }
+        }
+        if (node.properties && typeof node.properties === 'object') {
+          for (const [key, val] of Object.entries(node.properties)) {
+            checkSchemaNode(`${schemaPath}.${key}`, val);
+          }
+        }
+        for (const combiner of ['allOf', 'oneOf', 'anyOf']) {
+          if (Array.isArray(node[combiner])) {
+            node[combiner].forEach((sub: any, idx: number) =>
+              checkSchemaNode(`${schemaPath}.${combiner}[${idx}]`, sub),
+            );
+          }
+        }
+      };
+
+      for (const [schemaName, schema] of Object.entries(spec.components?.schemas || {})) {
+        checkSchemaNode(`components.schemas.${schemaName}`, schema);
+      }
+
+      for (const [routePath, pathItem] of Object.entries<any>(spec.paths || {})) {
+        for (const [method, operation] of Object.entries<any>(pathItem || {})) {
+          if (!operation || typeof operation !== 'object') continue;
+          const reqSchema = operation.requestBody?.content?.['application/json']?.schema;
+          if (reqSchema) {
+            checkSchemaNode(`paths.${routePath}.${method}.requestBody`, reqSchema);
+          }
+          for (const [statusCode, resp] of Object.entries<any>(operation.responses || {})) {
+            const respSchema = resp?.content?.['application/json']?.schema;
+            if (respSchema) {
+              checkSchemaNode(`paths.${routePath}.${method}.responses.${statusCode}`, respSchema);
+            }
+          }
+        }
+      }
+
+      expect(bareObjects).toEqual([]);
+      expect(badArrays).toEqual([]);
+    });
+
+    it('should contain zero property-level Record<string, never> or unknown[][] in generated TypeScript types', () => {
+      const nodeFs = require('fs') as typeof import('fs');
+      const nodePath = require('path') as typeof import('path');
+      const targets = [
+        nodePath.resolve(__dirname, '../../../packages/api-client/src/generated/api-types.ts'),
+        nodePath.resolve(__dirname, '../../../docs/03-architecture/openapi-types.ts'),
+      ];
+
+      for (const target of targets) {
+        const content = nodeFs.readFileSync(target, 'utf8');
+        const badRecordNever = content
+          .split(/\r?\n/)
+          .filter(
+            (line) =>
+              line.includes('Record<string, never>') &&
+              !line.startsWith('export type webhooks =') &&
+              !line.startsWith('export type $defs ='),
+          );
+        expect(badRecordNever).toEqual([]);
+        expect(content).not.toContain('unknown[][]');
+      }
+    });
+
+    it('should verify resolved schema properties on union, nullable, and nested DTOs', () => {
+      type Schemas = import('../../../docs/03-architecture/openapi-types').components['schemas'];
+      type Payment = Schemas['PaymentRecordDto'];
+      type Reversal = Schemas['ReversalRecordDto'];
+      type Auction = Schemas['AuctionResponseDto'];
+      type Customer = Schemas['CustomerResponseDto'];
+      type VerifyUpiClaim = Schemas['VerifyUpiClaimResponseDto'];
+      type DefaultersReport = Schemas['DefaultersReportResponseDto'];
+
+      const checkPaymentPaidAt: Payment['paidAt'] = '2026-10-22T07:28:14.000Z';
+      const checkPaymentBranch: Payment['branchId'] = null;
+      const checkReversalApproved: Reversal['isApproved'] = true;
+      const checkReversalReviewed: Reversal['reviewedAt'] = null;
+      const checkAuctionDiscount: Auction['bidDiscount'] = 50000;
+      const checkAuctionDate: Auction['auctionDate'] = '2026-11-10T11:00:00.000Z';
+      const checkCustomerTamil: Customer['fullNameTamil'] = null;
+      const checkVerifyReceiptNumber: VerifyUpiClaim['receipt']['receiptNumber'] = 'KC-RCPT-001';
+      const checkDefaultersPage: DefaultersReport['pagination']['totalRecords'] = 10;
+      const checkDefaultersRows: DefaultersReport['defaulters'] = [{ customerId: 'c1' }];
+
+      expect([
+        checkPaymentPaidAt,
+        checkPaymentBranch,
+        checkReversalApproved,
+        checkReversalReviewed,
+        checkAuctionDiscount,
+        checkAuctionDate,
+        checkCustomerTamil,
+        checkVerifyReceiptNumber,
+        checkDefaultersPage,
+        checkDefaultersRows.length,
+      ]).toHaveLength(10);
+    });
+  });
+
   describe('Section 3: Type-Level Compile Safety', () => {
     it('should verify compile-time contract typing for Auth login request & response', () => {
-      type LoginBody = paths['/auth/web/login']['post']['requestBody']['content']['application/json'];
+      type LoginBody = paths['/api/v1/auth/web/login']['post']['requestBody']['content']['application/json'];
       const validLogin: LoginBody = {
         phone: '9842712345',
         password: 'Password123!',
+        clientType: 'WEB',
       };
       expect(validLogin.phone).toBe('9842712345');
     });
 
     it('should verify compile-time contract typing for Customer registration', () => {
-      type CreateCustomerBody = paths['/customers']['post']['requestBody']['content']['application/json'];
+      type CreateCustomerBody = paths['/api/v1/customers']['post']['requestBody']['content']['application/json'];
       const customerPayload: CreateCustomerBody = {
         fullName: 'Murugesan K',
         phone: '9842799999',
-        address: '12, Perundurai Road, Erode',
+        addressLine1: '12, Perundurai Road, Erode',
       };
       expect(customerPayload.fullName).toBe('Murugesan K');
     });
 
     it('should verify compile-time contract typing for Mid-Cycle Onboarding payload', () => {
-      type OnboardBody = paths['/chits/onboard-ongoing']['post']['requestBody']['content']['application/json'];
+      type OnboardBody = paths['/api/v1/chits/onboard-ongoing']['post']['requestBody']['content']['application/json'];
       const isTypeValid: OnboardBody = {
         groupCode: 'KMR-TEST-01',
-        totalChitValue: '500000',
-        totalMonths: 20,
-        monthlyContribution: '25000',
-        currentMonth: 5,
-        firstMonthAuctionDate: '2026-01-10T10:00:00.000Z',
-        subscribers: [],
-        historicalAuctions: [],
+        groupName: 'Kumaran 5L Test',
+        chitValue: 500000,
+        durationMonths: 20,
+        totalTickets: 20,
+        onboardedAtMonth: 5,
+        startDate: '2026-01-10T00:00:00.000Z',
+        endDate: '2027-08-10T00:00:00.000Z',
+        historicalWinners: [],
+        memberAllocations: [],
       };
       expect(isTypeValid.groupCode).toBe('KMR-TEST-01');
     });

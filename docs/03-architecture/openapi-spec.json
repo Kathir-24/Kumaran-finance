@@ -9269,25 +9269,28 @@
             "description": "Count of settlement discrepancies"
           },
           "matchedOrders": {
-            "description": "Matched orders details",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Matched orders details"
           },
           "ghostDropOrders": {
-            "description": "Ghost drop orders details",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Ghost drop orders details"
           },
           "exceptionOrders": {
-            "description": "Discrepancy orders details",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Discrepancy orders details"
           }
         },
         "required": [
@@ -9520,7 +9523,8 @@
             "description": "Delivery state"
           },
           "sentAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Dispatched timestamp"
           }
@@ -9549,11 +9553,12 @@
             "description": "Reminders dispatched to subscribers"
           },
           "details": {
-            "description": "Auction notification breakdown",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Auction notification breakdown"
           }
         },
         "required": [
@@ -9581,7 +9586,7 @@
             "description": "Cron expression"
           },
           "next": {
-            "type": "object",
+            "type": "number",
             "example": 1729641600000,
             "description": "Next scheduled timestamp",
             "nullable": true
@@ -9718,7 +9723,7 @@
             }
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Assigned branch ID",
             "nullable": true
@@ -9734,7 +9739,8 @@
             "description": "Whether 6-digit MPIN is configured"
           },
           "lastLoginAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Last login timestamp",
             "nullable": true
@@ -9879,7 +9885,7 @@
             "description": "Status message"
           },
           "fcmToken": {
-            "type": "object",
+            "type": "string",
             "example": "fcm-device-token-string",
             "description": "Registered device push token",
             "nullable": true
@@ -9895,7 +9901,8 @@
         "type": "object",
         "properties": {
           "fcmToken": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "description": "Firebase Cloud Messaging (FCM) device registration token. Pass null or omit to deregister device on logout.",
             "example": "dK9Z...f8Qm:APA91bH7..."
           },
@@ -9930,7 +9937,7 @@
             "description": "Branch name in English"
           },
           "nameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "தலைமை அலுவலகம் - பெருந்துறை",
             "description": "Branch name in Tamil",
             "nullable": true
@@ -9980,7 +9987,7 @@
             }
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Assigned branch ID",
             "nullable": true
@@ -9996,7 +10003,8 @@
             "description": "Whether 6-digit MPIN is configured"
           },
           "lastLoginAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Last login timestamp",
             "nullable": true
@@ -10012,7 +10020,7 @@
             ]
           },
           "fullNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "கே. செங்கோட்டையன்",
             "description": "Full name in Tamil",
             "nullable": true
@@ -10329,7 +10337,7 @@
             "description": "Branch name in English"
           },
           "nameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "தலைமை கிளை - பெருந்துறை",
             "description": "Branch name in Tamil",
             "nullable": true
@@ -10350,12 +10358,14 @@
             "description": "Whether branch is active"
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Last update timestamp"
           }
@@ -10460,7 +10470,7 @@
             "description": "Whether 6-digit MPIN is configured"
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
@@ -10476,18 +10486,21 @@
             ]
           },
           "lastLoginAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Last login timestamp",
             "nullable": true
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Account creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Last update timestamp"
           }
@@ -10649,7 +10662,7 @@
             "description": "Full name in English"
           },
           "fullNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "சுந்தரம் சு",
             "description": "Full name in Tamil",
             "nullable": true
@@ -10660,7 +10673,7 @@
             "description": "Primary contact phone"
           },
           "altPhone": {
-            "type": "object",
+            "type": "string",
             "example": "9443212345",
             "description": "Alternate phone number",
             "nullable": true
@@ -10671,7 +10684,7 @@
             "description": "Address line 1"
           },
           "addressLine2": {
-            "type": "object",
+            "type": "string",
             "example": "Near Bus Stand",
             "description": "Address line 2",
             "nullable": true
@@ -10687,13 +10700,13 @@
             "description": "Postal pincode"
           },
           "panNumber": {
-            "type": "object",
+            "type": "string",
             "example": "ABCDE1234F",
             "description": "Income Tax PAN",
             "nullable": true
           },
           "aadhaarLast4": {
-            "type": "object",
+            "type": "string",
             "example": "4821",
             "description": "Masked Aadhaar (last 4 digits)",
             "nullable": true
@@ -10704,7 +10717,7 @@
             "description": "Whether KYC verification is approved"
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
@@ -10720,12 +10733,14 @@
             ]
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Registration timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Last updated timestamp"
           }
@@ -10859,7 +10874,7 @@
             "description": "Full name in English"
           },
           "fullNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "சுந்தரம் சு",
             "description": "Full name in Tamil",
             "nullable": true
@@ -10870,7 +10885,7 @@
             "description": "Primary contact phone"
           },
           "altPhone": {
-            "type": "object",
+            "type": "string",
             "example": "9443212345",
             "description": "Alternate phone number",
             "nullable": true
@@ -10881,7 +10896,7 @@
             "description": "Address line 1"
           },
           "addressLine2": {
-            "type": "object",
+            "type": "string",
             "example": "Near Bus Stand",
             "description": "Address line 2",
             "nullable": true
@@ -10897,13 +10912,13 @@
             "description": "Postal pincode"
           },
           "panNumber": {
-            "type": "object",
+            "type": "string",
             "example": "ABCDE1234F",
             "description": "Income Tax PAN",
             "nullable": true
           },
           "aadhaarLast4": {
-            "type": "object",
+            "type": "string",
             "example": "4821",
             "description": "Masked Aadhaar (last 4 digits)",
             "nullable": true
@@ -10914,7 +10929,7 @@
             "description": "Whether KYC verification is approved"
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
@@ -10930,12 +10945,14 @@
             ]
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Registration timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Last updated timestamp"
           },
@@ -10988,7 +11005,7 @@
             "description": "Nominee full name in English"
           },
           "nameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "கவிதா சு",
             "description": "Nominee full name in Tamil",
             "nullable": true
@@ -11004,13 +11021,14 @@
             "description": "Nominee contact number"
           },
           "aadhaarLast4": {
-            "type": "object",
+            "type": "string",
             "example": "1234",
             "description": "Masked Aadhaar (last 4 digits)",
             "nullable": true
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Creation timestamp"
           }
@@ -11045,7 +11063,7 @@
             "description": "Full name in English"
           },
           "fullNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "சுந்தரம் சு",
             "description": "Full name in Tamil",
             "nullable": true
@@ -11056,7 +11074,7 @@
             "description": "Primary contact phone"
           },
           "altPhone": {
-            "type": "object",
+            "type": "string",
             "example": "9443212345",
             "description": "Alternate phone number",
             "nullable": true
@@ -11067,7 +11085,7 @@
             "description": "Address line 1"
           },
           "addressLine2": {
-            "type": "object",
+            "type": "string",
             "example": "Near Bus Stand",
             "description": "Address line 2",
             "nullable": true
@@ -11083,13 +11101,13 @@
             "description": "Postal pincode"
           },
           "panNumber": {
-            "type": "object",
+            "type": "string",
             "example": "ABCDE1234F",
             "description": "Income Tax PAN",
             "nullable": true
           },
           "aadhaarLast4": {
-            "type": "object",
+            "type": "string",
             "example": "4821",
             "description": "Masked Aadhaar (last 4 digits)",
             "nullable": true
@@ -11100,7 +11118,7 @@
             "description": "Whether KYC verification is approved"
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
@@ -11116,12 +11134,14 @@
             ]
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Registration timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Last updated timestamp"
           },
@@ -11133,18 +11153,20 @@
             }
           },
           "tickets": {
-            "description": "Subscribed chit tickets and group details",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Subscribed chit tickets and group details"
           },
           "documents": {
-            "description": "Uploaded KYC and surety documents",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Uploaded KYC and surety documents"
           }
         },
         "required": [
@@ -11292,7 +11314,7 @@
             "description": "Customer ID"
           },
           "fcmToken": {
-            "type": "object",
+            "type": "string",
             "example": "fcm-device-token-string",
             "description": "Registered device push token",
             "nullable": true
@@ -11309,7 +11331,8 @@
         "type": "object",
         "properties": {
           "fcmToken": {
-            "type": "object",
+            "type": "string",
+            "nullable": true,
             "description": "Firebase Cloud Messaging (FCM) device registration token for subscriber mobile passbook push notifications. Pass null to unregister.",
             "example": "eM3X...k9Lp:APA91bF4..."
           },
@@ -11354,7 +11377,8 @@
             "description": "Whether staff verified this document"
           },
           "uploadedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T10:00:00.000Z",
             "description": "Upload timestamp"
           }
@@ -11406,7 +11430,7 @@
             "description": "Chit group name in English"
           },
           "groupNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "ரூ 1 லட்சம் 20 மாதங்கள் குழு A",
             "description": "Chit group name in Tamil",
             "nullable": true
@@ -11468,18 +11492,20 @@
             "description": "Chit scheme lifecycle status"
           },
           "sanctionOrderNumber": {
-            "type": "object",
+            "type": "string",
             "example": "DRO/ERD/CHIT/2026/001",
             "description": "Registrar sanction order number",
             "nullable": true
           },
           "startDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-01T00:00:00.000Z",
             "description": "Chit commencement start date"
           },
           "endDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2028-05-01T00:00:00.000Z",
             "description": "Chit maturity end date"
           },
@@ -11499,12 +11525,14 @@
             ]
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Updated timestamp"
           }
@@ -11772,7 +11800,7 @@
             "description": "Whether ticket has won an auction"
           },
           "prizedAuctionId": {
-            "type": "object",
+            "type": "string",
             "example": null,
             "description": "Prized auction ID if won",
             "nullable": true
@@ -11788,7 +11816,8 @@
             "description": "Ticket enrollment status"
           },
           "joiningDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Enrollment joining date"
           },
@@ -11835,7 +11864,7 @@
             "description": "Chit group name in English"
           },
           "groupNameTamil": {
-            "type": "object",
+            "type": "string",
             "example": "ரூ 1 லட்சம் 20 மாதங்கள் குழு A",
             "description": "Chit group name in Tamil",
             "nullable": true
@@ -11897,18 +11926,20 @@
             "description": "Chit scheme lifecycle status"
           },
           "sanctionOrderNumber": {
-            "type": "object",
+            "type": "string",
             "example": "DRO/ERD/CHIT/2026/001",
             "description": "Registrar sanction order number",
             "nullable": true
           },
           "startDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-01T00:00:00.000Z",
             "description": "Chit commencement start date"
           },
           "endDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2028-05-01T00:00:00.000Z",
             "description": "Chit maturity end date"
           },
@@ -11928,12 +11959,14 @@
             ]
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Updated timestamp"
           },
@@ -11945,11 +11978,12 @@
             }
           },
           "auctions": {
-            "description": "Conducted or scheduled auction records",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Conducted or scheduled auction records"
           }
         },
         "required": [
@@ -12145,7 +12179,8 @@
             "description": "Installment month 1..N"
           },
           "auctionDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-11-10T11:00:00.000Z",
             "description": "Scheduled/Conducted auction timestamp"
           },
@@ -12160,49 +12195,49 @@
             "description": "Auction lifecycle status"
           },
           "bidDiscount": {
-            "type": "object",
+            "type": "number",
             "example": 25000,
             "description": "Winning bid discount in whole Rupees",
             "nullable": true
           },
           "foremanCommissionRate": {
-            "type": "object",
+            "type": "number",
             "example": 4,
             "description": "Foreman commission rate frozen at 4.00%",
             "nullable": true
           },
           "foremanCommissionAmount": {
-            "type": "object",
+            "type": "number",
             "example": 4000,
             "description": "Foreman commission in whole Rupees",
             "nullable": true
           },
           "totalDividend": {
-            "type": "object",
+            "type": "number",
             "example": 21000,
             "description": "Total universal dividend pool in whole Rupees",
             "nullable": true
           },
           "dividendPerTicket": {
-            "type": "object",
+            "type": "number",
             "example": 1050,
             "description": "Dividend allocated per ticket in whole Rupees",
             "nullable": true
           },
           "prizeMoney": {
-            "type": "object",
+            "type": "number",
             "example": 75000,
             "description": "Prize money payable to winner in whole Rupees",
             "nullable": true
           },
           "conductedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-maker-001",
             "description": "Maker user ID who entered bid",
             "nullable": true
           },
           "finalizedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-checker-001",
             "description": "Checker user ID who finalized auction",
             "nullable": true
@@ -12272,13 +12307,14 @@
             "description": "Whether filed at Chit Registrar office"
           },
           "filingReference": {
-            "type": "object",
+            "type": "string",
             "example": null,
             "description": "Government challan or filing reference",
             "nullable": true
           },
           "filedDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": null,
             "description": "Filing date at Registrar office",
             "nullable": true
@@ -12313,7 +12349,8 @@
             "description": "Installment month 1..N"
           },
           "auctionDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-11-10T11:00:00.000Z",
             "description": "Scheduled/Conducted auction timestamp"
           },
@@ -12328,49 +12365,49 @@
             "description": "Auction lifecycle status"
           },
           "bidDiscount": {
-            "type": "object",
+            "type": "number",
             "example": 25000,
             "description": "Winning bid discount in whole Rupees",
             "nullable": true
           },
           "foremanCommissionRate": {
-            "type": "object",
+            "type": "number",
             "example": 4,
             "description": "Foreman commission rate frozen at 4.00%",
             "nullable": true
           },
           "foremanCommissionAmount": {
-            "type": "object",
+            "type": "number",
             "example": 4000,
             "description": "Foreman commission in whole Rupees",
             "nullable": true
           },
           "totalDividend": {
-            "type": "object",
+            "type": "number",
             "example": 21000,
             "description": "Total universal dividend pool in whole Rupees",
             "nullable": true
           },
           "dividendPerTicket": {
-            "type": "object",
+            "type": "number",
             "example": 1050,
             "description": "Dividend allocated per ticket in whole Rupees",
             "nullable": true
           },
           "prizeMoney": {
-            "type": "object",
+            "type": "number",
             "example": 75000,
             "description": "Prize money payable to winner in whole Rupees",
             "nullable": true
           },
           "conductedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-maker-001",
             "description": "Maker user ID who entered bid",
             "nullable": true
           },
           "finalizedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-checker-001",
             "description": "Checker user ID who finalized auction",
             "nullable": true
@@ -12404,6 +12441,7 @@
           },
           "chitGroup": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Parent chit scheme parameters"
           }
         },
@@ -12423,8 +12461,7 @@
           "finalizedByUserId",
           "winner",
           "tieBidders",
-          "minutes",
-          "chitGroup"
+          "minutes"
         ]
       },
       "EligibleBidderResponseDto": {
@@ -12690,7 +12727,8 @@
             "description": "Installment month 1..N"
           },
           "dueDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-11-15T00:00:00.000Z",
             "description": "Due payment cutoff date"
           },
@@ -12726,6 +12764,7 @@
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber ticket details"
           }
         },
@@ -12845,10 +12884,12 @@
           },
           "customer": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber details"
           },
           "chitGroup": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Chit group details"
           }
         },
@@ -12940,7 +12981,8 @@
             "description": "Installment month"
           },
           "dueDate": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-11-15T00:00:00.000Z",
             "description": "Due cutoff date"
           },
@@ -12975,13 +13017,14 @@
             "description": "Payment status"
           },
           "paidAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-11-12T14:30:00.000Z",
             "description": "Payment date",
             "nullable": true
           },
           "receiptNumber": {
-            "type": "object",
+            "type": "string",
             "example": "KC-RCPT-202611-00042",
             "description": "Issued receipt number",
             "nullable": true
@@ -13004,18 +13047,22 @@
         "properties": {
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Ticket details"
           },
           "chitGroup": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Chit group parameters"
           },
           "customer": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Customer details"
           },
           "summary": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Summary statistics"
           },
           "passbook": {
@@ -13049,6 +13096,7 @@
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Updated subscriber ticket details"
           }
         },
@@ -13086,6 +13134,7 @@
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "example": {
               "id": "ticket-uuid-001",
               "ticketNumber": 5,
@@ -13175,7 +13224,8 @@
             "description": "Exit settlement refund voucher number"
           },
           "settledAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T19:00:00.000Z",
             "description": "Settlement timestamp"
           }
@@ -13345,7 +13395,8 @@
             "description": "Installment month"
           },
           "paidAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Payment recorded timestamp"
           }
@@ -13641,11 +13692,12 @@
             ]
           },
           "payments": {
-            "description": "Itemized collections list",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Itemized collections list"
           }
         },
         "required": [
@@ -13681,11 +13733,12 @@
             }
           },
           "collections": {
-            "description": "Itemized collection records",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Itemized collection records"
           }
         },
         "required": [
@@ -13826,35 +13879,38 @@
             "description": "Payment lifecycle status"
           },
           "paidAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Payment timestamp"
           },
           "transactionRef": {
-            "type": "object",
+            "type": "string",
             "example": "UPI-REF-9876543210",
             "description": "Transaction / Cheque reference",
             "nullable": true
           },
           "recordedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-agent-001",
             "description": "Collecting staff ID",
             "nullable": true
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Updated timestamp"
           }
@@ -13892,7 +13948,8 @@
             "description": "Receipt amount in whole Rupees"
           },
           "issuedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Receipt issue timestamp"
           }
@@ -14029,23 +14086,28 @@
             "example": "Paid via PhonePe"
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-27T10:00:00.000Z"
           },
           "submittedByUser": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Submitting user"
           },
           "customer": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Customer details"
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber ticket details"
           },
           "due": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Installment due details"
           }
         },
@@ -14054,11 +14116,7 @@
           "amount",
           "utrNumber",
           "notes",
-          "createdAt",
-          "submittedByUser",
-          "customer",
-          "ticket",
-          "due"
+          "createdAt"
         ]
       },
       "PaymentDetailResponseDto": {
@@ -14102,35 +14160,38 @@
             "description": "Payment lifecycle status"
           },
           "paidAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Payment timestamp"
           },
           "transactionRef": {
-            "type": "object",
+            "type": "string",
             "example": "UPI-REF-9876543210",
             "description": "Transaction / Cheque reference",
             "nullable": true
           },
           "recordedByUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-agent-001",
             "description": "Collecting staff ID",
             "nullable": true
           },
           "branchId": {
-            "type": "object",
+            "type": "string",
             "example": "branch-prd-001",
             "description": "Branch ID",
             "nullable": true
           },
           "createdAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Creation timestamp"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Updated timestamp"
           },
@@ -14146,10 +14207,12 @@
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber ticket details"
           },
           "installmentDue": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Installment due details"
           }
         },
@@ -14165,9 +14228,7 @@
           "branchId",
           "createdAt",
           "updatedAt",
-          "receipt",
-          "ticket",
-          "installmentDue"
+          "receipt"
         ]
       },
       "BilingualReceiptResponseDto": {
@@ -14184,7 +14245,8 @@
             "description": "Indicates receipt supports English and Tamil"
           },
           "issuedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Receipt issue timestamp"
           },
@@ -14195,6 +14257,7 @@
           },
           "data": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Structured bilingual digital receipt fields and metadata"
           },
           "formattedText": {
@@ -14235,36 +14298,38 @@
             "description": "Maker user ID"
           },
           "makerNotes": {
-            "type": "object",
+            "type": "string",
             "example": "Wrong member account credited by mistake",
             "description": "Maker explanation",
             "nullable": true
           },
           "requestedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Request timestamp"
           },
           "checkerUserId": {
-            "type": "object",
+            "type": "string",
             "example": "user-checker-001",
             "description": "Checker user ID",
             "nullable": true
           },
           "checkerNotes": {
-            "type": "object",
+            "type": "string",
             "example": "Verified with physical voucher. Approved.",
             "description": "Checker notes",
             "nullable": true
           },
           "isApproved": {
-            "type": "object",
+            "type": "boolean",
             "example": true,
             "description": "Reversal approval state",
             "nullable": true
           },
           "reviewedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Review timestamp",
             "nullable": true
@@ -14420,7 +14485,8 @@
             "example": "INITIATED"
           },
           "submittedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-27T10:00:00.000Z"
           }
         },
@@ -14475,12 +14541,20 @@
             "example": "UPI payment claim verified successfully. Official receipt generated and sent to customer."
           },
           "payment": {
-            "type": "object",
-            "description": "Verified payment record"
+            "description": "Verified payment record",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentRecordDto"
+              }
+            ]
           },
           "receipt": {
-            "type": "object",
-            "description": "Sequential bilingual receipt"
+            "description": "Sequential bilingual receipt",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptDto"
+              }
+            ]
           },
           "dueStatus": {
             "type": "string",
@@ -14547,29 +14621,32 @@
             "nullable": true
           },
           "disbursedAmount": {
-            "type": "object",
+            "type": "number",
             "example": 75000,
             "description": "Prize money amount in whole Rupees",
             "nullable": true
           },
           "disbursementReference": {
-            "type": "object",
+            "type": "string",
             "example": "UTR-NEFT-12345678",
             "description": "Bank UTR or Cheque number",
             "nullable": true
           },
           "disbursedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Payout release timestamp",
             "nullable": true
           },
           "auction": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Auction and scheme details"
           },
           "ticket": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber ticket details"
           }
         },
@@ -14581,9 +14658,7 @@
           "disbursementMode",
           "disbursedAmount",
           "disbursementReference",
-          "disbursedAt",
-          "auction",
-          "ticket"
+          "disbursedAt"
         ]
       },
       "UploadSafetyProofResponseDto": {
@@ -14615,7 +14690,8 @@
             "description": "Original uploaded file name"
           },
           "uploadedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-23T19:00:00.000Z",
             "description": "Timestamp when document was uploaded"
           }
@@ -14837,12 +14913,14 @@
             "description": "Bilingual flag"
           },
           "issuedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2026-10-22T07:28:14.000Z",
             "description": "Voucher issue timestamp"
           },
           "data": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Structured voucher parameters"
           },
           "formattedText": {
@@ -14899,7 +14977,8 @@
             "nullable": true
           },
           "disbursedAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "example": "2025-08-22T00:00:00.000Z"
           },
           "auctionId": {
@@ -14997,18 +15076,22 @@
           },
           "todayCollections": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Today collection totals breakdown"
           },
           "todayDisbursements": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Today disbursement totals"
           },
           "vaultBalance": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Branch vault cash balance status"
           },
           "arrearsSummary": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Arrears aging summary"
           },
           "pendingApprovalsCount": {
@@ -15082,32 +15165,36 @@
             ]
           },
           "handovers": {
-            "description": "Unacknowledged cash handover batches",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Unacknowledged cash handover batches"
           },
           "reversals": {
-            "description": "Pending payment reversals awaiting Checker signoff",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Pending payment reversals awaiting Checker signoff"
           },
           "authorizations": {
-            "description": "Pending prize payouts awaiting Checker authorization",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Pending prize payouts awaiting Checker authorization"
           },
           "safetyProofs": {
-            "description": "Pending safety proofs awaiting Maker verification",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Pending safety proofs awaiting Maker verification"
           }
         },
         "required": [
@@ -15134,26 +15221,31 @@
           },
           "openingCash": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Opening cash in safe"
           },
           "totalCollections": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Total daily collection receipts"
           },
           "totalDisbursements": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Total daily disbursements"
           },
           "closingCash": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Closing cash in safe"
           },
           "entries": {
-            "description": "Itemized receipts and payout voucher records",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Itemized receipts and payout voucher records"
           }
         },
         "required": [
@@ -15200,11 +15292,12 @@
             "description": "Closing physical cash in safe in whole Rupees"
           },
           "entries": {
-            "description": "Chronological cash ledger entries",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Chronological cash ledger entries"
           }
         },
         "required": [
@@ -15236,11 +15329,12 @@
             "description": "Duration in months"
           },
           "auctions": {
-            "description": "Chronological list of all auctions and minutes proceedings",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Chronological list of all auctions and minutes proceedings"
           }
         },
         "required": [
@@ -15265,18 +15359,21 @@
           },
           "customer": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Subscriber details"
           },
           "chitGroup": {
             "type": "object",
+            "additionalProperties": true,
             "description": "Chit scheme parameters"
           },
           "schedule": {
-            "description": "20-month schedule of dues, dividend credits, payments, and arrears",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "20-month schedule of dues, dividend credits, payments, and arrears"
           }
         },
         "required": [
@@ -15285,6 +15382,37 @@
           "customer",
           "chitGroup",
           "schedule"
+        ]
+      },
+      "ReportPaginationDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1,
+            "description": "Current page number"
+          },
+          "limit": {
+            "type": "number",
+            "example": 20,
+            "description": "Maximum records per page"
+          },
+          "totalRecords": {
+            "type": "number",
+            "example": 45,
+            "description": "Total matching records"
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 3,
+            "description": "Total available pages"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "totalRecords",
+          "totalPages"
         ]
       },
       "DefaultersReportResponseDto": {
@@ -15296,15 +15424,20 @@
             "description": "Reporting scope"
           },
           "pagination": {
-            "type": "object",
-            "description": "Pagination details"
+            "description": "Pagination details",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportPaginationDto"
+              }
+            ]
           },
           "defaulters": {
-            "description": "List of defaulting subscribers categorized by arrears buckets",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "List of defaulting subscribers categorized by arrears buckets"
           }
         },
         "required": [
@@ -15317,15 +15450,20 @@
         "type": "object",
         "properties": {
           "pagination": {
-            "type": "object",
-            "description": "Pagination details"
+            "description": "Pagination details",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportPaginationDto"
+              }
+            ]
           },
           "logs": {
-            "description": "Append-only audit trail logs",
             "type": "array",
             "items": {
-              "type": "array"
-            }
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Append-only audit trail logs"
           }
         },
         "required": [

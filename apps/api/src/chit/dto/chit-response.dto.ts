@@ -13,7 +13,7 @@ export class ChitGroupResponseDto {
   @ApiProperty({ example: '₹1 Lakh 20 Months Group A', description: 'Chit group name in English' })
   groupName: string;
 
-  @ApiProperty({ example: 'ரூ 1 லட்சம் 20 மாதங்கள் குழு A', description: 'Chit group name in Tamil', nullable: true })
+  @ApiProperty({ type: String, example: 'ரூ 1 லட்சம் 20 மாதங்கள் குழு A', description: 'Chit group name in Tamil', nullable: true })
   groupNameTamil?: string | null;
 
   @ApiProperty({ example: 100000, description: 'Chit total value in whole Rupees' })
@@ -43,13 +43,13 @@ export class ChitGroupResponseDto {
   @ApiProperty({ enum: ChitStatus, example: ChitStatus.DRAFT, description: 'Chit scheme lifecycle status' })
   status: ChitStatus;
 
-  @ApiProperty({ example: 'DRO/ERD/CHIT/2026/001', description: 'Registrar sanction order number', nullable: true })
+  @ApiProperty({ type: String, example: 'DRO/ERD/CHIT/2026/001', description: 'Registrar sanction order number', nullable: true })
   sanctionOrderNumber?: string | null;
 
-  @ApiProperty({ example: '2026-10-01T00:00:00.000Z', description: 'Chit commencement start date' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-01T00:00:00.000Z', description: 'Chit commencement start date' })
   startDate: Date | string;
 
-  @ApiProperty({ example: '2028-05-01T00:00:00.000Z', description: 'Chit maturity end date' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2028-05-01T00:00:00.000Z', description: 'Chit maturity end date' })
   endDate: Date | string;
 
   @ApiProperty({ example: 'branch-prd-001', description: 'Branch ID' })
@@ -58,10 +58,10 @@ export class ChitGroupResponseDto {
   @ApiProperty({ type: BranchSummaryDto, nullable: true, description: 'Operating branch details' })
   branch?: BranchSummaryDto | null;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Creation timestamp' })
   createdAt: Date | string;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Updated timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Updated timestamp' })
   updatedAt: Date | string;
 }
 
@@ -81,7 +81,7 @@ export class TicketResponseDto {
   @ApiProperty({ example: false, description: 'Whether ticket has won an auction' })
   isPrized: boolean;
 
-  @ApiProperty({ example: null, description: 'Prized auction ID if won', nullable: true })
+  @ApiProperty({ type: String, example: null, description: 'Prized auction ID if won', nullable: true })
   prizedAuctionId?: string | null;
 
   @ApiProperty({ example: 0, description: 'Consecutive unpaid installment months count' })
@@ -90,7 +90,7 @@ export class TicketResponseDto {
   @ApiProperty({ example: 'ACTIVE', description: 'Ticket enrollment status' })
   status: string;
 
-  @ApiProperty({ example: '2026-10-22T07:28:14.000Z', description: 'Enrollment joining date' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Enrollment joining date' })
   joiningDate: Date | string;
 
   @ApiProperty({ type: CustomerResponseDto, nullable: true, description: 'Subscriber profile details' })
@@ -101,6 +101,10 @@ export class ChitGroupDetailResponseDto extends ChitGroupResponseDto {
   @ApiProperty({ type: [TicketResponseDto], description: 'List of assigned subscriber tickets' })
   tickets: TicketResponseDto[];
 
-  @ApiProperty({ isArray: true, description: 'Conducted or scheduled auction records' })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+    description: 'Conducted or scheduled auction records',
+  })
   auctions: any[];
 }

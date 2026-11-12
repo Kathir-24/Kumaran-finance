@@ -596,35 +596,22 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-04: OpenAPI Spec Defines 97 String/Date Properties as Empty Objects `Record<string, never>` in Typed SDK
+#### Finding DEF-FE-04: OpenAPI Spec Defines 97 String/Date Properties as Empty Objects `Record<string, never>` in Typed SDK `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: OpenAPI Specification & Client SDK Contract Generator
 - **Exact File Path & Line Numbers**:
-  1. `docs/03-architecture/openapi-spec.json` (97 occurrences across schema definitions)
-  2. `packages/api-client/src/generated/api-types.ts:1-12194`
+  1. `docs/03-architecture/openapi-spec.json` & `docs/03-architecture/openapi-types.ts`
+  2. `packages/api-client/src/generated/api-types.ts`
+  3. `apps/mobile/lib/core/api/models/api_models.dart`
+  4. `apps/api/src/{auth,auction,branch,chit,collection,customer,disbursement,installment,jobs,payment,report,user}/dto/*.dto.ts` (17 DTO files)
 - **Violated Specification**: `docs/03-architecture/frontend-architecture.md` §6.1 ("Backend as Authoritative Contract").
 - **Severity**: **HIGH**
 - **Detailed Technical Root Cause**:
-  In NestJS DTOs (e.g., `apps/api/src/payment/dto/payment-response.dto.ts:34-48` and `apps/api/src/auth/dto/auth-response.dto.ts:46-54`), nullable string and date properties use TypeScript union types such as `paidAt: Date | string` and `transactionRef?: string | null` without explicit `type: String` inside `@ApiProperty()`.
-  TypeScript's `emitDecoratorMetadata` compiles union types down to runtime `Object`, causing `@nestjs/swagger` to emit `"type": "object"` across 97 schema properties in `docs/03-architecture/openapi-spec.json`.
-  `openapi-typescript` then translates `"type": "object"` with no sub-properties into `Record<string, never>`.
-- **Impact Analysis**:
-  Consuming these properties in `apps/web/` causes TypeScript compilation failures, forcing developers to use `(record as any).paidAt` and breaking SDK type guarantees.
-- **Concrete Production-Grade Remediation Code Design**:
-  Fix the source of truth in NestJS DTOs and automate live OpenAPI AST export so schema drift cannot recur:
-  1. **Add explicit `type: String` to all nullable/union DTO decorators (`apps/api/src/**/*.dto.ts`)**:
-```typescript
-@ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Payment timestamp' })
-paidAt: Date | string;
-
-@ApiPropertyOptional({ type: String, nullable: true, example: 'UPI-REF-9876543210', description: 'Transaction / Cheque reference' })
-transactionRef?: string | null;
-```
-  2. **Re-Run Existing Live Swagger AST Exporter & Monorepo Codegen Pipeline**:
-     The exporter already exists at `apps/api/scripts/export-openapi.ts` (`pnpm codegen:spec`). Once DTO decorators are updated, regenerate all specs and TypeScript/Dart clients cleanly:
-```bash
-pnpm run codegen:spec && pnpm run codegen:ts
-# (Or execute full monorepo sync including Flutter models via: pnpm run codegen:all)
-```
+  In NestJS DTOs (e.g., `apps/api/src/payment/dto/payment-response.dto.ts` and `apps/api/src/auth/dto/auth-response.dto.ts`), nullable/union primitive properties (`Date | string`, `string | null`, `number | null`, `boolean | null`), untyped/inline `any` object fields, and untyped `any[]` (`isArray: true`) fields lacked explicit Swagger metadata, emitting bare `{ "type": "object" }` (`Record<string, never>`) across `149` DTO schema properties (`115` primitive + `34` object) and `19` nested double-array `unknown[][]` schemas in generated TypeScript types.
+- **Remediation Implemented**:
+  1. Updated all 17 affected DTO files (`76` union/nullable primitive declarations -> `115` schema properties typed with `type: String`/`Number`/`Boolean`, `format: 'date-time'`, `nullable: true`; `34` object properties typed with nested DTO refs including new `ReportPaginationDto` and `PaymentRecordDto`/`ReceiptDto` on `VerifyUpiClaimResponseDto`, or `type: 'object', additionalProperties: true`; and `19` array properties typed with `type: 'array', items: { type: 'object', additionalProperties: true }`).
+  2. Regenerated all monorepo contracts cleanly via `pnpm run codegen:all` (`112` paths, `118` HTTP operations, `146` OpenAPI schemas and Dart models) and `pnpm run codegen:types`.
+  3. Hardened `apps/api/test/client-contract.spec.ts` (updated `/api/v1/...` path keys & sample request DTO shapes, added `Section 2B` OpenAPI AST & TS zero-defect checks) and `packages/api-client/test/client.spec.ts` (verified `Schema<...>` resolution).
+- **Verification Summary**: OpenAPI AST audit verified `0` bare object fields, `0` untyped/double arrays, `0` property-level `Record<string, never>`, and `0` `unknown[][]` occurrences across generated types; `@kumaran/api-client` (`typecheck` clean, `8/8` tests), `apps/api` (`oxlint` `0` errors, `nest build` exit `0`, `53/53` suites / `770/770` tests in `18.813 s`), `apps/web` (`typecheck` clean, `next build` clean, `14/14` suites / `321/321` tests), and `apps/mobile` (`dart analyze` `0` issues, `dart run test/offline_sync_test.dart` passed).
 
 ---
 
@@ -1099,7 +1086,7 @@ gantt
   2. `DEF-BE-01` **[FIXED & VERIFIED]**: Enforced `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE` (plus `@Min(0)` on `openingBalance`) across all 11 monetary DTOs and eliminated silent `Math.floor()` paise truncation via shared [`whole-rupee.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts).
   3. `DEF-FE-02` **[FIXED & VERIFIED]**: Enabled unbuffered `text/event-stream` passthrough with `X-Accel-Buffering: no` in BFF proxy & Nginx, passed `shouldUseSecureCookies` symmetrically into `/api/auth/session`, and removed the legacy `getStoredAccessToken()` guard in `useApprovalsStream` (`credentials: 'same-origin'`).
   4. `DEF-FE-03` **[FIXED & VERIFIED]**: Eliminated `kc_session_active` trust in Edge Middleware, enforced WebCrypto `jose.jwtVerify` (HS256 + `tokenType` validation) and fail-closed `JWT_SECRET` handling in `edge-auth.ts`, sanitized open redirects, and wired single-source-of-truth RBAC gates via `route-permissions.ts`.
-  5. `DEF-FE-04`: Add explicit `@ApiProperty({ type: String })` annotations on nullable/union NestJS DTOs and run `pnpm run codegen:spec && pnpm run codegen:ts`.
+  5. `DEF-FE-04` **[FIXED & VERIFIED]**: Added explicit `@ApiProperty`/`@ApiPropertyOptional` type metadata across 17 NestJS DTO files (`76` union/nullable primitive declarations -> `115` fields, `34` object fields including `ReportPaginationDto` and `VerifyUpiClaimResponseDto` sub-DTO refs, `19` typed object arrays), regenerated all contracts via `pnpm run codegen:all` & `pnpm run codegen:types` (`112` paths, `118` operations, `146` schemas -> `0` bare objects, `0` property-level `Record<string, never>`, `0` `unknown[][]`), and hardened `client-contract.spec.ts` (`10/10`) & `@kumaran/api-client` `client.spec.ts` (`8/8`).
 
 #### Phase 3: Security, Caching, Storage & Observability Optimization (Sprint 3 — Week 2)
 - **Objective**: Establish client IP audit trails, direct S3 uploads, explicit BigInt caching, and database index acceleration.

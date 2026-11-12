@@ -55,6 +55,6 @@ export class SettleRemovalResponseDto {
   @ApiProperty({ example: 'KC-VOU-DEF-819201', description: 'Exit settlement refund voucher number' })
   voucherNumber: string;
 
-  @ApiProperty({ example: '2026-10-23T19:00:00.000Z', description: 'Settlement timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T19:00:00.000Z', description: 'Settlement timestamp' })
   settledAt: Date | string;
 }

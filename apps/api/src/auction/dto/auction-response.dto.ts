@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AuctionStatus } from '@prisma/client';
 
 export class EligibleBidderResponseDto {
@@ -71,10 +71,10 @@ export class AuctionMinutesDto {
   @ApiProperty({ example: false, description: 'Whether filed at Chit Registrar office' })
   filedAtRegistrar: boolean;
 
-  @ApiProperty({ example: null, description: 'Government challan or filing reference', nullable: true })
+  @ApiProperty({ type: String, example: null, description: 'Government challan or filing reference', nullable: true })
   filingReference?: string | null;
 
-  @ApiProperty({ example: null, description: 'Filing date at Registrar office', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: null, description: 'Filing date at Registrar office', nullable: true })
   filedDate?: Date | string | null;
 }
 
@@ -88,34 +88,34 @@ export class AuctionResponseDto {
   @ApiProperty({ example: 2, description: 'Installment month 1..N' })
   installmentMonth: number;
 
-  @ApiProperty({ example: '2026-11-10T11:00:00.000Z', description: 'Scheduled/Conducted auction timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-11-10T11:00:00.000Z', description: 'Scheduled/Conducted auction timestamp' })
   auctionDate: Date | string;
 
   @ApiProperty({ enum: AuctionStatus, example: AuctionStatus.COMPLETED, description: 'Auction lifecycle status' })
   status: AuctionStatus;
 
-  @ApiProperty({ example: 25000, description: 'Winning bid discount in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 25000, description: 'Winning bid discount in whole Rupees', nullable: true })
   bidDiscount?: number | null;
 
-  @ApiProperty({ example: 4.0, description: 'Foreman commission rate frozen at 4.00%', nullable: true })
+  @ApiProperty({ type: Number, example: 4.0, description: 'Foreman commission rate frozen at 4.00%', nullable: true })
   foremanCommissionRate?: number | null;
 
-  @ApiProperty({ example: 4000, description: 'Foreman commission in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 4000, description: 'Foreman commission in whole Rupees', nullable: true })
   foremanCommissionAmount?: number | null;
 
-  @ApiProperty({ example: 21000, description: 'Total universal dividend pool in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 21000, description: 'Total universal dividend pool in whole Rupees', nullable: true })
   totalDividend?: number | null;
 
-  @ApiProperty({ example: 1050, description: 'Dividend allocated per ticket in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 1050, description: 'Dividend allocated per ticket in whole Rupees', nullable: true })
   dividendPerTicket?: number | null;
 
-  @ApiProperty({ example: 75000, description: 'Prize money payable to winner in whole Rupees', nullable: true })
+  @ApiProperty({ type: Number, example: 75000, description: 'Prize money payable to winner in whole Rupees', nullable: true })
   prizeMoney?: number | null;
 
-  @ApiProperty({ example: 'user-maker-001', description: 'Maker user ID who entered bid', nullable: true })
+  @ApiProperty({ type: String, example: 'user-maker-001', description: 'Maker user ID who entered bid', nullable: true })
   conductedByUserId?: string | null;
 
-  @ApiProperty({ example: 'user-checker-001', description: 'Checker user ID who finalized auction', nullable: true })
+  @ApiProperty({ type: String, example: 'user-checker-001', description: 'Checker user ID who finalized auction', nullable: true })
   finalizedByUserId?: string | null;
 
   @ApiProperty({ type: AuctionWinnerDto, nullable: true, description: 'Winning ticket record' })
@@ -129,7 +129,11 @@ export class AuctionDetailResponseDto extends AuctionResponseDto {
   @ApiProperty({ type: AuctionMinutesDto, nullable: true, description: 'Statutory Form XVII minutes record' })
   minutes?: AuctionMinutesDto | null;
 
-  @ApiProperty({ description: 'Parent chit scheme parameters' })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description: 'Parent chit scheme parameters',
+  })
   chitGroup?: any;
 }
 

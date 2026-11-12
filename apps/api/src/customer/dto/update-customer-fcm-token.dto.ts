@@ -3,6 +3,8 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateCustomerFcmTokenDto {
   @ApiPropertyOptional({
+    type: String,
+    nullable: true,
     description:
       'Firebase Cloud Messaging (FCM) device registration token for subscriber mobile passbook push notifications. Pass null to unregister.',
     example: 'eM3X...k9Lp:APA91bF4...',

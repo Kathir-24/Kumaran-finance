@@ -23,6 +23,8 @@ export class UploadSafetyProofResponseDto {
   fileName: string;
 
   @ApiProperty({
+    type: String,
+    format: 'date-time',
     example: '2026-10-23T19:00:00.000Z',
     description: 'Timestamp when document was uploaded',
   })

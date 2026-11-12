@@ -10,7 +10,7 @@ export class BranchResponseDto {
   @ApiProperty({ example: 'Head Office - Perundurai', description: 'Branch name in English' })
   name: string;
 
-  @ApiProperty({ example: 'தலைமை கிளை - பெருந்துறை', description: 'Branch name in Tamil', nullable: true })
+  @ApiProperty({ type: String, example: 'தலைமை கிளை - பெருந்துறை', description: 'Branch name in Tamil', nullable: true })
   nameTamil?: string | null;
 
   @ApiProperty({ example: '142, Erode Main Road, Perundurai - 638052', description: 'Physical address' })
@@ -22,9 +22,9 @@ export class BranchResponseDto {
   @ApiProperty({ example: true, description: 'Whether branch is active' })
   isActive: boolean;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Creation timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Creation timestamp' })
   createdAt: Date | string;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Last update timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Last update timestamp' })
   updatedAt: Date | string;
 }

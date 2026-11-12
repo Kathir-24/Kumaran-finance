@@ -29,18 +29,18 @@ export class UserResponseDto {
   @ApiProperty({ example: true, description: 'Whether 6-digit MPIN is configured' })
   hasMpin: boolean;
 
-  @ApiProperty({ example: 'branch-prd-001', description: 'Branch ID', nullable: true })
+  @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Branch ID', nullable: true })
   branchId?: string | null;
 
   @ApiProperty({ type: BranchSummaryDto, nullable: true, description: 'Assigned branch details' })
   branch?: BranchSummaryDto | null;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Last login timestamp', nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Last login timestamp', nullable: true })
   lastLoginAt?: Date | string | null;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Account creation timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Account creation timestamp' })
   createdAt: Date | string;
 
-  @ApiProperty({ example: '2026-10-23T10:00:00.000Z', description: 'Last update timestamp' })
+  @ApiProperty({ type: String, format: 'date-time', example: '2026-10-23T10:00:00.000Z', description: 'Last update timestamp' })
   updatedAt: Date | string;
 }
