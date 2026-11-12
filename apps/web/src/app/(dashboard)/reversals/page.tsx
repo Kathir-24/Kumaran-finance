@@ -84,7 +84,10 @@ export default function PaymentReversalsPage() {
     },
   });
 
-  const reversedPayments: any[] = historyData || [];
+  const reversedPayments = useMemo<any[]>(
+    () => historyData || [],
+    [historyData],
+  );
 
   // KPI Calculations
   const pendingTotal = useMemo(() => {

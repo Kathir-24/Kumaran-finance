@@ -102,7 +102,10 @@ export default function CustomersDirectoryPage() {
     staleTime: 30_000,
   });
 
-  const customers = response?.data || [];
+  const customers = React.useMemo(
+    () => response?.data || [],
+    [response?.data],
+  );
   const total = response?.total || 0;
   const totalPages = response?.totalPages || Math.ceil(total / limit) || 1;
 

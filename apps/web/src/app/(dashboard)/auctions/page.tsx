@@ -49,7 +49,10 @@ export default function AuctionsPage() {
     },
   });
 
-  const schemes = schemesData?.data || [];
+  const schemes = React.useMemo(
+    () => schemesData?.data || [],
+    [schemesData?.data],
+  );
 
   // Automatically select first scheme if none selected
   React.useEffect(() => {

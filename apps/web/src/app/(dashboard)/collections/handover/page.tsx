@@ -63,7 +63,10 @@ export default function EveningCashHandoverPage() {
     totalCollected: 0, cashCollected: 0, cashPendingHandover: 0,
     cashAcknowledgedInVault: 0, digitalCollected: 0,
   };
-  const collections: any[] = data?.collections || [];
+  const collections = useMemo<any[]>(
+    () => data?.collections || [],
+    [data?.collections],
+  );
 
   const pendingAgentBatches = useMemo<AgentPendingBatch[]>(() => {
     const pendingItems = collections.filter(

@@ -47,7 +47,6 @@ export function Sidebar({
   }, []);
 
   const user = useAuthStore((s) => s.user);
-  const userRoles = user?.roles || [];
 
   const cashHandoversCount = useApprovalsStore((s) => s.cashHandoversCount);
   const disbursementAuthorizationsCount = useApprovalsStore(
@@ -57,8 +56,8 @@ export function Sidebar({
 
   // Filter items matching current staff user's roles
   const allowedNavItems = React.useMemo(() => {
-    return filterNavItemsByRoles(MAIN_NAV_ITEMS, userRoles);
-  }, [userRoles]);
+    return filterNavItemsByRoles(MAIN_NAV_ITEMS, user?.roles || []);
+  }, [user?.roles]);
 
   const getBadgeCount = (badgeKey?: NavItem['badgeKey']) => {
     if (!badgeKey) return 0;
