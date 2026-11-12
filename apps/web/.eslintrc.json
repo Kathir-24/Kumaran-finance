@@ -2,5 +2,44 @@
   "extends": ["next/core-web-vitals", "next/typescript"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/app/**/*.ts",
+        "src/app/**/*.tsx",
+        "src/components/**/*.ts",
+        "src/components/**/*.tsx"
+      ],
+      "excludedFiles": [
+        "src/components/auth/**/*.ts",
+        "src/components/auth/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@/lib/api-client",
+                "importNames": ["getStoredAccessToken", "getStoredRefreshToken"],
+                "message": "Deprecated token getters return null under HttpOnly BFF cookies. Use typed apiClient or @/lib/pdf-download instead (DEF-FE-05)."
+              }
+            ]
+          }
+        ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "CallExpression[callee.name='fetch']",
+            "message": "Direct raw fetch() is prohibited in Web UI pages and components. Use typed apiClient from @/lib/api-client or helpers in @/lib/pdf-download (DEF-FE-05)."
+          },
+          {
+            "selector": "CallExpression[callee.object.name=/^(window|globalThis)$/][callee.property.name='fetch']",
+            "message": "Direct window/globalThis.fetch() is prohibited in Web UI pages and components. Use typed apiClient from @/lib/api-client (DEF-FE-05)."
+          }
+        ]
+      }
+    }
+  ]
 }

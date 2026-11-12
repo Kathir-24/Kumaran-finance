@@ -28,7 +28,7 @@ export function triggerBlobDownload(blob: Blob, filename: string): void {
 }
 
 async function downloadPdfAndSave(
-  requestPromise: Promise<{ data?: any; error?: any; response: Response }>,
+  requestPromise: Promise<{ data?: unknown; error?: unknown; response: Response }>,
   filename: string,
   deps: PdfDownloadDeps = {},
 ): Promise<void> {
