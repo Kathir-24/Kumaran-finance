@@ -9,15 +9,19 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
+  COOKIE_TOTP_PENDING,
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
   getSessionActiveCookieOptions,
+  getTotpPendingCookieOptions,
   getBackendApiUrl,
   shouldUseSecureCookies,
 } from '../src/lib/auth-cookies.ts';
 import {
   applyRefreshedCookies,
+  applyTotpPendingCookie,
   clearAuthCookies,
+  clearTotpPendingCookie,
 } from '../src/lib/bff-token-refresh.ts';
 
 test('BFF Cookies: Access token cookie enforces HttpOnly and 15-minute TTL', () => {
@@ -153,4 +157,39 @@ test('BFF Cookies: clearAuthCookies mirrors applyRefreshedCookies Secure attribu
     /clearAuthCookies\([^,)]+\)/,
     '/api/auth/session must never call clearAuthCookies without symmetric isSecure flag',
   );
+});
+
+test('BFF Cookies: Pending 2FA TOTP cookie enforces HttpOnly, 5-minute TTL, and symmetric clear', () => {
+  const opts = getTotpPendingCookieOptions(true);
+  assert.equal(opts.name, COOKIE_TOTP_PENDING);
+  assert.equal(opts.httpOnly, true);
+  assert.equal(opts.sameSite, 'lax');
+  assert.equal(opts.path, '/');
+  assert.equal(opts.maxAge, 5 * 60);
+  assert.equal(opts.secure, true);
+
+  const setCalls: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+  const mockRes = {
+    cookies: {
+      set(name: string, value: string, options: Record<string, unknown>) {
+        setCalls.push({ name, value, options });
+      },
+    },
+  } as any;
+
+  applyTotpPendingCookie(mockRes, 'pending-totp.jwt', true);
+  assert.equal(setCalls.length, 1);
+  assert.equal(setCalls[0].name, COOKIE_TOTP_PENDING);
+  assert.equal(setCalls[0].value, 'pending-totp.jwt');
+  assert.equal(setCalls[0].options.httpOnly, true);
+  assert.equal(setCalls[0].options.secure, true);
+
+  setCalls.length = 0;
+  clearTotpPendingCookie(mockRes, false);
+  assert.equal(setCalls.length, 1);
+  assert.equal(setCalls[0].name, COOKIE_TOTP_PENDING);
+  assert.equal(setCalls[0].value, '');
+  assert.equal(setCalls[0].options.maxAge, 0);
+  assert.equal(setCalls[0].options.httpOnly, true);
+  assert.equal(setCalls[0].options.secure, false);
 });

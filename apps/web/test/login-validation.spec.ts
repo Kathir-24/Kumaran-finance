@@ -63,18 +63,18 @@ test('Login Validation: Password requires at least 6 characters', () => {
   assert.equal(loginTestSchema.safeParse({ phone: '9842100001', password: '' }).success, false);
 });
 
-test('AuthStore: setTempToken securely stores 2FA temporary token and clears on session establishment', () => {
-  // 1. Set tempToken for TOTP challenge
-  useAuthStore.getState().setTempToken('mock-totp-temp-token-jwt');
-  assert.equal(useAuthStore.getState().tempToken, 'mock-totp-temp-token-jwt');
+test('AuthStore: setPendingTotp tracks non-secret 2FA challenge state and clears on session establishment (DEF-FE-08)', () => {
+  // 1. Mark 2FA pending challenge active (HttpOnly cookie managed by BFF)
+  useAuthStore.getState().setPendingTotp(true);
+  assert.equal(useAuthStore.getState().pendingTotp, true);
   assert.equal(useAuthStore.getState().isAuthenticated, false);
 
-  // 2. Clear tempToken
-  useAuthStore.getState().setTempToken(null);
-  assert.equal(useAuthStore.getState().tempToken, null);
+  // 2. Cancel pending 2FA challenge
+  useAuthStore.getState().setPendingTotp(false);
+  assert.equal(useAuthStore.getState().pendingTotp, false);
 
-  // 3. Establish full auth clears tempToken automatically
-  useAuthStore.getState().setTempToken('another-temp-token');
+  // 3. Establish full auth clears pendingTotp automatically
+  useAuthStore.getState().setPendingTotp(true);
   useAuthStore.getState().setAuth(
     {
       id: 'staff-001',
@@ -86,27 +86,26 @@ test('AuthStore: setTempToken securely stores 2FA temporary token and clears on 
   );
 
   assert.equal(useAuthStore.getState().isAuthenticated, true);
-  assert.equal(useAuthStore.getState().tempToken, null);
+  assert.equal(useAuthStore.getState().pendingTotp, false);
 
   // Clean up
   useAuthStore.getState().logout('manual');
 });
 
-test('Login Flow: Discerning 2FA challenge response vs full token response', () => {
-  // Response branch A: 2FA TOTP required
+test('Login Flow: Discerning 2FA BFF challenge response vs direct full login response (DEF-FE-08)', () => {
+  // Response branch A: 2FA TOTP required (BFF encloses tempToken in HttpOnly cookie, returns boolean flag only)
   const totpChallengeResponse = {
+    success: true,
     requireTotp: true,
-    tempToken: 'jwt-temp-token-5m',
-    message: 'Two-factor authentication required.',
   };
 
-  const isTotp = Boolean(totpChallengeResponse.requireTotp && totpChallengeResponse.tempToken);
+  const isTotp = Boolean(totpChallengeResponse.requireTotp);
   assert.equal(isTotp, true);
+  assert.equal('tempToken' in totpChallengeResponse, false);
 
   // Response branch B: Direct full login
   const directLoginResponse = {
-    accessToken: 'jwt-access-token-15m',
-    refreshToken: 'jwt-refresh-token-7d',
+    success: true,
     user: {
       id: 'user-001',
       name: 'Accountant',
@@ -115,6 +114,6 @@ test('Login Flow: Discerning 2FA challenge response vs full token response', () 
     },
   };
 
-  const isDirect = Boolean(directLoginResponse.accessToken && directLoginResponse.user);
+  const isDirect = Boolean(directLoginResponse.success && directLoginResponse.user);
   assert.equal(isDirect, true);
 });

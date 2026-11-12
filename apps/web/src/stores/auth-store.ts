@@ -28,7 +28,7 @@ export interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
-  tempToken: string | null;
+  pendingTotp: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   isHydrated: boolean;
@@ -38,7 +38,7 @@ export interface AuthState {
 
 export interface AuthActions {
   setAuth: (user: AuthUser, tokens?: { accessToken?: string; refreshToken?: string }) => void;
-  setTempToken: (token: string | null) => void;
+  setPendingTotp: (pending: boolean) => void;
   updateUser: (partial: Partial<AuthUser>) => void;
   setActiveBranchId: (branchId: string | null) => void;
   recordActivity: () => void;
@@ -52,26 +52,15 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
-  tempToken: null,
+  pendingTotp: false,
   isAuthenticated: false,
   isLoading: false,
   isHydrated: false,
   activeBranchId: null,
   lastActivity: Date.now(),
 
-  setTempToken: (token) => {
-    if (typeof window !== 'undefined') {
-      try {
-        if (token) {
-          sessionStorage.setItem('kc_temp_token', token);
-        } else {
-          sessionStorage.removeItem('kc_temp_token');
-        }
-      } catch {
-        // Safe fallback in restricted environments
-      }
-    }
-    set({ tempToken: token });
+  setPendingTotp: (pending) => {
+    set({ pendingTotp: pending });
   },
 
   setAuth: (user, tokens) => {
@@ -81,20 +70,11 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // Persist non-sensitive cached user profile for fast initial paint
     setStoredUserProfile(fullUser);
 
-    // Clear temporary 2FA challenge token from sessionStorage
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.removeItem('kc_temp_token');
-      } catch {
-        // Safe fallback in restricted environments
-      }
-    }
-
     set({
       user: fullUser,
       accessToken: tokens?.accessToken || null,
       refreshToken: tokens?.refreshToken || null,
-      tempToken: null,
+      pendingTotp: false,
       isAuthenticated: true,
       isLoading: false,
       isHydrated: true,
@@ -143,22 +123,15 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         console.warn('[AuthStore] BFF logout request failed, proceeding with local cleanup', err);
       }
 
-      // 2. Purge local profile cache & temporary challenge tokens WITHOUT re-dispatching kumaran:unauthorized
+      // 2. Purge local profile cache WITHOUT re-dispatching kumaran:unauthorized
       clearStoredTokens({ notify: false });
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.removeItem('kc_temp_token');
-        } catch {
-          // Safe fallback in restricted environments
-        }
-      }
 
       // 3. Reset store state
       set({
         user: null,
         accessToken: null,
         refreshToken: null,
-        tempToken: null,
+        pendingTotp: false,
         isAuthenticated: false,
         isLoading: false,
         isHydrated: true,
@@ -201,23 +174,22 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       // Validate session with Next.js BFF session handler
       const res = await fetch('/api/auth/session');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          const activeBranchId = data.user.activeBranchId || data.user.branchId || null;
-          const fullProfile = { ...data.user, activeBranchId };
-          setStoredUserProfile(fullProfile);
+      const data = res.ok ? await res.json().catch(() => null) : null;
+      if (data?.authenticated && data.user) {
+        const activeBranchId = data.user.activeBranchId || data.user.branchId || null;
+        const fullProfile = { ...data.user, activeBranchId };
+        setStoredUserProfile(fullProfile);
 
-          set({
-            user: fullProfile,
-            isAuthenticated: true,
-            isLoading: false,
-            isHydrated: true,
-            activeBranchId,
-            lastActivity: Date.now(),
-          });
-          return;
-        }
+        set({
+          user: fullProfile,
+          isAuthenticated: true,
+          pendingTotp: false,
+          isLoading: false,
+          isHydrated: true,
+          activeBranchId,
+          lastActivity: Date.now(),
+        });
+        return;
       }
 
       // Session is not valid: clear cached profile quietly without triggering logout storm
@@ -226,6 +198,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         user: null,
         accessToken: null,
         refreshToken: null,
+        pendingTotp: Boolean(data?.pendingTotp),
         isAuthenticated: false,
         isLoading: false,
         isHydrated: true,

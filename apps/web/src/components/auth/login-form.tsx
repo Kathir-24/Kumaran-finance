@@ -32,7 +32,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
 
   const setAuth = useAuthStore((state) => state.setAuth);
-  const setTempToken = useAuthStore((state) => state.setTempToken);
+  const setPendingTotp = useAuthStore((state) => state.setPendingTotp);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [showPassword, setShowPassword] = React.useState(false);
@@ -115,10 +115,14 @@ export function LoginForm() {
         return;
       }
 
-      // Branch 1: Staff user requires Microsoft Authenticator 2FA
-      if (response?.requireTotp && response?.tempToken) {
-        setTempToken(response.tempToken);
-        router.push('/2fa');
+      // Branch 1: Staff user requires Microsoft Authenticator 2FA (HttpOnly cookie set by BFF)
+      if (response?.requireTotp) {
+        setPendingTotp(true);
+        const twoFactorTarget =
+          redirectUrl && redirectUrl !== '/'
+            ? `/2fa?redirect=${encodeURIComponent(redirectUrl)}`
+            : '/2fa';
+        router.push(twoFactorTarget);
         return;
       }
 
@@ -167,6 +171,15 @@ export function LoginForm() {
             <Info className="h-4 w-4 text-emerald-400" />
             <AlertDescription className="text-xs">
               {t('loggedOutNotice')}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(reason === 'temp_session_expired' || reason === 'missing_temp_token') && (
+          <Alert variant="destructive" className="border-amber-500/50 bg-amber-950/40 text-amber-300">
+            <ShieldAlert className="h-4 w-4 text-amber-400" />
+            <AlertDescription className="text-xs text-amber-200/90">
+              {t('tempSessionExpired')}
             </AlertDescription>
           </Alert>
         )}

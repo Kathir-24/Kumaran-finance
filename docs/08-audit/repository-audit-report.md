@@ -683,20 +683,23 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-08: Intermediate 2FA TOTP Challenge JWT Stored in Client `sessionStorage`
+#### Finding DEF-FE-08: Intermediate 2FA TOTP Challenge JWT Stored in Client `sessionStorage` `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Web 2FA Authentication Flow
-- **Exact File Path & Line Numbers**:
-  - `apps/web/src/stores/auth-store.ts:60-72`
-  - `apps/web/src/components/auth/login-form.tsx:120`
-  - `apps/web/src/components/auth/totp-form.tsx:50`
+- **Original Defect Locations**:
+  - `apps/web/src/app/api/auth/login/route.ts:44-50`
+  - `apps/web/src/app/api/auth/verify-totp/route.ts:24-27`
+  - `apps/web/src/stores/auth-store.ts:62-91`
+  - `apps/web/src/components/auth/login-form.tsx:119-121`
+  - `apps/web/src/components/auth/totp-form.tsx:49-87`
 - **Violated Specification**: ADR-20; `docs/03-architecture/security-and-access-guardians.md` §7.5.
-- **Severity**: **MEDIUM**
-- **Detailed Technical Root Cause**:
-  While full access tokens are stored in HttpOnly cookies, the intermediate 2FA challenge JWT (`tempToken` with claim `tokenType: 'totp_pending'`) is returned to the client and stored in `sessionStorage.setItem('kc_temp_token', token)`.
-- **Impact Analysis**:
-  Exposes signed JWT credentials to JavaScript contexts and potential XSS vectors.
-- **Concrete Production-Grade Remediation Code Design**:
-  In `apps/web/src/app/api/auth/login/route.ts:44-50`, write `tempToken` into a short-lived 5-minute HttpOnly cookie `kc_totp_pending_token`. In `verify-totp`, extract the token from the cookie instead of client request bodies.
+- **Severity**: **MEDIUM** *(Resolved)*
+- **Original Technical Root Cause**:
+  While full access tokens were stored in HttpOnly cookies, the intermediate 5-minute 2FA challenge JWT (`tempToken` with claim `tokenType: 'totp_pending'`) was returned to the browser in `/api/auth/login` JSON, written into `sessionStorage.setItem('kc_temp_token', token)` and Zustand state, and sent in the `POST /api/auth/verify-totp` JSON body.
+- **Implemented Resolution**:
+  - **HttpOnly Pending 2FA Cookie (`apps/web/src/lib/auth-cookies.ts`, `bff-token-refresh.ts`, `bff-auth-handlers.ts`)**: Added `COOKIE_TOTP_PENDING` (`kc_totp_pending_token`, 5-minute TTL matching backend JWT expiry, `HttpOnly`, `SameSite=Lax`, `Path=/`, protocol-aware `Secure`), `applyTotpPendingCookie()`, and `clearTotpPendingCookie()`.
+  - **Cookie-Only BFF Auth Flow**: `POST /api/auth/login` now encloses `tempToken` strictly inside `kc_totp_pending_token` and omits `tempToken` from JSON (`{ success: true, requireTotp: true }`), while clearing any stale pending cookie on direct login. `POST /api/auth/verify-totp` extracts `tempToken` exclusively from `kc_totp_pending_token` (ignoring any `body.tempToken`), preserves the cookie across mistyped 6-digit code retries, and expires it on success or expired/tampered challenge JWTs (`sessionExpired: true`).
+  - **Edge `/2fa` Guard, Session Status & Back-to-Login Cleanup (`edge-auth.ts`, `middleware.ts`, `session/route.ts`, `logout/route.ts`)**: Extended `evaluateEdgeAuth` & `middleware.ts` to cryptographically verify `kc_totp_pending_token` (`tokenType === 'totp_pending'`) before rendering `/2fa` (redirecting missing/expired challenges to `/login?reason=missing_temp_token|temp_session_expired` and clearing stale cookies symmetrically). Updated `GET /api/auth/session` to surface a non-secret `pendingTotp: boolean` for `F5` reload recovery without leaking JWTs, and updated `POST /api/auth/logout` + `TotpForm` Back-to-Login to clear `kc_totp_pending_token`.
+  - **Zero-Token Client State (`auth-store.ts`, `login-form.tsx`, `totp-form.tsx`)**: Replaced `tempToken` / `setTempToken` / all `sessionStorage` (`kc_temp_token`) references with non-secret in-memory `pendingTotp: boolean` UI state and localized `tempSessionExpired` alert rendering, verified across `bff-totp-routes.spec.ts`, `bff-auth-cookies.spec.ts`, `edge-auth-middleware.spec.ts`, and updated Web unit suites.
 
 ---
 
@@ -1081,8 +1084,8 @@ gantt
 - **Objective**: Establish client IP audit trails, direct S3 uploads, explicit BigInt caching, and database index acceleration.
 - **Target Items**:
   1. `DEF-FE-06` **[FIXED & VERIFIED]**: Added shared `buildBffForwardHeaders` across all 6 Web BFF → NestJS callers, validated `TRUST_PROXY` (`['loopback', 'linklocal', 'uniquelocal']` default) replacing hardcoded `trust proxy = 1`, normalized `::ffff:` client IPs in `AppThrottlerGuard`, added `AsyncLocalStorage` `RequestContextMiddleware` + Prisma 6 `$extends` automatic `AuditLog.ipAddress` persistence, and aligned Nginx `X-Request-ID` / `X-Forwarded-Host` parity (`proxy-client-ip.e2e-spec.ts` + Web/API unit suites verified).
-  2. `DEF-FE-07`: Migrate KYC and safety proof uploads to client-direct `POST /api/v1/storage/presigned-upload-url` PUT flows with browser compression.
-  3. `DEF-FE-08`: Move 2FA intermediate challenge JWT into a 5-minute HttpOnly cookie.
+  2. `DEF-FE-07` **[FIXED & VERIFIED]**: Migrated KYC and safety proof uploads to client-direct S3/R2 `POST /api/v1/storage/presigned-upload-url` + direct `PUT` flows with client-side image compression and fail-closed backend confirmation endpoints.
+  3. `DEF-FE-08` **[FIXED & VERIFIED]**: Moved 2FA intermediate `tempToken` (`totp_pending`) out of browser JSON and `sessionStorage` into a 5-minute `HttpOnly` cookie (`kc_totp_pending_token`) with strict cookie-only BFF verification, Edge `/2fa` HS256 guard (`edge-auth.ts`), non-secret `pendingTotp` session reload recovery, and Back-to-Login cookie cleanup.
   4. `DEF-DB-03`: Implement explicit `serializeCatalog` / `deserializeCatalog` BigInt helpers in `ChitService.findAll` and update `chit-cache.spec.ts` to assert `2000000n`.
   5. `DEF-DB-05`: Apply SQL migration adding indexes on `PaymentAllocation` and unique constraint on `AuctionTieBidder`.
   6. `DEF-DB-06`: Add `removeOnFail: { count: 500, age: 604800 }` to BullMQ queue job configurations.

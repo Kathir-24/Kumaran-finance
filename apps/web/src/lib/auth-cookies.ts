@@ -6,6 +6,7 @@
 export const COOKIE_ACCESS_TOKEN = 'kc_access_token';
 export const COOKIE_REFRESH_TOKEN = 'kc_refresh_token';
 export const COOKIE_SESSION_ACTIVE = 'kc_session_active';
+export const COOKIE_TOTP_PENDING = 'kc_totp_pending_token';
 
 export interface CookieSecurityContext {
   headers?: {
@@ -90,6 +91,21 @@ export function getSessionActiveCookieOptions(isSecure?: boolean) {
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 7 * 24 * 60 * 60, // 7 days
+  };
+}
+
+/**
+ * Pending 2FA TOTP challenge JWT cookie options (5 minutes TTL, HttpOnly).
+ * Scoped at `/` so Next.js Edge Middleware (/2fa) and BFF auth routes share it safely.
+ */
+export function getTotpPendingCookieOptions(isSecure?: boolean) {
+  return {
+    name: COOKIE_TOTP_PENDING,
+    httpOnly: true,
+    secure: isSecure ?? shouldUseSecureCookies(),
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 5 * 60, // 5 minutes matching backend JWT expiry
   };
 }
 

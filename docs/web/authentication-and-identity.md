@@ -51,25 +51,27 @@ apps/web/src/
 │   │   └── logout/route.ts                     # BFF logout handler invalidating Redis/BFF caches & cookies
 │   └── bff/api/v1/[...path]/route.ts           # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
 ├── lib/
-│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto)
+│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto) & kc_totp_pending_token options
+│   ├── bff-auth-handlers.ts                    # Shared BFF login, HttpOnly verify-totp, session, and logout route cores (DEF-FE-08)
 │   ├── bff-api-proxy.ts                        # Shared BFF proxy handler with unbuffered SSE pass-through
 │   ├── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
-│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT verifier & open-redirect sanitizer
+│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT & /2fa totp_pending verifier & redirect sanitizer
 │   └── route-permissions.ts                    # Single canonical RBAC route permissions source of truth
 ├── stores/
-│   └── auth-store.ts                           # Re-entrancy-guarded logout & non-looping unauthenticated hydration
+│   └── auth-store.ts                           # Re-entrancy-guarded logout, non-secret pendingTotp flag & zero-storage hydration
 ├── components/auth/
-│   ├── login-form.tsx                          # Phone+Password form, 2FA fork & active session redirect
-│   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste & guards
+│   ├── login-form.tsx                          # Phone+Password form, 2FA fork, tempSessionExpired notice & active session redirect
+│   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste, cookie-backed guards & Back-to-Login purge
 │   ├── totp-enrollment-modal.tsx               # 3-step setup modal with SVG QR code & 1-click Base32 copy
 │   ├── totp-disable-modal.tsx                  # Password-verified 2FA deactivation modal
 │   └── change-password-modal.tsx               # Self-service password change modal with min-8 char validation
 └── test/
-    ├── login-validation.spec.ts                # ADR-18 10-digit regex, password length & 2FA fork tests
+    ├── login-validation.spec.ts                # ADR-18 10-digit regex, password length & BFF 2FA fork tests
     ├── totp-validation.spec.ts                 # RFC 6238 6-digit validation, paste extraction & guard tests
     ├── totp-enrollment.spec.ts                 # Base32 formatting, SVG QR, enable/disable & store sync tests
     ├── change-password.spec.ts                 # Current/new password validation, DTO matching & i18n parity tests
-    └── edge-auth-middleware.spec.ts            # Edge jose HS256, tokenType, fail-closed secret & RBAC gate tests
+    ├── edge-auth-middleware.spec.ts            # Edge jose HS256, tokenType, /2fa pending guard, fail-closed secret & RBAC gate tests
+    └── bff-totp-routes.spec.ts                 # HttpOnly kc_totp_pending_token login/verify-totp/session/logout route handler & static regression tests
 ```
 
 ---
@@ -93,13 +95,13 @@ sequenceDiagram
     API->>DB: Verify bcrypt password hash
     alt Staff has 2FA enabled
         API-->>BFF: 200 OK { requireTotp: true, tempToken: "jwt..." }
-        BFF-->>Web: { requireTotp: true, tempToken }
-        Web->>Web: Navigate to /2fa
+        BFF-->>Web: Set-Cookie HttpOnly (kc_totp_pending_token, 5m) + { success: true, requireTotp: true }
+        Web->>Web: setPendingTotp(true) & Navigate to /2fa (Edge verifies cookie)
         Staff->>Web: Enter 6-digit code from Microsoft Authenticator
-        Web->>BFF: POST /api/auth/verify-totp { tempToken, totpCode }
-        BFF->>API: POST /api/v1/auth/web/verify-totp
+        Web->>BFF: POST /api/auth/verify-totp { totpCode } (+ HttpOnly cookie)
+        BFF->>API: POST /api/v1/auth/web/verify-totp { tempToken: cookie, totpCode }
         API-->>BFF: 200 OK { accessToken, refreshToken, user }
-        BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + { user }
+        BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + Clear kc_totp_pending_token + { user }
         Web->>Staff: setAuth(user) & Navigate to /dashboard
     else Direct Authentication (2FA not required)
         API-->>BFF: 200 OK { accessToken, refreshToken, user }

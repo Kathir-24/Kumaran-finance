@@ -62,20 +62,18 @@ test('Clipboard Paste Extraction: Cleans dirty inputs and limits to 6 digits', (
   assert.equal(extractPasteDigits(''), '');
 });
 
-test('2FA State Guard: Verification requires valid tempToken', () => {
-  function canVerifyTotp(tempToken: string | null | undefined, code: string): boolean {
-    if (!tempToken || tempToken.trim().length === 0) return false;
+test('2FA State Guard: Verification requires active HttpOnly pending 2FA session (DEF-FE-08)', () => {
+  function canVerifyTotp(hasPendingTotpCookie: boolean, code: string): boolean {
+    if (!hasPendingTotpCookie) return false;
     return isValidTotp(code);
   }
 
-  // Missing tempToken should block verification
-  assert.equal(canVerifyTotp(null, '492817'), false);
-  assert.equal(canVerifyTotp(undefined, '492817'), false);
-  assert.equal(canVerifyTotp('', '492817'), false);
+  // Missing HttpOnly pending 2FA session should block verification
+  assert.equal(canVerifyTotp(false, '492817'), false);
 
-  // Present tempToken with valid code succeeds
-  assert.equal(canVerifyTotp('valid-temp-token-jwt', '492817'), true);
+  // Active pending 2FA challenge with valid code succeeds
+  assert.equal(canVerifyTotp(true, '492817'), true);
 
-  // Present tempToken with invalid code fails
-  assert.equal(canVerifyTotp('valid-temp-token-jwt', '12345'), false);
+  // Active pending 2FA challenge with invalid code fails
+  assert.equal(canVerifyTotp(true, '12345'), false);
 });

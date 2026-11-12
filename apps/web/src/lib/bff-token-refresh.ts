@@ -10,10 +10,12 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
+  COOKIE_TOTP_PENDING,
   getAccessTokenCookieOptions,
   getClearedCookieOptions,
   getRefreshTokenCookieOptions,
   getSessionActiveCookieOptions,
+  getTotpPendingCookieOptions,
 } from './auth-cookies.ts';
 
 export interface BffRefreshedTokens {
@@ -165,4 +167,23 @@ export function clearAuthCookies(response: NextResponse, isSecure?: boolean): vo
   response.cookies.set(COOKIE_ACCESS_TOKEN, '', getClearedCookieOptions(true, isSecure));
   response.cookies.set(COOKIE_REFRESH_TOKEN, '', getClearedCookieOptions(true, isSecure));
   response.cookies.set(COOKIE_SESSION_ACTIVE, '', getClearedCookieOptions(false, isSecure));
+}
+
+/**
+ * Stores the 5-minute 2FA TOTP challenge JWT in an HttpOnly cookie (DEF-FE-08).
+ */
+export function applyTotpPendingCookie(
+  response: NextResponse,
+  tempToken: string,
+  isSecure?: boolean,
+): void {
+  const opts = getTotpPendingCookieOptions(isSecure);
+  response.cookies.set(opts.name, tempToken, opts);
+}
+
+/**
+ * Expires the intermediate 2FA TOTP challenge cookie immediately (Max-Age=0).
+ */
+export function clearTotpPendingCookie(response: NextResponse, isSecure?: boolean): void {
+  response.cookies.set(COOKIE_TOTP_PENDING, '', getClearedCookieOptions(true, isSecure));
 }

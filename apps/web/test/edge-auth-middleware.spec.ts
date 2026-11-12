@@ -315,3 +315,101 @@ test('DEF-FE-03: Route permissions match MAIN_NAV_ITEMS cleanly and resolve long
     assert.deepEqual([...navItem.allowedRoles], [...canonical]);
   }
 });
+
+test('DEF-FE-08: Edge Middleware guards /2fa using cryptographic HttpOnly kc_totp_pending_token verification', async () => {
+  const validTotpPending = await signTestJwt({
+    sub: 'staff-001',
+    roles: ['SUPER_ADMIN'],
+    tokenType: 'totp_pending',
+  });
+  const wrongAccessToken = await signTestJwt({
+    sub: 'staff-001',
+    roles: ['SUPER_ADMIN'],
+    tokenType: 'access',
+  });
+  const expiredTotpPending = await signTestJwt(
+    {
+      sub: 'staff-001',
+      roles: ['SUPER_ADMIN'],
+      tokenType: 'totp_pending',
+    },
+    { expiresIn: '-10s' },
+  );
+
+  // 1. Valid totp_pending cookie -> allow /2fa
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      totpPendingToken: validTotpPending,
+      jwtSecret: TEST_SECRET,
+    }),
+    { action: 'next' },
+  );
+
+  // 2. Missing cookie -> fail closed redirect to /login?reason=missing_temp_token
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=missing_temp_token',
+      clearStaleCookies: false,
+      clearPendingTotpCookie: false,
+    },
+  );
+
+  // 3. Expired pending token -> redirect to /login?reason=temp_session_expired and clear cookie
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      redirectParam: '/users',
+      totpPendingToken: expiredTotpPending,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=temp_session_expired&redirect=%2Fusers',
+      clearStaleCookies: false,
+      clearPendingTotpCookie: true,
+    },
+  );
+
+  // 4. Cross-token substitution: access token placed into pending cookie must fail closed
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      totpPendingToken: wrongAccessToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=temp_session_expired',
+      clearStaleCookies: false,
+      clearPendingTotpCookie: true,
+    },
+  );
+
+  // 5. Already authenticated user on /2fa still redirects cleanly to dashboard
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      accessToken: wrongAccessToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/',
+      clearStaleCookies: false,
+    },
+  );
+
+  // 6. middleware.ts clears COOKIE_TOTP_PENDING when decision.clearPendingTotpCookie is set
+  const middlewareSource = readFileSync(
+    resolve(process.cwd(), 'src/middleware.ts'),
+    'utf8',
+  );
+  assert.match(middlewareSource, /COOKIE_TOTP_PENDING/);
+  assert.match(middlewareSource, /decision\.clearPendingTotpCookie/);
+});

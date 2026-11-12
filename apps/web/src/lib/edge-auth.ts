@@ -14,12 +14,25 @@ export interface EdgeAuthParams {
   errorParam?: string | null;
   accessToken?: string;
   refreshToken?: string;
+  totpPendingToken?: string;
   jwtSecret?: string;
 }
 
 export type EdgeAuthDecision =
   | { action: 'next' }
-  | { action: 'redirect'; location: string; clearStaleCookies: boolean };
+  | {
+      action: 'redirect';
+      location: string;
+      clearStaleCookies: boolean;
+      clearPendingTotpCookie?: boolean;
+    };
+
+export interface TotpPendingEvaluation {
+  valid: boolean;
+  expired: boolean;
+  hadToken: boolean;
+  secretConfigured: boolean;
+}
 
 interface SingleJwtVerification {
   valid: boolean;
@@ -74,7 +87,7 @@ export function sanitizeSafeRedirectPath(redirectParam?: string | null): string 
 async function verifySingleJwt(
   token: string,
   secretKey: Uint8Array,
-  expectedType: 'access' | 'refresh',
+  expectedType: 'access' | 'refresh' | 'totp_pending',
 ): Promise<SingleJwtVerification> {
   try {
     const { payload } = await jwtVerify(token, secretKey, {
@@ -113,6 +126,58 @@ async function verifySingleJwt(
   }
 }
 
+function resolveJwtSecretKey(explicitSecret?: string): Uint8Array | null {
+  const secret = (explicitSecret ?? process.env.JWT_SECRET)?.trim();
+  if (!secret) {
+    if (!hasWarnedMissingSecret) {
+      hasWarnedMissingSecret = true;
+      console.error('[EdgeAuth] JWT_SECRET is missing; failing closed on protected web routes.');
+    }
+    return null;
+  }
+
+  return new TextEncoder().encode(secret);
+}
+
+/**
+ * Cryptographically verifies an HttpOnly `kc_totp_pending_token` JWT (DEF-FE-08).
+ * Fails closed if JWT_SECRET is unset or if `tokenType !== 'totp_pending'`.
+ */
+export async function verifyTotpPendingJwt(
+  token?: string,
+  explicitSecret?: string,
+): Promise<TotpPendingEvaluation> {
+  const cleanToken = token?.trim();
+  const hadToken = Boolean(cleanToken);
+  const secretKey = resolveJwtSecretKey(explicitSecret);
+
+  if (!secretKey) {
+    return {
+      valid: false,
+      expired: false,
+      hadToken,
+      secretConfigured: false,
+    };
+  }
+
+  if (!cleanToken) {
+    return {
+      valid: false,
+      expired: false,
+      hadToken: false,
+      secretConfigured: true,
+    };
+  }
+
+  const result = await verifySingleJwt(cleanToken, secretKey, 'totp_pending');
+  return {
+    valid: Boolean(result.valid && result.sub),
+    expired: result.expired,
+    hadToken: true,
+    secretConfigured: true,
+  };
+}
+
 async function verifyEdgeTokens(
   accessToken?: string,
   refreshToken?: string,
@@ -122,12 +187,8 @@ async function verifyEdgeTokens(
   const cleanRefresh = refreshToken?.trim();
   const hadTokens = Boolean(cleanAccess || cleanRefresh);
 
-  const secret = (explicitSecret ?? process.env.JWT_SECRET)?.trim();
-  if (!secret) {
-    if (!hasWarnedMissingSecret) {
-      hasWarnedMissingSecret = true;
-      console.error('[EdgeAuth] JWT_SECRET is missing; failing closed on protected web routes.');
-    }
+  const secretKey = resolveJwtSecretKey(explicitSecret);
+  if (!secretKey) {
     return {
       authenticated: false,
       roles: [],
@@ -135,8 +196,6 @@ async function verifyEdgeTokens(
       secretConfigured: false,
     };
   }
-
-  const secretKey = new TextEncoder().encode(secret);
 
   if (cleanAccess) {
     const accessResult = await verifySingleJwt(cleanAccess, secretKey, 'access');
@@ -193,6 +252,7 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
     errorParam,
     accessToken,
     refreshToken,
+    totpPendingToken,
     jwtSecret,
   } = params;
 
@@ -200,16 +260,35 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
     return { action: 'next' };
   }
 
-  const isAuthPage =
-    pathname === '/login' ||
-    pathname.startsWith('/login/') ||
-    pathname === '/2fa' ||
-    pathname.startsWith('/2fa/');
+  const isLoginPage = pathname === '/login' || pathname.startsWith('/login/');
+  const isTwoFactorPage = pathname === '/2fa' || pathname.startsWith('/2fa/');
+  const isAuthPage = isLoginPage || isTwoFactorPage;
 
   const auth = await verifyEdgeTokens(accessToken, refreshToken, jwtSecret);
 
   if (!auth.authenticated) {
-    if (isAuthPage) {
+    if (isTwoFactorPage) {
+      const pending = await verifyTotpPendingJwt(totpPendingToken, jwtSecret);
+      if (pending.valid) {
+        return { action: 'next' };
+      }
+
+      const reason = pending.hadToken ? 'temp_session_expired' : 'missing_temp_token';
+      const safeRedirect = sanitizeSafeRedirectPath(redirectParam);
+      const loginQuery =
+        safeRedirect !== '/'
+          ? `reason=${reason}&redirect=${encodeURIComponent(safeRedirect)}`
+          : `reason=${reason}`;
+
+      return {
+        action: 'redirect',
+        location: `/login?${loginQuery}`,
+        clearStaleCookies: auth.hadTokens && auth.secretConfigured,
+        clearPendingTotpCookie: pending.hadToken && pending.secretConfigured,
+      };
+    }
+
+    if (isLoginPage) {
       return { action: 'next' };
     }
 

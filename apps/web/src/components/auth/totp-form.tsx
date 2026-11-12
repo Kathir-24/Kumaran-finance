@@ -27,9 +27,9 @@ export function TotpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const tempToken = useAuthStore((state) => state.tempToken);
+  const pendingTotp = useAuthStore((state) => state.pendingTotp);
   const setAuth = useAuthStore((state) => state.setAuth);
-  const setTempToken = useAuthStore((state) => state.setTempToken);
+  const setPendingTotp = useAuthStore((state) => state.setPendingTotp);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [digits, setDigits] = React.useState<string[]>(['', '', '', '', '', '']);
@@ -39,34 +39,53 @@ export function TotpForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
-  // Guard: Verify pending 2FA token exists; redirect to login if missing, or to dashboard if already authenticated
+  // Guard: Verify HttpOnly 2FA pending challenge exists (via store or BFF session after reload)
   React.useEffect(() => {
     if (isAuthenticated) {
       router.replace(redirectUrl);
       return;
     }
 
-    const activeToken =
-      tempToken || (typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null);
-
-    if (!activeToken) {
-      router.push('/login?reason=missing_temp_token');
-    } else {
-      // Focus the first input cell on mount
+    if (pendingTotp) {
       inputRefs.current[0]?.focus();
+      return;
     }
-  }, [isAuthenticated, tempToken, router, redirectUrl]);
+
+    let cancelled = false;
+
+    const verifyPendingChallenge = async () => {
+      try {
+        const res = await fetch('/api/auth/session');
+        const data = res.ok ? await res.json().catch(() => null) : null;
+        if (cancelled) return;
+
+        if (data?.authenticated && data.user) {
+          setAuth(data.user);
+          router.replace(redirectUrl);
+          return;
+        }
+
+        if (data?.pendingTotp) {
+          setPendingTotp(true);
+          inputRefs.current[0]?.focus();
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+      }
+
+      router.replace('/login?reason=missing_temp_token');
+    };
+
+    void verifyPendingChallenge();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, pendingTotp, router, redirectUrl, setAuth, setPendingTotp]);
 
   const submitCode = React.useCallback(
     async (codeToSubmit: string) => {
-      const activeToken =
-        tempToken || (typeof window !== 'undefined' ? sessionStorage?.getItem('kc_temp_token') : null);
-
-      if (!activeToken) {
-        router.push('/login?reason=missing_temp_token');
-        return;
-      }
-
       if (codeToSubmit.length !== 6 || !/^\d{6}$/.test(codeToSubmit)) {
         setServerError(t('totpInvalid'));
         return;
@@ -76,12 +95,11 @@ export function TotpForm() {
       setServerError(null);
 
       try {
-        // Call Next.js BFF verify-totp handler which validates 2FA & sets HttpOnly cookies
+        // Call Next.js BFF verify-totp handler which reads HttpOnly kc_totp_pending_token cookie
         const res = await fetch('/api/auth/verify-totp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tempToken: activeToken,
             totpCode: codeToSubmit,
           }),
         });
@@ -89,6 +107,11 @@ export function TotpForm() {
         const response = await res.json();
 
         if (!res.ok) {
+          if (res.status === 401 && response?.sessionExpired) {
+            setPendingTotp(false);
+            router.replace('/login?reason=temp_session_expired');
+            return;
+          }
           if (res.status === 401) {
             setServerError(t('invalidTotpCode'));
             // Clear cells and return focus to first box on failure
@@ -104,7 +127,6 @@ export function TotpForm() {
 
         if (response?.success && response?.user) {
           setAuth(response.user);
-          setTempToken(null);
           router.push(redirectUrl);
           return;
         }
@@ -117,7 +139,7 @@ export function TotpForm() {
         setIsLoading(false);
       }
     },
-    [tempToken, router, redirectUrl, setAuth, setTempToken, t],
+    [router, redirectUrl, setAuth, setPendingTotp, t],
   );
 
   const handleDigitChange = (index: number, value: string) => {
@@ -195,9 +217,17 @@ export function TotpForm() {
     handlePastedCode(pasted);
   };
 
-  const handleBackToLogin = () => {
-    setTempToken(null);
-    router.push('/login');
+  const handleBackToLogin = async () => {
+    setIsLoading(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Proceed to login even if cookie-clearing request fails offline
+    } finally {
+      setPendingTotp(false);
+      setIsLoading(false);
+      router.push('/login');
+    }
   };
 
   return (
@@ -279,7 +309,8 @@ export function TotpForm() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={handleBackToLogin}
+          disabled={isLoading}
+          onClick={() => void handleBackToLogin()}
           className="text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
         >
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />

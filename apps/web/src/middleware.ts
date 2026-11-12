@@ -9,6 +9,7 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
+  COOKIE_TOTP_PENDING,
   getClearedCookieOptions,
   shouldUseSecureCookies,
 } from './lib/auth-cookies.ts';
@@ -23,6 +24,7 @@ export async function middleware(request: NextRequest) {
     errorParam: searchParams.get('error'),
     accessToken: request.cookies.get(COOKIE_ACCESS_TOKEN)?.value,
     refreshToken: request.cookies.get(COOKIE_REFRESH_TOKEN)?.value,
+    totpPendingToken: request.cookies.get(COOKIE_TOTP_PENDING)?.value,
   });
 
   if (decision.action === 'next') {
@@ -30,12 +32,16 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(new URL(decision.location, request.url));
+  const isSecure = shouldUseSecureCookies(request);
 
   if (decision.clearStaleCookies) {
-    const isSecure = shouldUseSecureCookies(request);
     response.cookies.set(COOKIE_ACCESS_TOKEN, '', getClearedCookieOptions(true, isSecure));
     response.cookies.set(COOKIE_REFRESH_TOKEN, '', getClearedCookieOptions(true, isSecure));
     response.cookies.set(COOKIE_SESSION_ACTIVE, '', getClearedCookieOptions(false, isSecure));
+  }
+
+  if (decision.clearPendingTotpCookie) {
+    response.cookies.set(COOKIE_TOTP_PENDING, '', getClearedCookieOptions(true, isSecure));
   }
 
   return response;

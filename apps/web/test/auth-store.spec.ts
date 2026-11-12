@@ -110,7 +110,7 @@ test('AuthStore: Race condition prevention ensures isHydrated stays false before
   assert.equal(shouldRedirect, false, 'Must NOT trigger premature redirect on initial render before hydration');
 });
 
-test('AuthStore: setTempToken securely stores 2FA challenge token in sessionStorage without leaking to localStorage', () => {
+test('AuthStore: setPendingTotp tracks non-secret 2FA UI flag without touching sessionStorage or localStorage (DEF-FE-08)', () => {
   const mockSessionStorage = new Map<string, string>();
   const mockLocalStorage = new Map<string, string>();
 
@@ -127,13 +127,14 @@ test('AuthStore: setTempToken securely stores 2FA challenge token in sessionStor
   };
 
   try {
-    // Set temp token for 2FA TOTP challenge
-    useAuthStore.getState().setTempToken('temp-totp-jwt-challenge-xyz');
-    assert.equal(useAuthStore.getState().tempToken, 'temp-totp-jwt-challenge-xyz');
-    assert.equal(mockSessionStorage.get('kc_temp_token'), 'temp-totp-jwt-challenge-xyz');
+    // Enable non-secret 2FA challenge UI flag (JWT stays safely inside HttpOnly cookie)
+    useAuthStore.getState().setPendingTotp(true);
+    assert.equal(useAuthStore.getState().pendingTotp, true);
+    assert.equal(useAuthStore.getState().isAuthenticated, false);
+    assert.equal(mockSessionStorage.size, 0, '2FA flow must never write anything into sessionStorage');
     assert.equal(mockLocalStorage.has('kc_temp_token'), false, 'tempToken must never leak into localStorage');
 
-    // Establishing full authentication clears tempToken
+    // Establishing full authentication resets pendingTotp cleanly
     const mockUser: AuthUser = {
       id: 'user-002',
       name: 'Manager',
@@ -143,8 +144,8 @@ test('AuthStore: setTempToken securely stores 2FA challenge token in sessionStor
       isTotpEnabled: true,
     };
     useAuthStore.getState().setAuth(mockUser, { accessToken: 'access-token-123' });
-    assert.equal(useAuthStore.getState().tempToken, null);
-    assert.equal(mockSessionStorage.has('kc_temp_token'), false, 'tempToken must be purged from sessionStorage on setAuth');
+    assert.equal(useAuthStore.getState().pendingTotp, false);
+    assert.equal(mockSessionStorage.size, 0);
   } finally {
     delete (globalThis as any).window;
     delete (globalThis as any).sessionStorage;
