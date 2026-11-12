@@ -58,6 +58,7 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { UpdateCustomerFcmTokenDto } from './dto/update-customer-fcm-token.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
 import { UploadCustomerDocumentDto } from './dto/upload-customer-document.dto';
+import { ConfirmCustomerDocumentDto } from './dto/confirm-customer-document.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth('JWT-auth')
@@ -276,9 +277,9 @@ export class CustomerController {
     Role.CUSTOMER,
   )
   @ApiOperation({
-    summary: 'Upload and link a KYC verification document',
+    summary: 'Upload and link a KYC verification document (Legacy Multipart Fallback)',
     description:
-      'Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.',
+      'Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/customers/:id/documents/confirm.',
   })
   @ApiCreatedResponseEnvelope(CustomerDocumentResponseDto, {
     description: 'Document uploaded and linked successfully',
@@ -304,6 +305,44 @@ export class CustomerController {
     }
 
     return this.customerService.uploadDocument(customerId, dto, file, currentUser);
+  }
+
+  @Post(':id/documents/confirm')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+  )
+  @ApiOperation({
+    summary: 'Confirm direct-to-S3 KYC upload and persist document metadata',
+    description:
+      'Verifies the uploaded object exists in private S3/local storage under kyc/{customerId}/ and records the CustomerDocument row in PostgreSQL.',
+  })
+  @ApiCreatedResponseEnvelope(CustomerDocumentResponseDto, {
+    description: 'Direct S3 KYC upload confirmed and linked successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid key prefix or uploaded object missing in storage' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Customers can only confirm uploads for their own profile' })
+  @ApiResponse({ status: 404, description: 'Customer not found' })
+  async confirmDocument(
+    @Param('id') customerId: string,
+    @Body() dto: ConfirmCustomerDocumentDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    if (
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
+      currentUser.sub !== customerId
+    ) {
+      throw new ForbiddenException(
+        'Subscribers are only permitted to upload KYC documents for their own account',
+      );
+    }
+
+    return this.customerService.confirmDocument(customerId, dto, currentUser);
   }
 
   @Get(':id/documents/:docId/url')

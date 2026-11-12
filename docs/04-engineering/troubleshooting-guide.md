@@ -263,9 +263,16 @@ The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transacti
   ```
 
 ### H.2. `413 Request Entity Too Large`
-- **Symptoms**: KYC scan upload fails with HTTP 413.
-- **Root Cause**: File size exceeds client max body size (15 MB default).
-- **Remedy**: Compress scanned image/PDF to under 15 MB. In Nginx ingress, `client_max_body_size 20M;` is configured.
+- **Symptoms**: Multipart fallback upload or `STORAGE_DRIVER=local` PUT upload fails with HTTP 413.
+- **Root Cause**: Uncompressed raw file size exceeds the 10 MB application ceiling or Nginx upload limit.
+- **Remedy**: Web uploads automatically invoke `compressImageIfNeeded()` (`<= 1920x1080` JPEG) and route directly to S3/R2 when cloud storage is enabled. For multipart fallbacks and local-driver `storage/upload/` routes, `infra/docker/nginx/conf.d/chitflow.conf` enforces `client_max_body_size 25M;`.
+
+### H.3. Direct Browser S3/R2 `PUT` Fails With CORS or `403 SignatureDoesNotMatch`
+- **Symptoms**: Browser upload fails with `"Direct storage upload failed due to network interruption or bucket CORS policy"` or HTTP `403`.
+- **Root Cause**: Missing bucket CORS rule allowing `PUT` + `x-amz-*` headers from the web origin, or client `PUT` headers mismatching the presigned `PutObjectCommand` headers.
+- **Remedy**:
+  1. Ensure bucket CORS includes `"AllowedMethods": ["GET", "PUT", "HEAD"]`, `"AllowedHeaders": ["*"]`, `"ExposeHeaders": ["ETag"]`, and exact origin (`https://app.kumaranfinance.in` / `http://localhost:3000`). See [PRODUCTION-DEPLOYMENT-GUIDE.md §7.1](../07-operations/PRODUCTION-DEPLOYMENT-GUIDE.md#71-s3-bucket--cloudflare-r2-cors-configuration).
+  2. Always run `compressImageIfNeeded()` *before* requesting `/storage/presigned-upload-url` and send `presigned.headers` verbatim without `Authorization` or cookie headers.
 
 ---
 

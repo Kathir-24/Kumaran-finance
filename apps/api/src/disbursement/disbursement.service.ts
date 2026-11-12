@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import * as path from 'path';
 import { Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,7 @@ import {
 } from '../common/utils/state-transition-lock.util';
 import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
+import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
 import { StorageService } from '../storage/storage.service';
 import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -29,6 +31,7 @@ import {
   VoucherDataInput,
 } from './bilingual-voucher.helper';
 import { AuthorizePayoutDto } from './dto/authorize-payout.dto';
+import { ConfirmSafetyProofDto } from './dto/confirm-safety-proof.dto';
 import { QueryDisbursementDto } from './dto/query-disbursement.dto';
 import { ReleasePayoutDto } from './dto/release-payout.dto';
 import { SettleFinalMonthDto } from './dto/settle-final-month.dto';
@@ -382,6 +385,63 @@ export class DisbursementService {
     return result;
   }
 
+  private async loadAuctionWinnerForSafetyProof(auctionId: string) {
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { winner: true },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (!auction.winner) {
+      throw new BadRequestException('Cannot upload safety proof: No winner recorded for this auction');
+    }
+
+    return auction.winner;
+  }
+
+  private async persistSafetyProofLink(
+    auctionId: string,
+    winnerId: string,
+    s3Key: string,
+    meta: { fileName: string; size: number; mimetype: string; uploadMode: 'DIRECT_S3_PUT' | 'MULTIPART' },
+    makerUserId: string,
+  ) {
+    await this.prisma.auctionWinner.update({
+      where: { id: winnerId },
+      data: {
+        securityDocS3Key: s3Key,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: makerUserId,
+        action: 'SAFETY_PROOF_DOCUMENT_UPLOADED',
+        entityType: 'AuctionWinner',
+        entityId: winnerId,
+        newValue: {
+          s3Key,
+          fileName: meta.fileName,
+          size: meta.size,
+          mimetype: meta.mimetype,
+          uploadMode: meta.uploadMode,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Safety proof collateral document uploaded and linked successfully.',
+      auctionId,
+      securityDocS3Key: s3Key,
+      fileName: meta.fileName,
+      uploadedAt: new Date(),
+    };
+  }
+
   /**
    * Uploads photos of signed blank cheques, promissory notes, or agreement to private S3 bucket.
    */
@@ -404,54 +464,70 @@ export class DisbursementService {
       throw new BadRequestException('Safety proof document file size exceeds the 10 MB limit');
     }
 
-    const auction = await this.prisma.auction.findUnique({
-      where: { id: auctionId },
-      include: { winner: true },
-    });
-
-    if (!auction) {
-      throw new NotFoundException('Auction record not found');
-    }
-
-    if (!auction.winner) {
-      throw new BadRequestException('Cannot upload safety proof: No winner recorded for this auction');
-    }
-
+    const winner = await this.loadAuctionWinnerForSafetyProof(auctionId);
     const sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     const s3Key = `safety-proofs/${auctionId}/${Date.now()}_${sanitizedFilename}`;
 
     await this.storageService.uploadFile(s3Key, file.buffer, file.mimetype);
 
-    await this.prisma.auctionWinner.update({
-      where: { id: auction.winner.id },
-      data: {
-        securityDocS3Key: s3Key,
-      },
-    });
-
-    await this.prisma.auditLog.create({
-      data: {
-        userId: makerUserId,
-        action: 'SAFETY_PROOF_DOCUMENT_UPLOADED',
-        entityType: 'AuctionWinner',
-        entityId: auction.winner.id,
-        newValue: {
-          s3Key,
-          fileName: file.originalname,
-          size: file.size,
-          mimetype: file.mimetype,
-        },
-      },
-    });
-
-    return {
-      success: true,
-      message: 'Safety proof collateral document uploaded and linked successfully.',
+    return this.persistSafetyProofLink(
       auctionId,
-      securityDocS3Key: s3Key,
-      fileName: file.originalname,
-      uploadedAt: new Date(),
-    };
+      winner.id,
+      s3Key,
+      {
+        fileName: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+        uploadMode: 'MULTIPART',
+      },
+      makerUserId,
+    );
+  }
+
+  /**
+   * Confirms a direct-to-storage presigned PUT upload for auction safety proof.
+   * Fail-closed: verifies key prefix and storage object existence before DB update.
+   */
+  async confirmSafetyProof(
+    auctionId: string,
+    dto: ConfirmSafetyProofDto,
+    makerUserId: string,
+  ) {
+    const sanitizedKey = StorageKeyHelper.sanitizeKey(dto.key);
+    if (!sanitizedKey.startsWith(`safety-proof/${auctionId}/`)) {
+      throw new BadRequestException(
+        'Invalid storage key prefix: key must belong to this auction safety-proof folder',
+      );
+    }
+
+    const winner = await this.loadAuctionWinnerForSafetyProof(auctionId);
+    if (winner.disbursementStatus === 'DISBURSED') {
+      throw new BadRequestException(
+        'Cannot replace safety proof after prize money has already been disbursed',
+      );
+    }
+
+    const exists = await this.storageService.fileExists(sanitizedKey);
+    if (!exists) {
+      throw new BadRequestException(
+        'Uploaded safety proof object not found in storage; upload must complete before confirmation',
+      );
+    }
+
+    const safeFileName = path.basename(dto.fileName) || 'safety-proof.bin';
+
+    return this.persistSafetyProofLink(
+      auctionId,
+      winner.id,
+      sanitizedKey,
+      {
+        fileName: safeFileName,
+        size: dto.sizeBytes,
+        mimetype: dto.mimeType,
+        uploadMode: 'DIRECT_S3_PUT',
+      },
+      makerUserId,
+    );
   }
 
   /**

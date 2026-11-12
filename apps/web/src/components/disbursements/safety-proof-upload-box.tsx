@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl';
 import { CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { uploadDirectToStorage } from '@/lib/direct-upload';
 
 interface SafetyProofUploadBoxProps {
   auctionId: string;
@@ -37,24 +38,29 @@ export function SafetyProofUploadBox({
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}/upload-safety-proof`,
-        {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        },
+      const uploaded = await uploadDirectToStorage({
+        purpose: 'SAFETY_PROOF',
+        entityId: auctionId,
+        docType: 'SAFETY_PROOF',
+        file,
+      });
+
+      const result = await unwrapApiResponse<{
+        securityDocS3Key: string;
+        fileName?: string;
+      }>(
+        apiClient.POST('/api/v1/disbursements/auction/{auctionId}/confirm-safety-proof', {
+          params: { path: { auctionId } },
+          body: {
+            key: uploaded.key,
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf',
+            sizeBytes: uploaded.sizeBytes,
+          },
+        }),
       );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to upload safety proof file');
-      }
-      const json = await res.json();
-      const result = json?.data ?? json;
-      onUploaded(result.securityDocS3Key, result.fileName || file.name);
+
+      onUploaded(result.securityDocS3Key, result.fileName || uploaded.fileName);
     } catch (err: any) {
       onError(err.message || 'Error uploading file to S3');
     } finally {
@@ -65,19 +71,11 @@ export function SafetyProofUploadBox({
   const handleInspectPresignedUrl = async () => {
     setInspectingUrl(true);
     try {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}/safety-proof-url`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
+      const data = await unwrapApiResponse<{ url?: string }>(
+        apiClient.GET('/api/v1/disbursements/auction/{auctionId}/safety-proof-url', {
+          params: { path: { auctionId } },
+        }),
       );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to fetch presigned URL');
-      }
-      const json = await res.json();
-      const data = json?.data ?? json;
       if (data?.url) {
         window.open(data.url, '_blank', 'noopener,noreferrer');
       }

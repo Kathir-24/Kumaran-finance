@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 
 export enum UploadPurpose {
   KYC = 'KYC',
@@ -98,4 +98,28 @@ export class PresignedUploadResponseDto {
     additionalProperties: { type: 'string' },
   })
   headers!: Record<string, string>;
+}
+
+export class LocalUploadResponseDto {
+  @ApiProperty({
+    description: 'Sanitized storage object key written to local disk',
+    example: 'kyc/cust-001/AADHAAR_FRONT-a1b2c3d4.jpg',
+  })
+  @IsString()
+  key!: string;
+
+  @ApiProperty({
+    description: 'Verified MIME type of uploaded file',
+    example: 'image/jpeg',
+  })
+  @IsString()
+  mimeType!: string;
+
+  @ApiProperty({
+    description: 'Stored byte size of uploaded file',
+    example: 245120,
+  })
+  @IsInt()
+  @Min(1)
+  sizeBytes!: number;
 }

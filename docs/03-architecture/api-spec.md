@@ -90,7 +90,8 @@
 | `DELETE`| `/customers/:id/nominees/:nomineeId` | Remove linked nominee record | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `PATCH`| `/customers/:id/kyc-status` | Approve or revoke customer KYC verification status | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `PATCH`| `/customers/:id/fcm-token` | Register subscriber FCM device push token (Anti-IDOR) | Staff, Self (Customer) |
-| `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo, Signature; multipart/form-data) to private S3 | Staff, Self (Customer) |
+| `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo, Signature; legacy multipart fallback) to private S3 | Staff, Self (Customer) |
+| `POST` | `/customers/:id/documents/confirm` | Confirm direct-to-S3 presigned PUT KYC scan upload (`kyc/:id/...`, fail-closed `fileExists`) and record metadata | Staff, Self (Customer) |
 | `GET`  | `/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL for KYC scan (Agents blocked per ADR-15) | Staff (Excl. Agents), Self (Customer), Auditor |
 | `DELETE`| `/customers/:id/documents/:docId` | Delete KYC scan from S3 & DB (Verified docs restricted to Super Admin) | Staff, Self (Customer) |
 
@@ -164,7 +165,8 @@
 |---|---|---|---|
 | `GET`  | `/disbursements` | List prize disbursement records across schemes with pagination | Staff, Auditor |
 | `GET`  | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff, Member, Auditor |
-| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (multipart/form-data) to S3 | Staff |
+| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (legacy multipart fallback) to S3 | Staff |
+| `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof scan upload (`safety-proof/:auctionId/...`, fail-closed `fileExists`) | Staff |
 | `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
 | `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
 | `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
@@ -188,6 +190,8 @@
 ### 2.11 Component 1: Encrypted Storage Service (`/api/v1/storage`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
+| `POST` | `/storage/presigned-upload-url` | Request 300s direct-to-S3/R2 presigned `PUT` upload URL + required headers (ABAC-guarded by purpose) | Staff, Customer (Self KYC) |
+| `PUT`  | `/storage/upload/*key` | Local-driver fallback binary `PUT` upload target (`STORAGE_DRIVER=local` only; max 10 MB stream cap; rejected in S3 mode) | Staff, Customer (Self KYC) |
 | `GET`  | `/storage/file/:key` | Authenticated file download (`302` presigned S3/CDN redirect under S3 mode or `?redirect=true`; raw binary stream via `?stream=true` or local driver) | Staff, Customer, Auditor |
 
 ### 2.12 Component 2: Bilingual PDF Canvas Engine (`/api/v1/pdf`)

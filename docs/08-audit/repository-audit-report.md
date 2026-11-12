@@ -667,23 +667,19 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-07: Large File Uploads Proxied Through NestJS Instead of Direct Presigned S3 PUT URLs
+#### Finding DEF-FE-07: Large File Uploads Proxied Through NestJS Instead of Direct Presigned S3 PUT URLs `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Storage & Document Upload Subsystem
-- **Exact File Path & Line Numbers**:
-  - `apps/web/src/components/disbursements/safety-proof-upload-box.tsx:40-50`
-  - `apps/web/src/components/customers/customer-documents-card.tsx:101-110`
-- **Violated Specification**: `AGENTS.md` Invariant 5; ADR-15; `docs/03-architecture/document-and-storage-architecture.md`.
-- **Severity**: **MEDIUM**
-- **Detailed Technical Root Cause**:
-  Files up to 10MB are uploaded as multipart `FormData` directly through the NestJS API server. Client-side image compression (`compressImageIfNeeded`) is omitted.
-- **Impact Analysis**:
-  Uploads consume Node.js heap memory, block event loops on slow connections, and cause gateway timeouts on rural networks.
-- **Concrete Production-Grade Remediation Code Design**:
-  Use direct presigned S3 PUT uploads:
-  1. Compress client-side via `compressImageIfNeeded(file)`.
-  2. Request presigned PUT URL via `POST /api/v1/storage/presigned-upload-url` (`apps/api/src/storage/storage.controller.ts:49`).
-  3. Upload buffer directly from browser to S3 via `fetch(presignedUrl, { method: 'PUT', body: file })`.
-  4. Finalize record via `POST /api/v1/disbursements/.../verify-safety-proof` with the S3 key.
+- **Original Defect Locations**:
+  - `apps/web/src/components/disbursements/safety-proof-upload-box.tsx`
+  - `apps/web/src/components/customers/customer-documents-card.tsx`
+- **Violated Specification**: `AGENTS.md` Verification Gate #6; ADR-15; `docs/03-architecture/document-and-storage-architecture.md`.
+- **Severity**: **MEDIUM** *(Resolved)*
+- **Original Technical Root Cause**:
+  Both Web upload widgets sent multipart `FormData` directly through Next.js BFF and NestJS RAM, `safety-proof-upload-box.tsx` skipped client-side image compression, both widgets (plus `verifyMutation` in `safety-proof-checklist.tsx`) still used legacy `getStoredAccessToken()`, `CustomerModule`/`DisbursementModule` lacked fail-closed DB confirmation endpoints after direct S3 `PUT`, and `LocalStorageDriver` returned `/api/v1/storage/upload/*key` with no controller handler.
+- **Implemented Resolution**:
+  - **Shared Browser Upload Orchestrator (`apps/web/src/lib/direct-upload.ts`)**: Validates MIME (`JPEG/PNG/WEBP/PDF`) and 10 MB ceiling, runs `compressImageIfNeeded()` **before** presigning (aligning `.jpg` / `image/jpeg` with S3 signature), requests a 300s presigned PUT URL via `apiClient`, executes direct browser `PUT` to S3/R2 (zero cookies/Bearer) or `/bff` fallback in `local` mode with a 120s cellular timeout, and commits DB metadata via `/confirm` endpoints.
+  - **BFF Cookie Auth Migration**: Replaced legacy `getStoredAccessToken()` and multipart `FormData` calls in `customer-documents-card.tsx`, `safety-proof-upload-box.tsx`, and `safety-proof-checklist.tsx` with typed `@kumaran/api-client` + `uploadDirectToStorage`. *(Remaining non-upload `getStoredAccessToken()` callers in collections/disbursements/reversals/print modals remain tracked separately for full BFF cleanup.)*
+  - **Backend Fail-Closed Confirmation & Local PUT Target (`apps/api`)**: Added `POST /customers/:id/documents/confirm`, `POST /disbursements/auction/:auctionId/confirm-safety-proof` (validating key prefix ownership + `storageService.fileExists(key)` before writing PostgreSQL), `PUT /storage/upload/*key` (local-driver only with streaming 10 MB cap + `DocumentAccessHelper.assertStorageUploadAccess`), `S3StorageDriver.getPresignedUploadHeaders` SSE parity, and Nginx `storage/upload/` 25M allowance while retaining legacy multipart endpoints for mobile/backward compatibility.
 
 ---
 

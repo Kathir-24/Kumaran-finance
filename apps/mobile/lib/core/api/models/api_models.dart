@@ -617,6 +617,37 @@ class PresignedUploadResponseDto {
   }
 }
 
+class LocalUploadResponseDto {
+  /// Sanitized storage object key written to local disk
+  final String key;
+  /// Verified MIME type of uploaded file
+  final String mimeType;
+  /// Stored byte size of uploaded file
+  final double sizeBytes;
+
+  const LocalUploadResponseDto({
+    required this.key,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  factory LocalUploadResponseDto.fromJson(Map<String, dynamic> json) {
+    return LocalUploadResponseDto(
+      key: json['key']?.toString() ?? '',
+      mimeType: json['mimeType']?.toString() ?? '',
+      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['key'] = key;
+    data['mimeType'] = mimeType;
+    data['sizeBytes'] = sizeBytes;
+    return data;
+  }
+}
+
 class SanitizedUserDto {
   /// User unique ID
   final String id;
@@ -2334,6 +2365,47 @@ class CustomerDocumentResponseDto {
     data['fileName'] = fileName;
     data['verified'] = verified;
     data['uploadedAt'] = uploadedAt;
+    return data;
+  }
+}
+
+class ConfirmCustomerDocumentDto {
+  /// Private storage object key issued by /api/v1/storage/presigned-upload-url
+  final String key;
+  /// Type of KYC identity or address proof document
+  final String docType;
+  /// File name of the uploaded scan
+  final String fileName;
+  /// Verified MIME type uploaded directly to object storage
+  final String mimeType;
+  /// Uploaded file byte length (1 byte to 10 MB)
+  final double sizeBytes;
+
+  const ConfirmCustomerDocumentDto({
+    required this.key,
+    required this.docType,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  factory ConfirmCustomerDocumentDto.fromJson(Map<String, dynamic> json) {
+    return ConfirmCustomerDocumentDto(
+      key: json['key']?.toString() ?? '',
+      docType: json['docType']?.toString() ?? '',
+      fileName: json['fileName']?.toString() ?? '',
+      mimeType: json['mimeType']?.toString() ?? '',
+      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['key'] = key;
+    data['docType'] = docType;
+    data['fileName'] = fileName;
+    data['mimeType'] = mimeType;
+    data['sizeBytes'] = sizeBytes;
     return data;
   }
 }
@@ -5588,6 +5660,42 @@ class UploadSafetyProofResponseDto {
     data['securityDocS3Key'] = securityDocS3Key;
     data['fileName'] = fileName;
     data['uploadedAt'] = uploadedAt;
+    return data;
+  }
+}
+
+class ConfirmSafetyProofDto {
+  /// Private storage object key issued by /api/v1/storage/presigned-upload-url
+  final String key;
+  /// File name of the uploaded collateral scan
+  final String fileName;
+  /// Verified MIME type uploaded directly to object storage
+  final String mimeType;
+  /// Uploaded file byte length (1 byte to 10 MB)
+  final double sizeBytes;
+
+  const ConfirmSafetyProofDto({
+    required this.key,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  factory ConfirmSafetyProofDto.fromJson(Map<String, dynamic> json) {
+    return ConfirmSafetyProofDto(
+      key: json['key']?.toString() ?? '',
+      fileName: json['fileName']?.toString() ?? '',
+      mimeType: json['mimeType']?.toString() ?? '',
+      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['key'] = key;
+    data['fileName'] = fileName;
+    data['mimeType'] = mimeType;
+    data['sizeBytes'] = sizeBytes;
     return data;
   }
 }

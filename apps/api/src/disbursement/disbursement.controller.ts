@@ -34,6 +34,7 @@ import {
 import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import { DisbursementService } from './disbursement.service';
 import { AuthorizePayoutDto } from './dto/authorize-payout.dto';
+import { ConfirmSafetyProofDto } from './dto/confirm-safety-proof.dto';
 import {
   BilingualVoucherResponseDto,
   DisbursementAuthorizationResponseDto,
@@ -127,9 +128,9 @@ export class DisbursementController {
   })
   @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
-    summary: 'Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)',
+    summary: 'Maker: Upload signed blank cheques & agreement safety proof scan (Legacy Multipart Fallback)',
     description:
-      'Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).',
+      'Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof.',
   })
   @ApiCreatedResponseEnvelope(UploadSafetyProofResponseDto, {
     description: 'Safety proof collateral scan uploaded successfully',
@@ -142,6 +143,27 @@ export class DisbursementController {
     @CurrentUser('sub') makerUserId: string,
   ) {
     return this.disbursementService.uploadSafetyProof(auctionId, file, makerUserId);
+  }
+
+  @Post('auction/:auctionId/confirm-safety-proof')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Maker: Confirm direct-to-S3 safety proof collateral upload (ADR-15)',
+    description:
+      'Verifies uploaded safety proof scan exists in private S3/local storage under safety-proof/{auctionId}/ and links securityDocS3Key to the AuctionWinner record.',
+  })
+  @ApiCreatedResponseEnvelope(UploadSafetyProofResponseDto, {
+    description: 'Direct S3 safety proof upload confirmed and linked successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid key prefix, auction already disbursed, or object missing in storage' })
+  @ApiResponse({ status: 404, description: 'Auction or winner record not found' })
+  async confirmSafetyProof(
+    @Param('auctionId') auctionId: string,
+    @Body() dto: ConfirmSafetyProofDto,
+    @CurrentUser('sub') makerUserId: string,
+  ) {
+    return this.disbursementService.confirmSafetyProof(auctionId, dto, makerUserId);
   }
 
   @Get('auction/:auctionId/safety-proof-url')

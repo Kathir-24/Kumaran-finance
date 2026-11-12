@@ -128,6 +128,13 @@ export class StorageService {
     return this.driver.getPresignedUploadUrl(key, mimeType, expiresInSeconds);
   }
 
+  getPresignedUploadHeaders(mimeType: string): Record<string, string> {
+    if (typeof this.driver.getPresignedUploadHeaders === 'function') {
+      return this.driver.getPresignedUploadHeaders(mimeType);
+    }
+    return { 'Content-Type': mimeType };
+  }
+
   /**
    * Batch resolves multiple storage keys in a single roundtrip via Redis MGET pipeline.
    */

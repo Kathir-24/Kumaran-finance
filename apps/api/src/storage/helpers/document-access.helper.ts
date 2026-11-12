@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 
@@ -243,7 +243,11 @@ export class DocumentAccessHelper {
       return;
     }
 
-    if (key.startsWith('minutes/') || key.startsWith('safety-proof/')) {
+    if (
+      key.startsWith('minutes/') ||
+      key.startsWith('safety-proof/') ||
+      key.startsWith('safety-proofs/')
+    ) {
       if (user.roles.includes(Role.CUSTOMER)) {
         throw new ForbiddenException(
           'Access denied: Subscribers cannot access internal company safety or minutes files',
@@ -268,6 +272,50 @@ export class DocumentAccessHelper {
         );
       }
     }
+  }
+
+  /**
+   * Validates write/upload permissions to a sanitized storage key during local-driver
+   * presigned PUT fallback execution.
+   */
+  static assertStorageUploadAccess(key: string, user: JwtPayload): void {
+    const isStaffUploader = user.roles.some((r) =>
+      ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+    );
+
+    if (key.startsWith('kyc/')) {
+      if (
+        isStaffUploader ||
+        user.roles.includes(Role.COLLECTION_AGENT)
+      ) {
+        return;
+      }
+      if (user.roles.includes(Role.CUSTOMER)) {
+        const customerFolder = key.split('/')[1];
+        if (customerFolder !== user.sub && !customerFolder?.includes(user.phone)) {
+          throw new ForbiddenException(
+            'Access denied: You can only upload KYC documents to your own folder',
+          );
+        }
+        return;
+      }
+      throw new ForbiddenException(
+        'Access denied: Your role cannot upload KYC documents',
+      );
+    }
+
+    if (key.startsWith('safety-proof/')) {
+      if (!isStaffUploader) {
+        throw new ForbiddenException(
+          'Access denied: Only Super Admin, Branch Manager, or Accountant can upload safety proofs',
+        );
+      }
+      return;
+    }
+
+    throw new BadRequestException(
+      'Invalid storage upload key prefix: uploads must target kyc/ or safety-proof/',
+    );
   }
 
   /**

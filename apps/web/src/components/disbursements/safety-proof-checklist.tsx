@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { SafetyProofUploadBox } from './safety-proof-upload-box';
-import { getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export interface WinnerSafetyData {
@@ -79,31 +79,22 @@ export function SafetyProofChecklist({
   // Verify Safety Proof Mutation (Maker Transition)
   const verifyMutation = useMutation({
     mutationFn: async () => {
-      const token = getStoredAccessToken();
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/v1/disbursements/auction/${auctionId}/verify-safety-proof`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
+      return unwrapApiResponse(
+        apiClient.POST('/api/v1/disbursements/auction/{auctionId}/verify-safety-proof', {
+          params: { path: { auctionId } },
+          body: {
             isSecurityRequired,
-            securityType: isSecurityRequired ? securityType : undefined,
+            securityType: isSecurityRequired
+              ? (securityType as 'BLANK_CHEQUE' | 'PROMISSORY_NOTE' | 'AGREEMENT_ONLY' | 'NONE')
+              : undefined,
             blankChequeDetails: isSecurityRequired ? blankChequeDetails : undefined,
             agreementSigned,
             nomineeSigned,
             securityDocS3Key: securityDocS3Key || undefined,
             notes: notes.trim() || undefined,
-          }),
-        },
+          },
+        }),
       );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Safety proof verification failed');
-      }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.disbursements.all });

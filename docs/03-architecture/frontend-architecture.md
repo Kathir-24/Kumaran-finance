@@ -302,3 +302,10 @@ flowchart TD
 
 ### 5. Route Loading Transitions & Zero Blank Screens
 - **Instant Route Skeletons**: `apps/web/src/app/(dashboard)/loading.tsx` renders immediately during App Router navigation, presenting pulse skeleton layouts for KPI cards, charts, and tables to provide continuous visual feedback during latency spikes.
+
+### 6. Direct-to-Storage Uploads & Cellular Resilience (`DEF-FE-07`)
+- **Zero-Proxy Presigned PUT Pipeline**: Document uploads in Customer KYC ([`customer-documents-card.tsx`](file:///u:/Kumaran-finance/apps/web/src/components/customers/customer-documents-card.tsx)) and Prize Disbursements ([`safety-proof-upload-box.tsx`](file:///u:/Kumaran-finance/apps/web/src/components/disbursements/safety-proof-upload-box.tsx)) route through [`apps/web/src/lib/direct-upload.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/direct-upload.ts):
+  1. Compresses camera photos via `compressImageIfNeeded` ($\le 1920\times 1080$, JPEG `0.82`) **before** presigning so `.jpg` / `image/jpeg` matches the cryptographic S3 signature.
+  2. Requests a 300s presigned PUT URL from `POST /api/v1/storage/presigned-upload-url` via `apiClient` (`HttpOnly` BFF cookies).
+  3. Executes `PUT` directly to S3/R2 (`credentials: 'omit'`, exact signed headers, `120_000ms` abort timer) or `/bff/api/v1/storage/upload/*key` (`credentials: 'same-origin'`) when `STORAGE_DRIVER=local` is active.
+  4. Finalizes DB metadata exclusively on `2xx` upload success via `POST /customers/:id/documents/confirm` or `POST /disbursements/auction/:auctionId/confirm-safety-proof`.

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import * as fs from 'fs';
@@ -6,6 +6,7 @@ import * as path from 'path';
 import type { JwtPayload } from '../src/auth/interfaces/jwt-payload.interface';
 import { AwsS3StorageDriver, S3StorageDriver } from '../src/storage/drivers/aws-s3-storage.driver';
 import { LocalStorageDriver } from '../src/storage/drivers/local-storage.driver';
+import { DocumentAccessHelper } from '../src/storage/helpers/document-access.helper';
 import { StorageKeyHelper } from '../src/storage/helpers/storage-key.helper';
 import { StorageController } from '../src/storage/storage.controller';
 import { StorageService } from '../src/storage/storage.service';
@@ -444,6 +445,188 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       expect(mockStorageService.getFile).toHaveBeenCalledWith('kyc/usr-admin-1/pan.pdf');
       expect(mockRes.end).toHaveBeenCalled();
       expect(mockRes.redirect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('7. Local Driver Fallback PUT Upload & Header Parity (DEF-FE-07)', () => {
+    const adminUser: JwtPayload = {
+      sub: 'usr-admin-1',
+      phone: '9842100001',
+      roles: [Role.SUPER_ADMIN],
+    };
+    const accountantUser: JwtPayload = {
+      sub: 'usr-acc-1',
+      phone: '9842100002',
+      roles: [Role.ACCOUNTANT],
+    };
+    const customerUser: JwtPayload = {
+      sub: 'cust-001',
+      phone: '9842100003',
+      roles: [Role.CUSTOMER],
+    };
+    const agentUser: JwtPayload = {
+      sub: 'agent-001',
+      phone: '9842100004',
+      roles: [Role.COLLECTION_AGENT],
+    };
+    const auditorUser: JwtPayload = {
+      sub: 'auditor-001',
+      phone: '9842100005',
+      roles: [Role.AUDITOR],
+    };
+
+    let mockStorageService: any;
+    let controller: StorageController;
+
+    beforeEach(() => {
+      mockStorageService = {
+        getActiveDriverName: jest.fn().mockReturnValue('local'),
+        getPresignedUploadUrl: jest
+          .fn()
+          .mockResolvedValue('/api/v1/storage/upload/kyc/cust-001/AADHAAR_FRONT-1234.jpg'),
+        getPresignedUploadHeaders: jest.fn().mockReturnValue({ 'Content-Type': 'image/jpeg' }),
+        uploadFile: jest.fn().mockResolvedValue({
+          key: 'kyc/cust-001/AADHAAR_FRONT-1234.jpg',
+          url: '/api/v1/storage/file/kyc/cust-001/AADHAAR_FRONT-1234.jpg',
+          sizeBytes: 12,
+          mimeType: 'image/jpeg',
+        }),
+      };
+      controller = new StorageController(mockStorageService);
+    });
+
+    it('writes valid binary upload in local driver mode for authorized KYC key', async () => {
+      const mockReq: any = {
+        headers: { 'content-type': 'image/jpeg' },
+        body: Buffer.from('jpeg-binary!'),
+      };
+
+      const res = await controller.uploadLocalFile(
+        ['kyc', 'cust-001', 'AADHAAR_FRONT-1234.jpg'],
+        customerUser,
+        mockReq,
+      );
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        'kyc/cust-001/AADHAAR_FRONT-1234.jpg',
+        expect.any(Buffer),
+        'image/jpeg',
+      );
+      expect(res).toEqual({
+        key: 'kyc/cust-001/AADHAAR_FRONT-1234.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 12,
+      });
+    });
+
+    it('blocks @Put upload endpoint when active driver is s3 (enforces direct PUT)', async () => {
+      mockStorageService.getActiveDriverName.mockReturnValue('s3');
+      const mockReq: any = {
+        headers: { 'content-type': 'image/jpeg' },
+        body: Buffer.from('jpeg-binary!'),
+      };
+
+      await expect(
+        controller.uploadLocalFile('kyc/cust-001/pan.jpg', adminUser, mockReq),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects path traversal and unsupported prefixes on local upload', async () => {
+      const mockReq: any = {
+        headers: { 'content-type': 'image/jpeg' },
+        body: Buffer.from('abc'),
+      };
+
+      await expect(
+        controller.uploadLocalFile('kyc/../etc/passwd', adminUser, mockReq),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        controller.uploadLocalFile('receipts/PRD/2026/REC-1.pdf', adminUser, mockReq),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('enforces ABAC role boundaries on uploads (Auditor read-only, Agent blocked from safety-proof, Customer self-only)', async () => {
+      const mockReq: any = {
+        headers: { 'content-type': 'application/pdf' },
+        body: Buffer.from('%PDF-1.4'),
+      };
+
+      // Auditor cannot upload anything
+      await expect(
+        controller.uploadLocalFile('kyc/cust-001/pan.pdf', auditorUser, mockReq),
+      ).rejects.toThrow(ForbiddenException);
+
+      // Customer cannot upload to another customer's folder or safety-proof/
+      await expect(
+        controller.uploadLocalFile('kyc/cust-999/pan.pdf', customerUser, mockReq),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.uploadLocalFile('safety-proof/auc-1/chq.pdf', customerUser, mockReq),
+      ).rejects.toThrow(ForbiddenException);
+
+      // Collection Agent can upload KYC in field, but cannot upload safety-proof
+      await controller.uploadLocalFile('kyc/cust-001/pan.pdf', agentUser, mockReq);
+      expect(mockStorageService.uploadFile).toHaveBeenCalled();
+
+      await expect(
+        controller.uploadLocalFile('safety-proof/auc-1/chq.pdf', agentUser, mockReq),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects unsupported Content-Type and payloads exceeding 10 MB', async () => {
+      await expect(
+        controller.uploadLocalFile('kyc/cust-001/doc.html', adminUser, {
+          headers: { 'content-type': 'text/html' },
+          body: Buffer.from('<script>alert(1)</script>'),
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        controller.uploadLocalFile('safety-proof/auc-1/huge.pdf', accountantUser, {
+          headers: { 'content-type': 'application/pdf' },
+          body: Buffer.alloc(10 * 1024 * 1024 + 1),
+        } as any),
+      ).rejects.toThrow(/exceeds maximum allowed size/i);
+    });
+
+    it('supports both singular safety-proof/ and legacy safety-proofs/ keys in DocumentAccessHelper', () => {
+      expect(() =>
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proof/auc-1/chq.jpg', accountantUser),
+      ).not.toThrow();
+      expect(() =>
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', accountantUser),
+      ).not.toThrow();
+      expect(() =>
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', customerUser),
+      ).toThrow(ForbiddenException);
+      expect(() =>
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', agentUser),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('exposes exact AWS S3 SSE headers vs custom R2 headers for presigned PUT parity', () => {
+      const awsDriver = new S3StorageDriver({
+        region: 'ap-south-1',
+        bucket: 'kumaran-aws',
+        accessKeyId: 'AKIA_TEST',
+        secretAccessKey: 'SECRET_TEST',
+      });
+      const r2Driver = new S3StorageDriver({
+        region: 'auto',
+        bucket: 'kumaran-r2',
+        accessKeyId: 'R2_TEST',
+        secretAccessKey: 'R2_SECRET',
+        endpoint: 'https://account-id.r2.cloudflarestorage.com',
+      });
+
+      expect(awsDriver.getPresignedUploadHeaders('image/jpeg')).toEqual({
+        'Content-Type': 'image/jpeg',
+        'x-amz-server-side-encryption': 'AES256',
+      });
+      expect(r2Driver.getPresignedUploadHeaders('image/jpeg')).toEqual({
+        'Content-Type': 'image/jpeg',
+      });
     });
   });
 });

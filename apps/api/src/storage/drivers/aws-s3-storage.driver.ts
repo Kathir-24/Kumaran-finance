@@ -164,6 +164,13 @@ export class S3StorageDriver implements StorageDriver {
     });
   }
 
+  getPresignedUploadHeaders(mimeType: string): Record<string, string> {
+    return {
+      'Content-Type': mimeType,
+      ...(this.isCustomEndpoint ? {} : { 'x-amz-server-side-encryption': 'AES256' }),
+    };
+  }
+
   async delete(key: string): Promise<void> {
     const sanitizedKey = StorageKeyHelper.sanitizeKey(key);
 

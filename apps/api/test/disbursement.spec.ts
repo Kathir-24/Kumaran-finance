@@ -688,4 +688,112 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       );
     });
   });
+
+  describe('6. Direct Presigned S3 Safety Proof Confirm Controls (DEF-FE-07)', () => {
+    it('confirms existing S3 safety proof under safety-proof/{auctionId}/ and links AuctionWinner', async () => {
+      const storageMock = {
+        fileExists: jest.fn().mockResolvedValue(true),
+      };
+      const serviceWithStorage = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        storageMock as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue(mockAuction);
+      prismaMock.auctionWinner.update.mockResolvedValue({
+        ...mockWinner,
+        securityDocS3Key: `safety-proof/${mockAuctionId}/abcd1234-cheque.jpg`,
+      });
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-sp-1' });
+
+      const result = await serviceWithStorage.confirmSafetyProof(
+        mockAuctionId,
+        {
+          key: `safety-proof/${mockAuctionId}/abcd1234-cheque.jpg`,
+          fileName: 'cheque.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: 245_000,
+        },
+        mockMakerId,
+      );
+
+      expect(storageMock.fileExists).toHaveBeenCalledWith(
+        `safety-proof/${mockAuctionId}/abcd1234-cheque.jpg`,
+      );
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith({
+        where: { id: mockWinner.id },
+        data: { securityDocS3Key: `safety-proof/${mockAuctionId}/abcd1234-cheque.jpg` },
+      });
+      expect(result.securityDocS3Key).toBe(`safety-proof/${mockAuctionId}/abcd1234-cheque.jpg`);
+    });
+
+    it('fail-closed: rejects confirmSafetyProof when S3 object is missing (zero DB updates)', async () => {
+      const storageMock = {
+        fileExists: jest.fn().mockResolvedValue(false),
+      };
+      const serviceWithStorage = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        storageMock as any,
+      );
+
+      prismaMock.auction.findUnique.mockResolvedValue(mockAuction);
+
+      await expect(
+        serviceWithStorage.confirmSafetyProof(
+          mockAuctionId,
+          {
+            key: `safety-proof/${mockAuctionId}/abcd1234-missing.jpg`,
+            fileName: 'missing.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 120_000,
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prismaMock.auctionWinner.update).not.toHaveBeenCalled();
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects wrong auction key prefix and already-disbursed winners', async () => {
+      const storageMock = {
+        fileExists: jest.fn().mockResolvedValue(true),
+      };
+      const serviceWithStorage = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        storageMock as any,
+      );
+
+      await expect(
+        serviceWithStorage.confirmSafetyProof(
+          mockAuctionId,
+          {
+            key: 'safety-proof/other-auction-999/abcd-cheque.jpg',
+            fileName: 'cheque.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 100_000,
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockAuction,
+        winner: { ...mockWinner, disbursementStatus: 'DISBURSED' },
+      });
+
+      await expect(
+        serviceWithStorage.confirmSafetyProof(
+          mockAuctionId,
+          {
+            key: `safety-proof/${mockAuctionId}/abcd-cheque.jpg`,
+            fileName: 'cheque.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 100_000,
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

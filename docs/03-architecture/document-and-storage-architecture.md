@@ -52,7 +52,7 @@ Kumaran Chits classifies all files into 5 distinct domains:
 
 | Domain | Entity Linked | Storage Path Pattern | Max File Size | Allowed MIME Types | Primary Consumers |
 |---|---|---|:---:|---|---|
-| **1. Customer KYC Scans** | `CustomerDocument` | `kyc/{customerId}/{docType}-{uuid}.{ext}` | 5 MB | `image/jpeg`, `image/png`, `image/webp`, `application/pdf` | Customer (Self), Super Admin, Branch Manager, Accountant |
+| **1. Customer KYC Scans** | `CustomerDocument` | `kyc/{customerId}/{docType}-{uuid}.{ext}` | 10 MB (photos compressed &lt; 1.2 MB) | `image/jpeg`, `image/png`, `image/webp`, `application/pdf` | Customer (Self), Super Admin, Branch Manager, Accountant |
 | **2. Prize Winner Safety Proof** | `AuctionWinner` | `safety-proof/{auctionId}/{uuid}-{filename}` | 10 MB | `image/jpeg`, `image/png`, `image/webp`, `application/pdf` | Super Admin (Checker), Branch Manager, Accountant (Maker) |
 | **3. Digital Subscription Receipts** | `Receipt` | `receipts/{branchCode}/{year}/{receiptNumber}.pdf` | 1 MB | `application/pdf` (ISO A5 Portrait) | Customer, Collection Agent, Accountant, Super Admin |
 | **4. Payout Vouchers & Statutory Forms** | `AuctionWinner`, `Auction`, `SubscriberTicket` | `vouchers/...`, `minutes/...`, `passbooks/...` | 2 MB | `application/pdf` (A5 Landscape & A4) | Super Admin, Branch Manager, Auditor, Customer (Own only) |
@@ -408,13 +408,15 @@ flowchart TD
 ```
 
 ### 9.1 Direct-to-Storage Presigned PUT Uploads
-- **Endpoint**: `POST /api/v1/storage/presigned-upload-url`
-- **Mechanism**: The client requests a presigned S3 `PUT` upload URL with a 5-minute lifespan (`300s`). The API server verifies user ownership via `DocumentAccessHelper` before issuing the signed URL. The client then transfers the document directly to S3-compatible storage (Cloudflare R2, MinIO, or S3) via `PUT` with `Content-Type` and `ServerSideEncryption: 'AES256'`, completely bypassing the Node.js API memory heap.
-- **Fallback**: The standard multipart upload endpoint remains available as a transparent fallback for single-shot, low-latency uploads.
+- **Endpoints**:
+  1. `POST /api/v1/storage/presigned-upload-url` — Issues a 300s presigned PUT URL + required headers (`Content-Type`, and `x-amz-server-side-encryption: AES256` on AWS S3) after ABAC checks.
+  2. Direct browser `PUT` via `apps/web/src/lib/direct-upload.ts` (targeting Cloudflare R2 / S3 / MinIO directly with `credentials: 'omit'`, or `/bff/api/v1/storage/upload/*key` handled by NestJS `@Put('upload/*key')` exclusively when `STORAGE_DRIVER=local`).
+  3. Fail-closed DB confirmation: `POST /api/v1/customers/:id/documents/confirm` (KYC) and `POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof` (Safety Proof) sanitize the key, enforce entity-scoped prefix ownership, and verify `storageService.fileExists(key)` before writing PostgreSQL.
+- **Fallback**: The standard multipart upload endpoints remain available as backward-compatible fallbacks for mobile offline sync and automated harnesses.
 
 ### 9.2 Cellular Upload Timeout Resilience & Client-Side Image Downscaling
-- **120-Second Timeout Exemption**: The standard 15-second `TimeoutInterceptor` deadline is extended to 120 seconds (`@SetTimeout(120_000)`) on KYC document upload (`POST /customers/:id/documents`) and winner safety proof upload (`POST /disbursements/auction/:auctionId/upload-safety-proof`). This guarantees that rural field collection agents in Tamil Nadu operating on fluctuating 3G/4G cellular networks can upload scans without premature timeout termination.
-- **Client-Side HTML5 Canvas Downscaling**: High-resolution smartphone camera photos ($\ge 12\text{ MP}$, $6\text{--}10\text{ MB}$) are automatically downscaled in the browser prior to transmission using `apps/web/src/lib/image-compressor.ts`. Images are resized to a maximum bounding box of $1920\times 1080$ with JPEG quality `0.82`, reducing payload size by $70\text{--}85\%$ ($< 1.2\text{ MB}$) with zero visible degradation of text or signatures. PDF documents bypass canvas processing to prevent vector corruption.
+- **120-Second Timeout Resilience**: The Web upload orchestrator (`apps/web/src/lib/direct-upload.ts`) enforces a 120-second `AbortController` deadline on direct `PUT` transfers, and the standard 15-second `TimeoutInterceptor` deadline is extended to 120 seconds (`@SetTimeout(120_000)`) on the local-driver PUT target (`PUT /storage/upload/*key`), KYC multipart fallback (`POST /customers/:id/documents`), and safety proof multipart fallback (`POST /disbursements/auction/:auctionId/upload-safety-proof`). This guarantees that rural field collection agents and staff in Tamil Nadu operating on fluctuating 3G/4G cellular networks can upload scans without premature timeout termination.
+- **Client-Side HTML5 Canvas Downscaling**: High-resolution smartphone camera photos ($\ge 12\text{ MP}$, $6\text{--}10\text{ MB}$) are automatically downscaled in the browser **prior to requesting the presigned upload URL** using `apps/web/src/lib/image-compressor.ts` so the final `.jpg` filename and `image/jpeg` MIME type match the S3 signature. Images are resized to a maximum bounding box of $1920\times 1080$ with JPEG quality `0.82`, reducing payload size by $70\text{--}85\%$ ($< 1.2\text{ MB}$) with zero visible degradation of text or signatures. PDF documents bypass canvas processing to prevent vector corruption.
 
 ### 9.3 BullMQ Asynchronous Background PDF Pre-Rendering
 - **Pre-Rendering Bulkhead**: In `NotificationService.dispatchPaymentReceipt`, the background BullMQ worker asynchronously pre-renders the subscription receipt PDF via `PdfService.generateReceiptPdf(paymentId)` immediately upon payment confirmation.

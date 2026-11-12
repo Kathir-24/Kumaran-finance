@@ -375,6 +375,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/storage/upload/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Local-driver fallback PUT target for presigned-upload-url
+         * @description Receives raw binary PUT uploads exclusively when STORAGE_DRIVER=local (development/on-prem disk mode). Rejected when cloud S3/R2 driver is active.
+         */
+        put: operations["StorageController_uploadLocalFile_v1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/storage/file/{key}": {
         parameters: {
             query?: never;
@@ -961,10 +981,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Upload and link a KYC verification document
-         * @description Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.
+         * Upload and link a KYC verification document (Legacy Multipart Fallback)
+         * @description Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/customers/:id/documents/confirm.
          */
         post: operations["CustomerController_uploadDocument_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/documents/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm direct-to-S3 KYC upload and persist document metadata
+         * @description Verifies the uploaded object exists in private S3/local storage under kyc/{customerId}/ and records the CustomerDocument row in PostgreSQL.
+         */
+        post: operations["CustomerController_confirmDocument_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1926,10 +1966,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)
-         * @description Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).
+         * Maker: Upload signed blank cheques & agreement safety proof scan (Legacy Multipart Fallback)
+         * @description Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof.
          */
         post: operations["DisbursementController_uploadSafetyProof_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disbursements/auction/{auctionId}/confirm-safety-proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Maker: Confirm direct-to-S3 safety proof collateral upload (ADR-15)
+         * @description Verifies uploaded safety proof scan exists in private S3/local storage under safety-proof/{auctionId}/ and links securityDocS3Key to the AuctionWinner record.
+         */
+        post: operations["DisbursementController_confirmSafetyProof_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2656,6 +2716,23 @@ export interface components {
             headers: {
                 [key: string]: string;
             };
+        };
+        LocalUploadResponseDto: {
+            /**
+             * @description Sanitized storage object key written to local disk
+             * @example kyc/cust-001/AADHAAR_FRONT-a1b2c3d4.jpg
+             */
+            key: string;
+            /**
+             * @description Verified MIME type of uploaded file
+             * @example image/jpeg
+             */
+            mimeType: string;
+            /**
+             * @description Stored byte size of uploaded file
+             * @example 245120
+             */
+            sizeBytes: number;
         };
         SanitizedUserDto: {
             /**
@@ -3810,6 +3887,35 @@ export interface components {
              * @example 2026-10-23T10:00:00.000Z
              */
             uploadedAt: string;
+        };
+        ConfirmCustomerDocumentDto: {
+            /**
+             * @description Private storage object key issued by /api/v1/storage/presigned-upload-url
+             * @example kyc/cust-uuid-001/AADHAAR_FRONT-a1b2c3d4.jpg
+             */
+            key: string;
+            /**
+             * @description Type of KYC identity or address proof document
+             * @example AADHAAR_FRONT
+             * @enum {string}
+             */
+            docType: "AADHAAR_FRONT" | "AADHAAR_BACK" | "PAN" | "PHOTO" | "SIGNATURE";
+            /**
+             * @description File name of the uploaded scan
+             * @example aadhaar_front.jpg
+             */
+            fileName: string;
+            /**
+             * @description Verified MIME type uploaded directly to object storage
+             * @example image/jpeg
+             * @enum {string}
+             */
+            mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+            /**
+             * @description Uploaded file byte length (1 byte to 10 MB)
+             * @example 425120
+             */
+            sizeBytes: number;
         };
         DocumentPresignedUrlResponseDto: {
             /**
@@ -6019,6 +6125,29 @@ export interface components {
              */
             uploadedAt: string;
         };
+        ConfirmSafetyProofDto: {
+            /**
+             * @description Private storage object key issued by /api/v1/storage/presigned-upload-url
+             * @example safety-proof/auc-uuid-001/a1b2c3d4-signed_blank_cheques.jpg
+             */
+            key: string;
+            /**
+             * @description File name of the uploaded collateral scan
+             * @example signed_blank_cheques.jpg
+             */
+            fileName: string;
+            /**
+             * @description Verified MIME type uploaded directly to object storage
+             * @example image/jpeg
+             * @enum {string}
+             */
+            mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+            /**
+             * @description Uploaded file byte length (1 byte to 10 MB)
+             * @example 512000
+             */
+            sizeBytes: number;
+        };
         SafetyProofUrlResponseDto: {
             /**
              * @description Time-limited S3 presigned URL for viewing the safety proof collateral scan
@@ -7280,6 +7409,62 @@ export interface operations {
             };
             /** @description Forbidden: Unauthorized document purpose or ownership violation */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_uploadLocalFile_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/jpeg": string;
+                "image/png": string;
+                "image/webp": string;
+                "application/pdf": string;
+            };
+        };
+        responses: {
+            /** @description Binary payload written to local storage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["LocalUploadResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid key, MIME type, empty body, or S3 driver active */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Unauthorized upload prefix or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Payload exceeds 10 MB ceiling */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8826,6 +9011,68 @@ export interface operations {
             };
             /** @description Too many document upload attempts. Please wait a minute. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_confirmDocument_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmCustomerDocumentDto"];
+            };
+        };
+        responses: {
+            /** @description Direct S3 KYC upload confirmed and linked successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["CustomerDocumentResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid key prefix or uploaded object missing in storage */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Customers can only confirm uploads for their own profile */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Customer not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11532,6 +11779,68 @@ export interface operations {
                 };
             };
             /** @description Missing file or invalid format/size */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Auction or winner record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_confirmSafetyProof_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auctionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmSafetyProofDto"];
+            };
+        };
+        responses: {
+            /** @description Direct S3 safety proof upload confirmed and linked successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["UploadSafetyProofResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid key prefix, auction already disbursed, or object missing in storage */
             400: {
                 headers: {
                     [name: string]: unknown;

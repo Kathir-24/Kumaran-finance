@@ -24,8 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { apiClient, unwrapApiResponse, getApiBaseUrl, getStoredAccessToken } from '@/lib/api-client';
-import { compressImageIfNeeded } from '@/lib/image-compressor';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { uploadDirectToStorage } from '@/lib/direct-upload';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 
@@ -97,22 +97,25 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
     setUploadError(null);
 
     try {
-      const fileToUpload = await compressImageIfNeeded(selectedFile);
-      const formData = new FormData();
-      formData.append('docType', docType);
-      formData.append('file', fileToUpload);
-
-      const token = getStoredAccessToken();
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/customers/${customerId}/documents`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
+      const uploaded = await uploadDirectToStorage({
+        purpose: 'KYC',
+        entityId: customerId,
+        docType,
+        file: selectedFile,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error?.message || 'Failed to upload document');
-      }
+      await unwrapApiResponse(
+        apiClient.POST('/api/v1/customers/{id}/documents/confirm', {
+          params: { path: { id: customerId } },
+          body: {
+            key: uploaded.key,
+            docType: docType as 'AADHAAR_FRONT' | 'AADHAAR_BACK' | 'PAN' | 'PHOTO' | 'SIGNATURE',
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf',
+            sizeBytes: uploaded.sizeBytes,
+          },
+        }),
+      );
 
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId) });
       setIsUploadOpen(false);

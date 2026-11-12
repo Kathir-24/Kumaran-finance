@@ -1166,6 +1166,99 @@
         ]
       }
     },
+    "/api/v1/storage/upload/{key}": {
+      "put": {
+        "description": "Receives raw binary PUT uploads exclusively when STORAGE_DRIVER=local (development/on-prem disk mode). Rejected when cloud S3/R2 driver is active.",
+        "operationId": "StorageController_uploadLocalFile_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "Raw file payload (up to 10 MB) for local storage driver PUT target"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "Raw file payload (up to 10 MB) for local storage driver PUT target"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "Raw file payload (up to 10 MB) for local storage driver PUT target"
+              }
+            },
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "Raw file payload (up to 10 MB) for local storage driver PUT target"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Binary payload written to local storage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LocalUploadResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid key, MIME type, empty body, or S3 driver active"
+          },
+          "403": {
+            "description": "Forbidden: Unauthorized upload prefix or BOLA violation"
+          },
+          "413": {
+            "description": "Payload exceeds 10 MB ceiling"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Local-driver fallback PUT target for presigned-upload-url",
+        "tags": [
+          "Storage & Presigned Files"
+        ]
+      }
+    },
     "/api/v1/storage/file/{key}": {
       "get": {
         "description": "Provides authenticated file streaming for locally stored documents or HTTP 302 redirect to presigned S3/CDN URLs.",
@@ -3464,7 +3557,7 @@
     },
     "/api/v1/customers/{id}/documents": {
       "post": {
-        "description": "Uploads Aadhaar, PAN, Photo, or Signature scan to private S3 bucket and records document metadata. Allowed: Staff, or Customer uploading for their own profile.",
+        "description": "Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/customers/:id/documents/confirm.",
         "operationId": "CustomerController_uploadDocument_v1",
         "parameters": [
           {
@@ -3562,7 +3655,89 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Upload and link a KYC verification document",
+        "summary": "Upload and link a KYC verification document (Legacy Multipart Fallback)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/documents/confirm": {
+      "post": {
+        "description": "Verifies the uploaded object exists in private S3/local storage under kyc/{customerId}/ and records the CustomerDocument row in PostgreSQL.",
+        "operationId": "CustomerController_confirmDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmCustomerDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Direct S3 KYC upload confirmed and linked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerDocumentResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid key prefix or uploaded object missing in storage"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Customers can only confirm uploads for their own profile"
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Confirm direct-to-S3 KYC upload and persist document metadata",
         "tags": [
           "Customers"
         ]
@@ -7678,7 +7853,7 @@
     },
     "/api/v1/disbursements/auction/{auctionId}/upload-safety-proof": {
       "post": {
-        "description": "Uploads photos of signed blank cheques, promissory notes, or winner agreement to private S3 cloud storage and links key to auction winner record. Allowed: Staff (Super Admin, Branch Manager, Accountant).",
+        "description": "Multipart upload fallback retained for mobile offline sync and legacy clients. Web clients should use POST /api/v1/storage/presigned-upload-url followed by POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof.",
         "operationId": "DisbursementController_uploadSafetyProof_v1",
         "parameters": [
           {
@@ -7762,7 +7937,89 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Maker: Upload signed blank cheques & agreement safety proof scan (ADR-15)",
+        "summary": "Maker: Upload signed blank cheques & agreement safety proof scan (Legacy Multipart Fallback)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/auction/{auctionId}/confirm-safety-proof": {
+      "post": {
+        "description": "Verifies uploaded safety proof scan exists in private S3/local storage under safety-proof/{auctionId}/ and links securityDocS3Key to the AuctionWinner record.",
+        "operationId": "DisbursementController_confirmSafetyProof_v1",
+        "parameters": [
+          {
+            "name": "auctionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmSafetyProofDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Direct S3 safety proof upload confirmed and linked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 201
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UploadSafetyProofResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid key prefix, auction already disbursed, or object missing in storage"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden — Insufficient role permissions or BOLA violation"
+          },
+          "404": {
+            "description": "Auction or winner record not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Confirm direct-to-S3 safety proof collateral upload (ADR-15)",
         "tags": [
           "Prize Disbursements & Safety Proof"
         ]
@@ -9686,6 +9943,31 @@
           "headers"
         ]
       },
+      "LocalUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Sanitized storage object key written to local disk",
+            "example": "kyc/cust-001/AADHAAR_FRONT-a1b2c3d4.jpg"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Verified MIME type of uploaded file",
+            "example": "image/jpeg"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "description": "Stored byte size of uploaded file",
+            "example": 245120
+          }
+        },
+        "required": [
+          "key",
+          "mimeType",
+          "sizeBytes"
+        ]
+      },
       "SanitizedUserDto": {
         "type": "object",
         "properties": {
@@ -11390,6 +11672,58 @@
           "fileName",
           "verified",
           "uploadedAt"
+        ]
+      },
+      "ConfirmCustomerDocumentDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "kyc/cust-uuid-001/AADHAAR_FRONT-a1b2c3d4.jpg",
+            "description": "Private storage object key issued by /api/v1/storage/presigned-upload-url"
+          },
+          "docType": {
+            "type": "string",
+            "enum": [
+              "AADHAAR_FRONT",
+              "AADHAAR_BACK",
+              "PAN",
+              "PHOTO",
+              "SIGNATURE"
+            ],
+            "example": "AADHAAR_FRONT",
+            "description": "Type of KYC identity or address proof document"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "aadhaar_front.jpg",
+            "description": "File name of the uploaded scan"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "application/pdf"
+            ],
+            "description": "Verified MIME type uploaded directly to object storage"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "example": 425120,
+            "minimum": 1,
+            "maximum": 10485760,
+            "description": "Uploaded file byte length (1 byte to 10 MB)"
+          }
+        },
+        "required": [
+          "key",
+          "docType",
+          "fileName",
+          "mimeType",
+          "sizeBytes"
         ]
       },
       "DocumentPresignedUrlResponseDto": {
@@ -14703,6 +15037,45 @@
           "securityDocS3Key",
           "fileName",
           "uploadedAt"
+        ]
+      },
+      "ConfirmSafetyProofDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "safety-proof/auc-uuid-001/a1b2c3d4-signed_blank_cheques.jpg",
+            "description": "Private storage object key issued by /api/v1/storage/presigned-upload-url"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "signed_blank_cheques.jpg",
+            "description": "File name of the uploaded collateral scan"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "application/pdf"
+            ],
+            "description": "Verified MIME type uploaded directly to object storage"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "example": 512000,
+            "minimum": 1,
+            "maximum": 10485760,
+            "description": "Uploaded file byte length (1 byte to 10 MB)"
+          }
+        },
+        "required": [
+          "key",
+          "fileName",
+          "mimeType",
+          "sizeBytes"
         ]
       },
       "SafetyProofUrlResponseDto": {

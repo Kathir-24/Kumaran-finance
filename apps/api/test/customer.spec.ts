@@ -29,6 +29,7 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       getPresignedUrl: jest
         .fn()
         .mockResolvedValue('https://storage-presigned/kyc/cust-uuid-001/doc.jpg?sig=xyz'),
+      fileExists: jest.fn().mockResolvedValue(true),
     };
 
     prismaMock = {
@@ -51,6 +52,9 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       },
       branch: {
         findFirst: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
       },
     };
 
@@ -764,6 +768,107 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
         branchManagerPrdPayload,
       );
       expect(res.url).toBe('https://storage/presigned-url-prd');
+    });
+  });
+
+  describe('7. Direct Presigned S3 KYC Confirm Controls (DEF-FE-07)', () => {
+    const accountantUser = {
+      sub: 'usr-acc-001',
+      phone: '9842100001',
+      roles: [Role.ACCOUNTANT],
+    };
+
+    const validConfirmDto = {
+      key: `kyc/${mockCustomerId}/AADHAAR_FRONT-1234abcd.jpg`,
+      docType: KycDocumentType.AADHAAR_FRONT,
+      fileName: 'aadhaar_front.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: 345_678,
+    };
+
+    it('confirms existing S3 object and creates CustomerDocument + AuditLog', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        branchId: mockBranchId,
+        phone: '9842100099',
+      });
+      storageServiceMock.fileExists.mockResolvedValue(true);
+      prismaMock.customerDocument.create.mockResolvedValue({
+        id: 'doc-new-001',
+        customerId: mockCustomerId,
+        docType: KycDocumentType.AADHAAR_FRONT,
+        fileName: 'aadhaar_front.jpg',
+        verified: false,
+        uploadedAt: new Date('2026-11-12T08:00:00.000Z'),
+      });
+
+      const res = await customerController.confirmDocument(
+        mockCustomerId,
+        validConfirmDto,
+        accountantUser,
+      );
+
+      expect(storageServiceMock.fileExists).toHaveBeenCalledWith(validConfirmDto.key);
+      expect(prismaMock.customerDocument.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            customerId: mockCustomerId,
+            s3Key: validConfirmDto.key,
+            fileName: 'aadhaar_front.jpg',
+            verified: false,
+          }),
+        }),
+      );
+      expect(prismaMock.auditLog.create).toHaveBeenCalled();
+      expect(res.id).toBe('doc-new-001');
+    });
+
+    it('fail-closed: rejects confirm when uploaded object does not exist in S3 (zero orphan DB rows)', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: mockCustomerId,
+        customerCode: 'KC-CUST-00001',
+        branchId: mockBranchId,
+        phone: '9842100099',
+      });
+      storageServiceMock.fileExists.mockResolvedValue(false);
+
+      await expect(
+        customerController.confirmDocument(mockCustomerId, validConfirmDto, accountantUser),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prismaMock.customerDocument.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects cross-customer key spoofing and path traversal before checking storage', async () => {
+      await expect(
+        customerController.confirmDocument(
+          mockCustomerId,
+          { ...validConfirmDto, key: 'kyc/other-customer-999/AADHAAR_FRONT-1234.jpg' },
+          accountantUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        customerController.confirmDocument(
+          mockCustomerId,
+          { ...validConfirmDto, key: `kyc/${mockCustomerId}/../other/secret.jpg` },
+          accountantUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(storageServiceMock.fileExists).not.toHaveBeenCalled();
+      expect(prismaMock.customerDocument.create).not.toHaveBeenCalled();
+    });
+
+    it('enforces self-only access for Customer role on confirmDocument', async () => {
+      await expect(
+        customerController.confirmDocument(mockCustomerId, validConfirmDto, {
+          sub: 'another-customer-id',
+          phone: '9842199999',
+          roles: [Role.CUSTOMER],
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

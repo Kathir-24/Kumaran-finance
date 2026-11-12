@@ -164,6 +164,8 @@ Apply this JSON configuration to the `kumaran-chits-private` bucket in the Cloud
 ]
 ```
 
+> **Why `AllowedHeaders: ["*"]` and `"ExposeHeaders": ["ETag"]` matter**: Standard AWS S3 presigned URLs sign `x-amz-server-side-encryption: AES256` alongside `Content-Type`, and browsers send an `OPTIONS` preflight before direct `PUT` uploads from `apps/web/src/lib/direct-upload.ts`.
+
 ### 7.2 Cloudflare / CDN Media Edge Rules
 - **Origin**: Connect to `kumaran-chits-private` R2 bucket or S3 endpoint.
 - **Query String Forwarding**: Forward all query parameters (`X-Amz-*`) to enable standard S3 presigned signature verification.

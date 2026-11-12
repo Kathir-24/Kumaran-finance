@@ -19,12 +19,12 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
   });
 
   describe('Section 1: OpenAPI Path and Operation Metrics', () => {
-    it('should contain exactly 112 paths matching backend controllers', () => {
+    it('should contain exactly 115 paths matching backend controllers', () => {
       const pathKeys = Object.keys(openApiSpec.paths);
-      expect(pathKeys.length).toBe(112);
+      expect(pathKeys.length).toBe(115);
     });
 
-    it('should contain exactly 118 total HTTP operations', () => {
+    it('should contain exactly 121 total HTTP operations', () => {
       let operationCount = 0;
       for (const p of Object.values(openApiSpec.paths) as any[]) {
         for (const method of ['get', 'post', 'put', 'patch', 'delete', 'options', 'head']) {
@@ -33,7 +33,7 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
           }
         }
       }
-      expect(operationCount).toBe(118);
+      expect(operationCount).toBe(121);
     });
   });
 
@@ -249,6 +249,28 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
         memberAllocations: [],
       };
       expect(isTypeValid.groupCode).toBe('KMR-TEST-01');
+    });
+
+    it('should verify compile-time contract typing for Direct-to-S3 confirm payloads (DEF-FE-07)', () => {
+      type ConfirmKycBody = paths['/api/v1/customers/{id}/documents/confirm']['post']['requestBody']['content']['application/json'];
+      type ConfirmSafetyBody = paths['/api/v1/disbursements/auction/{auctionId}/confirm-safety-proof']['post']['requestBody']['content']['application/json'];
+
+      const kycBody: ConfirmKycBody = {
+        key: 'kyc/cust-001/AADHAAR_FRONT-1234.jpg',
+        docType: 'AADHAAR_FRONT',
+        fileName: 'aadhaar.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 102400,
+      };
+      const safetyBody: ConfirmSafetyBody = {
+        key: 'safety-proof/auc-001/abcd-cheque.jpg',
+        fileName: 'cheque.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 204800,
+      };
+
+      expect(kycBody.docType).toBe('AADHAAR_FRONT');
+      expect(safetyBody.sizeBytes).toBe(204800);
     });
   });
 });

@@ -11,7 +11,9 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
+import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { ConfirmCustomerDocumentDto } from './dto/confirm-customer-document.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreateNomineeDto } from './dto/create-nominee.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
@@ -408,6 +410,26 @@ export class CustomerService {
     };
   }
 
+  private async loadAndAuthorizeCustomerForUpload(
+    customerId: string,
+    currentUser?: JwtPayload,
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, customerCode: true, branchId: true, phone: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
+    }
+
+    return customer;
+  }
+
   /**
    * Uploads and links a KYC document scan (Aadhaar, PAN, Photo, Signature)
    */
@@ -431,18 +453,7 @@ export class CustomerService {
       throw new BadRequestException('Document file size exceeds the 10 MB limit');
     }
 
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-      select: { id: true, customerCode: true, branchId: true, phone: true },
-    });
-
-    if (!customer) {
-      throw new NotFoundException(`Customer with ID ${customerId} not found`);
-    }
-
-    if (currentUser) {
-      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
-    }
+    await this.loadAndAuthorizeCustomerForUpload(customerId, currentUser);
 
     const rawExt = path.extname(file.originalname).toLowerCase() || '.bin';
     const sanitizedExt = rawExt.replace(/[^a-z0-9.]/gi, '');
@@ -467,6 +478,73 @@ export class CustomerService {
         uploadedAt: true,
       },
     });
+  }
+
+  /**
+   * Confirms a direct-to-storage presigned PUT KYC upload and persists document metadata.
+   * Fail-closed: verifies object existence in S3/local storage before writing PostgreSQL.
+   */
+  async confirmDocument(
+    customerId: string,
+    dto: ConfirmCustomerDocumentDto,
+    currentUser?: JwtPayload,
+  ) {
+    const sanitizedKey = StorageKeyHelper.sanitizeKey(dto.key);
+    if (!sanitizedKey.startsWith(`kyc/${customerId}/`)) {
+      throw new BadRequestException(
+        'Invalid storage key prefix: key must belong to this customer KYC folder',
+      );
+    }
+
+    await this.loadAndAuthorizeCustomerForUpload(customerId, currentUser);
+
+    const exists = await this.storageService.fileExists(sanitizedKey);
+    if (!exists) {
+      throw new BadRequestException(
+        'Uploaded object not found in storage; upload must complete before confirmation',
+      );
+    }
+
+    const safeFileName = path.basename(dto.fileName) || `${dto.docType}.bin`;
+
+    const doc = await this.prisma.customerDocument.create({
+      data: {
+        customerId,
+        docType: dto.docType,
+        s3Key: sanitizedKey,
+        fileName: safeFileName,
+        verified: false,
+      },
+      select: {
+        id: true,
+        customerId: true,
+        docType: true,
+        fileName: true,
+        verified: true,
+        uploadedAt: true,
+      },
+    });
+
+    if (currentUser?.sub && this.prisma.auditLog) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: currentUser.sub,
+          action: 'CUSTOMER_DOCUMENT_CONFIRMED',
+          entityType: 'CustomerDocument',
+          entityId: doc.id,
+          newValue: {
+            customerId,
+            docType: dto.docType,
+            s3Key: sanitizedKey,
+            fileName: safeFileName,
+            mimeType: dto.mimeType,
+            sizeBytes: dto.sizeBytes,
+          },
+        },
+      });
+    }
+
+    return doc;
   }
 
   /**
