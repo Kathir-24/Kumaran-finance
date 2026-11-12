@@ -2,6 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  parseWholeRupees,
+  sanitizeWholeRupeeInput,
+} from '../src/lib/currency.ts';
 
 describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
   // 1. Guardrail 6: Floor and Ceiling validation bounds
@@ -42,19 +46,10 @@ describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
     assert.deepEqual(validateBidDiscount(25000n, minFloor, maxCeiling), { valid: true, error: null });
   });
 
-  // 2. Guardrail 2: Whole Rupee integer validation
+  // 2. Guardrail 2: Whole Rupee integer validation (uses shared SDK helpers, zero paise concatenation)
   it('Guardrail 2: Strictly rejects decimal paise and floating-point bids', () => {
-    const sanitizeWholeRupees = (input: string): string => {
-      return input.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
-    };
-
-    const parseWholeRupees = (input: string): number => {
-      const sanitized = sanitizeWholeRupees(input);
-      return sanitized === '' ? 0 : parseInt(sanitized, 10);
-    };
-
-    // Strips paise/decimals cleanly
-    assert.equal(sanitizeWholeRupees('22000.50'), '2200050'); // Stripping decimal point
+    assert.equal(sanitizeWholeRupeeInput('22000.50'), '22000');
+    assert.equal(parseWholeRupees('22000.50'), 22000);
     assert.equal(parseWholeRupees('25000'), 25000);
     assert.equal(parseWholeRupees('₹ 18,500'), 18500);
     assert.equal(parseWholeRupees('0015000'), 15000);

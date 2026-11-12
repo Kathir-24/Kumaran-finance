@@ -5,6 +5,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   formatRupee,
   formatRupeeAmount,
@@ -37,11 +40,22 @@ test('Guardrail 2: formatRupeeAmount produces comma-grouped whole integer string
   assert.equal(formatRupeeAmount(undefined), '0');
 });
 
-test('Guardrail 2: parseWholeRupees converts inputs to integer rupees, stripping decimals', () => {
+test('Guardrail 2: parseWholeRupees splits on decimal points without 100x paise concatenation (DEF-FE-10)', () => {
   assert.equal(parseWholeRupees(1500.99), 1500);
   assert.equal(parseWholeRupees('₹25,000'), 25000);
   assert.equal(parseWholeRupees('1,00,000'), 100000);
-  assert.equal(parseWholeRupees('₹500.50'), 50050);
+  assert.equal(parseWholeRupees('₹500.50'), 500);
+  assert.equal(parseWholeRupees('25000.50'), 25000);
+  assert.equal(parseWholeRupees('100000.00'), 100000);
+  assert.equal(parseWholeRupees('  INR 1,00,000.75 '), 100000);
+  assert.equal(parseWholeRupees('25,000.50.10'), 25000);
+  assert.equal(parseWholeRupees('.50'), 0);
+  assert.equal(parseWholeRupees('0.99'), 0);
+  assert.equal(parseWholeRupees('₹.99'), 0);
+  assert.equal(parseWholeRupees(Number.NaN), 0);
+  assert.equal(parseWholeRupees(Number.POSITIVE_INFINITY), 0);
+  assert.equal(Object.is(parseWholeRupees(-0.5), 0), true);
+  assert.equal(parseWholeRupees(null as unknown as string), 0);
 });
 
 test('Guardrail 2: assertWholeRupee rejects negative numbers, fractions, and paise', () => {
@@ -62,13 +76,20 @@ test('Guardrail 2: assertWholeRupee rejects negative numbers, fractions, and pai
   assert.throws(() => assertWholeRupee(Infinity), /must be a finite number/);
 });
 
-test('Guardrail 2: sanitizeWholeRupeeInput strips non-digits and leading zeros', () => {
-  assert.equal(sanitizeWholeRupeeInput('1000.50'), '100050');
+test('Guardrail 2: sanitizeWholeRupeeInput drops decimal fractions, strips non-digits and leading zeros (DEF-FE-10)', () => {
+  assert.equal(sanitizeWholeRupeeInput('1000.50'), '1000');
+  assert.equal(sanitizeWholeRupeeInput('22000.50'), '22000');
+  assert.equal(sanitizeWholeRupeeInput('₹25,000.99'), '25000');
+  assert.equal(sanitizeWholeRupeeInput('1000.'), '1000');
+  assert.equal(sanitizeWholeRupeeInput('.50'), '');
+  assert.equal(sanitizeWholeRupeeInput('0.50'), '0');
+  assert.equal(sanitizeWholeRupeeInput('00500.25'), '500');
+  assert.equal(sanitizeWholeRupeeInput('000'), '0');
   assert.equal(sanitizeWholeRupeeInput('abc₹500'), '500');
   assert.equal(sanitizeWholeRupeeInput('00500'), '500');
   assert.equal(sanitizeWholeRupeeInput('0'), '0');
   assert.equal(sanitizeWholeRupeeInput(''), '');
-  assert.equal(sanitizeWholeRupeeInput('-25000'), '25000');
+  assert.equal(sanitizeWholeRupeeInput('-25000.50'), '25000');
 });
 
 test('Guardrail 2: isValidWholeRupeeInput validates whole integer strings', () => {
@@ -89,4 +110,29 @@ test('Guardrail 2: formatRupeeWords converts integer amounts to Indian denominat
   assert.equal(formatRupeeWords(500), '₹500');
   assert.equal(formatRupeeWords(0), '₹0');
   assert.equal(formatRupeeWords(null), '₹0');
+});
+
+test('DEF-FE-10 (N5): Web currency helpers share compiled @kumaran/api-client dist/ implementation with zero duplicate sanitization logic', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const webCurrencyPath = path.resolve(__dirname, '../src/lib/currency.ts');
+  const sdkDistCurrencyPath = path.resolve(
+    __dirname,
+    '../../../packages/api-client/dist/utils/currency.js',
+  );
+
+  const webCurrencySource = fs.readFileSync(webCurrencyPath, 'utf-8');
+  assert.match(webCurrencySource, /sanitizeWholeRupeeInput/);
+  assert.match(webCurrencySource, /from '@kumaran\/api-client'/);
+  assert.doesNotMatch(
+    webCurrencySource,
+    /replace\s*\(\s*\/\\D\/g/,
+    'apps/web/src/lib/currency.ts must re-export sanitizeWholeRupeeInput from @kumaran/api-client instead of duplicating digit regexes',
+  );
+
+  const sdkDistSource = fs.readFileSync(sdkDistCurrencyPath, 'utf-8');
+  assert.match(
+    sdkDistSource,
+    /\.split\(['"]\.['"]\)/,
+    'packages/api-client/dist/utils/currency.js must be rebuilt with DEF-FE-10 decimal-split fix',
+  );
 });

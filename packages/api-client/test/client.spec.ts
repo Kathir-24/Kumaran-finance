@@ -9,6 +9,7 @@ import {
   formatRupee,
   formatRupeeAmount,
   parseWholeRupees,
+  sanitizeWholeRupeeInput,
   isSelfApproval,
   canAuthorizeAction,
   createKumaranClient,
@@ -29,7 +30,32 @@ test('Guardrail 2: Whole Rupee Math formatting', () => {
 
   // Verify parseWholeRupees strips floats/paise
   assert.equal(parseWholeRupees(1500.99), 1500);
-  assert.equal(parseWholeRupees('₹25,000.50'), 2500050);
+  // DEF-FE-10 (N1-N4): parseWholeRupees splits on decimal point & sanitizeWholeRupeeInput prevents 100x paise concatenation
+  assert.equal(parseWholeRupees('₹25,000.50'), 25000);
+  assert.equal(parseWholeRupees('25000.50'), 25000);
+  assert.equal(parseWholeRupees('100000.00'), 100000);
+  assert.equal(parseWholeRupees('1,00,000.99'), 100000);
+  assert.equal(parseWholeRupees('.50'), 0);
+  assert.equal(parseWholeRupees('0.99'), 0);
+  assert.equal(parseWholeRupees('₹.99'), 0);
+  assert.equal(parseWholeRupees('25,000.50.10'), 25000);
+  assert.equal(parseWholeRupees('  INR 1,00,000.75 '), 100000);
+  assert.equal(parseWholeRupees('0015000.25'), 15000);
+  assert.equal(parseWholeRupees(''), 0);
+  assert.equal(parseWholeRupees('   '), 0);
+  assert.equal(parseWholeRupees('abc'), 0);
+  assert.equal(parseWholeRupees('₹'), 0);
+  assert.equal(parseWholeRupees(Number.NaN), 0);
+  assert.equal(parseWholeRupees(Number.POSITIVE_INFINITY), 0);
+  assert.equal(parseWholeRupees(Number.NEGATIVE_INFINITY), 0);
+  assert.equal(Object.is(parseWholeRupees(-0), 0), true);
+  assert.equal(Object.is(parseWholeRupees(-0.5), 0), true);
+  assert.equal(parseWholeRupees(null as unknown as string), 0);
+  assert.equal(parseWholeRupees(undefined as unknown as string), 0);
+  assert.equal(sanitizeWholeRupeeInput('₹25,000.50'), '25000');
+  assert.equal(sanitizeWholeRupeeInput('000.50'), '0');
+  assert.equal(sanitizeWholeRupeeInput('.50'), '');
+  assert.equal(sanitizeWholeRupeeInput('1000.'), '1000');
 });
 
 test('Guardrail 10: Maker-Checker separation of duties', () => {

@@ -79,7 +79,7 @@ The 10 Invariant Architectural Guardrails defined in `AGENTS.md` and confirmed b
 | # | Guardrail Name | Primary Spec | Backend (`apps/api/`) | Database (`prisma/`) | Frontend (`apps/web/`) | SDK (`@kumaran/api-client`) | Verdict |
 |---|---|---|---|---|---|---|---|
 | **1** | **Single Company Tenancy** | ADR-01 | **Verified**: Zero multi-tenant `company_id` filters; branch scoping only (`branch.service.ts:1-120`). | **Verified**: Zero `company_id` columns across all 12 models in `schema.prisma:1-440`. | **Verified**: Zero company switcher components or headers. | **Verified**: No company context in API client. | **PASS** |
-| **2** | **Pure Whole Rupee Math** | Guardrail 2, `financial-rules.md` §1 | **Verified (`DEF-BE-01` Fixed)**: All financial DTOs enforce `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE`; services enforce fail-closed [`toWholeRupeeBigInt`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts) (`0` `Math.floor()` paise truncation) and BigInt formulas (`* 4n / 100n`). | **Verified**: All currency columns are 64-bit `BigInt` (`schema.prisma:147-150, 187, 219, 252-255`). | **Verified**: Zero paise/floats; `formatRupee` uses `maximumFractionDigits: 0` (`lib/currency.ts:22-72`). | **Verified**: `assertWholeRupee` throws `RangeError` on decimals. *Finding DEF-FE-10 on parsing*. | **PASS (With SDK Fix Pending)** |
+| **2** | **Pure Whole Rupee Math** | Guardrail 2, `financial-rules.md` §1 | **Verified (`DEF-BE-01` Fixed)**: All financial DTOs enforce `@IsInt()` + `parseStrictWholeRupeeValue` + `MAX_SAFE_WHOLE_RUPEE`; services enforce fail-closed [`toWholeRupeeBigInt`](file:///u:/Kumaran-finance/apps/api/src/common/utils/whole-rupee.util.ts) (`0` `Math.floor()` paise truncation) and BigInt formulas (`* 4n / 100n`). | **Verified**: All currency columns are 64-bit `BigInt` (`schema.prisma:147-150, 187, 219, 252-255`). | **Verified**: Zero paise/floats; `formatRupee` uses `maximumFractionDigits: 0`; shared `sanitizeWholeRupeeInput` drops `.xx` before digit stripping (`lib/currency.ts`). | **Verified (`DEF-FE-10` Fixed)**: `parseWholeRupees` & `sanitizeWholeRupeeInput` split on `.` before extracting digits (zero 100x concatenation), and `assertWholeRupee` throws `RangeError` on decimals. | **PASS** |
 | **3** | **Commission Freeze (4.00%)** | ADR-04 | **Verified**: 4.00% commission permanently frozen upon group activation (`chit.service.ts:453-455`). | **Verified**: Frozen rate stored in `ChitGroup.foremanCommissionRate Decimal(5,2)`. | **Verified**: Displayed as locked 4% in scheme preview (`scheme-math-preview.tsx:28-35`). | **Verified**: SDK constants lock 4% minimum floor. | **PASS** |
 | **4** | **Universal Equal Dividend Deduction** | Guardrail 4, `financial-rules.md` §2 | **Verified**: Dividend distributed equally to ALL members including winner & prized (`installment.service.ts:162-171`). | **Verified**: `InstallmentDue` generated uniformly for all active tickets in chit group. | **Verified**: `notebook-entry-grid.tsx:89-111` applies identical $I_{net} = I_{base} - Div$ to all members. | **Verified**: Invariant math verified in test suites. | **PASS** |
 | **5** | **Month 1 & Month N Rules** | Guardrail 5, `financial-rules.md` §3 | **Verified**: Month 1 assigned to company Ticket #1 (₹0 div); Month N settled directly with 4% comm (`disbursement.service.ts:771-929`). Auctions blocked for $m=1$ and $m=N$ (`auction.service.ts:74`). | **Verified**: `Auction_chitGroupId_installmentMonth_key` protects sequence; Month 1 recorded as company take. | **Verified**: UI locks bidding console for Month 1 and Month N; routes to direct settlement modal. | **Verified**: SDK types distinguish settlement vouchers. | **PASS** |
@@ -652,31 +652,19 @@ export async function middleware(request: NextRequest) {
 
 ---
 
-#### Finding DEF-FE-10: `parseWholeRupees` Decimal Concatenation Bug in SDK
-- **Layer & Subsystem**: Client SDK Currency Parser
-- **Exact File Path & Line Numbers**: `packages/api-client/src/utils/currency.ts:55-56`
+#### Finding DEF-FE-10: `parseWholeRupees` Decimal Concatenation Bug in SDK **[REMEDIATED]**
+- **Layer & Subsystem**: Client SDK Currency Parser (`@kumaran/api-client`) & Web Keystroke Sanitizer (`apps/web`)
+- **Remediated Files**:
+  - [`packages/api-client/src/utils/currency.ts`](file:///u:/Kumaran-finance/packages/api-client/src/utils/currency.ts) (`sanitizeWholeRupeeInput`, `parseWholeRupees`)
+  - [`packages/api-client/src/index.ts`](file:///u:/Kumaran-finance/packages/api-client/src/index.ts) (exported `sanitizeWholeRupeeInput`)
+  - [`apps/web/src/lib/currency.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/currency.ts) (re-exports shared helpers from `@kumaran/api-client`, removing duplicated `.replace(/\D/g, '')` logic and unused alias imports)
+  - [`packages/api-client/test/client.spec.ts`](file:///u:/Kumaran-finance/packages/api-client/test/client.spec.ts), [`apps/web/test/currency.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/currency.spec.ts), [`apps/web/test/auction-live-room.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/auction-live-room.spec.ts) (`N1`–`N5` tests + fixed 3 inverted legacy assertions)
 - **Violated Specification**: Guardrail 2 (Pure Whole Rupee Math).
 - **Severity**: **LOW**
-- **Detailed Technical Root Cause**:
-  In `packages/api-client/src/utils/currency.ts`:
-  ```typescript
-  const cleaned = value.replace(/[^0-9]/g, '');
-  return cleaned ? parseInt(cleaned, 10) : 0;
-  ```
-  If an amount with decimals (e.g. `'25000.50'`) is passed, stripping non-digits removes the period and concatenates paise, converting ₹25,000 into ₹25,00,050 (25 lakhs)!
-- **Impact Analysis**:
-  Accidental decimal input inflates values by 100x if not intercepted by regex validation.
-- **Concrete Production-Grade Remediation Code Design**:
-
-```typescript
-// packages/api-client/src/utils/currency.ts:51-57
-export function parseWholeRupees(value: string | number): number {
-  if (typeof value === 'number') return Math.trunc(value);
-  const integerPart = value.split('.')[0] || '';
-  const cleaned = integerPart.replace(/[^0-9]/g, '');
-  return cleaned ? parseInt(cleaned, 10) : 0;
-}
-```
+- **Implemented Remediation**:
+  - Centralized `sanitizeWholeRupeeInput` in [`packages/api-client/src/utils/currency.ts`](file:///u:/Kumaran-finance/packages/api-client/src/utils/currency.ts) to split on `.` **before** stripping non-digits (`'₹25,000.50'` -> `'25000'`), preventing 100x paise concatenation on paste/entry in both `parseWholeRupees` and `BiddingConsole`.
+  - Added defensive non-throwing bounds in `parseWholeRupees` for `null`/`undefined`, non-finite numbers (`NaN`, `±Infinity` -> `0`), `-0` normalization (`+0`), leading decimals (`'.50'` -> `0`), and multiple dots (`'25,000.50.10'` -> `25000`).
+  - Rebuilt `@kumaran/api-client` `dist/` and verified via 5-point gate: `pnpm run typecheck` (`0`), `pnpm run lint` (`0`, including `0` warnings in `apps/web/src/lib/currency.ts`), `pnpm run build` (`0`, `33/33` pages), and `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819` tests, `web`: `14/14` suites / `347/347` tests including `N1`–`N5`).
 
 ---
 
@@ -961,7 +949,7 @@ gantt
 - **Target Items**:
   1. `DEF-FE-05` **[FIXED & VERIFIED]**: Eliminated all **31** raw `/api/v1/` `fetch()` calls and deprecated `getStoredAccessToken()` imports across **21** Web UI pages/components (`6` pages, `15` components) using `apiClient`, `unwrapApiResponse()`, `unwrapPaginatedList()`, and centralized [`pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`parseAs: 'blob'`), fixed the live 404 `/api/v1/chit-groups` -> `GET /api/v1/chits` endpoint bug and `AuthorizePayoutDto` body, added `AbortSignal` forwarding, synced `frontend-architecture.md`, and verified with `N1`–`N5` static/unit guards (`web`: `14/14` suites / `346/346` tests, `@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819`).
   2. `DEF-FE-09` **[FIXED & VERIFIED]**: Updated Playwright E2E fixtures (`auth-fixtures.ts` `buildSessionCookies`/`injectSession`) to inject HttpOnly BFF session cookies cleanly across isolated `chitflow_test` runs.
-  3. `DEF-FE-10`: Update `parseWholeRupees` in SDK to split on decimal points.
+  3. `DEF-FE-10` **[FIXED & VERIFIED]**: Unified `sanitizeWholeRupeeInput` & `parseWholeRupees` in `@kumaran/api-client` (`packages/api-client/src/utils/currency.ts`) to split on `.` before extracting digits (eliminating 100x paise concatenation across SDK + `apps/web/src/lib/currency.ts`), added `NaN`/`Infinity`/`-0`/nullish guards, corrected 3 inverted legacy test assertions, added `N1`–`N5` tests, rebuilt SDK `dist/`, and passed the 5-point gate (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819` tests, `web`: `14/14` suites / `347/347` tests).
   4. `DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.
   5. `DEF-BE-04` **[WONTFIX / OVER-ENGINEERED]**: Pre-controller `MakerCheckerGuard` closed to avoid redundant non-transactional DB lookups; existing atomic in-transaction `maker_user_id != checker_user_id` checks remain authoritative.
   6. `DEF-DB-07`: Add pessimistic row lock on `ChitGroup` activation.

@@ -3,14 +3,15 @@
 // Pure Whole Rupee Math: Zero paise, zero decimals (.00), BigInt / integer compatibility.
 // ==============================================================================
 
-import {
-  formatRupee as baseFormatRupee,
-  formatRupeeAmount as baseFormatRupeeAmount,
-  parseWholeRupees as baseParseWholeRupees,
-} from '@kumaran/api-client';
+import { formatRupee as baseFormatRupee } from '@kumaran/api-client';
 
-// Re-export core whole-rupee utilities from shared client SDK
-export { formatRupee, formatRupeeAmount, parseWholeRupees } from '@kumaran/api-client';
+// Re-export core whole-rupee utilities from shared client SDK (single source of truth)
+export {
+  formatRupee,
+  formatRupeeAmount,
+  parseWholeRupees,
+  sanitizeWholeRupeeInput,
+} from '@kumaran/api-client';
 
 /**
  * Asserts that a value represents a valid non-negative whole integer Rupee amount.
@@ -69,24 +70,6 @@ export function assertWholeRupee(
       );
     }
   }
-}
-
-/**
- * Sanitizes form text inputs on keystroke (e.g. in onChange event handlers),
- * stripping any decimal points, signs, or alphabets, ensuring only digits remain.
- *
- * @param value Raw string from text input.
- * @returns Cleaned string containing only whole integer digits.
- */
-export function sanitizeWholeRupeeInput(value: string): string {
-  if (!value) return '';
-  // Remove all non-digits (including decimal points, minus signs, spaces, symbols)
-  const digitsOnly = value.replace(/\D/g, '');
-  // Remove leading zeros if number > 0 (e.g., "0500" -> "500")
-  if (digitsOnly.length > 1 && digitsOnly.startsWith('0')) {
-    return digitsOnly.replace(/^0+/, '') || '0';
-  }
-  return digitsOnly;
 }
 
 /**

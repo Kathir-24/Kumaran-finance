@@ -9,7 +9,12 @@ export { createKumaranClient, type KumaranClientConfig, type KumaranApiClient } 
 export { KumaranApiError, type ApiErrorPayload } from './errors/api-error.js';
 
 // 3. Whole Rupee & Currency Utilities (Guardrail 2)
-export { formatRupee, formatRupeeAmount, parseWholeRupees } from './utils/currency.js';
+export {
+  formatRupee,
+  formatRupeeAmount,
+  parseWholeRupees,
+  sanitizeWholeRupeeInput,
+} from './utils/currency.js';
 
 // 4. Maker-Checker Guardians (Guardrail 10)
 export { isSelfApproval, canAuthorizeAction, type MakerCheckerEntity } from './utils/maker-checker.js';
