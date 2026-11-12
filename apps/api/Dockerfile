@@ -83,9 +83,9 @@ USER node
 # Expose standard application port
 EXPOSE 3000
 
-# Health check using node's built-in http request
+# Health check using node's built-in http request (honors custom PORT such as 3002 for worker)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "const http = require('http'); const req = http.get('http://127.0.0.1:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on('error', () => process.exit(1));"
+  CMD node -e "const http = require('http'); const req = http.get('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on('error', () => process.exit(1));"
 
 # Launch the NestJS backend
 CMD ["node", "dist/main.js"]
