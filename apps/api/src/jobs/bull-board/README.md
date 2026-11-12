@@ -69,8 +69,8 @@ location /admin/queues {
 Inside the dashboard, Super Admins can:
 1. **View Real-Time Counters**: Inspect active, waiting, completed, delayed, and failed job counts across all 3 queues.
 2. **Inspect Job Data & Payloads**: Click into any job to view input parameters, execution start time, duration, and worker logs.
-3. **Retry Failed Jobs**: One-click manual retry for failed notifications or gateway reconciliations.
-4. **Purge Completed / Failed Jobs**: Clean up historical jobs to maintain clean Redis memory utilization.
+3. **Retry Failed Jobs**: One-click manual retry for failed notifications or gateway reconciliations. Failed jobs are capped automatically via BullMQ `removeOnFail: { count: 500, age: 604800 }` (retaining up to 500 recent failures or 7 days per queue) so DLQ entries remain actionable without unbounded Redis memory growth.
+4. **Purge Completed / Failed Jobs**: Clean up historical jobs manually in addition to automated completion (`removeOnComplete: true`) and bounded failure pruning (`removeOnFail: { count: 500, age: 604800 }`).
 
 ---
 

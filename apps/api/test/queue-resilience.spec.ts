@@ -4,8 +4,45 @@
 // Compliance: docs/03-architecture/bullmq-architecture.md (§3, §4)
 // ==============================================================================
 
+import { Logger } from '@nestjs/common';
+import { Queue, Worker } from 'bullmq';
+import { Redis } from 'ioredis';
 import { BullMqQueueProvider, JobEnqueueOptions } from '../src/jobs/providers/bullmq-queue.provider';
-import { NOTIFICATION_QUEUE, DAILY_MAINTENANCE_QUEUE } from '../src/jobs/constants/queue-names.constant';
+import {
+  BULLMQ_FAILED_JOB_MAX_AGE_SECONDS,
+  BULLMQ_FAILED_JOB_MAX_COUNT,
+  createDefaultBullMqJobOptions,
+  DAILY_MAINTENANCE_QUEUE,
+  NOTIFICATION_QUEUE,
+  RECONCILIATION_QUEUE,
+} from '../src/jobs/constants/queue-names.constant';
+
+async function createLiveTestRedis(): Promise<Redis | null> {
+  const host = process.env.REDIS_HOST || '127.0.0.1';
+  const port = Number(process.env.REDIS_PORT || '6379');
+  const db = Number(process.env.REDIS_DB || '0') || 0;
+  const client = new Redis({
+    host,
+    port,
+    db,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: true,
+    connectTimeout: 1000,
+    retryStrategy: () => null,
+  });
+  try {
+    await client.connect();
+    const pong = await client.ping();
+    if (pong === 'PONG') {
+      return client;
+    }
+  } catch {
+    // Redis unavailable in offline CI environments
+  }
+  client.disconnect();
+  return null;
+}
 
 describe('Background Processing & Queue Resilience Suite', () => {
   let queueProvider: BullMqQueueProvider;
@@ -111,6 +148,10 @@ describe('Background Processing & Queue Resilience Suite', () => {
           attempts: 3,
           backoff: { type: 'exponential', delay: 1000 },
           removeOnComplete: true,
+          removeOnFail: {
+            count: BULLMQ_FAILED_JOB_MAX_COUNT,
+            age: BULLMQ_FAILED_JOB_MAX_AGE_SECONDS,
+          },
         }),
       );
     });
@@ -286,6 +327,206 @@ describe('Background Processing & Queue Resilience Suite', () => {
       expect(repeatable.length).toBeGreaterThan(0);
       expect(repeatable[0].id).toBe('daily-arrears-ist');
       expect(repeatable[0].tz).toBe('Asia/Kolkata');
+    });
+  });
+
+  describe('5. Bounded Failed-Job (DLQ) Retention & Pruning (DEF-DB-06)', () => {
+    it('JOB-RETENTION-1: addJob enforces removeOnFail cap { count: 500, age: 604800 } across all 3 queues', async () => {
+      (queueProvider as any).dailyMaintenanceQueue = mockTargetQueue;
+      (queueProvider as any).notificationQueue = mockTargetQueue;
+      (queueProvider as any).reconciliationQueue = mockTargetQueue;
+
+      const cases = [
+        { queue: DAILY_MAINTENANCE_QUEUE, job: 'process-daily-arrears' },
+        { queue: NOTIFICATION_QUEUE, job: 'dispatch-payment-receipt' },
+        { queue: RECONCILIATION_QUEUE, job: 'run-daily-reconciliation' },
+      ];
+
+      for (const item of cases) {
+        await queueProvider.addJob(item.queue, item.job, { test: true });
+      }
+
+      expect(mockTargetQueue.add).toHaveBeenCalledTimes(3);
+      for (const call of mockTargetQueue.add.mock.calls) {
+        expect(call[2]).toEqual(
+          expect.objectContaining({
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 1000 },
+            removeOnComplete: true,
+            removeOnFail: { count: 500, age: 604800 },
+          }),
+        );
+      }
+    });
+
+    it('JOB-RETENTION-2: Custom removeOnFail override does not mutate createDefaultBullMqJobOptions()', async () => {
+      (queueProvider as any).notificationQueue = mockTargetQueue;
+
+      const baseline = createDefaultBullMqJobOptions();
+      await queueProvider.addJob(
+        NOTIFICATION_QUEUE,
+        'dispatch-payment-receipt',
+        { receiptNumber: 'KC-REC-OVR-1' },
+        { removeOnFail: { count: 100, age: 86400 } },
+      );
+
+      expect(mockTargetQueue.add).toHaveBeenLastCalledWith(
+        'dispatch-payment-receipt',
+        { receiptNumber: 'KC-REC-OVR-1' },
+        expect.objectContaining({
+          removeOnFail: { count: 100, age: 86400 },
+        }),
+      );
+
+      const secondBaseline = createDefaultBullMqJobOptions();
+      expect(secondBaseline).toEqual(baseline);
+      expect(secondBaseline).not.toBe(baseline);
+    });
+
+    it('JOB-RETENTION-3: Worker failed handler logs intermediate retries as warn and terminal exhaustion with [DLQ]', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+      try {
+        (queueProvider as any).handleWorkerJobFailure(
+          'Notification',
+          { id: 'job-1', name: 'dispatch-payment-receipt', attemptsMade: 1, opts: { attempts: 3 } },
+          new Error('Temporary gateway timeout'),
+        );
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('attempt 1/3'));
+        expect(errorSpy).not.toHaveBeenCalled();
+
+        (queueProvider as any).handleWorkerJobFailure(
+          'Notification',
+          { id: 'job-1', name: 'dispatch-payment-receipt', attemptsMade: 3, opts: { attempts: 3 } },
+          new Error('Permanent invalid token'),
+        );
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[DLQ] Notification job dispatch-payment-receipt (job-1)'));
+
+        (queueProvider as any).handleWorkerJobFailure(
+          'Maintenance',
+          undefined,
+          new Error('Missing job metadata'),
+        );
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown-job (unknown-id)'));
+      } finally {
+        warnSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('JOB-RETENTION-4: onModuleInit sets defaultJobOptions across all 3 BullMQ Queues so IST crons inherit caps', async () => {
+      const redis = await createLiveTestRedis();
+      if (!redis) {
+        return;
+      }
+
+      const prevEnableWorkers = process.env.ENABLE_BULLMQ_WORKERS;
+      process.env.ENABLE_BULLMQ_WORKERS = 'false';
+
+      const liveProvider = new BullMqQueueProvider(
+        {
+          getClient: () => redis,
+          getIsConnected: () => true,
+        } as any,
+        mockDailyArrearsService,
+        mockNotificationService,
+        mockReconciliationService,
+        mockAuctionSchedulerService,
+      );
+
+      try {
+        await liveProvider.onModuleInit();
+
+        const queues = [
+          liveProvider.getDailyMaintenanceQueue(),
+          liveProvider.getNotificationQueue(),
+          liveProvider.getReconciliationQueue(),
+        ];
+
+        for (const q of queues) {
+          expect(q).not.toBeNull();
+          expect(q!.opts.defaultJobOptions).toEqual({
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 1000 },
+            removeOnComplete: true,
+            removeOnFail: {
+              count: BULLMQ_FAILED_JOB_MAX_COUNT,
+              age: BULLMQ_FAILED_JOB_MAX_AGE_SECONDS,
+            },
+          });
+        }
+      } finally {
+        if (prevEnableWorkers === undefined) {
+          delete process.env.ENABLE_BULLMQ_WORKERS;
+        } else {
+          process.env.ENABLE_BULLMQ_WORKERS = prevEnableWorkers;
+        }
+        await liveProvider.onModuleDestroy();
+        await redis.quit();
+      }
+    });
+
+    it('JOB-RETENTION-5: Live Redis 7 prunes N=4 permanently failed jobs to strict removeOnFail count=2 cap', async () => {
+      const redis = await createLiveTestRedis();
+      if (!redis) {
+        return;
+      }
+
+      const testQueueName = `dlq-prune-test-${Date.now()}`;
+      const queue = new Queue(testQueueName, {
+        connection: redis as any,
+        defaultJobOptions: {
+          attempts: 2,
+          backoff: { type: 'fixed', delay: 10 },
+          removeOnComplete: true,
+          removeOnFail: { count: 2, age: BULLMQ_FAILED_JOB_MAX_AGE_SECONDS },
+        },
+      });
+
+      let terminalFailures = 0;
+      let resolveAllFailed!: () => void;
+      const allFailedPromise = new Promise<void>((resolve) => {
+        resolveAllFailed = resolve;
+      });
+
+      const worker = new Worker(
+        testQueueName,
+        async () => {
+          throw new Error('Simulated permanent SMS gateway outage');
+        },
+        { connection: redis as any, concurrency: 1 },
+      );
+
+      worker.on('failed', (job) => {
+        if (job && job.attemptsMade >= (job.opts.attempts ?? 2)) {
+          terminalFailures += 1;
+          if (terminalFailures === 4) {
+            resolveAllFailed();
+          }
+        }
+      });
+
+      try {
+        for (let i = 1; i <= 4; i += 1) {
+          await queue.add(`fail-job-${i}`, { seq: i });
+        }
+
+        await allFailedPromise;
+        // Allow BullMQ's in-flight Lua moveToFailed script to complete trimming on the 4th terminal job
+        await new Promise((r) => setTimeout(r, 150));
+
+        const counts = await queue.getJobCounts('failed');
+        expect(counts.failed).toBe(2);
+
+        const retainedFailed = await queue.getFailed(0, -1);
+        expect(retainedFailed).toHaveLength(2);
+      } finally {
+        await worker.close();
+        await queue.obliterate({ force: true });
+        await queue.close();
+        await redis.quit();
+      }
     });
   });
 });

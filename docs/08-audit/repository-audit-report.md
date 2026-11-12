@@ -860,31 +860,20 @@ if (acquired === 'OK') {
 
 ---
 
-#### Finding DEF-DB-06: Missing Dead-Letter Queue (DLQ) & Job Failure Retention Caps in BullMQ Queues
+#### Finding DEF-DB-06: Missing Dead-Letter Queue (DLQ) & Job Failure Retention Caps in BullMQ Queues `[FIXED & VERIFIED]`
 - **Layer & Subsystem**: Background Queue Workers & Redis Memory Management
-- **Exact File Path & Line Numbers**: `apps/api/src/jobs/providers/bullmq-queue.provider.ts:291-298`
-- **Violated Specification**: `docs/03-architecture/bullmq-architecture.md` §3 & §8.
-- **Severity**: **MEDIUM**
+- **Exact File Path & Line Numbers**: [`apps/api/src/jobs/constants/queue-names.constant.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts), [`apps/api/src/jobs/providers/bullmq-queue.provider.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/providers/bullmq-queue.provider.ts)
+- **Violated Specification**: [`docs/03-architecture/bullmq-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/bullmq-architecture.md) §3 & §7.4
+- **Severity**: **MEDIUM** *(Resolved)*
 - **Detailed Technical Root Cause**:
-  `BullMqQueueProvider.addJob` sets `removeOnComplete: true`, but omits `removeOnFail`. Failed jobs that exhaust all 3 retries remain indefinitely in Redis within `bull:<queueName>:failed` sorted sets and hashes.
-- **Impact Analysis**:
-  Persistent failure payloads (e.g. invalid phone numbers, DLT failures) slowly leak Redis memory.
-- **Concrete Production-Grade Remediation Code Design**:
-
-```typescript
-// apps/api/src/jobs/providers/bullmq-queue.provider.ts:291-298
-const job = await targetQueue.add(jobName, data, {
-  jobId: options?.jobId,
-  priority: options?.priority,
-  attempts: options?.attempts ?? 3,
-  backoff: options?.backoff ?? { type: 'exponential', delay: 1000 },
-  removeOnComplete: true,
-  removeOnFail: {
-    count: 500, // Retain max 500 failed jobs
-    age: 7 * 24 * 3600, // Auto-prune after 7 days
-  },
-});
-```
+  1. `BullMqQueueProvider.addJob` set `removeOnComplete: true` but omitted `removeOnFail`, causing permanently failed jobs to accumulate indefinitely inside Redis `bull:<queueName>:failed` sets/hashes.
+  2. All 3 `new Queue(...)` constructors (`daily-maintenance-queue`, `notification-queue`, `reconciliation-queue`) omitted `defaultJobOptions` and repeatable IST `upsertJobScheduler` crons (`00:01`, `06:00`, `09:00`) passed no `opts`, leaving cron runs unbounded (`attempts: 1`, `removeOnComplete: false`, `removeOnFail: false`).
+  3. Workers lacked `.on('failed')` logging for terminal `[DLQ]` retry exhaustion.
+- **Verified Production Implementation**:
+  - Centralized `BULLMQ_FAILED_JOB_MAX_COUNT = 500`, `BULLMQ_FAILED_JOB_MAX_AGE_SECONDS = 604800` (7 days), and `createDefaultBullMqJobOptions()` (`attempts: 3`, exponential `1000ms` backoff, `removeOnComplete: true`, `removeOnFail: { count: 500, age: 604800 }`) in [`queue-names.constant.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts).
+  - Extracted DRY `createManagedQueue` / `createManagedWorker` / `handleWorkerJobFailure` helpers in [`bullmq-queue.provider.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/providers/bullmq-queue.provider.ts) applying `defaultJobOptions` to all 3 Queues (protecting repeatable IST crons and ad-hoc jobs uniformly), enforcing `removeOnFail` + optional caller override in `addJob`, and emitting `[DLQ]` error logs on terminal retry exhaustion while preserving Bull Board (`/admin/queues`) 1-click retries.
+  - Synced [`bullmq-architecture.md`](file:///u:/Kumaran-finance/docs/03-architecture/bullmq-architecture.md), [`CRON-SCHEDULES.md`](file:///u:/Kumaran-finance/apps/api/src/jobs/CRON-SCHEDULES.md), and [`bull-board/README.md`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/README.md).
+- **Verification Summary**: Targeted BullMQ suites (`queue-resilience.spec.ts`, `jobs.spec.ts`, `bull-board.spec.ts`: `3/3` suites / `44/44` tests including live Redis 7 `N=4 -> 2` pruning verification and zero leaked keys), targeted `oxlint` (`0` warnings / `0` errors), full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `806/806` tests, `web`: `14/14` suites / `341/341` tests), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), and `pnpm run build` (`exit 0`).
 
 ---
 
@@ -1006,7 +995,7 @@ gantt
   3. `DEF-FE-08` **[FIXED & VERIFIED]**: Moved 2FA intermediate `tempToken` (`totp_pending`) out of browser JSON and `sessionStorage` into a 5-minute `HttpOnly` cookie (`kc_totp_pending_token`) with strict cookie-only BFF verification, Edge `/2fa` HS256 guard (`edge-auth.ts`), non-secret `pendingTotp` session reload recovery, and Back-to-Login cookie cleanup.
   4. `DEF-DB-03` **[FIXED & VERIFIED]**: Removed global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`, introduced shared [`bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts), refactored `ChitService.findAll` (`serializeCatalog`/`deserializeCatalog`) to store exact decimal strings in Redis while returning native `bigint`s on cache miss & hit, hardened `ReportEtagInterceptor` with `stringifyBigIntSafe`, and expanded `chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, and `report-etag.spec.ts`.
   5. `DEF-DB-05` **[FIXED & VERIFIED]**: Added non-unique B-Tree indexes on `PaymentAllocation` (`paymentId`, `ticketId`, `installmentDueId`), composite `@@unique([auctionId, ticketId])` + `@@index([ticketId])` on `AuctionTieBidder` (`20261112115900_add_allocation_and_tie_bidder_indexes`), distinct-`ticketId` pre-check in `AuctionService.recordTieBreak`, and unit + live PostgreSQL 17 `pg_indexes`/`P2002`/append-only/`EXPLAIN` tests (`auction.spec.ts` & `CONCURR-INV-20`–`23`).
-  6. `DEF-DB-06`: Add `removeOnFail: { count: 500, age: 604800 }` to BullMQ queue job configurations.
+  6. `DEF-DB-06` **[FIXED & VERIFIED]**: Centralized BullMQ failed-job retention (`removeOnFail: { count: 500, age: 604800 }`) and `defaultJobOptions` (`attempts: 3`, exponential backoff, `removeOnComplete: true`) across all 3 Queues (`createManagedQueue` covering repeatable IST `upsertJobScheduler` crons + `addJob`), added Worker `.on('failed')` `[DLQ]` terminal logging (`createManagedWorker`/`handleWorkerJobFailure`), and verified with unit + live Redis 7 `N=4 -> 2` pruning tests (`queue-resilience.spec.ts`, `44/44` targeted queue tests, `806/806` API tests).
   7. `DEF-DB-04`: Harden `ReportService` distributed lock fallback with unique token and Lua script.
   8. `DEF-BE-02`: Correct PDF storage key generation to use `branch.code`.
 

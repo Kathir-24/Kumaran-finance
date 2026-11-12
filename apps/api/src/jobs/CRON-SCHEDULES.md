@@ -48,7 +48,7 @@ In addition to scheduled cron runs, BullMQ queues handle real-time transactional
 - **Authentication**: HTTP Basic Auth with credentials configured in `apps/api/.env`:
   - Username: `BULL_BOARD_USER`
   - Password: `BULL_BOARD_PASSWORD`
-- **Features**: Visual inspection of waiting, active, completed, and failed jobs with 1-click dead-letter queue (DLQ) retry and stack trace exploration.
+- **Features**: Visual inspection of waiting, active, completed, and failed jobs with 1-click dead-letter queue (DLQ) retry and stack trace exploration. Queue `defaultJobOptions` cap retained failures at `{ count: 500, age: 604800 }` (500 jobs / 7 days) and auto-remove completed runs (`removeOnComplete: true`) across all 3 IST cron schedules and ad-hoc jobs, while Workers emit explicit `[DLQ]` error logs when retries exhaust.
 
 ### B. REST Endpoints for Health & Auditing
 - `GET /api/v1/jobs/queue-status`: Real-time job counters across all 3 queues.

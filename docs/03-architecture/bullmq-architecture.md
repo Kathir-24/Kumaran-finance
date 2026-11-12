@@ -279,7 +279,7 @@ Content-Type: text/html; charset=utf-8
 
 ## 7. Queue Resilience, Concurrency Tuning & Priority Scheduling (`CONFIRMED-BY-DEVELOPER`)
 
-Under high load and bursty end-of-month collections, BullMQ queues enforce 3 operational resilience policies:
+Under high load and bursty end-of-month collections, BullMQ queues enforce 4 operational resilience policies:
 
 ### 7.1 Worker Concurrency & Stalled Job Recovery
 * **`notificationWorker` (`concurrency: 5`)**: Configured with 5 concurrent workers to handle parallel network I/O for MSG91 DLT SMS and Firebase FCM push dispatches, eliminating sequential worker bottlenecks.
@@ -304,4 +304,9 @@ BullMQ prioritizes jobs with lower numerical priority values (`1` runs before `1
 3. **Priority 10 (Background / Bulk)**:
    * Pre-Auction Upcoming Reminders (`JOB_DISPATCH_AUCTION_REMINDER`)
    * Daily Arrears Default Warnings (`JOB_DISPATCH_DEFAULT_WARNING`)
+
+### 7.4 Bounded Failed-Job (DLQ) Retention & Pruning Policy (`DEF-DB-06`)
+* **Centralized Defaults (`createDefaultBullMqJobOptions`)**: All 3 BullMQ queues (`daily-maintenance-queue`, `notification-queue`, `reconciliation-queue`) are constructed in `BullMqQueueProvider.onModuleInit` with `defaultJobOptions` (`attempts: 3`, exponential backoff `1000ms`, `removeOnComplete: true`, and `removeOnFail: { count: 500, age: 604800 }`), ensuring both ad-hoc `addJob` enqueues and repeatable IST cron schedules (`upsertJobScheduler`) inherit bounded Redis retention.
+* **BullMQ Native Retention (Bull Board Compatible)**: Instead of creating secondary shadow DLQ queues, permanently failed jobs stay inspectable and 1-click retryable inside Bull Board (`/admin/queues`) while BullMQ automatically prunes any failed job exceeding **500 entries per queue** or **7 days (`604800` seconds)** upon subsequent failure transitions.
+* **Terminal `[DLQ]` Diagnostic Logging**: All 3 workers attach a shared `.on('failed')` listener (`handleWorkerJobFailure`) that emits a `warn` log on intermediate retries and an `[DLQ]` `error` log when `attemptsMade >= maxAttempts`.
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
-import { Queue, Worker } from 'bullmq';
+import { Job, KeepJobs, Processor, Queue, Worker } from 'bullmq';
 import {
   CRON_DAILY_ARREARS,
   CRON_PRE_AUCTION_REMINDERS,
@@ -11,6 +11,9 @@ import {
   TIMEZONE_IST,
 } from '../constants/cron-schedules.constant';
 import {
+  BULLMQ_FAILED_JOB_MAX_AGE_SECONDS,
+  BULLMQ_FAILED_JOB_MAX_COUNT,
+  createDefaultBullMqJobOptions,
   DAILY_MAINTENANCE_QUEUE,
   JOB_DISPATCH_APPROVAL_ALERT,
   JOB_DISPATCH_AUCTION_REMINDER,
@@ -42,6 +45,7 @@ export interface JobEnqueueOptions {
   priority?: number;
   attempts?: number;
   backoff?: { type: string; delay: number };
+  removeOnFail?: boolean | number | KeepJobs;
 }
 
 @Injectable()
@@ -64,6 +68,68 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     @Optional() private readonly auctionReminderSchedulerService?: AuctionReminderSchedulerService,
   ) {}
 
+  /**
+   * Instantiates a managed BullMQ Queue with centralized defaultJobOptions so both
+   * ad-hoc jobs and repeatable IST cron schedulers inherit bounded retention.
+   */
+  private createManagedQueue(queueName: string, connection: unknown, label: string): Queue {
+    const queue = new Queue(queueName, {
+      connection: connection as any,
+      defaultJobOptions: createDefaultBullMqJobOptions(),
+    });
+    queue.on('error', (err) => {
+      this.logger.warn(`${label} queue connection error: ${err.message}`);
+    });
+    return queue;
+  }
+
+  /**
+   * Logs intermediate job retry attempts vs terminal DLQ exhaustion for operations visibility.
+   */
+  private handleWorkerJobFailure(label: string, job: Job | undefined, err: Error): void {
+    const jobName = job?.name ?? 'unknown-job';
+    const jobId = job?.id ?? 'unknown-id';
+    const maxAttempts = job?.opts?.attempts ?? 3;
+    const attemptsMade = job?.attemptsMade ?? 0;
+
+    if (attemptsMade >= maxAttempts) {
+      this.logger.error(
+        `[DLQ] ${label} job ${jobName} (${jobId}) exhausted all ${attemptsMade}/${maxAttempts} attempts; retained in Bull Board failed set for inspection: ${err.message}`,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `${label} job ${jobName} (${jobId}) failed on attempt ${attemptsMade}/${maxAttempts}; scheduled for retry: ${err.message}`,
+    );
+  }
+
+  /**
+   * Instantiates a BullMQ Worker with uniform lock settings, connection error handling,
+   * and terminal DLQ failure logging.
+   */
+  private createManagedWorker(
+    queueName: string,
+    processor: Processor,
+    connection: unknown,
+    concurrency: number,
+    label: string,
+  ): Worker {
+    const worker = new Worker(queueName, processor, {
+      connection: connection as any,
+      concurrency,
+      lockDuration: 30000,
+      stalledInterval: 30000,
+    });
+    worker.on('error', (err) => {
+      this.logger.warn(`${label} worker connection error: ${err.message}`);
+    });
+    worker.on('failed', (job, err) => {
+      this.handleWorkerJobFailure(label, job, err);
+    });
+    return worker;
+  }
+
   async onModuleInit(): Promise<void> {
     const client = this.redisProvider.getClient();
     if (!client) {
@@ -72,32 +138,15 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      // 1. Initialize BullMQ Queues with Redis connection & error guardians
-      this.dailyMaintenanceQueue = new Queue(DAILY_MAINTENANCE_QUEUE, {
-        connection: client as any,
-      });
-      this.dailyMaintenanceQueue.on('error', (err) => {
-        this.logger.warn(`Daily maintenance queue connection error: ${err.message}`);
-      });
+      // 1. Initialize BullMQ Queues with bounded defaultJobOptions & error guardians
+      this.dailyMaintenanceQueue = this.createManagedQueue(DAILY_MAINTENANCE_QUEUE, client, 'Daily maintenance');
+      this.notificationQueue = this.createManagedQueue(NOTIFICATION_QUEUE, client, 'Notification');
+      this.reconciliationQueue = this.createManagedQueue(RECONCILIATION_QUEUE, client, 'Reconciliation');
 
-      this.notificationQueue = new Queue(NOTIFICATION_QUEUE, {
-        connection: client as any,
-      });
-      this.notificationQueue.on('error', (err) => {
-        this.logger.warn(`Notification queue connection error: ${err.message}`);
-      });
-
-      this.reconciliationQueue = new Queue(RECONCILIATION_QUEUE, {
-        connection: client as any,
-      });
-      this.reconciliationQueue.on('error', (err) => {
-        this.logger.warn(`Reconciliation queue connection error: ${err.message}`);
-      });
-
-      // 2. Initialize Workers with error guardians (if enabled for this process)
+      // 2. Initialize Workers with error guardians & DLQ failure logging (if enabled for this process)
       const enableWorkers = process.env.ENABLE_BULLMQ_WORKERS !== 'false';
       if (enableWorkers) {
-        this.maintenanceWorker = new Worker(
+        this.maintenanceWorker = this.createManagedWorker(
           DAILY_MAINTENANCE_QUEUE,
           async (job) => {
             if (job.name === JOB_PROCESS_DAILY_ARREARS) {
@@ -105,18 +154,12 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
               return await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
             }
           },
-          {
-            connection: client as any,
-            concurrency: 2,
-            lockDuration: 30000,
-            stalledInterval: 30000,
-          },
+          client,
+          2,
+          'Maintenance',
         );
-        this.maintenanceWorker.on('error', (err) => {
-          this.logger.warn(`Maintenance worker connection error: ${err.message}`);
-        });
 
-        this.notificationWorker = new Worker(
+        this.notificationWorker = this.createManagedWorker(
           NOTIFICATION_QUEUE,
           async (job) => {
             if (job.name === JOB_DISPATCH_PAYMENT_RECEIPT) {
@@ -140,34 +183,22 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
               );
             }
           },
-          {
-            connection: client as any,
-            concurrency: 5, // Process up to 5 push/SMS notifications in parallel
-            lockDuration: 30000,
-            stalledInterval: 30000,
-          },
+          client,
+          5, // Process up to 5 push/SMS notifications in parallel
+          'Notification',
         );
-        this.notificationWorker.on('error', (err) => {
-          this.logger.warn(`Notification worker connection error: ${err.message}`);
-        });
 
-        this.reconciliationWorker = new Worker(
+        this.reconciliationWorker = this.createManagedWorker(
           RECONCILIATION_QUEUE,
           async (job) => {
             if (job.name === JOB_RUN_DAILY_RECONCILIATION) {
               return await this.reconciliationService.reconcileSettlement(job.data?.records || []);
             }
           },
-          {
-            connection: client as any,
-            concurrency: 2,
-            lockDuration: 30000,
-            stalledInterval: 30000,
-          },
+          client,
+          2,
+          'Reconciliation',
         );
-        this.reconciliationWorker.on('error', (err) => {
-          this.logger.warn(`Reconciliation worker connection error: ${err.message}`);
-        });
 
         // 3. Register Automated Repeatable Cron Jobs (Asia/Kolkata timezone)
         await this.registerRepeatableJobs();
@@ -303,6 +334,10 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
           attempts: options?.attempts ?? 3,
           backoff: options?.backoff ?? { type: 'exponential', delay: 1000 },
           removeOnComplete: true,
+          removeOnFail: options?.removeOnFail ?? {
+            count: BULLMQ_FAILED_JOB_MAX_COUNT,
+            age: BULLMQ_FAILED_JOB_MAX_AGE_SECONDS,
+          },
         });
         return { jobId: job?.id || safeJobId || `job-${Date.now()}`, status: 'ENQUEUED' };
       }
