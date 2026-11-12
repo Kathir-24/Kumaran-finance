@@ -3,7 +3,7 @@
 > **Module**: `apps/api/src/notification/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
 > **Compliance**: Telecom Regulatory Authority of India (TRAI) DLT Telecom Directives & Indian Digital Personal Data Protection (DPDP) Act 2023  
-> **Guiding ADR**: [ADR-04](../../../docs/01-business/decision-log.md) & [Notification Templates Specification](../../../docs/02-requirements/notification-and-receipt-templates.md)
+> **Guiding ADR**: [ADR-04](../../../../docs/01-business/decision-log.md) & [Notification Templates Specification](../../../../docs/02-requirements/notification-and-receipt-templates.md)
 
 ---
 

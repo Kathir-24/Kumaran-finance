@@ -3,7 +3,7 @@
 > **Module**: `apps/api/src/notification/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
 > **Channel**: Mobile App Push Notifications (Android & iOS)  
-> **Guiding ADRs**: [ADR-10, ADR-12, ADR-17](../../../docs/01-business/decision-log.md)
+> **Guiding ADRs**: [ADR-10, ADR-12, ADR-17](../../../../docs/01-business/decision-log.md)
 
 ---
 

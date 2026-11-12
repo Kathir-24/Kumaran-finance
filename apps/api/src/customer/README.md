@@ -3,7 +3,7 @@
 > **Module**: `apps/api/src/customer/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
 > **Compliance**: Indian DPDP Act 2023 & Tamil Nadu Chit Funds Rules  
-> **Guiding ADRs**: [ADR-13, ADR-15, ADR-16](../../../docs/01-business/decision-log.md)
+> **Guiding ADRs**: [ADR-13, ADR-15, ADR-16](../../../../docs/01-business/decision-log.md)
 
 ---
 

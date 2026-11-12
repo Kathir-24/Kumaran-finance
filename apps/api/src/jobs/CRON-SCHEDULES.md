@@ -3,7 +3,7 @@
 > **Module**: `apps/api/src/jobs/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
 > **Standard Timezone**: **Indian Standard Time (IST — `Asia/Kolkata` / UTC+05:30)**  
-> **Guiding ADRs**: [ADR-04, ADR-07, ADR-10, ADR-12](../../../docs/01-business/decision-log.md)
+> **Guiding ADRs**: [ADR-04, ADR-07, ADR-10, ADR-12](../../../../docs/01-business/decision-log.md)
 
 ---
 

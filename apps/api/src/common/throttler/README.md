@@ -2,7 +2,7 @@
 
 > **Package**: `@kumaran/api` (NestJS Modular Monolith)  
 > **Location**: `apps/api/src/common/throttler/`  
-> **Master Architecture Spec**: [`docs/03-architecture/rate-limiting-and-abuse-prevention.md`](../../../../docs/03-architecture/rate-limiting-and-abuse-prevention.md)
+> **Master Architecture Spec**: [`docs/03-architecture/rate-limiting-and-abuse-prevention.md`](../../../../../docs/03-architecture/rate-limiting-and-abuse-prevention.md)
 
 ---
 

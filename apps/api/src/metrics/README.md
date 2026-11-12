@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Location**: `apps/api/src/metrics/`  
-> **Compliance Reference**: [`docs/02-requirements/non-functional-requirements.md`](../../../docs/02-requirements/non-functional-requirements.md) §3
+> **Compliance Reference**: [`docs/02-requirements/non-functional-requirements.md`](../../../../docs/02-requirements/non-functional-requirements.md) §3
 
 ---
 

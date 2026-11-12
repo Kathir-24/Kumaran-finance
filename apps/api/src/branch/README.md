@@ -2,7 +2,7 @@
 
 > **Module**: `apps/api/src/branch/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
-> **Guiding ADRs**: [ADR-01 (Single Company Tenancy), ADR-17 (Bilingual Receipts)](../../../docs/01-business/decision-log.md)
+> **Guiding ADRs**: [ADR-01 (Single Company Tenancy), ADR-17 (Bilingual Receipts)](../../../../docs/01-business/decision-log.md)
 
 ---
 

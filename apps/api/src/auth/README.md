@@ -2,7 +2,7 @@
 
 > **Module**: `apps/api/src/auth/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
-> **Guiding ADRs**: [ADR-01, ADR-02, ADR-10, ADR-17](../../../docs/01-business/decision-log.md)
+> **Guiding ADRs**: [ADR-01, ADR-02, ADR-10, ADR-17](../../../../docs/01-business/decision-log.md)
 
 ---
 
