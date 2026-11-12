@@ -119,12 +119,12 @@ This triggers an intentional 500 error: `InternalServerErrorException('Sentry Ve
 
 ## 5. Verification & Testing
 
-Run the automated test suite verifying bypass, PII scrubbing, BigInt compatibility, and 4xx/5xx filtering:
+Run the automated test suite verifying bypass, PII scrubbing, BigInt compatibility, JWT `sub` user attribution (`DEF-BE-03`), and 4xx/5xx filtering:
 
 ```bash
-# Run Sentry unit tests (14 passing tests)
+# Run Sentry unit tests (16 passing tests)
 pnpm --filter api test -- test/sentry.spec.ts
 
-# Run all API tests (24 suites, 343 passing unit tests)
+# Run all API tests (54 suites, 821 passing unit tests)
 pnpm --filter api test
 ```

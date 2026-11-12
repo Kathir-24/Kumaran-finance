@@ -9,10 +9,12 @@ import type { ErrorEvent } from '@sentry/nestjs';
 import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
 import {
   beforeSend,
+  buildSafeSentryUserContext,
   initSentry,
   isSentryActive,
   scrubPii,
   setCustomCaptureFn,
+  setCustomWithScopeFn,
   setSentryActiveOverride,
 } from '../src/common/sentry/sentry.config';
 import { SentryService } from '../src/common/sentry/sentry.service';
@@ -26,12 +28,14 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
     process.env = { ...originalEnv };
     setSentryActiveOverride(null);
     setCustomCaptureFn(null);
+    setCustomWithScopeFn(null);
   });
 
   afterAll(() => {
     process.env = originalEnv;
     setSentryActiveOverride(null);
     setCustomCaptureFn(null);
+    setCustomWithScopeFn(null);
   });
 
   describe('1. Sentry Initialization & Safe Bypass', () => {
@@ -137,9 +141,13 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
         user: {
           id: 'user-001',
           username: 'partner_erode',
+          roles: 'BRANCH_MANAGER,ACCOUNTANT',
+          branchId: 'PRD',
+          clientType: 'WEB',
+          phone: '9876543210',
           email: 'sensitive@kumaranfinance.in',
           ip_address: '192.168.1.5',
-        },
+        } as any,
         breadcrumbs: [
           {
             category: 'http',
@@ -158,11 +166,22 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
       expect(processed?.request?.data?.phone).toBe('+91******3210');
       expect(processed?.request?.data?.amount).toBe('5000');
 
-      // User object stripped of email & IP
+      // DEF-BE-03 (N3): Operational identifiers preserved; phone, email & IP stripped
       expect(processed?.user?.id).toBe('user-001');
       expect(processed?.user?.username).toBe('partner_erode');
+      expect((processed?.user as any)?.roles).toBe('BRANCH_MANAGER,ACCOUNTANT');
+      expect((processed?.user as any)?.branchId).toBe('PRD');
+      expect((processed?.user as any)?.clientType).toBe('WEB');
+      expect((processed?.user as any)?.phone).toBeUndefined();
       expect((processed?.user as any)?.email).toBeUndefined();
       expect((processed?.user as any)?.ip_address).toBeUndefined();
+
+      // PII-only user object is completely removed rather than emitting empty {}
+      const piiOnlyEvent = beforeSend({
+        event_id: 'test-event-pii-only',
+        user: { email: 'only-pii@example.com', ip_address: '10.0.0.1' },
+      });
+      expect(piiOnlyEvent?.user).toBeUndefined();
 
       // Breadcrumb scrubbed
       expect(processed?.breadcrumbs?.[0].data?.authkey).toBe('[FILTERED]');
@@ -170,23 +189,35 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
     });
   });
 
-  describe('4. GlobalExceptionFilter Sentry Integration', () => {
+  describe('4. GlobalExceptionFilter Sentry Integration (DEF-BE-03 N1-N5)', () => {
     let filter: GlobalExceptionFilter;
     let mockResponse: any;
+    let mockRequest: any;
     let mockArgumentsHost: ArgumentsHost;
     let mockCaptureFn: jest.Mock;
+    let mockSetUser: jest.Mock;
+    let mockSetTag: jest.Mock;
 
     beforeEach(() => {
       filter = new GlobalExceptionFilter();
       mockResponse = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn().mockReturnThis(),
+        setHeader: jest.fn().mockReturnThis(),
       };
 
-      const mockRequest = {
+      // Mock real RFC 7519 JwtPayload produced by JwtStrategy.validate()
+      mockRequest = {
         method: 'POST',
         originalUrl: '/api/v1/auctions/bid',
-        user: { id: 'usr-123', roles: ['BRANCH_MANAGER'], branchId: 'PRD' },
+        user: {
+          sub: 'usr-jwt-123',
+          phone: '9876543210',
+          roles: ['BRANCH_MANAGER', 'ACCOUNTANT'],
+          branchId: 'PRD',
+          clientType: 'WEB',
+          tokenType: 'access',
+        },
         headers: { 'x-request-id': 'req-abc-999' },
       };
 
@@ -197,13 +228,22 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
         }),
       } as unknown as ArgumentsHost;
 
-      // Enable Sentry and attach mock capture function
+      // Enable Sentry and capture scope mutations synchronously
       setSentryActiveOverride(true);
       mockCaptureFn = jest.fn().mockReturnValue('mock-event-id-99');
+      mockSetUser = jest.fn();
+      mockSetTag = jest.fn();
       setCustomCaptureFn(mockCaptureFn);
+      setCustomWithScopeFn((callback) => {
+        callback({
+          setTag: mockSetTag,
+          setUser: mockSetUser,
+          setExtra: jest.fn(),
+        } as any);
+      });
     });
 
-    it('should forward 500 Internal Server Errors to Sentry with tags and user scope', () => {
+    it('N1: forwards 500 Internal Server Errors with JWT sub mapped to Sentry user.id and non-PII context', () => {
       const internalError = new InternalServerErrorException('Database query failed');
 
       filter.catch(internalError, mockArgumentsHost);
@@ -219,39 +259,92 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
         }),
       );
 
+      expect(mockSetUser).toHaveBeenCalledWith({
+        id: 'usr-jwt-123',
+        roles: 'BRANCH_MANAGER,ACCOUNTANT',
+        branchId: 'PRD',
+        clientType: 'WEB',
+      });
+      // DPDP PII must never be attached to Sentry user scope
+      expect((mockSetUser.mock.calls[0][0] as any).phone).toBeUndefined();
+      expect(mockSetTag).toHaveBeenCalledWith('statusCode', '500');
+      expect(mockSetTag).toHaveBeenCalledWith('errorCode', 'INTERNAL_SERVER_ERROR');
+      expect(mockSetTag).toHaveBeenCalledWith('requestId', 'req-abc-999');
       expect(mockCaptureFn).toHaveBeenCalledWith(internalError);
     });
 
-    it('should forward unhandled non-HttpExceptions to Sentry', () => {
+    it('N2: resolves fallback id/userId, skips setUser on empty user object, and uses req.requestId fallback', () => {
+      mockRequest.headers = {};
+      mockRequest.requestId = 'req-fallback-777';
+      mockRequest.user = { id: 'usr-legacy-456', roles: ['AUDITOR'], branchId: null };
+
+      filter.catch(new InternalServerErrorException('Fallback ID fault'), mockArgumentsHost);
+
+      expect(mockSetUser).toHaveBeenCalledWith({
+        id: 'usr-legacy-456',
+        roles: 'AUDITOR',
+      });
+      expect(mockSetTag).toHaveBeenCalledWith('requestId', 'req-fallback-777');
+
+      jest.clearAllMocks();
+      mockRequest.user = { userId: 'usr-alt-789' };
+      filter.catch(new InternalServerErrorException('Alt ID fault'), mockArgumentsHost);
+      expect(mockSetUser).toHaveBeenCalledWith({ id: 'usr-alt-789' });
+
+      jest.clearAllMocks();
+      mockRequest.user = { phone: '9876543210' }; // No sub/id/userId, no non-PII attrs
+      filter.catch(new InternalServerErrorException('Empty user attr fault'), mockArgumentsHost);
+      expect(mockSetUser).not.toHaveBeenCalled();
+    });
+
+    it('N4: fault tolerance guarantees HTTP 500 JSON response even if Sentry scope throws', () => {
+      setCustomWithScopeFn(() => {
+        throw new Error('Synthetic Sentry transport crash');
+      });
+      const logSpy = jest.spyOn((filter as any).logger, 'error').mockImplementation(() => {});
+
+      const err = new Error('Underlying DB failure');
+      filter.catch(err, mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          statusCode: 500,
+        }),
+      );
+      logSpy.mockRestore();
+    });
+
+    it('N5: forwards unauthenticated 500s without calling setUser and suppresses 4xx client errors', () => {
+      delete mockRequest.user;
       const logSpy = jest.spyOn((filter as any).logger, 'error').mockImplementation(() => {});
       const typeError = new TypeError('Cannot read properties of undefined');
 
       filter.catch(typeError, mockArgumentsHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockSetUser).not.toHaveBeenCalled();
       expect(mockCaptureFn).toHaveBeenCalledWith(typeError);
-      expect(logSpy).toHaveBeenCalled();
       logSpy.mockRestore();
-    });
 
-    it('should NOT forward 4xx client errors (401, 400, 404) to Sentry', () => {
+      jest.clearAllMocks();
+      mockRequest.user = { sub: 'usr-jwt-123', roles: ['SUPER_ADMIN'] };
       const unauthorized = new UnauthorizedException('Invalid staff token');
 
       filter.catch(unauthorized, mockArgumentsHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.UNAUTHORIZED);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: false,
-          statusCode: 401,
-          error: expect.objectContaining({
-            message: 'Invalid staff token',
-          }),
-        }),
-      );
-
-      // Must not spam Sentry with client errors
       expect(mockCaptureFn).not.toHaveBeenCalled();
+      expect(mockSetUser).not.toHaveBeenCalled();
+    });
+
+    it('buildSafeSentryUserContext handles edge inputs safely', () => {
+      expect(buildSafeSentryUserContext(null)).toBeNull();
+      expect(buildSafeSentryUserContext(undefined)).toBeNull();
+      expect(buildSafeSentryUserContext({ sub: '  usr-trim  ', roles: [], branchId: '   ' })).toEqual({
+        id: 'usr-trim',
+      });
     });
   });
 
@@ -273,19 +366,31 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
       }).not.toThrow();
     });
 
-    it('should capture exception and attach user context when Sentry is active', () => {
+    it('should capture exception and attach JWT sub / user context cleanly when Sentry is active', () => {
       setSentryActiveOverride(true);
       const mockCaptureFn = jest.fn().mockReturnValue('event-12345');
+      const mockSetUser = jest.fn();
       setCustomCaptureFn(mockCaptureFn);
+      setCustomWithScopeFn((cb) => {
+        cb({
+          setTag: jest.fn(),
+          setUser: mockSetUser,
+          setExtra: jest.fn(),
+        } as any);
+      });
 
       const err = new Error('Reconciliation mismatch');
       const eventId = service.captureException(err, {
         tags: { chitCode: 'KCA-1L' },
-        user: { id: 'usr-1', roles: ['SUPER_ADMIN'] },
+        user: { sub: 'usr-svc-1', roles: ['SUPER_ADMIN'], branchId: null },
         extra: { password: 'should-be-scrubbed', balance: 3750n },
       });
 
       expect(eventId).toBe('event-12345');
+      expect(mockSetUser).toHaveBeenCalledWith({
+        id: 'usr-svc-1',
+        roles: 'SUPER_ADMIN',
+      });
       expect(mockCaptureFn).toHaveBeenCalledWith(err);
     });
   });

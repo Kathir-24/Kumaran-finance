@@ -77,6 +77,68 @@ export function scrubPii<T = any>(val: T, depth = 0): T {
   return val;
 }
 
+export interface SentryUserInput {
+  sub?: unknown;
+  id?: unknown;
+  userId?: unknown;
+  username?: unknown;
+  roles?: unknown;
+  branchId?: unknown;
+  clientType?: unknown;
+}
+
+/**
+ * Builds a sanitized, DPDP-compliant Sentry user context from a JWT payload or manual user object.
+ * Resolves RFC 7519 `sub` -> `id` (with `id`/`userId` fallbacks), retains non-PII operational
+ * attributes (`roles`, `branchId`, `clientType`, `username`), and omits all PII (`phone`, `email`, `ip_address`).
+ */
+export function buildSafeSentryUserContext(
+  user: SentryUserInput | null | undefined,
+): Sentry.User | null {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  const rawId = user.sub ?? user.id ?? user.userId;
+  const normalizedId =
+    typeof rawId === 'string' && rawId.trim().length > 0
+      ? rawId.trim()
+      : typeof rawId === 'number' && Number.isFinite(rawId)
+        ? String(rawId)
+        : undefined;
+
+  const rolesStr = Array.isArray(user.roles)
+    ? user.roles.map(String).filter(Boolean).join(',')
+    : typeof user.roles === 'string' && user.roles.trim().length > 0
+      ? user.roles.trim()
+      : undefined;
+
+  const branchId =
+    typeof user.branchId === 'string' && user.branchId.trim().length > 0
+      ? user.branchId.trim()
+      : undefined;
+
+  const clientType =
+    typeof user.clientType === 'string' && user.clientType.trim().length > 0
+      ? user.clientType.trim()
+      : undefined;
+
+  const username =
+    typeof user.username === 'string' && user.username.trim().length > 0
+      ? user.username.trim()
+      : undefined;
+
+  const sanitized: Sentry.User = {
+    ...(normalizedId !== undefined ? { id: normalizedId } : {}),
+    ...(username ? { username } : {}),
+    ...(rolesStr ? { roles: rolesStr } : {}),
+    ...(branchId ? { branchId } : {}),
+    ...(clientType ? { clientType } : {}),
+  };
+
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}
+
 /**
  * Sentry beforeSend hook enforcing DPDP Act compliance.
  */
@@ -95,13 +157,14 @@ export function beforeSend(event: Sentry.ErrorEvent, _hint?: Sentry.EventHint): 
       }
     }
 
-    // 2. Sanitize user context (only retain non-PII operational identifiers)
+    // 2. Sanitize user context (retain non-PII operational fields only; strip phone, email, ip_address)
     if (event.user) {
-      event.user = {
-        id: event.user.id,
-        // Exclude unmasked phone, email, ip_address
-        ...(event.user.username ? { username: event.user.username } : {}),
-      };
+      const safeUser = buildSafeSentryUserContext(event.user);
+      if (safeUser) {
+        event.user = safeUser;
+      } else {
+        delete event.user;
+      }
     }
 
     // 3. Scrub breadcrumbs
@@ -166,6 +229,7 @@ export function initSentry(): boolean {
  */
 let activeOverride: boolean | null = null;
 let customCaptureFn: ((exception: unknown) => string | undefined) | null = null;
+let customWithScopeFn: ((callback: (scope: Sentry.Scope) => void) => void) | null = null;
 
 export function setSentryActiveOverride(active: boolean | null): void {
   activeOverride = active;
@@ -173,6 +237,20 @@ export function setSentryActiveOverride(active: boolean | null): void {
 
 export function setCustomCaptureFn(fn: ((exception: unknown) => string | undefined) | null): void {
   customCaptureFn = fn;
+}
+
+export function setCustomWithScopeFn(
+  fn: ((callback: (scope: Sentry.Scope) => void) => void) | null,
+): void {
+  customWithScopeFn = fn;
+}
+
+export function withSentryScope(callback: (scope: Sentry.Scope) => void): void {
+  if (customWithScopeFn) {
+    customWithScopeFn(callback);
+    return;
+  }
+  Sentry.withScope(callback);
 }
 
 export function captureSentryException(exception: unknown): string | undefined {

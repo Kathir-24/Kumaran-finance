@@ -6,7 +6,14 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
-import { captureSentryException, isSentryActive, scrubPii } from './sentry.config';
+import {
+  buildSafeSentryUserContext,
+  captureSentryException,
+  isSentryActive,
+  scrubPii,
+  SentryUserInput,
+  withSentryScope,
+} from './sentry.config';
 
 @Injectable()
 export class SentryService {
@@ -21,7 +28,7 @@ export class SentryService {
     context?: {
       tags?: Record<string, string | number | boolean>;
       extra?: Record<string, any>;
-      user?: { id?: string; roles?: string[]; branchId?: string };
+      user?: SentryUserInput;
     },
   ): string | undefined {
     if (!isSentryActive()) {
@@ -31,19 +38,16 @@ export class SentryService {
     try {
       let eventId: string | undefined;
 
-      Sentry.withScope((scope) => {
+      withSentryScope((scope) => {
         if (context?.tags) {
           for (const [k, v] of Object.entries(context.tags)) {
             scope.setTag(k, String(v));
           }
         }
 
-        if (context?.user) {
-          scope.setUser({
-            id: context.user.id,
-            ...(context.user.roles ? { roles: context.user.roles.join(',') } : {}),
-            ...(context.user.branchId ? { branchId: context.user.branchId } : {}),
-          });
+        const safeUser = buildSafeSentryUserContext(context?.user);
+        if (safeUser) {
+          scope.setUser(safeUser);
         }
 
         if (context?.extra) {

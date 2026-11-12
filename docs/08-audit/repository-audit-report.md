@@ -260,30 +260,17 @@ disbursedAmount?: number;
 ---
 
 #### Finding DEF-BE-03: Sentry User ID Attribution Bug in Global Exception Filter
+- **Status**: ✅ **REMEDIATED & VERIFIED** (`GlobalExceptionFilter`, `SentryService`, and `sentry.config.ts` normalized via `buildSafeSentryUserContext` + `withSentryScope`, 16/16 Sentry tests passing)
 - **Layer & Subsystem**: Observability & Error Telemetry
-- **Exact File Path & Line Numbers**: `apps/api/src/common/filters/global-exception.filter.ts:124-131`
+- **Exact File Path & Line Numbers**: `apps/api/src/common/filters/global-exception.filter.ts`, `apps/api/src/common/sentry/sentry.config.ts`, `apps/api/src/common/sentry/sentry.service.ts`
 - **Violated Specification**: `docs/03-architecture/observability-and-monitoring-architecture.md` §3.
 - **Severity**: **LOW**
 - **Detailed Technical Root Cause**:
-  In `GlobalExceptionFilter`:
-  ```typescript
-  if (req.user) {
-    scope.setUser({ id: req.user.id });
-  ```
-  However, `JwtStrategy.validate()` returns a `JwtPayload` where the user identifier is stored under property `sub` (`sub: string`), matching standard JWT RFC 7519 specifications. Consequently, `req.user.id` evaluates to `undefined`.
-- **Impact Analysis**:
-  Sentry exception events lack user attribution (`user: { id: undefined }`), hindering error triage during production incidents.
-- **Concrete Production-Grade Remediation Code Design**:
-
-```typescript
-// apps/api/src/common/filters/global-exception.filter.ts:124-125
-if (req.user) {
-  scope.setUser({
-    id: req.user.sub || req.user.id,
-    ...(req.user.roles ? { roles: Array.isArray(req.user.roles) ? req.user.roles.join(',') : String(req.user.roles) } : {}),
-  });
-}
-```
+  In `GlobalExceptionFilter`, Sentry scope enrichment previously set `{ id: req.user.id }`, whereas `JwtStrategy.validate()` returns a standard RFC 7519 `JwtPayload` where the user identifier is stored under `sub` (`sub: string`). Consequently, `req.user.id` evaluated to `undefined`. Additionally, `beforeSend` rebuilt `event.user` keeping only `{ id, username }`, silently dropping non-PII `roles`, `branchId`, and `clientType` attributes.
+- **Implemented Remediation**:
+  - Added shared `buildSafeSentryUserContext(user)` and `withSentryScope` helpers in `apps/api/src/common/sentry/sentry.config.ts` to map `sub ?? id ?? userId` to Sentry `user.id`, preserve non-PII `username`, `roles`, `branchId`, and `clientType`, strip DPDP Act PII (`phone`, `email`, `ip_address`), and omit `user` completely when no safe attributes are present.
+  - Updated `beforeSend`, `GlobalExceptionFilter` (also adding `req.requestId` fallback for `requestId` tag normalization), and `SentryService.captureException` to share `buildSafeSentryUserContext` + `withSentryScope`.
+  - Verified with `N1`–`N5` tests in `apps/api/test/sentry.spec.ts` (16/16 passing) and full monorepo gate.
 
 ---
 
@@ -950,7 +937,7 @@ gantt
   1. `DEF-FE-05` **[FIXED & VERIFIED]**: Eliminated all **31** raw `/api/v1/` `fetch()` calls and deprecated `getStoredAccessToken()` imports across **21** Web UI pages/components (`6` pages, `15` components) using `apiClient`, `unwrapApiResponse()`, `unwrapPaginatedList()`, and centralized [`pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`parseAs: 'blob'`), fixed the live 404 `/api/v1/chit-groups` -> `GET /api/v1/chits` endpoint bug and `AuthorizePayoutDto` body, added `AbortSignal` forwarding, synced `frontend-architecture.md`, and verified with `N1`–`N5` static/unit guards (`web`: `14/14` suites / `346/346` tests, `@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819`).
   2. `DEF-FE-09` **[FIXED & VERIFIED]**: Updated Playwright E2E fixtures (`auth-fixtures.ts` `buildSessionCookies`/`injectSession`) to inject HttpOnly BFF session cookies cleanly across isolated `chitflow_test` runs.
   3. `DEF-FE-10` **[FIXED & VERIFIED]**: Unified `sanitizeWholeRupeeInput` & `parseWholeRupees` in `@kumaran/api-client` (`packages/api-client/src/utils/currency.ts`) to split on `.` before extracting digits (eliminating 100x paise concatenation across SDK + `apps/web/src/lib/currency.ts`), added `NaN`/`Infinity`/`-0`/nullish guards, corrected 3 inverted legacy test assertions, added `N1`–`N5` tests, rebuilt SDK `dist/`, and passed the 5-point gate (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819` tests, `web`: `14/14` suites / `347/347` tests).
-  4. `DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.
+  4. ~~`DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.~~ *(✅ Fixed via shared `buildSafeSentryUserContext` + `withSentryScope` across `sentry.config.ts`, `global-exception.filter.ts`, and `sentry.service.ts`)*
   5. `DEF-BE-04` **[WONTFIX / OVER-ENGINEERED]**: Pre-controller `MakerCheckerGuard` closed to avoid redundant non-transactional DB lookups; existing atomic in-transaction `maker_user_id != checker_user_id` checks remain authoritative.
   6. `DEF-DB-07`: Add pessimistic row lock on `ChitGroup` activation.
 

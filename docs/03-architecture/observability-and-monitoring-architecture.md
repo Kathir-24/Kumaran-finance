@@ -192,9 +192,9 @@ sequenceDiagram
         Filter->>Filter: Log to local NestJS console with stack trace
     else SENTRY_DSN is configured (Staging / Production)
         SentryCfg-->>Filter: true
-        Filter->>Filter: Enrich Sentry Scope (userId, roles, branchId, requestId)
-        Filter->>SentryCfg: beforeSend(event) -> scrubPii()
-        Note over SentryCfg: 1. Redact credentials to [FILTERED]<br/>2. Mask phone numbers (+91******3210)<br/>3. Stringify native BigInt primitives
+        Filter->>Filter: Enrich Sentry Scope (sub/id, roles, branchId, clientType, requestId)
+        Filter->>SentryCfg: beforeSend(event) -> scrubPii() & buildSafeSentryUserContext()
+        Note over SentryCfg: 1. Redact credentials to [FILTERED]<br/>2. Mask phone numbers (+91******3210)<br/>3. Preserve non-PII user context (id/roles/branchId/clientType) while stripping PII (phone/email/ip_address)<br/>4. Stringify native BigInt primitives
         SentryCfg->>SentrySDK: Cleaned Event Envelope
         SentrySDK->>SentryCloud: Async Non-Blocking Telemetry Ingestion
     end
@@ -255,7 +255,7 @@ flowchart LR
 
 1. **NGINX Ingress Generation**: NGINX assigns a unique `$request_id` (32-character hexadecimal string) to every incoming HTTP connection, logs `rid="$request_id"` in `access.log`, and proxies `X-Request-ID` upstream.
 2. **NestJS `RequestIdInterceptor`**: Injects or preserves `X-Request-ID`, attaches `req.requestId`, and echoes the header on the outgoing HTTP response.
-3. **Sentry & Exception Filter**: `GlobalExceptionFilter` enriches Sentry error scopes with `scope.setTag('requestId', req.headers['x-request-id'])` so crashes can be correlated back to exact NGINX log entries.
+3. **Sentry & Exception Filter**: `GlobalExceptionFilter` enriches Sentry error scopes with `scope.setTag('requestId', headerRequestId || req.requestId)` and normalized `buildSafeSentryUserContext(req.user)` attribution (mapping RFC 7519 `JwtPayload.sub` to Sentry `user.id` and preserving `roles`, `branchId`, and `clientType` without DPDP PII) so crashes correlate cleanly to NGINX log entries and staff/customer sessions.
 
 ---
 

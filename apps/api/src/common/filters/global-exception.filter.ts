@@ -6,9 +6,13 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import * as Sentry from '@sentry/nestjs';
 import type { Response } from 'express';
-import { captureSentryException, isSentryActive } from '../sentry/sentry.config';
+import {
+  buildSafeSentryUserContext,
+  captureSentryException,
+  isSentryActive,
+  withSentryScope,
+} from '../sentry/sentry.config';
 
 export interface StandardErrorResponse {
   success: false;
@@ -112,7 +116,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const ctx = host.switchToHttp();
       const req = ctx.getRequest<any>();
 
-      Sentry.withScope((scope) => {
+      withSentryScope((scope) => {
         scope.setTag('statusCode', String(status));
         scope.setTag('errorCode', code);
 
@@ -120,18 +124,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           if (req.method) scope.setTag('httpMethod', req.method);
           if (req.originalUrl || req.url) scope.setTag('url', req.originalUrl || req.url);
 
-          if (req.user) {
-            scope.setUser({
-              id: req.user.id,
-              ...(req.user.roles
-                ? { roles: Array.isArray(req.user.roles) ? req.user.roles.join(',') : String(req.user.roles) }
-                : {}),
-              ...(req.user.branchId ? { branchId: req.user.branchId } : {}),
-            });
+          const safeUser = buildSafeSentryUserContext(req.user);
+          if (safeUser) {
+            scope.setUser(safeUser);
           }
 
-          if (req.headers && req.headers['x-request-id']) {
-            scope.setTag('requestId', String(req.headers['x-request-id']));
+          const rawHeaderRequestId = req.headers?.['x-request-id'];
+          const normalizedRequestId =
+            (Array.isArray(rawHeaderRequestId) ? rawHeaderRequestId[0] : rawHeaderRequestId) ||
+            req.requestId;
+          if (typeof normalizedRequestId === 'string' && normalizedRequestId.trim().length > 0) {
+            scope.setTag('requestId', normalizedRequestId.trim());
           }
         }
 
