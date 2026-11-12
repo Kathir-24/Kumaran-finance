@@ -2,8 +2,10 @@
 // Kumaran Chits — Chit Schemes Master Catalog Redis Caching Tests
 // ==============================================================================
 
+import { Prisma } from '@prisma/client';
 import { ChitService } from '../src/chit/chit.service';
 import { MasterCacheKeys } from '../src/common/constants';
+import { stringifyBigIntSafe } from '../src/common/utils/bigint-json.util';
 
 describe('ChitService Master Scheme Redis Caching', () => {
   let chitService: ChitService;
@@ -11,16 +13,33 @@ describe('ChitService Master Scheme Redis Caching', () => {
   let redisClientMock: any;
   let redisProviderMock: any;
 
-  const mockSchemeResult = {
+  const mockPrismaRows = [
+    {
+      id: 'chit-grp-01',
+      groupCode: 'KCF-2026-A',
+      groupName: 'Gold 20 Lakhs Scheme',
+      chitValue: 2000000n,
+      durationMonths: 20,
+      totalTickets: 20,
+      baseInstallment: 100000n,
+      maxDiscountCeiling: 500000n,
+      foremanCommissionRate: new Prisma.Decimal('4.00'),
+      status: 'DRAFT',
+    },
+  ];
+
+  const expectedSchemeResult = {
     data: [
       {
         id: 'chit-grp-01',
         groupCode: 'KCF-2026-A',
         groupName: 'Gold 20 Lakhs Scheme',
-        chitValue: 2000000,
+        chitValue: 2000000n,
         durationMonths: 20,
         totalTickets: 20,
-        baseInstallment: 100000,
+        baseInstallment: 100000n,
+        maxDiscountCeiling: 500000n,
+        foremanCommissionRate: 4,
         status: 'DRAFT',
       },
     ],
@@ -33,10 +52,10 @@ describe('ChitService Master Scheme Redis Caching', () => {
   beforeEach(() => {
     prismaMock = {
       chitGroup: {
-        findMany: jest.fn().mockResolvedValue(mockSchemeResult.data),
+        findMany: jest.fn().mockResolvedValue(mockPrismaRows),
         count: jest.fn().mockResolvedValue(1),
         findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue(mockSchemeResult.data[0]),
+        create: jest.fn().mockResolvedValue(mockPrismaRows[0]),
       },
       branch: {
         findFirst: jest.fn().mockResolvedValue({ id: 'branch-prd' }),
@@ -60,12 +79,16 @@ describe('ChitService Master Scheme Redis Caching', () => {
     chitService = new ChitService(prismaMock, redisProviderMock);
   });
 
-  it('1. Cache Miss: Queries database and caches default catalog list in Redis with 30-min TTL with jitter', async () => {
+  it('1. Cache Miss: Queries database, preserves native bigint, and caches exact strings in Redis with 30-min TTL with jitter', async () => {
     redisClientMock.get.mockResolvedValueOnce(null);
 
     const result = await chitService.findAll({});
 
-    expect(result.data).toEqual(mockSchemeResult.data);
+    expect(result).toEqual(expectedSchemeResult);
+    expect(typeof result.data[0].chitValue).toBe('bigint');
+    expect(typeof result.data[0].baseInstallment).toBe('bigint');
+    expect(typeof result.data[0].maxDiscountCeiling).toBe('bigint');
+    expect(result.data[0].foremanCommissionRate).toBe(4);
     expect(prismaMock.chitGroup.findMany).toHaveBeenCalledTimes(1);
     expect(redisClientMock.set).toHaveBeenCalledWith(
       MasterCacheKeys.schemesAll,
@@ -73,17 +96,25 @@ describe('ChitService Master Scheme Redis Caching', () => {
       'EX',
       expect.any(Number),
     );
+    const cachedJson = JSON.parse(redisClientMock.set.mock.calls[0][1]);
+    expect(cachedJson.data[0].chitValue).toBe('2000000');
+    expect(cachedJson.data[0].baseInstallment).toBe('100000');
+    expect(cachedJson.data[0].maxDiscountCeiling).toBe('500000');
+    expect(cachedJson.data[0].foremanCommissionRate).toBe(4);
     const ttl = redisClientMock.set.mock.calls[0][3];
     expect(ttl).toBeGreaterThanOrEqual(1530);
     expect(ttl).toBeLessThanOrEqual(2070);
   });
 
-  it('2. Cache Hit: Returns cached catalog directly from Redis without hitting database', async () => {
-    redisClientMock.get.mockResolvedValueOnce(JSON.stringify(mockSchemeResult));
+  it('2. Cache Hit: Revives native bigint values from Redis catalog without hitting database', async () => {
+    redisClientMock.get.mockResolvedValueOnce(stringifyBigIntSafe(expectedSchemeResult));
 
     const result = await chitService.findAll({});
 
-    expect(result).toEqual(mockSchemeResult);
+    expect(result).toEqual(expectedSchemeResult);
+    expect(typeof result.data[0].chitValue).toBe('bigint');
+    expect(typeof result.data[0].baseInstallment).toBe('bigint');
+    expect(typeof result.data[0].maxDiscountCeiling).toBe('bigint');
     expect(prismaMock.chitGroup.findMany).not.toHaveBeenCalled();
     expect(redisClientMock.get).toHaveBeenCalledWith(MasterCacheKeys.schemesAll);
   });
@@ -93,7 +124,8 @@ describe('ChitService Master Scheme Redis Caching', () => {
 
     const result = await chitService.findAll({});
 
-    expect(result.data).toEqual(mockSchemeResult.data);
+    expect(result.data).toEqual(expectedSchemeResult.data);
+    expect(typeof result.data[0].chitValue).toBe('bigint');
     expect(prismaMock.chitGroup.findMany).toHaveBeenCalledTimes(1);
   });
 
@@ -112,7 +144,7 @@ describe('ChitService Master Scheme Redis Caching', () => {
 
     expect(redisClientMock.del).toHaveBeenCalledWith(
       MasterCacheKeys.schemesAll,
-      MasterCacheKeys.schemeById(mockSchemeResult.data[0].id),
+      MasterCacheKeys.schemeById(mockPrismaRows[0].id),
     );
   });
 
@@ -140,5 +172,44 @@ describe('ChitService Master Scheme Redis Caching', () => {
     );
 
     expect(prismaMock.chitGroup.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('7. 64-Bit Precision: Preserves whole-rupee BigInt values beyond Number.MAX_SAFE_INTEGER across cache miss and hit', async () => {
+    const hugeValue = 9007199254740993n; // MAX_SAFE_INTEGER + 2 (odd integer that Number rounds to ...992)
+    prismaMock.chitGroup.findMany.mockResolvedValueOnce([
+      {
+        ...mockPrismaRows[0],
+        chitValue: hugeValue,
+        baseInstallment: 4503599627370496n,
+        maxDiscountCeiling: 2251799813685248n,
+      },
+    ]);
+    redisClientMock.get.mockResolvedValueOnce(null);
+
+    const missResult = await chitService.findAll({});
+    expect(missResult.data[0].chitValue).toBe(hugeValue);
+
+    const serializedForRedis = redisClientMock.set.mock.calls[0][1];
+    expect(JSON.parse(serializedForRedis).data[0].chitValue).toBe('9007199254740993');
+
+    redisClientMock.get.mockResolvedValueOnce(serializedForRedis);
+    const hitResult = await chitService.findAll({});
+    expect(hitResult.data[0].chitValue).toBe(hugeValue);
+    expect(prismaMock.chitGroup.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('8. Corrupt Cache & Non-Default Filter: Falls open cleanly on invalid JSON and bypasses cache for filtered queries', async () => {
+    redisClientMock.get.mockResolvedValueOnce('{corrupt-json');
+
+    const recoveredResult = await chitService.findAll({});
+    expect(recoveredResult.data).toEqual(expectedSchemeResult.data);
+    expect(typeof recoveredResult.data[0].chitValue).toBe('bigint');
+
+    const filteredResult = await chitService.findAll({ status: 'ACTIVE' as any });
+    expect(filteredResult.data).toEqual(expectedSchemeResult.data);
+    expect(typeof filteredResult.data[0].chitValue).toBe('bigint');
+    expect(filteredResult.data[0].foremanCommissionRate).toBe(4);
+    expect(prismaMock.chitGroup.findMany).toHaveBeenCalledTimes(2);
+    expect(redisClientMock.get).toHaveBeenCalledTimes(1);
   });
 });

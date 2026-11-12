@@ -13,6 +13,7 @@ import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+import { stringifyBigIntSafe } from '../utils/bigint-json.util';
 
 @Injectable()
 export class ReportEtagInterceptor implements NestInterceptor {
@@ -32,7 +33,7 @@ export class ReportEtagInterceptor implements NestInterceptor {
         }
 
         // Generate deterministic SHA-256 weak ETag from the serialized report data
-        const serialized = JSON.stringify(data);
+        const serialized = stringifyBigIntSafe(data);
         const hash = crypto
           .createHash('sha256')
           .update(serialized)

@@ -145,4 +145,48 @@ describe('ReportEtagInterceptor (HTTP 304 Conditional Caching)', () => {
       done();
     });
   });
+
+  it('5. BigInt Report Payloads: Computes deterministic ETag and handles 304 without BigInt.prototype.toJSON', (done) => {
+    const bigIntReportPayload = {
+      date: '2026-10-15',
+      totalCollections: 500000n,
+      totalDisbursements: 200000n,
+      closingCashBalance: 300000n,
+    };
+    const nextMock = {
+      handle: () => of(bigIntReportPayload),
+    };
+
+    interceptor.intercept(mockExecutionContext, nextMock).subscribe((result) => {
+      expect(result).toEqual(bigIntReportPayload);
+      const generatedEtag = mockResponse.headers['etag'];
+      expect(generatedEtag).toMatch(/^W\/"[a-f0-9]{32}"$/);
+
+      mockRequest.headers['if-none-match'] = generatedEtag;
+      const secondResponse: any = {
+        headers: {},
+        statusCode: 200,
+        setHeader: jest.fn((k: string, v: string) => {
+          secondResponse.headers[k.toLowerCase()] = v;
+        }),
+        status: jest.fn((code: number) => {
+          secondResponse.statusCode = code;
+          return secondResponse;
+        }),
+        end: jest.fn(),
+      };
+      const secondContext = {
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+          getResponse: () => secondResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      interceptor.intercept(secondContext, nextMock).subscribe((secondResult) => {
+        expect(secondResult).toBeNull();
+        expect(secondResponse.status).toHaveBeenCalledWith(304);
+        done();
+      });
+    });
+  });
 });

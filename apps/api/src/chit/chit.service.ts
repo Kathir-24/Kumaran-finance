@@ -18,7 +18,8 @@ import {
   MasterCacheKeys,
 } from '../common/constants';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
-import { serializePrismaPrimitives } from '../common/interceptors/bigint.interceptor';
+import { isPrismaDecimal } from '../common/interceptors/bigint.interceptor';
+import { parseBigIntField, stringifyBigIntSafe } from '../common/utils/bigint-json.util';
 import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
@@ -472,6 +473,69 @@ export class ChitService {
     return activated;
   }
 
+  private static readonly CATALOG_BIGINT_FIELDS = [
+    'chitValue',
+    'baseInstallment',
+    'maxDiscountCeiling',
+  ] as const;
+
+  private normalizeCatalogItem<T extends Record<string, any>>(item: T): T {
+    if (!item || typeof item !== 'object' || !('foremanCommissionRate' in item)) {
+      return item;
+    }
+
+    const rawRate = item.foremanCommissionRate;
+    let normalizedRate = rawRate;
+    if (isPrismaDecimal(rawRate)) {
+      normalizedRate = rawRate.toNumber();
+    } else if (typeof rawRate === 'string') {
+      const numericRate = Number(rawRate);
+      if (Number.isFinite(numericRate)) {
+        normalizedRate = numericRate;
+      }
+    }
+
+    return normalizedRate === rawRate
+      ? item
+      : { ...item, foremanCommissionRate: normalizedRate };
+  }
+
+  private serializeCatalog(result: {
+    data: Record<string, any>[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }): string {
+    return stringifyBigIntSafe(result);
+  }
+
+  private deserializeCatalog(cached: string) {
+    const parsed = JSON.parse(cached);
+    if (!parsed || !Array.isArray(parsed.data)) {
+      return parsed;
+    }
+
+    return {
+      ...parsed,
+      data: parsed.data.map((item: Record<string, any>) => {
+        if (!item || typeof item !== 'object') {
+          return item;
+        }
+        const revived: Record<string, any> = { ...item };
+        for (const field of ChitService.CATALOG_BIGINT_FIELDS) {
+          if (revived[field] !== null && revived[field] !== undefined) {
+            const parsedBigInt = parseBigIntField(revived[field]);
+            if (parsedBigInt !== undefined) {
+              revived[field] = parsedBigInt;
+            }
+          }
+        }
+        return this.normalizeCatalogItem(revived);
+      }),
+    };
+  }
+
   /**
    * Search & list chit schemes with status filter and pagination.
    * Default catalog view cached in Redis for 30 minutes with fail-open safety.
@@ -488,18 +552,7 @@ export class ChitService {
       try {
         const cached = await redis.get(MasterCacheKeys.schemesAll);
         if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed?.data)) {
-            for (const item of parsed.data) {
-              if (typeof item?.foremanCommissionRate === 'string') {
-                const numericRate = Number(item.foremanCommissionRate);
-                if (Number.isFinite(numericRate)) {
-                  item.foremanCommissionRate = numericRate;
-                }
-              }
-            }
-          }
-          return parsed;
+          return this.deserializeCatalog(cached);
         }
       } catch (err: any) {
         this.logger.warn(`Redis scheme cache read error: ${err.message}`);
@@ -538,19 +591,19 @@ export class ChitService {
       this.prisma.chitGroup.count({ where }),
     ]);
 
-    const result = serializePrismaPrimitives({
-      data,
+    const result = {
+      data: data.map((item) => this.normalizeCatalogItem(item)),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    });
+    };
 
     if (isDefaultQuery && redis && this.redisProvider?.getIsConnected()) {
       try {
         await redis.set(
           MasterCacheKeys.schemesAll,
-          JSON.stringify(result),
+          this.serializeCatalog(result),
           'EX',
           withTtlJitter(MASTER_CACHE_SCHEME_TTL_SECONDS),
         );

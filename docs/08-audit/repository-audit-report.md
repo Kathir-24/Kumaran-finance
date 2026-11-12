@@ -98,7 +98,7 @@ The backend architecture exhibits exceptional financial integrity and structural
 1. **Whole Rupee Financial Calculation Engine**:
    - In `apps/api/src/installment/installment.service.ts:60-98` and `apps/api/src/auction/auction.service.ts:47-55`, financial computations are executed using native TypeScript BigInt literals (`chitValue * 4n / 100n`, `bidDiscount - foremanCommission`). No floating-point division is performed on financial amounts.
 2. **BigInt JSON Serialization Safety**:
-   - `apps/api/src/common/interceptors/bigint.interceptor.ts:1-55` intercepts outbound HTTP responses and serializes 64-bit integer BigInt values to string/integer representations, preventing `TypeError: Do not know how to serialize a BigInt`.
+   - `apps/api/src/common/interceptors/bigint.interceptor.ts` intercepts outbound HTTP responses and converts 64-bit `BigInt` and `Prisma.Decimal` values for API JSON wire contracts, while [`bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts) provides explicit `BigInt` JSON helpers for Redis caching and ETag hashing without global `BigInt.prototype.toJSON` mutation.
 3. **Automated Transaction Deadlock & Conflict Recovery**:
    - `apps/api/src/common/utils/transaction-retry.util.ts:40-78` implements `withTransactionRetry`, wrapping database write paths in exponential backoff retry loops with randomized jitter (`baseDelayMs * 2 ** attempt + randomJitter`). It transparently recovers from PostgreSQL deadlocks (`40P01`), serialization errors (`40001`), Prisma write conflicts (`P2034`), and sequence collisions (`P2002`).
 4. **Deterministic Row-Level Locking in Payments**:
@@ -780,44 +780,30 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
 
 ---
 
-#### Finding DEF-DB-03: Implicit Global `BigInt.prototype.toJSON` Dependency & Cache Type Coercion in `ChitService.findAll`
+#### Finding DEF-DB-03: Implicit Global `BigInt.prototype.toJSON` Dependency & Cache Type Coercion in `ChitService.findAll` `[FIXED & VERIFIED — 2026-11-12]`
 - **Layer & Subsystem**: Redis Caching & Master Scheme Catalog
 - **Exact File Path & Line Numbers**:
-  1. `apps/api/src/chit/chit.service.ts:481-484, 531-541`
-  2. `apps/api/src/common/interceptors/bigint.interceptor.ts:11-15`
-  3. `apps/api/test/chit-cache.spec.ts:20, 23`
+  1. `apps/api/src/chit/chit.service.ts` (`findAll`, `serializeCatalog`, `deserializeCatalog`, `normalizeCatalogItem`)
+  2. `apps/api/src/common/utils/bigint-json.util.ts` *(Added `bigintSafeJsonReplacer`, `stringifyBigIntSafe`, `parseBigIntField`)*
+  3. `apps/api/src/common/interceptors/bigint.interceptor.ts` & `apps/api/src/main.ts` *(Removed global `BigInt.prototype.toJSON` mutation)*
+  4. `apps/api/src/common/interceptors/report-etag.interceptor.ts` *(Switched ETag hashing to `stringifyBigIntSafe`)*
+  5. `apps/api/test/chit-cache.spec.ts`, `apps/api/test/chit.spec.ts`, `apps/api/test/bigint-interceptor.spec.ts`, `apps/api/test/report-etag.spec.ts`
 - **Violated Specification**: `docs/03-architecture/caching-architecture.md` §3.1 ("Explicit BigInt Serialization"); Guardrail 2.
 - **Severity**: **MEDIUM** *(Architectural Fragility & Cache Type Mismatch)*
 - **Detailed Technical Root Cause**:
-  In `ChitService.findAll`:
-  ```typescript
-  await redis.set(MasterCacheKeys.schemesAll, JSON.stringify(result), 'EX', ttl);
-  ```
-  Prisma returns `ChitGroup` fields (`chitValue`, `baseInstallment`, `maxDiscountCeiling`) as native `BigInt`. In the HTTP API server (`main.ts:15`), importing `BigIntInterceptor` silently triggers a global side-effect (`bigint.interceptor.ts:11-15`) that monkey-patches `BigInt.prototype.toJSON = () => Number(this)`, preventing an immediate crash during live HTTP runs. However, this design introduces three bugs:
-  1. **Implicit Global State Fragility**: Any isolated service runner, CLI script, or unit test that imports `ChitService` without `BigIntInterceptor` crashes on `JSON.stringify`.
-  2. **Silent Type Loss on Cache Hit**: `JSON.parse(cached)` (line 483) restores cached currency fields as plain JS `number` rather than native `bigint`, breaking downstream strict BigInt arithmetic if consumed internally.
-  3. **Masked Unit Tests**: `apps/api/test/chit-cache.spec.ts:20,23` mocked numbers (`2000000`) instead of real `BigInt` values (`2000000n`).
-- **Impact Analysis**:
-  Breaks Guardrail 2 type uniformity between DB cache misses (`bigint`) and Redis cache hits (`number`), and threatens failures in non-HTTP workers.
-- **Concrete Production-Grade Remediation Code Design**:
-  Eliminate reliance on `BigInt.prototype` side-effects by using explicit serializer/reviver helpers in `ChitService` and updating `test/chit-cache.spec.ts` to test real `BigInt` literals (`2000000n`):
+  In `ChitService.findAll`, Prisma returns `ChitGroup` fields (`chitValue`, `baseInstallment`, `maxDiscountCeiling`) as native `BigInt`. Previously:
+  1. Importing `BigIntInterceptor` or running `main.ts` globally patched `(BigInt.prototype as any).toJSON = () => Number(this)`, masking missing `JSON.stringify` replacers and coercing 64-bit `BigInt` values into lossy numbers.
+  2. `ChitService.findAll` called HTTP-layer `serializePrismaPrimitives(...)` before writing to Redis, causing both cache misses and cache hits (`JSON.parse`) to return plain JS `number`s instead of native `bigint`s.
+  3. `ReportEtagInterceptor` called raw `JSON.stringify(data)` prior to global `BigIntInterceptor`, creating an implicit runtime dependency on `BigInt.prototype.toJSON`.
+  4. `apps/api/test/chit-cache.spec.ts` mocked `chitValue` / `baseInstallment` as plain numbers instead of native `bigint`s (`2000000n` / `100000n`).
+- **Verified Production Implementation**:
+  - Removed both global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`.
+  - Created [`apps/api/src/common/utils/bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts) with explicit `bigintSafeJsonReplacer`, `stringifyBigIntSafe`, and `parseBigIntField` (supporting exact digit strings and legacy safe-integer rollout payloads).
+  - Refactored `ChitService.findAll` to remove `serializePrismaPrimitives()`, normalize `Decimal` `foremanCommissionRate` cleanly without mutating `bigint` fields, store `chitValue`/`baseInstallment`/`maxDiscountCeiling` in Redis as exact strings (`serializeCatalog`), and revive native `bigint`s (`deserializeCatalog`) across cache hits (`> Number.MAX_SAFE_INTEGER` precision preserved).
+  - Hardened `ReportEtagInterceptor` with `stringifyBigIntSafe(data)` so `@UseInterceptors(ReportEtagInterceptor)` hashes raw `bigint` payloads safely without global prototype hacks.
+  - Updated `chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, and `report-etag.spec.ts` with real `bigint`, `> MAX_SAFE_INTEGER` (`9007199254740993n`), legacy Redis payload revival, corrupt JSON fail-open, prototype-isolation, and raw-BigInt ETag assertions.
 
-```typescript
-// apps/api/src/chit/chit.service.ts
-private serializeCatalog(data: any): string {
-  return JSON.stringify(data, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
-}
-
-private deserializeCatalog(json: string): any {
-  const bigintKeys = new Set(['chitValue', 'baseInstallment', 'maxDiscountCeiling', 'openingBalance']);
-  return JSON.parse(json, (key, value) => {
-    if (typeof value === 'string' && bigintKeys.has(key) && /^\d+$/.test(value)) {
-      return BigInt(value);
-    }
-    return value;
-  });
-}
-```
+- **Verification Summary**: Targeted `DEF-DB-03` specs (`chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, `report-etag.spec.ts`: `4/4` suites, `30/30` tests), full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `796/796` tests, `web`: `14/14` suites / `341/341` tests), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), and `pnpm run build` (`exit 0`).
 
 ---
 
@@ -1037,7 +1023,7 @@ gantt
   1. `DEF-FE-06` **[FIXED & VERIFIED]**: Added shared `buildBffForwardHeaders` across all 6 Web BFF → NestJS callers, validated `TRUST_PROXY` (`['loopback', 'linklocal', 'uniquelocal']` default) replacing hardcoded `trust proxy = 1`, normalized `::ffff:` client IPs in `AppThrottlerGuard`, added `AsyncLocalStorage` `RequestContextMiddleware` + Prisma 6 `$extends` automatic `AuditLog.ipAddress` persistence, and aligned Nginx `X-Request-ID` / `X-Forwarded-Host` parity (`proxy-client-ip.e2e-spec.ts` + Web/API unit suites verified).
   2. `DEF-FE-07` **[FIXED & VERIFIED]**: Migrated KYC and safety proof uploads to client-direct S3/R2 `POST /api/v1/storage/presigned-upload-url` + direct `PUT` flows with client-side image compression and fail-closed backend confirmation endpoints.
   3. `DEF-FE-08` **[FIXED & VERIFIED]**: Moved 2FA intermediate `tempToken` (`totp_pending`) out of browser JSON and `sessionStorage` into a 5-minute `HttpOnly` cookie (`kc_totp_pending_token`) with strict cookie-only BFF verification, Edge `/2fa` HS256 guard (`edge-auth.ts`), non-secret `pendingTotp` session reload recovery, and Back-to-Login cookie cleanup.
-  4. `DEF-DB-03`: Implement explicit `serializeCatalog` / `deserializeCatalog` BigInt helpers in `ChitService.findAll` and update `chit-cache.spec.ts` to assert `2000000n`.
+  4. `DEF-DB-03` **[FIXED & VERIFIED]**: Removed global `BigInt.prototype.toJSON` monkey-patches from `bigint.interceptor.ts` and `main.ts`, introduced shared [`bigint-json.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/bigint-json.util.ts), refactored `ChitService.findAll` (`serializeCatalog`/`deserializeCatalog`) to store exact decimal strings in Redis while returning native `bigint`s on cache miss & hit, hardened `ReportEtagInterceptor` with `stringifyBigIntSafe`, and expanded `chit-cache.spec.ts`, `chit.spec.ts`, `bigint-interceptor.spec.ts`, and `report-etag.spec.ts`.
   5. `DEF-DB-05`: Apply SQL migration adding indexes on `PaymentAllocation` and unique constraint on `AuctionTieBidder`.
   6. `DEF-DB-06`: Add `removeOnFail: { count: 500, age: 604800 }` to BullMQ queue job configurations.
   7. `DEF-DB-04`: Harden `ReportService` distributed lock fallback with unique token and Lua script.

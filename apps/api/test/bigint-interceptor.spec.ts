@@ -90,4 +90,9 @@ describe('BigIntInterceptor & serializePrismaPrimitives', () => {
     expect(output.data[0].foremanCommissionRate).toBe(4);
     expect(typeof output.data[0].foremanCommissionRate).toBe('number');
   });
+
+  it('does not globally monkey-patch BigInt.prototype.toJSON', () => {
+    expect((BigInt.prototype as any).toJSON).toBeUndefined();
+    expect(() => JSON.stringify({ chitValue: 100000n })).toThrow(TypeError);
+  });
 });

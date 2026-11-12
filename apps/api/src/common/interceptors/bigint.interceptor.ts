@@ -8,18 +8,11 @@ import { Prisma } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-// Bank-Grade Safety Guard: globally patch BigInt.prototype.toJSON so JSON.stringify never throws on BigInt
-if (typeof (BigInt.prototype as any).toJSON !== 'function') {
-  (BigInt.prototype as any).toJSON = function () {
-    return Number(this);
-  };
-}
-
 /**
  * Checks whether a runtime value is a Prisma Decimal instance (e.g. Decimal(5, 2) rate columns).
  * Rate columns are serialized as JSON numbers matching OpenAPI / Flutter DTO contracts.
  */
-function isPrismaDecimal(value: unknown): value is Prisma.Decimal {
+export function isPrismaDecimal(value: unknown): value is Prisma.Decimal {
   if (typeof value !== 'object' || value === null) {
     return false;
   }

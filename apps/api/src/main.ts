@@ -22,15 +22,6 @@ import { BullBoardAuthMiddleware } from './jobs/bull-board/bull-board-auth.middl
 import { BullBoardService } from './jobs/bull-board/bull-board.service';
 import { captureSentryException, initSentry, isSentryActive } from './common/sentry/sentry.config';
 
-// ------------------------------------------------------------------------------
-// Bank-Grade Safety: Globally guarantee BigInt serialization safety for Express & Sentry
-// ------------------------------------------------------------------------------
-if (typeof (BigInt.prototype as any).toJSON !== 'function') {
-  (BigInt.prototype as any).toJSON = function () {
-    return Number(this);
-  };
-}
-
 async function bootstrap() {
   // 0. Initialize Sentry APM & Crash Monitoring (Safe bypass if SENTRY_DSN is unset)
   initSentry();

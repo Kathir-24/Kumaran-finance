@@ -476,14 +476,21 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       prismaMock.chitGroup.count.mockResolvedValue(1);
 
       const missResult = await cachedChitService.findAll({});
+      expect(typeof missResult.data[0].chitValue).toBe('bigint');
+      expect(missResult.data[0].chitValue).toBe(100000n);
+      expect(missResult.data[0].baseInstallment).toBe(5000n);
+      expect(missResult.data[0].maxDiscountCeiling).toBe(25000n);
       expect(typeof missResult.data[0].foremanCommissionRate).toBe('number');
       expect(missResult.data[0].foremanCommissionRate).toBe(4);
       expect(redisMock.set).toHaveBeenCalledTimes(1);
       const cachedJson = JSON.parse(redisMock.set.mock.calls[0][1]);
+      expect(cachedJson.data[0].chitValue).toBe('100000');
+      expect(cachedJson.data[0].baseInstallment).toBe('5000');
+      expect(cachedJson.data[0].maxDiscountCeiling).toBe('25000');
       expect(typeof cachedJson.data[0].foremanCommissionRate).toBe('number');
       expect(cachedJson.data[0].foremanCommissionRate).toBe(4);
 
-      // Simulate legacy Redis entry where Decimal was previously stored as string "4"
+      // Simulate legacy Redis entry where Decimal was string "4" and BigInts were plain numbers
       redisMock.get.mockResolvedValueOnce(
         JSON.stringify({
           data: [
@@ -504,6 +511,10 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       );
 
       const hitResult = await cachedChitService.findAll({});
+      expect(typeof hitResult.data[0].chitValue).toBe('bigint');
+      expect(hitResult.data[0].chitValue).toBe(100000n);
+      expect(hitResult.data[0].baseInstallment).toBe(5000n);
+      expect(hitResult.data[0].maxDiscountCeiling).toBe(25000n);
       expect(typeof hitResult.data[0].foremanCommissionRate).toBe('number');
       expect(hitResult.data[0].foremanCommissionRate).toBe(4);
     });

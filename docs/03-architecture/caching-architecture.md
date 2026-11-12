@@ -83,8 +83,8 @@ flowchart TD
    All Redis reads are wrapped in safety blocks. If the Redis server restarts, experiences network partition, or exceeds latency thresholds, the application logs a warning and queries PostgreSQL directly without throwing errors.
 2. **Atomic Invalidation on Mutations**:
    Whenever administrative users execute write operations (e.g. creating a new branch, configuring a new chit scheme, or activating a chit group), all affected Redis cache keys are atomically evicted using Redis `DEL`.
-3. **BigInt & Decimal Safe Serialization**:
-   All monetary amounts and IDs are serialized into ISO-standard JSON strings with exact whole-rupee precision to prevent floating-point truncation.
+3. **Explicit BigInt & Decimal Safe Serialization (Zero Global Prototype Mutation)**:
+   Monetary amounts (`BigInt`) and rate columns (`Decimal`) must be serialized explicitly using a designated replacer/reviver (`bigint-json.util.ts` -> `ChitService.serializeCatalog` / `deserializeCatalog` for `cache:master:schemes:all`, and `ReportService.serializeReport` / `deserializeReport` for dashboard/daybook caches). Global `BigInt.prototype.toJSON` monkey-patching and passing HTTP-layer `serializePrismaPrimitives()` into service/cache paths are strictly prohibited; all monetary `BigInt` fields are stored in Redis as exact whole-rupee decimal strings (`> Number.MAX_SAFE_INTEGER` safe) and revived cleanly as native `bigint` values on cache hit.
 
 ### 3.2 Key Naming Standard
 - `cache:master:branches:all` — Complete list of all branch offices.
