@@ -4,7 +4,7 @@
 > **Lifecycle**: **Lifecycle 7 — Counter Payments, Collections Query, A5 Digital Receipts & Dual-Control Reversals (Approval & Rejection)**  
 > **Execution Date**: October 25, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433) $\longleftrightarrow$ Redis 7 $\longleftrightarrow$ MinIO Private S3 (`:9000`)  
-> **Test Script**: [`apps/api/scripts/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts)  
+> **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts)  
 > **Result**: **8 / 8 Live Steps Passed (100% Request $\to$ Server $\to$ Database $\to$ S3 $\to$ Queue $\to$ Response Verified)**
 
 ---

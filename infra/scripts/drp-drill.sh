@@ -14,6 +14,6 @@ cd "${REPO_ROOT}"
 
 echo "[INFO] Starting Kumaran Chits Automated DRP Disaster Recovery Drill..."
 
-pnpm --filter api exec ts-node scripts/drp-drill.ts
+pnpm run db:drp:drill
 
 echo "[SUCCESS] Disaster Recovery Drill completed with 100% compliance!"

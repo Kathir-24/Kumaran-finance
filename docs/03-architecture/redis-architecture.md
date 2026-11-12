@@ -188,7 +188,7 @@ chitflow-redis:
 
 ## 7. Verification Proofs (Live Terminal Evidence)
 
-Verified live against Redis 7 on port `6379` during [`verify-lifecycle-1.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-1.ts):
+Verified live against Redis 7 on port `6379` during [`verify-lifecycle-1.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-1.ts):
 
 ### Step 1: Redis Key & Payload Inspection
 ```bash

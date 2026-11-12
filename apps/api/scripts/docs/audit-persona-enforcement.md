@@ -1,8 +1,8 @@
 # Kumaran Chits — Automated AST Persona Enforcement Audit Tool
 
-> **Script**: [`apps/api/scripts/audit-persona-enforcement.ts`](../audit-persona-enforcement.ts)  
-> **Companion Printer**: [`apps/api/scripts/print-detailed-audit.ts`](../print-detailed-audit.ts)  
-> **Generated Audit Artifact**: [`apps/api/scripts/endpoint-audit-report.json`](../endpoint-audit-report.json)  
+> **Script**: [`apps/api/scripts/audit/audit-persona-enforcement.ts`](../audit/audit-persona-enforcement.ts)  
+> **Companion Printer**: [`apps/api/scripts/audit/print-detailed-audit.ts`](../audit/print-detailed-audit.ts)  
+> **Generated Audit Artifact**: [`apps/api/scripts/audit/endpoint-audit-report.json`](../audit/endpoint-audit-report.json)  
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Compliance References**: [`docs/01-business/permissions-matrix.md`](../../../docs/01-business/permissions-matrix.md), [`docs/03-architecture/completed-modules-api-registry.md`](../../../docs/03-architecture/completed-modules-api-registry.md), [`docs/03-architecture/security-and-access-guardians.md`](../../../docs/03-architecture/security-and-access-guardians.md)  
 > **Status**: ✅ **100% Complete & Verified** across all 111 Operations / 18 Controllers / 6 Personas.
@@ -64,7 +64,7 @@ flowchart TD
     end
 
     subgraph Outputs ["5. Audit Artifacts & Reports"]
-        JSON["apps/api/scripts/endpoint-audit-report.json\nFull structured dump of all 111 operations"]
+        JSON["apps/api/scripts/audit/endpoint-audit-report.json\nFull structured dump of all 111 operations"]
         CLI["CLI Console Metrics & Summary Table"]
     end
 
@@ -168,14 +168,14 @@ These 8 operations require a valid cryptographically signed JWT, but do not use 
 ### 1. Run Full AST Controller Audit:
 ```bash
 # From workspace root:
-pnpm --filter api exec ts-node scripts/audit-persona-enforcement.ts
+pnpm --filter api exec ts-node scripts/audit/audit-persona-enforcement.ts
 ```
-*Outputs parsed results to console and writes full structured JSON to `apps/api/scripts/endpoint-audit-report.json`.*
+*Outputs parsed results to console and writes full structured JSON to `apps/api/scripts/audit/endpoint-audit-report.json`.*
 
 ### 2. Print Detailed Controller-by-Controller Inventory:
 ```bash
 # From workspace root:
-pnpm --filter api exec ts-node scripts/print-detailed-audit.ts
+pnpm --filter api exec ts-node scripts/audit/print-detailed-audit.ts
 ```
 *Prints a formatted list of all 18 controllers with exact HTTP verbs, handler names, effective guards, and active `@Roles` lists.*
 
@@ -188,4 +188,4 @@ When implementing a new API route in `apps/api/src/`, developers must follow the
 1. **Class-Level Guards**: Every domain controller must declare `@UseGuards(JwtAuthGuard, RolesGuard)` at the class level.
 2. **Explicit Roles on Methods**: Every operational method must explicitly declare `@Roles(...)` with the exact roles permitted per [`permissions-matrix.md`](../../../docs/01-business/permissions-matrix.md). Do not rely on inherited roles.
 3. **Strict Zero-Write for Auditors**: `Role.AUDITOR` must **NEVER** be included on `@Post`, `@Patch`, or `@Delete` endpoints. Auditors are strictly read-only.
-4. **Run AST Audit Before Committing**: Run `pnpm --filter api exec ts-node scripts/audit-persona-enforcement.ts` to ensure the generated `endpoint-audit-report.json` reflects zero unauthorized gaps.
+4. **Run AST Audit Before Committing**: Run `pnpm --filter api exec ts-node scripts/audit/audit-persona-enforcement.ts` to ensure the generated `endpoint-audit-report.json` reflects zero unauthorized gaps.

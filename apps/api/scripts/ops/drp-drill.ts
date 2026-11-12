@@ -17,7 +17,7 @@ import * as path from 'path';
 import type { Readable } from 'stream';
 import { runBackup } from './backup-to-s3';
 
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 } else {
@@ -195,7 +195,7 @@ export async function runDrpDrill(): Promise<DrillResult> {
 
     const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
 
-    const tempDir = path.resolve(__dirname, '../../../infra/backups');
+    const tempDir = path.resolve(__dirname, '../../../../infra/backups');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }

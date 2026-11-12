@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Environment**: Live NestJS 12 Backend (`http://127.0.0.1:3000`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
-> **Verification Script**: [`apps/api/scripts/verify-lifecycle-9.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-9.ts)  
+> **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-9.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-9.ts)  
 > **Execution Status**: **100% Passed (9 / 9 Endpoints Verified Live)**
 
 ---

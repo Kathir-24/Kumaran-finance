@@ -4,7 +4,7 @@ import { VersioningType } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { AppModule } from '../src/app.module';
+import { AppModule } from '../../src/app.module';
 
 async function exportOpenApi() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(), {
@@ -68,7 +68,7 @@ async function exportOpenApi() {
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
-  const outputPath = path.resolve(__dirname, '../../../docs/03-architecture/openapi-spec.json');
+  const outputPath = path.resolve(__dirname, '../../../../docs/03-architecture/openapi-spec.json');
   fs.writeFileSync(outputPath, JSON.stringify(document, null, 2));
 
   console.log(`[SUCCESS] OpenAPI JSON successfully written to: ${outputPath}`);

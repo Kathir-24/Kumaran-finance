@@ -18,7 +18,7 @@ interface EndpointAuditResult {
   notes: string[];
 }
 
-const controllersDir = path.resolve(__dirname, '../src');
+const controllersDir = path.resolve(__dirname, '../../src');
 
 function findControllers(dir: string): string[] {
   let results: string[] = [];
@@ -139,7 +139,7 @@ function analyzeController(filePath: string): EndpointAuditResult[] {
             }
 
             results.push({
-              file: path.relative(path.resolve(__dirname, '..'), filePath),
+              file: path.relative(path.resolve(__dirname, '../..'), filePath),
               controller: node.name?.getText(sourceFile) || 'UnknownController',
               methodName,
               httpMethod,

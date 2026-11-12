@@ -13,8 +13,8 @@
 > - [`apps/api/test/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/collection.spec.ts) (16/16 PASS)  
 > - [`apps/api/test/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/pdf.spec.ts) (28/28 PASS)  
 > **Live E2E Verification Scripts**:  
-> - [`apps/api/scripts/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-6.ts) (Lifecycle 6: Collections & Vault Handover)  
-> - [`apps/api/scripts/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts) (Lifecycle 7: Counter Payments & Dual-Control Reversals)
+> - [`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts) (Lifecycle 6: Collections & Vault Handover)  
+> - [`apps/api/scripts/lifecycle/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts) (Lifecycle 7: Counter Payments & Dual-Control Reversals)
 
 ---
 
@@ -417,7 +417,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 
    - `[8/8] POST /payments/:id/approve-reversal (Reversal Approval Branch)`: Maker requested reversal on Payment A. Maker self-approval blocked with HTTP 403 Forbidden. Checker (Partner) approved reversal $\to$ **Payment marked `REVERSED`, InstallmentDue atomically restored to `0|UNPAID`, `AuditLog` entry `PAYMENT_REVERSED` recorded** (`HTTP 200 OK`).
 
-3. **Extended Concurrency Row-Locking Live Verification Output (`scripts/verify-extended-concurrency.ps1`)**:
+3. **Extended Concurrency Row-Locking Live Verification Output (`scripts/probes/verify-extended-concurrency.ps1`)**:
    - `[PROBE 1] Desk Cash Handover Contention`: Two concurrent background workers simultaneously attempted to sign off the exact same cash collection payment batch $\to$ **Worker 1 acquired row lock and succeeded (HTTP 200 OK), Worker 2 blocked and was safely rejected (HTTP 400 Bad Request: "Payment has already been acknowledged or is not pending handover")**. Final DB state verified as `ACKNOWLEDGED`.
    - `[PROBE 2] Defaulter Ticket Substitution Race`: Two concurrent background workers simultaneously attempted to assign distinct candidate replacement customers to the same vacated ticket $\to$ **Worker 1 acquired row lock and succeeded (HTTP 200 OK, Ticket restored to `ACTIVE`), Worker 2 blocked and was safely rejected (HTTP 400 Bad Request: "Subscriber substitution failed: Ticket is no longer in REMOVED_DEF_3M status")**.
 

@@ -22,9 +22,9 @@ Every finding, claim, and discrepancy has been directly verified against the run
   - **712 / 712 Backend Unit Tests PASS** (50 suites, `pnpm --filter api test`, 15.39s)
   - **281 / 281 Frontend Unit Tests PASS** (11 suites, `pnpm --filter web run test`, 2.45s)
   - **Next.js Web Production Build PASS** (29 route bundles, 35 page entrypoints, `tsc --noEmit` exits 0)
-  - **20-Month Chronological Financial Simulation PASS** (`scripts/verify-full-20month-simulation.ts` — 400 dues, 400 payments, 20 auctions, 5 Grand Invariants reconciled to exact whole Rupee)
-  - **Pessimistic Concurrency Stress Harness PASS** (`scripts/verify-concurrency-stress.ts` — 10 simultaneous workers, 1 commit, 9 rejected, zero race condition)
-  - **31 / 31 Financial Adversarial Assertions PASS** (`scripts/verify-financial-adversarial-challenger.ts` — whole rupee, 25% ceiling, tie-break, Month 1 & N invariants)
+  - **20-Month Chronological Financial Simulation PASS** (`apps/api/scripts/stress/verify-full-20month-simulation.ts` — 400 dues, 400 payments, 20 auctions, 5 Grand Invariants reconciled to exact whole Rupee)
+  - **Pessimistic Concurrency Stress Harness PASS** (`apps/api/scripts/stress/verify-concurrency-stress.ts` — 10 simultaneous workers, 1 commit, 9 rejected, zero race condition)
+  - **31 / 31 Financial Adversarial Assertions PASS** (`apps/api/scripts/stress/verify-financial-adversarial-challenger.ts` — whole rupee, 25% ceiling, tie-break, Month 1 & N invariants)
 - **Identified Remediations**:
   - **0 Core Financial Invariant Bugs**: Chit math, whole rupee calculations, dividend distribution, and row locking are 100% sound.
   - **3 Staging/Infrastructure Defects**: Stale Docker API container, Nginx upstream crash loop, PostCSS dependency vulnerability.
@@ -107,7 +107,7 @@ Every finding, claim, and discrepancy has been directly verified against the run
 ### Discrepancy 3: Payment Module Marked Complete Despite Failed Tests
 * **The Conflict**: Module 4 (Payments & Receipts) was marked as 100% functionally complete in the business summary, yet the E2E test report logged 4 test failures.
 * **Investigation & Root Cause**:
-  1. We ran `scripts/verify-full-20month-simulation.ts` and `scripts/verify-concurrency-stress.ts`:
+  1. We ran `apps/api/scripts/stress/verify-full-20month-simulation.ts` and `apps/api/scripts/stress/verify-concurrency-stress.ts`:
      - **Financial backend logic is 100% verified**: 400 collections, 400 dues, whole-rupee allocation, arrears calculation, and single-payment constraints work with zero math discrepancies.
      - Concurrency row locking (`SELECT FOR UPDATE`) prevents any double payment or race conditions under stress.
   2. Inspection of the 4 failing assertions in `apps/api/test/e2e/chitflow-api.e2e-spec.ts`:
@@ -192,9 +192,9 @@ Every finding, claim, and discrepancy has been directly verified against the run
 | **3** | `pnpm --filter web run test` | `apps/web` | 0 | **VERIFIED** | 11 suites passed, 281 tests passed (2.45s). Tests utilities and stores. |
 | **4** | `pnpm --filter web run typecheck` | `apps/web` | 0 | **VERIFIED** | TypeScript compiler (`tsc --noEmit`) exited with 0 errors. |
 | **5** | `pnpm --filter web run build` | `apps/web` | 0 | **VERIFIED** | Next.js compiled 29 route bundles (35 page routes) in 27.7s. |
-| **6** | `ts-node scripts/verify-full-20month-simulation.ts` | Root | 0 | **VERIFIED** | 20-month simulation passed. 400 dues, 400 collections, 20 auctions verified to exact whole Rupee. |
-| **7** | `ts-node scripts/verify-concurrency-stress.ts` | Root | 0 | **VERIFIED** | 10 concurrent requests to single due. 1 succeeded, 9 rejected. Zero double collection. |
-| **8** | `ts-node scripts/verify-financial-adversarial-challenger.ts` | Root | 0 | **VERIFIED** | 31 adversarial invariant tests passed. Zero float leakage. |
+| **6** | `pnpm test:simulation` | Root | 0 | **VERIFIED** | 20-month simulation passed. 400 dues, 400 collections, 20 auctions verified to exact whole Rupee. |
+| **7** | `pnpm test:stress` | Root | 0 | **VERIFIED** | 10 concurrent requests to single due. 1 succeeded, 9 rejected. Zero double collection. |
+| **8** | `pnpm --filter api exec ts-node scripts/stress/verify-financial-adversarial-challenger.ts` | Root | 0 | **VERIFIED** | 31 adversarial invariant tests passed. Zero float leakage. |
 | **9** | `pnpm audit` | Root | 1 | **FAILED (DEF-03)** | 14 vulnerabilities found (3 High, 11 Moderate) in `postcss <=8.5.11`. |
 | **10** | `docker ps -a` | Host | 0 | **VERIFIED** | `chitflow-db` (healthy), `chitflow-redis` (healthy), `chitflow-minio` (running), `chitflow-api` (stale), `chitflow-nginx` (restarting). |
 | **11** | `docker compose logs nginx` | Root | 0 | **VERIFIED (DEF-04)** | Error log confirms crash loop: `host not found in upstream "web:3001"`. |
@@ -267,7 +267,7 @@ Inspection of `apps/mobile/` reveals the following exact file layout:
 | **R-2: Rebuilding Stale Docker API Image** | Low | High | Ensure Docker build context includes current monorepo root and all shared workspace packages (`@kumaran/api-client`). |
 | **R-3: Breaking PostCSS Dependency Tree** | Low | Medium | Test Next.js build immediately after updating PostCSS; pin version in root `pnpm.overrides` if peer dependency issues occur. |
 | **R-4: Nginx Upstream Routing Deadlock** | Low | High | Validate Nginx configuration syntax with `nginx -t` inside container before releasing port 80/443. |
-| **R-5: Financial Invariant Regression** | Very Low | Critical | Re-run `verify-full-20month-simulation.ts` and `verify-concurrency-stress.ts` after every single phase. |
+| **R-5: Financial Invariant Regression** | Very Low | Critical | Re-run `pnpm test:simulation` and `pnpm test:stress` after every single phase. |
 
 ---
 

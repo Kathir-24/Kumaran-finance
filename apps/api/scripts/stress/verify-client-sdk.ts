@@ -15,7 +15,7 @@ import {
   isSelfApproval,
   canAuthorizeAction,
   KumaranApiError,
-} from '../../../packages/api-client/dist/index.js';
+} from '../../../../packages/api-client/dist/index.js';
 
 const BASE_URL = 'http://127.0.0.1:3000';
 

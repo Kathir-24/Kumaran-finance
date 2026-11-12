@@ -460,7 +460,7 @@ Time:        3.642 s
 
 ### 7.2 Live Server End-to-End Proofs (Live Postgres, Redis 7 & NestJS)
 
-#### Proof 1: Observability Probes, Guards & Scrapes ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts))
+#### Proof 1: Observability Probes, Guards & Scrapes ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-11.ts))
 * **Step 2 (`GET /health`)**: Status `200 OK`, response `{ status: 'ok', service: 'chitflow-api', sentryActive: false }`.
 * **Step 3 (`GET /health/sentry-test`)**: Status `500 Internal Server Error`, intentional diagnostic crash captured cleanly by `GlobalExceptionFilter` with sanitized envelope (`code: 'INTERNAL_SERVER_ERROR'`).
 * **Step 4A & 4B (`GET /metrics`)**:
@@ -478,7 +478,7 @@ Time:        3.642 s
   -- Output: 90 rows verified
   ```
 
-#### Proof 2: Live Financial Audit Trail ([`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts))
+#### Proof 2: Live Financial Audit Trail ([`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts))
 * **Reversal Rejection Audit**:
   ```sql
   SELECT action, "entityId", "userId" FROM public."AuditLog" 

@@ -214,7 +214,7 @@ Super Admin, Branch Managers, and Accountants can inspect and trigger jobs via a
 
 ## 9. Verification Proofs (Live Terminal Evidence)
 
-Verified live during [`verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-6.ts), [`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts), and [`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts):
+Verified live during [`verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts), [`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts), and [`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-11.ts):
 
 ### Proof 1: Post-Commit Receipt Dispatch (Lifecycle 6 & 7)
 ```text

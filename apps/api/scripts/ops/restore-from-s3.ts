@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Readable } from 'stream';
 
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 } else {
@@ -133,7 +133,7 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
   const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
 
   // Write temporary local file (repo root infra/backups/)
-  const tempDir = path.resolve(__dirname, '../../../infra/backups');
+  const tempDir = path.resolve(__dirname, '../../../../infra/backups');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }

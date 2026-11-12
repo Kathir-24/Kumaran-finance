@@ -1727,7 +1727,7 @@ ${failCount === 0
 
   const outputPath =
     process.env.VERIFY_PROOFS_FILE ||
-    path.resolve(__dirname, '..', '..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
+    path.resolve(__dirname, '..', '..', '..', '..', '.agents', 'teamwork', 'worker_m1_m2_1', 'm1_m2_verification_proofs.md');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, md, 'utf-8');
   console.log(`📄 Verification proof table successfully written to: ${outputPath}`);

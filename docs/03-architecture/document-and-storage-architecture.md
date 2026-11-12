@@ -155,11 +155,11 @@ Generated dynamically in-memory using PDFKit and cached in private S3 storage.
 
 ### Domain 5: Automated Disaster Recovery Database Backups
 
-* **Execution**: Scheduled every midnight at 02:00 AM IST via [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/backup-to-s3.ts).
+* **Execution**: Scheduled every midnight at 02:00 AM IST via [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/ops/backup-to-s3.ts).
 * **Storage Path**: `backups/db/2026/10/kumaran_chits_backup_20261024_020000.dump`
 * **Encryption**: `ServerSideEncryption: 'AES256'` mandatory.
 * **Retention Policy**: Scans directory and auto-deletes snapshots older than **30 days** (`DRP §3.2`).
-* **Restore CLI**: [`restore-from-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/restore-from-s3.ts) restores directly into PostgreSQL.
+* **Restore CLI**: [`restore-from-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/ops/restore-from-s3.ts) restores directly into PostgreSQL.
 
 ---
 
@@ -306,7 +306,7 @@ Time:        5.441 s
 
 ### 6.2 Live Server End-to-End Proofs (PostgreSQL 17 $\longleftrightarrow$ MinIO S3)
 
-#### Proof 1: Customer KYC Document Lifecycle ([`verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-2.ts))
+#### Proof 1: Customer KYC Document Lifecycle ([`verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-2.ts))
 * **Step 9 (`POST /customers/:id/documents`)**:
   - Multipart upload: `aadhaar_front_sundaram.jpg` (`image/jpeg`, 56 bytes test buffer).
   - Status: **`201 Created`**
@@ -319,7 +319,7 @@ Time:        5.441 s
   - Status: **`200 OK`**
   - DB Verification: `SELECT count(*) FROM public."CustomerDocument" WHERE id = 'doc-uuid-001'` $\to$ **`0`**.
 
-#### Proof 2: Prize Winner Safety Proof Collateral ([`verify-lifecycle-8.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-8.ts))
+#### Proof 2: Prize Winner Safety Proof Collateral ([`verify-lifecycle-8.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-8.ts))
 * **Step 3 (`POST /disbursements/auction/:auctionId/upload-safety-proof`)**:
   - Uploaded scan: `signed_blank_cheques_sundaram.jpg` by Desk Accountant (Maker).
   - Status: **`201 Created`**
@@ -332,7 +332,7 @@ Time:        5.441 s
   - Status: **`200 OK`**
   - BullMQ Job Dispatched: `JOB_DISPATCH_APPROVAL_ALERT` enqueued to `notification-queue` (excluding Maker).
 
-#### Proof 3: Digital PDF Canvas & Path Traversal Security ([`verify-lifecycle-10.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-10.ts))
+#### Proof 3: Digital PDF Canvas & Path Traversal Security ([`verify-lifecycle-10.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-10.ts))
 * **Step 1 (`GET /pdf/receipt/:paymentId`)**:
   - Binary Stream: `Status 200 OK`, `Content-Type: application/pdf`, Buffer size `26,931 bytes`, Magic Header `%PDF-`.
   - Presigned S3 Download (`?download=true`): Returns S3 key `receipts/.../KC-REC-PRD-2026-00014.pdf` with 900s presigned URL.
@@ -377,7 +377,7 @@ return this.prisma.customerDocument.create({ ... });
 1. **Automated Chaos Integration Spec ([`test/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/chaos-network-disconnect.spec.ts))**:
    - `CHAOS-S3-1`: KYC upload socket disconnect (`ETIMEDOUT`) simulated $\to$ Throws exception, database assertion confirms `SELECT COUNT(*) FROM "CustomerDocument"` is strictly **0**.
    - `CHAOS-S3-2`: Blank cheque upload disconnect simulated $\to$ Throws exception, database assertion confirms `AuctionWinner.securityDocS3Key` remains strictly **null** and `AuditLog` count is **0**.
-2. **Live Docker Container Probe ([`scripts/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/verify-chaos-network-disconnect.ps1))**:
+2. **Live Docker Container Probe ([`scripts/probes/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-chaos-network-disconnect.ps1))**:
    - `CHAOS-PROBE-1`: Penetration probe executed on live container port 3000 $\to$ **100% Pass** (`Zero orphan records in CustomerDocument`).
 
 ---

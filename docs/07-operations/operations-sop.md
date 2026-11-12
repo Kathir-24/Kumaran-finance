@@ -116,7 +116,7 @@ Because a prized subscriber has already received the pool amount:
 > **Recovery Targets**: $\text{RPO} \le 15\text{ minutes}$, $\text{RTO} \le 2\text{ hours}$
 
 ### 4.1 Daily Off-Site Automated Backup (02:00 AM IST)
-1. **Automated Snapshot**: Every night at 02:00 AM IST, the automated script ([`apps/api/scripts/backup-to-s3.ts`](../../apps/api/scripts/backup-to-s3.ts)) creates a compressed binary dump (`pg_dump -F c`) of the entire PostgreSQL database.
+1. **Automated Snapshot**: Every night at 02:00 AM IST, the automated script ([`apps/api/scripts/ops/backup-to-s3.ts`](../../apps/api/scripts/ops/backup-to-s3.ts)) creates a compressed binary dump (`pg_dump -F c`) of the entire PostgreSQL database.
 2. **Encrypted Cloud Upload**: The dump is encrypted using `AES256` and streamed to the private S3 bucket under `backups/db/YYYY/MM/`.
 3. **Automated 30-Day Retention Prune**: Any backup older than 30 days is automatically purged to minimize storage overhead.
 4. **Manual Run & Container Inspection**:

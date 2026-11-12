@@ -217,7 +217,7 @@ Tests:       22 passed, 22 total
 
 ### 6.2 Live Server Execution Proof (Lifecycle 7 Step 1)
 
-During live server execution of [`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-7.ts):
+During live server execution of [`verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts):
 ```text
 [Nest] LOG [MockSmsDriver] [MockSmsDriver] Bypassed SMS to +91******0105 (Template: 1407169823412093848):
 "Kumaran Chits: Received Rs.3,950 for Chit KC-LIVE-20M-01, Ticket #5 on 2026-10-24T14:21:11.027Z. Receipt: KC-REC-PRD-2026-00014. View passbook: https://app.kumaranfinance.in/passbook/ed087ad5-ee76-481b-bc65-6de55ba61db0"
@@ -247,7 +247,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
   * `CHAOS-SMS-1`: Telecom 504 timeout simulated $\to$ Transaction commits in **<500ms**, `InstallmentDue` verified `PAID`, `Receipt` generated, zero rollback.
   * `CHAOS-SMS-2`: Driver exponential backoff verified $\to$ 2 timeouts followed by successful 3rd attempt, returns `success: true`.
   * `CHAOS-SMS-3`: Mobile App Push fallback verified $\to$ Dispatches cleanly via FCM when SMS carrier is offline.
-- **Live Docker Container Probe ([`scripts/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/verify-chaos-network-disconnect.ps1))**:
+- **Live Docker Container Probe ([`scripts/probes/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-chaos-network-disconnect.ps1))**:
 
 ---
 
@@ -283,7 +283,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
   * `OTP-RATE-5`: Verifying OTP during active lockout fails closed with HTTP 429.
   * `OTP-RATE-6`: Correct verification atomically wipes session, cooldown, and lockout keys.
   * `OTP-REDIS-1` & `OTP-REDIS-2`: Distributed Redis key presence and TTL verification.
-- **Live Docker Penetration Probe ([`scripts/verify-otp-cooldown-lockout.ps1`](file:///u:/Kumaran-finance/scripts/verify-otp-cooldown-lockout.ps1))**:
+- **Live Docker Penetration Probe ([`scripts/probes/verify-otp-cooldown-lockout.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-otp-cooldown-lockout.ps1))**:
   * Probe 1: Cooldown HTTP 429 confirmed on port 3000.
   * Probe 2: 3-attempt lockout penalty confirmed on port 3000.
   * Probe 3: Direct Redis query confirms `ttl auth:otp:lockout:9876543210` = 300s, `auth:otp:9876543210` = nil.

@@ -5,7 +5,7 @@
 > **Queue & Cache Engine**: Redis 7 Container (`chitflow-redis`, Port 6379, BullMQ)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Observability**: Prometheus Metrics (`/metrics`), Bull Board (`/admin/queues/`), Sentry Diagnostic Probe (`/health/sentry-test`)  
-> **Verification Script**: [`apps/api/scripts/verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts)  
+> **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-11.ts)  
 > **Execution Status**: **100% Passed (15 / 15 Endpoints Verified Live)**
 
 ---

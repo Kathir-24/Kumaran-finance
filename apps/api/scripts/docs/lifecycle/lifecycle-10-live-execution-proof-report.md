@@ -4,7 +4,7 @@
 > **Environment**: Live NestJS 12 Backend (`http://127.0.0.1:3000`)  
 > **Storage Engine**: MinIO S3 Container (`chitflow-minio`, Port 9000, Bucket: `kumaran-chits-private`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
-> **Verification Script**: [`apps/api/scripts/verify-lifecycle-10.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-10.ts)  
+> **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-10.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-10.ts)  
 > **Execution Status**: **100% Passed (5 / 5 Endpoints Verified Live)**
 
 ---

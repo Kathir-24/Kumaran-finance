@@ -34,7 +34,7 @@
 
 ### 1.1 Automated TypeScript AST Persona Enforcement Verification
 
-An automated AST inspection utility (`apps/api/scripts/audit-persona-enforcement.ts`) parses all 18 NestJS controllers across `apps/api/src/` using the TypeScript Compiler API (`ts.createSourceFile`, `ts.canHaveDecorators`, `ts.getDecorators`). It maps every class-level and method-level decorator (`@Roles`, `@UseGuards`, `@Get`, `@Post`, `@Patch`, `@Delete`, `@Sse`) to evaluate RBAC and ABAC compliance against this registry.
+An automated AST inspection utility (`apps/api/scripts/audit/audit-persona-enforcement.ts`) parses all 18 NestJS controllers across `apps/api/src/` using the TypeScript Compiler API (`ts.createSourceFile`, `ts.canHaveDecorators`, `ts.getDecorators`). It maps every class-level and method-level decorator (`@Roles`, `@UseGuards`, `@Get`, `@Post`, `@Patch`, `@Delete`, `@Sse`) to evaluate RBAC and ABAC compliance against this registry.
 
 ```
 ================================================================

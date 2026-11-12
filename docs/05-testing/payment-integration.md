@@ -93,5 +93,5 @@ When launched on Android, the payment app does not allow the subscriber to edit 
   - Duplicate pending claim prevention on same due
   - Dual control verification with sequential bilingual receipt issuance
   - Submitter self-verification rejection (`maker != checker`)
-- **Live Server Integration Script**: [`apps/api/scripts/verify-upi-intent-and-claims.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-upi-intent-and-claims.ts)
+- **Live Server Integration Script**: [`apps/api/scripts/stress/verify-upi-intent-and-claims.ts`](file:///u:/Kumaran-finance/apps/api/scripts/stress/verify-upi-intent-and-claims.ts)
   - Proves end-to-end execution against live PostgreSQL 17 on Port 5433 with 100% pass rate.

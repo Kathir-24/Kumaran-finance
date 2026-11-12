@@ -216,7 +216,7 @@ it('should accept cash handover acknowledgment when confirmed by an independent 
 > **Mandate**: Every operational model in Kumaran Chits possessing a status lifecycle must have 100% automated test coverage across its complete $N \times N$ transition permutations. Any illegal transition MUST fail-closed with HTTP 400 `BadRequestException`.
 
 - **Test Harness File**: [`apps/api/test/state-matrix-sweep.spec.ts`](../../apps/api/test/state-matrix-sweep.spec.ts)
-- **Live Container Probe**: [`scripts/verify-state-matrix-sweep.ps1`](../../scripts/verify-state-matrix-sweep.ps1)
+- **Live Container Probe**: [`scripts/probes/verify-state-matrix-sweep.ps1`](../../scripts/probes/verify-state-matrix-sweep.ps1)
 
 ### Status Lifecycle Census & Test Assertions
 ```typescript
@@ -249,7 +249,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
 > **Mandate**: All financial mutation DTOs must enforce strict `@IsInt()` whole-rupee validation. Fractional paise, negative values, zero payments, and ceiling overflows must fail-closed with HTTP 400 `BadRequestException`.
 
 - **Test Harness File**: [`apps/api/test/financial-boundary-fuzz.spec.ts`](../../apps/api/test/financial-boundary-fuzz.spec.ts)
-- **Live Container Probe**: [`scripts/verify-financial-boundary-fuzz.ps1`](../../scripts/verify-financial-boundary-fuzz.ps1)
+- **Live Container Probe**: [`scripts/probes/verify-financial-boundary-fuzz.ps1`](../../scripts/probes/verify-financial-boundary-fuzz.ps1)
 
 ### The 5 Fuzzing Threat Categories Tested
 ```typescript
@@ -274,7 +274,7 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
 > **Mandate**: In high-velocity financial operations (installment payments, auction closing, prize payout release, desk cash handover, and defaulter ticket reassignment), race conditions and stampedes MUST be serialized at the database row level via PostgreSQL pessimistic row locks (`SELECT ... FOR UPDATE`). In all race condition scenarios, strictly 1 concurrent worker succeeds and all competing workers are cleanly rejected.
 
 - **Test Harness File**: [`apps/api/test/concurrency-postgres.spec.ts`](../../apps/api/test/concurrency-postgres.spec.ts)
-- **Live Container Probe**: [`scripts/verify-extended-concurrency.ps1`](../../scripts/verify-extended-concurrency.ps1)
+- **Live Container Probe**: [`scripts/probes/verify-extended-concurrency.ps1`](../../scripts/probes/verify-extended-concurrency.ps1)
 
 ### Concurrency Invariant Scenarios Tested
 ```typescript
@@ -301,7 +301,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 > **Mandate**: Rural monsoon network drops and Indian telecom SMS gateway congestion must fail-closed safely without leaving dangling cloud pointers in PostgreSQL or blocking/reversing financial ledger commits.
 
 - **Test Harness File**: [`apps/api/test/chaos-network-disconnect.spec.ts`](../../apps/api/test/chaos-network-disconnect.spec.ts)
-- **Live Container Probe**: [`scripts/verify-chaos-network-disconnect.ps1`](../../scripts/verify-chaos-network-disconnect.ps1)
+- **Live Container Probe**: [`scripts/probes/verify-chaos-network-disconnect.ps1`](../../scripts/probes/verify-chaos-network-disconnect.ps1)
 
 ### Chaos Scenarios Tested
 ```typescript
@@ -328,7 +328,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
 > **Mandate**: To protect Kumaran Finance's paid MSG91 commercial SMS credits from bot flooding and prevent endless-cycling brute-force attacks against 6-digit OTP codes, the authentication system must enforce a 60-second request cooldown and a 5-minute (300s) brute-force lockout on the 3rd failed attempt across distributed Redis 7 instances with in-memory fallback.
 
 - **Test Harness File**: [`apps/api/test/otp-cooldown-lockout.spec.ts`](../../apps/api/test/otp-cooldown-lockout.spec.ts)
-- **Live Container Probe**: [`scripts/verify-otp-cooldown-lockout.ps1`](../../scripts/verify-otp-cooldown-lockout.ps1)
+- **Live Container Probe**: [`scripts/probes/verify-otp-cooldown-lockout.ps1`](../../scripts/probes/verify-otp-cooldown-lockout.ps1)
 
 ### Scenarios Tested
 ```typescript

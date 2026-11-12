@@ -4,7 +4,7 @@
 > **Lifecycle**: **Lifecycle 3 — Chit Scheme Creation, Tickets, Mid-Cycle Intake & Activation**  
 > **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
-> **Test Script**: [`apps/api/scripts/verify-lifecycle-3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-3.ts)  
+> **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-3.ts)  
 > **Result**: **9 / 9 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
 
 ---

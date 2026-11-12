@@ -92,7 +92,7 @@ async function seedTestDatabase(): Promise<void> {
   console.log(`🎯 Target DB : ${dbName} (${maskedUrl})`);
   console.log('================================================================');
 
-  const apiDir = path.resolve(__dirname, '..');
+  const apiDir = path.resolve(__dirname, '../..');
 
   try {
     execSync('npx prisma migrate deploy', {

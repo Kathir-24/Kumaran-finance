@@ -14,6 +14,6 @@ cd "${REPO_ROOT}"
 
 echo "[INFO] Starting Kumaran Chits S3 Database Backup Runner..."
 
-pnpm --filter api exec ts-node scripts/backup-to-s3.ts
+pnpm run db:backup:s3
 
 echo "[SUCCESS] S3 Database backup executed cleanly!"

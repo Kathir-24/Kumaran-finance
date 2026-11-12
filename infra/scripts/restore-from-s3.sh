@@ -12,4 +12,4 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 cd "${REPO_ROOT}"
 
-pnpm --filter api exec ts-node scripts/restore-from-s3.ts "$@"
+pnpm run db:restore:s3 "$@"

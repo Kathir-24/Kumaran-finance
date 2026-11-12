@@ -4,7 +4,7 @@
 > **Lifecycle**: **Lifecycle 5 — Installment Dues, Universal Dividends, Cycle Windows & 6-Column Physical Passbook Ledger**  
 > **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
-> **Test Script**: [`apps/api/scripts/verify-lifecycle-5.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-5.ts)  
+> **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-5.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-5.ts)  
 > **Result**: **All Endpoints & Invariants Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
 
 ---

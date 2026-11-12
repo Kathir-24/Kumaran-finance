@@ -304,7 +304,7 @@ Test Suites: 1 passed, 1 total
 Tests:       16 passed, 16 total
 ```
 
-### 6.2 Live Server Lifecycle 6 Proof ([`apps/api/scripts/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-6.ts))
+### 6.2 Live Server Lifecycle 6 Proof ([`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts))
 
 Executed live against the running NestJS server on `http://127.0.0.1:3000/api/v1` and verified directly in PostgreSQL 17:
 

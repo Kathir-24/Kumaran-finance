@@ -130,7 +130,7 @@ flowchart TD
 - **Symptoms**: `NoSuchBucket: The specified bucket does not exist`
 - **Root Cause**: Fresh MinIO volume started without creating `kumaran-chits-private`.
 - **Remedy**:
-  - Both [`S3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) and [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/backup-to-s3.ts) feature self-healing `ensureBucketExists()` routines via `HeadBucketCommand` and `CreateBucketCommand`.
+  - Both [`S3StorageDriver`](file:///u:/Kumaran-finance/apps/api/src/storage/drivers/aws-s3-storage.driver.ts) and [`backup-to-s3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/ops/backup-to-s3.ts) feature self-healing `ensureBucketExists()` routines via `HeadBucketCommand` and `CreateBucketCommand`.
   - To manually verify or recreate via MinIO Web Console: open [http://localhost:9001](http://localhost:9001) (`chitflow_admin` / `chitflow_storage_secret`) and create bucket `kumaran-chits-private`.
 
 ### C.3. Clock Skew Error (`RequestTimeTooSkewed`)

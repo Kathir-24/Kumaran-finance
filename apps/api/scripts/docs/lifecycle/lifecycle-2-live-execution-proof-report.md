@@ -4,7 +4,7 @@
 > **Lifecycle**: **Lifecycle 2 — Customer Intake, Nominee Lifecycle, KYC Document Upload & Presigned URLs (11 Endpoints)**  
 > **Execution Date**: October 23, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
-> **Test Script**: [`apps/api/scripts/verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-2.ts)  
+> **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-2.ts)  
 > **Result**: **11 / 11 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
 
 ---

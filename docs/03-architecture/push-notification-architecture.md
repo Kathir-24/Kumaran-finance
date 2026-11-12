@@ -344,7 +344,7 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
 
 ### 7.2 Live Server Lifecycle Proofs
 
-- **Lifecycle 1** ([`verify-lifecycle-1.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-1.ts) Step 3):
+- **Lifecycle 1** ([`verify-lifecycle-1.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-1.ts) Step 3):
   ```text
   --- [3/24] PATCH /auth/fcm-token (Register FCM Device Token) ---
   Status: 200
@@ -352,7 +352,7 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
   [PostgreSQL DB Verification]: User ebf67759... fcmToken = 'fcm-staff-sample-token-...'
   ✅ Step 3 PASSED: Device FCM push token registered in PostgreSQL.
   ```
-- **Lifecycle 2** ([`verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-2.ts) Step 7):
+- **Lifecycle 2** ([`verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-2.ts) Step 7):
   ```text
   --- [7/11] PATCH /customers/:id/fcm-token (Register Customer FCM Token) ---
   Status: 200
@@ -360,7 +360,7 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
   [PostgreSQL DB Verification]: Customer 6cb8a9e8... fcmToken updated in DB.
   ✅ Step 7 PASSED: Customer mobile FCM push token registered.
   ```
-- **Lifecycle 11** ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/verify-lifecycle-11.ts) Step 9):
+- **Lifecycle 11** ([`verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-11.ts) Step 9):
   ```text
   --- [9/15] GET /jobs/notification-audit-logs (Push Notification Audit Trail) ---
   Status: 200
