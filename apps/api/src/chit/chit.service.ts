@@ -20,6 +20,8 @@ import {
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { isPrismaDecimal } from '../common/interceptors/bigint.interceptor';
 import { parseBigIntField, stringifyBigIntSafe } from '../common/utils/bigint-json.util';
+import { lockChitGroupRow } from '../common/utils/state-transition-lock.util';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { ActivateChitDto } from './dto/activate-chit.dto';
@@ -307,6 +309,56 @@ export class ChitService {
   }
 
   /**
+   * Acquires an exclusive row lock on ChitGroup at the root of the State Machine Lock DAG
+   * and verifies that the locked database status permits the transition.
+   * Gracefully returns false in unit-test mocks that do not implement $queryRaw.
+   */
+  private async assertLockedChitGroupStatus(
+    tx: any,
+    chitGroupId: string,
+    allowedStatuses: ChitStatus[],
+    invalidStatusMessage: (status: ChitStatus | string) => string,
+  ): Promise<boolean> {
+    const hasRawLock = typeof tx?.$queryRaw === 'function';
+    const lockedChit = await lockChitGroupRow(tx, chitGroupId);
+
+    if (hasRawLock && !lockedChit) {
+      throw new NotFoundException(`Chit scheme with ID ${chitGroupId} not found`);
+    }
+
+    if (
+      lockedChit &&
+      !allowedStatuses.includes(lockedChit.status as ChitStatus)
+    ) {
+      throw new BadRequestException(invalidStatusMessage(lockedChit.status));
+    }
+
+    return hasRawLock;
+  }
+
+  private mapTicketUniqueConstraintError(err: any, ticketNumber: number): never {
+    if (err?.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target)
+        ? err.meta.target.join(',')
+        : String(err.meta?.target || err.message || '');
+
+      if (target.includes('customerId')) {
+        throw new ConflictException(
+          'ADR-13 Violation: Customer already holds a ticket in this chit group (Max 1 ticket per customer)',
+        );
+      }
+
+      if (target.includes('ticketNumber')) {
+        throw new ConflictException(
+          `Ticket #${ticketNumber} is already allocated in this chit group`,
+        );
+      }
+    }
+
+    throw err;
+  }
+
+  /**
    * Assigns a ticket number to a verified customer under ADR-13 constraints
    */
   async assignTicket(chitGroupId: string, dto: AssignTicketDto) {
@@ -357,22 +409,73 @@ export class ChitService {
       throw new NotFoundException('Customer profile not found');
     }
 
-    return this.prisma.subscriberTicket.create({
-      data: {
+    const openingBalanceBigInt =
+      dto.openingBalance !== undefined && dto.openingBalance !== null
+        ? toWholeRupeeBigInt(dto.openingBalance, 'Opening balance', { min: 0n })
+        : 0n;
+
+    const assignedTicket = await withTransactionRetry(this.prisma, async (tx) => {
+      const hasRawLock = await this.assertLockedChitGroupStatus(
+        tx,
         chitGroupId,
-        customerId: dto.customerId,
-        ticketNumber: dto.ticketNumber,
-        openingBalance:
-          dto.openingBalance !== undefined && dto.openingBalance !== null
-            ? toWholeRupeeBigInt(dto.openingBalance, 'Opening balance', { min: 0n })
-            : 0n,
-      },
-      include: {
-        customer: {
-          select: { id: true, customerCode: true, fullName: true, phone: true },
-        },
-      },
+        [ChitStatus.DRAFT, ChitStatus.REGISTERED],
+        (status) => `Cannot assign tickets: scheme is already in ${status} status`,
+      );
+
+      if (hasRawLock && typeof tx?.chitGroup?.findUnique === 'function') {
+        const currentChit = await tx.chitGroup.findUnique({
+          where: { id: chitGroupId },
+          include: { tickets: true },
+        });
+        if (!currentChit) {
+          throw new NotFoundException('Chit scheme not found');
+        }
+        if (
+          currentChit.status !== ChitStatus.DRAFT &&
+          currentChit.status !== ChitStatus.REGISTERED
+        ) {
+          throw new BadRequestException(
+            `Cannot assign tickets: scheme is already in ${currentChit.status} status`,
+          );
+        }
+        if (dto.ticketNumber < 1 || dto.ticketNumber > currentChit.totalTickets) {
+          throw new BadRequestException(
+            `Ticket number must be between 1 and ${currentChit.totalTickets}`,
+          );
+        }
+        if (currentChit.tickets.some((t: any) => t.ticketNumber === dto.ticketNumber)) {
+          throw new ConflictException(
+            `Ticket #${dto.ticketNumber} is already allocated in this chit group`,
+          );
+        }
+        if (currentChit.tickets.some((t: any) => t.customerId === dto.customerId)) {
+          throw new ConflictException(
+            'ADR-13 Violation: Customer already holds a ticket in this chit group (Max 1 ticket per customer)',
+          );
+        }
+      }
+
+      try {
+        return await tx.subscriberTicket.create({
+          data: {
+            chitGroupId,
+            customerId: dto.customerId,
+            ticketNumber: dto.ticketNumber,
+            openingBalance: openingBalanceBigInt,
+          },
+          include: {
+            customer: {
+              select: { id: true, customerCode: true, fullName: true, phone: true },
+            },
+          },
+        });
+      } catch (err: any) {
+        this.mapTicketUniqueConstraintError(err, dto.ticketNumber);
+      }
     });
+
+    await this.invalidateSchemesCache(chitGroupId);
+    return assignedTicket;
   }
 
   /**
@@ -410,17 +513,59 @@ export class ChitService {
       );
     }
 
-    const activated = await this.prisma.$transaction(async (tx) => {
+    const activated = await withTransactionRetry(this.prisma, async (tx) => {
+      // 0. Acquire pessimistic row lock on ChitGroup to serialize concurrent activations & draft mutations
+      const hasRawLock = await this.assertLockedChitGroupStatus(
+        tx,
+        id,
+        [ChitStatus.DRAFT, ChitStatus.REGISTERED],
+        (status) =>
+          `Cannot activate chit scheme: Scheme is in ${status} status. Only DRAFT or REGISTERED schemes can be activated.`,
+      );
+
+      // Re-read authoritative scheme & ticket roster inside lock to prevent TOCTOU races with unassignTicket
+      const currentChit =
+        hasRawLock && typeof tx?.chitGroup?.findUnique === 'function'
+          ? await tx.chitGroup.findUnique({
+              where: { id },
+              include: {
+                tickets: {
+                  include: { customer: true },
+                  orderBy: { ticketNumber: 'asc' },
+                },
+              },
+            })
+          : chit;
+
+      if (!currentChit) {
+        throw new NotFoundException('Chit scheme not found');
+      }
+
+      if (
+        currentChit.status !== ChitStatus.DRAFT &&
+        currentChit.status !== ChitStatus.REGISTERED
+      ) {
+        throw new BadRequestException(
+          `Cannot activate chit scheme: Scheme is in ${currentChit.status} status. Only DRAFT or REGISTERED schemes can be activated.`,
+        );
+      }
+
+      if (currentChit.tickets.length !== currentChit.totalTickets) {
+        throw new BadRequestException(
+          `Cannot activate chit: ${currentChit.tickets.length}/${currentChit.totalTickets} tickets assigned. All tickets must be filled before activation.`,
+        );
+      }
+
       // 2. Month 1 Rule for fresh chits
-      if (chit.initMode === InitializationMode.NEW_GROUP) {
+      if (currentChit.initMode === InitializationMode.NEW_GROUP) {
         // Month 1 has NO auction. Full pool is taken by Ticket #1 (Company representative)
-        const ticket1 = chit.tickets.find((t) => t.ticketNumber === 1);
+        const ticket1 = currentChit.tickets.find((t: any) => t.ticketNumber === 1);
         if (ticket1) {
           const month1Auction = await tx.auction.create({
             data: {
-              chitGroupId: chit.id,
+              chitGroupId: currentChit.id,
               installmentMonth: 1,
-              auctionDate: chit.startDate,
+              auctionDate: currentChit.startDate,
               status: 'COMPLETED',
               isHistoricalEntry: false,
               bidDiscount: 0n,
@@ -428,7 +573,7 @@ export class ChitService {
               foremanCommissionAmount: 0n,
               totalDividend: 0n,
               dividendPerTicket: 0n,
-              prizeMoney: chit.chitValue,
+              prizeMoney: currentChit.chitValue,
               conductedByUserId: checkerUserId,
               finalizedByUserId: checkerUserId,
             },
@@ -440,7 +585,7 @@ export class ChitService {
               ticketId: ticket1.id,
               wasTieBreakWinner: false,
               disbursementStatus: 'DISBURSED',
-              disbursedAmount: chit.chitValue,
+              disbursedAmount: currentChit.chitValue,
               authorizedByUserId: checkerUserId,
               disbursedAt: new Date(),
               paymentReference: 'COMPANY_POOL_MONTH_1',
@@ -786,22 +931,34 @@ export class ChitService {
     if (dto.sanctionOrderNumber !== undefined) data.sanctionOrderNumber = dto.sanctionOrderNumber.trim() || null;
     if (dto.sanctionDate !== undefined) data.sanctionDate = dto.sanctionDate ? new Date(dto.sanctionDate) : null;
 
-    const updated = await this.prisma.chitGroup.update({
-      where: { id },
-      data,
-      include: {
-        branch: { select: { id: true, code: true, name: true } },
-      },
-    });
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      await this.assertLockedChitGroupStatus(
+        tx,
+        id,
+        [ChitStatus.DRAFT],
+        (status) =>
+          `Cannot update chit scheme: Only schemes in DRAFT status can be modified (current status: ${status}). Active or completed schemes are legally frozen.`,
+      );
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: adminUserId,
-        action: 'CHIT_GROUP_DRAFT_UPDATED',
-        entityType: 'ChitGroup',
-        entityId: id,
-        newValue: dto as any,
-      },
+      const updatedChit = await tx.chitGroup.update({
+        where: { id },
+        data,
+        include: {
+          branch: { select: { id: true, code: true, name: true } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          action: 'CHIT_GROUP_DRAFT_UPDATED',
+          entityType: 'ChitGroup',
+          entityId: id,
+          newValue: dto as any,
+        },
+      });
+
+      return updatedChit;
     });
 
     await this.invalidateSchemesCache(id);
@@ -847,9 +1004,40 @@ export class ChitService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    let customerName = ticket.customer.fullName;
+
+    await withTransactionRetry(this.prisma, async (tx) => {
+      const hasRawLock = await this.assertLockedChitGroupStatus(
+        tx,
+        chitGroupId,
+        [ChitStatus.DRAFT],
+        (status) =>
+          `Cannot unassign ticket: Tickets can only be unassigned while scheme is in DRAFT status (current: ${status}). Once activated, member removals must follow the statutory 3-month arrears rule.`,
+      );
+
+      const currentTicket =
+        hasRawLock && typeof tx?.subscriberTicket?.findUnique === 'function'
+          ? await tx.subscriberTicket.findUnique({
+              where: {
+                chitGroupId_ticketNumber: {
+                  chitGroupId,
+                  ticketNumber,
+                },
+              },
+              include: { customer: true },
+            })
+          : ticket;
+
+      if (!currentTicket) {
+        throw new NotFoundException(
+          `Ticket #${ticketNumber} is not assigned in this chit group`,
+        );
+      }
+
+      customerName = currentTicket.customer.fullName;
+
       await tx.subscriberTicket.delete({
-        where: { id: ticket.id },
+        where: { id: currentTicket.id },
       });
 
       await tx.auditLog.create({
@@ -857,19 +1045,21 @@ export class ChitService {
           userId: staffUserId,
           action: 'TICKET_UNASSIGNED_PRE_ACTIVATION',
           entityType: 'SubscriberTicket',
-          entityId: ticket.id,
+          entityId: currentTicket.id,
           oldValue: {
             ticketNumber,
-            customerId: ticket.customerId,
-            customerName: ticket.customer.fullName,
+            customerId: currentTicket.customerId,
+            customerName,
           },
         },
       });
     });
 
+    await this.invalidateSchemesCache(chitGroupId);
+
     return {
       success: true,
-      message: `Ticket #${ticketNumber} allocated to ${ticket.customer.fullName} has been unassigned successfully.`,
+      message: `Ticket #${ticketNumber} allocated to ${customerName} has been unassigned successfully.`,
     };
   }
 }

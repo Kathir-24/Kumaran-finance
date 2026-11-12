@@ -165,9 +165,10 @@ $$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{
    `;
    ```
 
-4. **State Machine Lock Hierarchy (Auction, Disbursement & Subscriber Substitution)**:
+4. **State Machine Lock Hierarchy (Scheme Activation, Auction, Disbursement & Subscriber Substitution)**:
    Shared helpers in [`state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) enforce monotonic locking across critical lifecycle transitions without conflicting with payment paths:
    $$\texttt{"ChitGroup"} \;\longrightarrow\; \texttt{"Auction"} \;\longrightarrow\; \texttt{"AuctionMinutes"} \;/\; \texttt{"AuctionWinner"} \;\longrightarrow\; \texttt{"SubscriberTicket"} \;\longrightarrow\; \texttt{"InstallmentDue"}$$
+   - `ChitService.activate` / `assignTicket` / `unassignTicket` / `update` (`DEF-DB-07`): lock `"ChitGroup" FOR UPDATE` via `lockChitGroupRow` inside `withTransactionRetry` and re-verify authoritative locked `status` and `SubscriberTicket` roster (`tickets.length === totalTickets`) prior to Month 1 initialization, ticket assignment/unassignment (`P2002` mapped cleanly to `ConflictException`), or draft parameter updates.
    - `AuctionService.recordBid` / `recordTieBreak`: lock `"ChitGroup" FOR UPDATE` before upserting Auction/Winner.
    - `AuctionService.finalizeAuction`: locks `"ChitGroup" FOR UPDATE` strictly *before* `"Auction" FOR UPDATE` (monotonic `"ChitGroup" -> "Auction"` DAG alignment) and refreshes state snapshot under both locks, eliminating `COMPLETED -> SCHEDULED` regressions against concurrent bids.
    - `AuctionService.markMinutesFiled`: locks `"AuctionMinutes" FOR UPDATE` before committing filing status (`filedAtRegistrar === true -> MINUTES_ALREADY_FILED`).
@@ -193,7 +194,7 @@ export async function withTransactionRetry<T>(
 - **Integration Points**:
   - **Payment, Collections & Reconciliation**: [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`CollectionService.acknowledgeHandover`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts).
   - **Reversals**: [`PaymentService.requestReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.approveReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`PaymentService.rejectReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts).
-  - **Auction, Disbursement & Installment State Machines**: [`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), and [`InstallmentService`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts) (`generateMonthlyDues`, `substituteSubscriber`).
+  - **Scheme Lifecycle, Auction, Disbursement & Installment State Machines**: [`ChitService`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.service.ts) (`activate`, `assignTicket`, `unassignTicket`, `update`), [`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), and [`InstallmentService`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts) (`generateMonthlyDues`, `substituteSubscriber`).
 
 ---
 

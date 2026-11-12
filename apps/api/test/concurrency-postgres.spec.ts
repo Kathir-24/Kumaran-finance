@@ -1,7 +1,9 @@
 import {
   AuctionStatus,
+  ChitStatus,
   DisbursementMode,
   DueStatus,
+  InitializationMode,
   PaymentMethod,
   PaymentStatus,
   PrismaClient,
@@ -9,6 +11,7 @@ import {
 } from '@prisma/client';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AuctionService } from '../src/auction/auction.service';
+import { ChitService } from '../src/chit/chit.service';
 import { CollectionService } from '../src/collection/collection.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { InstallmentService } from '../src/installment/installment.service';
@@ -30,6 +33,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
   let prisma: PrismaClient;
   let paymentService: PaymentService;
   let auctionService: AuctionService;
+  let chitService: ChitService;
   let disbursementService: DisbursementService;
   let collectionService: CollectionService;
   let installmentService: InstallmentService;
@@ -56,6 +60,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 
       paymentService = new PaymentService(prisma as any);
       auctionService = new AuctionService(prisma as any);
+      chitService = new ChitService(prisma as any);
       disbursementService = new DisbursementService(prisma as any, null as any);
       collectionService = new CollectionService(prisma as any);
       installmentService = new InstallmentService(prisma as any);
@@ -2105,5 +2110,165 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
     expect(JSON.stringify(plans.byDue)).toContain('PaymentAllocation_installmentDueId_idx');
     expect(JSON.stringify(plans.tieByAuction)).toContain('AuctionTieBidder_auctionId_ticketId_key');
     expect(JSON.stringify(plans.tieByTicket)).toContain('AuctionTieBidder_ticketId_idx');
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 24: DEF-DB-07 Concurrent NEW_GROUP Chit Activation Stampede
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-24: 5 parallel Admins racing to activate same NEW_GROUP chit MUST yield strictly 1 ACTIVE winner, 4 BadRequestExceptions, and 1 Month-1 Auction (DEF-DB-07)', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-24: DB or required seed data not present');
+      return;
+    }
+
+    const customers = await prisma.customer.findMany({ take: 2, orderBy: { id: 'asc' } });
+    if (customers.length < 2) {
+      console.warn('Skipping CONCURR-INV-24: fewer than 2 seeded customers present');
+      return;
+    }
+
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `CONCURR-DB07-ACT-${Date.now()}`,
+        groupName: 'Concurrency Activation Stampede Test',
+        chitValue: 20000n,
+        durationMonths: 2,
+        totalTickets: 2,
+        baseInstallment: 10000n,
+        maxDiscountCeiling: 5000n,
+        initMode: InitializationMode.NEW_GROUP,
+        status: ChitStatus.DRAFT,
+        startDate: new Date('2026-11-01T00:00:00Z'),
+        endDate: new Date('2026-12-31T00:00:00Z'),
+      },
+    });
+
+    try {
+      await prisma.subscriberTicket.createMany({
+        data: [
+          { chitGroupId: tempChit.id, customerId: customers[0].id, ticketNumber: 1 },
+          { chitGroupId: tempChit.id, customerId: customers[1].id, ticketNumber: 2 },
+        ],
+      });
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 5 }).map(() => chitService.activate(tempChit.id, makerUserId)),
+      );
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(4);
+      for (const err of rejected) {
+        expect(err.reason).toBeInstanceOf(BadRequestException);
+      }
+
+      const persistedChit = await prisma.chitGroup.findUnique({ where: { id: tempChit.id } });
+      expect(persistedChit?.status).toBe(ChitStatus.ACTIVE);
+
+      const month1Auctions = await prisma.auction.findMany({
+        where: { chitGroupId: tempChit.id },
+        include: { winner: true },
+      });
+      expect(month1Auctions).toHaveLength(1);
+      expect(month1Auctions[0].installmentMonth).toBe(1);
+      expect(month1Auctions[0].winner?.paymentReference).toBe('COMPANY_POOL_MONTH_1');
+    } finally {
+      await prisma.auctionWinner.deleteMany({ where: { auction: { chitGroupId: tempChit.id } } });
+      await prisma.auction.deleteMany({ where: { chitGroupId: tempChit.id } });
+      await prisma.subscriberTicket.deleteMany({ where: { chitGroupId: tempChit.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
+    }
+  }, 20000);
+
+  // --------------------------------------------------------------------------
+  // Scenario 25: DEF-DB-07 Cross-Method Contention (activate vs unassignTicket vs update)
+  // --------------------------------------------------------------------------
+  it('CONCURR-INV-25: concurrent activate + unassignTicket + update on same DRAFT chit MUST serialize with zero unhandled crashes and zero under-subscribed ACTIVE chits', async () => {
+    if (!isDbConnected || !activeTicket || !makerUserId) {
+      console.warn('Skipping CONCURR-INV-25: DB or required seed data not present');
+      return;
+    }
+
+    const customers = await prisma.customer.findMany({ take: 2, orderBy: { id: 'asc' } });
+    if (customers.length < 2) {
+      console.warn('Skipping CONCURR-INV-25: fewer than 2 seeded customers present');
+      return;
+    }
+
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `CONCURR-DB07-X-${Date.now()}`,
+        groupName: 'Concurrency Cross-Method Test',
+        chitValue: 20000n,
+        durationMonths: 2,
+        totalTickets: 2,
+        baseInstallment: 10000n,
+        maxDiscountCeiling: 5000n,
+        initMode: InitializationMode.ONGOING_GROUP,
+        onboardedAtMonth: 2,
+        status: ChitStatus.DRAFT,
+        startDate: new Date('2026-10-01T00:00:00Z'),
+        endDate: new Date('2026-12-31T00:00:00Z'),
+      },
+    });
+
+    let createdTicketIds: string[] = [];
+    try {
+      await prisma.subscriberTicket.createMany({
+        data: [
+          { chitGroupId: tempChit.id, customerId: customers[0].id, ticketNumber: 1 },
+          { chitGroupId: tempChit.id, customerId: customers[1].id, ticketNumber: 2 },
+        ],
+      });
+      createdTicketIds = (
+        await prisma.subscriberTicket.findMany({
+          where: { chitGroupId: tempChit.id },
+          select: { id: true },
+        })
+      ).map((t) => t.id);
+
+      const results = await Promise.allSettled([
+        chitService.activate(tempChit.id, makerUserId),
+        chitService.activate(tempChit.id, checkerUserId || makerUserId),
+        chitService.unassignTicket(tempChit.id, 2, makerUserId),
+        chitService.update(tempChit.id, { groupName: 'Raced Rename' }, makerUserId),
+      ]);
+
+      // Every rejection must be a clean domain BadRequestException (never P2002/P2025/40P01)
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          expect(r.reason).toBeInstanceOf(BadRequestException);
+        }
+      }
+
+      const persistedChit = await prisma.chitGroup.findUnique({
+        where: { id: tempChit.id },
+        include: { tickets: true },
+      });
+
+      // Fundamental lifecycle invariant: if ACTIVE, all N=2 tickets must still be present!
+      if (persistedChit?.status === ChitStatus.ACTIVE) {
+        expect(persistedChit.tickets).toHaveLength(2);
+      } else {
+        expect(persistedChit?.status).toBe(ChitStatus.DRAFT);
+        expect(persistedChit?.tickets).toHaveLength(1);
+      }
+
+      // At most 1 activate() can succeed
+      const activateFulfilled = [results[0], results[1]].filter((r) => r.status === 'fulfilled');
+      expect(activateFulfilled.length).toBeLessThanOrEqual(1);
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: { entityId: { in: [tempChit.id, ...createdTicketIds] } },
+      });
+      await prisma.subscriberTicket.deleteMany({ where: { chitGroupId: tempChit.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
+    }
   }, 20000);
 });

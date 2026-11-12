@@ -4,16 +4,18 @@
 // Compliance: PostgreSQL 17 40P01 / 40001 / P2034 Recovery & Acyclic Locking
 // ==============================================================================
 
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import {
   AuctionStatus,
   ChitStatus,
   DisbursementMode,
+  InitializationMode,
   PaymentMethod,
   PaymentStatus,
   Role,
 } from '@prisma/client';
 import { AuctionService } from '../src/auction/auction.service';
+import { ChitService } from '../src/chit/chit.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { InstallmentService } from '../src/installment/installment.service';
 import { PaymentService } from '../src/payment/payment.service';
@@ -590,6 +592,202 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
         [Role.SUPER_ADMIN],
       );
       expect(rejectRes.reversal.status).toBe('REJECTED');
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('5. ChitService Lifecycle Row Locks & Transient Deadlock Recovery (DEF-DB-07)', () => {
+    let chitService: ChitService;
+    let prismaMock: any;
+    let redisMock: any;
+
+    const fullDraftChit = {
+      id: 'chit-defdb07-1',
+      branchId: 'branch-prd-001',
+      groupCode: 'KCA-LOCK-01',
+      totalTickets: 2,
+      durationMonths: 2,
+      chitValue: 100000n,
+      startDate: new Date('2026-11-01T00:00:00Z'),
+      status: ChitStatus.DRAFT,
+      initMode: InitializationMode.NEW_GROUP,
+      tickets: [
+        {
+          id: 'tkt-1',
+          ticketNumber: 1,
+          customerId: 'cust-1',
+          customer: { id: 'cust-1', fullName: 'Company Pool' },
+        },
+        {
+          id: 'tkt-2',
+          ticketNumber: 2,
+          customerId: 'cust-2',
+          customer: { id: 'cust-2', fullName: 'Subscriber Two' },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      redisMock = {
+        getIsConnected: jest.fn().mockReturnValue(true),
+        getClient: jest.fn().mockReturnValue({
+          del: jest.fn().mockResolvedValue(1),
+        }),
+      };
+
+      prismaMock = {
+        chitGroup: {
+          findUnique: jest.fn().mockResolvedValue(fullDraftChit),
+          update: jest.fn().mockResolvedValue({
+            id: fullDraftChit.id,
+            status: ChitStatus.ACTIVE,
+            foremanCommissionRate: 4.0,
+          }),
+        },
+        subscriberTicket: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'tkt-2',
+            ticketNumber: 2,
+            customerId: 'cust-2',
+            customer: { fullName: 'Subscriber Two' },
+          }),
+          create: jest.fn().mockResolvedValue({ id: 'tkt-new', ticketNumber: 2 }),
+          update: jest.fn().mockResolvedValue({ id: 'tkt-1', isPrized: true }),
+          delete: jest.fn().mockResolvedValue({ id: 'tkt-2' }),
+        },
+        customer: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'cust-3', fullName: 'Third Customer' }),
+        },
+        auction: {
+          create: jest.fn().mockResolvedValue({ id: 'm1-auc-001' }),
+        },
+        auctionWinner: {
+          create: jest.fn().mockResolvedValue({ id: 'm1-win-001' }),
+        },
+        auditLog: {
+          create: jest.fn().mockResolvedValue({ id: 'audit-chit-1' }),
+        },
+        $queryRaw: jest.fn().mockResolvedValue([{ id: fullDraftChit.id, status: ChitStatus.DRAFT }]),
+        $transaction: jest.fn(),
+      };
+      prismaMockRef.current = prismaMock;
+      chitService = new ChitService(prismaMock as unknown as PrismaService, redisMock);
+    });
+
+    it.each(transientCodes)(
+      'N1: activate recovers automatically across transient %s and locks ChitGroup before writes',
+      async (code) => {
+        const execOrder: string[] = [];
+        prismaMock.$queryRaw.mockImplementation(async (q: any) => {
+          const sql = Array.isArray(q) ? q.join('') : String(q);
+          if (sql.includes('"ChitGroup"') && sql.includes('FOR UPDATE')) {
+            execOrder.push('lock:ChitGroup');
+          }
+          return [{ id: fullDraftChit.id, status: ChitStatus.DRAFT }];
+        });
+        prismaMock.auction.create.mockImplementation(async () => {
+          execOrder.push('create:Month1Auction');
+          return { id: 'm1-auc-001' };
+        });
+        prismaMock.chitGroup.update.mockImplementation(async () => {
+          execOrder.push('update:ChitGroupACTIVE');
+          return { id: fullDraftChit.id, status: ChitStatus.ACTIVE };
+        });
+        prismaMock.$transaction = createTransientThenSucceedTx(code);
+
+        const res = await chitService.activate(fullDraftChit.id, 'checker-admin-1');
+
+        expect(res.status).toBe(ChitStatus.ACTIVE);
+        expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+        expect(execOrder).toEqual([
+          'lock:ChitGroup',
+          'create:Month1Auction',
+          'update:ChitGroupACTIVE',
+        ]);
+        expect(redisMock.getClient().del).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('N2: activate rejects stale pre-check split-brain when locked row is already ACTIVE, missing, or under-subscribed', async () => {
+      // 2a. Locked row flipped to ACTIVE concurrently -> fail fast with 400 (zero retries, zero writes)
+      prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
+      prismaMock.$queryRaw.mockResolvedValue([{ id: fullDraftChit.id, status: ChitStatus.ACTIVE }]);
+
+      await expect(
+        chitService.activate(fullDraftChit.id, 'checker-admin-2'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(prismaMock.auction.create).not.toHaveBeenCalled();
+      expect(prismaMock.chitGroup.update).not.toHaveBeenCalled();
+      expect(redisMock.getClient().del).not.toHaveBeenCalled();
+
+      // 2b. Locked row missing concurrently -> NotFoundException
+      prismaMock.$queryRaw.mockResolvedValue([]);
+      await expect(
+        chitService.activate(fullDraftChit.id, 'checker-admin-2'),
+      ).rejects.toThrow(NotFoundException);
+
+      // 2c. Outer read saw 2/2 tickets, but concurrent unassignTicket removed 1 before lock -> BadRequestException
+      prismaMock.$queryRaw.mockResolvedValue([{ id: fullDraftChit.id, status: ChitStatus.DRAFT }]);
+      prismaMock.chitGroup.findUnique
+        .mockResolvedValueOnce(fullDraftChit)
+        .mockResolvedValueOnce({
+          ...fullDraftChit,
+          tickets: [fullDraftChit.tickets[0]],
+        });
+
+      await expect(
+        chitService.activate(fullDraftChit.id, 'checker-admin-2'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.auction.create).not.toHaveBeenCalled();
+    });
+
+    it('N3: assignTicket, unassignTicket, and update serialize via ChitGroup lock and map P2002 ADR-13 races', async () => {
+      // 3a. Concurrent activation flipped locked ChitGroup to ACTIVE before unassignTicket/update/assignTicket
+      prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
+      prismaMock.$queryRaw.mockResolvedValue([{ id: fullDraftChit.id, status: ChitStatus.ACTIVE }]);
+
+      await expect(
+        chitService.unassignTicket(fullDraftChit.id, 2, 'staff-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.subscriberTicket.delete).not.toHaveBeenCalled();
+
+      await expect(
+        chitService.update(fullDraftChit.id, { groupName: 'Late Rename' }, 'admin-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.chitGroup.update).not.toHaveBeenCalled();
+
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        ...fullDraftChit,
+        totalTickets: 3,
+      });
+      await expect(
+        chitService.assignTicket(fullDraftChit.id, {
+          ticketNumber: 3,
+          customerId: 'cust-3',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.subscriberTicket.create).not.toHaveBeenCalled();
+
+      // 3b. P2002 fallback on assignTicket maps cleanly to ConflictException without retry
+      prismaMock.$queryRaw.mockResolvedValue([{ id: fullDraftChit.id, status: ChitStatus.DRAFT }]);
+      const p2002Customer: any = new Error('Unique constraint on chitGroupId_customerId');
+      p2002Customer.code = 'P2002';
+      p2002Customer.meta = { target: ['chitGroupId', 'customerId'] };
+      prismaMock.subscriberTicket.create.mockRejectedValueOnce(p2002Customer);
+
+      await expect(
+        chitService.assignTicket(fullDraftChit.id, {
+          ticketNumber: 3,
+          customerId: 'cust-3',
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(4);
+
+      // 3c. Transient 40P01 recovers transparently in unassignTicket
+      prismaMock.$transaction = createTransientThenSucceedTx('40P01');
+      const unassignRes = await chitService.unassignTicket(fullDraftChit.id, 2, 'staff-1');
+      expect(unassignRes.success).toBe(true);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
     });
   });

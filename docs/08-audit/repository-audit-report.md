@@ -809,30 +809,20 @@ const result = await withTransactionRetry(this.prisma, async (tx) => {
 
 ---
 
-#### Finding DEF-DB-07: Missing Concurrency Row Lock on Chit Group Activation
+#### Finding DEF-DB-07: Missing Concurrency Row Lock on Chit Group Activation `[FIXED & VERIFIED]`
+- **Status**: ✅ **REMEDIATED & VERIFIED** (`ChitService.activate`, `assignTicket`, `unassignTicket`, `update` serialized via `lockChitGroupRow` + `withTransactionRetry`; `N1`–`N5` unit + live PostgreSQL 17 contention tests passing)
 - **Layer & Subsystem**: Scheme Lifecycle & State Machine Concurrency
-- **Exact File Path & Line Numbers**: `apps/api/src/chit/chit.service.ts:390-461`
+- **Exact File Path & Line Numbers**: [`apps/api/src/chit/chit.service.ts`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.service.ts) (`activate`, `assignTicket`, `unassignTicket`, `update`), [`apps/api/src/common/utils/state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) (`lockChitGroupRow`)
 - **Violated Specification**: `docs/03-architecture/database-concurrency-and-performance.md` §4.1.
 - **Severity**: **LOW**
 - **Detailed Technical Root Cause**:
-  In `ChitService.activate`, chit group status is checked in memory before entering `this.prisma.$transaction`. No pessimistic row lock (`SELECT id, status FROM "ChitGroup" WHERE id = ${id} FOR UPDATE`) is acquired inside the transaction.
-- **Impact Analysis**:
-  If two administrators click "Activate" simultaneously, both enter the transaction and attempt to create Month 1 records. One transaction crashes with an unhandled unique constraint error.
-- **Concrete Production-Grade Remediation Code Design**:
-  Acquire an exclusive row lock on `ChitGroup` during activation:
-
-```typescript
-// apps/api/src/chit/chit.service.ts:390-461
-const activated = await withTransactionRetry(this.prisma, async (tx) => {
-  const lockedChits = await tx.$queryRaw<Array<{ id: string; status: ChitStatus }>>`
-    SELECT id, status FROM "ChitGroup" WHERE id = ${id} FOR UPDATE
-  `;
-  if (lockedChits[0]?.status !== ChitStatus.DRAFT) {
-    throw new BadRequestException('Scheme is already activated');
-  }
-  // Proceed with activation...
-});
-```
+  Previously, `ChitService.activate` checked `status` and `tickets.length === totalTickets` in memory before entering `this.prisma.$transaction(...)`, acquired no pessimistic `ChitGroup` row lock (`FOR UPDATE`), did not wrap the transaction in `withTransactionRetry`, and relied on a stale outer snapshot. Sibling write paths (`assignTicket`, `unassignTicket`, `update`) were similarly unlocked against concurrent activation.
+- **Implemented Remediation**:
+  - Wrapped `ChitService.activate`, `assignTicket`, `unassignTicket`, and `update` in `withTransactionRetry` acquiring exclusive `"ChitGroup" FOR UPDATE` via shared `lockChitGroupRow(tx, id)` at the root of the State Machine Lock DAG (zero deadlock cycles with downstream `Auction` / `AuctionWinner` / `SubscriberTicket` locks).
+  - Extracted DRY helpers (`assertLockedChitGroupStatus`, `mapTicketUniqueConstraintError`) to validate locked `ChitGroup` status (`DRAFT` | `REGISTERED` for `activate`/`assignTicket`; `DRAFT` for `unassignTicket`/`update`), re-read authoritative `ChitGroup` + `tickets` inside `activate()` to block `TOCTOU` races against `unassignTicket`, map concurrent `P2002` ticket conflicts cleanly to `ConflictException`, and invalidate Redis scheme caches post-commit.
+- **Verification Summary**:
+  - Added `N1`–`N3` unit/deadlock recovery tests in [`state-transition-retry.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/state-transition-retry.spec.ts) and live PostgreSQL 17 parallel contention tests (`CONCURR-INV-24`, `CONCURR-INV-25`) in [`concurrency-postgres.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/concurrency-postgres.spec.ts).
+  - Passed targeted suites (`5/5` suites / `185/185` tests), `oxlint` (`0` warnings / `0` errors on modified files), `pnpm run typecheck` (`exit 0`), `pnpm run lint` (`exit 0`), `pnpm run build` (`exit 0`), and full monorepo `pnpm test` (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `828/828` tests, `web`: `14/14` suites / `347/347` tests).
 
 ---
 
@@ -939,7 +929,7 @@ gantt
   3. `DEF-FE-10` **[FIXED & VERIFIED]**: Unified `sanitizeWholeRupeeInput` & `parseWholeRupees` in `@kumaran/api-client` (`packages/api-client/src/utils/currency.ts`) to split on `.` before extracting digits (eliminating 100x paise concatenation across SDK + `apps/web/src/lib/currency.ts`), added `NaN`/`Infinity`/`-0`/nullish guards, corrected 3 inverted legacy test assertions, added `N1`–`N5` tests, rebuilt SDK `dist/`, and passed the 5-point gate (`@kumaran/api-client`: `8/8`, `api`: `54/54` suites / `819/819` tests, `web`: `14/14` suites / `347/347` tests).
   4. ~~`DEF-BE-03`: Update `GlobalExceptionFilter` Sentry user attribution to use `req.user.sub`.~~ *(✅ Fixed via shared `buildSafeSentryUserContext` + `withSentryScope` across `sentry.config.ts`, `global-exception.filter.ts`, and `sentry.service.ts`)*
   5. `DEF-BE-04` **[WONTFIX / OVER-ENGINEERED]**: Pre-controller `MakerCheckerGuard` closed to avoid redundant non-transactional DB lookups; existing atomic in-transaction `maker_user_id != checker_user_id` checks remain authoritative.
-  6. `DEF-DB-07`: Add pessimistic row lock on `ChitGroup` activation.
+  6. `DEF-DB-07` **[FIXED & VERIFIED]**: Pessimistic `"ChitGroup" FOR UPDATE` row locking (`lockChitGroupRow`) + `withTransactionRetry` across `ChitService` (`activate`, `assignTicket`, `unassignTicket`, `update`) with inside-transaction authoritative ticket re-read, `P2002` -> `ConflictException` mapping, `N1`–`N3` unit tests, and live PostgreSQL 17 contention verification (`CONCURR-INV-24`, `CONCURR-INV-25`; `5/5` targeted suites / `185/185` tests, `828/828` API tests).
 
 ---
 

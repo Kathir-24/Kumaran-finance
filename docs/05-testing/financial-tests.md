@@ -235,7 +235,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
 ```
 
 ### Verification Assertions
-1. **ChitGroup Activation Guard**: `ChitService.activate()` strictly asserts `chit.status === ChitStatus.DRAFT || chit.status === ChitStatus.REGISTERED`. Attempting to activate an `ACTIVE`, `COMPLETED`, or `CLOSED` chit group throws `BadRequestException`.
+1. **ChitGroup Activation Guard**: `ChitService.activate()` strictly asserts `chit.status === ChitStatus.DRAFT || chit.status === ChitStatus.REGISTERED` both on fast-fail pre-check and under pessimistic `lockChitGroupRow()` (`SELECT ... FOR UPDATE`) inside `withTransactionRetry`, re-verifying full ticket capacity before creating Month 1 records. Attempting to activate an `ACTIVE`, `COMPLETED`, or `CLOSED` chit group (or under concurrent activation races) throws `BadRequestException`.
 2. **Defaulter & Arrears Removal Guard**: `InstallmentService.settleRemoval()` strictly asserts `ticket.status === 'REMOVED_DEF_3M'`. Attempting exit settlement on `ACTIVE` or `DEFAULT_3_MONTHS` tickets throws `BadRequestException`.
 3. **Disbursement Pipeline Guard**: `DisbursementService.releasePayout()` strictly asserts `winner.disbursementStatus === 'AUTHORIZED_BY_CHECKER'`. Attempting payout release on `PENDING_VERIFICATION` or `VERIFIED_BY_MAKER` winners throws `BadRequestException`.
 4. **Auction Bidding & Tie-Break Guard**: `AuctionService.recordBid()` strictly asserts that the target auction is not `COMPLETED` or `MINUTES_FILED`. Attempting to submit bids or tie-breaks on finalized auctions throws `BadRequestException`.
