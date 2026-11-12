@@ -84,6 +84,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: false,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -100,8 +101,10 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
       expect(result).toHaveProperty('user');
-      expect(result.user.phone).toBe('9876543210');
-      expect(result.user.roles).toContain(Role.SUPER_ADMIN);
+      if ('user' in result) {
+        expect(result.user.phone).toBe('9876543210');
+        expect(result.user.roles).toContain(Role.SUPER_ADMIN);
+      }
       expect(prismaMock.user.update).toHaveBeenCalled();
     });
 
@@ -118,6 +121,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: false,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -146,6 +150,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: false,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -177,6 +182,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: true,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -191,7 +197,9 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
 
       expect(loginResult).toHaveProperty('requireTotp', true);
       expect(loginResult).toHaveProperty('tempToken');
-      expect(typeof loginResult.tempToken).toBe('string');
+      if ('tempToken' in loginResult) {
+        expect(typeof loginResult.tempToken).toBe('string');
+      }
     });
 
     it('should complete login when valid 6-digit TOTP code is provided', async () => {
@@ -208,6 +216,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: true,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -224,8 +233,10 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
 
       const validTotpCode = generateSync({ secret: totpSecret });
 
+      if (!('tempToken' in loginResult)) throw new Error('Expected tempToken');
+
       const verifyResult = await authService.verifyTotp({
-        tempToken: loginResult.tempToken!,
+        tempToken: loginResult.tempToken,
         totpCode: validTotpCode,
       });
 
@@ -248,6 +259,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: true,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -261,9 +273,11 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         password: rawPassword,
       });
 
+      if (!('tempToken' in loginResult)) throw new Error('Expected tempToken');
+
       await expect(
         authService.verifyTotp({
-          tempToken: loginResult.tempToken!,
+          tempToken: loginResult.tempToken,
           totpCode: '000000',
         }),
       ).rejects.toThrow(UnauthorizedException);
@@ -303,6 +317,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         isTotpEnabled: false,
         mpinHash: null,
         refreshTokenHash: null,
+        fcmToken: null,
         lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -316,7 +331,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         password: rawPassword,
       });
 
-      const refreshToken = loginRes.refreshToken!;
+      if (!('refreshToken' in loginRes)) throw new Error('Expected refreshToken in login response');
+      const refreshToken = loginRes.refreshToken;
       const hashed = await bcrypt.hash(refreshToken, 12);
 
       prismaMock.user.findUnique.mockResolvedValue({
@@ -621,9 +637,11 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       });
 
       expect(verifyRes.verified).toBe(true);
-      expect(verifyRes.accessToken).toBeDefined();
-      expect(verifyRes.refreshToken).toBeDefined();
-      expect(verifyRes.user.roles).toContain(Role.CUSTOMER);
+      if ('accessToken' in verifyRes) {
+        expect(verifyRes.accessToken).toBeDefined();
+        expect(verifyRes.refreshToken).toBeDefined();
+        expect(verifyRes.user.roles).toContain(Role.CUSTOMER);
+      }
     });
 
     it('should throw BadRequestException if OTP code is incorrect', async () => {

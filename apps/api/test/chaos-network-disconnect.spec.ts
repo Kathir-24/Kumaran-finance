@@ -25,10 +25,8 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
   let storageService: StorageService;
   let customerService: CustomerService;
   let disbursementService: DisbursementService;
-  let paymentService: PaymentService;
 
   let makerUserId = '';
-  let checkerUserId = '';
   let branchId = '';
   let activeChitGroupId = '';
   let activeTicketId = '';
@@ -53,13 +51,10 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       );
       customerService = new CustomerService(prisma as any, storageService);
       disbursementService = new DisbursementService(prisma as any, storageService);
-      paymentService = new PaymentService(prisma as any);
 
-      // Resolve Maker and Checker
+      // Resolve Maker
       const maker = await prisma.user.findFirst({ where: { phone: '9876543210' } });
-      const checker = await prisma.user.findFirst({ where: { phone: '9876543211' } });
       makerUserId = maker?.id || '';
-      checkerUserId = checker?.id || '';
 
       // Resolve branch
       const branch = await prisma.branch.findFirst();

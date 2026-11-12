@@ -776,6 +776,8 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       sub: 'usr-acc-001',
       phone: '9842100001',
       roles: [Role.ACCOUNTANT],
+      branchId: mockBranchId,
+      tokenType: 'access' as const,
     };
 
     const validConfirmDto = {
@@ -867,6 +869,8 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
           sub: 'another-customer-id',
           phone: '9842199999',
           roles: [Role.CUSTOMER],
+          branchId: mockBranchId,
+          tokenType: 'access' as const,
         }),
       ).rejects.toThrow(ForbiddenException);
     });

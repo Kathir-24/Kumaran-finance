@@ -1,10 +1,11 @@
 import { NotificationService, SentNotificationRecord } from '../src/jobs/services/notification.service';
+import { PaymentReceiptNotificationJobPayload } from '../src/jobs/dto/job-payloads.dto';
 
 describe('NotificationService Distributed State Tests', () => {
   let service: NotificationService;
   const mockRedisStorage: string[] = [];
 
-  const mockPipeline = {
+  const mockPipeline: any = {
     lpush: jest.fn((key: string, val: string) => {
       mockRedisStorage.unshift(val);
       return mockPipeline;
@@ -40,14 +41,18 @@ describe('NotificationService Distributed State Tests', () => {
   });
 
   it('pushes sent notifications to shared Redis cluster pipeline', async () => {
-    const payload = {
+    const payload: PaymentReceiptNotificationJobPayload = {
+      paymentId: 'pay-001',
       receiptNumber: 'KC-REC-PRD-2026-00999',
-      customerPhone: '9842199999',
+      recipientPhone: '9842199999',
       subscriberName: 'Perundurai Member',
-      chitGroupName: 'KCA-1L-20M-01',
-      installmentMonth: 5,
+      chitCode: 'KCA-1L-20M-01',
+      ticketNumber: 5,
       amountPaid: '5000',
-      branchCode: 'PRD',
+      paymentMode: 'CASH',
+      transactionTimestamp: '2026-10-18T10:00:00.000Z',
+      receiptDownloadUrl: 'https://cdn.example.com/receipt.pdf',
+      passbookAppUrl: 'https://app.kumaranfinance.com/passbook',
     };
 
     await service.dispatchPaymentReceipt(payload);

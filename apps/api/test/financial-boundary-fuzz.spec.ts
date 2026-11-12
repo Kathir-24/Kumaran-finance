@@ -573,7 +573,7 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
         paymentService.recordPayment(
           {
             ticketId: 'ticket-001',
-            dueId: 'due-001',
+            installmentMonth: 1,
             amount: 3900, // Underpayment
             paymentMethod: PaymentMethod.CASH,
           },
@@ -586,7 +586,7 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
         paymentService.recordPayment(
           {
             ticketId: 'ticket-001',
-            dueId: 'due-001',
+            installmentMonth: 1,
             amount: 4000, // Overpayment
             paymentMethod: PaymentMethod.CASH,
           },
@@ -753,7 +753,7 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
       const chitService = new ChitService(prismaMock);
       const paymentService = new PaymentService(prismaMock);
       const collectionService = new CollectionService(prismaMock);
-      const disbursementService = new DisbursementService(prismaMock);
+      const disbursementService = new DisbursementService(prismaMock as any, {} as any);
       const jobsController = new JobsController(
         {} as any,
         {} as any,

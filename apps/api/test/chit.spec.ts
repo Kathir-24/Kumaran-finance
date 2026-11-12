@@ -401,15 +401,16 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       };
 
       const result = await chitService.findOne('chit-group-privacy-test', customerAPayload);
+      expect(result).not.toBeNull();
 
       // Customer A's own ticket must be fully visible
-      expect(result.tickets[0].customer.fullName).toBe('K. Customer A');
-      expect(result.tickets[0].customer.phone).toBe('9876500001');
+      expect(result!.tickets[0].customer!.fullName).toBe('K. Customer A');
+      expect(result!.tickets[0].customer!.phone).toBe('9876500001');
 
       // Customer B's ticket must be masked
-      expect(result.tickets[1].customer.fullName).toBe('Subscriber (Ticket #2)');
-      expect(result.tickets[1].customer.phone).toBe('+91 ******0000');
-      expect(result.tickets[1].customer.customerCode).toBe('KC-CUST-RESERVED');
+      expect(result!.tickets[1].customer!.fullName).toBe('Subscriber (Ticket #2)');
+      expect(result!.tickets[1].customer!.phone).toBe('+91 ******0000');
+      expect(result!.tickets[1].customer!.customerCode).toBe('KC-CUST-RESERVED');
     });
 
     it('should provide unmasked member roster to privileged staff', async () => {
@@ -443,8 +444,9 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       };
 
       const result = await chitService.findOne('chit-group-privacy-test', staffPayload);
-      expect(result.tickets[0].customer.fullName).toBe('K. Customer A');
-      expect(result.tickets[0].customer.phone).toBe('9876500001');
+      expect(result).not.toBeNull();
+      expect(result!.tickets[0].customer!.fullName).toBe('K. Customer A');
+      expect(result!.tickets[0].customer!.phone).toBe('9876500001');
     });
   });
 

@@ -130,6 +130,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
 
     disbursementService = new DisbursementService(
       prismaMock as unknown as PrismaService,
+      {} as any,
     );
   });
 

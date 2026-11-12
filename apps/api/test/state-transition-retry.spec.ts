@@ -161,7 +161,7 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
       prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
 
       await expect(
-        auctionService.finalizeAuction('auc-001', 'checker-002', {}),
+        auctionService.finalizeAuction('auc-001', 'checker-002', { subscribersPresent: 20 }),
       ).rejects.toThrow('AUCTION_ALREADY_FINALIZED');
       expect(lockOrder).toEqual(['ChitGroup', 'Auction']);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
@@ -287,7 +287,7 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
         $transaction: jest.fn(),
       };
       prismaMockRef.current = prismaMock;
-      disbursementService = new DisbursementService(prismaMock as unknown as PrismaService);
+      disbursementService = new DisbursementService(prismaMock as unknown as PrismaService, {} as any);
     });
 
     it('DEF-DB-02: verifySafetyProof recovers from 40P01 and blocks concurrent double verification via FOR UPDATE', async () => {

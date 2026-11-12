@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { paths } from '../../../packages/api-client/src/generated/api-types';
+import type { paths, components } from '@kumaran/api-client';
 
 describe('Layer 7: Client Contract & Type Safety Verification', () => {
   const specPath = path.resolve(__dirname, '../../../docs/03-architecture/openapi-spec.json');
@@ -77,7 +77,7 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
             expect(responses).toBeDefined();
             const successStatus = Object.keys(responses).find((k) => k.startsWith('2'));
             expect(successStatus).toBeDefined();
-            const jsonContent = responses[successStatus]?.content?.['application/json'];
+            const jsonContent = successStatus ? responses[successStatus]?.content?.['application/json'] : undefined;
             expect(jsonContent).toBeDefined();
           }
         }
@@ -178,7 +178,7 @@ describe('Layer 7: Client Contract & Type Safety Verification', () => {
     });
 
     it('should verify resolved schema properties on union, nullable, and nested DTOs', () => {
-      type Schemas = import('../../../packages/api-client/src/generated/api-types').components['schemas'];
+      type Schemas = components['schemas'];
       type Payment = Schemas['PaymentRecordDto'];
       type Reversal = Schemas['ReversalRecordDto'];
       type Auction = Schemas['AuctionResponseDto'];

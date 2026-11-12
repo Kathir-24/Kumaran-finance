@@ -23,6 +23,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     phone: '9842100001',
     roles: [Role.SUPER_ADMIN],
     branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const branchManagerUser: JwtPayload = {
@@ -30,6 +31,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     phone: '9842100002',
     roles: [Role.BRANCH_MANAGER],
     branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const branchManagerOtherBranch: JwtPayload = {
@@ -37,6 +39,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     phone: '9842100003',
     roles: [Role.BRANCH_MANAGER],
     branchId: 'branch-OTHER',
+    tokenType: 'access',
   };
 
   const collectionAgent1: JwtPayload = {
@@ -44,6 +47,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     phone: '9842100004',
     roles: [Role.COLLECTION_AGENT],
     branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const collectionAgent2: JwtPayload = {
@@ -51,24 +55,31 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     phone: '9842100005',
     roles: [Role.COLLECTION_AGENT],
     branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const customerSundaram: JwtPayload = {
     sub: 'usr-cust-1',
     phone: '9842143210',
     roles: [Role.CUSTOMER],
+    branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const customerOther: JwtPayload = {
     sub: 'usr-cust-2',
     phone: '9999999999',
     roles: [Role.CUSTOMER],
+    branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   const auditorUser: JwtPayload = {
     sub: 'usr-audit-1',
     phone: '9842100099',
     roles: [Role.AUDITOR],
+    branchId: 'branch-PRD',
+    tokenType: 'access',
   };
 
   beforeEach(() => {

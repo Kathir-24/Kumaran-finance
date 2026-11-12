@@ -111,6 +111,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       });
 
       expect(verifyRes.verified).toBe(true);
+      if (!('accessToken' in verifyRes)) throw new Error('Expected full session in verifyRes');
       expect(verifyRes.accessToken).toBeDefined();
       expect(verifyRes.refreshToken).toBeDefined();
       expect(verifyRes.user.roles).toContain(Role.CUSTOMER);
@@ -524,6 +525,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         sub: 'user-001',
         phone: '9842100001',
         roles: [Role.SUPER_ADMIN],
+        branchId: 'PRD',
         tokenType: 'access' as const,
       };
 
@@ -542,6 +544,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         sub: 'user-deactivated',
         phone: '9842100001',
         roles: [Role.SUPER_ADMIN],
+        branchId: 'PRD',
         tokenType: 'access' as const,
       };
 
@@ -567,6 +570,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         sub: 'user-001',
         phone: '9842100001',
         roles: [Role.SUPER_ADMIN],
+        branchId: 'PRD',
         tokenType: 'access' as const,
         iat: sameSecondUnixSec,
         issuedAtMs: sameSecondBaseMs - 50,
@@ -576,6 +580,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         sub: 'user-001',
         phone: '9842100001',
         roles: [Role.SUPER_ADMIN],
+        branchId: 'PRD',
         tokenType: 'access' as const,
         iat: sameSecondUnixSec,
         issuedAtMs: sameSecondBaseMs + 50,
@@ -600,6 +605,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         sub: 'user-001',
         phone: '9842100001',
         roles: [Role.SUPER_ADMIN],
+        branchId: 'PRD',
         tokenType: 'access' as const,
       };
 
@@ -709,6 +715,10 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         clientType: 'MOBILE',
       });
 
+      if (!('accessToken' in webTokens) || !('accessToken' in mobileTokens)) {
+        throw new Error('Expected full tokens in login response');
+      }
+
       expect(webTokens.accessToken).toBeDefined();
       expect(mobileTokens.accessToken).toBeDefined();
       expect(webTokens.refreshToken).not.toEqual(mobileTokens.refreshToken);
@@ -750,6 +760,10 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         password: 'CorrectPass@123',
         clientType: 'MOBILE',
       });
+
+      if (!('refreshToken' in webLogin) || !('refreshToken' in mobileLogin)) {
+        throw new Error('Expected full tokens in login response');
+      }
 
       const initialMobileHash = sessionMap.get(`auth:session:${mockUserId}:MOBILE`);
 
@@ -800,6 +814,10 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         password: 'CorrectPass@123',
         clientType: 'MOBILE',
       });
+
+      if (!('refreshToken' in webLogin) || !('refreshToken' in mobileLogin)) {
+        throw new Error('Expected full tokens in login response');
+      }
 
       // Legitimate Web rotation
       await authServiceWithRedis.refreshToken({
@@ -882,6 +900,10 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         password: 'CorrectPass@123',
         clientType: 'MOBILE',
       });
+
+      if (!('accessToken' in webLogin) || !('accessToken' in mobileLogin)) {
+        throw new Error('Expected full tokens in login response');
+      }
 
       const webPayload = jwtService.verify(webLogin.accessToken) as any;
       const mobilePayload = jwtService.verify(mobileLogin.accessToken) as any;

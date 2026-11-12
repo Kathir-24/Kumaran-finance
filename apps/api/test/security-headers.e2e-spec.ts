@@ -41,7 +41,10 @@ describe('Security Headers & CORS (e2e)', () => {
 
     // 2. Strict CORS Configuration
     app.enableCors({
-      origin: (origin, callback) => {
+      origin: (
+        origin: string | undefined,
+        callback: (err: Error | null, allow?: boolean) => void,
+      ) => {
         if (!origin || DEFAULT_CORS_ORIGINS.includes(origin)) {
           callback(null, true);
         } else {

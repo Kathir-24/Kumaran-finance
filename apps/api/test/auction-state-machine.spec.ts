@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ForbiddenException,
-  NotFoundException,
 } from '@nestjs/common';
 import { AuctionStatus } from '@prisma/client';
 import { AuctionService } from '../src/auction/auction.service';

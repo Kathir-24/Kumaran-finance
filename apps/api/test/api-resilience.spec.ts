@@ -23,9 +23,10 @@ describe('API Architecture Resilience & High-Load Hardening (Gate #4)', () => {
       // Push 250 items through the private pushLog method
       for (let i = 1; i <= 250; i++) {
         const record: SentNotificationRecord = {
+          id: `notif-${i}`,
           recipientPhone: `98421000${i.toString().padStart(3, '0')}`,
           channel: 'SMS_DLT',
-          notificationType: 'PAYMENT_RECEIPT',
+          templateType: 'RECEIPT',
           messageText: `Receipt #${i}`,
           variables: { receiptNumber: `REC-${i}` },
           sentAt: new Date(),
@@ -62,7 +63,7 @@ describe('API Architecture Resilience & High-Load Hardening (Gate #4)', () => {
         },
         body: {
           amount: 5000,
-        },
+        } as { amount: number; idempotencyKey?: string },
       };
 
       const mockContext = {
@@ -111,7 +112,7 @@ describe('API Architecture Resilience & High-Load Hardening (Gate #4)', () => {
     it('should safely handle requests without idempotency header', (done) => {
       const mockRequest = {
         headers: {},
-        body: { amount: 2000 },
+        body: { amount: 2000 } as { amount: number; idempotencyKey?: string },
       };
 
       const mockContext = {

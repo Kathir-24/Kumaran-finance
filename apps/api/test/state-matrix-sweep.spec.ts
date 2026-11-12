@@ -5,14 +5,11 @@
 // Compliance: docs/03-architecture/state-machines.md, AGENTS.md §3
 // ==============================================================================
 
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import {
   AuctionStatus,
   ChitStatus,
+  DisbursementMode,
   DueStatus,
   PaymentMethod,
   PaymentStatus,
@@ -71,7 +68,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
         $transaction: jest.fn().mockImplementation((cb) => cb(prismaMock)),
       };
       chitService = new ChitService(prismaMock);
-      disbursementService = new DisbursementService(prismaMock);
+      disbursementService = new DisbursementService(prismaMock, {} as any);
     });
 
     for (const fromState of allChitStatuses) {
@@ -89,7 +86,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
                 id: 'chit-001',
                 status: fromState,
                 totalTickets: 20,
-                tickets: new Array(20).fill({ id: 'ticket-1', ticketNumber: 1 }),
+                tickets: Array.from({ length: 20 }, () => ({ id: 'ticket-1', ticketNumber: 1 })),
                 initMode: 'NEW_GROUP',
               });
               await expect(
@@ -109,7 +106,10 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
               await expect(
                 disbursementService.settleFinalMonth(
                   'chit-001',
-                  { disbursementMode: 'ACCOUNT_PAYEE_CHEQUE' as any },
+                  {
+                    ticketId: 'ticket-001',
+                    disbursementMode: 'ACCOUNT_PAYEE_CHEQUE' as any,
+                  },
                   'super-admin-001',
                   [Role.SUPER_ADMIN],
                 ),
@@ -123,7 +123,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
                 status: fromState,
               });
               await expect(
-                chitService.update('chit-001', { groupName: 'Malicious Rename' }),
+                chitService.update('chit-001', { groupName: 'Malicious Rename' }, 'admin-001'),
               ).rejects.toThrow(BadRequestException);
             }
           } else {
@@ -226,7 +226,9 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
                 customer: { fullName: 'Test Subscriber' },
               });
               await expect(
-                installmentService.settleRemoval('ticket-001', 'admin-001', { reason: 'SETTLE' }),
+                installmentService.settleRemoval('ticket-001', 'admin-001', {
+                  paymentMethod: PaymentMethod.CASH,
+                }),
               ).rejects.toThrow(BadRequestException);
             }
           } else {
@@ -382,7 +384,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
         $queryRaw: jest.fn(),
         $transaction: jest.fn().mockImplementation((cb) => cb(prismaMock)),
       };
-      disbursementService = new DisbursementService(prismaMock);
+      disbursementService = new DisbursementService(prismaMock, {} as any);
     });
 
     for (const fromState of allDisbursementStatuses) {
@@ -403,9 +405,8 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
               await expect(
                 disbursementService.verifySafetyProof(
                   'auction-001',
-                  { agreementSigned: true, nomineeSigned: true, guarantorSigned: false, blankChequesCollected: 2 },
+                  { isSecurityRequired: true, agreementSigned: true, nomineeSigned: true },
                   'maker-001',
-                  [Role.BRANCH_MANAGER],
                 ),
               ).rejects.toThrow(BadRequestException);
             }
@@ -420,7 +421,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
               await expect(
                 disbursementService.authorizePayout(
                   'auction-001',
-                  { approvedPaymentMode: 'ACCOUNT_PAYEE_CHEQUE' as any, checkerNotes: 'Approved' },
+                  { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE, notes: 'Approved' },
                   'checker-002',
                   [Role.SUPER_ADMIN],
                 ),
@@ -437,9 +438,8 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
               await expect(
                 disbursementService.releasePayout(
                   'auction-001',
-                  { disbursementMode: 'ACCOUNT_PAYEE_CHEQUE' as any },
+                  { paymentReference: 'CHQ-12345' },
                   'accountant-003',
-                  [Role.ACCOUNTANT],
                 ),
               ).rejects.toThrow(BadRequestException);
             }
@@ -511,10 +511,10 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
               await expect(
                 paymentService.recordPayment({
                   ticketId: 'ticket-001',
-                  dueId: 'due-001',
+                  installmentMonth: 5,
                   amount: 4000,
                   paymentMethod: PaymentMethod.CASH,
-                }, 'agent-001', [Role.COLLECTION_AGENT]),
+                }, 'agent-001'),
               ).rejects.toThrow(BadRequestException);
             }
           } else {
@@ -647,7 +647,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
                 reversal: { id: 'rev-001', status: fromState, initiatedByUserId: 'maker-001' },
               });
               await expect(
-                paymentService.rejectReversal('payment-001', { reason: 'REJECT' }, 'checker-002', [Role.SUPER_ADMIN]),
+                paymentService.rejectReversal('payment-001', { rejectionReason: 'REJECT' }, 'checker-002', [Role.SUPER_ADMIN]),
               ).rejects.toThrow(BadRequestException);
             }
           } else {
@@ -706,7 +706,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
                   {
                     collectorUserId: 'agent-001',
                     paymentIds: ['payment-001'],
-                    physicalCashCounted: 4000,
+                    acknowledgedAmount: 4000,
                   },
                   'accountant-002',
                 ),

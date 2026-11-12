@@ -413,6 +413,8 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       sub: 'usr-admin-1',
       phone: '9842100001',
       roles: [Role.SUPER_ADMIN],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
 
     let mockStorageService: any;
@@ -487,26 +489,36 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       sub: 'usr-admin-1',
       phone: '9842100001',
       roles: [Role.SUPER_ADMIN],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
     const accountantUser: JwtPayload = {
       sub: 'usr-acc-1',
       phone: '9842100002',
       roles: [Role.ACCOUNTANT],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
     const customerUser: JwtPayload = {
       sub: 'cust-001',
       phone: '9842100003',
       roles: [Role.CUSTOMER],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
     const agentUser: JwtPayload = {
       sub: 'agent-001',
       phone: '9842100004',
       roles: [Role.COLLECTION_AGENT],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
     const auditorUser: JwtPayload = {
       sub: 'auditor-001',
       phone: '9842100005',
       roles: [Role.AUDITOR],
+      branchId: 'PRD',
+      tokenType: 'access',
     };
 
     let mockStorageService: any;

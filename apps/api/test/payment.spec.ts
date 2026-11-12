@@ -864,6 +864,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       phone: '9842143210',
       roles: [Role.CUSTOMER],
       branchId: null,
+      tokenType: 'access',
     };
 
     const mockAccountantUser: JwtPayload = {
@@ -871,6 +872,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       phone: '9842100000',
       roles: [Role.ACCOUNTANT],
       branchId: mockBranchId,
+      tokenType: 'access',
     };
 
     it('should allow customer to submit a UPI claim in INITIATED status with valid UTR', async () => {

@@ -55,6 +55,9 @@ jobs:
       - name: Run Oxlint (Code Quality & Style)
         run: pnpm --filter api run lint
 
+      - name: Run TypeScript Typecheck (App & Tests)
+        run: pnpm --filter api run typecheck
+
       - name: Validate Prisma Schema & Generate Client
         working-directory: apps/api
         env:
@@ -95,9 +98,10 @@ jobs:
 
       - name: Verify Client SDK Contract Drift Prevention
         run: |
+          pnpm run codegen:spec
           pnpm run codegen:ts
           pnpm run codegen:dart
-          git diff --exit-code packages/api-client/src/generated/ apps/mobile/lib/core/api/models/
+          git diff --exit-code docs/03-architecture/openapi-spec.json packages/api-client/src/generated/ apps/mobile/lib/core/api/models/
 
       - name: Validate Docker Compose Orchestration Blueprints
         run: |

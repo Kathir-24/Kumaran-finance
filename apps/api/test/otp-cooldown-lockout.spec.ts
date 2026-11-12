@@ -121,14 +121,10 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
         authService.verifyOtp({ phone: testPhone, otp: '000000' }),
       ).rejects.toThrow(HttpException);
 
-      try {
-        // Direct state check
-        const lockoutStatus = await authService.checkOtpLockout(testPhone);
-        expect(lockoutStatus.locked).toBe(true);
-        expect(lockoutStatus.remainingSeconds).toBeGreaterThan(0);
-      } catch (e) {
-        throw e;
-      }
+      // Direct state check
+      const lockoutStatus = await authService.checkOtpLockout(testPhone);
+      expect(lockoutStatus.locked).toBe(true);
+      expect(lockoutStatus.remainingSeconds).toBeGreaterThan(0);
     });
 
     it('OTP-RATE-4: Calling requestOtp while actively locked out MUST fail closed with HTTP 429 without sending SMS', async () => {
@@ -164,7 +160,7 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
     });
 
     it('OTP-RATE-6: Correct OTP verification MUST atomically clear active OTP, cooldown, and lockout states', async () => {
-      const res = await authService.requestOtp({ phone: testPhone });
+      await authService.requestOtp({ phone: testPhone });
       const sentOtp = smsServiceMock.sendOtpSms.mock.calls[0][1];
 
       // Verification succeeds

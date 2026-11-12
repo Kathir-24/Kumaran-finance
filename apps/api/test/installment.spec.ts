@@ -408,6 +408,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ]);
 
       const defaulters = await installmentService.getDefaulters();
+      if (!Array.isArray(defaulters)) throw new Error('Expected array');
       expect(defaulters).toHaveLength(1);
       expect(defaulters[0].consecutiveUnpaidMonths).toBe(3);
       expect(defaulters[0].eligibleForRemoval).toBe(true);

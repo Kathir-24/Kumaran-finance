@@ -547,7 +547,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       ]);
 
       const defaulters = await reportService.getDefaultersAgingReport(
-        { minArrearsMonths: 3 },
+        { minArrearsMonths: 3, page: 1, limit: 20 },
         superAdminUser,
       );
 
@@ -590,7 +590,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       ]);
 
       const report = await reportService.getDefaultersAgingReport(
-        {},
+        { page: 1, limit: 20 },
         collectionAgentUser,
       );
 
@@ -623,7 +623,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       ]);
 
       const audit = await reportService.getAuditLogs(
-        { action: 'PAYMENT_REVERSED' },
+        { action: 'PAYMENT_REVERSED', page: 1, limit: 50 },
         auditorUser,
       );
 
@@ -653,7 +653,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
         },
       ]);
 
-      const audit = await reportService.getAuditLogs({}, customerUser);
+      const audit = await reportService.getAuditLogs({ page: 1, limit: 50 }, customerUser);
 
       expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

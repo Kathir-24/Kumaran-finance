@@ -160,8 +160,8 @@ describe('Component 3: Pluggable SMS Drivers & DLT Notification Suite', () => {
 
       const httpRequestSpy = jest
         .spyOn(driver as any, 'httpRequest')
-        .mockImplementation((postData: string) => {
-          const parsed = JSON.parse(postData);
+        .mockImplementation((postData: unknown) => {
+          const parsed = JSON.parse(postData as string);
           expect(parsed.template_id).toBe('1407169823412093848');
           expect(parsed.sender).toBe('KMRCHT');
           expect(parsed.recipients[0].mobiles).toBe('919842143210');

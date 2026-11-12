@@ -124,6 +124,7 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
   describe('3. Sentry beforeSend Hook', () => {
     it('should sanitize request headers, body, and user data', () => {
       const mockEvent: ErrorEvent = {
+        type: undefined,
         event_id: 'test-event-1',
         request: {
           headers: {
@@ -162,9 +163,10 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
       expect(processed?.request?.headers?.authorization).toBe('[FILTERED]');
       expect(processed?.request?.headers?.cookie).toBe('[FILTERED]');
       expect(processed?.request?.headers?.['user-agent']).toBe('Mozilla/5.0');
-      expect(processed?.request?.data?.password).toBe('[FILTERED]');
-      expect(processed?.request?.data?.phone).toBe('+91******3210');
-      expect(processed?.request?.data?.amount).toBe('5000');
+      const requestData = processed?.request?.data as Record<string, unknown> | undefined;
+      expect(requestData?.password).toBe('[FILTERED]');
+      expect(requestData?.phone).toBe('+91******3210');
+      expect(requestData?.amount).toBe('5000');
 
       // DEF-BE-03 (N3): Operational identifiers preserved; phone, email & IP stripped
       expect(processed?.user?.id).toBe('user-001');
@@ -178,6 +180,7 @@ describe('Component 4: Sentry Error Monitoring & Crash Tracking Suite', () => {
 
       // PII-only user object is completely removed rather than emitting empty {}
       const piiOnlyEvent = beforeSend({
+        type: undefined,
         event_id: 'test-event-pii-only',
         user: { email: 'only-pii@example.com', ip_address: '10.0.0.1' },
       });

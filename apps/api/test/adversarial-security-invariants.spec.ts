@@ -1,8 +1,6 @@
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
-  HttpException,
   HttpStatus,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -22,7 +20,6 @@ import { AuctionService } from '../src/auction/auction.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ChitService } from '../src/chit/chit.service';
 import { CollectionService } from '../src/collection/collection.service';
-import { CustomerService } from '../src/customer/customer.service';
 import { DisbursementService } from '../src/disbursement/disbursement.service';
 import { PaymentService } from '../src/payment/payment.service';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -141,7 +138,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
           chitGroupId: mockChitGroupId,
           installmentMonth: 2,
           conductedByUserId: mockMakerId, // Auction recorded/conducted by Maker
-          status: AuctionStatus.BID_RECORDED,
+          status: AuctionStatus.SCHEDULED,
           winner: { ticketId: mockTicketId },
         };
 
@@ -164,7 +161,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
           installmentMonth: 2,
           auctionDate: new Date('2026-10-20'),
           conductedByUserId: mockMakerId,
-          status: AuctionStatus.BID_RECORDED,
+          status: AuctionStatus.SCHEDULED,
           winner: {
             ticketId: mockTicketId,
             bidAmount: 20000n,
@@ -438,7 +435,10 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       let disbursementService: DisbursementService;
 
       beforeEach(() => {
-        disbursementService = new DisbursementService(prismaMock as unknown as PrismaService);
+        disbursementService = new DisbursementService(
+          prismaMock as unknown as PrismaService,
+          {} as any,
+        );
       });
 
       it('should REJECT self-authorization when Maker who verified safety checklist attempts to authorize (403 Forbidden)', async () => {
@@ -509,7 +509,10 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
 
     beforeEach(() => {
       paymentService = new PaymentService(prismaMock as unknown as PrismaService);
-      disbursementService = new DisbursementService(prismaMock as unknown as PrismaService);
+      disbursementService = new DisbursementService(
+        prismaMock as unknown as PrismaService,
+        {} as any,
+      );
     });
 
     it('should STRICTLY BLOCK Branch Manager from approving payment reversals (403 Forbidden)', async () => {
@@ -709,20 +712,13 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
   // 6. ANTI-BOLA / IDOR PERMISSION BOUNDARIES
   // =========================================================================
   describe('6. Anti-BOLA / IDOR Protection Boundaries', () => {
-    let customerService: CustomerService;
-
-    beforeEach(() => {
-      customerService = new CustomerService(
-        prismaMock as unknown as PrismaService,
-        {} as any,
-      );
-    });
-
     it('Customer A token viewing Customer B KYC document throws 403 Forbidden', () => {
       const customerAPayload = {
         sub: mockCustomer1Id,
         phone: mockCustomer1Phone,
         roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
       };
 
       // Customer A tries to access Customer B KYC folder
@@ -741,6 +737,8 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         sub: mockCustomer1Id,
         phone: mockCustomer1Phone,
         roles: [Role.CUSTOMER],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
       };
 
       const ticketB = {
@@ -760,6 +758,8 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         sub: mockCollectorId,
         phone: '9876543214',
         roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
       };
 
       expect(() => {
@@ -777,8 +777,10 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
     it('Branch Manager from Branch PRD cannot access KYC of customer in another branch (403 Forbidden)', () => {
       const bmPayload = {
         sub: mockBranchManagerId,
+        phone: '9876543210',
         branchId: 'branch-prd-001',
         roles: [Role.BRANCH_MANAGER],
+        tokenType: 'access' as const,
       };
 
       const customerInAnotherBranch = {
