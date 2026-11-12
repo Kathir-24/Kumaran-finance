@@ -6,7 +6,6 @@ import {
   ShieldAlert,
   CheckCircle2,
   XCircle,
-  Receipt,
   User,
   Clock,
   Lock,
@@ -69,7 +68,6 @@ export function ReversalApprovalTable({
           <TableBody className="divide-y divide-slate-800/60 bg-slate-900/40 text-xs">
             {reversals.map((r) => {
               const isMaker = Boolean(currentUser && currentUser.id === r.initiatedByUserId);
-              const canAuthorize = isSuperAdmin && !isMaker;
 
               return (
                 <TableRow key={r.id} className="hover:bg-slate-800/30 transition-colors">

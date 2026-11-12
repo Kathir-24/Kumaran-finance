@@ -2,16 +2,14 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Gavel,
   ArrowLeft,
   Clock,
   Loader2,
   AlertCircle,
-  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
@@ -34,17 +32,28 @@ import {
 } from '@/components/auctions/auction-summary-card';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-export default function LiveAuctionRoomPage() {
+interface LiveAuctionRecord extends AuctionSummaryData {
+  chitGroup?: {
+    id?: string;
+    groupCode?: string;
+    groupName?: string;
+    chitValue?: number | bigint | string;
+    durationMonths?: number;
+  };
+}
+
+function LiveAuctionRoomContent() {
   const t = useTranslations('auctions');
   const params = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const auctionId = String(params.id);
   const monthParam = searchParams.get('month');
-  const monthNum = monthParam ? parseInt(monthParam, 10) : undefined;
+  const parsedMonth = monthParam ? Number.parseInt(monthParam, 10) : Number.NaN;
+  const monthNum = Number.isFinite(parsedMonth) && parsedMonth >= 1 ? parsedMonth : undefined;
 
   const [selectedTicket, setSelectedTicket] = React.useState<SubscriberTicketItem | null>(null);
   const [isTieBreakOpen, setIsTieBreakOpen] = React.useState(false);
@@ -76,11 +85,11 @@ export default function LiveAuctionRoomPage() {
     isLoading: isAuctionLoading,
     isError: isAuctionError,
     refetch: refetchAuction,
-  } = useQuery<AuctionSummaryData & { chitGroup?: any }>({
+  } = useQuery<LiveAuctionRecord>({
     queryKey: queryKeys.auctions.detail(auctionId),
     queryFn: async () => {
-      return unwrapApiResponse<AuctionSummaryData & { chitGroup?: any }>(
-        apiClient.GET('/api/v1/auctions/{id}' as any, {
+      return unwrapApiResponse<LiveAuctionRecord>(
+        apiClient.GET('/api/v1/auctions/{id}', {
           params: { path: { id: auctionId } },
         }),
       );
@@ -99,7 +108,7 @@ export default function LiveAuctionRoomPage() {
     queryKey: queryKeys.auctions.eligibleBidders(auctionId, currentMonth),
     queryFn: async () => {
       return unwrapApiResponse<EligibleBidderItem[]>(
-        apiClient.GET('/api/v1/auctions/{id}/eligible-bidders' as any, {
+        apiClient.GET('/api/v1/auctions/{id}/eligible-bidders', {
           params: {
             path: { id: auctionId },
             query: { month: currentMonth },
@@ -115,11 +124,11 @@ export default function LiveAuctionRoomPage() {
     data: allTickets = [],
     isLoading: isTicketsLoading,
   } = useQuery<SubscriberTicketItem[]>({
-    queryKey: queryKeys.schemes.detail(chitGroupId),
+    queryKey: queryKeys.schemes.detail(chitGroupId || ''),
     queryFn: async () => {
       if (!chitGroupId) return [];
       return unwrapApiResponse<SubscriberTicketItem[]>(
-        apiClient.GET('/api/v1/chits/{id}/tickets' as any, {
+        apiClient.GET('/api/v1/chits/{id}/tickets', {
           params: { path: { id: chitGroupId } },
         }),
       );
@@ -137,7 +146,7 @@ export default function LiveAuctionRoomPage() {
   const recordBidMutation = useMutation({
     mutationFn: async (payload: RecordBidPayload) => {
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/auctions/{id}/record-bid' as any, {
+        apiClient.POST('/api/v1/auctions/{id}/record-bid', {
           params: { path: { id: auctionId } },
           body: payload,
         }),
@@ -155,7 +164,7 @@ export default function LiveAuctionRoomPage() {
   const recordTieBreakMutation = useMutation({
     mutationFn: async (payload: RecordTieBreakPayload) => {
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/auctions/{id}/tie-break' as any, {
+        apiClient.POST('/api/v1/auctions/{id}/tie-break', {
           params: { path: { id: auctionId } },
           body: payload,
         }),
@@ -308,5 +317,13 @@ export default function LiveAuctionRoomPage() {
         isSubmitting={recordTieBreakMutation.isPending}
       />
     </div>
+  );
+}
+
+export default function LiveAuctionRoomPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <LiveAuctionRoomContent />
+    </React.Suspense>
   );
 }

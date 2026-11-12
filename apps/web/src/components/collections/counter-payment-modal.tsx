@@ -10,12 +10,47 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 import { CounterUpiQr } from './counter-upi-qr';
 
 export type PaymentMethod = 'CASH' | 'UPI' | 'CHEQUE' | 'BANK_TRANSFER';
+
+interface CounterSchemeOption {
+  id: string;
+  groupCode: string;
+  chitValue: string | number | bigint;
+  currentInstallmentMonth?: number;
+  durationMonths?: number;
+}
+
+interface CounterDueItem {
+  id: string;
+  ticketId: string;
+  installmentMonth: number;
+  status: string;
+  grossAmount: number | bigint;
+  dividendDeduction: number | bigint;
+  netPayableAmount: number | bigint;
+  ticketNumber?: number;
+  subscriberName?: string;
+  ticket?: {
+    ticketNumber?: number;
+    customer?: {
+      name?: string;
+    };
+  };
+}
+
+interface RecordPaymentResponse {
+  id?: string;
+  payment?: { id?: string };
+  data?: {
+    id?: string;
+    payment?: { id?: string };
+  };
+}
 
 interface CounterPaymentModalProps {
   isOpen: boolean;
@@ -53,16 +88,16 @@ export function CounterPaymentModal({
   }, [isOpen, selectedDueId, resetKey]);
 
   // Fetch active schemes
-  const { data: schemesData } = useQuery({
+  const { data: schemesData } = useQuery<CounterSchemeOption[]>({
     queryKey: queryKeys.schemes.list(),
     queryFn: async ({ signal }) => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<unknown>(
         apiClient.GET('/api/v1/chits', {
           params: { query: { limit: 100 } },
           signal,
         }),
       );
-      return unwrapPaginatedList(res);
+      return unwrapPaginatedList<CounterSchemeOption>(res);
     },
     enabled: isOpen,
   });
@@ -77,16 +112,16 @@ export function CounterPaymentModal({
   }, [schemes, selectedGroupId]);
 
   const activeScheme = useMemo(
-    () => schemes.find((s: any) => s.id === selectedGroupId),
+    () => schemes.find((s) => s.id === selectedGroupId),
     [schemes, selectedGroupId],
   );
 
   // Fetch dues for scheme and month
-  const { data: duesData, isLoading: duesLoading } = useQuery({
+  const { data: duesData, isLoading: duesLoading } = useQuery<CounterDueItem[]>({
     queryKey: queryKeys.installments.groupMonth(selectedGroupId, selectedMonth),
     queryFn: async ({ signal }) => {
       if (!selectedGroupId) return [];
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<CounterDueItem[]>(
         apiClient.GET('/api/v1/installments/group/{chitGroupId}/month/{month}', {
           params: {
             path: { chitGroupId: selectedGroupId, month: selectedMonth },
@@ -101,16 +136,16 @@ export function CounterPaymentModal({
 
   const dues = useMemo(() => (Array.isArray(duesData) ? duesData : []), [duesData]);
   const unpaidDues = useMemo(
-    () => dues.filter((d: any) => d.status === 'UNPAID' || d.status === 'OVERDUE'),
+    () => dues.filter((d) => d.status === 'UNPAID' || d.status === 'OVERDUE'),
     [dues],
   );
 
   useEffect(() => {
     if (unpaidDues.length > 0) {
       if (preselectedTicketId) {
-        const match = unpaidDues.find((d: any) => d.ticketId === preselectedTicketId);
+        const match = unpaidDues.find((d) => d.ticketId === preselectedTicketId);
         setSelectedDueId(match ? match.id : unpaidDues[0].id);
-      } else if (!selectedDueId || !unpaidDues.some((d: any) => d.id === selectedDueId)) {
+      } else if (!selectedDueId || !unpaidDues.some((d) => d.id === selectedDueId)) {
         setSelectedDueId(unpaidDues[0].id);
       }
     } else {
@@ -119,7 +154,7 @@ export function CounterPaymentModal({
   }, [unpaidDues, preselectedTicketId, selectedDueId]);
 
   const selectedDue = useMemo(
-    () => dues.find((d: any) => d.id === selectedDueId),
+    () => dues.find((d) => d.id === selectedDueId),
     [dues, selectedDueId],
   );
 
@@ -127,7 +162,7 @@ export function CounterPaymentModal({
     mutationFn: async () => {
       if (!selectedDue) throw new Error('No due selected');
       setErrorMessage(null);
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<RecordPaymentResponse>(
         apiClient.POST('/api/v1/payments', {
           headers: { 'Idempotency-Key': idempotencyKey },
           body: {
@@ -151,7 +186,7 @@ export function CounterPaymentModal({
       onClose();
       if (paymentId) onPaymentSuccess(paymentId);
     },
-    onError: (err: any) => setErrorMessage(err.message || 'Error recording payment'),
+    onError: (err: unknown) => setErrorMessage(getErrorMessage(err, 'Error recording payment')),
   });
 
   return (
@@ -182,12 +217,12 @@ export function CounterPaymentModal({
                 value={selectedGroupId}
                 onChange={(e) => {
                   setSelectedGroupId(e.target.value);
-                  const grp = schemes.find((s: any) => s.id === e.target.value);
+                  const grp = schemes.find((s) => s.id === e.target.value);
                   if (grp) setSelectedMonth(grp.currentInstallmentMonth || 1);
                 }}
                 className="w-full mt-1 h-8 rounded-md border border-slate-700 bg-slate-800 px-2.5 text-xs text-slate-100"
               >
-                {schemes.map((s: any) => (
+                {schemes.map((s) => (
                   <option key={s.id} value={s.id}>{s.groupCode} ({formatRupee(s.chitValue)})</option>
                 ))}
               </select>
@@ -223,7 +258,7 @@ export function CounterPaymentModal({
                 onChange={(e) => setSelectedDueId(e.target.value)}
                 className="w-full mt-1 h-8 rounded-md border border-slate-700 bg-slate-800 px-2.5 text-xs text-slate-100 font-mono"
               >
-                {unpaidDues.map((d: any) => (
+                {unpaidDues.map((d) => (
                   <option key={d.id} value={d.id}>
                     T#{d.ticket?.ticketNumber || d.ticketNumber || '—'} - {d.ticket?.customer?.name || d.subscriberName || 'Member'} ({formatRupee(d.netPayableAmount)})
                   </option>

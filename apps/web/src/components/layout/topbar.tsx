@@ -13,9 +13,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   LogOut,
-  User,
   KeyRound,
-  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -53,7 +51,6 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   const tTopbar = useTranslations('topbar');
   const tNav = useTranslations('nav');
   const tAuth = useTranslations('auth');
-  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
 
   const user = useAuthStore((s) => s.user);

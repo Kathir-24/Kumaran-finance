@@ -7,13 +7,10 @@ import {
   Banknote,
   CheckCircle2,
   Clock,
-  ShieldCheck,
-  Building,
   User,
   Ticket as TicketIcon,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
 

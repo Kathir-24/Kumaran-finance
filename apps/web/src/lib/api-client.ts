@@ -51,13 +51,32 @@ export function getStoredRefreshToken(): string | null {
 }
 
 /**
+ * Extracts a readable message from an unknown thrown error or API failure payload.
+ */
+export function getErrorMessage(err: unknown, fallback = 'Request failed'): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg.trim().length > 0) {
+      return msg;
+    }
+  }
+  if (typeof err === 'string' && err.trim().length > 0) {
+    return err;
+  }
+  return fallback;
+}
+
+/**
  * SSR-safe getter for stored user profile.
  */
-export function getStoredUserProfile<T = any>(): T | null {
+export function getStoredUserProfile<T = unknown>(): T | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(USER_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
@@ -66,7 +85,7 @@ export function getStoredUserProfile<T = any>(): T | null {
 /**
  * SSR-safe setter for user profile.
  */
-export function setStoredUserProfile<T = any>(user: T | null): void {
+export function setStoredUserProfile<T = unknown>(user: T | null): void {
   if (typeof window === 'undefined') return;
   try {
     if (user) {
@@ -137,8 +156,8 @@ export const apiClient: KumaranApiClient = createWebApiClient();
  */
 export async function unwrapApiResponse<T>(
   responsePromise: Promise<{
-    data?: any;
-    error?: any;
+    data?: unknown;
+    error?: unknown;
     response: Response;
   }>,
 ): Promise<T> {
@@ -146,24 +165,34 @@ export async function unwrapApiResponse<T>(
   const { data, error, response } = result;
 
   if (error || !response.ok) {
-    const errorPayload: ApiErrorPayload =
-      error && typeof error === 'object'
-        ? {
-            code: error.code || error.error || 'API_ERROR',
-            message: error.message || response.statusText || 'Request failed',
-            details: error.details || error.errors || [],
-          }
-        : {
-            code: 'API_ERROR',
-            message: typeof error === 'string' ? error : response.statusText || 'Request failed',
-          };
+    const errRecord =
+      error && typeof error === 'object' ? (error as Record<string, unknown>) : null;
+    const errorPayload: ApiErrorPayload = errRecord
+      ? {
+          code:
+            (typeof errRecord.code === 'string' && errRecord.code) ||
+            (typeof errRecord.error === 'string' && errRecord.error) ||
+            'API_ERROR',
+          message:
+            (typeof errRecord.message === 'string' && errRecord.message) ||
+            response.statusText ||
+            'Request failed',
+          details:
+            (Array.isArray(errRecord.details) && errRecord.details) ||
+            (Array.isArray(errRecord.errors) && errRecord.errors) ||
+            [],
+        }
+      : {
+          code: 'API_ERROR',
+          message: typeof error === 'string' ? error : response.statusText || 'Request failed',
+        };
 
     throw new KumaranApiError(response.status, errorPayload);
   }
 
   // Handle standard NestJS response envelope: { success: true, statusCode: 200, data: ... }
   if (data && typeof data === 'object' && 'data' in data && 'success' in data) {
-    return data.data as T;
+    return (data as { data: T }).data;
   }
 
   return data as T;
@@ -173,7 +202,7 @@ export async function unwrapApiResponse<T>(
  * Safely extracts array items from either a direct array (`T[]`) or an
  * `ApiPaginatedResponseEnvelope` payload (`{ data: T[], total, page, limit, totalPages }`).
  */
-export function unwrapPaginatedList<T = any>(payload: unknown): T[] {
+export function unwrapPaginatedList<T = unknown>(payload: unknown): T[] {
   if (Array.isArray(payload)) {
     return payload as T[];
   }

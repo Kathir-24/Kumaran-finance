@@ -5,8 +5,6 @@ import { useTranslations } from 'next-intl';
 import {
   Bell,
   CheckCircle2,
-  Clock,
-  Filter,
   Info,
   MessageSquare,
   Search,
@@ -42,10 +40,9 @@ export function NotificationAuditTable({
   isLoading,
   limit,
   onLimitChange,
-  onRefresh,
+  onRefresh: _onRefresh,
 }: NotificationAuditTableProps) {
   const t = useTranslations('jobs');
-  const tCommon = useTranslations('common');
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedChannel, setSelectedChannel] = React.useState<'ALL' | 'PUSH' | 'SMS'>('ALL');

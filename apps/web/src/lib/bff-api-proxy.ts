@@ -36,25 +36,38 @@ function jsonErrorResponse(
   });
 }
 
+interface ProxyCookieOptions {
+  path?: string;
+  maxAge?: number;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: string | boolean;
+}
+
 function defaultProxyResponseFactory(
   body: BodyInit | null,
   init: ResponseInit,
 ): NextResponse {
-  const baseRes = new Response(body, init) as unknown as NextResponse;
+  const baseRes = new Response(body, init);
 
-  (baseRes as any).cookies = {
-    set(name: string, value: string, opts: any = {}) {
-      const attrs = [`${name}=${encodeURIComponent(value)}`];
-      if (opts.path) attrs.push(`Path=${opts.path}`);
-      if (typeof opts.maxAge === 'number') attrs.push(`Max-Age=${opts.maxAge}`);
-      if (opts.httpOnly) attrs.push('HttpOnly');
-      if (opts.secure) attrs.push('Secure');
-      if (opts.sameSite) attrs.push(`SameSite=${opts.sameSite}`);
-      baseRes.headers.append('set-cookie', attrs.join('; '));
+  Object.defineProperty(baseRes, 'cookies', {
+    value: {
+      set(name: string, value: string, opts: ProxyCookieOptions = {}) {
+        const attrs = [`${name}=${encodeURIComponent(value)}`];
+        if (opts.path) attrs.push(`Path=${opts.path}`);
+        if (typeof opts.maxAge === 'number') attrs.push(`Max-Age=${opts.maxAge}`);
+        if (opts.httpOnly) attrs.push('HttpOnly');
+        if (opts.secure) attrs.push('Secure');
+        if (typeof opts.sameSite === 'string' && opts.sameSite) {
+          attrs.push(`SameSite=${opts.sameSite}`);
+        }
+        baseRes.headers.append('set-cookie', attrs.join('; '));
+      },
     },
-  };
+    configurable: true,
+  });
 
-  return baseRes;
+  return baseRes as unknown as NextResponse;
 }
 
 export async function handleBffProxyRequest(
@@ -69,7 +82,7 @@ export async function handleBffProxyRequest(
     const subpath = path.join('/');
     const backendUrl = getBackendApiUrl();
     const urlObj = new URL(request.url, 'http://localhost');
-    const search = (request as any).nextUrl?.search ?? urlObj.search ?? '';
+    const search = request.nextUrl?.search ?? urlObj.search ?? '';
     const targetUrl = `${backendUrl}/api/v1/${subpath}${search}`;
 
     let accessToken = request.cookies.get(COOKIE_ACCESS_TOKEN)?.value;
@@ -178,8 +191,10 @@ export async function handleBffProxyRequest(
     }
 
     return clientResponse;
-  } catch (error: any) {
-    if (error?.name === 'AbortError' || error?.name === 'ResponseAborted' || request.signal?.aborted) {
+  } catch (error: unknown) {
+    const errName = error instanceof Error ? error.name : undefined;
+    const errMessage = error instanceof Error ? error.message : undefined;
+    if (errName === 'AbortError' || errName === 'ResponseAborted' || request.signal?.aborted) {
       return createResponse(null, { status: 499 });
     }
     console.error('[BFF Proxy] Unhandled proxy error:', error);
@@ -188,7 +203,7 @@ export async function handleBffProxyRequest(
       {
         success: false,
         error: 'GATEWAY_ERROR',
-        message: error?.message || 'Failed to proxy request to backend service',
+        message: errMessage || 'Failed to proxy request to backend service',
       },
       502,
     );

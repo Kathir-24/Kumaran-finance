@@ -8,7 +8,6 @@ import {
   FileDown,
   Receipt,
   Ticket,
-  Calendar,
   Layers,
   Loader2,
   AlertCircle,
@@ -88,7 +87,7 @@ export function CustomerPassbookTab({
     queryFn: async () => {
       if (!activeTicketId) throw new Error('No ticket selected');
       return unwrapApiResponse<PassbookStatementResponse>(
-        apiClient.GET('/api/v1/tickets/{ticketId}/passbook' as any, {
+        apiClient.GET('/api/v1/tickets/{ticketId}/passbook', {
           params: { path: { ticketId: activeTicketId } },
         }),
       );
@@ -100,11 +99,11 @@ export function CustomerPassbookTab({
     if (!activeTicketId) return;
     setIsDownloading(true);
     try {
-      const res: any = await unwrapApiResponse(
-        apiClient.GET('/api/v1/pdf/passbook/{ticketId}' as any, {
+      const res = await unwrapApiResponse<{ presignedUrl?: string }>(
+        apiClient.GET('/api/v1/pdf/passbook/{ticketId}', {
           params: {
             path: { ticketId: activeTicketId },
-            query: { download: true } as any,
+            query: { download: true },
           },
         }),
       );

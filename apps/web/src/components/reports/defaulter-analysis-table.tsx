@@ -8,9 +8,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
   Phone,
-  User,
   UserMinus,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';

@@ -9,7 +9,6 @@ import {
   Loader2,
   CheckCircle2,
   ShieldCheck,
-  Banknote,
 } from 'lucide-react';
 import {
   Dialog,
@@ -23,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export interface FinalSettlementChitTarget {
@@ -89,12 +88,12 @@ export function FinalSettlementModal({
         throw new Error('No unprized subscriber ticket found for final month settlement');
       }
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ message?: string }>(
         apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/final-settlement', {
           params: { path: { chitGroupId: chitGroup.id } },
           body: {
             ticketId: unprizedTicket.id,
-            disbursementMode: disbursementMode as any,
+            disbursementMode: disbursementMode as 'ACCOUNT_PAYEE_CHEQUE' | 'BANK_TRANSFER_NEFT' | 'BANK_TRANSFER_RTGS' | 'BANK_TRANSFER_IMPS' | 'CASH',
             paymentReference: paymentReference.trim() || undefined,
             notes: notes.trim() || undefined,
             disbursedAt: disbursedAt ? new Date(disbursedAt).toISOString() : undefined,
@@ -110,8 +109,8 @@ export function FinalSettlementModal({
       onSuccess?.();
       onClose();
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Settlement failed');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Settlement failed'));
     },
   });
 

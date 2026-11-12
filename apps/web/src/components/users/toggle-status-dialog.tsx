@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, ShieldAlert, UserX } from 'lucide-react';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,8 +50,8 @@ export function ToggleStatusDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
       onOpenChange(false);
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Failed to update user status');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to update user status'));
     },
   });
 

@@ -6,17 +6,14 @@ import { useTranslations } from 'next-intl';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
-  Building2,
   CheckCircle2,
   IdCard,
-  KeyRound,
   Loader2,
   Phone,
-  Shield,
   Sparkles,
   User,
 } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,7 +95,7 @@ export function UserForm() {
           body: {
             name: name.trim(),
             phone: cleanPhone,
-            roles: selectedRoles as any,
+            roles: selectedRoles as Array<'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR'>,
             branchId: branchId || undefined,
             password: password.trim() || undefined,
           },
@@ -109,11 +106,11 @@ export function UserForm() {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
       router.push('/users');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError && err.statusCode === 409) {
         setErrorMsg(t('conflictError', { phone }));
       } else {
-        setErrorMsg(err.message || 'Failed to create staff account');
+        setErrorMsg(getErrorMessage(err, 'Failed to create staff account'));
       }
     },
   });

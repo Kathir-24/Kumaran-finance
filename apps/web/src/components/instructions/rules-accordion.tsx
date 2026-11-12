@@ -3,14 +3,10 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  ShieldCheck,
   ChevronDown,
   ChevronUp,
   Code2,
   AlertOctagon,
-  BookOpen,
-  CheckCircle2,
-  ExternalLink,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,8 +40,8 @@ export function RulesAccordion({ activeRuleId, searchQuery = '' }: RulesAccordio
     if (!searchQuery.trim()) return GUARDRAIL_DEFINITIONS;
     const q = searchQuery.toLowerCase().trim();
     return GUARDRAIL_DEFINITIONS.filter((r) => {
-      const title = t(r.titleKey as any).toLowerCase();
-      const desc = t(r.descKey as any).toLowerCase();
+      const title = t(r.titleKey).toLowerCase();
+      const desc = t(r.descKey).toLowerCase();
       const cat = r.category.toLowerCase();
       return (
         title.includes(q) ||
@@ -73,8 +69,8 @@ export function RulesAccordion({ activeRuleId, searchQuery = '' }: RulesAccordio
     <div className="space-y-3">
       {filteredRules.map((rule) => {
         const isExpanded = expandedId === rule.id;
-        const title = t(rule.titleKey as any);
-        const desc = t(rule.descKey as any);
+        const title = t(rule.titleKey);
+        const desc = t(rule.descKey);
 
         return (
           <Card

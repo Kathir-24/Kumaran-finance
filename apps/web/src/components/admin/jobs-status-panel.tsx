@@ -3,16 +3,10 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  Activity,
   Calendar,
-  CheckCircle2,
   Clock,
   Layers,
-  Play,
   RotateCw,
-  Server,
-  XCircle,
-  PauseCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +28,9 @@ export interface RepeatableScheduleDto {
   key: string;
   name: string;
   cron: string;
+  pattern?: string;
+  id?: string;
+  queue?: string;
   next?: number | null;
 }
 
@@ -53,7 +50,6 @@ export function JobsStatusPanel({
   onRefresh,
 }: JobsStatusPanelProps) {
   const t = useTranslations('jobs');
-  const tCommon = useTranslations('common');
 
   const formatNextRun = (timestamp?: number | null) => {
     if (!timestamp) return '—';
@@ -273,9 +269,9 @@ export function JobsStatusPanel({
                 </thead>
                 <tbody className="divide-y divide-slate-800/80 font-mono">
                   {schedules.map((s, idx) => {
-                    const cronExpr = s.cron || (s as any).pattern || '—';
-                    const scheduleKey = s.key || (s as any).id || `${s.name || (s as any).queue || 'sched'}-${idx}`;
-                    const scheduleName = s.name || (s as any).queue || scheduleKey;
+                    const cronExpr = s.cron || s.pattern || '—';
+                    const scheduleKey = s.key || s.id || `${s.name || s.queue || 'sched'}-${idx}`;
+                    const scheduleName = s.name || s.queue || scheduleKey;
                     return (
                       <tr key={scheduleKey} className="hover:bg-slate-800/40 transition-colors">
                         <td className="py-2.5 px-3 font-semibold text-slate-200 flex items-center gap-2 whitespace-nowrap">

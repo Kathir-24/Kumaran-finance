@@ -9,7 +9,7 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, ArrowLeft, AlertCircle, KeyRound, ClipboardPaste } from 'lucide-react';
+import { ArrowLeft, AlertCircle, KeyRound, ClipboardPaste } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,

@@ -24,8 +24,9 @@ import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
 import { downloadReceiptPdf } from '@/lib/pdf-download';
+import { getErrorMessage } from '@/lib/api-client';
 
-interface PaymentItem {
+export interface PaymentItem {
   id: string;
   chitGroupId?: string;
   chitGroupCode?: string;
@@ -70,8 +71,8 @@ export function PaymentsTable({
         paymentId,
         `receipt-${receiptNumber || paymentId.slice(0, 8)}.pdf`,
       );
-    } catch (err: any) {
-      alert(err.message || 'Error downloading PDF receipt');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Error downloading PDF receipt'));
     } finally {
       setDownloadingId(null);
     }

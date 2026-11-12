@@ -24,8 +24,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import type { DefaulterTicketRef } from './defaulter-removal-dialog';
@@ -66,7 +66,7 @@ export function DefaulterSubstitutionModal({
   const [reason, setReason] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN')) || (user as any)?.role === 'SUPER_ADMIN';
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -83,7 +83,7 @@ export function DefaulterSubstitutionModal({
     queryFn: async () => {
       if (!searchTerm || searchTerm.trim().length < 2) return [];
       const res = await unwrapApiResponse<{ data: CustomerCandidate[] }>(
-        apiClient.GET('/api/v1/customers' as any, {
+        apiClient.GET('/api/v1/customers', {
           params: { query: { search: searchTerm.trim(), limit: 10 } },
         }),
       );
@@ -109,7 +109,7 @@ export function DefaulterSubstitutionModal({
         throw new Error(t('adr13SchemeConflictError', { ticket: conflictTicket.ticketNumber }));
       }
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/tickets/{id}/substitute' as any, {
+        apiClient.POST('/api/v1/tickets/{id}/substitute', {
           params: { path: { id: ticket.id } },
           body: {
             newCustomerId: selectedCustomer.id,
@@ -125,7 +125,7 @@ export function DefaulterSubstitutionModal({
       onSuccess?.();
       onClose();
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to substitute replacement subscriber'),
+    onError: (err: unknown) => setErrorMsg(getErrorMessage(err, 'Failed to substitute replacement subscriber')),
   });
 
   if (!ticket) return null;

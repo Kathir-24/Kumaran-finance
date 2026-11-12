@@ -6,13 +6,11 @@ import { useTranslations } from 'next-intl';
 import {
   CheckCircle2,
   Crown,
-  UserCheck,
   ShieldAlert,
   ArrowRight,
   Edit3,
   Sparkles,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 
@@ -59,9 +57,9 @@ interface AuctionSummaryCardProps {
 
 export function AuctionSummaryCard({
   auction,
-  chitValue,
+  chitValue: _chitValue,
   baseInstallment,
-  totalTickets,
+  totalTickets: _totalTickets,
   onModifyBid,
 }: AuctionSummaryCardProps) {
   const t = useTranslations('auctions');

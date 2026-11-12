@@ -23,9 +23,27 @@ import {
 
 export type { UserRole };
 
+export type NavLabelSubKey =
+  | 'dashboard'
+  | 'schemes'
+  | 'onboardGrid'
+  | 'customers'
+  | 'auctions'
+  | 'disbursements'
+  | 'collections'
+  | 'handover'
+  | 'reversals'
+  | 'reports'
+  | 'instructions'
+  | 'branches'
+  | 'users'
+  | 'jobs';
+
+export type NavLabelKey = `nav.${NavLabelSubKey}`;
+
 export interface NavItem {
   href: string;
-  labelKey: string;
+  labelKey: NavLabelKey;
   icon: LucideIcon;
   allowedRoles: UserRole[];
   badgeKey?: 'pendingApprovals' | 'cashHandovers' | 'disbursements' | 'reversals';

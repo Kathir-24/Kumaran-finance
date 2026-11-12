@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Info, Loader2 } from 'lucide-react';
 import { parseWholeRupees } from '@kumaran/api-client';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import {
   Dialog,
@@ -133,11 +133,11 @@ export function AssignTicketDialog({
       onSuccess();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError) {
         setErrorMsg(err.message);
       } else {
-        setErrorMsg(err.message || 'Failed to assign ticket slot');
+        setErrorMsg(getErrorMessage(err, 'Failed to assign ticket slot'));
       }
     },
   });

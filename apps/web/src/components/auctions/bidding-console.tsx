@@ -6,16 +6,12 @@ import {
   Gavel,
   Calculator,
   AlertTriangle,
-  CheckCircle2,
   AlertCircle,
   Loader2,
-  Users,
-  Coins,
-  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { formatRupee, parseWholeRupees, sanitizeWholeRupeeInput } from '@/lib/currency';
+import { getErrorMessage } from '@/lib/api-client';
 import type { SubscriberTicketItem, EligibleBidderItem } from './defaulter-eligibility-roster';
 
 export interface RecordBidPayload {
@@ -116,8 +112,8 @@ export function BiddingConsole({
         bidDiscount: currentDiscount,
         auctionDate: new Date(auctionDate).toISOString(),
       });
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to record auction bid');
+    } catch (err: unknown) {
+      setErrorMsg(getErrorMessage(err, 'Failed to record auction bid'));
     }
   };
 

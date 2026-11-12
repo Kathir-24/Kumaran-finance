@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,9 +14,6 @@ import {
   FileCheck2,
   Loader2,
   AlertCircle,
-  Building2,
-  FileText,
-  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,14 +30,26 @@ import {
   RegistrarFilingDialog,
   type MarkFiledPayload,
 } from '@/components/auctions/registrar-filing-dialog';
+import type { AuctionSummaryData } from '@/components/auctions/auction-summary-card';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatRupee } from '@/lib/currency';
 
+interface AuctionDetailRecord extends AuctionSummaryData {
+  status: string;
+  chitGroup?: {
+    id: string;
+    groupCode: string;
+    groupName?: string;
+    chitValue: number | bigint | string;
+    durationMonths: number;
+  };
+  minutes?: AuctionMinutesData | null;
+}
+
 export default function AuctionDetailPage() {
   const t = useTranslations('auctions');
   const params = useParams();
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const auctionId = String(params.id);
@@ -52,11 +61,11 @@ export default function AuctionDetailPage() {
     isLoading,
     isError,
     refetch,
-  } = useQuery<any>({
+  } = useQuery<AuctionDetailRecord>({
     queryKey: queryKeys.auctions.detail(auctionId),
     queryFn: async () => {
-      return unwrapApiResponse<any>(
-        apiClient.GET('/api/v1/auctions/{id}' as any, {
+      return unwrapApiResponse<AuctionDetailRecord>(
+        apiClient.GET('/api/v1/auctions/{id}', {
           params: { path: { id: auctionId } },
         }),
       );
@@ -68,7 +77,7 @@ export default function AuctionDetailPage() {
   const finalizeMutation = useMutation({
     mutationFn: async (payload: FinalizeAuctionPayload) => {
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/auctions/{id}/finalize' as any, {
+        apiClient.POST('/api/v1/auctions/{id}/finalize', {
           params: { path: { id: auctionId } },
           body: payload,
         }),
@@ -85,7 +94,7 @@ export default function AuctionDetailPage() {
   const markFiledMutation = useMutation({
     mutationFn: async (payload: MarkFiledPayload) => {
       return unwrapApiResponse(
-        apiClient.PATCH('/api/v1/auctions/{auctionId}/mark-filed-with-registrar' as any, {
+        apiClient.PATCH('/api/v1/auctions/{auctionId}/mark-filed-with-registrar', {
           params: { path: { auctionId } },
           body: payload,
         }),
@@ -141,7 +150,7 @@ export default function AuctionDetailPage() {
 
   // Tie-break token info
   const winningTieBidder = auction.tieBidders?.find(
-    (tb: any) => tb.isLotWinner || tb.isWinner || tb.ticketId === winner?.ticketId,
+    (tb) => tb.isLotWinner || tb.isWinner || tb.ticketId === winner?.ticketId,
   );
   const drawnToken = winningTieBidder?.tokenNumber;
 

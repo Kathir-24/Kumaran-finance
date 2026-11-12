@@ -4,13 +4,11 @@ import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CheckCircle2,
-  Clock,
   Copy,
   Check,
   ShieldAlert,
   Loader2,
   FileCheck2,
-  ExternalLink,
 } from 'lucide-react';
 import {
   Table,
@@ -21,7 +19,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
 import { useAuthStore } from '@/stores/auth-store';

@@ -9,12 +9,10 @@ import {
   CheckCircle2,
   Loader2,
   Info,
-  Layers,
   Coins,
-  Receipt,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import {
   Dialog,
@@ -83,7 +81,14 @@ export function GenerateDuesDialog({
   const { data: auctions, isLoading: isAuctionsLoading } = useQuery({
     queryKey: queryKeys.auctions.list(chitGroupId),
     queryFn: async () => {
-      return unwrapApiResponse<any[]>(
+      return unwrapApiResponse<
+        Array<{
+          installmentMonth?: number;
+          dividendPerTicket?: number | null;
+          bidDiscount?: number | null;
+          foremanCommissionAmount?: number | null;
+        }>
+      >(
         apiClient.GET('/api/v1/auctions/group/{chitGroupId}', {
           params: { path: { chitGroupId } },
         })
@@ -121,7 +126,7 @@ export function GenerateDuesDialog({
   const generateMutation = useMutation({
     mutationFn: async () => {
       setErrorMessage(null);
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ message?: string }>(
         apiClient.POST('/api/v1/installments/group/{chitGroupId}/month/{month}/generate', {
           params: { path: { chitGroupId, month } },
           body: {
@@ -142,12 +147,12 @@ export function GenerateDuesDialog({
       onSuccess();
       onClose();
     },
-    onError: (err: any) => {
-      const msg =
-        err instanceof KumaranApiError
-          ? err.message
-          : err?.response?.data?.message || err?.message || 'Failed to generate monthly dues';
-      setErrorMessage(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    onError: (err: unknown) => {
+      if (err instanceof KumaranApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage(getErrorMessage(err, 'Failed to generate monthly dues'));
+      }
     },
   });
 
@@ -201,8 +206,8 @@ export function GenerateDuesDialog({
               </div>
               <p className="text-xs text-emerald-200/90 leading-relaxed">
                 {t('generateDuesAuctionFinalized', {
-                  discount: formatRupee(matchingAuction.bidDiscount || 0),
-                  commission: formatRupee(matchingAuction.foremanCommissionAmount || 0),
+                  discount: formatRupee(matchingAuction?.bidDiscount || 0),
+                  commission: formatRupee(matchingAuction?.foremanCommissionAmount || 0),
                   dividend: formatRupee(dividendPerTicket || 0),
                 })}
               </p>

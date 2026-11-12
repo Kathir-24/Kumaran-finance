@@ -18,13 +18,14 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RulesAccordion } from '@/components/instructions/rules-accordion';
 import { CalculatorSimulator } from '@/components/instructions/calculator-simulator';
 import { FormulaReferenceCard } from '@/components/instructions/formula-reference-card';
 import { SopGuideCard } from '@/components/instructions/sop-guide-card';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-export default function InstructionsPage() {
+function InstructionsContent() {
   const t = useTranslations('instructions');
   const searchParams = useSearchParams();
 
@@ -245,5 +246,13 @@ export default function InstructionsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function InstructionsPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <InstructionsContent />
+    </React.Suspense>
   );
 }

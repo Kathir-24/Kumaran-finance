@@ -7,7 +7,7 @@ import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { ReceiptPrintTemplate, type ReceiptData } from '@/components/print/receipt-print-template';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { AlertCircle, FileText } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function PrintReceiptPage() {
   const params = useParams();
@@ -16,12 +16,15 @@ export default function PrintReceiptPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.payments.receipt(paymentId),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
-        apiClient.GET('/api/v1/payments/{id}/receipt' as any, {
-          params: { path: { id: paymentId } } as any,
+      const res = await unwrapApiResponse<{ data?: ReceiptData } | ReceiptData>(
+        apiClient.GET('/api/v1/payments/{id}/receipt', {
+          params: { path: { id: paymentId } },
         })
       );
-      return res?.data ?? res;
+      if (res && typeof res === 'object' && 'data' in res && res.data) {
+        return res.data;
+      }
+      return res as ReceiptData;
     },
     enabled: Boolean(paymentId),
   });

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Calendar, ChevronRight, Lock, ShieldCheck, Users } from 'lucide-react';
+import { Calendar, ChevronRight, Lock, Users } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export interface SchemeSummary {
   branch?: { id?: string; name: string; code: string } | null;
   startDate: string | Date;
   _count?: { tickets?: number; auctions?: number };
-  tickets?: any[];
+  tickets?: unknown[];
 }
 
 export interface SchemeCardProps {

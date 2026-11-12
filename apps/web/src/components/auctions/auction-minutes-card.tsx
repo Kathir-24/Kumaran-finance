@@ -9,16 +9,11 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  Building2,
-  Calendar,
-  Users,
   ShieldCheck,
-  ExternalLink,
   Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatRupee } from '@/lib/currency';
 import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
 
 export interface AuctionMinutesData {
@@ -52,18 +47,18 @@ interface AuctionMinutesCardProps {
 
 export function AuctionMinutesCard({
   auctionId,
-  groupCode,
-  groupName,
-  installmentMonth,
+  groupCode: _groupCode,
+  groupName: _groupName,
+  installmentMonth: _installmentMonth,
   auctionDate,
-  chitValue,
-  bidDiscount,
-  foremanCommissionAmount,
-  totalDividend,
-  dividendPerTicket,
-  prizeMoney,
-  winnerTicketNumber,
-  winnerCustomerName,
+  chitValue: _chitValue,
+  bidDiscount: _bidDiscount,
+  foremanCommissionAmount: _foremanCommissionAmount,
+  totalDividend: _totalDividend,
+  dividendPerTicket: _dividendPerTicket,
+  prizeMoney: _prizeMoney,
+  winnerTicketNumber: _winnerTicketNumber,
+  winnerCustomerName: _winnerCustomerName,
   minutes,
   onOpenFilingDialog,
 }: AuctionMinutesCardProps) {
@@ -84,7 +79,7 @@ export function AuctionMinutesCard({
     setIsDownloading(true);
     try {
       const response = await unwrapApiResponse<{ presignedUrl?: string }>(
-        apiClient.GET('/api/v1/pdf/minutes/{auctionId}' as any, {
+        apiClient.GET('/api/v1/pdf/minutes/{auctionId}', {
           params: {
             path: { auctionId },
             query: { download: true },
@@ -99,7 +94,7 @@ export function AuctionMinutesCard({
         const streamUrl = `${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`;
         window.open(streamUrl, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
+    } catch {
       // Direct stream fallback via BFF
       window.open(`${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`, '_blank', 'noopener,noreferrer');
     } finally {

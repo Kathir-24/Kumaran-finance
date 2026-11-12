@@ -7,14 +7,13 @@ import { useTranslations } from 'next-intl';
 import {
   ChevronLeft,
   ChevronRight,
-  ShieldAlert,
   Coins,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStore } from '@/stores/approvals-store';
-import { MAIN_NAV_ITEMS, filterNavItemsByRoles, type NavItem } from './nav-items';
+import { MAIN_NAV_ITEMS, filterNavItemsByRoles, type NavItem, type NavLabelSubKey } from './nav-items';
 import {
   Tooltip,
   TooltipContent,
@@ -38,7 +37,6 @@ export function Sidebar({
   const pathname = usePathname();
   const tNav = useTranslations('nav');
   const tSidebar = useTranslations('sidebar');
-  const tCommon = useTranslations('common');
 
   const [isMounted, setIsMounted] = React.useState(false);
 
@@ -126,13 +124,8 @@ export function Sidebar({
                 const active = isItemActive(item.href);
                 const Icon = item.icon;
                 const badgeCount = getBadgeCount(item.badgeKey);
-                const labelSubKey = item.labelKey.replace('nav.', '');
-                let label = labelSubKey;
-                try {
-                  label = tNav(labelSubKey as any);
-                } catch {
-                  label = labelSubKey;
-                }
+                const labelSubKey = item.labelKey.slice(4) as NavLabelSubKey;
+                const label = tNav(labelSubKey);
 
                 const linkElement = (
                   <Link

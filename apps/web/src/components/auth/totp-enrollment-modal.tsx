@@ -29,7 +29,7 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
-import { apiClient, unwrapApiResponse } from '../../lib/api-client.ts';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '../../lib/api-client.ts';
 import { useAuthStore } from '../../stores/auth-store.ts';
 
 export interface TotpEnrollmentModalProps {
@@ -105,9 +105,9 @@ export function TotpEnrollmentModal({
         if (isMounted) {
           setQrSvg(svg);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) return;
-        setErrorMessage(err?.message || t('invalidCredentials'));
+        setErrorMessage(getErrorMessage(err, t('invalidCredentials')));
       } finally {
         if (isMounted) {
           setIsLoadingSetup(false);
@@ -210,8 +210,8 @@ export function TotpEnrollmentModal({
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setErrorMessage(err?.message || t('invalidTotpCode'));
+    } catch (err: unknown) {
+      setErrorMessage(getErrorMessage(err, t('invalidTotpCode')));
       setDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {

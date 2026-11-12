@@ -9,16 +9,16 @@ import {
   UserCheck,
   CheckCircle2,
   Loader2,
-  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole, getUserDisplayName } from '@/stores/auth-store';
+import { getErrorMessage } from '@/lib/api-client';
 import { isSelfApproval } from '@kumaran/api-client';
 
 export interface FinalizeAuctionPayload {
   subscribersPresent: number;
   notes?: string;
-  signedByForeman?: boolean;
+  signedByForeman: boolean;
 }
 
 interface AuctionFinalizeCardProps {
@@ -32,11 +32,11 @@ interface AuctionFinalizeCardProps {
 }
 
 export function AuctionFinalizeCard({
-  auctionId,
+  auctionId: _auctionId,
   conductedByUserId,
   winnerTicketNumber,
   winnerCustomerName,
-  installmentMonth,
+  installmentMonth: _installmentMonth,
   onFinalize,
   isSubmitting = false,
 }: AuctionFinalizeCardProps) {
@@ -50,12 +50,9 @@ export function AuctionFinalizeCard({
 
   // Maker-Checker Dual Control Invariant Check (Guardrail 10)
   const isMaker = isSelfApproval(user?.id, { makerUserId: conductedByUserId });
-  const isAuthorizedRole =
-    user?.roles?.includes('SUPER_ADMIN') ||
-    user?.roles?.includes('BRANCH_MANAGER') ||
-    (user as any)?.role === 'SUPER_ADMIN' ||
-    (user as any)?.role === 'BRANCH_MANAGER';
+  const isAuthorizedRole = hasAnyRole(user, ['SUPER_ADMIN', 'BRANCH_MANAGER']);
   const canFinalize = !isMaker && isAuthorizedRole;
+  const checkerDisplayName = getUserDisplayName(user, 'Partner');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,8 +83,8 @@ export function AuctionFinalizeCard({
         notes: notes.trim() || undefined,
         signedByForeman,
       });
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to finalize auction');
+    } catch (err: unknown) {
+      setErrorMsg(getErrorMessage(err, 'Failed to finalize auction'));
     }
   };
 
@@ -108,7 +105,7 @@ export function AuctionFinalizeCard({
         {/* Checker Badge */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 border border-slate-700 text-slate-300">
           <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Checker: {user?.name || (user as any)?.fullName || 'Partner'}</span>
+          <span>Checker: {checkerDisplayName}</span>
         </div>
       </div>
 
@@ -122,7 +119,7 @@ export function AuctionFinalizeCard({
             </div>
             <p className="text-[11px] text-amber-200/90 leading-relaxed">
               {t('selfApprovalBlockedAlert', {
-                maker: conductedByUserId || user?.name || (user as any)?.fullName || 'Current User',
+                maker: conductedByUserId || getUserDisplayName(user, 'Current User'),
               })}
             </p>
           </div>

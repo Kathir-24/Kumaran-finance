@@ -5,13 +5,10 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
   Gavel,
-  ShieldCheck,
   Crown,
   FileCheck2,
   Calendar,
   ArrowRight,
-  ExternalLink,
-  Ticket,
   Clock,
   CheckCircle2,
 } from 'lucide-react';
@@ -48,9 +45,7 @@ export function AuctionScheduleTable({
 
   const chitValueNum = Number(scheme.chitValue);
   const duration = scheme.durationMonths || 20;
-  const baseInstallment = Math.floor(chitValueNum / duration);
   const ceilingDiscount = Math.floor(chitValueNum / 4);
-  const commissionFloor = Math.floor(chitValueNum * 0.04);
 
   // Map existing auctions by installment month
   const auctionMap = React.useMemo(() => {
@@ -127,9 +122,15 @@ export function AuctionScheduleTable({
 
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-thin scrollbar-thumb-slate-800">
-          {['ALL', 'SCHEDULED', 'COMPLETED', 'MINUTES_FILED'].map((filterKey) => {
+          {(
+            [
+              ['ALL', 'filterAll'],
+              ['SCHEDULED', 'filterScheduled'],
+              ['COMPLETED', 'filterCompleted'],
+              ['MINUTES_FILED', 'filterMinutesFiled'],
+            ] as const
+          ).map(([filterKey, labelKey]) => {
             const isSelected = statusFilter === filterKey;
-            const labelKey = `filter${filterKey.charAt(0) + filterKey.slice(1).toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
 
             return (
               <button
@@ -141,7 +142,7 @@ export function AuctionScheduleTable({
                     : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 hover:border-slate-700'
                 }`}
               >
-                {t(labelKey as any)}
+                {t(labelKey)}
               </button>
             );
           })}

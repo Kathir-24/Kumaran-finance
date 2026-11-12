@@ -7,7 +7,6 @@ import { useTranslations } from 'next-intl';
 import {
   Download,
   FileCheck,
-  FileSpreadsheet,
   Printer,
   ShieldAlert,
   Vault,
@@ -22,6 +21,23 @@ import { CashBookKpiBar } from '@/components/reports/cash-book-kpi-bar';
 import { ReportDateNavigator } from '@/components/reports/report-date-navigator';
 import { FormXxiiTable, type FormXxiiInflowItem, type FormXxiiOutflowItem } from '@/components/reports/form-xxii-table';
 import { DayBookTable, type DayBookInflowItem, type DayBookOutflowItem, type DayBookSummary } from '@/components/reports/day-book-table';
+
+interface FormXxiiReportResponse {
+  inflows?: FormXxiiInflowItem[];
+  outflows?: FormXxiiOutflowItem[];
+  reconciliation?: {
+    openingCashInSafe: number;
+    todayCashInflows: number;
+    todayCashOutflows: number;
+    closingCashInSafe: number;
+  };
+}
+
+interface DayBookReportResponse {
+  inflows?: DayBookInflowItem[];
+  outflows?: DayBookOutflowItem[];
+  summary?: DayBookSummary;
+}
 
 export default function FormXxiiCashBookPage() {
   const t = useTranslations('reports');
@@ -65,7 +81,7 @@ export default function FormXxiiCashBookPage() {
   const { data: formXxiiData, isLoading: isLoadingFormXxii } = useQuery({
     queryKey: queryKeys.reports.formXxii({ date: selectedDate, branchId: selectedBranchId }),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<FormXxiiReportResponse>(
         apiClient.GET('/api/v1/reports/form-xxii', {
           params: { query: { date: selectedDate, branchId: selectedBranchId } },
         })
@@ -79,7 +95,7 @@ export default function FormXxiiCashBookPage() {
   const { data: dayBookData, isLoading: isLoadingDayBook } = useQuery({
     queryKey: queryKeys.reports.dayBook({ date: selectedDate, branchId: selectedBranchId }),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<DayBookReportResponse>(
         apiClient.GET('/api/v1/reports/day-book', {
           params: { query: { date: selectedDate, branchId: selectedBranchId } },
         })
@@ -271,7 +287,7 @@ export default function FormXxiiCashBookPage() {
       </div>
 
       {/* Main Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'form-xxii' | 'day-book')} className="space-y-6">
         <div className="overflow-x-auto scrollbar-none">
           <TabsList className="inline-flex min-w-full sm:min-w-0 bg-slate-900/80 border border-slate-800 p-1 print:hidden">
             <TabsTrigger value="form-xxii" className="text-xs gap-1.5 shrink-0 whitespace-nowrap">

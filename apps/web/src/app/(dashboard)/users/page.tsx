@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -26,6 +25,7 @@ import { UserTable, type UserItem } from '@/components/users/user-table';
 import { cn } from '@/lib/utils';
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
+type RoleFilter = 'ALL' | 'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR';
 
 export default function UsersDirectoryPage() {
   const t = useTranslations('users');
@@ -35,7 +35,7 @@ export default function UsersDirectoryPage() {
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
-  const [selectedRole, setSelectedRole] = React.useState<string>('ALL');
+  const [selectedRole, setSelectedRole] = React.useState<RoleFilter>('ALL');
   const [selectedBranch, setSelectedBranch] = React.useState<string>('ALL');
   const [page, setPage] = React.useState(1);
   const limit = 20;
@@ -67,7 +67,7 @@ export default function UsersDirectoryPage() {
   const queryParams = React.useMemo(() => {
     const q: {
       search?: string;
-      role?: any;
+      role?: Exclude<RoleFilter, 'ALL'>;
       branchId?: string;
       isActive?: string;
       page: number;
@@ -219,7 +219,7 @@ export default function UsersDirectoryPage() {
           <select
             value={selectedRole}
             onChange={(e) => {
-              setSelectedRole(e.target.value);
+              setSelectedRole(e.target.value as RoleFilter);
               setPage(1);
             }}
             className="w-full sm:w-auto rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"

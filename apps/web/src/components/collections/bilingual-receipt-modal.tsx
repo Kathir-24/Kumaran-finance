@@ -7,7 +7,6 @@ import {
   FileText,
   Download,
   Printer,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   Building,
@@ -26,8 +25,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { downloadReceiptPdf } from '@/lib/pdf-download';
+import type { ReceiptData } from '@/components/print/receipt-print-template';
 import { queryKeys } from '@/lib/query-keys';
 
 interface BilingualReceiptModalProps {
@@ -48,7 +48,7 @@ export function BilingualReceiptModal({
     queryKey: queryKeys.payments.receipt(paymentId || ''),
     queryFn: async ({ signal }) => {
       if (!paymentId) return null;
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ data?: ReceiptData; receiptNumber?: string; issuedAt?: string | Date }>(
         apiClient.GET('/api/v1/payments/{id}/receipt', {
           params: { path: { id: paymentId } },
           signal,
@@ -66,8 +66,8 @@ export function BilingualReceiptModal({
         paymentId,
         `receipt-${data?.receiptNumber || paymentId.slice(0, 8)}.pdf`,
       );
-    } catch (err: any) {
-      alert(err.message || 'Error downloading PDF receipt');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Error downloading PDF receipt'));
     } finally {
       setDownloadingPdf(false);
     }

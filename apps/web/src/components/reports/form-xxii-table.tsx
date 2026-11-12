@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDownLeft, ArrowUpRight, Clock, FileText, Info } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, FileText, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';

@@ -8,20 +8,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BookOpen,
-  FileSpreadsheet,
   RotateCcw,
-  Save,
   Trash2,
-  CheckCircle2,
   AlertCircle,
-  Building2,
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
-import { toSafeIsoDate, getDefaultStartDate, projectEndDate } from '@/lib/date-utils';
+import { getDefaultStartDate, projectEndDate } from '@/lib/date-utils';
+
+interface ActiveBranchOption {
+  id: string;
+  name: string;
+  branchCode: string;
+  isActive?: boolean;
+}
+
+interface DemoCustomerOption {
+  id: string;
+  fullName: string;
+  customerCode?: string;
+  phone?: string;
+}
+
+interface OnboardResultResponse {
+  id?: string;
+  data?: { id?: string };
+}
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
@@ -96,16 +111,18 @@ export default function NotebookOnboardingPage() {
     user?.roles?.includes('ACCOUNTANT');
 
   // Fetch branches for branch dropdown
-  const { data: branchesData } = useQuery({
+  const { data: branchesData } = useQuery<ActiveBranchOption[]>({
     queryKey: ['branches', 'active'],
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<
+        { data?: ActiveBranchOption[]; items?: ActiveBranchOption[] } | ActiveBranchOption[]
+      >(
         apiClient.GET('/api/v1/branches', {
           params: { query: { activeOnly: 'true' } },
         })
       );
-      const items = res?.data || res?.items || res || [];
-      return items.filter((b: any) => b.isActive !== false);
+      const items = Array.isArray(res) ? res : res?.data || res?.items || [];
+      return items.filter((b) => b.isActive !== false);
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -193,7 +210,6 @@ export default function NotebookOnboardingPage() {
         (patch.durationMonths && patch.durationMonths !== prev.durationMonths) ||
         (patch.startDate && patch.startDate !== prev.startDate)
       ) {
-        const dur = next.durationMonths;
         const intake = next.onboardedAtMonth;
         const sDate = next.startDate;
 
@@ -300,12 +316,16 @@ export default function NotebookOnboardingPage() {
   const fillSampleData = async () => {
     setIsDemoLoading(true);
     try {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<
+        { data?: DemoCustomerOption[]; items?: DemoCustomerOption[] } | DemoCustomerOption[]
+      >(
         apiClient.GET('/api/v1/customers', {
           params: { query: { limit: 30 } },
         })
       );
-      const custList: any[] = Array.isArray(res) ? res : res?.data || res?.items || [];
+      const custList: DemoCustomerOption[] = Array.isArray(res)
+        ? res
+        : res?.data || res?.items || [];
 
       // 1. Assign unique verified subscribers to all durationMonths tickets (ADR-13 compliant)
       const count = masterState.durationMonths;
@@ -475,7 +495,7 @@ export default function NotebookOnboardingPage() {
         memberAllocations,
       };
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<OnboardResultResponse>(
         apiClient.POST('/api/v1/chits/onboard-ongoing', {
           body: payload,
         })
@@ -495,11 +515,11 @@ export default function NotebookOnboardingPage() {
         router.push('/schemes');
       }
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError) {
         setSubmissionError(err.message);
       } else {
-        setSubmissionError(err?.message || 'Failed to onboard ongoing chit scheme');
+        setSubmissionError(getErrorMessage(err, 'Failed to onboard ongoing chit scheme'));
       }
     },
   });

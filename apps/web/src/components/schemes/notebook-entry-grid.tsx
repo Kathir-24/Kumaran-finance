@@ -6,11 +6,7 @@ import {
   Check,
   X,
   UserCheck,
-  Calendar,
-  AlertCircle,
-  HelpCircle,
   Trophy,
-  Search,
   UserPlus,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
@@ -20,6 +16,15 @@ import { Input } from '@/components/ui/input';
 import { CustomerSearchPicker, type CustomerSearchResult } from './customer-search-picker';
 import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+
+interface NotebookCustomerItem {
+  id: string;
+  customerCode?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
 
 export interface HistoricalAuctionState {
   month: number;
@@ -60,7 +65,7 @@ export function NotebookEntryGrid({
   chitValue,
   durationMonths,
   onboardedAtMonth,
-  startDate,
+  startDate: _startDate,
   historicalWinners,
   onAuctionChange,
   members,
@@ -70,16 +75,12 @@ export function NotebookEntryGrid({
   isLocked = false,
 }: NotebookEntryGridProps) {
   const t = useTranslations('onboarding');
-  const tSchemes = useTranslations('schemes');
 
   // Active customer picker state
   const [activePickerTicket, setActivePickerTicket] = React.useState<number | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [customerResults, setCustomerResults] = React.useState<CustomerSearchResult[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
-
-  // Focus matrix tracking for keyboard navigation [ticketNumber, month]
-  const [focusedCell, setFocusedCell] = React.useState<{ ticket: number; month: number } | null>(null);
 
   const cellLabels = React.useMemo(() => ({
     paid: t('paidStatus'),
@@ -122,7 +123,7 @@ export function NotebookEntryGrid({
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const result = await unwrapApiResponse<any>(
+        const result = await unwrapApiResponse<unknown>(
           apiClient.GET('/api/v1/customers', {
             params: {
               query: {
@@ -133,17 +134,17 @@ export function NotebookEntryGrid({
             signal: controller.signal,
           }),
         );
-        const items = unwrapPaginatedList<any>(result);
+        const items = unwrapPaginatedList<NotebookCustomerItem>(result);
         setCustomerResults(
-          items.map((c: any) => ({
+          items.map((c) => ({
             id: c.id,
-            customerCode: c.customerCode,
+            customerCode: c.customerCode || '',
             fullName: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
             phone: c.phone || '',
           })),
         );
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+      } catch (err: unknown) {
+        if (!(err instanceof Error && err.name === 'AbortError')) {
           console.error('Customer search error:', err);
         }
       } finally {
@@ -164,25 +165,21 @@ export function NotebookEntryGrid({
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prevTicket = Math.max(1, ticket - 1);
-      setFocusedCell({ ticket: prevTicket, month });
       const el = document.getElementById(`cell-${prevTicket}-${month}`);
       el?.focus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const nextTicket = Math.min(durationMonths, ticket + 1);
-      setFocusedCell({ ticket: nextTicket, month });
       const el = document.getElementById(`cell-${nextTicket}-${month}`);
       el?.focus();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       const prevMonth = Math.max(1, month - 1);
-      setFocusedCell({ ticket, month: prevMonth });
       const el = document.getElementById(`cell-${ticket}-${prevMonth}`);
       el?.focus();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       const nextMonth = Math.min(onboardedAtMonth - 1, month + 1);
-      setFocusedCell({ ticket, month: nextMonth });
       const el = document.getElementById(`cell-${ticket}-${nextMonth}`);
       el?.focus();
     } else if (e.key === ' ' || e.key === 'Enter') {

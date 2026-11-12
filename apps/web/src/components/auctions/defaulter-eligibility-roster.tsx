@@ -10,7 +10,6 @@ import {
   Search,
   Gavel,
   Users,
-  AlertTriangle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

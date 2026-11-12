@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl';
 import {
   Ticket,
   Crown,
-  AlertTriangle,
   ArrowRight,
   Calendar,
   Layers,

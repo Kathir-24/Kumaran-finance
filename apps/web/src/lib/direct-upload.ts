@@ -174,8 +174,8 @@ export async function uploadDirectToStorage(
         `Direct storage PUT failed (HTTP ${putResponse.status})`;
       throw new Error(msg);
     }
-  } catch (err: any) {
-    if (err?.name === 'AbortError') {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw new Error(
         `Upload timed out after ${Math.round(timeoutMs / 1000)} seconds. Please check network signal and retry.`,
       );

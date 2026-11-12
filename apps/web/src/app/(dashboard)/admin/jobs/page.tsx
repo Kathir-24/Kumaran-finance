@@ -2,17 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import {
   Activity,
   AlertTriangle,
   Bell,
-  CheckCircle2,
   Cpu,
   ExternalLink,
   Layers,
-  Play,
   RotateCw,
   Server,
   ShieldAlert,
@@ -40,7 +38,6 @@ import { cn } from '@/lib/utils';
 export default function BackgroundJobsPage() {
   const t = useTranslations('jobs');
   const tCommon = useTranslations('common');
-  const queryClient = useQueryClient();
 
   const user = useAuthStore((s) => s.user);
   const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
@@ -48,7 +45,7 @@ export default function BackgroundJobsPage() {
   const hasAccess = isSuperAdmin || isAuditor;
 
   const [auditLimit, setAuditLimit] = React.useState(50);
-  const [lastRefreshedAt, setLastRefreshedAt] = React.useState<Date>(new Date());
+  const [_lastRefreshedAt, setLastRefreshedAt] = React.useState<Date>(new Date());
 
   // 1. Fetch Queue Status Reports
   const {

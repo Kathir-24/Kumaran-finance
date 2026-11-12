@@ -6,13 +6,12 @@ import {
   Gavel,
   X,
   Crown,
-  Users,
   AlertTriangle,
-  FileText,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
+import { getErrorMessage } from '@/lib/api-client';
 import type { SubscriberTicketItem, EligibleBidderItem } from './defaulter-eligibility-roster';
 
 export interface TiedTicketEntry {
@@ -123,8 +122,8 @@ export function TieBreakModal({
         witnessNames: witnessNames.length > 0 ? witnessNames : undefined,
       });
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to record tie-break result');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to record tie-break result'));
     }
   };
 

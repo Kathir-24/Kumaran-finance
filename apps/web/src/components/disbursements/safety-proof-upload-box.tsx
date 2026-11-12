@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { uploadDirectToStorage } from '@/lib/direct-upload';
 
 interface SafetyProofUploadBoxProps {
@@ -61,8 +61,8 @@ export function SafetyProofUploadBox({
       );
 
       onUploaded(result.securityDocS3Key, result.fileName || uploaded.fileName);
-    } catch (err: any) {
-      onError(err.message || 'Error uploading file to S3');
+    } catch (err: unknown) {
+      onError(getErrorMessage(err, 'Error uploading file to S3'));
     } finally {
       setUploading(false);
     }
@@ -79,8 +79,8 @@ export function SafetyProofUploadBox({
       if (data?.url) {
         window.open(data.url, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
-      onError(err.message || 'Failed to open document preview');
+    } catch (err: unknown) {
+      onError(getErrorMessage(err, 'Failed to open document preview'));
     } finally {
       setInspectingUrl(false);
     }

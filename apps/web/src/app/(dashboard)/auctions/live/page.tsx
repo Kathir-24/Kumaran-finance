@@ -3,29 +3,27 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import type { Schema } from '@kumaran/api-client';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-interface AuctionItem {
-  id: string;
-  chitGroupId: string;
-  installmentMonth: number;
-}
+type AuctionItem = Schema<'AuctionResponseDto'>;
 
-export default function AuctionsLiveFallbackPage() {
+function AuctionsLiveFallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const groupId = searchParams.get('group');
   const monthStr = searchParams.get('month');
-  const monthNum = monthStr ? parseInt(monthStr, 10) : 2;
+  const parsedMonth = monthStr ? Number.parseInt(monthStr, 10) : Number.NaN;
+  const monthNum = Number.isFinite(parsedMonth) && parsedMonth >= 1 ? parsedMonth : 2;
 
   const { data: auctions = [], isLoading } = useQuery<AuctionItem[]>({
     queryKey: queryKeys.auctions.list(groupId || undefined),
     queryFn: async () => {
       if (!groupId) return [];
       return unwrapApiResponse<AuctionItem[]>(
-        apiClient.GET('/api/v1/auctions/group/{chitGroupId}' as any, {
+        apiClient.GET('/api/v1/auctions/group/{chitGroupId}', {
           params: { path: { chitGroupId: groupId } },
         }),
       );
@@ -50,12 +48,13 @@ export default function AuctionsLiveFallbackPage() {
     }
   }, [groupId, monthNum, auctions, isLoading, router]);
 
+  return <RouteSuspenseFallback label="Loading auction room..." />;
+}
+
+export default function AuctionsLiveFallbackPage() {
   return (
-    <div className="flex h-96 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40">
-      <div className="flex flex-col items-center gap-2">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-        <span className="text-xs text-slate-400">Loading auction room...</span>
-      </div>
-    </div>
+    <React.Suspense fallback={<RouteSuspenseFallback label="Loading auction room..." />}>
+      <AuctionsLiveFallbackContent />
+    </React.Suspense>
   );
 }

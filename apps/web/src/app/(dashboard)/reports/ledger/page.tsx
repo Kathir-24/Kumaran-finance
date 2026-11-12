@@ -7,12 +7,9 @@ import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen,
-  Calendar,
   Download,
-  FileSpreadsheet,
   Printer,
   ShieldAlert,
-  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
@@ -20,8 +17,30 @@ import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 import { downloadCsv } from '@/lib/csv-export';
 import { FormXxiTable, FormXxiTicketLedger } from '@/components/reports/form-xxi-table';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-export default function FormXxiLedgerPage() {
+interface LedgerSchemeOption {
+  id: string;
+  groupCode: string;
+  groupName: string;
+  status: string;
+}
+
+type LedgerSchemesResponse = LedgerSchemeOption[] | { data?: LedgerSchemeOption[] };
+
+interface FormXxiReportResponse {
+  chitGroup?: {
+    id: string;
+    groupCode: string;
+    groupName: string;
+    chitValue?: number;
+    durationMonths?: number;
+    status?: string;
+  };
+  ledgers?: FormXxiTicketLedger[];
+}
+
+function FormXxiLedgerContent() {
   const t = useTranslations('reports.ledger');
   const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
@@ -40,12 +59,10 @@ export default function FormXxiLedgerPage() {
   const [selectedTicket, setSelectedTicket] = React.useState<number | 'ALL'>(initialTicketNumber);
 
   // 1. Fetch Chit Schemes for the Scheme Selector
-  const { data: schemes = [] } = useQuery<
-    Array<{ id: string; groupCode: string; groupName: string; status: string }>
-  >({
+  const { data: schemes = [] } = useQuery<LedgerSchemeOption[]>({
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<LedgerSchemesResponse>(
         apiClient.GET('/api/v1/chits')
       );
       if (Array.isArray(res)) return res;
@@ -71,7 +88,7 @@ export default function FormXxiLedgerPage() {
     }),
     queryFn: async () => {
       if (!selectedGroupId) return null;
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<FormXxiReportResponse>(
         apiClient.GET('/api/v1/reports/form-xxi', {
           params: {
             query: {
@@ -118,7 +135,7 @@ export default function FormXxiLedgerPage() {
     });
 
     downloadCsv({
-      filename: `${t('exportFilename')}_${formXxiData.chitGroup.groupCode}`,
+      filename: `${t('exportFilename')}_${formXxiData.chitGroup?.groupCode || 'SCHEME'}`,
       headers: [
         'Ticket #',
         'Customer Code',
@@ -280,5 +297,13 @@ export default function FormXxiLedgerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function FormXxiLedgerPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <FormXxiLedgerContent />
+    </React.Suspense>
   );
 }

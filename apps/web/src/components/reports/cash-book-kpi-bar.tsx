@@ -6,13 +6,10 @@ import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
-  CheckCircle2,
   Landmark,
-  ShieldCheck,
   Vault,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
 

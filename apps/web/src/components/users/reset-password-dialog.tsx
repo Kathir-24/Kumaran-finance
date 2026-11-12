@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, KeyRound, Loader2 } from 'lucide-react';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -55,8 +55,8 @@ export function ResetPasswordDialog({
     onSuccess: (data) => {
       setIssuedPass(data?.temporaryPassword || null);
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Failed to reset password');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to reset password'));
     },
   });
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Printer, Download, ArrowLeft, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { RupeeWords } from '@/lib/rupee-words';

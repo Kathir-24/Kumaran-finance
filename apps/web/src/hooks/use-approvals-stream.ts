@@ -3,18 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
-import { useApprovalsStore } from '@/stores/approvals-store';
+import { useApprovalsStore, type ApprovalsSummary } from '@/stores/approvals-store';
 import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
 
 interface SseApprovalsMessage {
   type: string;
-  summary?: {
-    totalPendingCount?: number;
-    cashHandoversCount?: number;
-    disbursementAuthorizationsCount?: number;
-    paymentReversalsCount?: number;
-    safetyProofVerificationsCount?: number;
-  };
+  summary?: Partial<ApprovalsSummary>;
   timestamp?: string;
 }
 
@@ -44,7 +38,7 @@ export function useApprovalsStream() {
   const { data: initialData } = useQuery({
     queryKey: ['approvals', 'pending', { branchId: activeBranchId }],
     queryFn: async ({ signal }) => {
-      const response = await unwrapApiResponse<any>(
+      const response = await unwrapApiResponse<{ summary?: Partial<ApprovalsSummary> }>(
         apiClient.GET('/api/v1/reports/pending-approvals', {
           params: {
             query: activeBranchId ? { branchId: activeBranchId } : undefined,
@@ -219,8 +213,9 @@ export function useApprovalsStream() {
             }
           }
         }
-      } catch (err: any) {
-        if (err?.name !== 'AbortError' && !isCancelled) {
+      } catch (err: unknown) {
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        if (!isAbort && !isCancelled) {
           setConnected(false);
           clearWatchdog();
           scheduleReconnect(false);

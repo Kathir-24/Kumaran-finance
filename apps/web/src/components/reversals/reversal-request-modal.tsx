@@ -8,10 +8,7 @@ import {
   Search,
   AlertTriangle,
   Loader2,
-  CheckCircle2,
   Receipt,
-  User,
-  Building,
 } from 'lucide-react';
 import {
   Dialog,
@@ -24,8 +21,23 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { formatDate } from '@/lib/date-utils';
-import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
+
+interface SearchablePaymentRecord {
+  id: string;
+  amount: string | number;
+  paymentMethod: string;
+  createdAt: string;
+  receipt?: { receiptNumber?: string };
+  allocations?: Array<{
+    ticket?: {
+      ticketNumber?: number;
+      customer?: { fullName?: string; customerCode?: string };
+      chitGroup?: { groupCode?: string };
+    };
+    due?: { installmentMonth?: number };
+  }>;
+}
 
 export interface PaymentPreview {
   id: string;
@@ -82,12 +94,12 @@ export function ReversalRequestModal({
     setErrorMessage(null);
 
     try {
-      const result = await unwrapApiResponse<any>(
+      const result = await unwrapApiResponse<unknown>(
         apiClient.GET('/api/v1/payments', {
           params: { query: { limit: 5 } },
         }),
       );
-      const list = unwrapPaginatedList<any>(result);
+      const list = unwrapPaginatedList<SearchablePaymentRecord>(result);
 
       const match = list.find(
         (p) =>
@@ -113,8 +125,8 @@ export function ReversalRequestModal({
         paymentMethod: match.paymentMethod,
         createdAt: match.createdAt,
       });
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Payment not found');
+    } catch (err: unknown) {
+      setErrorMessage(getErrorMessage(err, 'Payment not found'));
     } finally {
       setIsSearching(false);
     }
@@ -128,7 +140,7 @@ export function ReversalRequestModal({
         throw new Error('Mandatory justification must be at least 5 characters');
       }
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<unknown>(
         apiClient.POST('/api/v1/payments/{id}/request-reversal', {
           params: { path: { id: selectedPayment.id } },
           body: {
@@ -145,7 +157,7 @@ export function ReversalRequestModal({
       onClose();
       if (onSuccess) onSuccess();
     },
-    onError: (err: any) => setErrorMessage(err.message || 'Error requesting payment reversal'),
+    onError: (err: unknown) => setErrorMessage(getErrorMessage(err, 'Error requesting payment reversal')),
   });
 
   return (
@@ -229,7 +241,7 @@ export function ReversalRequestModal({
             >
               {REASON_CODES.map((r) => (
                 <option key={r.value} value={r.value}>
-                  {t(r.key as any)}
+                  {t(r.key)}
                 </option>
               ))}
             </select>

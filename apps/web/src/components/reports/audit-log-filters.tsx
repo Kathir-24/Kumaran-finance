@@ -66,7 +66,7 @@ export function AuditLogFilters({
     { value: 'CHIT_GROUP_DRAFT_UPDATED', labelKey: 'actionChitGroupDraftUpdated' },
     { value: 'TICKET_UNASSIGNED_PRE_ACTIVATION', labelKey: 'actionTicketUnassigned' },
     { value: 'CUSTOMER_DOCUMENT_DELETED', labelKey: 'actionCustomerDocumentDeleted' },
-  ];
+  ] as const;
 
   const entityOptions = [
     { value: 'ALL', labelKey: 'allEntities' },
@@ -77,7 +77,7 @@ export function AuditLogFilters({
     { value: 'CustomerDocument', labelKey: 'entityCustomerDocument' },
     { value: 'AuctionMinutes', labelKey: 'entityAuctionMinutes' },
     { value: 'AuctionWinner', labelKey: 'entityAuctionWinner' },
-  ];
+  ] as const;
 
   const hasActiveFilters =
     selectedAction !== 'ALL' ||
@@ -118,7 +118,7 @@ export function AuditLogFilters({
           >
             {actionOptions.map((opt) => (
               <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-200">
-                {t(opt.labelKey as any)}
+                {t(opt.labelKey)}
               </option>
             ))}
           </select>
@@ -134,7 +134,7 @@ export function AuditLogFilters({
           >
             {entityOptions.map((opt) => (
               <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-200">
-                {t(opt.labelKey as any)}
+                {t(opt.labelKey)}
               </option>
             ))}
           </select>

@@ -7,8 +7,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   Loader2,
-  CheckCircle2,
-  Banknote,
   FileCheck,
 } from 'lucide-react';
 import {
@@ -23,10 +21,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
-import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
+
+type DisbursementModeOption =
+  | 'ACCOUNT_PAYEE_CHEQUE'
+  | 'BANK_TRANSFER_NEFT'
+  | 'BANK_TRANSFER_RTGS'
+  | 'BANK_TRANSFER_IMPS'
+  | 'CASH';
+
+const DISBURSEMENT_MODES: readonly DisbursementModeOption[] = [
+  'ACCOUNT_PAYEE_CHEQUE',
+  'BANK_TRANSFER_NEFT',
+  'BANK_TRANSFER_RTGS',
+  'BANK_TRANSFER_IMPS',
+  'CASH',
+];
+
+function isDisbursementModeOption(value: string): value is DisbursementModeOption {
+  return DISBURSEMENT_MODES.includes(value as DisbursementModeOption);
+}
 
 export interface AuthWinnerTarget {
   id: string;
@@ -68,7 +85,7 @@ export function DisbursementAuthModal({
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const [disbursementMode, setDisbursementMode] = useState<string>('ACCOUNT_PAYEE_CHEQUE');
+  const [disbursementMode, setDisbursementMode] = useState<DisbursementModeOption>('ACCOUNT_PAYEE_CHEQUE');
   const [disbursedAmount, setDisbursedAmount] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -99,9 +116,7 @@ export function DisbursementAuthModal({
       user.id.toLowerCase() === winner.verifiedByUserId.toLowerCase(),
   );
 
-  const isSuperAdmin = Boolean(
-    user?.roles?.includes('SUPER_ADMIN') || (user as any)?.role === 'SUPER_ADMIN',
-  );
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
 
   const authorizeMutation = useMutation({
     mutationFn: async () => {
@@ -113,12 +128,12 @@ export function DisbursementAuthModal({
         throw new Error('Only Super Admin (Partners) possess financial authority to authorize prize money disbursements');
       }
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<unknown>(
         apiClient.POST('/api/v1/disbursements/auction/{auctionId}/authorize-payout', {
           params: { path: { auctionId: winner.auctionId } },
           headers: { 'Idempotency-Key': idempotencyKey },
           body: {
-            disbursementMode: disbursementMode as any,
+            disbursementMode,
             disbursedAmount: disbursedAmount ? Number(disbursedAmount) : undefined,
             notes: notes.trim() || undefined,
           },
@@ -136,8 +151,8 @@ export function DisbursementAuthModal({
       onSuccess?.();
       onClose();
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Authorization failed');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Authorization failed'));
     },
   });
 
@@ -200,7 +215,10 @@ export function DisbursementAuthModal({
             <select
               value={disbursementMode}
               disabled={isMaker || authorizeMutation.isPending}
-              onChange={(e) => setDisbursementMode(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (isDisbursementModeOption(val)) setDisbursementMode(val);
+              }}
               className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
             >
               <option value="ACCOUNT_PAYEE_CHEQUE">Account Payee Cheque (வங்கி கணக்கு காசோலை)</option>

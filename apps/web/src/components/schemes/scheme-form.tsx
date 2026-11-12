@@ -8,16 +8,14 @@ import {
   AlertCircle,
   Building,
   Calendar,
-  Check,
   FileCheck2,
-  HelpCircle,
   Loader2,
   Lock,
   Plus,
   Sparkles,
 } from 'lucide-react';
 import { formatRupee, parseWholeRupees } from '@kumaran/api-client';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { toSafeIsoDate, getDefaultStartDate, projectEndDate } from '@/lib/date-utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -26,7 +24,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SchemeMathPreview } from './scheme-math-preview';
-import { cn } from '@/lib/utils';
 
 interface PresetScheme {
   label: string;
@@ -155,11 +152,11 @@ export function SchemeForm() {
       queryClient.invalidateQueries({ queryKey: queryKeys.schemes.list() });
       router.push(`/schemes/${data.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError) {
         setErrorMsg(err.message);
       } else {
-        setErrorMsg(err.message || 'Failed to create chit scheme');
+        setErrorMsg(getErrorMessage(err, 'Failed to create chit scheme'));
       }
     },
   });

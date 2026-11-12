@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Banknote,
-  CheckCircle2,
   Loader2,
   AlertCircle,
   Receipt,
@@ -22,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
 
@@ -98,7 +97,7 @@ export function DisbursementReleaseModal({
         throw new Error('Payment reference is mandatory for prize payout release');
       }
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ message?: string }>(
         apiClient.POST('/api/v1/disbursements/auction/{auctionId}/disburse', {
           params: { path: { auctionId: winner.auctionId } },
           headers: { 'Idempotency-Key': idempotencyKey },
@@ -122,8 +121,8 @@ export function DisbursementReleaseModal({
       onSuccess?.();
       onClose();
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Release failed');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Release failed'));
     },
   });
 

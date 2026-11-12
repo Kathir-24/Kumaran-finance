@@ -9,7 +9,6 @@ import {
   Phone,
   MapPin,
   Building2,
-  CreditCard,
   FileCheck2,
   CheckCircle2,
   XCircle,
@@ -59,7 +58,7 @@ export function CustomerProfileHeader({ customer }: CustomerProfileHeaderProps) 
   const kycMutation = useMutation({
     mutationFn: async (nextStatus: boolean) => {
       return unwrapApiResponse(
-        apiClient.PATCH('/api/v1/customers/{id}/kyc-status' as any, {
+        apiClient.PATCH('/api/v1/customers/{id}/kyc-status', {
           params: { path: { id: customer.id } },
           body: { isKycVerified: nextStatus },
         }),

@@ -6,11 +6,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Receipt,
   Printer,
-  CheckCircle2,
   AlertTriangle,
   Loader2,
-  FileCheck2,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   Dialog,
@@ -22,11 +19,23 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatRupee } from '@/lib/currency';
 import type { DefaulterTicketRef } from './defaulter-removal-dialog';
+
+type SettlementPaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+
+const SETTLEMENT_PAYMENT_METHODS: readonly SettlementPaymentMethod[] = [
+  'CASH',
+  'BANK_TRANSFER',
+  'CHEQUE',
+];
+
+function isSettlementPaymentMethod(value: string): value is SettlementPaymentMethod {
+  return SETTLEMENT_PAYMENT_METHODS.includes(value as SettlementPaymentMethod);
+}
 
 interface SettleResult {
   voucherNumber: string;
@@ -53,7 +62,7 @@ export function DefaulterSettlementDialog({
   onClose,
   ticket,
   chitGroupId,
-  chitGroupCode,
+  chitGroupCode: _chitGroupCode,
   chitValue,
   totalPaidEstimate = 0n,
   onSuccess,
@@ -62,13 +71,13 @@ export function DefaulterSettlementDialog({
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const [paymentMethod, setPaymentMethod] = React.useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
+  const [paymentMethod, setPaymentMethod] = React.useState<SettlementPaymentMethod>('CASH');
   const [notes, setNotes] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [voucherData, setVoucherData] = React.useState<SettleResult | null>(null);
 
-  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN')) || (user as any)?.role === 'SUPER_ADMIN';
-  const isAccountant = Boolean(user?.roles?.includes('ACCOUNTANT')) || (user as any)?.role === 'ACCOUNTANT';
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isAccountant = hasAnyRole(user, ['ACCOUNTANT']);
   const canSettle = isSuperAdmin || isAccountant;
 
   const valueBigInt = BigInt(chitValue || 0);
@@ -89,7 +98,7 @@ export function DefaulterSettlementDialog({
     mutationFn: async () => {
       if (!ticket) throw new Error('No ticket selected');
       return unwrapApiResponse<SettleResult>(
-        apiClient.POST('/api/v1/tickets/{id}/settle-removal' as any, {
+        apiClient.POST('/api/v1/tickets/{id}/settle-removal', {
           params: { path: { id: ticket.id } },
           body: {
             paymentMethod,
@@ -105,8 +114,8 @@ export function DefaulterSettlementDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.installments.all });
       onSuccess?.();
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Failed to settle defaulter account');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to settle defaulter account'));
     },
   });
 
@@ -211,7 +220,10 @@ export function DefaulterSettlementDialog({
               </label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (isSettlementPaymentMethod(val)) setPaymentMethod(val);
+                }}
                 className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none"
               >
                 <option value="CASH">Cash (In-Office Handover)</option>

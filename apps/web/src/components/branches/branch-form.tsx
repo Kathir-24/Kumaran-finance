@@ -8,13 +8,12 @@ import {
   AlertCircle,
   Building,
   CheckCircle2,
-  FileText,
   Loader2,
   MapPin,
   Phone,
   Sparkles,
 } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage, KumaranApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,11 +73,11 @@ export function BranchForm() {
       queryClient.invalidateQueries({ queryKey: queryKeys.branches.all });
       router.push('/branches');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError && err.statusCode === 409) {
         setErrorMsg(t('conflictError', { code: code.trim().toUpperCase() }));
       } else {
-        setErrorMsg(err.message || 'Failed to create branch');
+        setErrorMsg(getErrorMessage(err, 'Failed to create branch'));
       }
     },
   });

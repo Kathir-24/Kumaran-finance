@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, ShieldAlert } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import {
   Dialog,
@@ -59,11 +59,11 @@ export function ActivateSchemeDialog({
       onSuccess();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError) {
         setActivationError(err.message);
       } else {
-        setActivationError(err.message || 'Activation failed');
+        setActivationError(getErrorMessage(err, 'Activation failed'));
       }
     },
   });

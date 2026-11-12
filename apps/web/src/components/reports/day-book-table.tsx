@@ -3,14 +3,8 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Banknote,
-  Building,
-  CreditCard,
   FileCheck,
   FileText,
-  QrCode,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

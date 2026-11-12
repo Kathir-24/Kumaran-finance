@@ -27,7 +27,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Alert, AlertDescription } from '../ui/alert';
-import { apiClient, unwrapApiResponse } from '../../lib/api-client.ts';
+import { apiClient, unwrapApiResponse, getErrorMessage, KumaranApiError } from '../../lib/api-client.ts';
 import { useAuthStore } from '../../stores/auth-store.ts';
 
 export interface TotpDisableModalProps {
@@ -85,11 +85,11 @@ export function TotpDisableModal({
       setTimeout(() => {
         handleClose();
       }, 1200);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.statusCode === 401) {
+    } catch (err: unknown) {
+      if (err instanceof KumaranApiError && (err.statusCode === 401 || err.statusCode === 400)) {
         setErrorMessage(t('wrongPassword'));
       } else {
-        setErrorMessage(err?.message || t('wrongPassword'));
+        setErrorMessage(getErrorMessage(err, t('wrongPassword')));
       }
     } finally {
       setIsDisabling(false);

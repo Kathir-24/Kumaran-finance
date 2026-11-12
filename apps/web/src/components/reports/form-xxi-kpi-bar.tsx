@@ -6,11 +6,9 @@ import {
   AlertCircle,
   Banknote,
   CheckCircle2,
-  Coins,
   Receipt,
   Scale,
   Sparkles,
-  TrendingDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupee } from '@kumaran/api-client';
@@ -35,7 +33,7 @@ export function FormXxiKpiBar({
 
   // Mathematical Reconciliation: Net === Gross - Dividend
   const expectedNet = totalGrossDue - totalDividendCredit;
-  const isNetBalanced = expectedNet === totalNetPayable;
+  const _isNetBalanced = expectedNet === totalNetPayable;
 
   return (
     <div className="space-y-3">

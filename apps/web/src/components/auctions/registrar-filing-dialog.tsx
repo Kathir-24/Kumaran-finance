@@ -5,13 +5,11 @@ import { useTranslations } from 'next-intl';
 import {
   FileCheck2,
   X,
-  FileText,
-  Calendar,
-  Building2,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getErrorMessage } from '@/lib/api-client';
 
 export interface MarkFiledPayload {
   filingReference?: string;
@@ -32,7 +30,7 @@ interface RegistrarFilingDialogProps {
 export function RegistrarFilingDialog({
   isOpen,
   onClose,
-  auctionId,
+  auctionId: _auctionId,
   groupCode,
   installmentMonth,
   onMarkFiled,
@@ -56,8 +54,8 @@ export function RegistrarFilingDialog({
         notes: notes.trim() || undefined,
       });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to record Registrar filing');
+    } catch (err: unknown) {
+      setErrorMsg(getErrorMessage(err, 'Failed to record Registrar filing'));
     }
   };
 

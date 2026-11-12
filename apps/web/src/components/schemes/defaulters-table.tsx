@@ -49,9 +49,9 @@ interface DefaultersTableProps {
 }
 
 export function DefaultersTable({
-  chitGroupId,
-  chitGroupCode,
-  chitValue,
+  chitGroupId: _chitGroupId,
+  chitGroupCode: _chitGroupCode,
+  chitValue: _chitValue,
   tickets,
   duesMap = {},
   onRemoveClick,

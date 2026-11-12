@@ -11,18 +11,23 @@ import {
   Users2,
   FileText,
   Loader2,
-  AlertCircle,
   UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import { CustomerProfileHeader } from '@/components/customers/customer-profile-header';
+import { CustomerProfileHeader, type CustomerProfileData } from '@/components/customers/customer-profile-header';
 import { CustomerPassbookTab } from '@/components/customers/customer-passbook-tab';
-import { CustomerTicketsTab } from '@/components/customers/customer-tickets-tab';
-import { CustomerNomineesCard } from '@/components/customers/customer-nominees-card';
-import { CustomerDocumentsCard } from '@/components/customers/customer-documents-card';
+import { CustomerTicketsTab, type CustomerTicketHolding } from '@/components/customers/customer-tickets-tab';
+import { CustomerNomineesCard, type CustomerNominee } from '@/components/customers/customer-nominees-card';
+import { CustomerDocumentsCard, type CustomerDocument } from '@/components/customers/customer-documents-card';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+
+interface CustomerDetailRecord extends CustomerProfileData {
+  tickets?: CustomerTicketHolding[];
+  nominees?: CustomerNominee[];
+  documents?: CustomerDocument[];
+}
 
 export default function CustomerProfilePage({
   params,
@@ -35,11 +40,11 @@ export default function CustomerProfilePage({
   const [activeTab, setActiveTab] = React.useState<'passbook' | 'tickets' | 'nominees' | 'documents'>('passbook');
   const [selectedTicketId, setSelectedTicketId] = React.useState<string | undefined>(undefined);
 
-  const { data: customer, isLoading, isError, error } = useQuery<any>({
+  const { data: customer, isLoading, isError, error } = useQuery<CustomerDetailRecord>({
     queryKey: queryKeys.customers.detail(id),
     queryFn: async () => {
-      return unwrapApiResponse<any>(
-        apiClient.GET('/api/v1/customers/{id}' as any, {
+      return unwrapApiResponse<CustomerDetailRecord>(
+        apiClient.GET('/api/v1/customers/{id}', {
           params: { path: { id } },
         }),
       );

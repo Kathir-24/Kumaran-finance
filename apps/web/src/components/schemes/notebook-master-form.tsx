@@ -8,11 +8,9 @@ import {
   Sparkles,
   Lock,
   Layers,
-  ArrowRight,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toSafeIsoDate, projectEndDate } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';

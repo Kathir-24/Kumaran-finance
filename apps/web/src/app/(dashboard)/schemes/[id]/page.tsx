@@ -13,7 +13,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,25 @@ import { ActivateSchemeDialog } from '@/components/schemes/activate-scheme-dialo
 import { MonthlyInstallmentsPanel } from '@/components/schemes/monthly-installments-panel';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+
+interface SchemeDetailRecord {
+  id: string;
+  groupCode: string;
+  groupName: string;
+  groupNameTamil?: string | null;
+  status: string;
+  chitValue: string | number | bigint;
+  baseInstallment: string | number | bigint;
+  maxDiscountCeiling: string | number | bigint;
+  durationMonths: number;
+  totalTickets: number;
+  startDate: string;
+  endDate: string;
+  sanctionOrderNumber?: string | null;
+  sanctionDate?: string | null;
+  currentInstallmentMonth?: number;
+  tickets?: TicketItem[];
+}
 
 export default function SchemeDetailPage() {
   const t = useTranslations('schemes');
@@ -43,7 +62,7 @@ export default function SchemeDetailPage() {
   const { data: scheme, isLoading, error } = useQuery({
     queryKey: queryKeys.schemes.detail(id),
     queryFn: async () => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<SchemeDetailRecord>(
         apiClient.GET('/api/v1/chits/{id}', {
           params: { path: { id } },
         })
@@ -73,7 +92,7 @@ export default function SchemeDetailPage() {
   if (error || !scheme) {
     return (
       <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-8 text-center text-rose-300">
-        <p className="font-semibold">{error ? (error as any).message : 'Scheme not found'}</p>
+        <p className="font-semibold">{error ? getErrorMessage(error, 'Scheme not found') : 'Scheme not found'}</p>
         <Button variant="outline" className="mt-4" asChild>
           <Link href="/schemes">{t('backToDirectory')}</Link>
         </Button>
@@ -271,7 +290,7 @@ export default function SchemeDetailPage() {
             chitGroupId={id}
             groupCode={scheme.groupCode}
             durationMonths={scheme.durationMonths}
-            baseInstallment={scheme.baseInstallment}
+            baseInstallment={Number(scheme.baseInstallment)}
             startDate={scheme.startDate}
             status={scheme.status}
             currentInstallmentMonth={scheme.currentInstallmentMonth}

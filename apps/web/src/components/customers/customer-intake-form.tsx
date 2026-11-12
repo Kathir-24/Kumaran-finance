@@ -5,7 +5,15 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import type { Schema } from '@kumaran/api-client';
+
+interface CreatedCustomerSummary {
+  id: string;
+  customerCode: string;
+  fullName: string;
+  phone: string;
+}
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -135,7 +143,7 @@ export function CustomerIntakeForm() {
       }
 
       // 3. Submit Customer payload
-      const customerPayload: any = {
+      const customerPayload: Schema<'CreateCustomerDto'> = {
         fullName: fullName.trim(),
         fullNameTamil: fullNameTamil.trim() || undefined,
         phone: phone.trim(),
@@ -149,13 +157,13 @@ export function CustomerIntakeForm() {
         branchId: activeBranchId || user?.branchId || undefined,
       };
 
-      const customer = await unwrapApiResponse<any>(
+      const customer = await unwrapApiResponse<CreatedCustomerSummary>(
         apiClient.POST('/api/v1/customers', { body: customerPayload })
       );
 
       // 4. Submit Nominee payload if entered
       if (includeNominee && nomineeName.trim() && customer?.id) {
-        const nomineePayload: any = {
+        const nomineePayload: Schema<'CreateNomineeDto'> = {
           fullName: nomineeName.trim(),
           relationship: nomineeRelation,
           phone: nomineePhone.trim(),
@@ -181,11 +189,11 @@ export function CustomerIntakeForm() {
         phone: data.phone,
       });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError && (err.statusCode === 409 || err.isConflict)) {
         setErrorMsg(t('phoneConflictAlert', { phone, code: 'EXISTING' }));
       } else {
-        setErrorMsg(err.message || 'Failed to register subscriber');
+        setErrorMsg(getErrorMessage(err, 'Failed to register subscriber'));
       }
     },
   });

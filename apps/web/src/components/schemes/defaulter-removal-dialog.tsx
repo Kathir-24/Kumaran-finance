@@ -8,7 +8,6 @@ import {
   UserX,
   Loader2,
   ShieldAlert,
-  CheckCircle2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -20,8 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export interface DefaulterTicketRef {
@@ -59,9 +58,7 @@ export function DefaulterRemovalDialog({
   const [reason, setReason] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const isSuperAdmin =
-    Boolean(user?.roles?.includes('SUPER_ADMIN')) ||
-    (user as any)?.role === 'SUPER_ADMIN';
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -77,7 +74,7 @@ export function DefaulterRemovalDialog({
         throw new Error(t('removeReasonMinLength'));
       }
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/tickets/{id}/remove-defaulter' as any, {
+        apiClient.POST('/api/v1/tickets/{id}/remove-defaulter', {
           params: { path: { id: ticket.id } },
           body: { reason: reason.trim() },
         }),
@@ -90,8 +87,8 @@ export function DefaulterRemovalDialog({
       onSuccess?.();
       onClose();
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Failed to remove defaulted subscriber');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to remove defaulted subscriber'));
     },
   });
 

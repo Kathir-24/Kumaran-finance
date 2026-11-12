@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import { PaymentsTable } from '@/components/collections/payments-table';
+import { PaymentsTable, type PaymentItem } from '@/components/collections/payments-table';
 import { CounterPaymentModal } from '@/components/collections/counter-payment-modal';
 import { BilingualReceiptModal } from '@/components/collections/bilingual-receipt-modal';
 import { UpiClaimsTable, type PendingUpiClaimItem } from '@/components/collections/upi-claims-table';
@@ -17,12 +17,15 @@ import { formatRupee } from '@/lib/currency';
 import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
+type PaymentMethodFilter = 'CASH' | 'UPI' | 'CHEQUE' | 'BANK_TRANSFER';
+type PaymentStatusFilter = 'SUCCESS' | 'INITIATED' | 'FAILED' | 'REVERSED';
+
 export default function CollectionsPage() {
   const t = useTranslations('collections');
 
   const [activeTab, setActiveTab] = useState<'COUNTER' | 'UPI_CLAIMS'>('COUNTER');
-  const [selectedMethod, setSelectedMethod] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedMethod, setSelectedMethod] = useState<'ALL' | PaymentMethodFilter>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | PaymentStatusFilter>('ALL');
   const [isCollectOpen, setIsCollectOpen] = useState(false);
   const [selectedClaimForVerify, setSelectedClaimForVerify] = useState<PendingUpiClaimItem | null>(null);
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
@@ -35,12 +38,12 @@ export default function CollectionsPage() {
       paymentStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
     }),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<unknown>(
         apiClient.GET('/api/v1/payments', {
           params: {
             query: {
-              paymentMethod: selectedMethod === 'ALL' ? undefined : (selectedMethod as any),
-              paymentStatus: selectedStatus === 'ALL' ? undefined : (selectedStatus as any),
+              paymentMethod: selectedMethod === 'ALL' ? undefined : selectedMethod,
+              paymentStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
               limit: 100,
             },
           },
@@ -55,7 +58,7 @@ export default function CollectionsPage() {
     queryKey: queryKeys.payments.list(),
     queryFn: async ({ signal }) => {
       try {
-        return await unwrapApiResponse<any>(
+        return await unwrapApiResponse<unknown>(
           apiClient.GET('/api/v1/payments', {
             params: { query: { limit: 100 } },
             signal,
@@ -72,7 +75,7 @@ export default function CollectionsPage() {
     queryKey: queryKeys.payments.pendingUpiClaims(),
     queryFn: async ({ signal }) => {
       try {
-        const result = await unwrapApiResponse<any>(
+        const result = await unwrapApiResponse<unknown>(
           apiClient.GET('/api/v1/payments/pending-upi-claims', {
             params: { query: { limit: 100 } },
             signal,
@@ -85,8 +88,8 @@ export default function CollectionsPage() {
     },
   });
 
-  const allItems: any[] = useMemo(() => unwrapPaginatedList(globalData), [globalData]);
-  const currentItems: any[] = useMemo(() => unwrapPaginatedList(paymentsData), [paymentsData]);
+  const allItems: PaymentItem[] = useMemo(() => unwrapPaginatedList<PaymentItem>(globalData), [globalData]);
+  const currentItems: PaymentItem[] = useMemo(() => unwrapPaginatedList<PaymentItem>(paymentsData), [paymentsData]);
   const pendingClaims: PendingUpiClaimItem[] = useMemo(
     () => unwrapPaginatedList<PendingUpiClaimItem>(claimsData),
     [claimsData],
@@ -221,7 +224,7 @@ export default function CollectionsPage() {
             <div className="flex items-center gap-2 overflow-x-auto max-w-full py-0.5">
               <span className="text-xs text-slate-400 font-medium shrink-0">Method:</span>
               <div className="flex items-center gap-1.5 shrink-0">
-                {['ALL', 'CASH', 'UPI', 'CHEQUE', 'BANK_TRANSFER'].map((m) => (
+                {(['ALL', 'CASH', 'UPI', 'CHEQUE', 'BANK_TRANSFER'] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -241,7 +244,7 @@ export default function CollectionsPage() {
             <div className="flex items-center gap-2 overflow-x-auto max-w-full py-0.5">
               <span className="text-xs text-slate-400 font-medium shrink-0">Status:</span>
               <div className="flex items-center gap-1.5 shrink-0">
-                {['ALL', 'SUCCESS', 'INITIATED', 'REVERSED'].map((s) => (
+                {(['ALL', 'SUCCESS', 'INITIATED', 'REVERSED'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"

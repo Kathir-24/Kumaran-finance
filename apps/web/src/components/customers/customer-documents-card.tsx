@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { uploadDirectToStorage } from '@/lib/direct-upload';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
@@ -67,15 +67,15 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
   const handleViewDocument = async (docId: string) => {
     setViewingDocId(docId);
     try {
-      const res: any = await unwrapApiResponse(
-        apiClient.GET('/api/v1/customers/{id}/documents/{docId}/url' as any, {
+      const res = await unwrapApiResponse<{ url?: string }>(
+        apiClient.GET('/api/v1/customers/{id}/documents/{docId}/url', {
           params: { path: { id: customerId, docId } },
         }),
       );
       if (res?.url) {
         window.open(res.url, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to retrieve presigned document URL', err);
     } finally {
       setViewingDocId(null);
@@ -120,8 +120,8 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId) });
       setIsUploadOpen(false);
       setSelectedFile(null);
-    } catch (err: any) {
-      setUploadError(err.message || 'Upload failed');
+    } catch (err: unknown) {
+      setUploadError(getErrorMessage(err, 'Upload failed'));
     } finally {
       setIsUploading(false);
     }
@@ -130,7 +130,7 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
   const deleteMutation = useMutation({
     mutationFn: async (docId: string) => {
       return unwrapApiResponse(
-        apiClient.DELETE('/api/v1/customers/{id}/documents/{docId}' as any, {
+        apiClient.DELETE('/api/v1/customers/{id}/documents/{docId}', {
           params: { path: { id: customerId, docId } },
         }),
       );

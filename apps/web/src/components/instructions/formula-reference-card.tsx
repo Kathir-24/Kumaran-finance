@@ -4,10 +4,6 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
   FileSpreadsheet,
-  Coins,
-  CheckCircle2,
-  Calendar,
-  Layers,
   Scale,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';

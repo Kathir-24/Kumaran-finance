@@ -3,7 +3,6 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  FileText,
   Printer,
   CheckCircle2,
   Building,

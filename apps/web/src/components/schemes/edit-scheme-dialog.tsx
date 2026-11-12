@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, KumaranApiError, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { toSafeIsoDate } from '@/lib/date-utils';
 import {
@@ -106,11 +106,11 @@ export function EditSchemeDialog({
       onSuccess();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err instanceof KumaranApiError) {
         setErrorMsg(err.message);
       } else {
-        setErrorMsg(err.message || 'Failed to update draft scheme');
+        setErrorMsg(getErrorMessage(err, 'Failed to update draft scheme'));
       }
     },
   });

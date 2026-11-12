@@ -16,7 +16,7 @@ export const RELATIONSHIPS = [
   { value: 'Brother', labelKey: 'relBrother' },
   { value: 'Sister', labelKey: 'relSister' },
   { value: 'Other', labelKey: 'relOther' },
-];
+] as const;
 
 export interface SubscriberSectionProps {
   fullName: string;
@@ -225,7 +225,7 @@ export function NomineeDetailsSection(props: NomineeSectionProps) {
             >
               {RELATIONSHIPS.map((r) => (
                 <option key={r.value} value={r.value}>
-                  {t(r.labelKey as any)} ({r.value})
+                  {t(r.labelKey)} ({r.value})
                 </option>
               ))}
             </select>

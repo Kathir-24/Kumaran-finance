@@ -8,11 +8,8 @@ import {
   Clock,
   ShieldCheck,
   Ban,
-  CheckCircle2,
   RefreshCw,
   PlusCircle,
-  FileText,
-  AlertOctagon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
@@ -27,6 +24,35 @@ import {
   RejectReversalDialog,
   type PendingReversalItem,
 } from '@/components/reversals/reversal-action-dialogs';
+
+interface PendingApprovalsResponse {
+  paymentReversals?: PendingReversalItem[];
+}
+
+interface ReversedPaymentRecord {
+  id: string;
+  amount: string | number;
+  updatedAt?: string;
+  receipt?: {
+    receiptNumber?: string | null;
+  } | null;
+  reversal?: {
+    reason?: string;
+    approvedByUserId?: string;
+    reversedAt?: string;
+  } | null;
+  allocations?: Array<{
+    ticket?: {
+      ticketNumber?: number;
+      customer?: {
+        fullName?: string;
+      };
+      chitGroup?: {
+        groupCode?: string;
+      };
+    };
+  }>;
+}
 
 export default function PaymentReversalsPage() {
   const t = useTranslations('reversals');
@@ -47,7 +73,7 @@ export default function PaymentReversalsPage() {
   } = useQuery({
     queryKey: queryKeys.reversals.pending(activeBranchId || undefined),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<PendingApprovalsResponse>(
         apiClient.GET('/api/v1/reports/pending-approvals', {
           params: { query: { branchId: activeBranchId || undefined } },
           signal,
@@ -68,17 +94,17 @@ export default function PaymentReversalsPage() {
   } = useQuery({
     queryKey: queryKeys.reversals.history({ limit: 50 }),
     queryFn: async ({ signal }) => {
-      const result = await unwrapApiResponse<any>(
+      const result = await unwrapApiResponse<ReversedPaymentRecord[] | { data?: ReversedPaymentRecord[] }>(
         apiClient.GET('/api/v1/payments', {
           params: { query: { paymentStatus: 'REVERSED', limit: 50 } },
           signal,
         }),
       );
-      return unwrapPaginatedList(result);
+      return unwrapPaginatedList<ReversedPaymentRecord>(result);
     },
   });
 
-  const reversedPayments = useMemo<any[]>(
+  const reversedPayments = useMemo<ReversedPaymentRecord[]>(
     () => historyData || [],
     [historyData],
   );

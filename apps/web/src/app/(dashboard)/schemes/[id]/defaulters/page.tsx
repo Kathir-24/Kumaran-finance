@@ -7,28 +7,34 @@ import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  UserX,
-  UserCheck,
   AlertTriangle,
   Loader2,
   Clock,
   Ban,
-  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import { DefaultersTable } from '@/components/schemes/defaulters-table';
+import { DefaultersTable, type SchemeTicketRow } from '@/components/schemes/defaulters-table';
 import {
   DefaulterRemovalDialog,
   type DefaulterTicketRef,
 } from '@/components/schemes/defaulter-removal-dialog';
 import { DefaulterSubstitutionModal } from '@/components/schemes/defaulter-substitution-modal';
 import { DefaulterSettlementDialog } from '@/components/schemes/defaulter-settlement-dialog';
-import { useAuthStore } from '@/stores/auth-store';
-import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { apiClient, getErrorMessage, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatRupee } from '@/lib/currency';
+
+interface SchemeDefaultersDetail {
+  id: string;
+  groupCode: string;
+  status: string;
+  chitValue: bigint | number;
+  totalTickets?: number;
+  tickets?: SchemeTicketRow[];
+}
 
 export default function SchemeDefaultersPage() {
   const t = useTranslations('schemes');
@@ -40,12 +46,8 @@ export default function SchemeDefaultersPage() {
   const [substitutionTicket, setSubstitutionTicket] = React.useState<DefaulterTicketRef | null>(null);
   const [settlementTicket, setSettlementTicket] = React.useState<DefaulterTicketRef | null>(null);
 
-  const isSuperAdmin =
-    Boolean(user?.roles?.includes('SUPER_ADMIN')) ||
-    (user as any)?.role === 'SUPER_ADMIN';
-  const isAccountant =
-    Boolean(user?.roles?.includes('ACCOUNTANT')) ||
-    (user as any)?.role === 'ACCOUNTANT';
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isAccountant = hasAnyRole(user, ['ACCOUNTANT']);
   const canSettle = isSuperAdmin || isAccountant;
 
   // 1. Fetch Chit Scheme Detail (Includes all tickets & customers)
@@ -54,10 +56,10 @@ export default function SchemeDefaultersPage() {
     isLoading: isLoadingScheme,
     error: schemeError,
     refetch: refetchScheme,
-  } = useQuery({
+  } = useQuery<SchemeDefaultersDetail>({
     queryKey: queryKeys.schemes.detail(id),
     queryFn: async () => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<SchemeDefaultersDetail>(
         apiClient.GET('/api/v1/chits/{id}', {
           params: { path: { id } },
         }),
@@ -70,12 +72,17 @@ export default function SchemeDefaultersPage() {
   const { data: defaultersList } = useQuery({
     queryKey: queryKeys.tickets.defaulters({ minConsecutiveMonths: 1 }),
     queryFn: async () => {
-      const payload = await unwrapApiResponse<any>(
-        apiClient.GET('/api/v1/tickets/defaulters' as any, {
+      const payload = await unwrapApiResponse<unknown>(
+        apiClient.GET('/api/v1/tickets/defaulters', {
           params: { query: { minConsecutiveMonths: 1, limit: 100 } },
         }),
       );
-      return unwrapPaginatedList(payload);
+      return unwrapPaginatedList<{
+        ticketId: string;
+        chitGroup?: { id: string };
+        totalOverdueAmount?: string | number;
+        consecutiveUnpaidMonths?: number;
+      }>(payload);
     },
     staleTime: 30_000,
   });
@@ -85,7 +92,7 @@ export default function SchemeDefaultersPage() {
   // Map arrears and total overdue per ticket
   const duesMap = React.useMemo(() => {
     const map: Record<string, { totalOverdue: bigint | number; unpaidCount: number }> = {};
-    for (const item of unwrapPaginatedList(defaultersList)) {
+    for (const item of defaultersList ?? []) {
       if (item.chitGroup?.id === id || item.ticketId) {
         map[item.ticketId] = {
           totalOverdue: BigInt(item.totalOverdueAmount || 0),
@@ -98,21 +105,21 @@ export default function SchemeDefaultersPage() {
 
   // Aggregate Metrics
   const activeDefaulters = tickets.filter(
-    (t: any) => t.status !== 'REMOVED_DEF_3M' && t.consecutiveUnpaidMonths > 0 && t.consecutiveUnpaidMonths < 3,
+    (t) => t.status !== 'REMOVED_DEF_3M' && t.consecutiveUnpaidMonths > 0 && t.consecutiveUnpaidMonths < 3,
   ).length;
 
   const eligibleForRemoval = tickets.filter(
-    (t: any) => t.status !== 'REMOVED_DEF_3M' && t.consecutiveUnpaidMonths >= 3,
+    (t) => t.status !== 'REMOVED_DEF_3M' && t.consecutiveUnpaidMonths >= 3,
   ).length;
 
-  const removedTickets = tickets.filter((t: any) => t.status === 'REMOVED_DEF_3M').length;
+  const removedTickets = tickets.filter((t) => t.status === 'REMOVED_DEF_3M').length;
 
   const totalOverdue = Object.values(duesMap).reduce(
     (sum, d) => sum + BigInt(d.totalOverdue),
     0n,
   );
 
-  const existingAssigned = tickets.map((t: any) => ({
+  const existingAssigned = tickets.map((t) => ({
     ticketNumber: t.ticketNumber,
     customerId: t.customerId,
   }));
@@ -128,7 +135,7 @@ export default function SchemeDefaultersPage() {
   if (schemeError || !scheme) {
     return (
       <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-8 text-center text-rose-300">
-        <p className="font-semibold">{schemeError ? (schemeError as any).message : 'Scheme not found'}</p>
+        <p className="font-semibold">{schemeError ? getErrorMessage(schemeError, 'Scheme not found') : 'Scheme not found'}</p>
         <Button variant="outline" className="mt-4" asChild>
           <Link href="/schemes">{t('backToDirectory')}</Link>
         </Button>

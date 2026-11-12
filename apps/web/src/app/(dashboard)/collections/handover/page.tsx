@@ -24,8 +24,30 @@ import {
   HandoverVerificationCard,
   type AgentPendingBatch,
   type HandoverAckResult,
+  type PendingHandoverCollectionItem,
 } from '@/components/collections/handover-verification-card';
 import { CashSettlementVoucherModal } from '@/components/collections/cash-settlement-voucher-modal';
+
+interface DailyCollectionItem extends PendingHandoverCollectionItem {
+  paymentMethod?: string;
+  cashHandoverStatus?: string;
+  collectorUserId?: string;
+  collectorName?: string;
+  collectorPhone?: string;
+  acknowledgedByUserId?: string;
+  acknowledgedAt?: string;
+}
+
+interface DailyCollectionsSummaryResponse {
+  totals?: {
+    totalCollected: number;
+    cashCollected: number;
+    cashPendingHandover: number;
+    cashAcknowledgedInVault: number;
+    digitalCollected: number;
+  };
+  collections?: DailyCollectionItem[];
+}
 
 export default function EveningCashHandoverPage() {
   const t = useTranslations('collections');
@@ -44,7 +66,7 @@ export default function EveningCashHandoverPage() {
       branchId: activeBranchId || undefined,
     }),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<DailyCollectionsSummaryResponse>(
         apiClient.GET('/api/v1/collections/daily-summary', {
           params: {
             query: {
@@ -62,7 +84,7 @@ export default function EveningCashHandoverPage() {
     totalCollected: 0, cashCollected: 0, cashPendingHandover: 0,
     cashAcknowledgedInVault: 0, digitalCollected: 0,
   };
-  const collections = useMemo<any[]>(
+  const collections = useMemo<DailyCollectionItem[]>(
     () => data?.collections || [],
     [data?.collections],
   );
@@ -98,7 +120,7 @@ export default function EveningCashHandoverPage() {
     refetch();
   };
 
-  const handleViewHistoricalVoucher = (c: any) => {
+  const handleViewHistoricalVoucher = (c: DailyCollectionItem) => {
     const dateStr = (c.collectedAt || new Date().toISOString()).slice(0, 10).replace(/-/g, '');
     setActiveVoucher({
       success: true,

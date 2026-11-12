@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 
 interface RegistrarFilingModalProps {
   isOpen: boolean;
@@ -70,8 +70,8 @@ export function RegistrarFilingModal({
       );
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to record Registrar filing');
+    } catch (err: unknown) {
+      setErrorMsg(getErrorMessage(err, 'Failed to record Registrar filing'));
     } finally {
       setIsSubmitting(false);
     }

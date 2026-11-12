@@ -11,12 +11,20 @@ import {
   CheckCircle2,
   Calendar,
   ArrowRight,
-  ExternalLink,
 } from 'lucide-react';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+
+interface ActiveChitGroupForFiling {
+  id: string;
+  groupCode: string;
+  currentInstallmentMonth: number;
+  lastAuctionDate?: string | null;
+  lastAuctionId?: string | null;
+  minutesFiledAtRegistrar?: boolean;
+}
 
 interface FilingCountdownItem {
   auctionId: string;
@@ -40,17 +48,19 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
   const t = useTranslations('dashboard');
 
   // Query active chit groups to inspect recent auctions
-  const { data: chitsData, isLoading: chitsLoading } = useQuery({
+  const { data: chitsData, isLoading: chitsLoading } = useQuery<ActiveChitGroupForFiling[]>({
     queryKey: ['dashboard', 'chits-filing-countdown', { branchId }],
     queryFn: async () => {
-      const res = await unwrapApiResponse<{ data?: any[]; items?: any[] } | any[]>(
+      const res = await unwrapApiResponse<
+        { data?: ActiveChitGroupForFiling[]; items?: ActiveChitGroupForFiling[] } | ActiveChitGroupForFiling[]
+      >(
         apiClient.GET('/api/v1/chits', {
           params: { query: { status: 'ACTIVE', limit: 5 } },
         }),
       );
       if (Array.isArray(res)) return res;
       if (res && Array.isArray(res.data)) return res.data;
-      if (res && Array.isArray((res as any).items)) return (res as any).items;
+      if (res && Array.isArray(res.items)) return res.items;
       return [];
     },
     staleTime: 60 * 1000,

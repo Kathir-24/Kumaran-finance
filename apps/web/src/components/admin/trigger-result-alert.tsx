@@ -4,10 +4,10 @@ import * as React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
 export interface ResultAlertProps {
-  result: any;
+  result: { jobId?: string } | null;
   successMsg: string;
   enqueueMsg: string;
-  fields?: { label: string; value: any }[];
+  fields?: { label: string; value: React.ReactNode }[];
 }
 
 export function TriggerResultAlert({

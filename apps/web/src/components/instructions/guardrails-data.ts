@@ -1,8 +1,32 @@
+export type GuardrailTitleKey =
+  | 'rules.guardrail1Title'
+  | 'rules.guardrail2Title'
+  | 'rules.guardrail3Title'
+  | 'rules.guardrail4Title'
+  | 'rules.guardrail5Title'
+  | 'rules.guardrail6Title'
+  | 'rules.guardrail7Title'
+  | 'rules.guardrail8Title'
+  | 'rules.guardrail9Title'
+  | 'rules.guardrail10Title';
+
+export type GuardrailDescKey =
+  | 'rules.guardrail1Desc'
+  | 'rules.guardrail2Desc'
+  | 'rules.guardrail3Desc'
+  | 'rules.guardrail4Desc'
+  | 'rules.guardrail5Desc'
+  | 'rules.guardrail6Desc'
+  | 'rules.guardrail7Desc'
+  | 'rules.guardrail8Desc'
+  | 'rules.guardrail9Desc'
+  | 'rules.guardrail10Desc';
+
 export interface GuardrailDefinition {
   ruleNumber: number;
   id: string;
-  titleKey: string;
-  descKey: string;
+  titleKey: GuardrailTitleKey;
+  descKey: GuardrailDescKey;
   category: string;
   badgeVariant: 'paid' | 'unpaid' | 'overdue' | 'pending' | 'neutral' | 'outline';
   formula?: string;

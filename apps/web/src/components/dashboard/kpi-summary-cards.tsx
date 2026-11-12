@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ShieldAlert,
-  Wallet,
 } from 'lucide-react';
 import { formatRupee } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';

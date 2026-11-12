@@ -7,10 +7,8 @@ import {
   Banknote,
   Clock,
   ShieldCheck,
-  CheckCircle2,
   RefreshCw,
   Coins,
-  FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +21,15 @@ import { formatRupee } from '@/lib/currency';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
+type DisbursementsListResponse =
+  | WinnerDisbursementRow[]
+  | { data?: WinnerDisbursementRow[]; total?: number };
+
+function extractDisbursementRows(res: DisbursementsListResponse | undefined): WinnerDisbursementRow[] {
+  if (!res) return [];
+  return Array.isArray(res) ? res : (res.data ?? []);
+}
+
 export default function DisbursementsPage() {
   const t = useTranslations('disbursements');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
@@ -32,7 +39,7 @@ export default function DisbursementsPage() {
       disbursementStatus: selectedStatus === 'ALL' ? undefined : selectedStatus,
     }),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<DisbursementsListResponse>(
         apiClient.GET('/api/v1/disbursements', {
           params: {
             query: {
@@ -51,7 +58,7 @@ export default function DisbursementsPage() {
     queryKey: queryKeys.disbursements.list(),
     queryFn: async ({ signal }) => {
       try {
-        return await unwrapApiResponse<any>(
+        return await unwrapApiResponse<DisbursementsListResponse>(
           apiClient.GET('/api/v1/disbursements', {
             params: { query: { limit: 100 } },
             signal,
@@ -63,8 +70,8 @@ export default function DisbursementsPage() {
     },
   });
 
-  const allItems: WinnerDisbursementRow[] = (globalData?.data || globalData || []) as WinnerDisbursementRow[];
-  const currentItems: WinnerDisbursementRow[] = (data?.data || data || []) as WinnerDisbursementRow[];
+  const allItems = extractDisbursementRows(globalData);
+  const currentItems = extractDisbursementRows(data);
 
   // Metric counts
   const totalWinnersCount = allItems.length;

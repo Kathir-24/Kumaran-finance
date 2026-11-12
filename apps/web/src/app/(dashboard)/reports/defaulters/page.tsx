@@ -6,12 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  Building2,
-  Calendar,
   Download,
-  Filter,
   ShieldAlert,
-  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
@@ -21,6 +17,18 @@ import { downloadCsv } from '@/lib/csv-export';
 import { DefaulterItem, DefaulterKpiBar } from '@/components/reports/defaulter-kpi-bar';
 import { DefaulterAnalysisTable } from '@/components/reports/defaulter-analysis-table';
 import { cn } from '@/lib/utils';
+
+type SchemeFilterOption = { id: string; groupCode: string; groupName: string };
+type SchemesFilterResponse = SchemeFilterOption[] | { data?: SchemeFilterOption[] };
+
+interface DefaultersReportResponse {
+  defaulters?: DefaulterItem[];
+  pagination?: {
+    page: number;
+    totalPages: number;
+    totalRecords: number;
+  };
+}
 
 export default function DefaultersRegisterPage() {
   const t = useTranslations('reports.defaulters');
@@ -59,7 +67,7 @@ export default function DefaultersRegisterPage() {
   const { data: schemes = [] } = useQuery<Array<{ id: string; groupCode: string; groupName: string }>>({
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<SchemesFilterResponse>(
         apiClient.GET('/api/v1/chits')
       );
       if (Array.isArray(res)) return res;
@@ -79,7 +87,7 @@ export default function DefaultersRegisterPage() {
       limit,
     }),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<DefaultersReportResponse>(
         apiClient.GET('/api/v1/reports/defaulters', {
           params: {
             query: {

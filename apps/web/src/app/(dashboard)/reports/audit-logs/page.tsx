@@ -11,7 +11,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { downloadCsv } from '@/lib/csv-export';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AuditLogKpiBar } from '@/components/reports/audit-log-kpi-bar';
 import { AuditLogFilters } from '@/components/reports/audit-log-filters';
 import { AuditLogTable, type AuditLogItem } from '@/components/reports/audit-log-table';
@@ -31,6 +31,8 @@ interface StaffUserRaw {
   name: string;
   roles: string[];
 }
+
+type UsersListResponse = StaffUserRaw[] | { data?: StaffUserRaw[]; users?: StaffUserRaw[] };
 
 export default function AuditLogsReportPage() {
   const t = useTranslations('reports.auditTrail');
@@ -59,7 +61,7 @@ export default function AuditLogsReportPage() {
   const { data: staffUsers = [] } = useQuery<StaffUserRaw[]>({
     queryKey: queryKeys.users.list({ limit: 100 }),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<UsersListResponse>(
         apiClient.GET('/api/v1/users', {
           params: { query: { limit: 100 } },
         })

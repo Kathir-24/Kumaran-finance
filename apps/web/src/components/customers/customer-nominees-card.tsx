@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 
@@ -68,7 +68,7 @@ export function CustomerNomineesCard({ customerId, nominees }: CustomerNomineesC
   const addMutation = useMutation({
     mutationFn: async () => {
       return unwrapApiResponse(
-        apiClient.POST('/api/v1/customers/{id}/nominees' as any, {
+        apiClient.POST('/api/v1/customers/{id}/nominees', {
           params: { path: { id: customerId } },
           body: {
             fullName: fullName.trim(),
@@ -87,15 +87,15 @@ export function CustomerNomineesCard({ customerId, nominees }: CustomerNomineesC
       setAadhaarLast4('');
       setFormError(null);
     },
-    onError: (err: any) => {
-      setFormError(err?.message || 'Failed to link nominee');
+    onError: (err: unknown) => {
+      setFormError(getErrorMessage(err, 'Failed to link nominee'));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (nomineeId: string) => {
       return unwrapApiResponse(
-        apiClient.DELETE('/api/v1/customers/{id}/nominees/{nomineeId}' as any, {
+        apiClient.DELETE('/api/v1/customers/{id}/nominees/{nomineeId}', {
           params: { path: { id: customerId, nomineeId } },
         }),
       );

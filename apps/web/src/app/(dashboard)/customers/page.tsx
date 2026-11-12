@@ -24,6 +24,7 @@ import {
   type CustomerRowData,
 } from '@/components/customers/customer-table';
 import { CustomerPagination } from '@/components/customers/customer-pagination';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
 interface CustomerListResponse {
   data: CustomerRowData[];
@@ -33,7 +34,7 @@ interface CustomerListResponse {
   totalPages: number;
 }
 
-export default function CustomersDirectoryPage() {
+function CustomersDirectoryContent() {
   const t = useTranslations('customers');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -225,5 +226,13 @@ export default function CustomersDirectoryPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function CustomersDirectoryPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <CustomersDirectoryContent />
+    </React.Suspense>
   );
 }

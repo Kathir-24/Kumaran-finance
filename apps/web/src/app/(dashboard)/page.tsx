@@ -125,7 +125,7 @@ export default function DashboardRootPage() {
       color: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
       desc: 'The 10 Invariant Guardrails & daily staff operating manuals',
     },
-  ];
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -212,13 +212,7 @@ export default function DashboardRootPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickNav.map((item) => {
             const Icon = item.icon;
-            const subKey = item.titleKey.replace('nav.', '');
-            let title = subKey;
-            try {
-              title = t(`nav.${subKey}` as any);
-            } catch {
-              title = subKey;
-            }
+            const title = t(item.titleKey);
 
             return (
               <Link

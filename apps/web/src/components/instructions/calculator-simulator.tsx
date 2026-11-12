@@ -4,14 +4,10 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Calculator,
-  Coins,
   ShieldAlert,
-  ArrowRight,
-  TrendingDown,
-  Award,
   BookOpen,
 } from 'lucide-react';
-import { formatRupee, parseWholeRupees, assertWholeRupee } from '@/lib/currency';
+import { formatRupee } from '@/lib/currency';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

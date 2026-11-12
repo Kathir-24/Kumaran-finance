@@ -8,7 +8,6 @@ import {
   Building2,
   CheckCircle2,
   Landmark,
-  Layers,
   Network,
   Plus,
   Search,

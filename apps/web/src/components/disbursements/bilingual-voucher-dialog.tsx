@@ -10,7 +10,6 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  CheckCircle2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -21,12 +20,23 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { downloadVoucherPdf } from '@/lib/pdf-download';
 import { queryKeys } from '@/lib/query-keys';
+
+interface VoucherPreviewResponse {
+  voucherNumber?: string;
+  issuedAt?: string | Date;
+  formattedText?: string;
+  data?: {
+    grossPrize?: number;
+    bidDiscount?: number;
+    foremanCommission?: number;
+    netPrizeMoney?: number;
+  };
+}
 
 interface BilingualVoucherDialogProps {
   isOpen: boolean;
@@ -45,7 +55,7 @@ export function BilingualVoucherDialog({
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.disbursements.voucher(auctionId),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<VoucherPreviewResponse>(
         apiClient.GET('/api/v1/disbursements/auction/{auctionId}/voucher', {
           params: { path: { auctionId } },
           signal,
@@ -59,8 +69,8 @@ export function BilingualVoucherDialog({
     setDownloadingPdf(true);
     try {
       await downloadVoucherPdf(auctionId, `prize-voucher-${auctionId.slice(0, 8)}.pdf`);
-    } catch (err: any) {
-      alert(err.message || 'Error downloading PDF voucher');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Error downloading PDF voucher'));
     } finally {
       setDownloadingPdf(false);
     }

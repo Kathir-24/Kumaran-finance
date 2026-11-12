@@ -66,7 +66,7 @@ export function MonthlyDuesTable({
   isLoading,
   selectedMonth,
   chitGroupId,
-  groupCode,
+  groupCode: _groupCode,
   isSchemeActive,
   canManage,
   onOpenGenerate,

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { KeyRound, Eye, EyeOff, CheckCircle2, AlertTriangle, X, ShieldCheck } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { apiClient, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import {

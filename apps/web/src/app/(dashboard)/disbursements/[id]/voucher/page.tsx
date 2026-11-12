@@ -14,20 +14,30 @@ import {
   AlertCircle,
   AlertTriangle,
   FileText,
-  Download,
   Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
-import { PayoutVoucherCard } from '@/components/disbursements/payout-voucher-card';
-import { SafetyProofChecklist } from '@/components/disbursements/safety-proof-checklist';
+import { PayoutVoucherCard, type PayoutVoucherDetails } from '@/components/disbursements/payout-voucher-card';
+import { SafetyProofChecklist, type WinnerSafetyData } from '@/components/disbursements/safety-proof-checklist';
 import { DisbursementAuthModal } from '@/components/disbursements/disbursement-auth-modal';
 import { DisbursementReleaseModal } from '@/components/disbursements/disbursement-release-modal';
 import { BilingualVoucherDialog } from '@/components/disbursements/bilingual-voucher-dialog';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+
+interface VoucherWinnerRecord extends PayoutVoucherDetails, WinnerSafetyData {
+  verifiedByUserId?: string | null;
+}
+
+interface AuctionDisbursementResponse {
+  auction?: PayoutVoucherDetails['auction'];
+  winner?: VoucherWinnerRecord | null;
+  makerName?: string | null;
+  checkerName?: string | null;
+}
 
 export default function PayoutVoucherPage() {
   const t = useTranslations('disbursements');
@@ -42,7 +52,7 @@ export default function PayoutVoucherPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.disbursements.detail(auctionId),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<AuctionDisbursementResponse>(
         apiClient.GET('/api/v1/disbursements/auction/{auctionId}', {
           params: { path: { auctionId } },
           signal,
@@ -102,9 +112,7 @@ export default function PayoutVoucherPage() {
       user.id.toLowerCase() === winner.verifiedByUserId.toLowerCase(),
   );
 
-  const isSuperAdmin = Boolean(
-    user?.roles?.includes('SUPER_ADMIN') || (user as any)?.role === 'SUPER_ADMIN',
-  );
+  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
 
   return (
     <div className="space-y-6">

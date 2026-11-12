@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  CheckCircle2,
   Clock,
   Play,
   Send,
@@ -13,8 +12,30 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { TriggerResultAlert } from './trigger-result-alert';
+
+interface ArrearsTriggerResult {
+  jobId?: string;
+  totalDuesChecked?: number;
+  overdueCount?: number;
+  newlyOverdueCount?: number;
+  defaults3MonthsCount?: number;
+  executionTimeMs?: number;
+}
+
+interface PreAuctionTriggerResult {
+  jobId?: string;
+  auctionsFound?: number;
+  totalRemindersBroadcasted?: number;
+}
+
+interface ReconTriggerResult {
+  jobId?: string;
+  matchedCount?: number;
+  ghostDropsResolvedCount?: number;
+  exceptionsCount?: number;
+}
 
 interface JobTriggersPanelProps {
   isSuperAdmin: boolean;
@@ -28,27 +49,27 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
   const [arrearsCutoff, setArrearsCutoff] = React.useState('');
   const [isRunningArrears, setIsRunningArrears] = React.useState(false);
   const [isEnqueuingArrears, setIsEnqueuingArrears] = React.useState(false);
-  const [arrearsResult, setArrearsResult] = React.useState<any>(null);
+  const [arrearsResult, setArrearsResult] = React.useState<ArrearsTriggerResult | null>(null);
   const [arrearsError, setArrearsError] = React.useState<string | null>(null);
 
   // Pre-auction trigger state
   const [auctionTargetDate, setAuctionTargetDate] = React.useState('');
   const [isRunningAuctionScan, setIsRunningAuctionScan] = React.useState(false);
-  const [auctionScanResult, setAuctionScanResult] = React.useState<any>(null);
+  const [auctionScanResult, setAuctionScanResult] = React.useState<PreAuctionTriggerResult | null>(null);
   const [auctionScanError, setAuctionScanError] = React.useState<string | null>(null);
 
   // Reconciliation trigger state
   const [isRunningRecon, setIsRunningRecon] = React.useState(false);
   const [isEnqueuingRecon, setIsEnqueuingRecon] = React.useState(false);
-  const [reconResult, setReconResult] = React.useState<any>(null);
+  const [reconResult, setReconResult] = React.useState<ReconTriggerResult | null>(null);
   const [reconError, setReconError] = React.useState<string | null>(null);
 
   // Generic trigger executor
-  const executeTrigger = async (
+  const executeTrigger = async <TResult,>(
     setLoading: (l: boolean) => void,
     setError: (e: string | null) => void,
-    setResult: (r: any) => void,
-    apiFn: () => Promise<any>,
+    setResult: (r: TResult | null) => void,
+    apiFn: () => Promise<TResult>,
     fallbackMsg: string
   ) => {
     if (!isSuperAdmin) return;
@@ -59,8 +80,8 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       const res = await apiFn();
       setResult(res);
       onJobExecuted?.();
-    } catch (err: any) {
-      setError(err?.message || fallbackMsg);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, fallbackMsg));
     } finally {
       setLoading(false);
     }
@@ -73,7 +94,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       setArrearsError,
       setArrearsResult,
       () =>
-        unwrapApiResponse(
+        unwrapApiResponse<ArrearsTriggerResult>(
           apiClient.POST('/api/v1/jobs/run-daily-arrears', {
             params: { query: { cutoffDate: arrearsCutoff || undefined } },
           })
@@ -88,7 +109,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       setArrearsError,
       setArrearsResult,
       () =>
-        unwrapApiResponse(
+        unwrapApiResponse<ArrearsTriggerResult>(
           apiClient.POST('/api/v1/jobs/enqueue-daily-arrears', {
             params: { query: { cutoffDate: arrearsCutoff || undefined } },
           })
@@ -103,7 +124,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       setAuctionScanError,
       setAuctionScanResult,
       () =>
-        unwrapApiResponse(
+        unwrapApiResponse<PreAuctionTriggerResult>(
           apiClient.POST('/api/v1/jobs/run-pre-auction-scan', {
             params: { query: { targetDate: auctionTargetDate || undefined } },
           })
@@ -118,7 +139,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       setReconError,
       setReconResult,
       () =>
-        unwrapApiResponse(
+        unwrapApiResponse<ReconTriggerResult>(
           apiClient.POST('/api/v1/jobs/run-reconciliation', {
             body: { records: [] },
           })
@@ -133,7 +154,7 @@ export function JobTriggersPanel({ isSuperAdmin, onJobExecuted }: JobTriggersPan
       setReconError,
       setReconResult,
       () =>
-        unwrapApiResponse(
+        unwrapApiResponse<ReconTriggerResult>(
           apiClient.POST('/api/v1/jobs/enqueue-reconciliation', {
             body: { records: [] },
           })

@@ -6,11 +6,8 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Calendar,
   Download,
   FileCheck2,
-  FileSpreadsheet,
-  Gavel,
   Printer,
   Scale,
   ShieldAlert,
@@ -27,8 +24,18 @@ import {
   FormXviiViewer,
 } from '@/components/reports/form-xvii-viewer';
 import { RegistrarFilingModal } from '@/components/reports/registrar-filing-modal';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-export default function FormXviiMinutesPage() {
+interface MinutesSchemeOption {
+  id: string;
+  groupCode: string;
+  groupName: string;
+  status: string;
+}
+
+type MinutesSchemesResponse = MinutesSchemeOption[] | { data?: MinutesSchemeOption[] };
+
+function FormXviiMinutesContent() {
   const t = useTranslations('reports.minutes');
   const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
@@ -46,19 +53,17 @@ export default function FormXviiMinutesPage() {
   // Scheme Selection State
   const initialGroupId = searchParams.get('chitGroupId') || '';
   const [selectedGroupId, setSelectedGroupId] = React.useState<string>(initialGroupId);
-  const [fromDate, setFromDate] = React.useState<string>('');
-  const [toDate, setToDate] = React.useState<string>('');
+  const [fromDate] = React.useState<string>('');
+  const [toDate] = React.useState<string>('');
 
   // Filing Modal State
   const [filingAuction, setFilingAuction] = React.useState<FormXviiAuctionRecord | null>(null);
 
   // 1. Fetch Chit Schemes for the Scheme Selector
-  const { data: schemes = [], isLoading: isLoadingSchemes } = useQuery<
-    Array<{ id: string; groupCode: string; groupName: string; status: string }>
-  >({
+  const { data: schemes = [] } = useQuery<MinutesSchemeOption[]>({
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
-      const res = await unwrapApiResponse<any>(
+      const res = await unwrapApiResponse<MinutesSchemesResponse>(
         apiClient.GET('/api/v1/chits')
       );
       if (Array.isArray(res)) return res;
@@ -329,5 +334,13 @@ export default function FormXviiMinutesPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FormXviiMinutesPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <FormXviiMinutesContent />
+    </React.Suspense>
   );
 }

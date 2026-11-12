@@ -6,10 +6,6 @@ import {
   Briefcase,
   UserCheck,
   Building,
-  Receipt,
-  ShieldAlert,
-  Clock,
-  ArrowRight,
   FileCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';

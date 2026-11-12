@@ -8,10 +8,7 @@ import {
   QrCode as QrCodeIcon,
   Copy,
   Check,
-  Building2,
-  ExternalLink,
   Loader2,
-  X,
   ShieldCheck,
 } from 'lucide-react';
 import { formatRupee } from '@kumaran/api-client';
@@ -38,6 +35,14 @@ export interface UpiQrDialogProps {
   onClose: () => void;
 }
 
+interface UpiIntentResponse {
+  upiUri?: string;
+  amount?: number;
+  payeeName?: string;
+  payeeVpa?: string;
+  transactionNote?: string;
+}
+
 export function UpiQrDialog({
   dueId,
   ticketNumber,
@@ -53,11 +58,11 @@ export function UpiQrDialog({
   const [svgQr, setSvgQr] = React.useState<string | null>(null);
 
   // Fetch real NPCI UPI Intent from backend
-  const { data: upiData, isLoading, error } = useQuery({
+  const { data: upiData, isLoading } = useQuery({
     queryKey: dueId ? queryKeys.installments.upiIntent(dueId) : ['installments', 'none'],
     queryFn: async () => {
       if (!dueId) return null;
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<UpiIntentResponse>(
         apiClient.GET('/api/v1/installments/{dueId}/upi-intent', {
           params: { path: { dueId } },
         })

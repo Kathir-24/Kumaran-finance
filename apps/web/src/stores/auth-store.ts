@@ -15,6 +15,8 @@ export interface AuthUser {
   name: string;
   phone: string;
   roles: string[];
+  role?: string;
+  fullName?: string;
   branchId?: string | null;
   activeBranchId?: string | null;
   isTotpEnabled?: boolean;
@@ -22,6 +24,31 @@ export interface AuthUser {
   fullNameTamil?: string | null;
   customerCode?: string;
   lastLoginAt?: string | null;
+}
+
+/**
+ * Checks if the authenticated user possesses any of the allowed RBAC roles,
+ * supporting both canonical `roles[]` arrays and legacy `role` fields.
+ */
+export function hasAnyRole(
+  user: AuthUser | null | undefined,
+  allowedRoles: readonly string[],
+): boolean {
+  if (!user) return false;
+  if (Array.isArray(user.roles) && user.roles.some((r) => allowedRoles.includes(r))) {
+    return true;
+  }
+  return typeof user.role === 'string' && allowedRoles.includes(user.role);
+}
+
+/**
+ * Resolves the display name from canonical `name` or legacy `fullName`.
+ */
+export function getUserDisplayName(
+  user: AuthUser | null | undefined,
+  fallback = 'User',
+): string {
+  return user?.name || user?.fullName || fallback;
 }
 
 export interface AuthState {

@@ -24,8 +24,9 @@ import {
 import { AuctionScheduleTable } from '@/components/auctions/auction-schedule-table';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
-export default function AuctionsPage() {
+function AuctionsContent() {
   const t = useTranslations('auctions');
   const searchParams = useSearchParams();
   const initialGroupId = searchParams.get('group');
@@ -44,7 +45,7 @@ export default function AuctionsPage() {
     queryKey: queryKeys.schemes.list(),
     queryFn: async () => {
       return unwrapApiResponse<{ data: ChitGroupSummary[] }>(
-        apiClient.GET('/api/v1/chits' as any, {}),
+        apiClient.GET('/api/v1/chits', {}),
       );
     },
   });
@@ -67,13 +68,12 @@ export default function AuctionsPage() {
   const {
     data: auctions,
     isLoading: isAuctionsLoading,
-    isError: isAuctionsError,
   } = useQuery<AuctionScheduleItem[]>({
     queryKey: queryKeys.auctions.list(activeScheme?.id),
     queryFn: async () => {
       if (!activeScheme?.id) return [];
       return unwrapApiResponse<AuctionScheduleItem[]>(
-        apiClient.GET('/api/v1/auctions/group/{chitGroupId}' as any, {
+        apiClient.GET('/api/v1/auctions/group/{chitGroupId}', {
           params: { path: { chitGroupId: activeScheme.id } },
         }),
       );
@@ -172,5 +172,13 @@ export default function AuctionsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AuctionsPage() {
+  return (
+    <React.Suspense fallback={<RouteSuspenseFallback />}>
+      <AuctionsContent />
+    </React.Suspense>
   );
 }

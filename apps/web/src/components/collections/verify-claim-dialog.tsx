@@ -8,10 +8,6 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle,
-  Building,
-  User,
-  ShieldCheck,
-  CreditCard,
 } from 'lucide-react';
 import {
   Dialog,
@@ -24,8 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { formatDate } from '@/lib/date-utils';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { PendingUpiClaimItem } from './upi-claims-table';
 
@@ -53,7 +48,7 @@ export function VerifyClaimDialog({
     mutationFn: async () => {
       if (!claim) throw new Error('No claim selected');
       setErrorMessage(null);
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ message?: string }>(
         apiClient.POST('/api/v1/payments/{id}/verify-upi-claim', {
           params: { path: { id: claim.claimId } },
           body: {
@@ -75,8 +70,8 @@ export function VerifyClaimDialog({
         onVerified(verifiedPaymentId);
       }
     },
-    onError: (err: any) => {
-      setErrorMessage(err.message || 'Error verifying UPI claim');
+    onError: (err: unknown) => {
+      setErrorMessage(getErrorMessage(err, 'Error verifying UPI claim'));
     },
   });
 

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, Shield, ShieldAlert } from 'lucide-react';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,7 +82,7 @@ export function EditRolesDialog({
       return unwrapApiResponse(
         apiClient.PATCH('/api/v1/users/{id}/roles', {
           params: { path: { id: user.id } },
-          body: { roles: selectedRoles as any },
+          body: { roles: selectedRoles as UserRoleType[] },
         })
       );
     },
@@ -90,8 +90,8 @@ export function EditRolesDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
       onOpenChange(false);
     },
-    onError: (err: any) => {
-      setErrorMsg(err.message || 'Failed to update roles');
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to update roles'));
     },
   });
 

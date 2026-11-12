@@ -83,7 +83,14 @@ export function reportClientError(
 
   // 2. Safe Sentry dispatch (if configured or loaded globally)
   try {
-    const globalWindow = typeof window !== 'undefined' ? (window as any) : null;
+    const globalWindow =
+      typeof window !== 'undefined'
+        ? (window as Window & {
+            Sentry?: {
+              captureException?: (err: Error, ctx: Record<string, unknown>) => void;
+            };
+          })
+        : null;
     if (globalWindow?.Sentry && typeof globalWindow.Sentry.captureException === 'function') {
       globalWindow.Sentry.captureException(errObj, {
         tags: {

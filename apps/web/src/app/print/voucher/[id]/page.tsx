@@ -9,6 +9,40 @@ import { VoucherPrintTemplate, type VoucherData } from '@/components/print/vouch
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 
+interface PrintVoucherApiResponse {
+  voucherNumber?: string;
+  disbursedAt?: string;
+  chitGroupCode?: string;
+  chitValue?: number | bigint;
+  installmentMonth?: number;
+  ticketNumber?: number;
+  winnerCode?: string;
+  winnerName?: string;
+  winnerNameTamil?: string | null;
+  winnerPhone?: string;
+  bidDiscount?: number | bigint;
+  netPrizeMoney?: number | bigint;
+  disbursementMode?: string;
+  paymentReference?: string | null;
+  agreementSigned?: boolean;
+  nomineeSigned?: boolean;
+  isSecurityRequired?: boolean;
+  blankChequeDetails?: string | null;
+  verifiedByUserName?: string;
+  authorizedByUserName?: string;
+  branchName?: string | null;
+  branchAddress?: string | null;
+  branchPhone?: string | null;
+  chitGroup?: { groupCode?: string; chitValue?: number | bigint };
+  auction?: { auctionMonth?: number; bidDiscount?: number | bigint; prizeMoney?: number | bigint };
+  winner?: { ticketNumber?: number; ticketCode?: string; customer?: { fullName?: string; fullNameTamil?: string | null; phone?: string } };
+  disbursement?: { disbursementMode?: string; referenceNumber?: string | null };
+  safetyProof?: { agreementSigned?: boolean; nomineeSigned?: boolean; isSecurityRequired?: boolean; blankChequeDetails?: string | null };
+  verifiedByUser?: { name?: string };
+  authorizedByUser?: { name?: string };
+  branch?: { name?: string; address?: string; phone?: string };
+}
+
 export default function PrintVoucherPage() {
   const params = useParams();
   const auctionId = params?.id as string;
@@ -16,7 +50,7 @@ export default function PrintVoucherPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.disbursements.voucher(auctionId),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<PrintVoucherApiResponse>(
         apiClient.GET('/api/v1/disbursements/auction/{auctionId}/voucher', {
           params: { path: { auctionId } },
           signal,

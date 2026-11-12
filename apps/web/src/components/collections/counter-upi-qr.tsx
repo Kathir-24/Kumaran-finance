@@ -13,13 +13,22 @@ interface CounterUpiQrProps {
   netPayableAmount: number | bigint;
 }
 
+interface CounterUpiIntentData {
+  upiUri?: string;
+  payeeName?: string;
+  payeeVpa?: string;
+  transactionNote?: string;
+  groupCode?: string;
+  ticketNumber?: number;
+}
+
 export function CounterUpiQr({ dueId, netPayableAmount }: CounterUpiQrProps) {
   const [qrSvg, setQrSvg] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.installments.upiIntent(dueId),
     queryFn: async ({ signal }) => {
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<CounterUpiIntentData>(
         apiClient.GET('/api/v1/installments/{dueId}/upi-intent', {
           params: { path: { dueId } },
           signal,

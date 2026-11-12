@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { SafetyProofUploadBox } from './safety-proof-upload-box';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
 export interface WinnerSafetyData {
@@ -107,10 +107,10 @@ export function SafetyProofChecklist({
       });
       onSuccess?.();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Failed to verify safety proof',
+        text: getErrorMessage(err, 'Failed to verify safety proof'),
       });
     },
   });

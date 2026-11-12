@@ -4,14 +4,8 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Award,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Coins,
-  Receipt,
-  User,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
@@ -59,7 +53,6 @@ interface FormXxiTableProps {
 
 export function FormXxiTable({ ledger }: FormXxiTableProps) {
   const t = useTranslations('reports.ledger');
-  const tCommon = useTranslations('common');
 
   const { customer, summary, monthlySchedule } = ledger;
 

@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 
 export interface PendingHandoverCollectionItem {
   paymentId: string;
@@ -108,7 +108,7 @@ export function HandoverVerificationCard({
         ? `${notes.trim()} | Denominations: ${denomSummary}`
         : `Denominations: ${denomSummary}`;
 
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<{ message?: string; notes?: string }>(
         apiClient.POST('/api/v1/collections/cash-handover/acknowledge', {
           body: {
             collectorUserId: batch.collectorUserId,
@@ -139,7 +139,7 @@ export function HandoverVerificationCard({
         voucherNumber: voucherNum,
       });
     },
-    onError: (err: any) => setErrorMessage(err.message || 'Error acknowledging cash into vault'),
+    onError: (err: unknown) => setErrorMessage(getErrorMessage(err, 'Error acknowledging cash into vault')),
   });
 
   return (

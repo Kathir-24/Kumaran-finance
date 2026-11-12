@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, FileSpreadsheet, Loader2, Plus, Search, Layers } from 'lucide-react';
+import { FileSpreadsheet, Plus, Search, Layers } from 'lucide-react';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/stores/auth-store';
@@ -33,7 +33,7 @@ export default function SchemesDirectoryPage() {
   }, [activeTab, debouncedSearch]);
 
   const queryParams = React.useMemo(() => {
-    const params: { status?: any; search?: string; page: number; limit: number } = {
+    const params: { status?: Exclude<FilterTab, 'ALL'>; search?: string; page: number; limit: number } = {
       page,
       limit: SCHEMES_PAGE_LIMIT,
     };

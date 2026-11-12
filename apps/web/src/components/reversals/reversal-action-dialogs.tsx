@@ -8,9 +8,6 @@ import {
   XCircle,
   AlertTriangle,
   Loader2,
-  Receipt,
-  User,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   Dialog,
@@ -23,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatRupee } from '@/lib/currency';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 
 export interface PendingReversalItem {
   id: string;
@@ -60,7 +57,7 @@ export function ApproveReversalDialog({
   const approveMutation = useMutation({
     mutationFn: async () => {
       if (!reversal) return;
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<unknown>(
         apiClient.POST('/api/v1/payments/{id}/approve-reversal', {
           params: { path: { id: reversal.paymentId } },
           body: { notes: checkerNotes.trim() || undefined },
@@ -75,7 +72,7 @@ export function ApproveReversalDialog({
       onClose();
       onSuccess();
     },
-    onError: (err: any) => setErrorMessage(err.message || 'Error approving reversal'),
+    onError: (err: unknown) => setErrorMessage(getErrorMessage(err, 'Error approving reversal')),
   });
 
   if (!reversal) return null;
@@ -180,7 +177,7 @@ export function RejectReversalDialog({
       if (rejectionReason.trim().length < 5) {
         throw new Error('Mandatory rejection reason must be at least 5 characters');
       }
-      return unwrapApiResponse<any>(
+      return unwrapApiResponse<unknown>(
         apiClient.POST('/api/v1/payments/{id}/reject-reversal', {
           params: { path: { id: reversal.paymentId } },
           body: { rejectionReason: rejectionReason.trim() },
@@ -195,7 +192,7 @@ export function RejectReversalDialog({
       onClose();
       onSuccess();
     },
-    onError: (err: any) => setErrorMessage(err.message || 'Error rejecting reversal'),
+    onError: (err: unknown) => setErrorMessage(getErrorMessage(err, 'Error rejecting reversal')),
   });
 
   if (!reversal) return null;
