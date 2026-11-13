@@ -57,10 +57,14 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | | Verify UPI Claim & Issue Receipt | Yes (Checker)| Yes (Branch) | Yes (Checker)| No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Submit Cash Handover | Yes (Agent role)| No | No | Yes (Assigned) | No | No | `CONFIRMED-BY-DEVELOPER` |
 | | Acknowledge Cash Handover | Yes | Yes (Branch) | Yes | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Payment Adjustments**| Request Payment Reversal (Maker)| Yes | Yes (Branch) | Yes | No | No | No | `CONFIRMED-BY-DEVELOPER` |
-| | Approve Payment Reversal (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| **Offline Auctions** | Record Auction Result (Maker) | Yes | Yes (Branch) | No | No | View result | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| | Finalize Auction Result (Checker)| Yes | Authorized checker | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Payment Adjustments**| Request Payment Reversal (Maker)| Yes (Partner A)| No | No | No | No | No | `CONFIRMED-BY-DEVELOPER` |
+| | Approve Payment Reversal (Checker)| Yes (Partner B)| No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Offline Auctions** | Record Auction Result (Maker) | Yes (Partner A)| Yes (Branch) | No | No | View result | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Finalize Auction Result (Checker)| Yes (Partner B)| No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Request Auction Correction (Maker)| Yes (Partner A)| No | No | No | No | No | `CONFIRMED-BY-DEVELOPER` |
+| | Approve Auction Correction (Checker)| Yes (Partner B)| No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| **Defaulter Management**| Remove Defaulter (3-Month Default)| Yes (Partner A)| No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | Settle Defaulter Exit (Checker)| Yes (Partner B)| No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Prize Disbursement** | Verify Safety Proof Checklist & Voucher (Maker)| Yes | Yes (Branch) | Yes (Voucher prep)| No | View status | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Authorize Prize Payout (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Reports & Auditing** | View Financial Reports & Day Books| Global | Branch scope | Global | Dual role only | Own passbook | Read-only | `CONFIRMED-BY-DEVELOPER` |
@@ -77,20 +81,31 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 > **The Maker and Checker must always be different individual user accounts (`CONFIRMED-BY-DEVELOPER`).**  
 > Under no circumstances may the user who initiates or records an action approve or finalize it. The application and database strictly reject any transaction where `maker_user_id == checker_user_id`, regardless of the user's role or partner status.
 
-### 1. Payment Reversals & Adjustments:
-- **Maker**: Super Admin (Partner A) or Accountant initiates a reversal request with a mandatory documented justification.
-- **Checker**: Super Admin (Partner B) verifies the justification and approves the ledger adjustment.
+### 1. Payment Reversals & Adjustments (`KFC-SEC-001`):
+- **Maker**: Super Admin (Partner A only) initiates a reversal request with a mandatory documented justification (`POST /payments/:id/request-reversal`). Branch Manager and Accountant roles are strictly blocked.
+- **Checker**: Super Admin (Partner B) verifies the justification and approves the ledger adjustment (`POST /payments/:id/approve-reversal`).
 - **Hard Guard**: `maker_user_id != checker_user_id` (Partner A cannot approve their own reversal request; Partner B, C, or D must verify).
 
-### 2. Offline Auction Recording vs. Finalization:
+### 2. Offline Auction Recording vs. Finalization (`KFC-SEC-003`):
 - **Maker (Record Result)**: Super Admin (Partner A who conducted/attended physical auction) enters winning ticket, bid discount, and attendee list.
-- **Checker (Finalize Result)**: Super Admin (Partner B) reviews the entered bid against ceiling rules ($D \le V/4$) and commits the auction outcome.
+- **Checker (Finalize Result)**: Super Admin (Partner B) reviews the entered bid against ceiling rules ($D \le V/4$) and commits the auction outcome (`POST /auctions/:id/finalize`). Branch Manager is strictly blocked from finalizing.
+- **Hard Guard**: `maker_user_id != checker_user_id`.
+
+### 2.1 Finalized Auction Correction (`KFC-FIN-005`):
+- **Maker (Request Correction)**: Super Admin (Partner A) requests correction of winning ticket or bid discount with mandatory reason (`POST /auctions/:id/correction/request`). Blocked if prize money already disbursed.
+- **Checker (Approve Correction)**: Super Admin (Partner B) verifies and applies correction (`POST /auctions/:id/correction/approve`), swapping `isPrized` flags and reconciling downstream unpaid dues.
 - **Hard Guard**: `maker_user_id != checker_user_id`.
 
 ### 3. Prize Money Disbursement:
 - **Maker (Verify & Submit)**: Accountant or Super Admin (Partner A) verifies the physical safety proof checklist (winner agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads) and prepares the payout voucher.
-- **Checker (Authorize Payout)**: Super Admin (Partner B) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash.
+- **Checker (Authorize Payout)**: Super Admin (Partner B) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash with automatic prior arrears offset (`KFC-FIN-003`). Payout overrides are strictly prohibited (`KFC-FIN-004`).
 - **Hard Guard**: `maker_user_id != checker_user_id`.
+
+### 3.1 Defaulter Removal & Exit Account Settlement (`KFC-SEC-002`, `KFC-SEC-004`):
+- **Prized Ticket Immutability (`KFC-SEC-004`)**: Prized subscriber tickets can never be removed or substituted (`PRIZED_TICKET_IMMUTABLE`).
+- **Maker (Execute Removal)**: Super Admin (Partner A) removes non-prized subscriber after 3 consecutive months of arrears (`POST /installments/tickets/:id/remove-defaulter`).
+- **Checker (Settle Exit Account)**: Super Admin (Partner B) authorizes refund minus 4% contractual damages voucher (`POST /installments/tickets/:id/settle-removal`).
+- **Hard Guard**: `ticket.removedByUserId !== adminUserId` (`MAKER_CHECKER_VIOLATION`). The partner who executed the removal cannot authorize the exit payout.
 
 ### 4. Field Cash Handover & Vault Deposit (Dual Agent/Accountant Guard):
 - **Collector (Submit Handover)**: Field Collection Agent (or staff in field collector role) collects cash from customers and submits daily handover batch.
@@ -115,12 +130,14 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 
 | High-Risk Action | Branch Manager as Checker? | Reason |
 |---|:---:|---|
-| **Finalize In-Office Auction Result** | ✅ **ALLOWED** | Operational task — verifying the bid entered matches the physical auction outcome at the branch |
-| **Approve Payment Reversal** | 🚫 **STRICTLY BLOCKED** | Ledger change — financial authority reserved exclusively for Super Admin / Partners |
-| **Authorize Prize Payout** | 🚫 **STRICTLY BLOCKED** | Financial outflow — money leaving the company; reserved exclusively for Super Admin / Partners |
+| **Finalize In-Office Auction Result** | 🚫 **STRICTLY BLOCKED** (`KFC-SEC-003`) | Financial commitment — locks dividend allocations and prize debt; reserved strictly for Super Admin / Partners |
+| **Approve Payment Reversal** | 🚫 **STRICTLY BLOCKED** (`KFC-SEC-001`) | Ledger change — financial authority reserved exclusively for Super Admin / Partners |
+| **Authorize Prize Payout** | 🚫 **STRICTLY BLOCKED** (`KFC-FIN-003`) | Financial outflow — money leaving the company; reserved exclusively for Super Admin / Partners |
+| **Approve Auction Correction** | 🚫 **STRICTLY BLOCKED** (`KFC-FIN-005`) | Ledger change — modifies dividend allocation and winner entitlement; reserved exclusively for Super Admin / Partners |
+| **Settle Defaulter Exit** | 🚫 **STRICTLY BLOCKED** (`KFC-SEC-002`) | Financial refund voucher — reserved exclusively for Super Admin / Partners under Maker != Checker |
 
-- **The Governing Principle**: Branch Manager is an **operational role**. Any action that involves **money leaving the company** or **correcting the financial ledger** is strictly reserved for **Super Admin (Partners)** as the final financial authority — regardless of whether a Branch Manager is ever hired in the future.
-- **Hard Guard**: Backend must reject any `checker_user_id` with `BRANCH_MANAGER`-only role attempting to approve a payment reversal or authorize a prize payout, even if that user's role array does not include `SUPER_ADMIN`.
+- **The Governing Principle**: Branch Manager is strictly an **operational branch facilitation role**. Any action that involves **money leaving the company**, **finalizing auctions**, or **correcting the financial ledger** is strictly reserved for **Super Admin (Partners)** as the final financial authority.
+- **Hard Guard**: Backend asserts `@Roles(Role.SUPER_ADMIN)` on all finalization, reversal, correction, and exit settlement endpoints. Any non-Super Admin caller fails with `HTTP 403 Forbidden`.
 
 ---
 

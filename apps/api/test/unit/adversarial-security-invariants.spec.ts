@@ -506,6 +506,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
   describe('2. Branch Manager Role Blocks (Super Admin Exclusivity)', () => {
     let paymentService: PaymentService;
     let disbursementService: DisbursementService;
+    let auctionService: AuctionService;
 
     beforeEach(() => {
       paymentService = new PaymentService(prismaMock as unknown as PrismaService);
@@ -513,6 +514,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         prismaMock as unknown as PrismaService,
         {} as any,
       );
+      auctionService = new AuctionService(prismaMock as unknown as PrismaService);
     });
 
     it('should STRICTLY BLOCK Branch Manager from approving payment reversals (403 Forbidden)', async () => {
@@ -541,6 +543,21 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       ).rejects.toThrow(
         new ForbiddenException(
           'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to authorize prize money disbursements',
+        ),
+      );
+    });
+
+    it('KFC-SEC-003: should STRICTLY BLOCK Branch Manager from finalizing auctions (403 Forbidden)', async () => {
+      await expect(
+        auctionService.finalizeAuction(
+          mockAuctionId,
+          mockBranchManagerId,
+          undefined,
+          [Role.BRANCH_MANAGER], // Branch Manager role only
+        ),
+      ).rejects.toThrow(
+        new ForbiddenException(
+          'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to finalize and commit auctions.',
         ),
       );
     });

@@ -185,6 +185,32 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
 
+    it('KFC-PDF-001: should generate valid subscription receipt PDF with bilingual CANCELLED watermark for reversed payments', async () => {
+      const buffer = await SubscriptionReceiptTemplate.generate({
+        receiptNumber: 'KC-REC-PRD-2026-00412',
+        date: new Date('2026-10-18T10:45:00Z'),
+        groupCode: 'KCA-1L-20M-01',
+        installmentMonth: 4,
+        durationMonths: 20,
+        ticketNumber: 7,
+        subscriberName: 'S. Sundaram',
+        subscriberNameTamil: 'சுந்தரம்',
+        address: '14, Netaji Road, Perundurai',
+        phone: '9842143210',
+        baseInstallment: 5000n,
+        dividendDeduction: 1250n,
+        netPayableAmount: 3750n,
+        amountPaid: 3750n,
+        paymentMethod: 'CASH',
+        collectedByName: 'M. Kathiresan (AG-01)',
+        isCancelled: true, // Reversed payment watermark
+      });
+
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(500);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
     it('should generate a valid bilingual prize payout voucher PDF buffer', async () => {
       const buffer = await PayoutVoucherTemplate.generate({
         voucherNumber: 'KC-VOU-PRD-2026-00001',

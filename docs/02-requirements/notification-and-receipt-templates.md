@@ -7,7 +7,7 @@
 > 2. **All Financial & Operational Events**: Follow a single, elegant **Smart Channel Hierarchy**:
 >    - **Smartphone Users (App installed / `fcmToken` present)**: Receive **Free In-App Push Notifications (FCM, ₹0 cost)** deep-linking to the passbook or auction screen.
 >    - **Keypad Phone Users (Non-app / No `fcmToken`)**: Fall back to **Telecom DLT SMS**.
-> 3. **WhatsApp Business API**: **Parked / Shelved in V1** to eliminate third-party SaaS and per-conversation fees.
+> 3. **WhatsApp Business API**: **Parked / Shelved in V1 (`KFC-NOT-001`, Rule 34)** to eliminate third-party SaaS and per-conversation fees. Any code simulation stubs are strictly diagnostic mocks; active production delivery channels are exclusively Mobile Push (FCM) and Indian DLT SMS (MSG91).
 > 4. **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobiles).
 > 5. **Report Sharing**: Manual on-demand utility (A4 PDF download & Excel/CSV export) for Form XXII, Form XXI, and Handover tallies.
 > **Languages**: English & தமிழ் (Tamil)  
@@ -55,6 +55,39 @@ However, the software generates and archives a computer-generated digital receip
 --------------------------------------------------------------------------------
   * கணினி மூலம் உருவாக்கப்பட்ட ரசீது. கையொப்பம் தேவையில்லை.
   * This is a computer-generated digital receipt.
+================================================================================
+```
+
+### 1.2 Cancelled / Reversed Payment Receipt (`KFC-PDF-001` / `CONFIRMED-BY-DEVELOPER`)
+When a payment is reversed by dual-partner approval (`PaymentStatus === 'REVERSED'`), the PDFKit engine bypasses any pre-reversal cached S3 document and generates a marked invalid receipt:
+- **Header Alert**: Prominent banner `*** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***`
+- **Watermark Specification**:
+  - Text: `ரத்து செய்யப்பட்டது / CANCELLED`
+  - Font: 28pt Bold Helvetica
+  - Color: Crimson Red (`#DC2626`)
+  - Angle: -35° diagonal
+  - Opacity: 0.22 centered across the page
+- **Audit Footer**: Displays reversal timestamp, approving partner ID, and reversal reason.
+- **Cache File**: Stored and retrieved under key `${receiptNumber}-cancelled.pdf` to guarantee that invalid receipts can never be misrepresented as active.
+
+```text
+================================================================================
+                    KUMARAN FINANCE / குமரன் பைனான்ஸ்
+               Chit Fund Operations / சீட்டு நிறுவனம்
+        Main Road, Perundurai, Erode / தலைமை கிளை, பெருந்துறை, ஈரோடு
+================================================================================
+            *** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***
+--------------------------------------------------------------------------------
+ரசீது எண் / Receipt No   : KC-REC-PRD-2026-00412    தேதி / Date : 17-Oct-2026
+ரத்து தேதி / Cancelled   : 18-Oct-2026 14:30       காரணம் / Reason: WRONG_TICKET
+--------------------------------------------------------------------------------
+                     /-----------------------------------\
+                    /   ரத்து செய்யப்பட்டது / CANCELLED   \
+                   \         (REVERSAL VERIFIED)         /
+                    \-----------------------------------/
+--------------------------------------------------------------------------------
+செலுத்திய தொகை / AMOUNT PAID : ₹ 3,750 [ரத்து செய்யப்பட்டது / REVERSED]
+ஒப்புதல் / Approved By      : பார்ட்னர் (Super Admin B)
 ================================================================================
 ```
 

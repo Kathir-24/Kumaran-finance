@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import * as path from 'path';
-import { Prisma, Role } from '@prisma/client';
+import { DueStatus, Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -607,10 +607,42 @@ export class DisbursementService {
       );
     }
 
-    const amountToDisburse =
-      dto.disbursedAmount !== undefined && dto.disbursedAmount !== null
-        ? toWholeRupeeBigInt(dto.disbursedAmount, 'disbursedAmount', { min: 1n })
-        : auction.prizeMoney || 0n;
+    // KFC-FIN-003: Query all outstanding unpaid dues up to this auction month
+    const unpaidDues = typeof this.prisma.installmentDue?.findMany === 'function'
+      ? await this.prisma.installmentDue.findMany({
+          where: {
+            ticketId: auction.winner.ticketId,
+            installmentMonth: { lte: auction.installmentMonth },
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+          },
+          orderBy: { installmentMonth: 'asc' },
+        })
+      : [];
+    const totalArrears = unpaidDues.reduce(
+      (sum, d) => sum + (BigInt(d.netPayableAmount ?? 0n) - BigInt(d.paidAmount ?? 0n)),
+      0n,
+    );
+
+    const grossPrizeMoney = auction.prizeMoney || 0n;
+    if (totalArrears > 0n && totalArrears >= grossPrizeMoney) {
+      throw new BadRequestException(
+        `OUTSTANDING_ARREARS_EXCEED_PRIZE: Outstanding arrears (₹${totalArrears.toString()}) exceed or equal prize money (₹${grossPrizeMoney.toString()}). Prize cannot be authorized until arrears are resolved.`,
+      );
+    }
+
+    // KFC-FIN-004: Exactly calculated net entitlement (Zero arbitrary override)
+    const authorizedNetPayout = grossPrizeMoney - totalArrears;
+
+    if (dto.disbursedAmount !== undefined && dto.disbursedAmount !== null) {
+      const requestedAmount = toWholeRupeeBigInt(dto.disbursedAmount, 'disbursedAmount', { min: 1n });
+      if (requestedAmount !== authorizedNetPayout) {
+        throw new BadRequestException(
+          `PAYOUT_OVERRIDE_NOT_PERMITTED: Payout amount must exactly match authorized net prize after arrears deduction of ₹${authorizedNetPayout.toString()} (Gross: ₹${grossPrizeMoney.toString()}, Arrears: ₹${totalArrears.toString()}, Requested: ₹${requestedAmount.toString()}). Arbitrary adjustments are strictly prohibited.`,
+        );
+      }
+    }
+
+    const amountToDisburse = authorizedNetPayout;
 
     const result = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) to eliminate concurrent duplicate authorization
@@ -639,6 +671,8 @@ export class DisbursementService {
           entityId: auction.winner!.id,
           newValue: {
             disbursementMode: dto.disbursementMode,
+            grossPrizeMoney: grossPrizeMoney.toString(),
+            arrearsDeducted: totalArrears.toString(),
             disbursedAmount: amountToDisburse.toString(),
             authorizedByUserId: checkerUserId,
             status: 'AUTHORIZED_BY_CHECKER',
@@ -706,6 +740,36 @@ export class DisbursementService {
           paymentReference: dto.paymentReference,
           disbursedAt: releaseDate,
           disbursementStatus: 'DISBURSED',
+        },
+      });
+
+      // KFC-FIN-003: Auto-settle any outstanding dues that were deducted from the prize snapshot
+      const unpaidDuesToSettle = typeof tx.installmentDue?.findMany === 'function'
+        ? await tx.installmentDue.findMany({
+            where: {
+              ticketId: auction.winner!.ticketId,
+              installmentMonth: { lte: auction.installmentMonth },
+              status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            },
+          })
+        : [];
+
+      for (const d of unpaidDuesToSettle) {
+        if (typeof tx.installmentDue?.update === 'function') {
+          await tx.installmentDue.update({
+            where: { id: d.id },
+            data: {
+              status: DueStatus.PAID,
+              paidAmount: d.netPayableAmount,
+            },
+          });
+        }
+      }
+
+      await tx.subscriberTicket.update({
+        where: { id: auction.winner!.ticketId },
+        data: {
+          consecutiveUnpaidMonths: 0,
         },
       });
 
@@ -905,7 +969,8 @@ export class DisbursementService {
 
     const finalMonth = chit.durationMonths;
     const commissionAmount = (chit.chitValue * 4n) / 100n; // 4.00%
-    const prizeMoney = chit.chitValue - commissionAmount;
+    const finalMonthInstallment = chit.baseInstallment ?? (chit.chitValue / BigInt(chit.durationMonths));
+    const grossPrize = chit.chitValue;
     const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
 
     const result = await withTransactionRetry(this.prisma, async (tx) => {
@@ -923,6 +988,84 @@ export class DisbursementService {
         );
       }
 
+      // Check for any prior unpaid dues (Months 1 to N-1)
+      const unpaidPriorDues = typeof tx.installmentDue?.findMany === 'function'
+        ? await tx.installmentDue.findMany({
+            where: {
+              ticketId: ticket.id,
+              installmentMonth: { lt: finalMonth },
+              status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            },
+            orderBy: { installmentMonth: 'asc' },
+          })
+        : [];
+      const priorArrears = unpaidPriorDues.reduce(
+        (sum, d) => sum + (BigInt(d.netPayableAmount ?? 0n) - BigInt(d.paidAmount ?? 0n)),
+        0n,
+      );
+
+      // KFC-FIN-001: Net Prize Entitlement = Chit Value - 4% Commission - Final Month Installment - Prior Arrears
+      const netPayablePrize = grossPrize - commissionAmount - finalMonthInstallment - priorArrears;
+      if (netPayablePrize < 0n) {
+        throw new BadRequestException(
+          `OUTSTANDING_ARREARS_EXCEED_PRIZE: Total outstanding installments and commission exceed the chit prize value`,
+        );
+      }
+
+      // Settle Month N installment due for the winning ticket
+      if (typeof tx.installmentDue?.findUnique === 'function') {
+        const existingFinalDue = await tx.installmentDue.findUnique({
+          where: {
+            ticketId_installmentMonth: {
+              ticketId: ticket.id,
+              installmentMonth: finalMonth,
+            },
+          },
+        });
+
+        if (existingFinalDue) {
+          await tx.installmentDue.update({
+            where: { id: existingFinalDue.id },
+            data: {
+              status: DueStatus.PAID,
+              paidAmount: finalMonthInstallment,
+              grossAmount: finalMonthInstallment,
+              dividendDeduction: 0n,
+              netPayableAmount: finalMonthInstallment,
+            },
+          });
+        } else if (typeof tx.installmentDue?.create === 'function') {
+          await tx.installmentDue.create({
+            data: {
+              chitGroupId,
+              ticketId: ticket.id,
+              installmentMonth: finalMonth,
+              grossAmount: finalMonthInstallment,
+              dividendDeduction: 0n,
+              netPayableAmount: finalMonthInstallment,
+              paidAmount: finalMonthInstallment,
+              status: DueStatus.PAID,
+              cycleStartDate: releaseDate,
+              cycleEndDate: releaseDate,
+              dueDate: releaseDate,
+            },
+          });
+        }
+
+        // Mark any prior unpaid dues settled via maturity payout offset
+        for (const due of unpaidPriorDues) {
+          if (typeof tx.installmentDue?.update === 'function') {
+            await tx.installmentDue.update({
+              where: { id: due.id },
+              data: {
+                status: DueStatus.PAID,
+                paidAmount: due.netPayableAmount,
+              },
+            });
+          }
+        }
+      }
+
       // Create settlement auction record for Month N
       const settlementAuction = await tx.auction.create({
         data: {
@@ -936,13 +1079,13 @@ export class DisbursementService {
           foremanCommissionAmount: commissionAmount,
           totalDividend: 0n,
           dividendPerTicket: 0n,
-          prizeMoney,
+          prizeMoney: grossPrize - commissionAmount,
           conductedByUserId: checkerUserId,
           finalizedByUserId: checkerUserId,
         },
       });
 
-      // Create AuctionWinner record
+      // Create AuctionWinner record with exact net disbursed amount
       await tx.auctionWinner.create({
         data: {
           auctionId: settlementAuction.id,
@@ -950,7 +1093,7 @@ export class DisbursementService {
           wasTieBreakWinner: false,
           disbursementStatus: 'DISBURSED',
           disbursementMode: dto.disbursementMode,
-          disbursedAmount: prizeMoney,
+          disbursedAmount: netPayablePrize,
           authorizedByUserId: checkerUserId,
           disbursedAt: releaseDate,
           paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
@@ -959,12 +1102,14 @@ export class DisbursementService {
         },
       });
 
-      // Update ticket to prized
+      // Update ticket to prized and clear arrears
       await tx.subscriberTicket.update({
         where: { id: ticket.id },
         data: {
           isPrized: true,
           prizedAuctionId: settlementAuction.id,
+          consecutiveUnpaidMonths: 0,
+          status: 'ACTIVE',
         },
       });
 
@@ -986,9 +1131,11 @@ export class DisbursementService {
           newValue: {
             ticketId: ticket.id,
             ticketNumber: ticket.ticketNumber,
-            grossPrize: chit.chitValue.toString(),
+            grossPrize: grossPrize.toString(),
             foremanCommission: commissionAmount.toString(),
-            netPrizeMoney: prizeMoney.toString(),
+            finalMonthInstallment: finalMonthInstallment.toString(),
+            priorArrearsDeducted: priorArrears.toString(),
+            netPrizeMoney: netPayablePrize.toString(),
             disbursementMode: dto.disbursementMode,
             paymentReference: dto.paymentReference,
             status: 'COMPLETED',
@@ -997,15 +1144,17 @@ export class DisbursementService {
       });
 
       return {
-        message: `Final Month ${finalMonth} maturity settlement successfully executed for Ticket #${ticket.ticketNumber} (${ticket.customer.fullName}). Scheme marked as COMPLETED.`,
+        message: `Final Month ${finalMonth} maturity settlement successfully executed for Ticket #${ticket.ticketNumber} (${ticket.customer.fullName}). Final installment of ₹${finalMonthInstallment.toString()} and 4% commission of ₹${commissionAmount.toString()} deducted. Net payout: ₹${netPayablePrize.toString()}. Scheme marked as COMPLETED.`,
         settlement: {
           chitGroupId,
           installmentMonth: finalMonth,
           ticketNumber: ticket.ticketNumber,
           customerName: ticket.customer.fullName,
-          grossPrize: chit.chitValue,
-          foremanCommission: commissionAmount,
-          netPrizeMoney: prizeMoney,
+          grossPrize: Number(grossPrize),
+          foremanCommission: Number(commissionAmount),
+          finalMonthInstallment: Number(finalMonthInstallment),
+          priorArrearsDeducted: Number(priorArrears),
+          netPrizeMoney: Number(netPayablePrize),
           disbursementMode: dto.disbursementMode,
           paymentReference: dto.paymentReference,
           disbursedAt: releaseDate,

@@ -8,10 +8,11 @@
 
 1. **Company & Tenancy**: Built specifically for **Kumaran Finance** operating as a strict single-company database (zero redundant `company_id` columns).
 2. **Whole Rupee Arithmetic**: All financial amounts (installments, dividends, foreman commissions, prize payouts) are stored and calculated strictly as **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations.
-3. **Commission & Dividends**: Foreman commission defaults to **4.00%** and is frozen per chit group upon activation. Dividends are shared **equally across ALL members in that chit group, INCLUDING the auction winner and past prized winners** (`CONFIRMED-BY-DEVELOPER`), and deducted directly from the monthly installment payable next month ($I_{net} = I_{base} - Div$).
-4. **Auctions & Tie-Breaks**: Auctions are conducted offline at the branch. The software records and validates bids against a fixed **one-fourth (1/4 or 25%) discount ceiling** ($D \le \frac{V}{4}$). Tied ceiling bids are resolved via **Option A (Physical Paper Token Draw)** at the branch.
-5. **Operating Structure & Dual Controls**: Supports Kumaran Finance's structure (**4 equal partners**, **2–3 field collection agents**, **1 physical branch office**). The 4 Partners have 100% full feature parity across both Web (`apps/web`) and Mobile (`apps/mobile`) frontends. High-risk financial actions strictly enforce **Maker-Checker separation of duties** (`maker_user_id != checker_user_id`) across any device combination.
+3. **Commission & Dividends**: Foreman commission defaults to **4.00%** and is frozen per chit group upon activation. Dividends are shared **equally across ALL members in that chit group, INCLUDING the auction winner and past prized winners** (`CONFIRMED-BY-DEVELOPER`), and deducted directly from the monthly installment payable next month ($I_{net} = I_{base} - Div$). Total dividend must be cleanly divisible across tickets ($(D - C_f) \pmod M == 0$). Month $N$ final settlement deducts commission, base installment, and prior arrears ($V - C_f - I_{\text{base}} - \text{arrears} = \mathbf{₹91,000}$ net on ₹1L chit).
+4. **Auctions & Tie-Breaks**: Auctions are conducted offline at the branch. The software records and validates bids against a fixed **one-fourth (1/4 or 25%) discount ceiling** ($D \le \frac{V}{4}$). Tied ceiling bids are resolved via **Option A (Physical Paper Token Draw)** at the branch. Clerical corrections follow a 2-partner workflow (`KFC-FIN-005`).
+5. **Operating Structure & Dual Controls**: Supports Kumaran Finance's structure (**4 equal partners**, **2–3 field collection agents**, **1 physical branch office**). High-risk financial actions (reversals, auction finalization, auction corrections, prize payouts, defaulter exit settlements) strictly enforce **Maker-Checker separation of duties** (`maker_user_id != checker_user_id`) and partner exclusivity.
 6. **Data Scope**: Handles fresh new chits as well as mid-cycle onboarding from physical paper notebooks and physical receipts.
+7. **Operational Platform Scope**: Production focus is on the Web Management Portal (`apps/web`) and NestJS API (`apps/api`). Implementation of the Flutter mobile UI and Android application is **postponed** per explicit owner approval; all mobile API contracts remain preserved.
 
 ---
 
@@ -79,9 +80,22 @@ docs/
 │   ├── manual-onboarding-sop.md              # Physical notebook-to-digital onboarding wizard
 │   ├── operations-sop.md                     # Daily cash handover & reversal SOP
 │   └── user-manuals/                         # Role-specific user manuals (Admin, Cashier, Agent, Customer, Manager, Auditor)
-├── 08-audit/
-│   ├── repository-audit-report.md            # Independent defect register & verification proofs
-│   └── remediation-baseline.md               # Audit remediation & controlled execution baseline
+├── 08-audit/                                 # 15 Master Audit & Remediation Verification Documents
+│   ├── CONFIRMED-BUSINESS-RULES.md           # Authoritative 34 confirmed business requirements
+│   ├── MASTER-REMEDIATION-REGISTER.md        # Canonical defect tracking register (11/11 Closed)
+│   ├── REMEDIATION-IMPLEMENTATION-PLAN.md    # Phased engineering remediation plan (Phases 0–6)
+│   ├── REMEDIATION-CHANGELOG.md              # Detailed source code diffs and test additions
+│   ├── FINANCIAL-REGRESSION-EVIDENCE.md      # Mathematical proofs, Month N, divisibility, arrears
+│   ├── SECURITY-MAKER-CHECKER-EVIDENCE.md    # Dual control matrix, role blocks, anti-IDOR proofs
+│   ├── DATABASE-MIGRATION-CONCURRENCY-EVIDENCE.md # 25 real-DB concurrency suites & pessimistic locks
+│   ├── WEB-PDF-LOCALIZATION-EVIDENCE.md      # Bilingual PDFKit engine & cancelled watermark specs
+│   ├── REDIS-BULLMQ-RELIABILITY-EVIDENCE.md  # Redis noeviction, fault tolerance, queue durability
+│   ├── CI-CD-TEST-EXECUTION-EVIDENCE.md      # 52/52 suites (834/834 tests) execution log
+│   ├── BACKUP-DISASTER-RECOVERY-EVIDENCE.md  # AES-256 GPG backup cron, Cloudflare R2, DR runbook
+│   ├── DOCUMENTATION-CONSISTENCY-REGISTER.md # Code-to-doc reconciliation register
+│   ├── FLUTTER-ANDROID-DEFERRED-SCOPE.md     # Formal specification of postponed mobile UI
+│   ├── OPEN-BUSINESS-LEGAL-DECISIONS.md      # Partner board resolution items (escrow, cheques, tax)
+│   └── FINAL-PRODUCTION-READINESS.md         # Final production sign-off & go-live runbook
 └── web/                                      # Next.js 15 Web Operations Portal module specs (21 files; see docs/web/README.md)
 ```
 
@@ -187,7 +201,7 @@ pnpm run lint
 # 2. Run monorepo TypeScript checks (SDK + Web + API build)
 pnpm run typecheck
 
-# 3. Run monorepo unit tests (8 SDK + 828 API unit + 347 Web unit tests)
+# 3. Run monorepo unit tests (8 SDK + 834 API unit + 347 Web unit tests across 52 API suites)
 pnpm run test
 pnpm run test:e2e
 

@@ -22,6 +22,7 @@ export interface ReceiptPdfData {
   branchName?: string;
   branchAddress?: string;
   branchPhone?: string;
+  isCancelled?: boolean; // KFC-PDF-001: True if payment reversal was approved
 }
 
 export class SubscriptionReceiptTemplate {
@@ -156,6 +157,18 @@ export class SubscriptionReceiptTemplate {
       doc.text('* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. / This is a computer-generated digital receipt.', leftX, currentY, { align: 'center', width: pageWidth });
       doc.text('* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).', leftX, currentY + 9, { align: 'center', width: pageWidth });
       doc.text('* The primary acknowledged legal proof of payment is the signed physical paper passbook.', leftX, currentY + 18, { align: 'center', width: pageWidth });
+
+      // KFC-PDF-001: Bold Red Diagonal Cancelled Watermark for Reversed Payments (ADR-07 & Q22)
+      if (data.isCancelled) {
+        doc.save();
+        doc.rotate(-35, { origin: [209.76, 297.64] });
+        doc.font(boldFont).fontSize(28).fillColor('#DC2626').fillOpacity(0.28);
+        doc.text('ரத்து செய்யப்பட்டது / CANCELLED', -50, 280, {
+          align: 'center',
+          width: 519.53,
+        });
+        doc.restore();
+      }
 
       doc.end();
     });

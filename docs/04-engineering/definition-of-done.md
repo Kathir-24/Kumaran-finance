@@ -39,14 +39,20 @@ flowchart LR
 ### Gate 4: Security & Authorization (RBAC)
 - [ ] Endpoint is protected with JWT Auth Guard and Role Decorators (e.g., `@Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)`).
 - [ ] Branch scoping enforced: Users cannot read or mutate data outside their assigned branch unless granted global scope.
-- [ ] Sensitive operations (payment reversals, auction finalization, prize payouts) require Maker-Checker dual approval with **`maker_user_id != checker_user_id`** strictly enforced (`CONFIRMED-BY-DEVELOPER`).
+- [ ] Sensitive operations (payment reversals, auction finalization, auction corrections, prize payouts, defaulter exit settlements) require Maker-Checker dual control with **`maker_user_id != checker_user_id`** strictly enforced by backend services and database transactions (`CONFIRMED-BY-DEVELOPER`).
+- [ ] Partner exclusivity enforced: Payment reversal initiation, auction finalization, auction corrections, and defaulter exit settlements are strictly restricted to `SUPER_ADMIN` (the 4 Partners).
 - [ ] Distributed SMS OTP request cooldown (60s via `auth:otp:cooldown:<phone>`) and 5-minute brute-force lockout (300s via `auth:otp:lockout:<phone>` on 3rd invalid attempt) enforced with in-memory fallback to protect SMS gateway quota and prevent cycling attacks.
 
 ### Gate 5: Automated Testing Coverage
-- [ ] Unit tests for services and calculation logic pass with 100% success rate.
+- [ ] Unit tests for services and calculation logic pass with 100% success rate across all **52/52 test suites (834/834 tests, 0 failures)**.
 - [ ] Integration tests verify database transactions and pessimistic row locking (`SELECT FOR UPDATE`).
 - [ ] Mathematical invariant tests verify zero rupee leaks:
   $$\text{Foreman Commission } (4\%) + \text{Total Member Dividends} = \text{Discount}$$
+- [ ] Whole-rupee divisibility guard verified: $(D - C_f) \pmod M == 0$, rejecting fractional bids with HTTP 400.
+- [ ] Month $N$ final settlement verified: $V - C_f - I_{\text{base}} - \text{priorArrears}$, with Month $N$ installment atomically marked `PAID`.
+- [ ] Prize payout arrears auto-offset verified: prior unpaid dues are deducted from prize snapshot and auto-settled on release; payout overrides fail closed (`PAYOUT_OVERRIDE_NOT_PERMITTED`).
+- [ ] Prized ticket immutability verified: prized tickets reject defaulter removal or substitution with HTTP 400 `PRIZED_TICKET_IMMUTABLE`.
+- [ ] Cancelled receipt PDF verified: reversed payments bypass cached active PDFs and render bold red diagonal `ரத்து செய்யப்பட்டது / CANCELLED` watermark.
 - [ ] **Full $N \times N$ Status Transition Matrix Coverage**: Every model with a status lifecycle has exhaustive $N \times N$ transition tests (113 total transitions across the 9 product lifecycles) verifying that all illegal transitions fail-closed with HTTP 400 `BadRequestException`.
 - [ ] **Ambiguous Failure & Network Disconnect Chaos Coverage**: External storage mid-upload drops verify zero orphan database records; external telecom 504 timeouts verify non-blocking financial ledger isolation and driver-level exponential backoff retries.
 - [ ] **SMS OTP Cooldown & Lockout Coverage**: Rate limit and brute-force tests verify 60s request cooldown (HTTP 429) and 3-attempt 5-minute lockout (HTTP 429) across distributed Redis and in-memory stores.

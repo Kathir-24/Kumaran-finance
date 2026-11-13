@@ -193,11 +193,11 @@ export class TicketController {
 
   @Post(':id/settle-removal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.ACCOUNTANT)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Defaulter Account Settlement & Exit Refund Voucher',
+    summary: 'Defaulter Account Settlement & Exit Refund Voucher (Partner strictly, Maker != Checker)',
     description:
-      'Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.',
+      'Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Strictly requires two-partner approval: Partner who removed cannot settle. Allowed strictly: Super Admin.',
   })
   @ApiOkResponseEnvelope(SettleRemovalResponseDto, {
     description: 'Defaulter account exit settlement executed successfully',

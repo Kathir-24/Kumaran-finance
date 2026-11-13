@@ -6,7 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { AuctionStatus, Prisma } from '@prisma/client';
+import { AuctionStatus, DueStatus, Prisma, Role } from '@prisma/client';
 import {
   lockAuctionMinutesRow,
   lockAuctionRow,
@@ -32,6 +32,10 @@ import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
+import {
+  ApproveAuctionCorrectionDto,
+  RequestAuctionCorrectionDto,
+} from './dto/auction-correction.dto';
 
 @Injectable()
 export class AuctionService {
@@ -54,6 +58,15 @@ export class AuctionService {
     const commissionAmount =
       (chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
     const totalDividend = bidDiscount - commissionAmount;
+
+    // KFC-FIN-002: Whole-Rupee Divisibility Invariant (Zero Remainder Truncation)
+    if (totalDividend % totalTickets !== 0n) {
+      const remainder = totalDividend % totalTickets;
+      throw new BadRequestException(
+        `NON_DIVISIBLE_DIVIDEND: Bid discount ₹${bidDiscount.toString()} produces a total dividend of ₹${totalDividend.toString()}, which is not evenly divisible across ${totalTickets.toString()} members (remainder: ₹${remainder.toString()}). Only bids producing exact whole-rupee dividends are permitted.`,
+      );
+    }
+
     const dividendPerTicket = totalDividend / totalTickets;
     const prizeMoney = chitValue - bidDiscount;
 
@@ -439,13 +452,20 @@ export class AuctionService {
   }
 
   /**
-   * Checker: commits official auction result, freezes dividends, and enforces Maker != Checker
+   * Checker: commits official auction result, freezes dividends, and enforces Maker != Checker (Partner strictly)
    */
   async finalizeAuction(
     auctionId: string,
     checkerUserId: string,
     dto?: FinalizeAuctionDto,
+    userRoles?: string[],
   ) {
+    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to finalize and commit auctions.',
+      );
+    }
+
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
@@ -935,6 +955,283 @@ export class AuctionService {
     return {
       message: 'Auction minutes marked as filed with Registrar successfully.',
       minutes: updated,
+    };
+  }
+
+  /**
+   * KFC-FIN-005 / Q12: Maker Partner requests correction of a finalized auction.
+   * Allowed strictly: Super Admin (Partners).
+   * Fails closed if prize money has already been disbursed.
+   */
+  async requestAuctionCorrection(
+    auctionId: string,
+    partnerUserId: string,
+    dto: RequestAuctionCorrectionDto,
+    userRoles?: string[],
+  ) {
+    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to request auction corrections.',
+      );
+    }
+
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: {
+        chitGroup: true,
+        winner: { include: { ticket: true } },
+      },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (
+      auction.status !== AuctionStatus.COMPLETED &&
+      auction.status !== AuctionStatus.MINUTES_FILED
+    ) {
+      throw new BadRequestException(
+        `AUCTION_NOT_FINALIZED: Only finalized auctions can be corrected (current status: ${auction.status})`,
+      );
+    }
+
+    // Safety Invariant: Disbursed prize money is mathematically and legally immutable
+    if (auction.winner?.disbursementStatus === 'DISBURSED') {
+      throw new BadRequestException(
+        'DISBURSED_PRIZE_IMMUTABLE: Cannot correct an auction whose prize money has already been disbursed to the winner.',
+      );
+    }
+
+    const correctedDiscount = toWholeRupeeBigInt(
+      dto.correctedBidDiscount,
+      'correctedBidDiscount',
+      { min: 1n },
+    );
+
+    // Validate whole-rupee dividend divisibility (KFC-FIN-002) and 25% ceiling (ADR-06)
+    const math = this.calculateAuctionMath(
+      auction.chitGroup.chitValue,
+      BigInt(auction.chitGroup.totalTickets),
+      correctedDiscount,
+    );
+
+    let correctedTicket: any = null;
+    if (dto.correctedWinningTicketId) {
+      correctedTicket = await this.prisma.subscriberTicket.findUnique({
+        where: { id: dto.correctedWinningTicketId },
+      });
+
+      if (!correctedTicket || correctedTicket.chitGroupId !== auction.chitGroupId) {
+        throw new BadRequestException(
+          'INVALID_TICKET: Corrected winning ticket does not belong to this chit scheme',
+        );
+      }
+
+      // If ticket is prized in an earlier auction, reject
+      if (
+        correctedTicket.isPrized &&
+        correctedTicket.id !== auction.winner?.ticketId
+      ) {
+        throw new BadRequestException(
+          `TICKET_ALREADY_PRIZED: Ticket #${correctedTicket.ticketNumber} is already prized in another auction`,
+        );
+      }
+    }
+
+    const log = await this.prisma.auditLog.create({
+      data: {
+        userId: partnerUserId,
+        action: 'AUCTION_CORRECTION_REQUESTED',
+        entityType: 'Auction',
+        entityId: auctionId,
+        oldValue: {
+          bidDiscount: auction.bidDiscount?.toString(),
+          prizeMoney: auction.prizeMoney?.toString(),
+          dividendPerTicket: auction.dividendPerTicket?.toString(),
+          ticketId: auction.winner?.ticketId,
+          ticketNumber: auction.winner?.ticket?.ticketNumber,
+        },
+        newValue: {
+          correctedBidDiscount: correctedDiscount.toString(),
+          correctedPrizeMoney: math.prizeMoney.toString(),
+          correctedDividendPerTicket: math.dividendPerTicket.toString(),
+          correctedWinningTicketId: dto.correctedWinningTicketId || auction.winner?.ticketId,
+          correctedTicketNumber: correctedTicket?.ticketNumber || auction.winner?.ticket?.ticketNumber,
+          reason: dto.reason,
+          notes: dto.notes || null,
+          requestedByUserId: partnerUserId,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Auction Month ${auction.installmentMonth} correction requested. An independent Partner must review and authorize approval.`,
+      correctionRequestId: log.id,
+      auctionId,
+      correctedMath: {
+        bidDiscount: Number(correctedDiscount),
+        foremanCommission: Number(math.commissionAmount),
+        totalDividend: Number(math.totalDividend),
+        dividendPerTicket: Number(math.dividendPerTicket),
+        prizeMoney: Number(math.prizeMoney),
+      },
+    };
+  }
+
+  /**
+   * KFC-FIN-005 / Q12: Independent Checker Partner approves auction correction.
+   * Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).
+   * Recalculates dividends, updates winner ticket, and adjusts downstream dues.
+   */
+  async approveAuctionCorrection(
+    auctionId: string,
+    checkerPartnerUserId: string,
+    dto?: ApproveAuctionCorrectionDto,
+    userRoles?: string[],
+  ) {
+    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to approve auction corrections.',
+      );
+    }
+
+    const pendingRequest = await this.prisma.auditLog.findFirst({
+      where: {
+        entityType: 'Auction',
+        entityId: auctionId,
+        action: 'AUCTION_CORRECTION_REQUESTED',
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    if (!pendingRequest || !pendingRequest.newValue) {
+      throw new BadRequestException(
+        'NO_PENDING_CORRECTION: No pending correction request found for this auction.',
+      );
+    }
+
+    // Strict Maker != Checker Dual Control
+    if (pendingRequest.userId === checkerPartnerUserId) {
+      throw new ForbiddenException(
+        'Maker-Checker Separation of Duties Violated: The Partner who requested the auction correction cannot approve it. An independent Partner must review and authorize.',
+      );
+    }
+
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: {
+        chitGroup: true,
+        winner: { include: { ticket: true } },
+      },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    if (auction.winner?.disbursementStatus === 'DISBURSED') {
+      throw new BadRequestException(
+        'DISBURSED_PRIZE_IMMUTABLE: Cannot correct an auction whose prize money has already been disbursed to the winner.',
+      );
+    }
+
+    const reqData = pendingRequest.newValue as any;
+    const correctedDiscount = BigInt(reqData.correctedBidDiscount);
+    const correctedTicketId = reqData.correctedWinningTicketId || auction.winner?.ticketId;
+
+    const math = this.calculateAuctionMath(
+      auction.chitGroup.chitValue,
+      BigInt(auction.chitGroup.totalTickets),
+      correctedDiscount,
+    );
+
+    const result = await withTransactionRetry(this.prisma, async (tx) => {
+      // 1. Update Auction financial snapshots
+      const updatedAuction = await tx.auction.update({
+        where: { id: auctionId },
+        data: {
+          bidDiscount: correctedDiscount,
+          foremanCommissionAmount: math.commissionAmount,
+          totalDividend: math.totalDividend,
+          dividendPerTicket: math.dividendPerTicket,
+          prizeMoney: math.prizeMoney,
+        },
+      });
+
+      // 2. If winner ticket changed, swap isPrized flags
+      if (auction.winner && auction.winner.ticketId !== correctedTicketId) {
+        // Un-prize old ticket
+        await tx.subscriberTicket.update({
+          where: { id: auction.winner.ticketId },
+          data: { isPrized: false, prizedAuctionId: null },
+        });
+
+        // Mark new ticket prized
+        await tx.subscriberTicket.update({
+          where: { id: correctedTicketId },
+          data: { isPrized: true, prizedAuctionId: auctionId },
+        });
+
+        // Update winner record
+        await tx.auctionWinner.update({
+          where: { id: auction.winner.id },
+          data: {
+            ticketId: correctedTicketId,
+            disbursedAmount: null,
+            disbursementStatus: 'PENDING_VERIFICATION',
+          },
+        });
+      }
+
+      // 3. Compensating Dues Adjustment for Subsequent Month (if already generated)
+      const nextMonth = auction.installmentMonth + 1;
+      if (typeof tx.installmentDue?.findMany === 'function') {
+        const nextMonthUnpaidDues = await tx.installmentDue.findMany({
+          where: {
+            chitGroupId: auction.chitGroupId,
+            installmentMonth: nextMonth,
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+          },
+        });
+
+        for (const due of nextMonthUnpaidDues) {
+          const newNet = due.grossAmount - math.dividendPerTicket;
+          await tx.installmentDue.update({
+            where: { id: due.id },
+            data: {
+              dividendDeduction: math.dividendPerTicket,
+              netPayableAmount: newNet > 0n ? newNet : 0n,
+            },
+          });
+        }
+      }
+
+      // 4. Log Approved Correction
+      await tx.auditLog.create({
+        data: {
+          userId: checkerPartnerUserId,
+          action: 'AUCTION_CORRECTION_APPROVED',
+          entityType: 'Auction',
+          entityId: auctionId,
+          oldValue: pendingRequest.oldValue,
+          newValue: {
+            ...reqData,
+            approvedByUserId: checkerPartnerUserId,
+            checkerNotes: dto?.notes || null,
+            approvedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      return updatedAuction;
+    });
+
+    return {
+      success: true,
+      message: `Auction Month ${auction.installmentMonth} correction approved by Partner. Dividends and subsequent dues reconciled.`,
+      auction: result,
     };
   }
 }

@@ -1301,6 +1301,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       await prisma.auditLog.deleteMany({
         where: { action: 'FINAL_MONTH_SETTLEMENT_EXECUTED', entityId: tempChit.id },
       });
+      await prisma.installmentDue.deleteMany({ where: { ticketId: tempTicket.id } });
       await prisma.auctionWinner.deleteMany({ where: { ticketId: tempTicket.id } });
       await prisma.auction.deleteMany({ where: { chitGroupId: tempChit.id } });
       await prisma.subscriberTicket.deleteMany({ where: { id: tempTicket.id } });

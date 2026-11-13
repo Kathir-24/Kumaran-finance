@@ -93,7 +93,13 @@ export class FinalSettlementDataDto {
   @ApiProperty({ example: 4000 })
   foremanCommission: number;
 
-  @ApiProperty({ example: 96000 })
+  @ApiProperty({ example: 5000, description: 'Final month base installment deducted from payout', required: false })
+  finalMonthInstallment?: number;
+
+  @ApiProperty({ example: 0, description: 'Prior arrears deducted from payout', required: false })
+  priorArrearsDeducted?: number;
+
+  @ApiProperty({ example: 91000 })
   netPrizeMoney: number;
 
   @ApiProperty({ example: 'ACCOUNT_PAYEE_CHEQUE' })

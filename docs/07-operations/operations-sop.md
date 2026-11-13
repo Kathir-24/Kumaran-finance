@@ -62,19 +62,20 @@ Financial transactions can never be deleted from the database. If a staff member
 - Cheque bounced or dishonored by the bank.
 - Duplicate entry created due to network timeout.
 
-### 2.2 Reversal Workflow:
-1. **Maker (Desk Accountant / Partner A)**:
+### 2.2 Reversal Workflow (Strict Partner Dual Control - `KFC-SEC-001`):
+1. **Maker (Partner A / Super Admin exclusively)**:
    - Navigates to the payment record in the Web Dashboard.
-   - Clicks **"Request Payment Reversal"**.
+   - Clicks **"Request Payment Reversal"** (`POST /payments/:id/request-reversal`).
    - Selects mandatory reason code and uploads supporting proof (e.g., bank bounce slip or customer note).
+   - *Note*: Branch Manager and Accountant roles are strictly blocked from requesting reversals.
 2. **Checker (Partner B / Super Admin)**:
    - Receives high-priority reversal request in the Admin Dashboard.
-   - Verifies the reason and clicks **"Approve Reversal"**.
+   - Verifies the reason and clicks **"Approve Reversal"** (`POST /payments/:id/approve-reversal`).
    - **Hard Rule**: `maker_user_id != checker_user_id` (Partner A cannot approve their own reversal request; Partner B, C, or D must verify).
 3. **Automated Ledger Effect**:
    - The original payment is flagged as `REVERSED`.
    - The corresponding `InstallmentDue` is restored strictly to `UNPAID` with zero mathematical discrepancy.
-   - The original receipt is marked `VOID / CANCELED`.
+   - The original receipt is marked `REVERSED`, and all subsequent PDF downloads dynamically render the bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (`KFC-PDF-001`).
    - An immutable audit log records the Maker ID, Checker ID, timestamp, and justification.
 
 ---
@@ -99,7 +100,12 @@ flowchart LR
    - The customer who did not pay up to **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
    - The software tracks consecutive missed installments, flags the ticket with status `DEFAULT_3_MONTHS`, and prompts company management for review.
    - Company Management / Partners can formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M`.
-   - The company may then substitute a new subscriber or settle past contributions according to company terms.
+   - **Dual-Partner Control on Exit Settlement (`KFC-SEC-002`)**:
+     - Partner A executes subscriber removal (`POST /installments/tickets/:id/remove-defaulter`).
+     - Partner B authorizes the exit refund voucher minus 4% contractual damages (`POST /installments/tickets/:id/settle-removal`).
+     - Hard Guard: `ticket.removedByUserId !== adminUserId` (`MAKER_CHECKER_VIOLATION`). The partner who removed the subscriber cannot approve the exit payout.
+   - **Prized Ticket Immutability (`KFC-SEC-004`)**:
+     - Prized tickets can NEVER be removed or substituted (`PRIZED_TICKET_IMMUTABLE`). The system rejects any removal attempt on a prized ticket with HTTP 400.
 
 ### 3.2 Prized Subscriber Default (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)
 Because a prized subscriber has already received the pool amount:
@@ -107,6 +113,17 @@ Because a prized subscriber has already received the pool amount:
    - Demand notice is served on the subscriber and nominee based on the physical documents recorded in the **Company Safety Proof Checklist** during prize disbursement (signed agreement with winner & nominee signatures, signed blank cheques, promissory notes).
 2. **Statutory Recovery (`UNVERIFIED-LEGAL`)**:
    - Formal arbitration or legal petition before the Registrar of Chits for recovery of remaining installments. Legal citations are retained as `UNVERIFIED-LEGAL` pending inspection of primary Tamil Nadu regulatory orders.
+
+---
+
+### 3.3 Finalized Auction Correction SOP (`KFC-FIN-005` / `CONFIRMED-BY-DEVELOPER`)
+If a clerical error occurred during physical auction recording (e.g. inverted ticket number or mistyped discount):
+1. **Maker Request**: Partner A enters `POST /auctions/:id/correction/request` with corrected ticket ID or discount and documented justification.
+   - **Pre-Condition**: Fails closed with `HTTP 400 Bad Request` if prize money has already been disbursed.
+   - **Math Guard**: Enforces 25% discount ceiling and whole-rupee divisibility.
+2. **Checker Approval**: Partner B reviews physical lot draw sheet and submits `POST /auctions/:id/correction/approve`.
+   - **Dual Control**: Enforces `maker_user_id != checker_user_id` (`HTTP 403 Forbidden`).
+   - **Ledger Re-alignment**: Atomically updates auction math, swaps prized subscriber flag if winner changed, and reconciles downstream unpaid dues.
 
 ---
 

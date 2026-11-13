@@ -57,10 +57,12 @@ Every subscriber's physical paper passbook at Kumaran Finance maintains strictly
    - In every auction month, the discount is **competitive and dynamic**:
      $$4\% \text{ Foreman Commission} \le \text{Bid Discount } (D) \le \frac{1}{4} \text{ Ceiling } \left(\frac{V}{4}\right)$$
    - Discount does not have to be static. In quiet months it may be lower (e.g. ₹30,000 or ₹40,000); when competition hits the 25% ceiling (₹75,000), physical paper token lot draws are conducted in front of members.
-5. **Final Month (Month $N$) Settlement**:
-   - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission:
-     $$\text{Final Settlement Payout} = V - (V \times 0.04)$$
-   - Executed via `POST /api/v1/disbursements/group/{chitGroupId}/final-settlement` by Super Admin. Scheme status transitions to `COMPLETED`.
+5. **Final Month (Month $N$) Settlement (`CONFIRMED-BY-DEVELOPER`)**:
+   - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission ($C_f$), minus the final month's payable base installment ($I_{\text{base}}$), minus any prior unpaid arrears:
+     $$\text{Final Net Settlement Payout} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
+   - **Concrete Example**: On a ₹1,00,000 chit with 20 months ($I_{\text{base}} = \text{₹5,000}$, $C_f = \text{₹4,000}$), the net payout is strictly $\text{₹91,000}$ ($100,000 - 4,000 - 5,000$).
+   - The Month $N$ `InstallmentDue` is atomically settled as `PAID` in the same database transaction.
+   - Executed via `POST /api/v1/disbursements/group/{chitGroupId}/final-settlement` exclusively by Super Admin (Partners). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -106,8 +108,12 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
 - **No Auction**: There is **NO bidding auction** in the final month.
 - **Settlement Flow**:
   1. The single remaining non-prized subscriber is entitled to the final prize money.
-  2. The company takes the 4.00% foreman commission ($C_f$) and the final month's payable installment.
-  3. The company settles the entire remaining prize amount directly to the final subscriber with a formal settlement payout receipt.
+  2. The company retains the 4.00% foreman commission ($C_f = \text{₹4,000}$).
+  3. The subscriber's Month $N$ final base installment ($I_{\text{base}} = \text{₹5,000}$) is deducted directly from the pool payout, and their Month $N$ `InstallmentDue` record is marked `PAID`.
+  4. Any prior unpaid arrears are also deducted from the prize snapshot.
+  5. The net payout issued to the final subscriber is:
+     $$\text{Net Payout} = V - C_f - I_{\text{base}} - \text{priorArrears} = ₹1,00,000 - ₹4,000 - ₹5,000 - ₹0 = \mathbf{₹91,000}$$
+  6. The payout is authorized and released via formal settlement voucher by Super Admin (Partners).
 
 ---
 
@@ -126,10 +132,15 @@ The dividend settlement policy is confirmed as follows:
 
 ---
 
-## 4. Rounding and Remainder Handling (`CONFIRMED-BY-DEVELOPER`)
+## 4. Rounding, Remainder & Divisibility Gate (`CONFIRMED-BY-DEVELOPER`)
 
 - **Whole Number Mandate (`CONFIRMED-BY-DEVELOPER`)**: All financial values in Kumaran Finance (installments, dividends, commissions, prize payouts, and receipts) are **always whole numbers (Rupees only; paise never comes in)**.
-- **Standard Dividend Policy (`CONFIRMED-BY-DEVELOPER`)**: Kumaran Finance maintains standard dividend amounts across chit groups, ensuring clean whole numbers are maintained without fractional rupee accumulation or division issues.
+- **Whole-Rupee Dividend Divisibility Gate (`KFC-FIN-002`)**:
+  - The total member dividend ($Div_{total} = D - C_f$) must be **cleanly and perfectly divisible** by the total number of tickets ($M$) in the chit group:
+    $$(D - C_f) \pmod M == 0$$
+  - If a submitted bid discount would produce a fractional rupee or non-zero remainder (e.g., a ₹20,005 bid discount on a 20-ticket chit yields $(20,005 - 4,000) \pmod{20} = 5 \ne 0$), the application **strictly rejects the bid fail-closed** at entry with:
+    `HTTP 400 Bad Request: NON_DIVISIBLE_DIVIDEND: Total dividend (₹16005) must be cleanly divisible by 20 tickets.`
+  - The system **never silently truncates remainders** via integer division, guaranteeing zero rupee leakage across the lifecycle.
 
 ---
 
@@ -160,6 +171,18 @@ The dividend settlement policy is confirmed as follows:
   - The Foreman draws paper tokens/lots physically at the branch office in the presence of participating members.
   - Branch staff simply enters the winning ticket number drawn into the software.
   - The software records the result without running an autonomous digital RNG draw.
+
+### 6.4 Finalized Auction Correction Workflow (`KFC-FIN-005` / `CONFIRMED-BY-DEVELOPER`)
+In the event of a human clerical error during physical auction data entry (e.g. inverted digit on winning ticket or mistyped discount):
+1. **Maker Request (`POST /api/v1/auctions/:id/correction/request`)**:
+   - Initiated strictly by **Super Admin (Partner A)** with a mandatory justification.
+   - Enforces the 25% discount ceiling and whole-rupee divisibility rules on the corrected values.
+   - **Immutable Disbursed Prize Guard**: If the prize money has already been disbursed (`disbursementStatus === 'DISBURSED'`), correction is strictly blocked.
+2. **Checker Approval (`POST /api/v1/auctions/:id/correction/approve`)**:
+   - Approved strictly by **Super Admin (Partner B)** with hard dual control: `maker_user_id != checker_user_id`.
+   - Atomically updates auction fields (`winningTicketId`, `bidDiscount`, `prizeMoney`, `dividendPerTicket`).
+   - If the winning ticket changes, swaps `isPrized` flags (unmarks old winner, marks new winner).
+   - Reconciles downstream month installment dues (`netPayableAmount = baseInstallment - correctedDividend`) for unpaid records. Paid records remain preserved to protect financial auditability.
 
 ---
 
@@ -219,3 +242,18 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 5. **Discrete Net Due Exact Match (ADR-07)**:
    - Payment amount must identically equal `due.netPayableAmount` ($I_{net} = I_{base} - Div_{ticket}$).
    - Partial payments, advance overpayments, and floating credit balances are rejected with `HTTP 400 Bad Request`.
+
+---
+
+## 10. Prize Disbursement Arrears Offset & Override Guard (`KFC-FIN-003`, `KFC-FIN-004`)
+
+1. **Automatic Arrears Offsetting (`KFC-FIN-003`)**:
+   - When authorizing a prize payout (`POST /api/v1/disbursements/auction/:auctionId/authorize`), the system queries all unpaid installment dues for the winning subscriber up to the auction month.
+   - Total outstanding arrears are automatically deducted from the gross prize money:
+     $$\text{Authorized Net Payout} = \text{Prize Money } (P) - \text{Total Arrears}$$
+   - **Insolvency Guard**: If total unpaid arrears are greater than or equal to the prize money ($\text{Arrears} \ge P$), authorization is rejected fail-closed.
+   - Upon release (`POST /api/v1/disbursements/auction/:auctionId/release`), all deducted dues are atomically marked as `PAID` in the same transaction.
+2. **Staff Payout Override Prohibition (`KFC-FIN-004`)**:
+   - The release payload accepts an optional `disbursedAmount`. If supplied, it **must identically equal** the authorized net payout (`authorizedNetPayout`).
+   - Any attempt by staff to manually override or alter the payout amount is rejected with:
+     `HTTP 400 Bad Request: PAYOUT_OVERRIDE_NOT_PERMITTED: Manual override of authorized payout is prohibited.`

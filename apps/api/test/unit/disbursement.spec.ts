@@ -125,6 +125,13 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       auditLog: {
         create: jest.fn(),
       },
+      installmentDue: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'due-month-n-created' }),
+        update: jest.fn().mockResolvedValue({ id: 'due-month-n-updated' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
@@ -369,7 +376,10 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
     });
 
     it('should authorize prize payout in CASH for large amount (zero artificial cash block)', async () => {
-      prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockVerifiedAuction,
+        prizeMoney: 375000n,
+      });
       prismaMock.auctionWinner.update.mockResolvedValue({
         ...mockVerifiedAuction.winner,
         disbursementMode: DisbursementMode.CASH,
@@ -442,6 +452,61 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         'report:dashboard:branch-prd-01',
         'report:approvals:branch-prd-01',
       );
+    });
+
+    it('KFC-FIN-003: should automatically deduct unpaid installment arrears from prize money at payout authorization', async () => {
+      // Auction prize money: 75,000. Customer has 2 unpaid installments totaling 10,000.
+      prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: 'due-1', installmentMonth: 2, netPayableAmount: 5000n, paidAmount: 0n, status: 'UNPAID' },
+        { id: 'due-2', installmentMonth: 3, netPayableAmount: 5000n, paidAmount: 0n, status: 'UNPAID' },
+      ]);
+      prismaMock.auctionWinner.update.mockResolvedValue({
+        ...mockVerifiedAuction.winner,
+        disbursedAmount: 65000n, // 75,000 - 10,000
+        authorizedByUserId: mockCheckerId,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+      });
+
+      const result = await disbursementService.authorizePayout(
+        mockAuctionId,
+        {
+          disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          notes: 'Deducted ₹10,000 prior arrears from ₹75,000 prize',
+        },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      // Verify DB update recorded net amount after arrears offset: 75,000 - 10,000 = 65,000
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockWinner.id },
+          data: expect.objectContaining({
+            disbursedAmount: 65000n,
+            authorizedByUserId: mockCheckerId,
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+          }),
+        }),
+      );
+    });
+
+    it('KFC-FIN-004: should strictly reject arbitrary payout override if disbursedAmount does not match authorized net payout', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
+      prismaMock.installmentDue.findMany.mockResolvedValue([]); // Zero arrears -> expected net: 75,000
+
+      // Caller attempts to pass arbitrary disbursedAmount = 70,000 instead of calculated 75,000
+      await expect(
+        disbursementService.authorizePayout(
+          mockAuctionId,
+          {
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+            disbursedAmount: 70000, // Override attempt!
+          },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -626,7 +691,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should successfully execute final Month N settlement (₹1L chit -> ₹4,000 commission -> ₹96,000 net payout)', async () => {
+    it('should successfully execute final Month N settlement (KFC-FIN-001: ₹1L chit -> ₹4,000 commission - ₹5,000 Month N installment -> ₹91,000 net payout)', async () => {
       prismaMock.chitGroup.findUnique.mockResolvedValue({
         ...mockChitGroup,
         status: 'ACTIVE',
@@ -643,11 +708,11 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       prismaMock.auction.create.mockResolvedValue({
         id: 'auction-settle-final',
         installmentMonth: 20,
-        prizeMoney: 96000n,
+        prizeMoney: 91000n,
       });
       prismaMock.auctionWinner.create.mockResolvedValue({
         id: 'winner-settle-final',
-        disbursedAmount: 96000n,
+        disbursedAmount: 91000n,
         disbursementStatus: 'DISBURSED',
       });
       prismaMock.subscriberTicket.update.mockResolvedValue({
@@ -671,9 +736,11 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         [Role.SUPER_ADMIN],
       );
 
-      expect(result.settlement.grossPrize).toBe(100000n);
-      expect(result.settlement.foremanCommission).toBe(4000n); // 4% of 100,000
-      expect(result.settlement.netPrizeMoney).toBe(96000n);    // 100,000 - 4,000
+      expect(result.settlement.grossPrize).toBe(100000);
+      expect(result.settlement.foremanCommission).toBe(4000); // 4% of 100,000
+      expect(result.settlement.finalMonthInstallment).toBe(5000); // 100,000 / 20 months
+      expect(result.settlement.priorArrearsDeducted).toBe(0);
+      expect(result.settlement.netPrizeMoney).toBe(91000);    // 100,000 - 4,000 - 5,000
       expect(result.settlement.installmentMonth).toBe(20);
       expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
         expect.objectContaining({

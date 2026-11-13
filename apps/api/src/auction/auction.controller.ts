@@ -39,6 +39,10 @@ import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
+import {
+  ApproveAuctionCorrectionDto,
+  RequestAuctionCorrectionDto,
+} from './dto/auction-correction.dto';
 
 @ApiTags('Auctions')
 @ApiBearerAuth('JWT-auth')
@@ -199,23 +203,24 @@ export class AuctionController {
 
   @Post(':id/finalize')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Checker: Finalize auction and commit results (Maker != Checker)',
+    summary: 'Checker: Finalize auction and commit results (Partner strictly, Maker != Checker)',
     description:
-      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.',
+      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed strictly: Super Admin (Partner). Throws 403 Forbidden if finalized by the same user who recorded bids.',
   })
   @ApiOkResponseEnvelope(FinalizeAuctionResponseDto, { description: 'Auction successfully finalized' })
   @ApiResponse({
     status: 403,
-    description: 'Maker-Checker separation violated',
+    description: 'Maker-Checker separation violated or non-partner caller',
   })
   async finalize(
     @Param('id') auctionId: string,
     @CurrentUser('sub') checkerUserId: string,
+    @CurrentUser('roles') userRoles: Role[],
     @Body() dto?: FinalizeAuctionDto,
   ) {
-    return this.auctionService.finalizeAuction(auctionId, checkerUserId, dto);
+    return this.auctionService.finalizeAuction(auctionId, checkerUserId, dto, userRoles);
   }
 
   @Get(':id/minutes')
@@ -259,6 +264,54 @@ export class AuctionController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.auctionService.markMinutesFiled(auctionId, dto, currentUser.sub);
+  }
+
+  @Post(':id/correction/request')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Maker: Request correction of a finalized auction (Partner strictly)',
+    description:
+      'Initiates an audited correction of a finalized auction discount or winner. Strictly requires two-partner approval. Fails closed if prize money has already been disbursed.',
+  })
+  @ApiResponse({ status: 400, description: 'Auction not finalized, prize already disbursed, or non-divisible dividend' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Super Admin only' })
+  @ApiResponse({ status: 404, description: 'Auction not found' })
+  async requestAuctionCorrection(
+    @Param('id') auctionId: string,
+    @Body() dto: RequestAuctionCorrectionDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.auctionService.requestAuctionCorrection(
+      auctionId,
+      currentUser.sub,
+      dto,
+      currentUser.roles,
+    );
+  }
+
+  @Post(':id/correction/approve')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Checker: Authorize and apply finalized auction correction (Independent Partner)',
+    description:
+      'Approves auction correction, recalculates universal dividends, updates winner records, and reconciles downstream monthly dues. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).',
+  })
+  @ApiResponse({ status: 400, description: 'No pending correction request or prize already disbursed' })
+  @ApiResponse({ status: 403, description: 'Maker-Checker violation or insufficient role' })
+  @ApiResponse({ status: 404, description: 'Auction not found' })
+  async approveAuctionCorrection(
+    @Param('id') auctionId: string,
+    @Body() dto: ApproveAuctionCorrectionDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.auctionService.approveAuctionCorrection(
+      auctionId,
+      currentUser.sub,
+      dto,
+      currentUser.roles,
+    );
   }
 }
 

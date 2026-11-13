@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PaymentStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
@@ -73,8 +74,11 @@ export class PdfService {
       DocumentAccessHelper.assertReceiptAccess(payment, requestingUser);
     }
 
+    const isCancelled = payment.paymentStatus === PaymentStatus.REVERSED;
+
     // If receipt PDF has already been generated and persisted to S3/storage, return directly
-    if (payment.receipt.pdfS3Key) {
+    // KFC-PDF-001: Reversed payments must return watermarked cancelled PDF (bypass pre-reversal cache)
+    if (payment.receipt.pdfS3Key && (!isCancelled || payment.receipt.pdfS3Key.includes('-cancelled'))) {
       try {
         const file = await this.storageService.getFile(payment.receipt.pdfS3Key);
         const presignedUrl = await this.storageService.getPresignedUrl(
@@ -117,11 +121,13 @@ export class PdfService {
       branchName: chit.branch.name,
       branchAddress: chit.branch.address,
       branchPhone: chit.branch.phone,
+      isCancelled,
     });
 
     const year = payment.createdAt.getFullYear();
     const branchCode = this.resolveBranchCode(chit.branch);
-    const key = StorageKeyHelper.receiptPdf(branchCode, year, payment.receipt.receiptNumber);
+    const baseKey = StorageKeyHelper.receiptPdf(branchCode, year, payment.receipt.receiptNumber);
+    const key = isCancelled ? baseKey.replace('.pdf', '-cancelled.pdf') : baseKey;
 
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
 

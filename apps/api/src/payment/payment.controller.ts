@@ -198,11 +198,11 @@ export class PaymentController {
 
   @Post(':id/request-reversal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Maker: Request payment reversal with justification',
+    summary: 'Maker: Request payment reversal with justification (Partner strictly)',
     description:
-      'Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Requires Checker approval by Super Admin.',
+      'Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Strictly requires two-partner approval: one Partner initiates, a different Partner approves.',
   })
   @ApiOkResponseEnvelope(PaymentReversalResponseDto, {
     description: 'Payment reversal requested successfully',

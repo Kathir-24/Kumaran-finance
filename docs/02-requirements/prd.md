@@ -18,6 +18,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 2. **Mid-Cycle Onboarding for Active Ongoing Chits**: Seamlessly importing active running chit groups currently tracked in physical notebooks and paper receipts (no soft copies/Excel in current business; `CONFIRMED-BY-DEVELOPER`). Captures past winners, historical payments, and generates future due schedules.
 3. **No Dead Data**: Closed or archived chits from past years are not imported into the operational database.
 4. **Currency Integrity**: All financial amounts across all modules are stored and calculated strictly as **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations (`CONFIRMED-BY-DEVELOPER`).
+5. **Operational Platform Scope**: The web operations portal (`apps/web`) and backend API (`apps/api`) represent the active production scope. The Flutter mobile UI and Android APK build are **postponed** per explicit business owner approval; all backend mobile API endpoints and contracts are preserved for future activation.
 
 ---
 
@@ -66,7 +67,10 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - **NO auction** is conducted in Month 1; dividend is ₹0.
 - **Final Month (Month $N$) Rule (`CONFIRMED-BY-DEVELOPER`)**:
   - **NO auction** is conducted in Month $N$.
-  - Company retains 4.00% commission and the final month's payable installment, and settles the entire prize money to the final non-prized subscriber with a formal payout receipt.
+  - The company retains the 4.00% foreman commission ($C_f$) and automatically deducts the final month's payable base installment ($I_{\text{base}}$) plus any prior arrears:
+    $$\text{Final Net Settlement Payout} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
+  - On a ₹1,00,000 chit ($N=20$, $I_{\text{base}}=\text{₹5,000}$, $C_f=\text{₹4,000}$), net payout is strictly **₹91,000** ($100,000 - 4,000 - 5,000$), and Month $N$ `InstallmentDue` is atomically marked `PAID`.
+  - Payout is released to the final unprized subscriber with a formal settlement voucher.
 - **Initialization Lifecycle**:
   - `NEW_GROUP`: Standard lifecycle starting from Month 1.
   - `ONGOING_GROUP`: Mid-cycle onboarding from physical paper notebooks (e.g., entering at Month 7) with historical winner discounts and opening balances.
@@ -120,18 +124,23 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount to match local business reality.
   - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).
   - Property documents are completely eliminated; security proof is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
-- **Payment Reversals**:
-  - Never delete a posted payment.
-  - Requires Maker entry with documented reason and Checker approval by Super Admin (`maker_user_id != checker_user_id`).
+- **Payment Reversals (`KFC-SEC-001`, `KFC-PDF-001`)**:
+  - Never delete a posted payment from the ledger.
+  - Reversal initiation is strictly restricted to **Super Admin (Partner A exclusively)**; Branch Manager and Accountant roles are blocked.
+  - Reversal approval is strictly restricted to **Super Admin (Partner B)** with hard dual control (`maker_user_id != checker_user_id`).
+  - Reversed receipts dynamically render a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35°, 28pt bold, `#DC2626`).
 
 ### Module 9: In-Office Staff-Recorded Auction Engine (`CONFIRMED-BY-DEVELOPER`)
-- **Offline Auction Recording**:
+- **Offline Auction Recording & Finalization**:
   - Auctions are conducted offline at the branch by staff/foreman in the presence of members.
-  - Software does not conduct auctions autonomously; it validates and records results entered by staff.
+  - Software validates and records results entered by staff; finalization is strictly reserved for **Super Admin (Partners)** under `maker_user_id != checker_user_id`.
 - **Validation Rules & Pre-Conditions**:
   1. Bid discount $\ge$ Foreman commission (4.00%).
   2. Bid discount $\le$ Fixed 1/4 (25.00%) ceiling of the total chit value ($D \le \frac{V}{4}$).
-  3. **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: Any subscriber who has not paid their installment due for that specific month is **strictly ineligible to participate or bid** in that month's auction. The system verifies payment status and blocks entering an unpaid subscriber as an active bidder or winner.
+  3. **Whole-Rupee Dividend Divisibility (`KFC-FIN-002`)**: Total dividend $(D - C_f)$ must be cleanly divisible by total tickets $M$ without remainder ($(D - C_f) \pmod M == 0$). Bids failing this are rejected fail-closed with HTTP 400 `NON_DIVISIBLE_DIVIDEND`.
+  4. **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: Any subscriber who has not paid their installment due for that specific month is **strictly ineligible to participate or bid** in that month's auction. The system verifies payment status and blocks entering an unpaid subscriber as an active bidder or winner.
+- **Finalized Auction Correction Workflow (`KFC-FIN-005`)**:
+  - Allows correcting clerical errors (winning ticket, bid discount) via 2-partner workflow (`POST /auctions/:id/correction/request` $\to$ `approve`). Blocked if prize money has already been disbursed. Swaps `isPrized` and reconciles downstream unpaid dues.
 - **Tie-Breaker Protocol (`CONFIRMED-BY-DEVELOPER`)**:
   - **Option A (Physical Paper Token Draw)**: When multiple members bid the maximum 1/4 ceiling discount, the Foreman draws paper tokens physically at the branch in front of members.
   - Staff enters the winning ticket number into the software. (No autonomous digital lottery draws).

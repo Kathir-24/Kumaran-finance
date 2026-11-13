@@ -117,7 +117,9 @@
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`); enqueues background auction result broadcast to BullMQ `notification-queue` (`JOB_DISPATCH_AUCTION_RESULT`; Push primary, Keypad SMS fallback) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`); enqueues background auction result broadcast to BullMQ `notification-queue` (`JOB_DISPATCH_AUCTION_RESULT`; Push primary, Keypad SMS fallback) | `SUPER_ADMIN` |
+| `POST` | `/auctions/:id/correction/request` | **Maker**: Request correction of winning ticket or bid discount with reason (`KFC-FIN-005`) | `SUPER_ADMIN` |
+| `POST` | `/auctions/:id/correction/approve` | **Checker**: Authorize and apply auction correction, swap prized ticket, reconcile downstream unpaid dues (`maker != checker`) | `SUPER_ADMIN` |
 | `GET`  | `/auctions/:id/minutes` | View Form XVII statutory auction minutes summary | Staff, Auditor |
 | `GET`  | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for print/PDF | Staff, Auditor |
 | `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar of Chits | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
@@ -131,7 +133,7 @@
 | `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
 | `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute removal after 3 continuous months arrears (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
 | `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
-| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher | `SUPER_ADMIN`, `ACCOUNTANT` |
+| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher (`ticket.removedByUserId !== adminUserId`) | `SUPER_ADMIN` |
 | `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` |
@@ -156,9 +158,10 @@
 | `POST` | `/payments/upi-claim` | **Customer UPI Claim**: Self-report 12-digit bank UTR reference; validates uniqueness and records payment in `INITIATED` status | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `GET`  | `/payments/pending-upi-claims` | **Claims Queue**: List pending UPI claims awaiting bank credit statement verification with pagination (`?page=1&limit=20`, max 100) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify bank credit, transition to `SUCCESS`, issue bilingual receipt & mark due `PAID` (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
-| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `SUPER_ADMIN` |
+| `GET`  | `/payments/:id/receipt/cancelled` | Generate cancelled bilingual PDF receipt with bold red diagonal `ரத்து செய்யப்பட்டது / CANCELLED` watermark | Staff, Customer, Auditor |
 
 ### 2.9 Module 8: Prize Disbursements & Safety Proof Checklist (`/api/v1/disbursements`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -169,10 +172,11 @@
 | `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof scan upload (`safety-proof/:auctionId/...`, fail-closed `fileExists`) | Staff |
 | `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
 | `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
-| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher (Cheque, NEFT/RTGS/IMPS, Cash; `maker != checker`) | `SUPER_ADMIN` |
-| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher with automatic prior arrears offset; fails closed if arrears $\ge$ prize (`maker != checker`) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher (Prohibits manual override of authorized payout) | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/release` | Release payout, auto-settle deducted arrears dues as `PAID`, record transaction reference | `SUPER_ADMIN` |
 | `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Direct payout to final subscriber without auction (Less 4% commission; completes chit) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Direct payout to final subscriber without auction (Deducts 4% commission, Month N base installment $I_{\text{base}}$, and arrears; marks Month N due `PAID`) | `SUPER_ADMIN` |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -399,9 +403,11 @@ This section provides granular contract specifications (request bodies, response
 ### 3.7 `POST /api/v1/tickets/:id/settle-removal` (Defaulter Exit Account Settlement)
 - **HTTP Method**: `POST`
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
-- **Authorized Personas**: `SUPER_ADMIN`, `ACCOUNTANT`
+- **Authorized Personas**: `SUPER_ADMIN` exclusively (`KFC-SEC-002`)
 - **Path Parameter**: `id` — Subscriber Ticket UUID
 - **Description**: Calculates cumulative installments paid by a subscriber removed under 3-month consecutive default (`REMOVED_DEF_3M`), deducts 4.00% Foreman Commission damages ($V \times 0.04$), issues an exit settlement refund voucher, and records an immutable audit log.
+- **Maker-Checker Hard Guard (`KFC-SEC-002`)**: Enforces `ticket.removedByUserId !== adminUserId`. The partner who removed the subscriber cannot authorize the exit payout; a second distinct Partner must verify and sign off (`HTTP 403 Forbidden: MAKER_CHECKER_VIOLATION`).
+- **Prized Ticket Immutability Guard (`KFC-SEC-004`)**: Prized subscriber tickets are permanently immutable and cannot be removed or settled (`HTTP 400 Bad Request: PRIZED_TICKET_IMMUTABLE`).
 - **Formula**:
   $$\text{Refund Amount} = \max(0, \text{Total Paid} - (V \times 0.04))$$
 - **Request Body (`SettleRemovalDto`)**:
@@ -432,7 +438,7 @@ This section provides granular contract specifications (request bodies, response
     }
   }
   ```
-- **Error Codes**: `400 Bad Request` (Ticket status is not `REMOVED_DEF_3M`), `404 Not Found` (Subscriber ticket not found).
+- **Error Codes**: `400 Bad Request` (Ticket status is not `REMOVED_DEF_3M` or ticket is prized), `403 Forbidden` (`MAKER_CHECKER_VIOLATION`), `404 Not Found` (Subscriber ticket not found).
 
 ---
 
@@ -540,6 +546,84 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 - `OngoingMemberAllocationDto.openingBalance`: `@IsInt()`, `@Min(0)`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees; defaults to `0`)
 - `AssignTicketDto.openingBalance`: `@IsInt()`, `@Min(0)`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees; defaults to `0`)
 - `SettlementRecordDto.amount`: `@IsInt()`, `@IsPositive()`, `@Max(MAX_SAFE_WHOLE_RUPEE)` (Whole Rupees)
+
+---
+
+### 3.12 `POST /api/v1/auctions/:id/correction/request` & `approve` (Auction Correction Workflow - `KFC-FIN-005`)
+- **HTTP Methods**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Path Parameter**: `id` — Auction UUID
+- **Request Body (`RequestAuctionCorrectionDto`)**:
+  ```json
+  {
+    "correctedWinningTicketId": "d3b07384-d113-46fb-9a1b-3efb72c9e2b1",
+    "correctedDiscount": 20000,
+    "reason": "Clerical entry error on paper token lot draw transcription."
+  }
+  ```
+- **Validation Guards**:
+  - Enforces 25% ceiling: $D \le \frac{V}{4}$.
+  - Enforces whole-rupee divisibility: $(D - C_f) \pmod M == 0$.
+  - Enforces prize immutability: fails closed with HTTP 400 if `disbursementStatus === 'DISBURSED'`.
+- **Approval Body (`ApproveAuctionCorrectionDto`)**:
+  ```json
+  {
+    "approvalNotes": "Verified against physical branch auction minutes and token sheet."
+  }
+  ```
+- **Maker-Checker Hard Guard**: Enforces `auction.correctionRequestedByUserId !== adminUserId` (`HTTP 403 MAKER_CHECKER_VIOLATION`).
+- **Ledger Impact**: Atomically swaps `isPrized` flags if winner ticket changed, recalculates universal dividend, and updates downstream unpaid installment dues.
+
+---
+
+### 3.13 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Month N Settlement - `KFC-FIN-001`)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Path Parameter**: `chitGroupId` — Chit Group UUID
+- **Description**: Settles the final month ($N$) prize directly to the sole remaining unprized subscriber without conducting an auction.
+- **Formula**:
+  $$\text{Net Payable Amount} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
+- **Request Body (`FinalMonthSettlementDto`)**:
+  ```json
+  {
+    "paymentMethod": "NEFT",
+    "notes": "Month 20 final scheme settlement for unprized ticket #20."
+  }
+  ```
+- **Success Response (`HTTP 201 Created`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 201,
+    "data": {
+      "success": true,
+      "message": "Month 20 final settlement successfully completed.",
+      "disbursementId": "d4a08192-38ef-4a11-b452-e91823761234",
+      "chitGroupId": "8e312a01-b654-4ef8-a281-d21884619384",
+      "ticketId": "91ab7281-d301-44aa-99bb-cf1928374619",
+      "subscriberName": "M. Sivakumar",
+      "chitValue": 100000,
+      "foremanCommission": 4000,
+      "monthNInstallmentDeducted": 5000,
+      "priorArrearsDeducted": 0,
+      "netPayableAmount": 91000,
+      "paymentMethod": "NEFT",
+      "monthNInstallmentStatus": "PAID",
+      "groupStatus": "COMPLETED"
+    }
+  }
+  ```
+
+---
+
+### 3.14 Cancelled Receipt Watermark Endpoint (`KFC-PDF-001`)
+- **HTTP Method**: `GET /api/v1/payments/:id/receipt`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Behavior on Reversed Payments**:
+  - When `payment.status === 'REVERSED'`, the service automatically bypasses any cached pre-reversal PDF.
+  - Dynamically renders a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35° rotation, 28pt bold, color `#DC2626`) across the page body.
+  - Adds header banner: `*** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***` with reversal timestamp and audit ID.
+  - Persists and streams the document as `KC-REC-PRD-2026-XXXXX-cancelled.pdf`.
 
 ---
 

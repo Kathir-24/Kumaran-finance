@@ -587,6 +587,13 @@ export class InstallmentService {
       throw new NotFoundException('Subscriber ticket not found');
     }
 
+    // KFC-SEC-004: Prized subscriber tickets are immutable and cannot be removed
+    if (ticket.isPrized) {
+      throw new BadRequestException(
+        'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be removed under defaulter rules. Prize money has already been disbursed; company recovery must proceed via security documents/legal instruments.',
+      );
+    }
+
     if (ticket.status === 'REMOVED_DEF_3M') {
       throw new BadRequestException('Subscriber ticket is already removed from this chit scheme');
     }
@@ -642,6 +649,13 @@ export class InstallmentService {
 
     if (!ticket) {
       throw new NotFoundException('Subscriber ticket not found');
+    }
+
+    // KFC-SEC-004: Prized subscriber tickets are immutable and cannot be substituted
+    if (ticket.isPrized) {
+      throw new BadRequestException(
+        'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be substituted under defaulter rules.',
+      );
     }
 
     if (ticket.status !== 'REMOVED_DEF_3M') {
@@ -771,9 +785,23 @@ export class InstallmentService {
       throw new NotFoundException('Subscriber ticket not found');
     }
 
+    // KFC-SEC-004: Prized subscriber tickets are immutable and cannot be settled under defaulter exit rules
+    if (ticket.isPrized) {
+      throw new BadRequestException(
+        'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be settled under defaulter exit rules.',
+      );
+    }
+
     if (ticket.status !== 'REMOVED_DEF_3M') {
       throw new BadRequestException(
         `Defaulter account settlement can only be executed on tickets with REMOVED_DEF_3M status (current status: ${ticket.status})`,
+      );
+    }
+
+    // KFC-SEC-002: Dual-Partner Separation of Duties on Defaulter Exit Settlement
+    if (ticket.removedByUserId && ticket.removedByUserId === adminUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: The Partner who authorized defaulter removal cannot approve the exit refund settlement voucher. An independent Partner must review and authorize.',
       );
     }
 

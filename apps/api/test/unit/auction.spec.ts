@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AuctionStatus } from '@prisma/client';
+import { AuctionStatus, Role } from '@prisma/client';
 import { AuctionService } from '../../src/auction/auction.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -52,6 +52,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       auctionTieBidder: {
         create: jest.fn(),
@@ -62,8 +63,13 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         upsert: jest.fn(),
         update: jest.fn(),
       },
+      installmentDue: {
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+      },
       auditLog: {
         create: jest.fn(),
+        findFirst: jest.fn(),
       },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
@@ -225,6 +231,33 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockMakerId,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('KFC-FIN-002: should strictly reject bid producing non-divisible dividend remainder (e.g. ₹20,005 on 20-ticket group)', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 3,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'S. Ramanathan' },
+      });
+
+      // (20,005 - 4,000) = 16,005. 16,005 % 20 = 5 != 0 -> Must throw
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          {
+            ticketId: mockTicketId1,
+            bidDiscount: 20005,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/NON_DIVISIBLE_DIVIDEND/);
     });
 
     it('should reject a winning bid if ticket has unpaid arrears (ADR-07)', async () => {
@@ -833,6 +866,169 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       expect(result.message).toBe('Auction minutes marked as filed with Registrar successfully.');
       expect(result.minutes.filedAtRegistrar).toBe(true);
       expect(result.minutes.filingReference).toBe('DRC/ERD/CHAL-2026-00412');
+    });
+  });
+
+  describe('7. Finalized Auction Correction Workflow (KFC-FIN-005 & Q12)', () => {
+    const mockFinalizedAuction = {
+      id: mockAuctionId,
+      chitGroupId: mockChitGroupId,
+      chitGroup: mockChitScheme,
+      installmentMonth: 3,
+      status: AuctionStatus.COMPLETED,
+      bidDiscount: 20000n,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 16000n,
+      dividendPerTicket: 800n,
+      prizeMoney: 80000n,
+      winner: {
+        id: 'winner-001',
+        ticketId: mockTicketId1,
+        disbursementStatus: 'PENDING_VERIFICATION',
+        ticket: { id: mockTicketId1, ticketNumber: 3 },
+      },
+    };
+
+    it('KFC-FIN-005: should allow Partner A to request auction correction for a finalized auction', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-corr-req-1' });
+
+      const result = await auctionService.requestAuctionCorrection(
+        mockAuctionId,
+        mockMakerId,
+        {
+          correctedBidDiscount: 24000,
+          reason: 'Corrected bid discount entered incorrectly in branch ledger',
+        },
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.correctedMath.bidDiscount).toBe(24000);
+      expect(result.correctedMath.foremanCommission).toBe(4000); // 4% of 100,000
+      expect(result.correctedMath.dividendPerTicket).toBe(1000); // (24,000 - 4,000) / 20 = 1,000
+      expect(result.correctedMath.prizeMoney).toBe(76000); // 100,000 - 24,000
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'AUCTION_CORRECTION_REQUESTED',
+            userId: mockMakerId,
+          }),
+        }),
+      );
+    });
+
+    it('KFC-FIN-005: should strictly reject correction request if prize money has already been disbursed (DISBURSED_PRIZE_IMMUTABLE)', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockFinalizedAuction,
+        winner: {
+          ...mockFinalizedAuction.winner,
+          disbursementStatus: 'DISBURSED', // Already Disbursed!
+        },
+      });
+
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          {
+            correctedBidDiscount: 24000,
+            reason: 'Attempting correction after payout',
+          },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('KFC-FIN-005: should strictly reject correction request with non-divisible dividend remainder (NON_DIVISIBLE_DIVIDEND)', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
+
+      // 20,005 - 4,000 = 16,005. 16,005 % 20 != 0
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          {
+            correctedBidDiscount: 20005,
+            reason: 'Non-divisible bid discount',
+          },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('KFC-FIN-005: should ENFORCE Maker != Checker: reject approval if requesting Partner attempts to approve own correction', async () => {
+      prismaMock.auditLog.findFirst.mockResolvedValue({
+        id: 'audit-corr-req-1',
+        userId: mockMakerId, // Requested by Partner A
+        newValue: {
+          correctedBidDiscount: '24000',
+          correctedWinningTicketId: mockTicketId1,
+        },
+      });
+
+      // Partner A attempts to approve own correction (Violation!)
+      await expect(
+        auctionService.approveAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { notes: 'Self-approval attempt' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('KFC-FIN-005: should allow independent Partner B to approve auction correction, updating dividends and reconciling downstream dues', async () => {
+      prismaMock.auditLog.findFirst.mockResolvedValue({
+        id: 'audit-corr-req-1',
+        userId: mockMakerId, // Requested by Partner A
+        newValue: {
+          correctedBidDiscount: '24000',
+          correctedWinningTicketId: mockTicketId1,
+        },
+      });
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
+      prismaMock.auction.update.mockResolvedValue({
+        ...mockFinalizedAuction,
+        bidDiscount: 24000n,
+        foremanCommissionAmount: 4000n,
+        totalDividend: 20000n,
+        dividendPerTicket: 1000n,
+        prizeMoney: 76000n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: 'due-m4-t1', grossAmount: 5000n, dividendDeduction: 800n, netPayableAmount: 4200n },
+      ]);
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-corr-app-1' });
+
+      const result = await auctionService.approveAuctionCorrection(
+        mockAuctionId,
+        mockCheckerId, // Independent Partner B approves
+        { notes: 'Approved after verifying branch register' },
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.success).toBe(true);
+      expect(prismaMock.auction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockAuctionId },
+          data: expect.objectContaining({
+            bidDiscount: 24000n,
+            dividendPerTicket: 1000n,
+            prizeMoney: 76000n,
+          }),
+        }),
+      );
+      expect(prismaMock.installmentDue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'due-m4-t1' },
+          data: expect.objectContaining({
+            dividendDeduction: 1000n,
+            netPayableAmount: 4000n, // 5000 - 1000
+          }),
+        }),
+      );
     });
   });
 });

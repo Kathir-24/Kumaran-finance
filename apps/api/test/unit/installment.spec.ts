@@ -57,6 +57,12 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       customer: {
         findUnique: jest.fn(),
       },
+      paymentAllocation: {
+        findMany: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
@@ -473,6 +479,89 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
           }),
         }),
       );
+    });
+
+    it('KFC-SEC-004: should reject defaulter removal if ticket is already prized (PRIZED_TICKET_IMMUTABLE)', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        consecutiveUnpaidMonths: 3,
+        isPrized: true, // Already Prized!
+        status: 'ACTIVE',
+        customer: { fullName: 'Prized Winner Subscriber' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      await expect(
+        installmentService.removeDefaulter(mockTicketId1, mockAdminId, {
+          reason: 'Attempting removal on prized ticket',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('KFC-SEC-004: should reject subscriber substitution if ticket is prized (PRIZED_TICKET_IMMUTABLE)', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        isPrized: true, // Already Prized!
+        status: 'REMOVED_DEF_3M',
+        customer: { fullName: 'Prized Winner Subscriber' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      await expect(
+        installmentService.substituteSubscriber(mockTicketId1, mockAdminId, {
+          newCustomerId: 'new-cust-uuid',
+          reason: 'Attempting substitution on prized ticket',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('KFC-SEC-002: should enforce Maker != Checker on settleRemoval if removing partner attempts to settle exit voucher', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        isPrized: false,
+        status: 'REMOVED_DEF_3M',
+        removedByUserId: mockAdminId, // Removed by Partner A
+        customer: { fullName: 'Removed Subscriber' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01', chitValue: 100000n },
+      });
+
+      // Partner A attempts to settle the voucher (Violation!)
+      await expect(
+        installmentService.settleRemoval(mockTicketId1, mockAdminId, {
+          paymentMethod: 'CASH',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('KFC-SEC-002: should allow independent Partner B to settle exit voucher after Partner A removed defaulter', async () => {
+      const independentPartnerId = 'partner-b-uuid';
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        isPrized: false,
+        status: 'REMOVED_DEF_3M',
+        removedByUserId: mockAdminId, // Removed by Partner A
+        customer: { fullName: 'Removed Subscriber' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01', chitValue: 100000n },
+      });
+      prismaMock.paymentAllocation.findMany.mockResolvedValue([
+        { amountAllocated: 15000n },
+      ]);
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-def-settle-1' });
+
+      const result = await installmentService.settleRemoval(
+        mockTicketId1,
+        independentPartnerId, // Independent Partner B approves
+        { paymentMethod: 'CASH' },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.totalPaid).toBe(15000);
+      expect(result.damagesDeducted).toBe(4000); // 4% of 100,000
+      expect(result.refundAmount).toBe(11000); // 15,000 - 4,000
     });
   });
 
