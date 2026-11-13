@@ -27,7 +27,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 # Copy root monorepo manifests and all workspace package descriptors
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/api-client/package.json ./packages/api-client/

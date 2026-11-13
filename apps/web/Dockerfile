@@ -47,7 +47,7 @@ COPY --from=deps /app/packages/api-client/node_modules ./packages/api-client/nod
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 
 # Copy workspace source files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json ./
 COPY packages/api-client ./packages/api-client
 COPY apps/web ./apps/web
 

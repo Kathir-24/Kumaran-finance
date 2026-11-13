@@ -10,6 +10,7 @@
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 !.npmrc
+!tsconfig.base.json
 
 # Allowed workspace packages (parent directories must be un-ignored before descendants)
 !apps
