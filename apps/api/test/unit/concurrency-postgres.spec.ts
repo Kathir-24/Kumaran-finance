@@ -418,12 +418,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(finalPayment?.cashHandoverStatus).toBe('ACKNOWLEDGED');
       expect(finalPayment?.cashHandoverAcknowledgedByUserId).toBe(checkerUserId);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: 'CASH_HANDOVER_ACKNOWLEDGED',
-          entityId: makerUserId,
-        },
-      });
       await prisma.payment.delete({ where: { id: testPayment.id } });
     }
   });
@@ -523,12 +517,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       const winningCustomerId = (fulfilled[0] as PromiseFulfilledResult<any>).value.ticket.newCustomerId;
       expect(finalTicket?.customerId).toBe(winningCustomerId);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
-          entityId: removedTicket.id,
-        },
-      });
       await prisma.subscriberTicket.delete({ where: { id: removedTicket.id } });
       await prisma.customer.deleteMany({
         where: { id: { in: [...testCustomers.map((c) => c.id), defaulterCustomer.id] } },
@@ -884,9 +872,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       const paymentIds = [...new Set([...createdPreUpiPaymentIds, ...allocs.map((a) => a.paymentId)])];
       if (paymentIds.length > 0) {
-        await prisma.auditLog.deleteMany({
-          where: { action: 'UPI_CLAIM_VERIFIED', entityId: { in: paymentIds } },
-        });
         await prisma.receipt.deleteMany({ where: { paymentId: { in: paymentIds } } });
         await prisma.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
         await prisma.payment.deleteMany({ where: { id: { in: paymentIds } } });
@@ -1011,9 +996,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         where: { installmentDueId: { in: [dueA.id, dueB.id] } },
       });
       const paymentIds = [...new Set([claimA.id, claimB.id, ...allocs.map((a) => a.paymentId)])];
-      await prisma.auditLog.deleteMany({
-        where: { action: 'UPI_CLAIM_VERIFIED', entityId: { in: paymentIds } },
-      });
       await prisma.receipt.deleteMany({ where: { paymentId: { in: paymentIds } } });
       await prisma.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
       await prisma.payment.deleteMany({ where: { id: { in: paymentIds } } });
@@ -1097,9 +1079,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(dbPayment?.paymentStatus).toBe(PaymentStatus.SUCCESS);
       expect(dbReceiptCount).toBe(1);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { action: 'UPI_CLAIM_VERIFIED', entityId: ghostPayment.id },
-      });
       await prisma.receipt.deleteMany({ where: { paymentId: ghostPayment.id } });
       await prisma.paymentAllocation.deleteMany({ where: { paymentId: ghostPayment.id } });
       await prisma.payment.deleteMany({ where: { id: ghostPayment.id } });
@@ -1167,9 +1146,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       expect(dbWinner?.disbursementStatus).toBe('VERIFIED_BY_MAKER');
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { action: 'SAFETY_PROOF_VERIFIED', entityId: testAuction.winner!.id },
-      });
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.delete({ where: { id: testAuction.id } });
     }
@@ -1242,9 +1218,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       expect(dbWinner?.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { action: 'PRIZE_PAYOUT_AUTHORIZED', entityId: testAuction.winner!.id },
-      });
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.delete({ where: { id: testAuction.id } });
     }
@@ -1318,9 +1291,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(finalChit?.status).toBe('COMPLETED');
       expect(await prisma.auction.count({ where: { chitGroupId: tempChit.id } })).toBe(1);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { action: 'FINAL_MONTH_SETTLEMENT_EXECUTED', entityId: tempChit.id },
-      });
       await prisma.installmentDue.deleteMany({ where: { ticketId: tempTicket.id } });
       await prisma.auctionWinner.deleteMany({ where: { ticketId: tempTicket.id } });
       await prisma.auction.deleteMany({ where: { chitGroupId: tempChit.id } });
@@ -1419,12 +1389,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         expect(finalDue?.paidAmount).toBe(4000n);
       }
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: { in: ['PAYMENT_REVERSED', 'PAYMENT_REVERSAL_REJECTED'] },
-          entityId: testPayment.id,
-        },
-      });
       await prisma.paymentReversal.deleteMany({ where: { paymentId: testPayment.id } });
       await prisma.paymentAllocation.deleteMany({ where: { paymentId: testPayment.id } });
       await prisma.payment.deleteMany({ where: { id: testPayment.id } });
@@ -1530,12 +1494,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         expect(rejected[0].reason.message).toContain('ADR-13 Violation');
       }
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: 'TICKET_SUBSCRIBER_SUBSTITUTED',
-          entityId: { in: [tkt1.id, tkt2.id] },
-        },
-      });
       await prisma.subscriberTicket.deleteMany({ where: { id: { in: [tkt1.id, tkt2.id] } } });
       await prisma.customer.deleteMany({
         where: { id: { in: [def1.id, def2.id, candidate.id] } },
@@ -1688,9 +1646,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(winningTicket?.isPrized).toBe(true);
       expect(winningTicket?.prizedAuctionId).toBe(tempAuction.id);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { entityType: 'Auction', entityId: tempAuction.id },
-      });
       await prisma.auctionMinutes.deleteMany({ where: { auctionId: tempAuction.id } });
       await prisma.auctionTieBidder.deleteMany({ where: { auctionId: tempAuction.id } });
       await prisma.auctionWinner.deleteMany({ where: { auctionId: tempAuction.id } });
@@ -1754,12 +1709,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       expect(finalMinute?.filedAtRegistrar).toBe(true);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: 'MINUTES_FILED_AT_REGISTRAR',
-          entityId: testAuction.minutes!.id,
-        },
-      });
       await prisma.auctionMinutes.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.deleteMany({ where: { id: testAuction.id } });
     }
@@ -1902,12 +1851,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(reversals).toHaveLength(1);
       expect(reversals[0].status).toBe('REQUESTED');
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: {
-          action: 'PAYMENT_REVERSAL_REQUESTED',
-          entityId: testPayment.id,
-        },
-      });
       await prisma.paymentReversal.deleteMany({ where: { paymentId: testPayment.id } });
       await prisma.payment.deleteMany({ where: { id: testPayment.id } });
     }
@@ -2239,7 +2182,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       },
     });
 
-    let createdTicketIds: string[] = [];
     try {
       await prisma.subscriberTicket.createMany({
         data: [
@@ -2247,12 +2189,6 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
           { chitGroupId: tempChit.id, customerId: customers[1].id, ticketNumber: 2 },
         ],
       });
-      createdTicketIds = (
-        await prisma.subscriberTicket.findMany({
-          where: { chitGroupId: tempChit.id },
-          select: { id: true },
-        })
-      ).map((t) => t.id);
 
       const results = await Promise.allSettled([
         chitService.activate(tempChit.id, makerUserId),
@@ -2285,32 +2221,46 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       const activateFulfilled = [results[0], results[1]].filter((r) => r.status === 'fulfilled');
       expect(activateFulfilled.length).toBeLessThanOrEqual(1);
     } finally {
-      await prisma.auditLog.deleteMany({
-        where: { entityId: { in: [tempChit.id, ...createdTicketIds] } },
-      });
       await prisma.subscriberTicket.deleteMany({ where: { chitGroupId: tempChit.id } });
       await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
     }
   }, 20000);
 
-  it('CONCURR-INV-26: PostgreSQL trigger trg_prevent_audit_log_mutation MUST reject any UPDATE on AuditLog', async () => {
+  it('CONCURR-INV-26: PostgreSQL triggers MUST enforce append-only immutability (permit INSERT/SELECT, block UPDATE/DELETE/TRUNCATE)', async () => {
+    // 1. INSERT is allowed
     const testLog = await prisma.auditLog.create({
       data: {
-        action: 'TEST_TRIGGER_ACTION',
+        action: 'TEST_IMMUTABILITY_ACTION',
         entityType: 'TestEntity',
-        entityId: 'test-entity-001',
+        entityId: 'test-immutability-001',
       },
     });
+    expect(testLog.id).toBeDefined();
 
-    try {
-      await expect(
-        prisma.auditLog.update({
-          where: { id: testLog.id },
-          data: { action: 'TAMPERED_ACTION' },
-        }),
-      ).rejects.toThrow(/AuditLog records are strictly append-only and cannot be updated/);
-    } finally {
-      await prisma.auditLog.deleteMany({ where: { id: testLog.id } });
-    }
+    // 2. SELECT is allowed
+    const fetched = await prisma.auditLog.findUnique({
+      where: { id: testLog.id },
+    });
+    expect(fetched?.action).toBe('TEST_IMMUTABILITY_ACTION');
+
+    // 3. UPDATE is blocked
+    await expect(
+      prisma.auditLog.update({
+        where: { id: testLog.id },
+        data: { action: 'TAMPERED_ACTION' },
+      }),
+    ).rejects.toThrow(/AuditLog records are strictly append-only and cannot be updated/);
+
+    // 4. DELETE is blocked
+    await expect(
+      prisma.auditLog.delete({
+        where: { id: testLog.id },
+      }),
+    ).rejects.toThrow(/AuditLog records are strictly append-only and cannot be deleted/);
+
+    // 5. TRUNCATE is blocked
+    await expect(
+      prisma.$executeRawUnsafe('TRUNCATE "AuditLog";'),
+    ).rejects.toThrow(/AuditLog records are strictly append-only and cannot be truncated/);
   });
 });

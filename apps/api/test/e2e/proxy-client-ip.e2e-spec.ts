@@ -125,11 +125,6 @@ describe('Multi-Hop Proxy Client IP, Anti-Spoofing, Throttler & AuditLog (e2e) [
   });
 
   afterAll(async () => {
-    if (createdAuditIds.length > 0 && prisma) {
-      await prisma.auditLog.deleteMany({
-        where: { id: { in: createdAuditIds } },
-      });
-    }
     if (app) {
       await app.close();
     }
