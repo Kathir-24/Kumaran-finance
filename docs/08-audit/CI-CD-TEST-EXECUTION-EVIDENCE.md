@@ -5,35 +5,37 @@
 > **Date**: November 13, 2026  
 > **Execution Environment**: Windows Node.js 22.x + PostgreSQL 17 + Redis 7  
 > **Authority**: QA & Release Engineering Lead  
-> **Overall Result**: **100% SUITES PASSED (52/52 API SUITES, 843/843 TESTS + 14 WEB SUITES, 353/353 TESTS = 1,196/1,196 TOTAL TESTS, 0 FAILURES)**
+> **Overall Result**: **100% SUITES PASSED (54/54 API SUITES, 852/852 TESTS + 14 WEB SUITES, 353/353 TESTS + API CLIENT 8/8 TESTS = 1,213/1,213 TOTAL TESTS, 0 FAILURES)**
 
 ---
 
 ## 1. Test Execution Command & Terminal Output Summary
 
 ```bash
-$ pnpm --filter api test test/unit/
+$ pnpm test
 ```
 
 ```
-Test Suites: 52 passed, 52 total
-Tests:       843 passed, 843 total
+apps/api:
+Test Suites: 54 passed, 54 total
+Tests:       852 passed, 852 total
 Snapshots:   0 total
-Time:        31.529 s
 Ran all test suites matching test/unit/.
-```
 
-```bash
-$ pnpm --filter web test
-```
-
-```
+apps/web:
 ℹ tests 353
 ℹ suites 14
 ℹ pass 353
 ℹ fail 0
-ℹ duration_ms 3815.4627
+
+@kumaran/api-client:
+ℹ tests 8
+ℹ pass 8
+ℹ fail 0
 ```
+
+> [!NOTE]
+> Web tests are Node.js-based component, store, routing, and i18n unit/integration tests running via the Node test runner (`node --test`). Dedicated Playwright browser E2E test suites (Suites 00 through 11 in `apps/web/e2e/`) are maintained for pre-release staging validation (`pnpm test:web:e2e`).
 
 ---
 

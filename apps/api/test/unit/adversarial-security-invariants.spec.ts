@@ -442,6 +442,21 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
           ),
         );
       });
+
+      it('SEC-A: should REJECT non-partner attempting to request reversal (403 Forbidden)', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-maker', isPartner: false });
+        await expect(
+          paymentService.requestReversal(
+            mockPaymentId,
+            { reason: 'Mistake', notes: 'Request attempt by non-partner' },
+            'non-partner-maker',
+          ),
+        ).rejects.toThrow(
+          new ForbiddenException(
+            'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to request payment reversals',
+          ),
+        );
+      });
     });
 
     // -----------------------------------------------------------------------

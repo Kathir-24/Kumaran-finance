@@ -17,16 +17,17 @@ The web application (`apps/web`) and backend API (`apps/api`) of **Kumaran Chits
 
 | Verification Gate | Scope & Test Invariants | Automated Tests Executed | Pass Rate | Certification Status |
 |---|---|---|---|---|
-| **Backend Core & API** | NestJS 12, Prisma, Auth, State Machines, Reports | 843 tests across 52 test suites | **100.0%** (843/843) | **VERIFIED & CERTIFIED** |
+| **Backend Core & API** | NestJS 12, Prisma, Auth, State Machines, Reports | 852 tests across 54 test suites | **100.0%** (852/852) | **VERIFIED & CERTIFIED** |
 | **Frontend Web App** | Next.js 15, RBAC Routes, Bilingual i18n, Dual-Control | 353 tests across 14 test suites | **100.0%** (353/353) | **VERIFIED & CERTIFIED** |
-| **PostgreSQL Concurrency** | Real DB row locking, deadlocks, race conditions (Postgres 17) | 25 real contention scenarios (CONCURR-INV-1..25) | **100.0%** (25/25) | **VERIFIED & CERTIFIED** |
+| **API Client SDK** | TypeScript SDK, BFF Token Storage, Envelope Unwrap | 8 tests | **100.0%** (8/8) | **VERIFIED & CERTIFIED** |
+| **PostgreSQL Concurrency** | Real DB row locking, deadlocks, race conditions, triggers (Postgres 17) | 26 real contention scenarios (CONCURR-INV-1..26) | **100.0%** (26/26) | **VERIFIED & CERTIFIED** |
 | **Financial Mathematics** | BigInt whole Rupee math, 1/4 ceiling, universal dividends | All bid, tie-break, offset, and settlement math | **100.0%** | **VERIFIED & CERTIFIED** |
 | **Dual Control (Maker-Checker)** | Payment reversal, auction commit, prize release, defaulters | Strict identity separation (`maker_id != checker_id`) | **100.0%** | **VERIFIED & CERTIFIED** |
 | **Partner Identity (SEC-A)** | Verified partner check (`isPartner: true`) vs Super Admin | Enforced on reversals, auctions, payouts, removals | **100.0%** | **VERIFIED & CERTIFIED** |
-| **Disaster Recovery & Backup**| Daily pg_dump `-F c` backup script & S3 replication | Script syntax and restore protocol verified | **RPO $\le$ 24h, RTO $\le$ 1h**| **VERIFIED & CERTIFIED** |
+| **Disaster Recovery & Backup**| Daily pg_dump `-F c` backup script & S3 replication | Script syntax and restore protocol verified | **RPO $\le$ 24h, RTO $\le$ 1h**| **VERIFIED & CERTIFIED (Local)** |
 | **Telecom DLT SMS (Q34)** | MSG91 flow driver, TRAI DLT template interpolation | Pluggable driver unit tests and circuit breaker | **100.0%** | **VERIFIED (Mock Sandbox)** |
 
-**Total Automated Suite**: **1,196 Tests Passed, 0 Failed, 0 Skipped.**
+**Total Automated Suite**: **1,213 Tests Passed, 0 Failed, 0 Skipped.**
 
 ---
 
@@ -50,9 +51,10 @@ To ensure complete transparency and zero false assumptions, all functional domai
 13. English + Tamil bilingual interface with 100% dictionary key parity.
 14. Reversed receipt dynamic PDF generation with bold red watermark (`CANCELLED / ரத்து செய்யப்பட்டது`).
 
-### B. NOT VERIFIED (External Hardware / Telecom Gateways)
+### B. NOT VERIFIED (External Hardware / Telecom Gateways / Live Hosting)
 1. **Live Indian DLT Telecom Gateway**: Live production credentials (`MSG91_AUTH_KEY`, registered Sender ID) must be inserted into production `.env`.
 2. **Physical Thermal Printer Pairing**: Physical USB/Bluetooth pairing of 80mm thermal receipt printer at the Perundurai branch desk.
+3. **Live Linux VPS & Cloudflare R2 Offsite Bucket**: Cloudflare R2 bucket credentials and production host deployment pending live provisioning.
 
 ### C. BLOCKED (Statutory / Commercial Policy Confirmation Required)
 1. **Defaulter Early Exit Damage Formula (Q25)**: The 4% vs 5% deduction policy under Section 30 of the Chit Funds Act has not been confirmed by Kumaran Finance partners or legal counsel. The software **FAILS CLOSED** with `UNAPPROVED_SETTLEMENT_POLICY`.

@@ -75,3 +75,6 @@ The web automated test suite was executed via Node test runner (`node --experime
 | *Additional UI test suites* | Localization, forms, responsive viewports, receipt layouts | 264 / 264 | **PASS** |
 
 **Total Web Tests Executed**: **353 passed, 0 failed, 14 suites** (100% pass rate).
+
+> [!NOTE]
+> The 353 web tests executed above are Node.js-based component, store, routing, and i18n unit/integration tests running via the Node test runner (`node --test`). Dedicated Playwright browser E2E test suites (Suites 00 through 11 in `apps/web/e2e/`) are maintained for pre-release end-to-end browser workflows (`pnpm test:web:e2e`) and manual staging validation.

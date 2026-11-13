@@ -42,8 +42,8 @@ model AuditLog {
 ```
 
 ### Core Immutability Guarantees:
-1. **Append-Only Architecture**: Zero `PUT`, `PATCH`, or `DELETE` endpoints exist for the `AuditLog` model in NestJS controllers.
-2. **Database Level Protection**: The application user connection has no permissions to alter existing audit log rows.
+1. **Append-Only Architecture**: Zero `PUT`, `PATCH`, or `DELETE` endpoints exist for the `AuditLog` model in NestJS controllers. All audit logs are strictly read-only (`GET /reports/audit-logs`).
+2. **Database-Level Trigger Protection**: PostgreSQL trigger `trg_prevent_audit_log_mutation` (migration `20261113233000_audit_log_immutability_trigger`) blocks any direct SQL `UPDATE` on `"AuditLog"`, raising an exception: *'AuditLog records are strictly append-only and cannot be updated.'* (Verified in `CONCURR-INV-26`).
 3. **Structured JSON Diffs**: `oldValue` and `newValue` store full JSON state representations, allowing granular before-and-after state reconstruction.
 
 ---
@@ -77,3 +77,4 @@ model AuditLog {
 | State Matrix Sweep | `test/unit/state-matrix-sweep.spec.ts` | Complete audit log emission across every lifecycle mutation | **PASS** (100%) |
 | Web Audit Register | `apps/web/test/audit-register.spec.ts` | Read-only immutability, persona isolation, diff formatting | **PASS** (100%) |
 | Concurrency Audit | `test/unit/concurrency-postgres.spec.ts` | Audit log creation inside ACID transaction boundary | **PASS** (100%) |
+| Database Trigger Verification | `test/unit/concurrency-postgres.spec.ts` (CONCURR-INV-26) | PostgreSQL trigger `trg_prevent_audit_log_mutation` strictly rejects any UPDATE on AuditLog | **PASS** (100%) |

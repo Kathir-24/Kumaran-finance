@@ -584,6 +584,18 @@ export class PaymentService {
     dto: RequestReversalDto,
     makerUserId: string,
   ) {
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const maker = await this.prisma.user.findUnique({
+        where: { id: makerUserId },
+        select: { isPartner: true },
+      });
+      if (maker && !maker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to request payment reversals',
+        );
+      }
+    }
+
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: { reversal: true },

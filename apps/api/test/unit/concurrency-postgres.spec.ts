@@ -2292,4 +2292,25 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
     }
   }, 20000);
+
+  it('CONCURR-INV-26: PostgreSQL trigger trg_prevent_audit_log_mutation MUST reject any UPDATE on AuditLog', async () => {
+    const testLog = await prisma.auditLog.create({
+      data: {
+        action: 'TEST_TRIGGER_ACTION',
+        entityType: 'TestEntity',
+        entityId: 'test-entity-001',
+      },
+    });
+
+    try {
+      await expect(
+        prisma.auditLog.update({
+          where: { id: testLog.id },
+          data: { action: 'TAMPERED_ACTION' },
+        }),
+      ).rejects.toThrow(/AuditLog records are strictly append-only and cannot be updated/);
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { id: testLog.id } });
+    }
+  });
 });

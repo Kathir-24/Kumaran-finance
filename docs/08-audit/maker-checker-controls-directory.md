@@ -21,16 +21,18 @@ To prevent internal fraud, embezzlement, and accidental ledger split-brain, Kuma
 
 ### Control 1: Payment Reversal & Receipt Cancellation (SEC-03)
 - **Financial Significance**: High. Cancelling a receipt removes paid cash/bank funds from the ledger and reopens subscriber dues.
-- **Maker Persona**: Counter Cashier (`ACCOUNTANT`) or Field Agent (`COLLECTION_AGENT`).
-- **Maker Action**: `POST /payments/:id/reversal/request` with `reversalReason`. Status becomes `REQUESTED`.
-- **Checker Persona**: Verified Business Partner (`SUPER_ADMIN` with `isPartner: true`).
-- **Checker Action**: `POST /payments/:id/reversal/approve` or `POST /payments/:id/reversal/reject`.
+- **Maker Persona**: Verified Business Partner (`SUPER_ADMIN` with `isPartner: true` - Partner A).
+- **Maker Action**: `POST /payments/:id/request-reversal` with `RequestReversalDto` (`reason`, `notes`). Status becomes `REQUESTED`.
+- **Checker Persona**: Verified Business Partner (`SUPER_ADMIN` with `isPartner: true` - Partner B).
+- **Checker Action**: `POST /payments/:id/approve-reversal` or `POST /payments/:id/reject-reversal`.
 - **Backend Enforcement**:
-  - `PaymentService.approveReversal` verifies `payment.reversalRequestedByUserId !== checkerPartnerUserId`.
-  - Checks `checker.isPartner === true`. Throws `403 Forbidden` if violated.
+  - `PaymentController.requestReversal` enforces `@Roles(Role.SUPER_ADMIN)`.
+  - `PaymentService.requestReversal` validates `maker.isPartner === true`.
+  - `PaymentService.approveReversal` enforces `@Roles(Role.SUPER_ADMIN)`, verifies `checker.isPartner === true`, and asserts `payment.reversal.initiatedByUserId !== checkerUserId` (`maker != checker`).
+  - Throws `403 Forbidden` on any violation.
   - Generates audit log `PAYMENT_REVERSAL_APPROVED`.
-  - Watermarks existing receipt PDF with red `CANCELLED / ரத்து செய்யப்பட்டது`.
-- **Test Evidence**: `apps/api/test/unit/payment.spec.ts`, `apps/api/test/unit/concurrency-postgres.spec.ts` (CONCURR-INV-14).
+  - Watermarks existing receipt PDF with bold red diagonal `CANCELLED / ரத்து செய்யப்பட்டது`.
+- **Test Evidence**: `apps/api/test/unit/payment.spec.ts`, `apps/api/test/unit/adversarial-security-invariants.spec.ts`, `apps/api/test/unit/concurrency-postgres.spec.ts` (CONCURR-INV-14, CONCURR-INV-19).
 - **Status**: **IMPLEMENTED & TESTED**
 
 ---
@@ -147,7 +149,7 @@ To prevent internal fraud, embezzlement, and accidental ledger split-brain, Kuma
 
 | Workflow | Maker Persona | Checker Persona | Backend Check | Test Pass Rate |
 |---|---|---|---|---|
-| Payment Reversal | Cashier / Agent | Partner B | `maker != checker && isPartner` | 100% |
+| Payment Reversal | Partner A (Super Admin) | Partner B (Super Admin) | `maker != checker && isPartner` | 100% |
 | Auction Finalization | Auction Conductor | Partner B | `maker != checker && isPartner` | 100% |
 | Auction Correction | Partner A | Partner B | `maker != checker && isPartner` | 100% |
 | Prize Disbursement | Staff (Safety Check) | Partner B (Authorize) | `maker != checker && isPartner` | 100% |
