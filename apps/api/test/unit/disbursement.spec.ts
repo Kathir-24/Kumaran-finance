@@ -343,7 +343,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         disbursementStatus: 'AUTHORIZED_BY_CHECKER',
       });
 
-      const result = await disbursementService.authorizePayout(
+      await disbursementService.authorizePayout(
         mockAuctionId,
         {
           disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
@@ -388,7 +388,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         disbursementStatus: 'AUTHORIZED_BY_CHECKER',
       });
 
-      const result = await disbursementService.authorizePayout(
+      await disbursementService.authorizePayout(
         mockAuctionId,
         {
           disbursementMode: DisbursementMode.CASH,
@@ -468,7 +468,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         disbursementStatus: 'AUTHORIZED_BY_CHECKER',
       });
 
-      const result = await disbursementService.authorizePayout(
+      await disbursementService.authorizePayout(
         mockAuctionId,
         {
           disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,

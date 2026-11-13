@@ -994,8 +994,8 @@ export class InstallmentService {
    */
   async settleRemoval(
     ticketId: string,
-    adminUserId: string,
-    dto: SettleRemovalDto,
+    _adminUserId: string,
+    _dto: SettleRemovalDto,
   ) {
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
