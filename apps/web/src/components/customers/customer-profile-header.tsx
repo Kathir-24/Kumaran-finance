@@ -13,9 +13,11 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CustomerEditDialog } from './customer-edit-dialog';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
@@ -34,6 +36,7 @@ export interface CustomerProfileData {
   panNumber?: string | null;
   aadhaarLast4?: string | null;
   isKycVerified: boolean;
+  version?: number;
   branch?: {
     id: string;
     code: string;
@@ -54,6 +57,12 @@ export function CustomerProfileHeader({ customer }: CustomerProfileHeaderProps) 
   const canManageKyc = user?.roles?.some((role: string) =>
     ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
   );
+
+  const canEditProfile = user?.roles?.some((role: string) =>
+    ['SUPER_ADMIN', 'BRANCH_MANAGER'].includes(role),
+  );
+
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
 
   const kycMutation = useMutation({
     mutationFn: async (nextStatus: boolean) => {
@@ -154,6 +163,18 @@ export function CustomerProfileHeader({ customer }: CustomerProfileHeaderProps) 
               </span>
             </Button>
           )}
+
+          {canEditProfile && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditOpen(true)}
+              className="border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-xs text-slate-200 hover:text-emerald-400 h-8 px-2.5"
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+              <span>{t('editProfile')}</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -228,6 +249,14 @@ export function CustomerProfileHeader({ customer }: CustomerProfileHeaderProps) 
           </div>
         </div>
       </div>
+
+      {canEditProfile && (
+        <CustomerEditDialog
+          customer={customer}
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+        />
+      )}
     </div>
   );
 }

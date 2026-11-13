@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BranchSummaryDto } from '../../auth/dto/auth-response.dto';
 
 export class NomineeResponseDto {
@@ -77,6 +77,9 @@ export class CustomerResponseDto {
 
   @ApiProperty({ example: false, description: 'Whether KYC verification is approved' })
   isKycVerified: boolean;
+
+  @ApiPropertyOptional({ example: 1, description: 'Record version for optimistic concurrency control' })
+  version?: number;
 
   @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Branch ID', nullable: true })
   branchId?: string | null;

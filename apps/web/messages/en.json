@@ -553,7 +553,16 @@
     "consecutiveUnpaid": "Consecutive Unpaid Months",
     "viewPassbook": "View Passbook",
     "ticketStatusActive": "Active Subscription",
-    "ticketStatusRemoved": "Removed (Defaulter)"
+    "ticketStatusRemoved": "Removed (Defaulter)",
+    "editProfile": "Edit Profile",
+    "editProfileTitle": "Edit Subscriber Profile",
+    "editProfileDesc": "Update subscriber contact numbers, address, and statutory identifiers.",
+    "editProfileSuccess": "Subscriber profile updated successfully.",
+    "editProfileImmutableNotice": "Customer Code ({code}) and KYC Verification cannot be changed here.",
+    "concurrentConflict": "This customer profile was modified by another staff member. Please reload the page.",
+    "phoneInUse": "This mobile phone number is already registered to another subscriber.",
+    "saveChanges": "Save Changes",
+    "savingChanges": "Saving Changes..."
   },
   "auctions": {
     "title": "In-Office Auction Console",
