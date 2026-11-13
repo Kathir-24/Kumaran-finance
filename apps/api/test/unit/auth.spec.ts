@@ -79,6 +79,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret: null,
         isTotpEnabled: false,
@@ -116,6 +117,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret: null,
         isTotpEnabled: false,
@@ -145,6 +147,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.COLLECTION_AGENT],
+        isPartner: false,
         isActive: false,
         totpSecret: null,
         isTotpEnabled: false,
@@ -177,6 +180,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret,
         isTotpEnabled: true,
@@ -211,6 +215,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret,
         isTotpEnabled: true,
@@ -254,6 +259,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret,
         isTotpEnabled: true,
@@ -312,6 +318,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         phone: '9876543210',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
+        isPartner: true,
         isActive: true,
         totpSecret: null,
         isTotpEnabled: false,
@@ -541,6 +548,7 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       phone: staffPhone,
       passwordHash,
       roles: [Role.SUPER_ADMIN],
+      isPartner: true,
       isActive: true,
       totpSecret: null,
       isTotpEnabled: false,
@@ -617,9 +625,9 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       });
 
       expect(verifyRes.verified).toBe(true);
-      expect(verifyRes.setupToken).toBeDefined();
+      expect((verifyRes as any).setupToken).toBeDefined();
 
-      const decoded = jwtService.verify(verifyRes.setupToken!) as any;
+      const decoded = jwtService.verify((verifyRes as any).setupToken!) as any;
       expect(decoded.tokenType).toBe('mpin_setup');
       expect(decoded.sub).toBe(mockUserId);
     });

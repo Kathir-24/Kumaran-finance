@@ -186,7 +186,7 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
     });
 
     it('KFC-PDF-001: should generate valid subscription receipt PDF with bilingual CANCELLED watermark for reversed payments', async () => {
-      const buffer = await SubscriptionReceiptTemplate.generate({
+      const receiptData = {
         receiptNumber: 'KC-REC-PRD-2026-00412',
         date: new Date('2026-10-18T10:45:00Z'),
         groupCode: 'KCA-1L-20M-01',
@@ -203,12 +203,24 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
         amountPaid: 3750n,
         paymentMethod: 'CASH',
         collectedByName: 'M. Kathiresan (AG-01)',
+      };
+
+      const uncancelledBuffer = await SubscriptionReceiptTemplate.generate({
+        ...receiptData,
+        isCancelled: false,
+      });
+
+      const cancelledBuffer = await SubscriptionReceiptTemplate.generate({
+        ...receiptData,
         isCancelled: true, // Reversed payment watermark
       });
 
-      expect(buffer).toBeInstanceOf(Buffer);
-      expect(buffer.length).toBeGreaterThan(500);
-      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+      expect(cancelledBuffer).toBeInstanceOf(Buffer);
+      expect(cancelledBuffer.length).toBeGreaterThan(500);
+      expect(cancelledBuffer.toString('utf8', 0, 5)).toBe('%PDF-');
+
+      // Assert watermark adds additional graphics state operators (save/rotate/color/restore)
+      expect(cancelledBuffer.length).toBeGreaterThan(uncancelledBuffer.length);
     });
 
     it('should generate a valid bilingual prize payout voucher PDF buffer', async () => {
@@ -391,6 +403,33 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
       expect(storageMock.getFile).toHaveBeenCalledWith('receipts/PRD/2026/KC-REC-001.pdf');
       expect(result.key).toBe('receipts/PRD/2026/KC-REC-001.pdf');
       expect(result.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-url?exp=900');
+    });
+
+    it('KFC-PDF-001: should BYPASS pre-rendered cache and regenerate watermarked cancelled PDF when payment is REVERSED', async () => {
+      const mockReversedPaymentWithOldS3Key = {
+        ...mockPaymentData,
+        paymentStatus: 'REVERSED',
+        receipt: {
+          id: 'rec-001',
+          receiptNumber: 'KC-REC-PRD-2026-00045',
+          pdfS3Key: 'receipts/PRD/2026/KC-REC-001.pdf', // Old uncancelled key
+        },
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(mockReversedPaymentWithOldS3Key);
+
+      const result = await pdfService.generateReceiptPdf('pay-001', superAdminUser);
+
+      // Must NOT return the old uncancelled key
+      expect(result.key).toContain('-cancelled.pdf');
+      expect(storageMock.uploadFile).toHaveBeenCalledWith(
+        expect.stringContaining('-cancelled.pdf'),
+        expect.any(Buffer),
+        'application/pdf',
+      );
+      expect(prismaMock.receipt.update).toHaveBeenCalledWith({
+        where: { id: 'rec-001' },
+        data: expect.objectContaining({ pdfS3Key: expect.stringContaining('-cancelled.pdf') }),
+      });
     });
 
     it('should allow customer to download their own receipt', async () => {

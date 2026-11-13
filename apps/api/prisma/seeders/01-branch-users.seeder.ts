@@ -29,50 +29,59 @@ export async function seedBranchAndUsers(prisma: PrismaClient) {
       phone: '9876543210',
       name: 'P. Kumaran (Managing Partner)',
       roles: [Role.SUPER_ADMIN],
+      isPartner: true,
     },
     {
       phone: '9876543211',
       name: 'K. Senthil (Operations Partner / Checker)',
       roles: [Role.SUPER_ADMIN],
+      isPartner: true,
     },
     {
       phone: '9876543217',
       name: 'A. Velusamy (Finance Partner)',
       roles: [Role.SUPER_ADMIN],
+      isPartner: true,
     },
     {
       phone: '9876543218',
       name: 'R. Selvaraj (Compliance Partner)',
       roles: [Role.SUPER_ADMIN],
+      isPartner: true,
     },
     // Branch Manager (Maker for auction entries & onboarding)
     {
       phone: '9876543212',
       name: 'M. Rajendran (Branch Manager)',
       roles: [Role.BRANCH_MANAGER],
+      isPartner: false,
     },
     // Desk Accountant (Maker for receipts, vouchers, day closure)
     {
       phone: '9876543213',
       name: 'S. Priya (Desk Accountant)',
       roles: [Role.ACCOUNTANT],
+      isPartner: false,
     },
     // Field Collection Agents (Doorstep mobile app)
     {
       phone: '9876543214',
       name: 'R. Murugan (Field Collection Agent - Perundurai Route)',
       roles: [Role.COLLECTION_AGENT],
+      isPartner: false,
     },
     {
       phone: '9876543215',
       name: 'V. Karthik (Field Collection Agent - Erode Route)',
       roles: [Role.COLLECTION_AGENT],
+      isPartner: false,
     },
     // Statutory Auditor (Read-only Compliance)
     {
       phone: '9876543216',
       name: 'CA V. Natarajan (Statutory Auditor)',
       roles: [Role.AUDITOR],
+      isPartner: false,
     },
   ];
 
@@ -84,6 +93,7 @@ export async function seedBranchAndUsers(prisma: PrismaClient) {
       update: {
         roles: staff.roles,
         name: staff.name,
+        isPartner: staff.isPartner ?? false,
       },
       create: {
         branchId: branch.id,
@@ -92,6 +102,7 @@ export async function seedBranchAndUsers(prisma: PrismaClient) {
         passwordHash: defaultPasswordHash,
         mpinHash: defaultMpinHash,
         roles: staff.roles,
+        isPartner: staff.isPartner ?? false,
         isActive: true,
       },
     });

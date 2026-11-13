@@ -466,6 +466,18 @@ export class AuctionService {
       );
     }
 
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to finalize and commit auctions.',
+        );
+      }
+    }
+
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
@@ -975,6 +987,18 @@ export class AuctionService {
       );
     }
 
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const partner = await this.prisma.user.findUnique({
+        where: { id: partnerUserId },
+        select: { isPartner: true },
+      });
+      if (partner && !partner.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to request auction corrections.',
+        );
+      }
+    }
+
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
@@ -1001,6 +1025,24 @@ export class AuctionService {
       throw new BadRequestException(
         'DISBURSED_PRIZE_IMMUTABLE: Cannot correct an auction whose prize money has already been disbursed to the winner.',
       );
+    }
+
+    // FIN-E: Fail closed if subsequent month dues have already been paid
+    const nextMonth = auction.installmentMonth + 1;
+    if (typeof this.prisma.installmentDue?.findMany === 'function') {
+      const nextMonthPaidDues = await this.prisma.installmentDue.findMany({
+        where: {
+          chitGroupId: auction.chitGroupId,
+          installmentMonth: nextMonth,
+          status: DueStatus.PAID,
+        },
+      });
+
+      if (nextMonthPaidDues.length > 0) {
+        throw new BadRequestException(
+          `ALREADY_PAID_DUES_EXIST: Cannot request correction for Month ${auction.installmentMonth} auction because ${nextMonthPaidDues.length} subscriber(s) have already paid dues for Month ${nextMonth}. Correction would invalidate settled financial history.`,
+        );
+      }
     }
 
     const correctedDiscount = toWholeRupeeBigInt(
@@ -1097,6 +1139,18 @@ export class AuctionService {
       );
     }
 
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checkerPartner = await this.prisma.user.findUnique({
+        where: { id: checkerPartnerUserId },
+        select: { isPartner: true },
+      });
+      if (checkerPartner && !checkerPartner.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to approve auction corrections.',
+        );
+      }
+    }
+
     const pendingRequest = await this.prisma.auditLog.findFirst({
       where: {
         entityType: 'Auction',
@@ -1188,6 +1242,20 @@ export class AuctionService {
       // 3. Compensating Dues Adjustment for Subsequent Month (if already generated)
       const nextMonth = auction.installmentMonth + 1;
       if (typeof tx.installmentDue?.findMany === 'function') {
+        const nextMonthPaidDues = await tx.installmentDue.findMany({
+          where: {
+            chitGroupId: auction.chitGroupId,
+            installmentMonth: nextMonth,
+            status: DueStatus.PAID,
+          },
+        });
+
+        if (nextMonthPaidDues.length > 0) {
+          throw new BadRequestException(
+            `ALREADY_PAID_DUES_EXIST: Cannot approve correction for Month ${auction.installmentMonth} auction because ${nextMonthPaidDues.length} subscriber(s) have already paid dues for Month ${nextMonth}. Correction would invalidate settled financial history.`,
+          );
+        }
+
         const nextMonthUnpaidDues = await tx.installmentDue.findMany({
           where: {
             chitGroupId: auction.chitGroupId,

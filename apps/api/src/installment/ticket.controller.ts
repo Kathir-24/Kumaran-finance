@@ -141,16 +141,16 @@ export class TicketController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12)',
+    summary: 'Company 3-Month Arrears Removal Rights Request (ADR-07, ADR-12 & SEC-B)',
     description:
-      'Executes company removal rights when a subscriber has defaulted on 3 or more consecutive monthly installments (consecutiveUnpaidMonths >= 3). Transitions ticket status to REMOVED_DEF_3M. Allowed strictly: Super Admin (Partners).',
+      'Initiates company removal request when a subscriber has defaulted on 3 or more consecutive monthly installments. Transitions ticket status to PENDING_REMOVAL_APPROVAL. Allowed strictly: Super Admin (Partners).',
   })
   @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
-    description: 'Subscriber ticket successfully removed for 3-month default',
+    description: 'Subscriber ticket removal request submitted for Partner B approval',
   })
   @ApiResponse({
     status: 400,
-    description: 'Ticket has fewer than 3 consecutive unpaid months',
+    description: 'Ticket has fewer than 3 consecutive unpaid months or already prized',
   })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async removeDefaulter(
@@ -158,10 +158,70 @@ export class TicketController {
     @CurrentUser('sub') adminUserId: string,
     @Body() dto: RemoveDefaulterDto,
   ) {
-    return this.installmentService.removeDefaulter(
+    return this.installmentService.requestDefaulterRemoval(
       ticketId,
       adminUserId,
       dto,
+    );
+  }
+
+  @Post(':id/remove-defaulter/request')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Request Defaulter Removal (Maker Partner - SEC-B)',
+    description:
+      'Partner A requests removal of a 3-month consecutive defaulter. Transitions ticket to PENDING_REMOVAL_APPROVAL. Allowed strictly: Verified Partners.',
+  })
+  async requestDefaulterRemoval(
+    @Param('id') ticketId: string,
+    @CurrentUser('sub') adminUserId: string,
+    @Body() dto: RemoveDefaulterDto,
+  ) {
+    return this.installmentService.requestDefaulterRemoval(
+      ticketId,
+      adminUserId,
+      dto,
+    );
+  }
+
+  @Post(':id/remove-defaulter/approve')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Approve Defaulter Removal (Checker Partner - SEC-B)',
+    description:
+      'Partner B approves removal of a 3-month consecutive defaulter. Enforces Maker != Checker. Transitions ticket to REMOVED_DEF_3M. Allowed strictly: Verified Partners.',
+  })
+  async approveDefaulterRemoval(
+    @Param('id') ticketId: string,
+    @CurrentUser('sub') adminUserId: string,
+    @Body() dto?: { notes?: string },
+  ) {
+    return this.installmentService.approveDefaulterRemoval(
+      ticketId,
+      adminUserId,
+      dto,
+    );
+  }
+
+  @Post(':id/remove-defaulter/reject')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Reject Defaulter Removal Request (Checker Partner - SEC-B)',
+    description:
+      'Partner B rejects removal request and restores ticket to DEFAULT_3_MONTHS. Allowed strictly: Verified Partners.',
+  })
+  async rejectDefaulterRemoval(
+    @Param('id') ticketId: string,
+    @CurrentUser('sub') adminUserId: string,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.installmentService.rejectDefaulterRemoval(
+      ticketId,
+      adminUserId,
+      body?.reason,
     );
   }
 

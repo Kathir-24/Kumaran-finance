@@ -570,14 +570,27 @@ export class InstallmentService {
   }
 
   /**
-   * Executes company 3-month consecutive arrears removal rights (ADR-07 & ADR-12).
-   * Authorized strictly for Super Admin (Partners).
+   * Maker Partner requests company 3-month consecutive arrears removal (ADR-07, ADR-12 & SEC-B).
+   * Authorized strictly for verified Partners (Super Admin).
+   * Transitions ticket status to PENDING_REMOVAL_APPROVAL.
    */
-  async removeDefaulter(
+  async requestDefaulterRemoval(
     ticketId: string,
-    adminUserId: string,
+    partnerUserId: string,
     dto: RemoveDefaulterDto,
   ) {
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const partner = await this.prisma.user.findUnique({
+        where: { id: partnerUserId },
+        select: { isPartner: true },
+      });
+      if (partner && !partner.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to request defaulter removal.',
+        );
+      }
+    }
+
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
       include: { customer: true, chitGroup: true },
@@ -605,6 +618,107 @@ export class InstallmentService {
       );
     }
 
+    const requestedAt = new Date();
+
+    const updated = await this.prisma.subscriberTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: 'PENDING_REMOVAL_APPROVAL',
+        removalRequestedAt: requestedAt,
+        removalRequestedByUserId: partnerUserId,
+        removalReason: dto.reason,
+      },
+      include: { customer: true, chitGroup: true },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: partnerUserId,
+        action: 'DEFAULTER_REMOVAL_REQUESTED',
+        entityType: 'SubscriberTicket',
+        entityId: ticketId,
+        newValue: {
+          ticketNumber: updated.ticketNumber,
+          customerName: updated.customer.fullName,
+          groupCode: updated.chitGroup.groupCode,
+          consecutiveUnpaidMonths: updated.consecutiveUnpaidMonths,
+          removalReason: dto.reason,
+          status: 'PENDING_REMOVAL_APPROVAL',
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Defaulter removal requested for ${updated.customer.fullName} (Ticket #${updated.ticketNumber}). Pending independent Partner B approval.`,
+      ticket: {
+        id: updated.id,
+        ticketNumber: updated.ticketNumber,
+        status: updated.status,
+        consecutiveUnpaidMonths: updated.consecutiveUnpaidMonths,
+        removalRequestedAt: updated.removalRequestedAt,
+        removalRequestedByUserId: updated.removalRequestedByUserId,
+        removalReason: updated.removalReason,
+      },
+    };
+  }
+
+  /**
+   * Independent Checker Partner approves company 3-month consecutive arrears removal (ADR-07, ADR-12 & SEC-B).
+   * Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).
+   * Transitions ticket status to REMOVED_DEF_3M.
+   */
+  async approveDefaulterRemoval(
+    ticketId: string,
+    checkerPartnerUserId: string,
+    dto?: { notes?: string },
+  ) {
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerPartnerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to approve defaulter removal.',
+        );
+      }
+    }
+
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: ticketId },
+      include: { customer: true, chitGroup: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Subscriber ticket not found');
+    }
+
+    if (ticket.status !== 'PENDING_REMOVAL_APPROVAL') {
+      throw new BadRequestException(
+        `NO_PENDING_REMOVAL: Ticket is not pending removal approval (current status: ${ticket.status})`,
+      );
+    }
+
+    // Strict Maker != Checker Dual Control (SEC-B)
+    if (ticket.removalRequestedByUserId === checkerPartnerUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: The Partner who requested defaulter removal cannot approve it. An independent Partner must review and commit.',
+      );
+    }
+
+    if (ticket.isPrized) {
+      throw new BadRequestException(
+        'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be removed under defaulter rules.',
+      );
+    }
+
+    if (ticket.consecutiveUnpaidMonths < CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS) {
+      throw new BadRequestException(
+        `ADR-07 Violation: Company default removal rights require at least ${CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS} consecutive unpaid months.`,
+      );
+    }
+
     const removedAt = new Date();
 
     const updated = await this.prisma.subscriberTicket.update({
@@ -612,14 +726,33 @@ export class InstallmentService {
       data: {
         status: 'REMOVED_DEF_3M',
         removedAt,
-        removedByUserId: adminUserId,
+        removedByUserId: checkerPartnerUserId,
       },
       include: { customer: true, chitGroup: true },
     });
 
+    await this.prisma.auditLog.create({
+      data: {
+        userId: checkerPartnerUserId,
+        action: 'DEFAULTER_REMOVAL_APPROVED',
+        entityType: 'SubscriberTicket',
+        entityId: ticketId,
+        newValue: {
+          ticketNumber: updated.ticketNumber,
+          customerName: updated.customer.fullName,
+          groupCode: updated.chitGroup.groupCode,
+          removedByUserId: checkerPartnerUserId,
+          requestedByUserId: ticket.removalRequestedByUserId,
+          removedAt: removedAt.toISOString(),
+          status: 'REMOVED_DEF_3M',
+          notes: dto?.notes || null,
+        },
+      },
+    });
+
     return {
       success: true,
-      message: `Subscriber ${updated.customer.fullName} (Ticket #${updated.ticketNumber}) successfully removed from Chit Group ${updated.chitGroup.groupCode} under 3-month consecutive default rule.`,
+      message: `Subscriber ${updated.customer.fullName} (Ticket #${updated.ticketNumber}) successfully removed from Chit Group ${updated.chitGroup.groupCode} under two-partner dual control.`,
       ticket: {
         id: updated.id,
         ticketNumber: updated.ticketNumber,
@@ -627,9 +760,97 @@ export class InstallmentService {
         consecutiveUnpaidMonths: updated.consecutiveUnpaidMonths,
         removedAt: updated.removedAt,
         removedByUserId: updated.removedByUserId,
-        removalReason: dto.reason,
+        removalReason: updated.removalReason,
       },
     };
+  }
+
+  /**
+   * Independent Checker Partner rejects defaulter removal request.
+   * Reverts ticket status to DEFAULT_3_MONTHS.
+   */
+  async rejectDefaulterRemoval(
+    ticketId: string,
+    checkerPartnerUserId: string,
+    reason?: string,
+  ) {
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerPartnerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to reject defaulter removal.',
+        );
+      }
+    }
+
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: ticketId },
+      include: { customer: true, chitGroup: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Subscriber ticket not found');
+    }
+
+    if (ticket.status !== 'PENDING_REMOVAL_APPROVAL') {
+      throw new BadRequestException(
+        `NO_PENDING_REMOVAL: Ticket is not pending removal approval (current status: ${ticket.status})`,
+      );
+    }
+
+    const updated = await this.prisma.subscriberTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: 'DEFAULT_3_MONTHS',
+        removalRequestedAt: null,
+        removalRequestedByUserId: null,
+        removalReason: null,
+      },
+      include: { customer: true, chitGroup: true },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: checkerPartnerUserId,
+        action: 'DEFAULTER_REMOVAL_REJECTED',
+        entityType: 'SubscriberTicket',
+        entityId: ticketId,
+        newValue: {
+          ticketNumber: updated.ticketNumber,
+          customerName: updated.customer.fullName,
+          groupCode: updated.chitGroup.groupCode,
+          rejectedByUserId: checkerPartnerUserId,
+          rejectionReason: reason || null,
+          status: 'DEFAULT_3_MONTHS',
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Defaulter removal request rejected for Ticket #${updated.ticketNumber}. Status reverted to DEFAULT_3_MONTHS.`,
+      ticket: {
+        id: updated.id,
+        ticketNumber: updated.ticketNumber,
+        status: updated.status,
+      },
+    };
+  }
+
+  /**
+   * Executes company 3-month consecutive arrears removal rights (ADR-07 & ADR-12).
+   * Authorized strictly for Super Admin (Partners).
+   * Note: In production two-partner workflow, this initiates the request.
+   */
+  async removeDefaulter(
+    ticketId: string,
+    adminUserId: string,
+    dto: RemoveDefaulterDto,
+  ) {
+    return this.requestDefaulterRemoval(ticketId, adminUserId, dto);
   }
 
   /**
@@ -798,63 +1019,11 @@ export class InstallmentService {
       );
     }
 
-    // KFC-SEC-002: Dual-Partner Separation of Duties on Defaulter Exit Settlement
-    if (ticket.removedByUserId && ticket.removedByUserId === adminUserId) {
-      throw new ForbiddenException(
-        'MAKER_CHECKER_VIOLATION: The Partner who authorized defaulter removal cannot approve the exit refund settlement voucher. An independent Partner must review and authorize.',
-      );
-    }
-
-    // Whole Rupee Math: Total paid installments for this ticket
-    const allocations = await this.prisma.paymentAllocation.findMany({
-      where: { ticketId },
-    });
-
-    const totalPaidAmount = allocations.reduce(
-      (sum, a) => sum + a.amountAllocated,
-      0n,
+    // KFC-FIN-006 / Q25: Early exit settlement formula is NOT confirmed by business owner/legal.
+    // Fail closed to prevent unauthorized payouts until formal resolution.
+    throw new BadRequestException(
+      'UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed.',
     );
-
-    // 4.00% Foreman Commission damages based on total chit value
-    const damagesAmount = (ticket.chitGroup.chitValue * 4n) / 100n;
-
-    // Refund is remaining paid dues minus damages (bounded at ₹0)
-    const refundAmount =
-      totalPaidAmount > damagesAmount ? totalPaidAmount - damagesAmount : 0n;
-
-    const voucherNumber = `KC-VOU-DEF-${Date.now().toString().slice(-6)}`;
-    const settledAt = new Date();
-
-    await this.prisma.auditLog.create({
-      data: {
-        userId: adminUserId,
-        action: 'DEF_SETTLEMENT_PROCESSED',
-        entityType: 'SubscriberTicket',
-        entityId: ticketId,
-        newValue: {
-          totalPaid: totalPaidAmount.toString(),
-          damagesDeducted: damagesAmount.toString(),
-          refundAmount: refundAmount.toString(),
-          voucherNumber,
-          paymentMethod: dto.paymentMethod,
-          notes: dto.notes,
-        },
-      },
-    });
-
-    return {
-      success: true,
-      message: `Defaulter account for ${ticket.customer.fullName} (Ticket #${ticket.ticketNumber}) successfully settled.`,
-      ticketId: ticket.id,
-      ticketNumber: ticket.ticketNumber,
-      customerName: ticket.customer.fullName,
-      groupCode: ticket.chitGroup.groupCode,
-      totalPaid: Number(totalPaidAmount),
-      damagesDeducted: Number(damagesAmount),
-      refundAmount: Number(refundAmount),
-      voucherNumber,
-      settledAt,
-    };
   }
 
   /**

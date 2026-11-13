@@ -270,6 +270,19 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
 
     const testMonth = 993;
 
+    // Check unpaid dues for activeTicket up to testMonth to match TOCTOU Arrears Verification (FIN-A/D)
+    const unpaidDues = await prisma.installmentDue.findMany({
+      where: {
+        ticketId: activeTicket.id,
+        installmentMonth: { lte: testMonth },
+        status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+      },
+    });
+    const currentArrears = unpaidDues.reduce(
+      (sum, d) => sum + (BigInt(d.netPayableAmount ?? 0n) - BigInt(d.paidAmount ?? 0n)),
+      0n,
+    );
+
     const testAuction = await prisma.auction.create({
       data: {
         chitGroupId: activeTicket.chitGroupId,
@@ -289,6 +302,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
             ticketId: activeTicket.id,
             wasTieBreakWinner: false,
             disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+            disbursedAmount: 80000n - currentArrears,
             isSecurityRequired: false,
             agreementSigned: true,
             nomineeSigned: true,
@@ -336,6 +350,12 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       expect(finalWinner?.disbursementStatus).toBe('DISBURSED');
     } finally {
+      if (unpaidDues && unpaidDues.length > 0) {
+        await prisma.installmentDue.updateMany({
+          where: { id: { in: unpaidDues.map((d: any) => d.id) } },
+          data: { status: DueStatus.UNPAID, paidAmount: 0n },
+        });
+      }
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.delete({ where: { id: testAuction.id } });
     }

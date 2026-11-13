@@ -14,7 +14,8 @@ The software implements a standardized, industry-standard set of personas. Kumar
 
 | Role | Scope | Description | Status |
 |---|---|---|---|
-| **Super Admin / Owner** | Global (Company-wide) | **The 4 Equal Partners**. Can act as operational Maker (entering auction results, safety proof, reversals) and final Checker. Full administrative and financial authority. **100% full feature parity on BOTH Web and Mobile apps.** | `CONFIRMED-BY-DEVELOPER` |
+| **Super Admin (isPartner: true)** | Global (Company-wide) | **The 4 Equal Partners**. Verified business partners holding legal and financial ownership. Can act as Maker and Checker under strict `maker != checker`. Authorized for auction finalization, payout authorization, reversal approvals, and defaulter removal. | `CONFIRMED-BY-DEVELOPER` |
+| **Super Admin (isPartner: false)** | Global (Company-wide) | Administrative IT / System staff. Manages users, system settings, viewing audit logs. Strictly blocked from financial authorizations. | `CONFIRMED-BY-DEVELOPER` |
 | **Branch Manager** | Assigned Branch | Optional role. In current operations, the **4 partners fulfill all branch manager duties directly**; no external manager is hired. Accessible via Web Portal. | `CONFIRMED-BY-DEVELOPER` |
 | **Accountant** | Company-wide | Financial recordkeeper for day books, voucher preparation, and reconciliations. **Can be held by a field collection agent wearing the accountant hat**. Primarily uses Web Portal for dense data entry; accessible on Mobile. | `CONFIRMED-BY-DEVELOPER` |
 | **Collection Agent** | Assigned Customers | Field staff (2–3 agents today) using mobile app for daily/monthly doorstep collections; **also handles office accounting tasks**. Primarily uses Mobile App. | `CONFIRMED-BY-DEVELOPER` |
@@ -101,11 +102,12 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 - **Checker (Authorize Payout)**: Super Admin (Partner B) authorizes payment release via Cheque, NEFT/RTGS/IMPS, or Cash with automatic prior arrears offset (`KFC-FIN-003`). Payout overrides are strictly prohibited (`KFC-FIN-004`).
 - **Hard Guard**: `maker_user_id != checker_user_id`.
 
-### 3.1 Defaulter Removal & Exit Account Settlement (`KFC-SEC-002`, `KFC-SEC-004`):
+### 3.1 Defaulter Removal Two-Partner Dual Control (SEC-B, `KFC-SEC-002`, `KFC-SEC-004`):
 - **Prized Ticket Immutability (`KFC-SEC-004`)**: Prized subscriber tickets can never be removed or substituted (`PRIZED_TICKET_IMMUTABLE`).
-- **Maker (Execute Removal)**: Super Admin (Partner A) removes non-prized subscriber after 3 consecutive months of arrears (`POST /installments/tickets/:id/remove-defaulter`).
-- **Checker (Settle Exit Account)**: Super Admin (Partner B) authorizes refund minus 4% contractual damages voucher (`POST /installments/tickets/:id/settle-removal`).
-- **Hard Guard**: `ticket.removedByUserId !== adminUserId` (`MAKER_CHECKER_VIOLATION`). The partner who executed the removal cannot authorize the exit payout.
+- **Maker (Request Removal)**: Partner A (`SUPER_ADMIN` with `isPartner: true`) requests removal of non-prized subscriber after 3 consecutive months of arrears (`POST /tickets/:id/remove-defaulter/request`). Status becomes `PENDING_REMOVAL_APPROVAL`.
+- **Checker (Approve Removal)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`) reviews justification and approves removal (`POST /tickets/:id/remove-defaulter/approve`). Status becomes `REMOVED_DEF_3M` and ticket is vacated for substitution.
+- **Hard Guard**: `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`MAKER_CHECKER_VIOLATION`). The partner who requested the removal cannot approve it.
+- **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 
 ### 4. Field Cash Handover & Vault Deposit (Dual Agent/Accountant Guard):
 - **Collector (Submit Handover)**: Field Collection Agent (or staff in field collector role) collects cash from customers and submits daily handover batch.

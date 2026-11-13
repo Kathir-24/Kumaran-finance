@@ -33,6 +33,10 @@
 | **ADR-17** | Dual-Platform Full Parity for Partners | 100% full feature parity on BOTH Web (`apps/web`) and Mobile (`apps/mobile`) for the 4 Partners across both Maker and Checker roles (`maker_user_id != checker_user_id` enforced regardless of device). Desk roles on Web; field/customers on Mobile. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-20 | **Y** |
 | **ADR-18** | Phone-Only Identity & Email Elimination | Single non-nullable unique `phone` across users and customers; `email` column permanently dropped. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-22 | **Y** |
 | **ADR-19** | Zero-Fee Native UPI Intent & Bank UTR Uniqueness | Zero third-party gateway fees (No Razorpay/Cashfree/2% MDR). NPCI native `upi://pay` deep-linking to KVB current account. `Payment.transactionRef @unique` prevents duplicate bank UTR claims. Customer claims verified by Desk Accountant under Maker != Checker. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-27 | **Y** |
+| **ADR-20** | Backend-For-Frontend (BFF) & HttpOnly Cookie Architecture | Next.js 15 BFF proxy with HttpOnly cookies (`kc_access_token`, `kc_refresh_token`). Raw tokens eliminated from browser storage. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-11-10 | **Y** |
+| **ADR-21** | Partner Identity Separation (SEC-A) | `isPartner: true` on `User` and JWT separates verified business partners from administrative Super Admin. Enforced on reversals, auctions, payouts, and defaulter removals. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-22** | Defaulter Removal Dual Control (SEC-B) | Two-partner workflow: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B reviews & approves (`REMOVED_DEF_3M`) with `maker != checker`. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-23** | Indian TRAI DLT SMS Exclusivity (Q34) | Automated notifications delivered strictly via Indian TRAI DLT SMS flow (MSG91). WhatsApp simulation channels purged; mobile push disabled in production. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 
 ---
 
@@ -220,3 +224,43 @@
   3. **Zero FOUC Edge Middleware (`src/middleware.ts`)**: Next.js Edge Middleware inspects cookie presence on incoming requests to `/(dashboard)/*`. Unauthenticated users receive an immediate HTTP 307 redirect to `/login` with 0ms latency.
   4. **Transparent BFF API Proxying, SSE Pass-Through & Coalesced Refresh (`/bff/api/v1/[...path]`)**: Browser client calls target the dedicated Next.js BFF prefix (`/bff/api/v1/*`, keeping Nginx `/api/v1/*` routing unambiguous for Flutter mobile `Bearer` traffic); [`bff-api-proxy.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-api-proxy.ts) extracts `kc_access_token`, attaches `Authorization: Bearer <token>`, streams `text/event-stream` feeds live without buffering, deduplicates silent 401/expired refreshes across `/bff/api/v1/*` and `/api/auth/session` via [`bff-token-refresh.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-token-refresh.ts) paired with distributed coalescing and client-scoped revocation cutoffs (`auth:revoked_before:<userId>:<clientType>`) in NestJS `AuthService`, and expires cookies symmetrically (`Max-Age=0`, matching `SameSite` and `Secure`) on logout or terminal 401 failures.
   5. **Cross-Platform Decoupling**: The NestJS backend API (`apps/api`) remains 100% decoupled and accepts standard Bearer tokens, maintaining full architectural parity with the Flutter Mobile App (`apps/mobile`), which stores tokens in the Android Keystore (`flutter_secure_storage`).
+
+---
+
+### ADR-21: Verified Partner Identity Separation (`isPartner: true`) vs Administrative Super Admin (SEC-A) (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-13
+- **Operational Reality**: In Kumaran Finance, 4 equal partners own the business. The system role `SUPER_ADMIN` was previously overloaded between administrative IT privileges and genuine business partner authority. An administrative staff member or IT support user possessing `SUPER_ADMIN` must not have unilateral authority to authorize payouts, reverse payments, commit auctions, or remove subscribers.
+- **Architectural Decision**:
+  1. **Schema Column**: `User.isPartner Boolean @default(false)` added to Prisma schema and PostgreSQL database.
+  2. **JWT Payload**: `isPartner` added to `JwtPayload` and propagated via `SanitizedUser` and `JwtStrategy`.
+  3. **High-Impact Endpoints Guarded**:
+     - `approveReversal` (`POST /payments/:id/reversal/approve`) requires `isPartner: true`.
+     - `finalizeAuction` (`POST /auctions/:id/finalize`) requires `isPartner: true`.
+     - `authorizePayout` (`POST /auctions/:id/authorize-payout`) requires `isPartner: true`.
+     - `settleFinalMonth` (`POST /chits/:id/settle-final-month`) requires `isPartner: true`.
+     - `approveDefaulterRemoval` (`POST /tickets/:id/remove-defaulter/approve`) requires `isPartner: true`.
+
+---
+
+### ADR-22: Defaulter Removal Two-Partner Dual Control (SEC-B) (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-13
+- **Operational Reality**: Forcibly removing a 3-month delinquent subscriber vacates a ticket and initiates ticket substitution. Under company partnership rules, a single partner cannot unilaterally remove a member without independent partner review.
+- **Architectural Decision**:
+  1. **State Machine Flow**: `DEFAULT_3_MONTHS` $\to$ `PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M`.
+  2. **Maker Action**: Partner A submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Sets `removalRequestedByUserId` and `removalRequestedAt`.
+  3. **Checker Action**: Independent Partner B reviews and approves: `POST /tickets/:id/remove-defaulter/approve`. Backend strictly validates `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
+  4. **Rejection Reversion**: Partner B can reject removal via `POST /tickets/:id/remove-defaulter/reject`, restoring status to `DEFAULT_3_MONTHS`.
+  5. **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal counsel confirmation.
+
+---
+
+### ADR-23: Indian TRAI DLT SMS Exclusivity & Purge of Simulated Channels (Q34) (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-13
+- **Operational Reality**: Customer communication policy (Q34) confirms that automated messages are delivered strictly via official Indian TRAI DLT SMS flows. The WhatsApp Business API is not contracted, and previous simulation logs caused confusion. Flutter mobile app push notifications are deferred.
+- **Architectural Decision**:
+  1. **DLT SMS Exclusivity**: MSG91 HTTP flow API with registered 19-digit DLT template IDs is the sole automated delivery channel in production.
+  2. **Purge of Fake Channels**: All WhatsApp simulation mock loggers and fake delivery channels are completely purged from `NotificationService`.
+  3. **Financial Non-Blocking Guarantee**: Failure of external telecom gateway never blocks core financial database transactions. All SMS operations use non-blocking asynchronous dispatch with circuit breaker protection.

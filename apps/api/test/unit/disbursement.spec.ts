@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AuctionStatus, DisbursementMode, Role } from '@prisma/client';
+import { AuctionStatus, DisbursementMode, DueStatus, Role } from '@prisma/client';
 import { JwtPayload } from '../../src/auth/interfaces/jwt-payload.interface';
 import { DisbursementService } from '../../src/disbursement/disbursement.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -117,7 +117,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         create: jest.fn(),
       },
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isPartner: true, name: 'Partner Test' })),
       },
       customer: {
         findUnique: jest.fn(),
@@ -573,6 +573,33 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       expect(result.winner.disbursementStatus).toBe('DISBURSED');
     });
 
+    it('FIN-D / TOCTOU: should reject payout release if outstanding arrears changed between authorization and release', async () => {
+      // Payout was authorized with arrears offset of 5000 (disbursed 70000 out of 75000)
+      const auctionWithArrearsOffset = {
+        ...mockAuthorizedAuction,
+        winner: {
+          ...mockAuthorizedAuction.winner,
+          disbursedAmount: 70000n, // 75000 - 5000 expected arrears
+        },
+      };
+      prismaMock.auction.findUnique.mockResolvedValue(auctionWithArrearsOffset);
+
+      // But now inside releasePayout transaction, current unpaid dues is 0 (subscriber paid meanwhile)
+      prismaMock.installmentDue.findMany.mockResolvedValue([]);
+
+      await expect(
+        disbursementService.releasePayout(
+          mockAuctionId,
+          { paymentReference: 'IOB-CHQ-TOCTOU' },
+          mockDisburserId,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'ARREARS_STATE_CHANGED: Outstanding arrears (₹0) no longer match the authorized arrears offset (₹5000). Arrears status was modified after authorization. Payout must be re-authorized.',
+        ),
+      );
+    });
+
     it('should generate bilingual prize disbursement voucher (English + தமிழ்)', async () => {
       const mockDisbursedAuction = {
         ...mockAuthorizedAuction,
@@ -753,6 +780,83 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           where: { id: mockChitGroup.id },
           data: expect.objectContaining({ status: 'COMPLETED' }),
         }),
+      );
+    });
+
+    it('FIN-B: should NOT deduct final month installment again if subscriber already paid Month N due (finalMonthDeduction = 0n)', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        ...mockChitGroup,
+        status: 'ACTIVE',
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        ...mockTicket,
+        chitGroupId: mockChitGroup.id,
+        isPrized: false,
+      });
+      prismaMock.subscriberTicket.count.mockResolvedValue(1); // Exactly 1 unprized
+      prismaMock.installmentDue.findUnique.mockResolvedValue({
+        id: 'due-month-20-paid',
+        ticketId: mockTicketId,
+        installmentMonth: 20,
+        status: DueStatus.PAID,
+        netPayableAmount: 5000n,
+        paidAmount: 5000n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([]); // No prior arrears
+
+      prismaMock.auction.create.mockResolvedValue({
+        id: 'final-settlement-auction-002',
+        installmentMonth: 20,
+      });
+      prismaMock.auctionWinner.create.mockResolvedValue({
+        id: 'final-winner-002',
+        disbursedAmount: 96000n, // 100,000 - 4,000 (No Month 20 deduction because already paid!)
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        ...mockTicket,
+        isPrized: true,
+      });
+      prismaMock.chitGroup.update.mockResolvedValue({
+        id: mockChitGroup.id,
+        status: 'COMPLETED',
+      });
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-log-final-2' });
+
+      const result = await disbursementService.settleFinalMonth(
+        mockChitGroup.id,
+        {
+          ticketId: mockTicketId,
+          disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          paymentReference: 'IOB-CHQ-FINAL-ALREADY-PAID',
+        },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.settlement.grossPrize).toBe(100000);
+      expect(result.settlement.foremanCommission).toBe(4000); // 4% of 100,000
+      expect(result.settlement.finalMonthInstallment).toBe(0); // ₹0 deducted because already paid!
+      expect(result.settlement.isFinalMonthAlreadyPaid).toBe(true);
+      expect(result.settlement.priorArrearsDeducted).toBe(0);
+      expect(result.settlement.netPrizeMoney).toBe(96000);    // 100,000 - 4,000 - 0 = 96,000
+    });
+
+    it('SEC-A: should reject non-partner Super Admin attempting final month settlement', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+      await expect(
+        disbursementService.settleFinalMonth(
+          mockChitGroup.id,
+          {
+            ticketId: mockTicketId,
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          },
+          'non-partner-admin',
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(
+        new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to authorize final month settlements',
+        ),
       );
     });
   });

@@ -57,12 +57,13 @@ Every subscriber's physical paper passbook at Kumaran Finance maintains strictly
    - In every auction month, the discount is **competitive and dynamic**:
      $$4\% \text{ Foreman Commission} \le \text{Bid Discount } (D) \le \frac{1}{4} \text{ Ceiling } \left(\frac{V}{4}\right)$$
    - Discount does not have to be static. In quiet months it may be lower (e.g. ₹30,000 or ₹40,000); when competition hits the 25% ceiling (₹75,000), physical paper token lot draws are conducted in front of members.
-5. **Final Month (Month $N$) Settlement (`CONFIRMED-BY-DEVELOPER`)**:
-   - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission ($C_f$), minus the final month's payable base installment ($I_{\text{base}}$), minus any prior unpaid arrears:
-     $$\text{Final Net Settlement Payout} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
-   - **Concrete Example**: On a ₹1,00,000 chit with 20 months ($I_{\text{base}} = \text{₹5,000}$, $C_f = \text{₹4,000}$), the net payout is strictly $\text{₹91,000}$ ($100,000 - 4,000 - 5,000$).
-   - The Month $N$ `InstallmentDue` is atomically settled as `PAID` in the same database transaction.
-   - Executed via `POST /api/v1/disbursements/group/{chitGroupId}/final-settlement` exclusively by Super Admin (Partners). Scheme status transitions to `COMPLETED`.
+5. **Final Month (Month $N$) Settlement (FIN-B & `CONFIRMED-BY-DEVELOPER`)**:
+   - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission ($C_f$), minus the final month's payable base installment ($I_{\text{base}}$) **if unpaid**, minus any prior unpaid arrears:
+     $$\text{Final Net Settlement Payout} = V - C_f - (\text{finalMonthDeduction}) - \text{priorArrears}$$
+   - **Double Collection Prohibition (FIN-B)**:
+     - Case 1 (Month $N$ Unpaid): $\text{finalMonthDeduction} = I_{base}$. Payout is $100,000 - 4,000 - 5,000 = \mathbf{₹91,000}$. Month $N$ due is marked `PAID`.
+     - Case 2 (Month $N$ Already Paid at branch desk): $\text{finalMonthDeduction} = 0n$. Payout is $100,000 - 4,000 - 0 = \mathbf{₹96,000}$. Zero double collection.
+   - Executed via `POST /chits/:id/settle-final-month` exclusively by verified Partners (`isPartner: true`). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -104,16 +105,14 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
     - Dividend: $Div_{ticket} = ₹1,050$.
     - **All 20 tickets (including the winner) pay**: $I_{net} = ₹5,000 - ₹1,050 = ₹3,950$.
 
-### Final Month (Month $N$): Settlement (`CONFIRMED-BY-DEVELOPER`)
+### Final Month (Month $N$): Settlement (FIN-B & `CONFIRMED-BY-DEVELOPER`)
 - **No Auction**: There is **NO bidding auction** in the final month.
 - **Settlement Flow**:
   1. The single remaining non-prized subscriber is entitled to the final prize money.
   2. The company retains the 4.00% foreman commission ($C_f = \text{₹4,000}$).
-  3. The subscriber's Month $N$ final base installment ($I_{\text{base}} = \text{₹5,000}$) is deducted directly from the pool payout, and their Month $N$ `InstallmentDue` record is marked `PAID`.
+  3. **FIN-B Check**: If subscriber has NOT yet paid Month $N$ installment, ₹5,000 is deducted and Month $N$ due marked `PAID` ($\text{Net Payout} = \mathbf{₹91,000}$). If subscriber ALREADY paid Month $N$ installment at the branch desk, final month deduction is ₹0 ($\text{Net Payout} = \mathbf{₹96,000}$).
   4. Any prior unpaid arrears are also deducted from the prize snapshot.
-  5. The net payout issued to the final subscriber is:
-     $$\text{Net Payout} = V - C_f - I_{\text{base}} - \text{priorArrears} = ₹1,00,000 - ₹4,000 - ₹5,000 - ₹0 = \mathbf{₹91,000}$$
-  6. The payout is authorized and released via formal settlement voucher by Super Admin (Partners).
+  5. The payout is authorized and released via formal settlement voucher by verified Partners (`isPartner: true`). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -245,15 +244,42 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 
 ---
 
-## 10. Prize Disbursement Arrears Offset & Override Guard (`KFC-FIN-003`, `KFC-FIN-004`)
+## 10. Prize Disbursement Arrears Offset & TOCTOU Guard (FIN-A, FIN-D, `KFC-FIN-003`, `KFC-FIN-004`)
 
-1. **Automatic Arrears Offsetting (`KFC-FIN-003`)**:
-   - When authorizing a prize payout (`POST /api/v1/disbursements/auction/:auctionId/authorize`), the system queries all unpaid installment dues for the winning subscriber up to the auction month.
+1. **Automatic Arrears Offsetting (FIN-A & `KFC-FIN-003`)**:
+   - When authorizing a prize payout (`POST /auctions/:id/authorize-payout`), the system queries all unpaid installment dues for the winning subscriber up to the auction month.
    - Total outstanding arrears are automatically deducted from the gross prize money:
      $$\text{Authorized Net Payout} = \text{Prize Money } (P) - \text{Total Arrears}$$
    - **Insolvency Guard**: If total unpaid arrears are greater than or equal to the prize money ($\text{Arrears} \ge P$), authorization is rejected fail-closed.
-   - Upon release (`POST /api/v1/disbursements/auction/:auctionId/release`), all deducted dues are atomically marked as `PAID` in the same transaction.
-2. **Staff Payout Override Prohibition (`KFC-FIN-004`)**:
-   - The release payload accepts an optional `disbursedAmount`. If supplied, it **must identically equal** the authorized net payout (`authorizedNetPayout`).
+2. **Time-Of-Check-To-Time-Of-Use (TOCTOU) Arrears Verification (FIN-D)**:
+   - Upon release (`POST /auctions/:id/release-payout`), inside the row-locked database transaction:
+     - The system re-queries all unpaid dues $\le$ auction month.
+     - Validates `currentArrears === expectedArrears`.
+     - If arrears changed (e.g. subscriber made an intervening payment between authorization and release), the transaction fails closed immediately:
+       `HTTP 400 Bad Request: ARREARS_STATE_CHANGED: Outstanding arrears no longer match authorized arrears offset. Payout must be re-authorized.`
+3. **Atomic Due Settlement & Allocation Audit Log (FIN-A)**:
+   - For every unpaid due offset from the prize payout, the system sets `status: PAID`, records `paidAmount`, and emits an immutable audit log: `PRIZE_ARREARS_OFFSET_ALLOCATED`.
+   - Guaranteed zero double deduction and zero double collection.
+4. **Staff Payout Override Prohibition (`KFC-FIN-004`)**:
    - Any attempt by staff to manually override or alter the payout amount is rejected with:
      `HTTP 400 Bad Request: PAYOUT_OVERRIDE_NOT_PERMITTED: Manual override of authorized payout is prohibited.`
+
+---
+
+## 11. Finalized Auction Correction Downstream Integrity Guard (FIN-E & KFC-FIN-005)
+
+1. **Dual Control Requirement**: Partner A requests (`POST /auctions/:id/request-correction`); independent Partner B approves (`POST /auctions/:id/approve-correction`).
+2. **Disbursed Prize Immutability**: If prize money has already been disbursed to the winner, correction is strictly rejected: `DISBURSED_PRIZE_IMMUTABLE`.
+3. **Settled Financial History Preservation (FIN-E)**:
+   - If ANY subscriber has already paid their installment due for downstream Month $N+1$, correction fails closed:
+     `HTTP 400 Bad Request: ALREADY_PAID_DUES_EXIST: Cannot request/approve correction because downstream dues have already been paid. Correction would invalidate settled financial history.`
+
+---
+
+## 12. Defaulter & Early Exit Settlement Policy Guard (FIN-F & Q25)
+
+1. **Statutory Status**: Policy regarding damage deduction percentages (4% commission vs 5% damages under Section 30 Chit Funds Act) remains **UNCONFIRMED** by Kumaran Finance partners and legal counsel.
+2. **Fail-Closed Execution Guard**:
+   - Calling `POST /tickets/:id/settle-removal` strictly fails closed with:
+     `HTTP 400 Bad Request: UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement policy (Q25) has not been confirmed by business owner and legal counsel. Automatic settlement execution is blocked.`
+   - Prevents illegal or unauthorized forfeiture of subscriber capital.

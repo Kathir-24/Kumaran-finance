@@ -131,9 +131,11 @@
 | `GET`  | `/tickets/:ticketId/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
 | `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
 | `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
-| `POST` | `/tickets/:id/remove-defaulter` | **Defaulter Removal**: Execute removal after 3 continuous months arrears (`REMOVED_DEF_3M`) | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/remove-defaulter/request` | **Defaulter Removal Request (Maker)**: Partner A requests removal with justification (`PENDING_REMOVAL_APPROVAL`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/tickets/:id/remove-defaulter/approve` | **Defaulter Removal Approval (Checker)**: Partner B approves removal (`REMOVED_DEF_3M`; `maker != checker`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/tickets/:id/remove-defaulter/reject` | **Defaulter Removal Rejection (Checker)**: Partner B rejects removal (reverts to `DEFAULT_3_MONTHS`) | `SUPER_ADMIN` (Partner) |
 | `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
-| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement**: Settle defaulter account with refund minus 4% contractual damages voucher (`ticket.removedByUserId !== adminUserId`) | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement (BLOCKED / Q25)**: Fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation | `SUPER_ADMIN` |
 | `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` |

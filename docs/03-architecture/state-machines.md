@@ -183,7 +183,9 @@ stateDiagram-v2
     ARREARS_2_MONTHS --> ACTIVE : Arrears Paid Up-to-Date
     ARREARS_2_MONTHS --> DEFAULT_3_MONTHS : 3rd Consecutive Installment Missed
     DEFAULT_3_MONTHS --> ACTIVE : Full Arrears Paid Up-to-Date
-    DEFAULT_3_MONTHS --> REMOVED_DEF_3M : Company Executes Removal Rights (Partner / Admin)
+    DEFAULT_3_MONTHS --> PENDING_REMOVAL_APPROVAL : Partner A Requests Removal (SEC-B)
+    PENDING_REMOVAL_APPROVAL --> DEFAULT_3_MONTHS : Partner B Rejects Removal
+    PENDING_REMOVAL_APPROVAL --> REMOVED_DEF_3M : Partner B Approves Removal (Maker != Checker)
     REMOVED_DEF_3M --> [*]
 ```
 
@@ -193,10 +195,12 @@ stateDiagram-v2
   - Ineligibility: Subscribers in arrears are **strictly ineligible to bid in that month's auction** (`CONFIRMED-BY-DEVELOPER`).
 - **`ARREARS_2_MONTHS` $\to$ `DEFAULT_3_MONTHS`**:
   - Triggered when `consecutiveUnpaidMonths == 3`. Ticket is flagged for default removal.
-- **`DEFAULT_3_MONTHS` $\to$ `REMOVED_DEF_3M`**:
-  - Requires **Company Management / Partner Authorization**: Company exercises its confirmed right to remove the customer from the chit group.
-  - Generates an immutable audit event with `removedByUserId` and timestamp.
-  - Ticket is freed for substitution / re-assignment or account settlement according to company terms.
+- **`DEFAULT_3_MONTHS` $\to$ `PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M` (SEC-B Two-Partner Dual Control)**:
+  - **Step 1 (Maker Request)**: Partner A (`SUPER_ADMIN` with `isPartner: true`) submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Status transitions to `PENDING_REMOVAL_APPROVAL`.
+  - **Step 2 (Checker Approval)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`) reviews justification: `POST /tickets/:id/remove-defaulter/approve`. Backend enforces `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
+  - Sets `status: REMOVED_DEF_3M` and vacates ticket for customer substitution.
+  - Generates immutable audit event `DEFAULTER_REMOVAL_APPROVED`.
+  - **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 
 ---
 

@@ -614,7 +614,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       expect(result).toBe(payload);
       expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-001' },
-        select: { id: true, isActive: true },
+        select: { id: true, isActive: true, isPartner: true },
       });
       expect(redisClientMock.set).toHaveBeenCalledWith(
         'user:status:user-001',

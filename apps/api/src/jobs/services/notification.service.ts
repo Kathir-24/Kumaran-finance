@@ -15,7 +15,7 @@ import type {
 
 export interface SentNotificationRecord {
   id: string;
-  channel: 'SMS_DLT' | 'WHATSAPP' | 'PUSH_NOTIFICATION';
+  channel: 'SMS_DLT' | 'PUSH_NOTIFICATION';
   recipientPhone: string;
   templateType:
     | 'RECEIPT'
@@ -76,7 +76,7 @@ export class NotificationService {
    */
   async dispatchPaymentReceipt(
     payload: PaymentReceiptNotificationJobPayload,
-  ): Promise<{ smsId?: string; pushId?: string; whatsappId: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
+  ): Promise<{ smsId?: string; pushId?: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
     // Asynchronously pre-render receipt PDF into S3 so user downloads encounter 0ms generation delay
     if (this.pdfService && payload.paymentId) {
       try {
@@ -163,50 +163,13 @@ export class NotificationService {
       });
     }
 
-    // 2. Bilingual WhatsApp Notification
-    const whatsappText = `வணக்கம் திரு. *${payload.subscriberName}*,
-
-குமரன் சீட்ஸ்-ல் உங்கள் சீட்டு தவணை தொகை வெற்றிகரமாக பெறப்பட்டது.
-Your chit subscription payment has been received successfully.
-
-📋 *கட்டண விவரம் / Payment Details:*
--------------------------------------------
-• சீட்டு குழு / Chit Group: *${payload.chitCode}*
-• டிக்கெட் எண் / Ticket No: *${payload.ticketNumber}*
-• செலுத்திய தொகை / Amount: *₹${formattedAmount}*
-• கட்டண முறை / Mode: *${payload.paymentMode}*
-• ரசீது எண் / Receipt No: *${payload.receiptNumber}*
-• தேதி & நேரம் / Date: *${payload.transactionTimestamp}*
-
-📥 *டிஜிட்டல் ரசீதை பதிவிறக்க / Download Receipt PDF:*
-${payload.receiptDownloadUrl}
-
-📲 *உங்கள் டிஜிட்டல் பாஸ்புக்கை பார்க்க / View Passbook:*
-${payload.passbookAppUrl}
-
-நன்றி / Thank you,
-*குமரன் பைனான்ஸ் / Kumaran Finance*`;
-
-    const whatsappId = `wa-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    this.pushLog({
-      id: whatsappId,
-      channel: 'WHATSAPP',
-      recipientPhone: payload.recipientPhone,
-      templateType: 'RECEIPT',
-      messageText: whatsappText,
-      variables: { ...payload },
-      sentAt: new Date(),
-      status: 'DELIVERED',
-    });
-
     this.logger.log(
-      `Dispatched bilingual receipt notifications to ${payload.recipientPhone} for Receipt ${payload.receiptNumber}`,
+      `Dispatched receipt notification to ${payload.recipientPhone} for Receipt ${payload.receiptNumber} via ${isPushEligible ? 'PUSH_NOTIFICATION' : 'SMS_DLT'}`,
     );
 
     return {
       smsId,
       pushId,
-      whatsappId,
       channel: isPushEligible ? 'PUSH_NOTIFICATION' : 'SMS_DLT',
     };
   }

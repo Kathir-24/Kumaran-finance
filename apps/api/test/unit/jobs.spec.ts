@@ -227,7 +227,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
   });
 
   describe('2. NotificationService (DLT SMS & Bilingual WhatsApp Engine)', () => {
-    it('should format and log Indian DLT SMS and WhatsApp notification on payment receipt', async () => {
+    it('should format and log Indian DLT SMS notification on payment receipt (SMS sole confirmed channel per Q34)', async () => {
       const res = await notificationService.dispatchPaymentReceipt({
         paymentId: 'pay-001',
         receiptNumber: 'KC-REC-PRD-2026-00412',
@@ -243,19 +243,17 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       });
 
       expect(res.smsId).toBeDefined();
-      expect(res.whatsappId).toBeDefined();
 
       const logs = notificationService.getSentNotificationLog();
-      expect(logs.length).toBe(2);
+      expect(logs.length).toBe(1);
 
       const sms = logs.find((l) => l.channel === 'SMS_DLT');
       expect(sms?.messageText).toContain('Kumaran Chits: Received Rs.3,750 for Chit KCA-1L-20M-01, Ticket #7');
       expect(sms?.messageText).toContain('Receipt: KC-REC-PRD-2026-00412');
 
-      const whatsapp = logs.find((l) => l.channel === 'WHATSAPP');
-      expect(whatsapp?.messageText).toContain('வணக்கம் திரு. *S. Sundaram*');
-      expect(whatsapp?.messageText).toContain('செலுத்திய தொகை / Amount: *₹3,750*');
-      expect(whatsapp?.messageText).toContain('https://storage.kumaranfinance.in/receipt-00412.pdf');
+      // Assert that unapproved channels (e.g. WHATSAPP) are not present per Q34
+      const whatsapp = logs.find((l) => (l as any).channel === 'WHATSAPP');
+      expect(whatsapp).toBeUndefined();
     });
 
     it('should dispatch free Mobile App Push Notification when fcmToken is available', async () => {
@@ -276,7 +274,6 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
       expect(res.channel).toBe('PUSH_NOTIFICATION');
       expect(res.pushId).toBeDefined();
-      expect(res.whatsappId).toBeDefined();
 
       const logs = notificationService.getSentNotificationLog();
       const pushNotif = logs.find((l) => l.channel === 'PUSH_NOTIFICATION');

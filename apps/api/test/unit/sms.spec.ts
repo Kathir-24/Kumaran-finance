@@ -388,9 +388,8 @@ describe('Component 3: Pluggable SMS Drivers & DLT Notification Suite', () => {
       expect(mockDriver.getSentMessages()[0].message).toContain('Rs.3,750');
 
       const logs = notificationService.getSentNotificationLog();
-      expect(logs).toHaveLength(2); // SMS + WhatsApp
-      expect(logs[0].channel).toBe('WHATSAPP');
-      expect(logs[1].channel).toBe('SMS_DLT');
+      expect(logs).toHaveLength(1); // SMS only (WhatsApp purged per Q34)
+      expect(logs[0].channel).toBe('SMS_DLT');
     });
 
     it('should broadcast auction reminder SMS to all subscribers', async () => {

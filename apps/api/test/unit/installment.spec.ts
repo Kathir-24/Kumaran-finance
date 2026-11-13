@@ -52,7 +52,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
         update: jest.fn(),
       },
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ id: mockAdminId, isPartner: true }),
       },
       customer: {
         findUnique: jest.fn(),
@@ -438,7 +438,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should successfully execute removal rights when ticket has >= 3 consecutive missed months', async () => {
+    it('SEC-B: should submit removal request (PENDING_REMOVAL_APPROVAL) when ticket has >= 3 consecutive missed months', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
         id: mockTicketId1,
         ticketNumber: 5,
@@ -452,14 +452,15 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
         id: mockTicketId1,
         ticketNumber: 5,
         consecutiveUnpaidMonths: 3,
-        status: 'REMOVED_DEF_3M',
-        removedAt: new Date(),
-        removedByUserId: mockAdminId,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        removalRequestedAt: new Date(),
+        removalRequestedByUserId: mockAdminId,
+        removalReason: 'Failed to pay installments for 3 consecutive months despite formal notice.',
         customer: { fullName: 'Subscriber B' },
         chitGroup: { groupCode: 'KCA-1L-20M-01' },
       });
 
-      const result = await installmentService.removeDefaulter(
+      const result = await installmentService.requestDefaulterRemoval(
         mockTicketId1,
         mockAdminId,
         {
@@ -468,17 +469,72 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       );
 
       expect(result.success).toBe(true);
-      expect(result.ticket.status).toBe('REMOVED_DEF_3M');
-      expect(result.ticket.removedByUserId).toBe(mockAdminId);
+      expect(result.ticket.status).toBe('PENDING_REMOVAL_APPROVAL');
+      expect(result.ticket.removalRequestedByUserId).toBe(mockAdminId);
       expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: mockTicketId1 },
           data: expect.objectContaining({
-            status: 'REMOVED_DEF_3M',
-            removedByUserId: mockAdminId,
+            status: 'PENDING_REMOVAL_APPROVAL',
+            removalRequestedByUserId: mockAdminId,
           }),
         }),
       );
+    });
+
+    it('SEC-B: should ENFORCE Maker != Checker on approveDefaulterRemoval when requesting partner attempts approval', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        consecutiveUnpaidMonths: 3,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        removalRequestedByUserId: mockAdminId, // Requested by Partner A
+        customer: { fullName: 'Subscriber B' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      // Partner A attempts to approve own removal request (Violation!)
+      await expect(
+        installmentService.approveDefaulterRemoval(mockTicketId1, mockAdminId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('SEC-B: should ALLOW independent Partner B to approve defaulter removal (REMOVED_DEF_3M)', async () => {
+      const independentPartnerId = 'partner-b-uuid';
+      prismaMock.user.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve({ id: where?.id || independentPartnerId, isPartner: true }),
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        consecutiveUnpaidMonths: 3,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        removalRequestedByUserId: mockAdminId, // Requested by Partner A
+        customer: { fullName: 'Subscriber B' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        consecutiveUnpaidMonths: 3,
+        status: 'REMOVED_DEF_3M',
+        removedAt: new Date(),
+        removedByUserId: independentPartnerId,
+        removalReason: '3 consecutive unpaid months',
+        customer: { fullName: 'Subscriber B' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      const result = await installmentService.approveDefaulterRemoval(
+        mockTicketId1,
+        independentPartnerId,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.ticket.status).toBe('REMOVED_DEF_3M');
+      expect(result.ticket.removedByUserId).toBe(independentPartnerId);
     });
 
     it('KFC-SEC-004: should reject defaulter removal if ticket is already prized (PRIZED_TICKET_IMMUTABLE)', async () => {
@@ -517,51 +573,26 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('KFC-SEC-002: should enforce Maker != Checker on settleRemoval if removing partner attempts to settle exit voucher', async () => {
+    it('FIN-F / Q25: should FAIL CLOSED on settleRemoval with UNAPPROVED_SETTLEMENT_POLICY', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
         id: mockTicketId1,
         ticketNumber: 5,
         isPrized: false,
         status: 'REMOVED_DEF_3M',
-        removedByUserId: mockAdminId, // Removed by Partner A
+        removedByUserId: 'partner-a-uuid',
         customer: { fullName: 'Removed Subscriber' },
         chitGroup: { groupCode: 'KCA-1L-20M-01', chitValue: 100000n },
       });
 
-      // Partner A attempts to settle the voucher (Violation!)
       await expect(
-        installmentService.settleRemoval(mockTicketId1, mockAdminId, {
+        installmentService.settleRemoval(mockTicketId1, 'partner-b-uuid', {
           paymentMethod: 'CASH',
         }),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('KFC-SEC-002: should allow independent Partner B to settle exit voucher after Partner A removed defaulter', async () => {
-      const independentPartnerId = 'partner-b-uuid';
-      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
-        id: mockTicketId1,
-        ticketNumber: 5,
-        isPrized: false,
-        status: 'REMOVED_DEF_3M',
-        removedByUserId: mockAdminId, // Removed by Partner A
-        customer: { fullName: 'Removed Subscriber' },
-        chitGroup: { groupCode: 'KCA-1L-20M-01', chitValue: 100000n },
-      });
-      prismaMock.paymentAllocation.findMany.mockResolvedValue([
-        { amountAllocated: 15000n },
-      ]);
-      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-def-settle-1' });
-
-      const result = await installmentService.settleRemoval(
-        mockTicketId1,
-        independentPartnerId, // Independent Partner B approves
-        { paymentMethod: 'CASH' },
+      ).rejects.toThrow(
+        new BadRequestException(
+          'UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed.',
+        ),
       );
-
-      expect(result.success).toBe(true);
-      expect(result.totalPaid).toBe(15000);
-      expect(result.damagesDeducted).toBe(4000); // 4% of 100,000
-      expect(result.refundAmount).toBe(11000); // 15,000 - 4,000
     });
   });
 

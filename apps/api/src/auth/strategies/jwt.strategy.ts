@@ -72,7 +72,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, isPartner: true },
     });
 
     if (!user || !user.isActive) {
@@ -94,6 +94,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
       throw new UnauthorizedException('User account is deactivated or no longer exists');
     }
+
+    payload.isPartner = user.isPartner;
 
     if (useRedis && redis) {
       await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});

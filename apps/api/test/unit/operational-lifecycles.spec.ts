@@ -324,16 +324,17 @@ describe('Operational Lifecycles & Maintenance Workflows', () => {
         { amountAllocated: 4500n },
       ]);
 
-      const res = await installmentService.settleRemoval('ticket-5', 'admin-1', {
-        paymentMethod: 'CASH' as any,
-        notes: 'Exit voucher issued',
-      });
-
-      expect(res.success).toBe(true);
-      expect(res.totalPaid).toBe(9500);
-      expect(res.damagesDeducted).toBe(4000); // 4% of 100,000
-      expect(res.refundAmount).toBe(5500); // 9500 - 4000 = 5500
-      expect(res.voucherNumber).toMatch(/^KC-VOU-DEF-/);
+      // FIN-F / Q25: Early exit settlement formula is pending board resolution. Fails closed.
+      await expect(
+        installmentService.settleRemoval('ticket-5', 'admin-1', {
+          paymentMethod: 'CASH' as any,
+          notes: 'Exit voucher issued',
+        }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed.',
+        ),
+      );
     });
   });
 

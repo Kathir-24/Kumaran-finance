@@ -71,6 +71,9 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isPartner: true })),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 
@@ -957,6 +960,45 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('FIN-E: should FAIL CLOSED on requestAuctionCorrection when downstream Month N+1 dues are already PAID', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
+      prismaMock.installmentDue.findMany.mockResolvedValueOnce([
+        { id: 'due-m4-paid-1', status: 'PAID', installmentMonth: 4 },
+      ]);
+
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          {
+            correctedBidDiscount: 24000,
+            reason: 'Correction attempt after subscribers paid Month 4',
+          },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'ALREADY_PAID_DUES_EXIST: Cannot request correction for Month 3 auction because 1 subscriber(s) have already paid dues for Month 4. Correction would invalidate settled financial history.',
+        ),
+      );
+    });
+
+    it('SEC-A: should reject non-partner Super Admin on finalizeAuction', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+      await expect(
+        auctionService.finalizeAuction(
+          mockAuctionId,
+          'non-partner-admin',
+          undefined,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(
+        new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to finalize and commit auctions.',
+        ),
+      );
+    });
+
     it('KFC-FIN-005: should ENFORCE Maker != Checker: reject approval if requesting Partner attempts to approve own correction', async () => {
       prismaMock.auditLog.findFirst.mockResolvedValue({
         id: 'audit-corr-req-1',
@@ -996,9 +1038,11 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         dividendPerTicket: 1000n,
         prizeMoney: 76000n,
       });
-      prismaMock.installmentDue.findMany.mockResolvedValue([
-        { id: 'due-m4-t1', grossAmount: 5000n, dividendDeduction: 800n, netPayableAmount: 4200n },
-      ]);
+      prismaMock.installmentDue.findMany
+        .mockResolvedValueOnce([]) // Check for already paid downstream dues -> 0 found
+        .mockResolvedValueOnce([   // Downstream unpaid dues to adjust
+          { id: 'due-m4-t1', grossAmount: 5000n, dividendDeduction: 800n, netPayableAmount: 4200n },
+        ]);
       prismaMock.installmentDue.update.mockResolvedValue({});
       prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-corr-app-1' });
 

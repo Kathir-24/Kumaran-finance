@@ -52,7 +52,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
   beforeEach(() => {
     prismaMock = {
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isActive: true, isPartner: true })),
         findFirst: jest.fn(),
         update: jest.fn(),
       },
@@ -426,6 +426,22 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         expect(res.paymentStatus).toBe(PaymentStatus.REVERSED);
         expect(res.dueStatus).toBe(DueStatus.UNPAID);
       });
+
+      it('SEC-A: should REJECT non-partner Super Admin attempting to approve reversal (403 Forbidden)', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+        await expect(
+          paymentService.approveReversal(
+            mockPaymentId,
+            { notes: 'Approval attempt by non-partner admin' },
+            'non-partner-admin',
+            [Role.SUPER_ADMIN],
+          ),
+        ).rejects.toThrow(
+          new ForbiddenException(
+            'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to approve payment reversals',
+          ),
+        );
+      });
     });
 
     // -----------------------------------------------------------------------
@@ -496,6 +512,22 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
 
         expect(res.winner.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
         expect(res.winner.authorizedByUserId).toBe(mockCheckerId);
+      });
+
+      it('SEC-A: should REJECT non-partner Super Admin attempting to authorize payout (403 Forbidden)', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+        await expect(
+          disbursementService.authorizePayout(
+            mockAuctionId,
+            { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
+            'non-partner-admin',
+            [Role.SUPER_ADMIN],
+          ),
+        ).rejects.toThrow(
+          new ForbiddenException(
+            'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to authorize prize money disbursements',
+          ),
+        );
       });
     });
   });

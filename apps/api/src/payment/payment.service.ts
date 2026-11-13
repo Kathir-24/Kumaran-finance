@@ -709,11 +709,23 @@ export class PaymentService {
     checkerUserId: string,
     checkerRoles: Role[],
   ) {
-    // 1. Enforce Super Admin Exclusivity
+    // 1. Enforce Super Admin & Verified Partner Exclusivity (SEC-A)
     if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve payment reversals',
       );
+    }
+
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to approve payment reversals',
+        );
+      }
     }
 
     const payment = await this.prisma.payment.findUnique({
