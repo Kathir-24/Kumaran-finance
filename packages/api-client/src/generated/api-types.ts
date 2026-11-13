@@ -1262,8 +1262,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Checker: Finalize auction and commit results (Maker != Checker)
-         * @description Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.
+         * Checker: Finalize auction and commit results (Partner strictly, Maker != Checker)
+         * @description Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed strictly: Super Admin (Partner). Throws 403 Forbidden if finalized by the same user who recorded bids.
          */
         post: operations["AuctionController_finalize_v1"];
         delete?: never;
@@ -1330,6 +1330,46 @@ export interface paths {
          * @description Records official government challan/acknowledgement reference, filing date, and staff notes.
          */
         patch: operations["AuctionController_markMinutesFiled_v1"];
+        trace?: never;
+    };
+    "/api/v1/auctions/{id}/correction/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Maker: Request correction of a finalized auction (Partner strictly)
+         * @description Initiates an audited correction of a finalized auction discount or winner. Strictly requires two-partner approval. Fails closed if prize money has already been disbursed.
+         */
+        post: operations["AuctionController_requestAuctionCorrection_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{id}/correction/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checker: Authorize and apply finalized auction correction (Independent Partner)
+         * @description Approves auction correction, recalculates universal dividends, updates winner records, and reconciles downstream monthly dues. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).
+         */
+        post: operations["AuctionController_approveAuctionCorrection_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/installments/group/{chitGroupId}/month/{month}": {
@@ -1482,10 +1522,70 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12)
-         * @description Executes company removal rights when a subscriber has defaulted on 3 or more consecutive monthly installments (consecutiveUnpaidMonths >= 3). Transitions ticket status to REMOVED_DEF_3M. Allowed strictly: Super Admin (Partners).
+         * Company 3-Month Arrears Removal Rights Request (ADR-07, ADR-12 & SEC-B)
+         * @description Initiates company removal request when a subscriber has defaulted on 3 or more consecutive monthly installments. Transitions ticket status to PENDING_REMOVAL_APPROVAL. Allowed strictly: Super Admin (Partners).
          */
         post: operations["TicketController_removeDefaulter_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{id}/remove-defaulter/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Defaulter Removal (Maker Partner - SEC-B)
+         * @description Partner A requests removal of a 3-month consecutive defaulter. Transitions ticket to PENDING_REMOVAL_APPROVAL. Allowed strictly: Verified Partners.
+         */
+        post: operations["TicketController_requestDefaulterRemoval_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{id}/remove-defaulter/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Defaulter Removal (Checker Partner - SEC-B)
+         * @description Partner B approves removal of a 3-month consecutive defaulter. Enforces Maker != Checker. Transitions ticket to REMOVED_DEF_3M. Allowed strictly: Verified Partners.
+         */
+        post: operations["TicketController_approveDefaulterRemoval_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{id}/remove-defaulter/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Defaulter Removal Request (Checker Partner - SEC-B)
+         * @description Partner B rejects removal request and restores ticket to DEFAULT_3_MONTHS. Allowed strictly: Verified Partners.
+         */
+        post: operations["TicketController_rejectDefaulterRemoval_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1522,8 +1622,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Defaulter Account Settlement & Exit Refund Voucher
-         * @description Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.
+         * Defaulter Account Settlement & Exit Refund Voucher (Partner strictly, Maker != Checker)
+         * @description Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Strictly requires two-partner approval: Partner who removed cannot settle. Allowed strictly: Super Admin.
          */
         post: operations["TicketController_settleRemoval_v1"];
         delete?: never;
@@ -1746,8 +1846,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Maker: Request payment reversal with justification
-         * @description Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Requires Checker approval by Super Admin.
+         * Maker: Request payment reversal with justification (Partner strictly)
+         * @description Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Strictly requires two-partner approval: one Partner initiates, a different Partner approves.
          */
         post: operations["PaymentController_requestReversal_v1"];
         delete?: never;
@@ -3365,6 +3465,11 @@ export interface components {
              */
             isKycVerified: boolean;
             /**
+             * @description Record version for optimistic concurrency control
+             * @example 1
+             */
+            version?: number;
+            /**
              * @description Branch ID
              * @example branch-prd-001
              */
@@ -3525,6 +3630,11 @@ export interface components {
              */
             isKycVerified: boolean;
             /**
+             * @description Record version for optimistic concurrency control
+             * @example 1
+             */
+            version?: number;
+            /**
              * @description Branch ID
              * @example branch-prd-001
              */
@@ -3655,6 +3765,11 @@ export interface components {
              * @example false
              */
             isKycVerified: boolean;
+            /**
+             * @description Record version for optimistic concurrency control
+             * @example 1
+             */
+            version?: number;
             /**
              * @description Branch ID
              * @example branch-prd-001
@@ -4743,6 +4858,35 @@ export interface components {
             /**
              * @description Optional staff notes or remarks regarding physical filing
              * @example Submitted in person at Erode Deputy Registrar office by Partner A
+             */
+            notes?: string;
+        };
+        RequestAuctionCorrectionDto: {
+            /**
+             * @description Corrected winning auction bid discount in whole integer Rupees (must produce an exact whole-Rupee dividend)
+             * @example 24000
+             */
+            correctedBidDiscount: number;
+            /**
+             * @description UUID of the corrected winning subscriber ticket (optional if winner ticket is unchanged)
+             * @example 2351d319-24f1-48dd-8a9d-657fbf2d371f
+             */
+            correctedWinningTicketId?: string;
+            /**
+             * @description Mandatory justification reason for the finalized auction correction
+             * @example Tie-break ticket number data entry error corrected per physical branch token register
+             */
+            reason: string;
+            /**
+             * @description Additional administrative remarks or notes
+             * @example Verified against physical token draw record witnessed by 4 members
+             */
+            notes?: string;
+        };
+        ApproveAuctionCorrectionDto: {
+            /**
+             * @description Checker Partner notes upon approving auction correction
+             * @example Reviewed and confirmed against physical token draw register and bank statements
              */
             notes?: string;
         };
@@ -6257,7 +6401,17 @@ export interface components {
             grossPrize: number;
             /** @example 4000 */
             foremanCommission: number;
-            /** @example 96000 */
+            /**
+             * @description Final month base installment deducted from payout
+             * @example 5000
+             */
+            finalMonthInstallment?: number;
+            /**
+             * @description Prior arrears deducted from payout
+             * @example 0
+             */
+            priorArrearsDeducted?: number;
+            /** @example 91000 */
             netPrizeMoney: number;
             /** @example ACCOUNT_PAYEE_CHEQUE */
             disbursementMode: string;
@@ -9924,7 +10078,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Maker-Checker separation violated */
+            /** @description Maker-Checker separation violated or non-partner caller */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10075,6 +10229,130 @@ export interface operations {
                 content?: never;
             };
             /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Auction not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuctionController_requestAuctionCorrection_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestAuctionCorrectionDto"];
+            };
+        };
+        responses: {
+            /** @description Finalized auction correction requested successfully (pending checker partner approval) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuctionResponseDto"];
+                    };
+                };
+            };
+            /** @description Auction not finalized, prize already disbursed, or non-divisible dividend */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Super Admin only */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Auction not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuctionController_approveAuctionCorrection_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveAuctionCorrectionDto"];
+            };
+        };
+        responses: {
+            /** @description Finalized auction correction approved and applied successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuctionResponseDto"];
+                    };
+                };
+            };
+            /** @description No pending correction request or prize already disbursed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Maker-Checker violation or insufficient role */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10477,7 +10755,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Subscriber ticket successfully removed for 3-month default */
+            /** @description Subscriber ticket removal request submitted for Partner B approval */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10494,7 +10772,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Ticket has fewer than 3 consecutive unpaid months */
+            /** @description Ticket has fewer than 3 consecutive unpaid months or already prized */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10509,6 +10787,184 @@ export interface operations {
                 content?: never;
             };
             /** @description Forbidden — Insufficient role permissions or BOLA violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketController_requestDefaulterRemoval_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveDefaulterDto"];
+            };
+        };
+        responses: {
+            /** @description Subscriber ticket removal request submitted for Partner B approval (SEC-B) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RemoveDefaulterResponseDto"];
+                    };
+                };
+            };
+            /** @description Ticket has fewer than 3 consecutive unpaid months or already prized */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Partner account required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketController_approveDefaulterRemoval_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subscriber ticket removal approved and transitioned to REMOVED_DEF_3M (SEC-B) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RemoveDefaulterResponseDto"];
+                    };
+                };
+            };
+            /** @description Ticket not in PENDING_REMOVAL_APPROVAL or already prized */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Maker-Checker violation: removing partner cannot approve */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketController_rejectDefaulterRemoval_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subscriber ticket removal rejected and restored to DEFAULT_3_MONTHS (SEC-B) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["RemoveDefaulterResponseDto"];
+                    };
+                };
+            };
+            /** @description Ticket not in PENDING_REMOVAL_APPROVAL */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Maker-Checker violation or insufficient role */
             403: {
                 headers: {
                     [name: string]: unknown;

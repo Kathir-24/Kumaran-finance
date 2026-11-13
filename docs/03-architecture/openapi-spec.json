@@ -4998,7 +4998,7 @@
     },
     "/api/v1/auctions/{id}/finalize": {
       "post": {
-        "description": "Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed: Super Admin, Branch Manager (Authorized Checker). Throws 403 Forbidden if finalized by the same user who recorded bids.",
+        "description": "Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed strictly: Super Admin (Partner). Throws 403 Forbidden if finalized by the same user who recorded bids.",
         "operationId": "AuctionController_finalize_v1",
         "parameters": [
           {
@@ -5058,7 +5058,7 @@
             "description": "Unauthorized — Invalid or missing Bearer token"
           },
           "403": {
-            "description": "Maker-Checker separation violated"
+            "description": "Maker-Checker separation violated or non-partner caller"
           }
         },
         "security": [
@@ -5066,7 +5066,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Checker: Finalize auction and commit results (Maker != Checker)",
+        "summary": "Checker: Finalize auction and commit results (Partner strictly, Maker != Checker)",
         "tags": [
           "Auctions"
         ]
@@ -5284,6 +5284,170 @@
           }
         ],
         "summary": "Mark auction minutes as filed with Government Chit Registrar",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/correction/request": {
+      "post": {
+        "description": "Initiates an audited correction of a finalized auction discount or winner. Strictly requires two-partner approval. Fails closed if prize money has already been disbursed.",
+        "operationId": "AuctionController_requestAuctionCorrection_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestAuctionCorrectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Finalized auction correction requested successfully (pending checker partner approval)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuctionResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Auction not finalized, prize already disbursed, or non-divisible dividend"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Super Admin only"
+          },
+          "404": {
+            "description": "Auction not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Request correction of a finalized auction (Partner strictly)",
+        "tags": [
+          "Auctions"
+        ]
+      }
+    },
+    "/api/v1/auctions/{id}/correction/approve": {
+      "post": {
+        "description": "Approves auction correction, recalculates universal dividends, updates winner records, and reconciles downstream monthly dues. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).",
+        "operationId": "AuctionController_approveAuctionCorrection_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAuctionCorrectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Finalized auction correction approved and applied successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuctionResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pending correction request or prize already disbursed"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Maker-Checker violation or insufficient role"
+          },
+          "404": {
+            "description": "Auction not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Authorize and apply finalized auction correction (Independent Partner)",
         "tags": [
           "Auctions"
         ]
@@ -5930,7 +6094,7 @@
     },
     "/api/v1/tickets/{id}/remove-defaulter": {
       "post": {
-        "description": "Executes company removal rights when a subscriber has defaulted on 3 or more consecutive monthly installments (consecutiveUnpaidMonths >= 3). Transitions ticket status to REMOVED_DEF_3M. Allowed strictly: Super Admin (Partners).",
+        "description": "Initiates company removal request when a subscriber has defaulted on 3 or more consecutive monthly installments. Transitions ticket status to PENDING_REMOVAL_APPROVAL. Allowed strictly: Super Admin (Partners).",
         "operationId": "TicketController_removeDefaulter_v1",
         "parameters": [
           {
@@ -5954,7 +6118,7 @@
         },
         "responses": {
           "200": {
-            "description": "Subscriber ticket successfully removed for 3-month default",
+            "description": "Subscriber ticket removal request submitted for Partner B approval",
             "content": {
               "application/json": {
                 "schema": {
@@ -5987,7 +6151,7 @@
             }
           },
           "400": {
-            "description": "Ticket has fewer than 3 consecutive unpaid months"
+            "description": "Ticket has fewer than 3 consecutive unpaid months or already prized"
           },
           "401": {
             "description": "Unauthorized — Invalid or missing Bearer token"
@@ -6004,7 +6168,233 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12)",
+        "summary": "Company 3-Month Arrears Removal Rights Request (ADR-07, ADR-12 & SEC-B)",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/remove-defaulter/request": {
+      "post": {
+        "description": "Partner A requests removal of a 3-month consecutive defaulter. Transitions ticket to PENDING_REMOVAL_APPROVAL. Allowed strictly: Verified Partners.",
+        "operationId": "TicketController_requestDefaulterRemoval_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveDefaulterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscriber ticket removal request submitted for Partner B approval (SEC-B)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RemoveDefaulterResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ticket has fewer than 3 consecutive unpaid months or already prized"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Partner account required"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Request Defaulter Removal (Maker Partner - SEC-B)",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/remove-defaulter/approve": {
+      "post": {
+        "description": "Partner B approves removal of a 3-month consecutive defaulter. Enforces Maker != Checker. Transitions ticket to REMOVED_DEF_3M. Allowed strictly: Verified Partners.",
+        "operationId": "TicketController_approveDefaulterRemoval_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriber ticket removal approved and transitioned to REMOVED_DEF_3M (SEC-B)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RemoveDefaulterResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ticket not in PENDING_REMOVAL_APPROVAL or already prized"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Maker-Checker violation: removing partner cannot approve"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Approve Defaulter Removal (Checker Partner - SEC-B)",
+        "tags": [
+          "Subscriber Tickets & Passbook"
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/remove-defaulter/reject": {
+      "post": {
+        "description": "Partner B rejects removal request and restores ticket to DEFAULT_3_MONTHS. Allowed strictly: Verified Partners.",
+        "operationId": "TicketController_rejectDefaulterRemoval_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriber ticket removal rejected and restored to DEFAULT_3_MONTHS (SEC-B)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RemoveDefaulterResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ticket not in PENDING_REMOVAL_APPROVAL"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Maker-Checker violation or insufficient role"
+          },
+          "404": {
+            "description": "Ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Reject Defaulter Removal Request (Checker Partner - SEC-B)",
         "tags": [
           "Subscriber Tickets & Passbook"
         ]
@@ -6097,7 +6487,7 @@
     },
     "/api/v1/tickets/{id}/settle-removal": {
       "post": {
-        "description": "Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Allowed: Super Admin, Accountant.",
+        "description": "Calculates total paid dues by the removed subscriber, deducts 4.00% Foreman Commission contractual damages, and issues an exit settlement voucher. Strictly requires two-partner approval: Partner who removed cannot settle. Allowed strictly: Super Admin.",
         "operationId": "TicketController_settleRemoval_v1",
         "parameters": [
           {
@@ -6171,7 +6561,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Defaulter Account Settlement & Exit Refund Voucher",
+        "summary": "Defaulter Account Settlement & Exit Refund Voucher (Partner strictly, Maker != Checker)",
         "tags": [
           "Subscriber Tickets & Passbook"
         ]
@@ -7114,7 +7504,7 @@
     },
     "/api/v1/payments/{id}/request-reversal": {
       "post": {
-        "description": "Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Requires Checker approval by Super Admin.",
+        "description": "Initiates payment reversal request with mandatory reason code (e.g. wrong ticket, cheque bounce, duplicate entry). Strictly requires two-partner approval: one Partner initiates, a different Partner approves.",
         "operationId": "PaymentController_requestReversal_v1",
         "parameters": [
           {
@@ -7188,7 +7578,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Maker: Request payment reversal with justification",
+        "summary": "Maker: Request payment reversal with justification (Partner strictly)",
         "tags": [
           "Payments, Receipts & Reversals"
         ]
@@ -10932,6 +11322,11 @@
             "example": false,
             "description": "Whether KYC verification is approved"
           },
+          "version": {
+            "type": "number",
+            "example": 1,
+            "description": "Record version for optimistic concurrency control"
+          },
           "branchId": {
             "type": "string",
             "example": "branch-prd-001",
@@ -11144,6 +11539,11 @@
             "example": false,
             "description": "Whether KYC verification is approved"
           },
+          "version": {
+            "type": "number",
+            "example": 1,
+            "description": "Record version for optimistic concurrency control"
+          },
           "branchId": {
             "type": "string",
             "example": "branch-prd-001",
@@ -11332,6 +11732,11 @@
             "type": "boolean",
             "example": false,
             "description": "Whether KYC verification is approved"
+          },
+          "version": {
+            "type": "number",
+            "example": 1,
+            "description": "Record version for optimistic concurrency control"
           },
           "branchId": {
             "type": "string",
@@ -12968,6 +13373,45 @@
             "type": "string",
             "example": "Submitted in person at Erode Deputy Registrar office by Partner A",
             "description": "Optional staff notes or remarks regarding physical filing"
+          }
+        }
+      },
+      "RequestAuctionCorrectionDto": {
+        "type": "object",
+        "properties": {
+          "correctedBidDiscount": {
+            "type": "integer",
+            "example": 24000,
+            "description": "Corrected winning auction bid discount in whole integer Rupees (must produce an exact whole-Rupee dividend)"
+          },
+          "correctedWinningTicketId": {
+            "type": "string",
+            "example": "2351d319-24f1-48dd-8a9d-657fbf2d371f",
+            "description": "UUID of the corrected winning subscriber ticket (optional if winner ticket is unchanged)"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Tie-break ticket number data entry error corrected per physical branch token register",
+            "description": "Mandatory justification reason for the finalized auction correction"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Verified against physical token draw record witnessed by 4 members",
+            "description": "Additional administrative remarks or notes"
+          }
+        },
+        "required": [
+          "correctedBidDiscount",
+          "reason"
+        ]
+      },
+      "ApproveAuctionCorrectionDto": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string",
+            "example": "Reviewed and confirmed against physical token draw register and bank statements",
+            "description": "Checker Partner notes upon approving auction correction"
           }
         }
       },
@@ -15270,9 +15714,19 @@
             "type": "number",
             "example": 4000
           },
+          "finalMonthInstallment": {
+            "type": "number",
+            "example": 5000,
+            "description": "Final month base installment deducted from payout"
+          },
+          "priorArrearsDeducted": {
+            "type": "number",
+            "example": 0,
+            "description": "Prior arrears deducted from payout"
+          },
           "netPrizeMoney": {
             "type": "number",
-            "example": 96000
+            "example": 91000
           },
           "disbursementMode": {
             "type": "string",

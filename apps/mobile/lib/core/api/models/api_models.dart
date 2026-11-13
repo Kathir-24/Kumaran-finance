@@ -1602,6 +1602,8 @@ class CustomerResponseDto {
   final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
+  /// Record version for optimistic concurrency control
+  final double? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -1625,6 +1627,7 @@ class CustomerResponseDto {
     this.panNumber,
     this.aadhaarLast4,
     required this.isKycVerified,
+    this.version,
     this.branchId,
     this.branch,
     required this.createdAt,
@@ -1646,6 +1649,7 @@ class CustomerResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
+      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -1668,6 +1672,7 @@ class CustomerResponseDto {
     data['panNumber'] = panNumber;
     data['aadhaarLast4'] = aadhaarLast4;
     data['isKycVerified'] = isKycVerified;
+    data['version'] = version;
     data['branchId'] = branchId;
     data['branch'] = branch;
     data['createdAt'] = createdAt;
@@ -1805,6 +1810,8 @@ class CustomerListItemDto {
   final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
+  /// Record version for optimistic concurrency control
+  final double? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -1830,6 +1837,7 @@ class CustomerListItemDto {
     this.panNumber,
     this.aadhaarLast4,
     required this.isKycVerified,
+    this.version,
     this.branchId,
     this.branch,
     required this.createdAt,
@@ -1852,6 +1860,7 @@ class CustomerListItemDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
+      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -1875,6 +1884,7 @@ class CustomerListItemDto {
     data['panNumber'] = panNumber;
     data['aadhaarLast4'] = aadhaarLast4;
     data['isKycVerified'] = isKycVerified;
+    data['version'] = version;
     data['branchId'] = branchId;
     data['branch'] = branch;
     data['createdAt'] = createdAt;
@@ -1967,6 +1977,8 @@ class CustomerDetailResponseDto {
   final String? aadhaarLast4;
   /// Whether KYC verification is approved
   final bool isKycVerified;
+  /// Record version for optimistic concurrency control
+  final double? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -1996,6 +2008,7 @@ class CustomerDetailResponseDto {
     this.panNumber,
     this.aadhaarLast4,
     required this.isKycVerified,
+    this.version,
     this.branchId,
     this.branch,
     required this.createdAt,
@@ -2020,6 +2033,7 @@ class CustomerDetailResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
+      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -2045,6 +2059,7 @@ class CustomerDetailResponseDto {
     data['panNumber'] = panNumber;
     data['aadhaarLast4'] = aadhaarLast4;
     data['isKycVerified'] = isKycVerified;
+    data['version'] = version;
     data['branchId'] = branchId;
     data['branch'] = branch;
     data['createdAt'] = createdAt;
@@ -3577,6 +3592,63 @@ class MarkMinutesFiledDto {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['filingReference'] = filingReference;
     data['filedDate'] = filedDate;
+    data['notes'] = notes;
+    return data;
+  }
+}
+
+class RequestAuctionCorrectionDto {
+  /// Corrected winning auction bid discount in whole integer Rupees (must produce an exact whole-Rupee dividend)
+  final int correctedBidDiscount;
+  /// UUID of the corrected winning subscriber ticket (optional if winner ticket is unchanged)
+  final String? correctedWinningTicketId;
+  /// Mandatory justification reason for the finalized auction correction
+  final String reason;
+  /// Additional administrative remarks or notes
+  final String? notes;
+
+  const RequestAuctionCorrectionDto({
+    required this.correctedBidDiscount,
+    this.correctedWinningTicketId,
+    required this.reason,
+    this.notes,
+  });
+
+  factory RequestAuctionCorrectionDto.fromJson(Map<String, dynamic> json) {
+    return RequestAuctionCorrectionDto(
+      correctedBidDiscount: (json['correctedBidDiscount'] != null ? (json['correctedBidDiscount'] as num).toInt() : null) ?? 0,
+      correctedWinningTicketId: json['correctedWinningTicketId']?.toString(),
+      reason: json['reason']?.toString() ?? '',
+      notes: json['notes']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['correctedBidDiscount'] = correctedBidDiscount;
+    data['correctedWinningTicketId'] = correctedWinningTicketId;
+    data['reason'] = reason;
+    data['notes'] = notes;
+    return data;
+  }
+}
+
+class ApproveAuctionCorrectionDto {
+  /// Checker Partner notes upon approving auction correction
+  final String? notes;
+
+  const ApproveAuctionCorrectionDto({
+    this.notes,
+  });
+
+  factory ApproveAuctionCorrectionDto.fromJson(Map<String, dynamic> json) {
+    return ApproveAuctionCorrectionDto(
+      notes: json['notes']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
     data['notes'] = notes;
     return data;
   }
@@ -5898,6 +5970,10 @@ class FinalSettlementDataDto {
   final String customerName;
   final double grossPrize;
   final double foremanCommission;
+  /// Final month base installment deducted from payout
+  final double? finalMonthInstallment;
+  /// Prior arrears deducted from payout
+  final double? priorArrearsDeducted;
   final double netPrizeMoney;
   final String disbursementMode;
   final String? paymentReference;
@@ -5911,6 +5987,8 @@ class FinalSettlementDataDto {
     required this.customerName,
     required this.grossPrize,
     required this.foremanCommission,
+    this.finalMonthInstallment,
+    this.priorArrearsDeducted,
     required this.netPrizeMoney,
     required this.disbursementMode,
     this.paymentReference,
@@ -5926,6 +6004,8 @@ class FinalSettlementDataDto {
       customerName: json['customerName']?.toString() ?? '',
       grossPrize: (json['grossPrize'] != null ? (json['grossPrize'] as num).toDouble() : null) ?? 0.0,
       foremanCommission: (json['foremanCommission'] != null ? (json['foremanCommission'] as num).toDouble() : null) ?? 0.0,
+      finalMonthInstallment: json['finalMonthInstallment'] != null ? (json['finalMonthInstallment'] as num).toDouble() : null,
+      priorArrearsDeducted: json['priorArrearsDeducted'] != null ? (json['priorArrearsDeducted'] as num).toDouble() : null,
       netPrizeMoney: (json['netPrizeMoney'] != null ? (json['netPrizeMoney'] as num).toDouble() : null) ?? 0.0,
       disbursementMode: json['disbursementMode']?.toString() ?? '',
       paymentReference: json['paymentReference']?.toString(),
@@ -5942,6 +6022,8 @@ class FinalSettlementDataDto {
     data['customerName'] = customerName;
     data['grossPrize'] = grossPrize;
     data['foremanCommission'] = foremanCommission;
+    data['finalMonthInstallment'] = finalMonthInstallment;
+    data['priorArrearsDeducted'] = priorArrearsDeducted;
     data['netPrizeMoney'] = netPrizeMoney;
     data['disbursementMode'] = disbursementMode;
     data['paymentReference'] = paymentReference;

@@ -173,6 +173,12 @@ export class TicketController {
     description:
       'Partner A requests removal of a 3-month consecutive defaulter. Transitions ticket to PENDING_REMOVAL_APPROVAL. Allowed strictly: Verified Partners.',
   })
+  @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
+    description: 'Subscriber ticket removal request submitted for Partner B approval (SEC-B)',
+  })
+  @ApiResponse({ status: 400, description: 'Ticket has fewer than 3 consecutive unpaid months or already prized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Partner account required' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
   async requestDefaulterRemoval(
     @Param('id') ticketId: string,
     @CurrentUser('sub') adminUserId: string,
@@ -193,6 +199,12 @@ export class TicketController {
     description:
       'Partner B approves removal of a 3-month consecutive defaulter. Enforces Maker != Checker. Transitions ticket to REMOVED_DEF_3M. Allowed strictly: Verified Partners.',
   })
+  @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
+    description: 'Subscriber ticket removal approved and transitioned to REMOVED_DEF_3M (SEC-B)',
+  })
+  @ApiResponse({ status: 400, description: 'Ticket not in PENDING_REMOVAL_APPROVAL or already prized' })
+  @ApiResponse({ status: 403, description: 'Maker-Checker violation: removing partner cannot approve' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
   async approveDefaulterRemoval(
     @Param('id') ticketId: string,
     @CurrentUser('sub') adminUserId: string,
@@ -213,6 +225,12 @@ export class TicketController {
     description:
       'Partner B rejects removal request and restores ticket to DEFAULT_3_MONTHS. Allowed strictly: Verified Partners.',
   })
+  @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
+    description: 'Subscriber ticket removal rejected and restored to DEFAULT_3_MONTHS (SEC-B)',
+  })
+  @ApiResponse({ status: 400, description: 'Ticket not in PENDING_REMOVAL_APPROVAL' })
+  @ApiResponse({ status: 403, description: 'Maker-Checker violation or insufficient role' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
   async rejectDefaulterRemoval(
     @Param('id') ticketId: string,
     @CurrentUser('sub') adminUserId: string,

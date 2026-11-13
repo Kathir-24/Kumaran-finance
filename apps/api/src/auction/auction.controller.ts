@@ -274,6 +274,9 @@ export class AuctionController {
     description:
       'Initiates an audited correction of a finalized auction discount or winner. Strictly requires two-partner approval. Fails closed if prize money has already been disbursed.',
   })
+  @ApiOkResponseEnvelope(AuctionResponseDto, {
+    description: 'Finalized auction correction requested successfully (pending checker partner approval)',
+  })
   @ApiResponse({ status: 400, description: 'Auction not finalized, prize already disbursed, or non-divisible dividend' })
   @ApiResponse({ status: 403, description: 'Forbidden: Super Admin only' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
@@ -297,6 +300,9 @@ export class AuctionController {
     summary: 'Checker: Authorize and apply finalized auction correction (Independent Partner)',
     description:
       'Approves auction correction, recalculates universal dividends, updates winner records, and reconciles downstream monthly dues. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).',
+  })
+  @ApiOkResponseEnvelope(AuctionResponseDto, {
+    description: 'Finalized auction correction approved and applied successfully',
   })
   @ApiResponse({ status: 400, description: 'No pending correction request or prize already disbursed' })
   @ApiResponse({ status: 403, description: 'Maker-Checker violation or insufficient role' })
