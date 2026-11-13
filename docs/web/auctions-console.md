@@ -70,9 +70,9 @@ flowchart TD
    - Dedicated desk at `/schemes/[id]/defaulters` with 5 KPI summary cards (Total Tickets, 1-2 Mo Arrears, $\ge 3$ Mo Removal Eligible, Removed, Total Scheme Overdue Arrears).
    - Embedded `BusinessRuleBanner` detailing **ADR-07 & ADR-12 Company Removal Rights** and **ADR-13 Ticket Limit Substitution Guard**.
    - **Arrears Aging & Ineligibility Badging (`DefaultersTable`)**: Tabs for All, Active Arrears ($1\text{--}2$ mo), Removal Eligible ($\ge 3$ mo), and Removed Members.
-   - **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**: Restricted to **Super Admin (Partners)**. Submits `POST /api/v1/tickets/:id/remove-defaulter` with `RemoveDefaulterDto`. Strictly blocks removal if $consecutiveUnpaidMonths < 3$. Requires $\ge 10$ characters legal justification. Transitions ticket to `REMOVED_DEF_3M`.
+   - **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**: Restricted to **Super Admin (Partners)**. Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`) with mandatory justification ($\ge 10$ characters). Ticket transitions to `PENDING_REMOVAL_APPROVAL`. Partner B reviews and approves removal (`POST /api/v1/tickets/:id/remove-defaulter/approve`) under strict dual control (`maker != checker`), transitioning ticket to `REMOVED_DEF_3M` (`SEC-B`). Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
    - **ADR-13 Subscriber Substitution (`DefaulterSubstitutionModal`)**: Restricted to **Super Admin**. Validates candidate customer has `isKycVerified: true`. Enforces ADR-13 & Guardrail 7 by rejecting replacement customer already holding another ticket in the same chit scheme (`@@unique([chitGroupId, customerId])`). Restores ticket to `ACTIVE` and resets arrears to 0.
-   - **Defaulter Account Exit Settlement & Voucher (`DefaulterSettlementDialog`)**: Authorized for **Super Admin** and **Accountant**. Calculates exit refund: $\text{Refund} = \max(0, TotalPaid - Damages)$, deducting $4.00\%$ Foreman Commission damages ($\lfloor V \times 0.04 \rfloor$). Generates official exit voucher `KC-VOU-DEF-XXXXXX` payable via `CASH`, `BANK_TRANSFER`, or `CHEQUE`.
+   - **Defaulter Account Exit Settlement Guard (`DefaulterSettlementDialog`)**: Submitting `POST /api/v1/tickets/:id/settle-removal` strictly fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` pending formal confirmation of the contractual damages formula by the business owner and legal counsel under Q25.
 
 ---
 
@@ -87,15 +87,15 @@ All 14 endpoints connect directly to real NestJS 12 controllers and PostgreSQL 1
 | **Eligible Bidders** | `GET /api/v1/auctions/:id/eligible-bidders?month=...` | Staff & Auditor | Pre-Auction Defaulter Guard: returns active subscribers with zero arrears |
 | **Record Winning Bid** | `POST /api/v1/auctions/:id/record-bid` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Maker records in-office winning bid discount with floor (4%) and ceiling (1/4) validation |
 | **Record Tie-Break** | `POST /api/v1/auctions/:id/tie-break` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Option A: records physical paper token lot draw winner drawn by Foreman |
-| **Finalize Auction** | `POST /api/v1/auctions/:id/finalize` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Checker commits official result, marks winner `isPrized = true`, generates Form XVII minutes |
+| **Finalize Auction** | `POST /api/v1/auctions/:id/finalize` | Strictly `SUPER_ADMIN` (Partners) | Checker commits official result, marks winner `isPrized = true`, generates Form XVII minutes (`KFC-SEC-003`) |
 | **Get Minutes Text** | `GET /api/v1/auctions/:id/minutes` | Staff & Auditor | Retrieves Form XVII statutory auction proceedings record |
 | **Download Minutes PDF** | `GET /api/v1/pdf/minutes/:auctionId?download=true` | Staff & Auditor | Generates and streams official Form XVII PDF or returns 15-minute presigned S3 URL |
 | **Mark Minutes Filed** | `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` | Records official government Challan reference, filing date, and staff remarks |
 | **List Chit Schemes** | `GET /api/v1/chits` | Authenticated Staff | Fetches active and planned schemes for auction scheme selector |
 | **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Queries subscribers with continuous arrears and overdue totals |
-| **Remove Defaulter** | `POST /api/v1/tickets/:id/remove-defaulter` | Strictly `SUPER_ADMIN` | Company 3-month arrears removal rights; sets status to `REMOVED_DEF_3M` |
-| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` | ADR-13 substitution of KYC-verified replacement member; restores ticket to `ACTIVE` |
-| **Settle Defaulter Account** | `POST /api/v1/tickets/:id/settle-removal` | `SUPER_ADMIN`, `ACCOUNTANT` | Computes $TotalPaid - 4\%$ damages and issues exit refund voucher `KC-VOU-DEF-XXXXXX` |
+| **Remove Defaulter** | `POST /api/v1/tickets/:id/remove-defaulter/request`<br>`POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `SUPER_ADMIN` (Partners) | Two-partner dual control removal (`SEC-B`); sets status to `REMOVED_DEF_3M` |
+| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (Partners) | ADR-13 substitution of KYC-verified replacement member; restores ticket to `ACTIVE` |
+| **Settle Defaulter Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (Partners) | Fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending confirmed policy under Q25 |
 
 ---
 

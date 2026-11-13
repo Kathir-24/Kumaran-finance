@@ -28,7 +28,7 @@ flowchart TD
         
         subgraph DataTier ["Data & Authority Services"]
             DB[("PostgreSQL 17 Database\n• Port 5432 / Internal Docker Network\n• Sole Financial Truth | BigInt Math\n• max_connections=150")]
-            Redis[("Redis 7 In-Memory Cache & Queue\n• Port 6379 / Internal Docker Network\n• volatile-lru | Distributed Mutexes")]
+            Redis[("Redis 7 In-Memory Cache & Queue\n• Port 6379 / Internal Docker Network\n• noeviction (BullMQ Safety) | Distributed Mutexes")]
             BackupCron["Automated Backup Runner\n• Nightly pg_dump (02:00 AM IST)\n• Encrypted Archive Pipeline"]
         end
     end
@@ -96,7 +96,7 @@ Kumaran Finance operates 1 branch office in Perundurai. To avoid surprise cloud 
   - `statement_timeout = 15000` (15s query kill safeguard)
   - `lock_timeout = 5000` (5s lock abort safeguard)
 - **Redis Cache Limits**:
-  - `maxmemory 512mb` with `maxmemory-policy volatile-lru`.
+  - `maxmemory 512mb` with `maxmemory-policy noeviction` (`KFC-INF-001` BullMQ queue durability standard).
 
 ### 3.2 S3-Compatible Storage Setup (Cloudflare R2)
 Cloudflare R2 operates identically to S3 using the standard `@aws-sdk/client-s3` driver. In `.env`:

@@ -248,13 +248,13 @@ When `BranchService.findById` or `ChitService.findOne` encounters a missing ID:
 
 ---
 
-## 9. Redis Memory Bounds, `volatile-lru` Eviction & Concurrency Bulkheads
+## 9. Redis Memory Bounds, `noeviction` Policy & Concurrency Bulkheads (`KFC-INF-001`)
 
 ### 9.1 Redis Memory Ceiling & Queue Preservation
 In production, Redis is shared between master caches, rate limiters, distributed locks, and BullMQ background workers (`notification-queue`, `daily-arrears-queue`).
 - **Memory Ceiling**: `--maxmemory 512mb` enforces an absolute RAM boundary.
-- **Eviction Policy**: `--maxmemory-policy volatile-lru` restricts key eviction strictly to keys configured with an explicit TTL (`EX`).
-- **BullMQ Queue Safety**: Because BullMQ queues (delayed jobs, parent-child flows, stream records) do not carry Redis TTLs, `volatile-lru` guarantees persistent queues are never evicted, preventing job loss.
+- **Eviction Policy (`KFC-INF-001`)**: `--maxmemory-policy noeviction` ensures that Redis returns an error rather than evicting keys when the memory limit is reached.
+- **BullMQ Queue Safety**: Per official BullMQ architectural requirements, `noeviction` guarantees that persistent job queues, wait lists, streams, and delayed sets are never evicted under memory pressure, preventing silent job loss or queue state corruption.
 
 ### 9.2 Fail-Open Concurrency Bulkhead
 If Redis goes offline or experiences a network partition:

@@ -6,7 +6,7 @@
 > **Route Paths**: `/disbursements`, `/disbursements/[id]/voucher`  
 > **Primary Specification**: [`docs/01-business/decision-log.md`](../01-business/decision-log.md) (ADR-10, ADR-14, ADR-15), [`docs/03-architecture/api-spec.md`](../03-architecture/api-spec.md)  
 > **Target Personas**: Super Admin (Partner Maker/Checker), Branch Manager, Accountant, Cashier, Auditor  
-> **Status**: **Phase 7 (Tasks 7.1 & 7.2) 100% COMPLETE & VERIFIED** (16/16 Phase 7 tests pass, 176/176 full web test suite pass, 0 TypeScript errors, clean Next.js 15 production build)
+> **Status**: **Phase 7 (Tasks 7.1 & 7.2) 100% COMPLETE & VERIFIED** (16/16 Phase 7 tests pass, 353/353 full web test suite pass, 0 TypeScript errors, clean Next.js 15 production build)
 
 ---
 
@@ -25,7 +25,8 @@ In Kumaran Chits, prize money disbursement to an auction winner is a high-liabil
    - **ADR-14 Unlimited Hard Cash Payouts**: Enforces zero artificial cash payout caps for physical cash releases at the Perundurai head office counter.
    - Cashier/Accountant executes the final disbursement release with mandatory `paymentReference`.
    - Monospace & bilingual voucher dialog with direct browser print (`window.print()`) and official A4/A5 PDF download via `GET /api/v1/pdf/voucher/:auctionId`.
-   - **Month $N$ Final Maturity Settlement**: Directly settles the final unprized subscriber pool without auction ($D = 0, P = V - C_f$) via `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`.
+   - **Prior Arrears Auto-Offset (`KFC-FIN-003`, `KFC-FIN-004`)**: Unpaid installments are automatically queried and deducted from the gross prize snapshot; payout overrides deviating from authorized net entitlement fail closed (`PAYOUT_OVERRIDE_NOT_PERMITTED`).
+   - **Month $N$ Final Maturity Settlement (`KFC-FIN-001`, `FIN-B`)**: Directly settles the final unprized subscriber pool without auction ($D = 0, P = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$) via `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (paying ₹91,000 if Month $N$ due was unpaid and marking it `PAID`; or ₹96,000 if already paid at the branch counter).
 
 ---
 
@@ -36,14 +37,14 @@ flowchart TD
     S1["1. Auction Finalized\nStatus: PENDING_VERIFICATION"] -->|Maker verifies ADR-15| S2["2. Safety Proof Verified\nStatus: VERIFIED_BY_MAKER\nStamp: verifiedByUserId"]
     S2 -->|Independent Partner Authorizes| G{"Guardrail 10\nmaker != checker"}
     G -- "Same User" --> BLOCK["Blocked: MAKER_CHECKER_VIOLATION\nButton Disabled + Alert Banner"]
-    G -- "Different Partner" --> S3["3. Payout Authorized\nStatus: AUTHORIZED_BY_CHECKER\nStamp: authorizedByUserId"]
-    S3 -->|Cashier/Accountant Releases| S4["4. Payout Disbursed\nStatus: DISBURSED\nStamp: paymentReference + Date"]
+    G -- "Different Partner" --> S3["3. Payout Authorized\nStatus: AUTHORIZED_BY_CHECKER\nStamp: authorizedByUserId\nArrears auto-deducted"]
+    S3 -->|Cashier/Accountant Releases| S4["4. Payout Disbursed\nStatus: DISBURSED\nStamp: paymentReference + Date\nArrears marked PAID"]
     S4 --> PDF["Printable Voucher & PDF\nGET /api/v1/pdf/voucher/:auctionId"]
 ```
 
 1. **Net Prize Money Invariant (Guardrail 2 & Chit Math)**:
-   $$P = V - D$$
-   Gross chit value ($V$) minus auction bid discount ($D$). In Month $N$ final settlement, $D = 0$ and $P = V - C_f$ ($V$ minus 4.00% Foreman Commission). All values are 64-bit integer Rupees (`bigint`), strictly rejecting decimal paise and floats.
+   $$P_{\text{net}} = V - D - \text{priorArrears}$$
+   Gross chit value ($V$) minus auction bid discount ($D$) minus any prior unpaid arrears (`KFC-FIN-003`). In Month $N$ final settlement, $D = 0$ and $P = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$ ($V$ minus 4.00% Foreman Commission minus Month $N$ base installment if unpaid). All values are 64-bit integer Rupees (`bigint`), strictly rejecting decimal paise and floats.
 2. **ADR-15 Elimination of Property Documents**:
    Property deeds and encumbrance certificates are eliminated. Safety proof is on-demand, requiring mandatory signed agreement, nominee guarantee, and optional blank cheques.
 3. **ADR-14 Unlimited Hard Cash Prize Disbursements**:

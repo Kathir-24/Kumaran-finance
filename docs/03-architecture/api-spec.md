@@ -178,7 +178,7 @@
 | `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher (Prohibits manual override of authorized payout) | `ACCOUNTANT`, `SUPER_ADMIN` |
 | `POST` | `/disbursements/auction/:auctionId/release` | Release payout, auto-settle deducted arrears dues as `PAID`, record transaction reference | `SUPER_ADMIN` |
 | `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Direct payout to final subscriber without auction (Deducts 4% commission, Month N base installment $I_{\text{base}}$, and arrears; marks Month N due `PAID`) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement (`KFC-FIN-001`, `FIN-B`)**: Direct payout to final subscriber without auction (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears; marks Month N due `PAID`) | `SUPER_ADMIN` |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -584,7 +584,8 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 - **Path Parameter**: `chitGroupId` — Chit Group UUID
 - **Description**: Settles the final month ($N$) prize directly to the sole remaining unprized subscriber without conducting an auction.
 - **Formula**:
-  $$\text{Net Payable Amount} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
+  $$\text{Net Payable Amount} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$$
+  *(where $\text{finalMonthDeduction} = I_{\text{base}}$ if Month $N$ installment is unpaid, marking it `PAID` with ₹91,000 net on ₹1L chit; or $0$ if already paid at the branch desk with ₹96,000 net, eliminating double collection under `FIN-B`)*
 - **Request Body (`FinalMonthSettlementDto`)**:
   ```json
   {

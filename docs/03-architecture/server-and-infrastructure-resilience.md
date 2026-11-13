@@ -27,7 +27,7 @@ flowchart TD
 
     subgraph StateTier["State & Data Authority Tier"]
         DB["PostgreSQL 17 (chitflow-db)\n- max_connections: 150 | shared_buffers: 512MB\n- statement_timeout: 15s | lock_timeout: 5s\n- mem_limit: 1024m"]
-        Redis["Redis 7 (chitflow-redis)\n- maxmemory: 512mb | volatile-lru\n- mem_limit: 640m"]
+        Redis["Redis 7 (chitflow-redis)\n- maxmemory: 512mb | noeviction (BullMQ Safety)\n- mem_limit: 640m"]
         Minio["MinIO / S3 Storage (chitflow-minio)\n- Stateless KYC Scans & Signed PDFs\n- mem_limit: 512m"]
         Cron["Backup Cron (chitflow-backup-cron)\n- Encrypted Nightly pg_dump (02:00 AM IST)\n- mem_limit: 256m"]
     end

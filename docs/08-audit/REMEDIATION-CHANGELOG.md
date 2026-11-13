@@ -5,7 +5,7 @@
 > **Date**: November 13, 2026  
 > **Authority**: Antigravity Coordinated Multi-Agent Engineering Team  
 > **Baseline Commit**: `origin/main`  
-> **Verification Status**: 52/52 Test Suites Passed (834/834 Tests, 0 Failures)
+> **Verification Status**: 52/52 API Test Suites Passed (843/843 Tests, 0 Failures) + 14 Web Test Suites Passed (353/353 Tests) = 1,196 Total Tests
 
 ---
 
@@ -26,7 +26,10 @@ This changelog records all production code, configuration, test, and documentati
 | **KFC-SEC-003** | Security / RBAC | **HIGH** | `apps/api/src/auction/auction.controller.ts`<br>`apps/api/src/auction/auction.service.ts`<br>`apps/api/test/unit/adversarial-security-invariants.spec.ts` | Removed `Role.BRANCH_MANAGER` from `POST :id/finalize`, strictly gating auction finalization to Partners (`SUPER_ADMIN`). |
 | **KFC-SEC-004** | Financial Safety | **MEDIUM** | `apps/api/src/installment/installment.service.ts`<br>`apps/api/test/unit/installment.spec.ts` | Added `if (ticket.isPrized) throw BadRequestException('PRIZED_TICKET_IMMUTABLE: ...')` to `removeDefaulter`, `substituteSubscriber`, and `settleRemoval`. |
 | **KFC-PDF-001** | Web / PDF | **MEDIUM** | `apps/api/src/pdf/templates/subscription-receipt.template.ts`<br>`apps/api/src/pdf/pdf.service.ts`<br>`apps/api/test/unit/pdf.spec.ts` | Rendered bold red diagonal bilingual watermark `ரத்து செய்யப்பட்டது / CANCELLED` on reversed payment receipts; bypassed pre-reversal cached S3 PDFs. |
-| **KFC-NOT-001** | DevOps / Jobs | **LOW** | `apps/api/src/jobs/services/notification.service.ts` | Formalized WhatsApp out-of-scope status per confirmed business rule Q34. |
+| **KFC-NOT-001** | DevOps / Jobs | **LOW** | `apps/api/src/jobs/services/notification.service.ts` | Purged WhatsApp simulation mocks per confirmed business rule Q34 in favor of official Indian DLT SMS gateway. |
+| **KFC-SEC-005** | Security / Schema | **CRITICAL** | `packages/database/prisma/schema.prisma`<br>`packages/database/prisma/migrations/20261113200000_add_partner_identity_and_removal_approval/` | Added `isPartner Boolean @default(false)` on `User` model, strictly differentiating true equity partners from operational administrative accounts (`SEC-A`). |
+| **KFC-SEC-006** | Dual Control / Ops | **CRITICAL** | `apps/api/src/installment/installment.service.ts`<br>`apps/api/src/installment/ticket.controller.ts`<br>`apps/api/test/unit/installment.spec.ts` | Implemented two-partner dual control on defaulter removal (`PENDING_REMOVAL_APPROVAL` state, `request-defaulter-removal` + `approve-defaulter-removal` with `maker != checker`) (`SEC-B`). |
+| **KFC-FIN-006** | Financial Math | **HIGH** | `apps/api/src/disbursement/disbursement.service.ts`<br>`apps/api/test/unit/disbursement.spec.ts` | Fixed Month N double-collection bug (`FIN-B`): if Month N installment was already paid at branch desk, `finalMonthDeduction = 0n`, ensuring correct ₹96,000 net payout on ₹1L chit. |
 
 ---
 
@@ -84,17 +87,18 @@ This changelog records all production code, configuration, test, and documentati
 
 - Baseline test suites: 52
 - Baseline tests passing: 820
-- Post-remediation test suites: 52
-- **Post-remediation tests passing: 834**
+- Post-remediation test suites: 52 (API) + 14 (Web) = 66 suites
+- **Post-remediation tests passing: 843 (API) + 353 (Web) = 1,196 total tests**
 - **Failures: 0**
 - Test suites verified:
   - `apps/api/test/unit/auction.spec.ts` (30/30 passed)
   - `apps/api/test/unit/disbursement.spec.ts` (22/22 passed)
-  - `apps/api/test/unit/installment.spec.ts` (17/17 passed)
+  - `apps/api/test/unit/installment.spec.ts` (20/20 passed)
   - `apps/api/test/unit/adversarial-security-invariants.spec.ts` (20/20 passed)
   - `apps/api/test/unit/pdf.spec.ts` (43/43 passed)
   - `apps/api/test/unit/concurrency-postgres.spec.ts` (25/25 passed)
   - `apps/api/test/unit/financial-boundary-fuzz.spec.ts` (30/30 passed)
   - `apps/api/test/unit/state-transition-retry.spec.ts` (20/20 passed)
   - `apps/api/test/unit/chaos-network-disconnect.spec.ts` (7/7 passed)
-  - All remaining 43 suites passed.
+  - All remaining 43 API suites passed.
+  - All 14 Next.js Web test suites passed (353/353 passed).

@@ -53,7 +53,7 @@ flowchart TD
         direction TB
         FCM["Primary (₹0 Cost):\nFirebase Cloud Messaging (FCM)\nPush to Android App (Deep-link to /passbook or /approvals)"]
         SMS["Pluggable Fallback:\nIndian DLT-Compliant SMS\n(Strictly for non-smartphone / keypad users)"]
-        WA["Pluggable Commercial:\nWhatsApp Cloud API\n(Bilingual text template)"]
+        WA["WhatsApp Cloud API:\n(Parked in V1 per Q34;\nPurged from code)"]
     end
 
     subgraph PG_AUTHORITY ["PostgreSQL 17 Database (chitflow_dev)"]
@@ -191,7 +191,7 @@ Super Admin, Branch Managers, and Accountants can inspect and trigger jobs via a
 |---|:---:|---|---|
 | `/api/v1/jobs/queue-status` | `GET` | Staff / Auditor | Returns real-time job counts (waiting, active, completed, failed) across all 3 queues. |
 | `/api/v1/jobs/repeatable-schedules` | `GET` | Super Admin / Auditor | Lists active BullMQ cron schedules and next run times. |
-| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Returns recent dispatches across Push, SMS, and WhatsApp. |
+| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Returns recent dispatches across Push and SMS (WhatsApp purged per Q34). |
 | `/api/v1/jobs/run-daily-arrears` | `POST` | Super Admin / Manager | Triggers synchronous on-demand arrears evaluation. |
 | `/api/v1/jobs/enqueue-daily-arrears` | `POST` | Super Admin | Enqueues arrears evaluation job to `daily-maintenance-queue`. |
 | `/api/v1/jobs/run-reconciliation` | `POST` | Super Admin / Accountant | Triggers synchronous on-demand payment reconciliation. |

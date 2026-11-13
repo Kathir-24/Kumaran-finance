@@ -201,7 +201,7 @@ pnpm run lint
 # 2. Run monorepo TypeScript checks (SDK + Web + API build)
 pnpm run typecheck
 
-# 3. Run monorepo unit tests (8 SDK + 834 API unit + 347 Web unit tests across 52 API suites)
+# 3. Run monorepo unit tests (8 SDK + 843 API unit + 353 Web unit tests = 1,196 passed tests)
 pnpm run test
 pnpm run test:e2e
 

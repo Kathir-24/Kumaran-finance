@@ -99,11 +99,11 @@ flowchart LR
 2. **3-Month Consecutive Default & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
    - The customer who did not pay up to **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
    - The software tracks consecutive missed installments, flags the ticket with status `DEFAULT_3_MONTHS`, and prompts company management for review.
-   - Company Management / Partners can formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M`.
-   - **Dual-Partner Control on Exit Settlement (`KFC-SEC-002`)**:
-     - Partner A executes subscriber removal (`POST /installments/tickets/:id/remove-defaulter`).
-     - Partner B authorizes the exit refund voucher minus 4% contractual damages (`POST /installments/tickets/:id/settle-removal`).
-     - Hard Guard: `ticket.removedByUserId !== adminUserId` (`MAKER_CHECKER_VIOLATION`). The partner who removed the subscriber cannot approve the exit payout.
+   - Company Management / Partners can formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M` via two-partner dual control (`SEC-B`).
+   - **Dual-Partner Control on Removal & Exit Settlement (`SEC-B`, `Q25`)**:
+     - **Step 1 (Request Removal)**: Partner A initiates removal request (`POST /installments/tickets/:id/remove-defaulter/request`), specifying the mandatory justification. The ticket transitions from `DEFAULT_3_MONTHS` to `PENDING_REMOVAL_APPROVAL`.
+     - **Step 2 (Approve Removal)**: Partner B reviews the 3-month arrears history and approves removal (`POST /installments/tickets/:id/remove-defaulter/approve`). Hard Guard: `ticket.removalRequestedByUserId !== approvingPartnerId` (`MAKER_CHECKER_VIOLATION`). The partner who requested removal cannot approve it. Upon approval, the ticket transitions to `REMOVED_DEF_3M`.
+     - **Step 3 (Exit Settlement Policy)**: Financial exit refund settlement under Q25 fails closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal written confirmation of the contractual/statutory damages formula by the business owner.
    - **Prized Ticket Immutability (`KFC-SEC-004`)**:
      - Prized tickets can NEVER be removed or substituted (`PRIZED_TICKET_IMMUTABLE`). The system rejects any removal attempt on a prized ticket with HTTP 400.
 

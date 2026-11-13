@@ -44,12 +44,12 @@ flowchart LR
 - [ ] Distributed SMS OTP request cooldown (60s via `auth:otp:cooldown:<phone>`) and 5-minute brute-force lockout (300s via `auth:otp:lockout:<phone>` on 3rd invalid attempt) enforced with in-memory fallback to protect SMS gateway quota and prevent cycling attacks.
 
 ### Gate 5: Automated Testing Coverage
-- [ ] Unit tests for services and calculation logic pass with 100% success rate across all **52/52 test suites (834/834 tests, 0 failures)**.
+- [ ] Unit tests for services and calculation logic pass with 100% success rate across all **52/52 API test suites (843/843 tests) + 14 Web test suites (353/353 tests) = 1,196 total tests, 0 failures**.
 - [ ] Integration tests verify database transactions and pessimistic row locking (`SELECT FOR UPDATE`).
 - [ ] Mathematical invariant tests verify zero rupee leaks:
   $$\text{Foreman Commission } (4\%) + \text{Total Member Dividends} = \text{Discount}$$
 - [ ] Whole-rupee divisibility guard verified: $(D - C_f) \pmod M == 0$, rejecting fractional bids with HTTP 400.
-- [ ] Month $N$ final settlement verified: $V - C_f - I_{\text{base}} - \text{priorArrears}$, with Month $N$ installment atomically marked `PAID`.
+- [ ] Month $N$ final settlement verified: $V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$ (where $\text{finalMonthDeduction} = 0$ if Month $N$ installment was already paid at branch desk, resulting in ₹96,000 net payout; or $I_{\text{base}}$ if unpaid, marking Month $N$ installment atomically `PAID` with ₹91,000 net payout).
 - [ ] Prize payout arrears auto-offset verified: prior unpaid dues are deducted from prize snapshot and auto-settled on release; payout overrides fail closed (`PAYOUT_OVERRIDE_NOT_PERMITTED`).
 - [ ] Prized ticket immutability verified: prized tickets reject defaulter removal or substitution with HTTP 400 `PRIZED_TICKET_IMMUTABLE`.
 - [ ] Cancelled receipt PDF verified: reversed payments bypass cached active PDFs and render bold red diagonal `ரத்து செய்யப்பட்டது / CANCELLED` watermark.

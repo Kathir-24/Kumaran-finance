@@ -68,8 +68,9 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **Final Month (Month $N$) Rule (`CONFIRMED-BY-DEVELOPER`)**:
   - **NO auction** is conducted in Month $N$.
   - The company retains the 4.00% foreman commission ($C_f$) and automatically deducts the final month's payable base installment ($I_{\text{base}}$) plus any prior arrears:
-    $$\text{Final Net Settlement Payout} = V - C_f - I_{\text{base}} - \text{priorArrears}$$
-  - On a ₹1,00,000 chit ($N=20$, $I_{\text{base}}=\text{₹5,000}$, $C_f=\text{₹4,000}$), net payout is strictly **₹91,000** ($100,000 - 4,000 - 5,000$), and Month $N$ `InstallmentDue` is atomically marked `PAID`.
+    $$\text{Final Net Settlement Payout} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$$
+  - If Month $N$ installment is unpaid, $\text{finalMonthDeduction} = I_{\text{base}}$ (₹5,000 on a ₹1,00,000 chit), net payout is strictly **₹91,000** ($100,000 - 4,000 - 5,000$), and Month $N$ `InstallmentDue` is atomically marked `PAID`.
+  - If Month $N$ installment was already paid in advance or at branch desk (`monthNDue.status === 'PAID'`), $\text{finalMonthDeduction} = 0$, preventing double collection and resulting in strictly **₹96,000** net payout (`FIN-B`).
   - Payout is released to the final unprized subscriber with a formal settlement voucher.
 - **Initialization Lifecycle**:
   - `NEW_GROUP`: Standard lifecycle starting from Month 1.
@@ -83,7 +84,9 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **3-Month Consecutive Arrears & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
   - The software tracks consecutive missed monthly installments per ticket.
   - If a subscriber fails to pay for **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
-  - Company management / Partners can execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M` and allowing substitution or settlement.
+  - **Two-Partner Dual Control (`SEC-B`)**: Partner A requests removal (`POST /tickets/:id/remove-defaulter/request`), placing the ticket into `PENDING_REMOVAL_APPROVAL`. Partner B reviews and approves (`POST /tickets/:id/remove-defaulter/approve`) with strict `maker != checker` enforcement. Only upon approval does the ticket transition to `REMOVED_DEF_3M`.
+  - **Fail-Closed Exit Settlement Policy (`Q25`)**: Exit settlement calculations fail closed with HTTP 400 `UNAPPROVED_SETTLEMENT_POLICY` until the exact statutory damages formula is confirmed in writing by the business owner.
+  - Prized tickets are strictly immutable and reject defaulter removal with HTTP 400 `PRIZED_TICKET_IMMUTABLE`.
 - Real-time tracking of Prized vs. Non-Prized status per ticket.
 
 ### Module 6: Installments & Due Schedules (`CONFIRMED-BY-DEVELOPER`)

@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Mandate**: Financial tests must run in the CI/CD pipeline and achieve 100% pass rate. No release is allowed if any financial invariant fails.  
 > **Currency Standard**: All monetary values are tested as **whole integer Rupees (`BigInt`)**. Paise and floating-point math are strictly prohibited (`CONFIRMED-BY-DEVELOPER`).  
-> **Test Suite Status**: **52/52 Test Suites Passed (834/834 Tests, 0 Failures)** | Real-DB Concurrency: 25/25 Scenarios Passed | Execution Time: 17.3s
+> **Test Suite Status**: **52/52 API Test Suites Passed (843/843 Tests, 0 Failures) + 14 Web Test Suites Passed (353/353 Tests) = 1,196 Passing Tests** | Real-DB Concurrency: 25/25 Scenarios Passed | Execution Time: ~18s
 
 ---
 
@@ -374,10 +374,14 @@ it('should reject auction bid when dividend is not cleanly divisible across tick
 
 ---
 
-## 12. Month $N$ Final Settlement Installment Deduction Suite (`KFC-FIN-001`)
+## 12. Month $N$ Final Settlement Installment Deduction Suite (`KFC-FIN-001`, `FIN-B`, `FIN-D`, `FIN-E`)
 
 - **Harness**: [`apps/api/test/unit/disbursement.spec.ts`](../../apps/api/test/unit/disbursement.spec.ts)
-- **Formula**: $\text{Net Payout} = V - C_f - I_{\text{base}} - \text{priorArrears}$. On ₹1,00,000 chit: $100,000 - 4,000 - 5,000 = \text{₹91,000}$. Month $N$ due marked `PAID`.
+- **Formula**: $\text{Net Payout} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$.
+  - **Unpaid Case**: If Month $N$ installment is unpaid, $\text{finalMonthDeduction} = I_{\text{base}}$ (₹5,000 on ₹1,00,000 chit). Payout is $100,000 - 4,000 - 5,000 = \text{₹91,000}$, and Month $N$ due is atomically marked `PAID`.
+  - **Pre-Paid Case (FIN-B)**: If subscriber already paid their Month $N$ due at the branch desk, $\text{finalMonthDeduction} = 0$, preventing double collection. Net payout is $100,000 - 4,000 = \text{₹96,000}$.
+  - **State Guard (FIN-D)**: Settle final month rejects execution with HTTP 400 if group is in `AUCTION` status or has unfinalized auctions.
+  - **Month 1 Pool Handover (FIN-E)**: Company subscriber ticket claims full Month 1 pool ($V - C_f$ or gross pool per statutory chit rules) with zero auction discount and zero dividend.
 
 ```typescript
 it('should deduct Month N base installment and prior arrears from final month settlement', async () => {
@@ -413,14 +417,15 @@ it('should deduct Month N base installment and prior arrears from final month se
 
 ---
 
-## 15. Partner Exclusivity & Dual-Control Defaulter Removal / Settlement Suite (`KFC-SEC-001` - `004`)
+## 15. Partner Exclusivity & Dual-Control Defaulter Removal / Settlement Suite (`KFC-SEC-001` - `004`, `SEC-B`)
 
 - **Harness**: [`apps/api/test/unit/adversarial-security-invariants.spec.ts`](../../apps/api/test/unit/adversarial-security-invariants.spec.ts), [`apps/api/test/unit/installment.spec.ts`](../../apps/api/test/unit/installment.spec.ts)
 - **Verification Assertions**:
   1. `POST /payments/:id/request-reversal` rejects Branch Manager and Accountant with HTTP 403 (`KFC-SEC-001`).
   2. `POST /auctions/:id/finalize` rejects Branch Manager with HTTP 403 (`KFC-SEC-003`).
   3. Prized tickets reject defaulter removal and substitution with HTTP 400 `PRIZED_TICKET_IMMUTABLE` (`KFC-SEC-004`).
-  4. `POST /tickets/:id/settle-removal` rejects removing partner from authorizing exit voucher with HTTP 403 `MAKER_CHECKER_VIOLATION` (`KFC-SEC-002`).
+  4. Two-Partner Defaulter Removal (SEC-B): Partner A requests removal (`POST /tickets/:id/remove-defaulter/request`), placing ticket in `PENDING_REMOVAL_APPROVAL`. Partner B approves (`POST /tickets/:id/remove-defaulter/approve`) with strict dual control (`maker != checker`). Self-approval is rejected with HTTP 403.
+  5. Defaulter Exit Settlement Fail-Closed: Under Q25, financial exit settlement calculation fails closed with HTTP 400 `UNAPPROVED_SETTLEMENT_POLICY` pending confirmed statutory damages formula.
 
 ---
 

@@ -76,7 +76,7 @@ Here are the formal Agile user stories defining every capability the Super Admin
 
 ### Module 5: Ticket Enrollment & Defaulter Removal (M5)
 * **US-5.1 (Single Ticket Enforcement)**: *As a Partner*, I want the system to prevent any customer from holding 2 or more tickets in the same chit scheme, *so that* concentration risk is eliminated and local guidelines are respected.
-* **US-5.2 (3-Month Defaulter Removal)**: *As a Partner*, I want the system to alert me when a subscriber has missed 3 consecutive monthly payments and allow me to execute the company removal workflow (`REMOVED_DEF_3M`), *so that* we can reassign the ticket to a new subscriber or settle the balance.
+* **US-5.2 (3-Month Defaulter Removal)**: *As a Partner*, I want the system to alert me when a subscriber has missed 3 consecutive monthly payments and allow me to execute the two-partner removal workflow (`PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M`), *so that* an independent partner reviews the case before the ticket is freed for a replacement subscriber.
 
 ### Module 6: Installments & Due Schedules (M6)
 * **US-6.1 (Universal Equal Dividend Schedule)**: *As a Partner*, I want the system to calculate next month's net installment in whole integer Rupees and deduct the exact same dividend for **all 20 members (including the auction winner)**, *so that* accounting remains simple and transparent.
@@ -373,7 +373,7 @@ When provisioning a field agent to assist with office counter duties during the 
 | **Partner tries to approve their own auction or reversal** | System throws `HTTP 403: Forbidden - Maker and Checker cannot be the same user`. | Ask any of the other 3 partners to log in on Web or Mobile and click Approve. |
 | **Subscriber wants to pay ₹2,00,0 now and ₹2,100 next week** | Software rejects entering ₹2,000. Dues are strictly discrete (`UNPAID` or `PAID`). | Inform customer: *"Under company policy, full monthly installment must be paid at once."* Hold cash in office drawer until full balance is ready, or use customer savings. |
 | **Bidding discount entered as ₹27,000 on a ₹1L chit** | Software rejects bid with red validation error: `Discount cannot exceed 1/4 ceiling (₹25,000)`. | Re-enter bid discount $\le \text{₹}25,000$. Remind bidders of statutory ceiling. |
-| **Subscriber missed 3 consecutive months** | System triggers Defaulter Alert: `Ticket #14 has 3 consecutive unpaid dues`. | Partner initiates **"Execute Company Removal"** (`REMOVED_DEF_3M`), freeing the ticket for a replacement subscriber. |
+| **Subscriber missed 3 consecutive months** | System triggers Defaulter Alert: `Ticket #14 has 3 consecutive unpaid dues`. | Partner A initiates **"Request Removal"** (`PENDING_REMOVAL_APPROVAL`), and Partner B approves removal (`REMOVED_DEF_3M`) under two-partner dual control (`SEC-B`). Exit financial settlement fails closed under Q25. |
 | **Internet goes down during in-office auction** | Partners conduct the physical auction offline on paper slips as usual. | Once broadband/mobile 4G resumes, enter the winning ticket and finalize results. |
 
 ---

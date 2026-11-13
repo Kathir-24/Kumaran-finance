@@ -214,7 +214,7 @@ stateDiagram-v2
 | # | Entity & Status Column | Number of States ($N$) | Total Transitions ($N \times N$) | Legally Allowed | Strictly Fail-Closed |
 |---|---|:---:|:---:|:---:|:---:|
 | 1 | `ChitGroup.status` | 5 | 25 | 5 | 20 |
-| 2 | `SubscriberTicket.status` | 4 | 16 | 5 | 11 |
+| 2 | `SubscriberTicket.status` | 5 | 25 | 7 | 18 |
 | 3 | `Auction.status` | 3 | 9 | 2 | 7 |
 | 4 | `AuctionWinner.disbursementStatus` | 4 | 16 | 3 | 13 |
 | 5 | `InstallmentDue.status` | 3 | 9 | 4 | 5 |
@@ -222,7 +222,7 @@ stateDiagram-v2
 | 7 | `PaymentReversal.status` | 3 | 9 | 2 | 7 |
 | 8 | `Payment.cashHandoverStatus` | 2 | 4 | 1 | 3 |
 | 9 | `Payment.chequeStatus` | 3 | 9 | 2 | 7 |
-| **TOTAL** | **9 Status Lifecycles** | — | **113** | **27** | **86** |
+| **TOTAL** | **9 Status Lifecycles** | — | **122** | **29** | **93** |
 
 ---
 
@@ -242,18 +242,19 @@ stateDiagram-v2
 
 ---
 
-### Matrix 2: `SubscriberTicket.status` ($4 \times 4 = 16$)
-- **States**: `ACTIVE`, `DEFAULT_3_MONTHS`, `REMOVED_DEF_3M`, `SURRENDERED`
+### Matrix 2: `SubscriberTicket.status` ($5 \times 5 = 25$)
+- **States**: `ACTIVE`, `DEFAULT_3_MONTHS`, `PENDING_REMOVAL_APPROVAL`, `REMOVED_DEF_3M`, `SURRENDERED`
 
-| From \ To | `ACTIVE` | `DEFAULT_3_MONTHS` | `REMOVED_DEF_3M` | `SURRENDERED` |
-|---|:---:|:---:|:---:|:---:|
-| **`ACTIVE`** | ❌ 400 | ✅ Allowed (3 unpaid months) | ❌ 400 | ✅ Allowed (Voluntary surrender) |
-| **`DEFAULT_3_MONTHS`** | ✅ Allowed (Full arrears cleared) | ❌ 400 | ✅ Allowed (Company removes) | ❌ 400 |
-| **`REMOVED_DEF_3M`** | ✅ Allowed (New subscriber substituted) | ❌ 400 | ❌ 400 | ❌ 400 |
-| **`SURRENDERED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+| From \ To | `ACTIVE` | `DEFAULT_3_MONTHS` | `PENDING_REMOVAL_APPROVAL` | `REMOVED_DEF_3M` | `SURRENDERED` |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **`ACTIVE`** | ❌ 400 | ✅ Allowed (3 unpaid months) | ❌ 400 | ❌ 400 | ✅ Allowed (Voluntary surrender) |
+| **`DEFAULT_3_MONTHS`** | ✅ Allowed (Full arrears cleared) | ❌ 400 | ✅ Allowed (Partner A requests removal) | ❌ 400 | ❌ 400 |
+| **`PENDING_REMOVAL_APPROVAL`**| ❌ 400 | ✅ Allowed (Partner B rejects removal) | ❌ 400 | ✅ Allowed (Partner B approves removal) | ❌ 400 |
+| **`REMOVED_DEF_3M`** | ✅ Allowed (New subscriber substituted) | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`SURRENDERED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
 
-*Allowed (5)*: `ACTIVE -> DEFAULT_3_MONTHS`, `ACTIVE -> SURRENDERED`, `DEFAULT_3_MONTHS -> ACTIVE`, `DEFAULT_3_MONTHS -> REMOVED_DEF_3M`, `REMOVED_DEF_3M -> ACTIVE`.  
-*Fail-Closed (11)*: All other 11 transitions throw HTTP 400.
+*Allowed (7)*: `ACTIVE -> DEFAULT_3_MONTHS`, `ACTIVE -> SURRENDERED`, `DEFAULT_3_MONTHS -> ACTIVE`, `DEFAULT_3_MONTHS -> PENDING_REMOVAL_APPROVAL`, `PENDING_REMOVAL_APPROVAL -> DEFAULT_3_MONTHS`, `PENDING_REMOVAL_APPROVAL -> REMOVED_DEF_3M`, `REMOVED_DEF_3M -> ACTIVE`.  
+*Fail-Closed (18)*: All other 18 transitions throw HTTP 400.
 
 ---
 

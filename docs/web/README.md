@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Platform**: Web Workstation Portal (`apps/web`)  
 > **Tech Stack**: Next.js 15.2 (App Router), React 19, Tailwind CSS v4, TanStack Query v5, Zustand, `@kumaran/api-client`  
-> **Status**: **Phase 12 Complete & Verified** (347/347 passing unit tests, 48/48 Playwright E2E tests passing across Suites 00–11 + Visual Audit, 0 TypeScript errors, Next.js 15 production build verified)
+> **Status**: **Phase 12 Complete & Verified** (353/353 passing unit tests across 14 test suites, 48/48 Playwright E2E tests passing across Suites 00–11 + Visual Audit, 0 TypeScript errors, Next.js 15 production build verified)
 
 ---
 
@@ -54,7 +54,7 @@ docs/web/
 ├── chit-schemes-management.md            # Scheme wizard, 4% commission lock, mid-cycle onboarding grid, monthly dues tracker
 ├── customers-and-kyc.md                  # Customer directory, intake wizard, Form XXI passbook, 15-min S3 KYC scans
 ├── auctions-console.md                   # In-office auction console, 1/4 ceiling math, Option A tie-break, Maker-Checker finalization
-├── defaulter-substitution-desk.md        # Defaulter substitution, 3-month removal desk & 4% damages exit settlement
+├── defaulter-substitution-desk.md        # Defaulter substitution, two-partner removal desk (SEC-B) & Q25 fail-closed settlement
 ├── prize-disbursements.md                # Safety proof checklist, dual-control prize vouchers, final settlement
 ├── collections-and-handover.md           # Counter collections, ADR-07 discrete single due, dynamic UPI QR, receipts
 ├── payment-reversals.md                  # Maker-Checker reversal requests & approvals

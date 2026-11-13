@@ -65,6 +65,6 @@ Previously, `docker-compose.fullstack.yml` configured Redis with `--maxmemory-po
 
 ---
 
-## 5. WhatsApp Simulation Stub Formalization (KFC-NOT-001)
+## 5. WhatsApp Simulation Stub Purge (KFC-NOT-001)
 
-Per confirmed business requirement **Q34**, WhatsApp messaging is strictly out of operational scope for Kumaran Finance due to high per-message utility costs (~₹0.45/msg) and lack of formal TRAI DLT statutory standing for chit funds. The in-memory simulation stub in `notification.service.ts` has been formalized as out-of-scope, with Indian Telecom DLT SMS and Firebase Cloud Messaging remaining the sole communication channels.
+Per confirmed business requirement **Q34**, WhatsApp messaging is strictly out of operational scope for Kumaran Finance due to high per-message utility costs (~₹0.45/msg) and lack of formal TRAI DLT statutory standing for chit funds. All simulation mock loggers and fake channels in `notification.service.ts` have been completely purged from the codebase, with Indian TRAI DLT SMS via MSG91 flow established as the sole automated production channel (and Firebase Cloud Messaging deferred with the mobile app).

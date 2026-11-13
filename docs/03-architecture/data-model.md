@@ -99,6 +99,7 @@ model User {
   phone            String    @unique
   passwordHash     String
   roles            Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
+  isPartner        Boolean   @default(false) // Verified business partner identity (SEC-A)
   isActive         Boolean   @default(true)
   totpSecret       String?   // RFC 6238 TOTP secret for Microsoft Authenticator 2FA
   isTotpEnabled    Boolean   @default(false)
@@ -229,9 +230,12 @@ model SubscriberTicket {
   openingBalance          BigInt           @default(0) // Whole integer Rupees for mid-cycle onboarding
   consecutiveUnpaidMonths Int              @default(0) // Tracks continuous unpaid months (triggers removal rights at 3)
   joiningDate             DateTime         @default(now())
-  status                  String           @default("ACTIVE") // ACTIVE, DEFAULT_3_MONTHS, REMOVED_DEF_3M, SURRENDERED
-  removedAt               DateTime?        // Timestamp if removed by company after 3 continuous months arrears
-  removedByUserId         String?          // Partner / Super Admin who authorized removal
+  status                  String           @default("ACTIVE") // ACTIVE, DEFAULT_3_MONTHS, PENDING_REMOVAL_APPROVAL, REMOVED_DEF_3M, SURRENDERED
+  removalRequestedAt      DateTime?        // Timestamp of Partner A removal request
+  removalRequestedByUserId String?         // Partner A user UUID
+  removalReason           String?          // Mandatory reason for removal request
+  removedAt               DateTime?        // Timestamp if approved by Partner B (maker != checker)
+  removedByUserId         String?          // Partner B user UUID who authorized removal
 
   dues                    InstallmentDue[]
   allocations             PaymentAllocation[]

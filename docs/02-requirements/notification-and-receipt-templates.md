@@ -7,7 +7,7 @@
 > 2. **All Financial & Operational Events**: Follow a single, elegant **Smart Channel Hierarchy**:
 >    - **Smartphone Users (App installed / `fcmToken` present)**: Receive **Free In-App Push Notifications (FCM, ₹0 cost)** deep-linking to the passbook or auction screen.
 >    - **Keypad Phone Users (Non-app / No `fcmToken`)**: Fall back to **Telecom DLT SMS**.
-> 3. **WhatsApp Business API**: **Parked / Shelved in V1 (`KFC-NOT-001`, Rule 34)** to eliminate third-party SaaS and per-conversation fees. Any code simulation stubs are strictly diagnostic mocks; active production delivery channels are exclusively Mobile Push (FCM) and Indian DLT SMS (MSG91).
+> 3. **WhatsApp Business API**: **Parked / Shelved in V1 (`KFC-NOT-001`, Rule 34)** to eliminate third-party SaaS and per-conversation fees. All code simulation stubs have been completely purged from the codebase; active production delivery channel is Indian DLT SMS (MSG91), with Mobile Push (FCM) deferred with the mobile app.
 > 4. **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobiles).
 > 5. **Report Sharing**: Manual on-demand utility (A4 PDF download & Excel/CSV export) for Form XXII, Form XXI, and Handover tallies.
 > **Languages**: English & தமிழ் (Tamil)  

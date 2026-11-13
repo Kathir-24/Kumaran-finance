@@ -45,10 +45,10 @@ flowchart TD
    - **Removed Tickets (`REMOVED_DEF_3M`)**: Highlighted with a purple badge, exposing `Substitute Member` and `Settle Account` actions.
 
 3. **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**:
-   - Restricted strictly to **Super Admin (Partners)**.
-   - Submits `POST /api/v1/tickets/:id/remove-defaulter` with `RemoveDefaulterDto`.
-   - Validates that justification reason is non-empty and at least 10 characters long.
-   - Transitions ticket status to `REMOVED_DEF_3M`, recording `removedAt` and `removedByUserId`.
+   - Restricted strictly to **Super Admin (Partners)** with `isPartner: true` (`SEC-A`).
+   - Two-Partner Dual Control (`SEC-B`): Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`) with mandatory justification ($\ge 10$ characters), placing the ticket into `PENDING_REMOVAL_APPROVAL`.
+   - Partner B reviews and approves removal (`POST /api/v1/tickets/:id/remove-defaulter/approve`). Hard guard: `maker != checker`.
+   - Upon approval, transitions ticket status to `REMOVED_DEF_3M`, recording `removedAt` and `removedByUserId`. Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
 
 4. **ADR-13 Subscriber Substitution (`DefaulterSubstitutionModal`)**:
    - Restricted strictly to **Super Admin**.
@@ -57,14 +57,11 @@ flowchart TD
    - **ADR-13 Ticket Limit Guard**: Checks against all existing scheme members. Disables substitution and flags conflict if replacement customer already holds a ticket in the same chit scheme (`@@unique([chitGroupId, customerId])`).
    - Submits `POST /api/v1/tickets/:id/substitute` restoring ticket status to `ACTIVE`, resetting `consecutiveUnpaidMonths = 0`, and creating an audit trail.
 
-5. **Defaulter Account Exit Settlement & Voucher (`DefaulterSettlementDialog`)**:
-   - Authorized for **Super Admin** and **Accountant**.
-   - Contractual Damage Math: Deducts 4.00% Foreman Commission damages based on total chit value:
-     $$\text{Damages} = \lfloor V \times 0.04 \rfloor = \frac{V \times 4}{100}$$
-   - Net Exit Refund Math:
-     $$\text{Refund Amount} = \max(0, \text{Total Paid Installments} - \text{Damages})$$
-   - Submits `POST /api/v1/tickets/:id/settle-removal` with `{ paymentMethod, notes }`.
-   - Displays official Exit Refund Voucher Card (`KC-VOU-DEF-XXXXXX`) with print and copy capability.
+5. **Defaulter Account Exit Settlement Guard (`DefaulterSettlementDialog`)**:
+   - Under confirmed business rule **Q25**, the contractual damages and early-exit refund formula has NOT been confirmed by the business owner and legal counsel.
+   - Calling `POST /api/v1/tickets/:id/settle-removal` strictly fails closed with:
+     `HTTP 400 Bad Request: UNAPPROVED_SETTLEMENT_POLICY`
+   - Automated settlement execution is locked pending formal written Partner Board resolution.
 
 ---
 
@@ -74,13 +71,17 @@ flowchart TD
 |---|---|---|---|---|
 | **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Query: `minConsecutiveMonths=1` | Array of tickets with unpaid dues and overdue totals |
 | **Scheme Tickets** | `GET /api/v1/chits/:id` | Authenticated Staff / Customers | Path: `id` (chit group UUID) | Scheme details + 20 tickets with status, dues & customers |
-| **Remove Defaulter** | `POST /api/v1/tickets/:id/remove-defaulter` | Strictly `SUPER_ADMIN` | `{ reason: string }` ($\ge 10$ chars) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
-| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
-| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | `SUPER_ADMIN`, `ACCOUNTANT` | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Issues voucher `KC-VOU-DEF-XXXXXX` with damages & refund |
+| **Request Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/request` | Strictly `SUPER_ADMIN` (Partners) | `{ reason: string }` ($\ge 10$ chars) | Transitions to `PENDING_REMOVAL_APPROVAL` (`SEC-B`) |
+| **Approve Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `SUPER_ADMIN` (Partners) | None (Maker != Checker) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
+| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (Partners) | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
+| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (Partners) | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Fails closed with `UNAPPROVED_SETTLEMENT_POLICY` (Q25) |
 
 ---
 
 ## 3. Mathematical & Business Rule Proofs
+
+> [!WARNING]
+> **Statutory Policy Notice (Q25)**: The 4.00% damages formula below represents the proposed contractual calculation model. Under confirmed business rule Q25, automated settlement execution is strictly blocked fail-closed (`UNAPPROVED_SETTLEMENT_POLICY`) in production until the statutory damages formula is confirmed in writing by the business owner and legal counsel.
 
 ### Proof 1: 4.00% Contractual Damages & Whole Rupee Exit Refund
 

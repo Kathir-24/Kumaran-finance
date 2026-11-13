@@ -79,7 +79,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec prisma db seed
 
-      - name: Run Unit & Financial Invariant Tests (289 tests)
+      - name: Run Monorepo Automated Tests (1,196 tests: 843 API + 353 Web)
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://chitflow_test:chitflow_test_password@localhost:5432/chitflow_test_db?schema=public
@@ -117,6 +117,6 @@ jobs:
 
 The repository must enforce the following GitHub branch protections:
 1. **Require status checks to pass before merging**:
-   - `Lint, Test & Validate` job must be green (enforces 100% pass across all **360 tests: 278 Unit + 82 E2E**, with zero oxlint warnings).
+   - `Lint, Test & Validate` job must be green (enforces 100% pass across all **1,196 automated tests: 843 API + 353 Web**, with zero oxlint/ESLint warnings).
 2. **Require linear history**: Fast-forward merges or squashed commits only.
 3. **No direct pushes**: All changes must arrive via reviewed pull requests.

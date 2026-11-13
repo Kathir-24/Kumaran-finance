@@ -315,7 +315,7 @@ flowchart TD
    - No auction takes place.
    - Partner opens **Disbursements $\to$ Group KCA-1L-20M-01 $\to$ "Month 20 Final Settlement"**.
    - Click **"Execute Final Settlement"** (`POST /disbursements/group/:chitGroupId/final-settlement`).
-   - System retains the 4% commission (`₹4,000`) and final installment (`₹5,000`), disbursing the net balance (`₹91,000`) directly to the subscriber and marking the chit scheme as `COMPLETED`.
+   - System retains the 4% commission (`₹4,000`). If Month $N$ installment is unpaid, it deducts the final installment (`₹5,000`), disbursing the net balance (`₹91,000`) and marking the due `PAID`. If the subscriber already paid at the branch desk, deduction is ₹0 and net payout is `₹96,000` (FIN-B). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -325,18 +325,20 @@ flowchart TD
 flowchart TD
     Cron["Daily Maintenance Cron at 00:01 AM IST"] --> Scan["Scans all active ticket dues"]
     Scan --> Check3M{"Has subscriber missed\n3 consecutive months?"}
-    Check3M -- Yes --> Tag["Tag ticket: hasDefaulterNotice = true\nAlert displayed on Partner Dashboard"]
+    Check3M -- Yes --> Tag["Tag ticket: DEFAULT_3_MONTHS\nAlert displayed on Partner Dashboard"]
     Check3M -- No --> Normal["Normal Dues Tracking"]
     Tag --> Action{"Partner Decision"}
     Action -- "Collect Due" --> Clear["Member pays: Tag cleared automatically"]
-    Action -- "Remove Defaulter" --> Remove["Partner clicks 'Execute Defaulter Removal'\n• Status = REMOVED_DEF_3M\n• Ticket freed for replacement subscriber\n• Settlement balance queued"]
+    Action -- "Remove Defaulter" --> Req["Partner A clicks 'Request Defaulter Removal'\n• Status = PENDING_REMOVAL_APPROVAL\n• Documented justification recorded"]
+    Req --> Appr["Partner B reviews & clicks 'Approve Removal'\n• maker != checker enforced\n• Status = REMOVED_DEF_3M\n• Ticket freed for replacement subscriber"]
 ```
 
 ### Step-by-Step Instructions:
-1. The background scheduler flags any subscriber who misses 3 consecutive installment payments.
+1. The background scheduler flags any subscriber who misses 3 consecutive installment payments with status `DEFAULT_3_MONTHS`.
 2. Defaulters appear under **Subscribers $\to$ Defaulter Management**.
-3. If informal field collection fails, open the subscriber's ticket and click **"Execute Defaulter Removal"** (`POST /tickets/:id/remove-defaulter`).
-4. The ticket transitions to `REMOVED_DEF_3M`, enabling the company to assign a substitute subscriber (`POST /tickets/:id/substitute`) or settle the accrued balance.
+3. **Step 1 (Request Removal)**: Partner A opens the subscriber's ticket and clicks **"Request Defaulter Removal"** (`POST /tickets/:id/remove-defaulter/request`), entering a mandatory justification. Status changes to `PENDING_REMOVAL_APPROVAL`.
+4. **Step 2 (Approve Removal)**: Independent Partner B reviews the case and clicks **"Approve Defaulter Removal"** (`POST /tickets/:id/remove-defaulter/approve`). Hard guard: `maker != checker`.
+5. The ticket transitions to `REMOVED_DEF_3M`, enabling the company to assign a substitute subscriber (`POST /tickets/:id/substitute`). Exit financial settlement fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal counsel confirmation (Q25).
 
 ---
 

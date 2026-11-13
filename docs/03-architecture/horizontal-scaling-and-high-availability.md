@@ -119,7 +119,7 @@ upstream api_upstream {
 To guarantee 100% consistency when scaling horizontally, in-memory state is synchronized via Redis:
 
 1. **Distributed Notification Audit Log**:
-   - Dispatched SMS, WhatsApp, and Push alerts are recorded to Redis capped list `audit:notifications` via atomic `LPUSH` + `LTRIM 0 199` with a 7-day TTL.
+   - Dispatched SMS and Push alerts are recorded to Redis capped list `audit:notifications` via atomic `LPUSH` + `LTRIM 0 199` with a 7-day TTL (WhatsApp simulation purged per Q34).
    - Any replica or auditor querying `getDistributedNotificationLog()` accesses the unified audit trail regardless of which container processed the dispatch.
 2. **Distributed Circuit Breaker Coordination**:
    - Third-party downstream gateways (MSG91 SMS Gateway, FCM Push) employ a distributed circuit breaker.

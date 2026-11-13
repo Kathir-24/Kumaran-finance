@@ -13,9 +13,9 @@ Financial transactions recorded in PostgreSQL can **never be deleted** (immutabl
 
 ### Key Operational Capabilities
 
-#### A. Maker Step (Desk Accountant / Cashier / Staff)
+#### A. Maker Step (Partner A — Super Admin / Partner, KFC-SEC-001)
 1. **Error Identification & Search**:
-   - Staff navigates to `/reversals` and clicks **"Request Payment Reversal"**.
+   - Partner A navigates to `/reversals` and clicks **"Request Payment Reversal"**.
    - Enters or pastes Receipt Number (`KC-REC-PRD-2026-00001`) or Payment ID to fetch live payment preview card.
 2. **Structured Reason Codes**:
    - `WRONG_TICKET_ENTERED`: Wrong subscriber ticket number entered.
@@ -63,7 +63,7 @@ Financial transactions recorded in PostgreSQL can **never be deleted** (immutabl
 
 ```mermaid
 flowchart TD
-    subgraph MakerWorkflow["Maker Step (Desk Accountant / Staff)"]
+    subgraph MakerWorkflow["Maker Step (Partner A — Super Admin)"]
         ERR["Payment Error Identified\n(Wrong Ticket, Bounced Cheque, Duplicate)"] --> REQMOD["ReversalRequestModal\nSelect Reason Code & Justification (min 5 chars)"]
         REQMOD --> POST_REQ["POST /api/v1/payments/:id/request-reversal"]
         POST_REQ --> PEND["PaymentReversal: status = REQUESTED\nPayment: SUCCESS (Unchanged)\nDue: PAID (Unchanged)"]
@@ -125,7 +125,7 @@ All files strictly comply with the $\le 300\text{--}350$ lines limit per **AGENT
 - **Bilingual Parity**: All 59 reversal keys match 100% between `en.json` and `ta.json`.
 
 ### B. Full Web Workspace Health
-- **Total Web Tests**: **200 / 200 tests passing** (`pnpm --filter web test`).
+- **Total Web Tests**: **353 / 353 tests passing across 14 test suites** (`pnpm --filter web test`).
 - **Static Typecheck**: `tsc --noEmit` exited with **0 errors**.
 - **Production Build**: `next build` compiled all 18 routes cleanly.
 - **Bilingual Parity**: 100% bidirectional parity across all namespaces.
