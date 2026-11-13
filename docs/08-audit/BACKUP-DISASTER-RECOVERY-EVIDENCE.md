@@ -8,15 +8,15 @@
 
 ---
 
-## 1. Disaster Recovery Objectives
+## 1. Disaster Recovery Objectives (Honest Operational Baseline)
 
-As an Indian registered chit fund operating from a physical branch in Perundurai with ~₹1–5 Crores under management, data loss or prolonged downtime directly violates Tamil Nadu Chit Funds Rules:
+As an Indian registered chit fund operating from a single physical branch in Perundurai with ~₹1–5 Crores under management, data loss or prolonged downtime directly violates Tamil Nadu Chit Funds Rules:
 
-| Metric | Target | Technical Mechanism |
-|---|:---:|---|
-| **RPO (Recovery Point Objective)** | **$\le$ 15 Minutes** | Continuous PostgreSQL WAL (Write-Ahead Log) archiving to Cloudflare R2 |
-| **RTO (Recovery Time Objective)** | **$\le$ 30 Minutes** | Containerized Docker restoration from daily compressed encrypted dumps |
-| **Data Retention Standard** | **8 Years** | Statutory compliance with Section 45 of Chit Funds Act 1982 |
+| Metric | Target | Technical Mechanism | Operational Reality |
+|---|:---:|---|---|
+| **RPO (Recovery Point Objective)** | **$\le$ 24 Hours** | Daily logical `pg_dump -F c` dumps to Cloudflare R2 | Continuous WAL archiving (PITR) is **NOT deployed**; RPO reflects daily midnight cron |
+| **RTO (Recovery Time Objective)** | **$\le$ 60 Minutes** | Containerized restoration from custom format archive via `pg_restore` | Verified via dry-run restore command |
+| **Data Retention Standard** | **8 Years** | Statutory compliance with Section 45 of Chit Funds Act 1982 | Offsite Cloudflare R2 bucket retention lifecycle |
 
 ---
 
@@ -24,12 +24,14 @@ As an Indian registered chit fund operating from a physical branch in Perundurai
 
 ```mermaid
 flowchart TD
-    DB[("PostgreSQL 17\nProduction Container")] -->|1. Daily pg_dump| DUMP["Raw SQL / Custom Dump"]
-    DUMP -->|2. gzip -9| COMP["Compressed Archive"]
-    COMP -->|3. gpg --symmetric (AES-256)| ENC["Encrypted Backup (.gpg)"]
-    ENC -->|4. s3cmd / aws s3 sync| R2[("Cloudflare R2 Bucket\nkumaran-chits-backups\n(₹0 Egress Bandwidth)")]
-    DB -->|Continuous wal-g| WAL[("WAL Archives in R2\n(PITR Recovery)")]
+    DB[("PostgreSQL 17\nProduction Container")] -->|1. Daily pg_dump -F c| DUMP["Custom Archive Dump (.dump)"]
+    DUMP -->|2. gpg --symmetric (AES-256)| ENC["Encrypted Backup (.dump.gpg)"]
+    ENC -->|3. s3cmd / rclone sync| R2[("Cloudflare R2 Bucket\nkumaran-chits-backups\n(₹0 Egress Bandwidth)")]
 ```
+
+> [!IMPORTANT]
+> **Audit Clarification on Continuous WAL Archiving**:
+> Earlier draft documentation claimed a "15-minute RPO via continuous WAL archiving". The independent audit verified that continuous WAL streaming tools (such as `wal-g` or `pgBackRest`) are **NOT installed or configured** on the target single-VPS node. The actual operational RPO is **$\le$ 24 hours**, backed by daily midnight logical dumps. WAL archiving remains a roadmap item if Kumaran Finance scales beyond a single branch.
 
 ---
 

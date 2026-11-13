@@ -29,8 +29,8 @@ All 11 approved remediation work packages (`KFC-INF-001`, `KFC-FIN-001` through 
 | **Gate 5: Security, RBAC & Anti-IDOR** | **PASSED** | Branch scoping, JWT rotation, token revocation, rate limiting, adversarial tests 100%. |
 | **Gate 6: PDF Receipts & Watermarking** | **PASSED** | Bilingual PDFKit rendering; bold red diagonal `CANCELLED` watermark on reversals. |
 | **Gate 7: Redis, BullMQ & Reliability** | **PASSED** | Redis configured to `noeviction`; DB is sole financial truth; async worker non-blocking. |
-| **Gate 8: Automated Test Coverage** | **PASSED** | **52/52 Test Suites Passed (834/834 tests, 0 failures)** executed in 17.3 seconds. |
-| **Gate 9: Backup & Disaster Recovery** | **PASSED** | Daily automated AES-256 GPG backup cron; Cloudflare R2 offsite; RTO < 30m; RPO < 24h. |
+| **Gate 8: Automated Test Coverage** | **PASSED** | **52/52 API Suites Passed (843/843 tests)** + **14 Web Suites Passed (353/353 tests)** = **1,196/1,196 total tests (100% pass)**. |
+| **Gate 9: Backup & Disaster Recovery** | **PASSED** | Daily automated pg_dump `-F c` backup script; Cloudflare R2 offsite; RTO < 60m; RPO <= 24h (WAL archiving not deployed). |
 | **Gate 10: Web UI & Accessibility** | **PASSED** | Bilingual Tamil/English Next.js portal; responsive desktop/tablet; clean print CSS. |
 
 ---
@@ -66,7 +66,7 @@ flowchart TD
     QG4 --> QG5["5. Security & RBAC\nPASSED"]
     QG5 --> QG6["6. Bilingual PDF & Watermark\nPASSED"]
     QG6 --> QG7["7. Redis noeviction & Queues\nPASSED"]
-    QG7 --> QG8["8. Automated Tests (834/834)\nPASSED"]
+    QG7 --> QG8["8. Automated Tests (1,196/1,196)\nPASSED"]
     QG8 --> QG9["9. Automated Backup & DR\nPASSED"]
     QG9 --> QG10["10. Web UI & Print Readiness\nPASSED"]
 ```
@@ -107,12 +107,12 @@ flowchart TD
 - **Result**: **PASS**
 
 ### Gate 8: Automated Test Coverage & Quality Verification
-- **Evaluation**: The repository contains 52 comprehensive unit and integration test suites covering domain math, API contracts, concurrency, security invariants, background queues, and storage drivers. All 52 suites pass with 100% success rate (834 passed, 0 failed).
+- **Evaluation**: The repository contains 52 comprehensive unit and integration test suites covering domain math, API contracts, concurrency, security invariants, background queues, and storage drivers (843 passed in API), alongside 14 Next.js web test suites (353 passed in Web). Total automated test suite: 1,196 passed, 0 failed.
 - **Evidence**: [CI-CD-TEST-EXECUTION-EVIDENCE.md](file:///u:/Kumaran-finance/docs/08-audit/CI-CD-TEST-EXECUTION-EVIDENCE.md).
 - **Result**: **PASS**
 
 ### Gate 9: Backup, Disaster Recovery & High Availability
-- **Evaluation**: The production deployment specification targets any flat-fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Contabo) with ₹0 vendor lock-in. An automated daily cron dumps PostgreSQL 17 via `pg_dump -Fc`, compresses and encrypts with AES-256 GPG, and synchronizes to Cloudflare R2 object storage. Point-in-time recovery runbooks achieve an RTO of < 30 minutes and RPO of < 24 hours (or < 15 minutes with WAL archiving).
+- **Evaluation**: The production deployment specification targets any flat-fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Contabo) with ₹0 vendor lock-in. An automated daily cron dumps PostgreSQL 17 via `pg_dump -F c`, compresses and encrypts, and synchronizes to Cloudflare R2 object storage. Recovery runbooks achieve an RTO of < 60 minutes and RPO of <= 24 hours. Continuous WAL archiving is NOT currently deployed.
 - **Evidence**: [BACKUP-DISASTER-RECOVERY-EVIDENCE.md](file:///u:/Kumaran-finance/docs/08-audit/BACKUP-DISASTER-RECOVERY-EVIDENCE.md).
 - **Result**: **PASS**
 

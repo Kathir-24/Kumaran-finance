@@ -35,11 +35,11 @@
 
 | Discrepancy Discovered | Prior Documentation Wording | Confirmed & Remediated Reality |
 |---|---|---|
-| **Month N Prize Amount** | "Pays full pool $V - C$ = ₹96,000" | Deducts Month N installment: $V - C - I_{\text{base}} = \mathbf{₹91,000}$; marks due `PAID`. |
+| **Month N Prize Amount** | "Pays full pool $V - C$ = ₹96,000" | Deducts Month N installment if unpaid: $V - C - I_{\text{base}} = \mathbf{₹91,000}$ (or $\mathbf{₹96,000}$ if Month N was already paid at counter; double collection strictly barred under FIN-B). |
 | **Dividend Remainder** | "Silently truncated via integer division" | Strictly rejected at bid entry: $(D-C)\%N==0$ throwing HTTP 400. |
-| **Prize Payout Arrears** | "Arrears collected manually" | Automatically queried and deducted from prize snapshot in `authorizePayout`. |
-| **Auction Finalization Roles** | "Allowed: Super Admin, Branch Manager" | Allowed strictly: **Super Admin (Partners only)**. |
-| **Reversal Initiation Roles** | "Allowed: Super Admin, Branch Manager, Accountant" | Allowed strictly: **Super Admin (Partner A initiates; Partner B approves)**. |
-| **Defaulter Settlement Roles** | "Allowed: Super Admin, Accountant" | Allowed strictly: **Super Admin (Maker $\ne$ Checker)**. |
+| **Prize Payout Arrears** | "Arrears collected manually" | Automatically queried and deducted from prize snapshot in `authorizePayout`; verified via TOCTOU check inside lock (FIN-D). |
+| **Auction Finalization Roles** | "Allowed: Super Admin, Branch Manager" | Allowed strictly: **Super Admin (Partners only with `isPartner: true` under SEC-A)**. |
+| **Reversal Initiation Roles** | "Allowed: Super Admin, Branch Manager, Accountant" | Cashier/Staff requests reversal; approved strictly by verified **Partner (`isPartner: true` under SEC-A with `maker != checker`)**. |
+| **Defaulter Settlement Roles** | "Allowed: Super Admin, Accountant" | Two-partner dual control: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B approves (`REMOVED_DEF_3M` with `maker != checker`). Damage settlement fails closed with `UNAPPROVED_SETTLEMENT_POLICY` (Q25). |
 | **Cancelled Receipt PDF** | "Receipt marked cancelled in database" | Prominently displays bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED`. |
-| **WhatsApp Notifications** | "Simulated WhatsApp alerts in service" | Formally out-of-scope (Q34); Indian Telecom DLT SMS & Push remain active channels. |
+| **WhatsApp Notifications** | "Simulated WhatsApp alerts in service" | Fake simulation mocks completely purged per Q34; Indian Telecom DLT SMS is sole automated production delivery channel. |

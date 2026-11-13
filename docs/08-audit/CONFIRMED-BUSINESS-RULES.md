@@ -28,13 +28,13 @@ Kumaran Finance operates a registered chit fund under the **Tamil Nadu Chit Fund
 ### 2.2 Auction & Dividend Engine
 1. **Month 1 Company Entitlement (Q06)**: Month 1 has **NO auction**. The company/foreman takes the full pool ($V$) with ₹0 dividend.
 2. **Month N Final Subscriber Maturity (Q07)**: The final month ($N$) has **NO auction**. The single remaining unprized subscriber receives the prize pool.
-3. **Month N Installment Deduction (Q08)**: The final-month winner's installment ($I_{\text{base}}$) must be deducted directly from their prize payout ($\text{Net Payout} = V - \text{Commission} - I_{\text{base}}$), and Month $N$'s installment due must be marked settled (`PAID`) exactly once.
+3. **Month N Installment Deduction (FIN-B / Q08)**: The final-month winner's installment ($I_{\text{base}}$) is deducted directly from their prize payout ($\text{Net Payout} = V - \text{Commission} - I_{\text{base}}$) **if unpaid**. If the subscriber has ALREADY paid their Month $N$ installment at the branch desk, finalMonthDeduction is set to ₹0 ($\text{Net Payout} = V - \text{Commission} = \mathbf{₹96,000}$ on ₹1L chit), strictly preventing double collection.
 4. **Universal Equal Dividend Credit (Q09)**: Dividend is credited equally across **ALL $N$ tickets in the group**, including the auction winner and past prized winners.
-5. **Whole-Rupee Dividend Divisibility (Q10)**: Only auction bids that produce an **exactly divisible, whole-rupee dividend** across all members are permitted:
+5. **Whole-Rupee Dividend Divisibility (FIN-C / Q10)**: Only auction bids that produce an **exactly divisible, whole-rupee dividend** across all members are permitted:
    $$(D_{\text{bid}} - \text{Commission}) \pmod N == 0$$
    Bids producing fractional remainders must be rejected by the backend. Remainders must NEVER be silently truncated or rounded.
 6. **Physical Paper Token Tie-Break Draw (Option A / Q11)**: When multiple members bid the maximum 25% discount ceiling, tie resolution is conducted via physical paper token draw at the branch in front of members. The staff enters the drawn winning ticket and token details into the system.
-7. **Controlled Finalized Auction Correction (Q12)**: A finalized auction may be corrected only through a controlled, audited workflow requiring approval from a second authorized partner, with compensating ledger adjustments.
+7. **Controlled Finalized Auction Correction (FIN-E / Q12)**: A finalized auction may be corrected only through a controlled, audited workflow requiring approval from a second authorized partner (`maker != checker`), and strictly fails closed with `ALREADY_PAID_DUES_EXIST` if downstream Month $N+1$ dues have already been paid.
 
 ### 2.3 Prize Payout & Obligations
 1. **Automated Arrears Deduction (Q13)**: All outstanding unpaid installments for the winner's ticket must be automatically deducted from the prize payout snapshot.
@@ -54,7 +54,7 @@ Kumaran Finance operates a registered chit fund under the **Tamil Nadu Chit Fund
 ### 2.5 Defaults, Penalties & Exits
 1. **Zero Late Fees or Penalties (Q23)**: Kumaran Finance charges strictly ₹0 late fee and ₹0 penalty interest.
 2. **3-Month Arrears Default & Dual-Partner Removal (Q24)**: Missing 3 consecutive monthly installments tags the ticket as default. Subscriber removal requires formal dual-partner approval (`maker_partner_id != checker_partner_id`).
-3. **Early Exit Settlement Policy (Q25)**: Subscribers may exit subject to company settlement rules. (Exact forfeiture percentage is pending owner/legal confirmation).
+3. **Early Exit Settlement Policy (FIN-F / Q25)**: Subscribers may exit subject to company settlement rules. Exact forfeiture/damage percentage (4% vs 5%) is **BLOCKED** and unconfirmed by owner/legal counsel. The software strictly **fails closed** with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 4. **Winning Ticket Immutability (Q26)**: A winning subscriber can NEVER transfer, substitute, or surrender their prized ticket.
 
 ### 2.6 Administration & Maker-Checker Separation of Duties

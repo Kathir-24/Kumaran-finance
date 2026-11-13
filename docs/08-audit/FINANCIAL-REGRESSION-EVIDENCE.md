@@ -31,25 +31,27 @@ Previously, `settleFinalMonth` calculated the payout as:
 $$\text{Prize Money} = V - C$$
 For a ₹1,00,000, 20-month scheme with 4% commission (₹4,000), it paid ₹96,000 without collecting Month 20's installment ($I_{\text{base}} = ₹5,000$). The subscriber was overpaid by ₹5,000, and their Month 20 ledger record was either omitted or collected separately.
 
-#### Remediated Formula (Confirmed Rule 2.2.3 & Q08)
-$$\text{Net Prize Entitlement} = V - C - I_{\text{base}} - \text{Prior Arrears}$$
-$$\text{Net Prize Entitlement} = ₹1,00,000 - ₹4,000 - ₹5,000 - ₹0 = \mathbf{₹91,000}$$
+#### Remediated Formula (Confirmed Rule 2.2.3, Q08 & FIN-B)
+$$\text{Net Prize Entitlement} = V - C - (\text{finalMonthDeduction}) - \text{Prior Arrears}$$
 
-In addition, Month $N$'s `InstallmentDue` is atomically settled:
-$$\text{Status} = \text{PAID}, \quad \text{paidAmount} = I_{\text{base}} = ₹5,000$$
+- **Case 1 (Month $N$ Unpaid)**: $\text{finalMonthDeduction} = I_{\text{base}} = ₹5,000$.
+  $$\text{Net Prize Entitlement} = ₹1,00,000 - ₹4,000 - ₹5,000 - ₹0 = \mathbf{₹91,000}$$
+  Month $N$'s `InstallmentDue` is atomically marked `PAID`.
+- **Case 2 (Month $N$ Already Paid at Counter)**: $\text{finalMonthDeduction} = ₹0$.
+  $$\text{Net Prize Entitlement} = ₹1,00,000 - ₹4,000 - ₹0 - ₹0 = \mathbf{₹96,000}$$
+  Zero double collection.
 
 #### Test Evidence (`apps/api/test/unit/disbursement.spec.ts`)
 ```typescript
-it('should successfully execute final Month N settlement (KFC-FIN-001: ₹1L chit -> ₹4,000 commission - ₹5,000 Month N installment -> ₹91,000 net payout)', async () => {
-  // Executed against DisbursementService.settleFinalMonth
+it('FIN-B: should NOT deduct final month installment again if subscriber already paid Month N due (finalMonthDeduction = 0n)', async () => {
+  // Executed against DisbursementService.settleFinalMonth with existing paid Month N due
   expect(result.settlement.grossPrize).toBe(100000);
   expect(result.settlement.foremanCommission).toBe(4000);
-  expect(result.settlement.finalMonthInstallment).toBe(5000);
-  expect(result.settlement.priorArrearsDeducted).toBe(0);
-  expect(result.settlement.netPrizeMoney).toBe(91000); // V - C - I_base
-  expect(result.settlement.installmentMonth).toBe(20);
+  expect(result.settlement.finalMonthInstallment).toBe(0); // Zero deduction
+  expect(result.settlement.isFinalMonthAlreadyPaid).toBe(true);
+  expect(result.settlement.netPrizeMoney).toBe(96000); // 100,000 - 4,000 - 0
 });
-// RESULT: PASS (22/22 in disbursement.spec.ts)
+// RESULT: PASS (25/25 in disbursement.spec.ts)
 ```
 
 ---

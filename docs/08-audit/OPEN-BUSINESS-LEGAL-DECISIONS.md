@@ -31,9 +31,11 @@ Under Section 39 and 40 of the Chit Funds Act, 1982:
 - However, statutory provisions differ on whether the refund is payable immediately or only at the termination of the chit scheme (Month $N$), and whether past dividend deductions are retained by the company or credited to the defaulting subscriber.
 
 #### Current Code Implementation
-[`apps/api/src/installment/installment.service.ts#L760-L830`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts#L760-L830):
-$$\text{Refund Amount} = \max(0, \text{Total Paid Dues} - \text{Foreman Commission Damages})$$
-$$\text{Damages} = \frac{V \times 4}{100} = ₹4,000 \quad (\text{for a ₹1 Lakh scheme})$$
+[`apps/api/src/installment/installment.service.ts`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts):
+The software strictly **fails closed** with `BadRequestException('UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement policy (Q25) has not been confirmed by business owner and legal counsel. Automatic settlement execution is blocked.')`. This prevents premature or legally non-compliant deduction of subscriber funds until the policy is confirmed.
+
+$$\text{Refund Formula (Proposed)} = \max(0, \text{Total Paid Dues} - \text{Foreman Commission Damages})$$
+$$\text{Damages} = \frac{V \times 4}{100} = ₹4,00,000 \quad (\text{or } 5\% \text{ under Section 28})$$
 
 #### Partner Decision Needed
 The 4 Partners must formally resolve:
