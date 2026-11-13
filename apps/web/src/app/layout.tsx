@@ -9,6 +9,9 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Kumaran Chits — Kumaran Finance (Perundurai)',
   description: 'Official chit-fund operations platform for Kumaran Finance, Perundurai, Tamil Nadu',
+  other: {
+    google: 'notranslate',
+  },
 };
 
 export default async function RootLayout({
@@ -20,8 +23,13 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${fontInter.variable} ${fontTamil.variable}`}>
-      <body className="min-h-screen bg-slate-950 text-slate-50 antialiased">
+    <html
+      lang={locale}
+      className={`${fontInter.variable} ${fontTamil.variable}`}
+      translate="no"
+      suppressHydrationWarning
+    >
+      <body className="min-h-screen bg-slate-950 text-slate-50 antialiased" suppressHydrationWarning>
         <NextIntlClientProvider messages={messages} locale={locale}>
           <QueryProvider>
             <SessionInactivityGuard />

@@ -54,7 +54,7 @@ export default function AuthLayout({
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-1 px-4 sm:flex-row sm:px-6">
           <p className="flex items-center text-center sm:text-left">
             <ShieldCheck className="mr-1.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-            Regulated by Tamil Nadu Chit Funds Act & Central Chit Funds Act 1982
+            <span>Regulated by Tamil Nadu Chit Funds Act & Central Chit Funds Act 1982</span>
           </p>
           <p className="font-mono text-[11px] text-slate-400">
             Perundurai HO Workstation • v1.0.0
