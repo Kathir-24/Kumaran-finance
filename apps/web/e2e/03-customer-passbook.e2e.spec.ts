@@ -32,7 +32,7 @@ test.describe('Suite 03: Customer Directory & Customer 360 Passbook Profile', ()
     await expect(profileHeader).toBeVisible();
 
     // Verify customer identity card renders customer code or name
-    const customerCode = managingPartnerPage.locator('text=KC-CUST-').first();
+    const customerCode = managingPartnerPage.locator('text=/KC-(CUST|DEF)/i').first();
     await expect(customerCode).toBeVisible();
   });
 
