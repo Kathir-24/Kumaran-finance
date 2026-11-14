@@ -80,6 +80,28 @@ export async function runBackup(options?: {
   let dumpSizeBytes = 0;
   let dumpSha256 = '';
 
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
+  const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
+
+  let preDumpRequiredKeys: string[] = [];
+  try {
+    const [customerDocs, winners] = await Promise.all([
+      prisma.customerDocument.findMany({ select: { s3Key: true } }),
+      prisma.auctionWinner.findMany({
+        where: { securityDocS3Key: { not: null } },
+        select: { securityDocS3Key: true },
+      }),
+    ]);
+    preDumpRequiredKeys = [
+      ...customerDocs.map((d) => d.s3Key),
+      ...winners.map((w) => w.securityDocS3Key!),
+    ];
+  } finally {
+    await prisma.$disconnect();
+  }
+
   // 1. Capture PostgreSQL Custom Binary Dump
   try {
     const isDirectPgDump =
@@ -113,9 +135,6 @@ export async function runBackup(options?: {
         stdio: 'ignore',
       });
     } else {
-      const dbUrl =
-        process.env.DATABASE_URL ||
-        'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
       console.log(`[BACKUP] Executing host pg_dump...`);
       execSync(`pg_dump "${dbUrl}" -F c -f "${localDumpPath}"`, { stdio: 'inherit' });
     }
@@ -156,10 +175,7 @@ export async function runBackup(options?: {
   }
 
   // 2. Query Baseline Financial & Ledger Counts for Manifest Invariants
-  const dbUrl =
-    process.env.DATABASE_URL ||
-    'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
-  const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
+  const prismaPost = new PrismaClient({ datasources: { db: { url: dbUrl } } });
 
   let recordCounts = {
     users: 0,
@@ -170,21 +186,31 @@ export async function runBackup(options?: {
     payments: 0,
     auditLogs: 0,
   };
+  let postDumpRequiredKeys: string[] = [];
 
   try {
-    const [users, customers, chitGroups, tickets, dues, payments, auditLogs] =
+    const [users, customers, chitGroups, tickets, dues, payments, auditLogs, customerDocsPost, winnersPost] =
       await Promise.all([
-        prisma.user.count(),
-        prisma.customer.count(),
-        prisma.chitGroup.count(),
-        prisma.subscriberTicket.count(),
-        prisma.installmentDue.count(),
-        prisma.payment.count(),
-        prisma.auditLog.count(),
+        prismaPost.user.count(),
+        prismaPost.customer.count(),
+        prismaPost.chitGroup.count(),
+        prismaPost.subscriberTicket.count(),
+        prismaPost.installmentDue.count(),
+        prismaPost.payment.count(),
+        prismaPost.auditLog.count(),
+        prismaPost.customerDocument.findMany({ select: { s3Key: true } }),
+        prismaPost.auctionWinner.findMany({
+          where: { securityDocS3Key: { not: null } },
+          select: { securityDocS3Key: true },
+        }),
       ]);
     recordCounts = { users, customers, chitGroups, tickets, installmentDues: dues, payments, auditLogs };
+    postDumpRequiredKeys = [
+      ...customerDocsPost.map((d) => d.s3Key),
+      ...winnersPost.map((w) => w.securityDocS3Key!),
+    ];
   } finally {
-    await prisma.$disconnect();
+    await prismaPost.$disconnect();
   }
 
   // 3. Snapshot MinIO Application Documents (KYC, Safety Proofs, Receipts)
@@ -238,6 +264,49 @@ export async function runBackup(options?: {
       mimeType: getObj.ContentType,
     });
     totalDocSizeBytes += docBuffer.length;
+  }
+
+  // 3b. Dual-Window Consistency Gate:
+  // Assert that ALL documents referenced in preDumpRequiredKeys are captured in the snapshot
+  const snapshottedKeys = new Set(documentEntries.map((e) => e.originalKey));
+  const missingPreDumpDocs = preDumpRequiredKeys.filter((k) => !snapshottedKeys.has(k));
+
+  if (missingPreDumpDocs.length > 0) {
+    const errorMsg = `[INTEGRITY FAILURE] Recovery set inconsistent: ${missingPreDumpDocs.length} required non-regenerable documents referenced in PostgreSQL are missing from MinIO snapshot: ${missingPreDumpDocs.slice(0, 5).join(', ')}${missingPreDumpDocs.length > 5 ? '...' : ''}`;
+    console.error(errorMsg);
+
+    const failedManifest: BackupManifest = {
+      version: '1.0',
+      setId,
+      timestamp: now.toISOString(),
+      status: 'FAILED',
+      environment: process.env.NODE_ENV || 'development',
+      sourceBucket: config.bucket,
+      error: errorMsg,
+      database: {
+        format: 'custom',
+        dumpFile: 'database.dump',
+        s3Key: dbSetKey,
+        sizeBytes: dumpSizeBytes,
+        sha256: dumpSha256,
+        recordCounts,
+      },
+      documents: {
+        prefix: `backups/sets/${setId}/documents/`,
+        totalCount: documentEntries.length,
+        totalSizeBytes: totalDocSizeBytes,
+        requiredCount,
+        regenerableCount,
+        files: documentEntries,
+      },
+      verification: {
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+      },
+    };
+
+    await writeManifest(s3Client, config.bucket, manifestKey, failedManifest);
+    throw new Error(errorMsg);
   }
 
   // 4. Construct and Atomically Write Backup Manifest

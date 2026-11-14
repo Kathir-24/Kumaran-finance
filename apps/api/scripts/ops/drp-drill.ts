@@ -38,8 +38,8 @@ if (fs.existsSync(envPath)) {
   dotenv.config();
 }
 
-const DRILL_DB_NAME = 'chitflow_drp_drill';
-const DRILL_BUCKET_NAME = 'kumaran-chits-drill';
+const DRILL_DB_NAME: string = 'chitflow_drp_drill';
+const DRILL_BUCKET_NAME: string = 'kumaran-chits-drill';
 
 export interface DrillAssertion {
   name: string;
@@ -80,6 +80,27 @@ export async function runDrpDrill(): Promise<DrillResult> {
 
   const s3Config = resolveS3Config();
   const s3Client = createS3Client(s3Config);
+
+  // INVARIANT SAFETY GUARDS: Never allow drill to target active database or live application bucket
+  if (DRILL_DB_NAME === 'chitflow_dev' || DRILL_DB_NAME === process.env.POSTGRES_DB) {
+    throw new Error(
+      `[FATAL SAFETY GUARD] DRP Drill cannot target active database '${DRILL_DB_NAME}'. Must be an isolated sandbox database.`,
+    );
+  }
+  if (!DRILL_DB_NAME.includes('drill')) {
+    throw new Error(
+      `[FATAL SAFETY GUARD] DRP Drill database name must contain 'drill'. Got '${DRILL_DB_NAME}'.`,
+    );
+  }
+  if (
+    DRILL_BUCKET_NAME === s3Config.bucket ||
+    DRILL_BUCKET_NAME === 'kumaran-chits-private' ||
+    !DRILL_BUCKET_NAME.includes('drill')
+  ) {
+    throw new Error(
+      `[FATAL SAFETY GUARD] DRP Drill bucket '${DRILL_BUCKET_NAME}' cannot be the active application bucket '${s3Config.bucket}'. Must contain 'drill'.`,
+    );
+  }
 
   const sourceDbUrl =
     process.env.DATABASE_URL ||
@@ -548,30 +569,35 @@ export async function runDrpDrill(): Promise<DrillResult> {
       // ignore
     }
 
-    // Teardown drill database
+    // Teardown drill database (guarded to ensure active DB can never be dropped)
     try {
-      if (isDockerRunning) {
-        if (containerTempFileName) {
-          execSync(`docker exec chitflow-db rm -f "/tmp/${containerTempFileName}"`, { stdio: 'ignore' });
-        }
-        if (drillDbCreated) {
+      if (drillDbCreated && DRILL_DB_NAME !== 'chitflow_dev' && DRILL_DB_NAME.includes('drill')) {
+        if (isDockerRunning) {
+          if (containerTempFileName) {
+            execSync(`docker exec chitflow-db rm -f "/tmp/${containerTempFileName}"`, { stdio: 'ignore' });
+          }
           execSync(
             `docker exec chitflow-db psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`,
             { stdio: 'ignore' },
           );
+        } else {
+          execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
+            stdio: 'ignore',
+          });
         }
-      } else if (drillDbCreated) {
-        execSync(`psql -U chitflow -d postgres -c "DROP DATABASE IF EXISTS ${DRILL_DB_NAME} WITH (FORCE);"`, {
-          stdio: 'ignore',
-        });
       }
     } catch {
       // ignore DB teardown error so bucket teardown still runs
     }
 
-    // Teardown isolated MinIO drill bucket
+    // Teardown isolated MinIO drill bucket (guarded to ensure active bucket can never be deleted)
     try {
-      if (drillBucketCreated) {
+      if (
+        drillBucketCreated &&
+        DRILL_BUCKET_NAME !== s3Config.bucket &&
+        DRILL_BUCKET_NAME !== 'kumaran-chits-private' &&
+        DRILL_BUCKET_NAME.includes('drill')
+      ) {
         const listRes = await s3Client.send(new ListObjectsV2Command({ Bucket: DRILL_BUCKET_NAME }));
         if (listRes.Contents) {
           for (const obj of listRes.Contents) {

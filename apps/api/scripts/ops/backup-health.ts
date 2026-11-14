@@ -124,9 +124,48 @@ export async function checkBackupHealth(
     };
   }
 
-  // 5. Deep Checksum Verification (Optional / on-demand)
+  // 5. Verify Backed-Up Documents in S3 (Existence & Size)
+  const missingDocs: string[] = [];
+  const corruptSizeDocs: string[] = [];
+
+  for (const doc of manifest.documents.files) {
+    try {
+      const headDoc = await s3Client.send(
+        new HeadObjectCommand({
+          Bucket: config.bucket,
+          Key: doc.backupKey,
+        }),
+      );
+      if (headDoc.ContentLength !== doc.sizeBytes) {
+        corruptSizeDocs.push(`${doc.backupKey} (S3: ${headDoc.ContentLength}b vs manifest: ${doc.sizeBytes}b)`);
+      }
+    } catch {
+      missingDocs.push(doc.backupKey);
+    }
+  }
+
+  if (missingDocs.length > 0 || corruptSizeDocs.length > 0) {
+    return {
+      healthy: false,
+      status: 'CORRUPT',
+      setId: manifest.setId,
+      timestamp: manifest.timestamp,
+      ageHours,
+      maxAgeHours,
+      reason: `Backup set has corrupted document storage: ${missingDocs.length} missing files, ${corruptSizeDocs.length} size mismatches`,
+      details: {
+        missingDocuments: missingDocs.slice(0, 5),
+        corruptSizeDocuments: corruptSizeDocs.slice(0, 5),
+      },
+    };
+  }
+
+  // 6. Deep Checksum Verification (Optional / on-demand via --verify-checksums)
   let dbSha256Valid = true;
+  let docsSha256Valid = true;
+
   if (options?.verifyChecksums) {
+    // 6a. Verify database dump checksum
     const getRes = await s3Client.send(
       new GetObjectCommand({
         Bucket: config.bucket,
@@ -155,6 +194,41 @@ export async function checkBackupHealth(
         maxAgeHours,
         dbSha256Valid: false,
         reason: `Database dump SHA-256 checksum mismatch! Expected ${manifest.database.sha256}, got ${calculatedSha}`,
+      };
+    }
+
+    // 6b. Verify SHA-256 checksums across backed-up document objects
+    const checksumMismatches: string[] = [];
+    for (const doc of manifest.documents.files) {
+      const docRes = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: doc.backupKey,
+        }),
+      );
+      if (!docRes.Body) {
+        checksumMismatches.push(`${doc.backupKey}: empty object body`);
+        continue;
+      }
+      const docBuf = await streamToBuffer(docRes.Body as Readable);
+      const docSha = computeSha256(docBuf);
+      if (docSha !== doc.sha256) {
+        checksumMismatches.push(`${doc.backupKey}: expected ${doc.sha256.substring(0, 16)}..., got ${docSha.substring(0, 16)}...`);
+      }
+    }
+
+    if (checksumMismatches.length > 0) {
+      docsSha256Valid = false;
+      return {
+        healthy: false,
+        status: 'CORRUPT',
+        setId: manifest.setId,
+        timestamp: manifest.timestamp,
+        ageHours,
+        maxAgeHours,
+        dbSha256Valid: true,
+        reason: `Document SHA-256 checksum verification failed for ${checksumMismatches.length} files: ${checksumMismatches.slice(0, 3).join(', ')}`,
+        details: { checksumMismatches: checksumMismatches.slice(0, 10) },
       };
     }
   }

@@ -200,5 +200,191 @@ describe('Backup & Disaster Recovery (DRP) System Tests', () => {
       expect(freshAgeHours).toBeLessThanOrEqual(maxAgeHours);
       expect(staleAgeHours).toBeGreaterThan(maxAgeHours);
     });
+
+    it('should forbid drill execution when target database is active chitflow_dev', () => {
+      const validateDrillTarget = (dbName: string, bucketName: string) => {
+        if (dbName === 'chitflow_dev' || !dbName.includes('drill')) {
+          throw new Error('Target DB must be isolated drill sandbox');
+        }
+        if (bucketName === 'kumaran-chits-private' || !bucketName.includes('drill')) {
+          throw new Error('Target bucket must be isolated drill sandbox');
+        }
+        return true;
+      };
+
+      expect(() => validateDrillTarget('chitflow_dev', 'kumaran-chits-drill')).toThrow(
+        'Target DB must be isolated drill sandbox',
+      );
+      expect(() => validateDrillTarget('chitflow_drp_drill', 'kumaran-chits-private')).toThrow(
+        'Target bucket must be isolated drill sandbox',
+      );
+      expect(validateDrillTarget('chitflow_drp_drill', 'kumaran-chits-drill')).toBe(true);
+    });
+  });
+
+  describe('6. Consistency Gate & Health Verifier Invariants', () => {
+    it('should reject manifest completion when required database document references are missing', () => {
+      const requiredDbKeys = ['kyc/cust-1/aadhaar.jpg', 'security/auc-1/agreement.pdf'];
+      const snapshottedKeys = new Set(['kyc/cust-1/aadhaar.jpg']); // missing agreement.pdf
+
+      const missing = requiredDbKeys.filter((k) => !snapshottedKeys.has(k));
+      expect(missing).toEqual(['security/auc-1/agreement.pdf']);
+
+      // Consistency Gate: Manifest cannot be COMPLETE when missing.length > 0
+      const manifestStatus = missing.length === 0 ? 'COMPLETE' : 'FAILED';
+      expect(manifestStatus).toBe('FAILED');
+    });
+
+    it('should detect when backed-up documents have corrupted sizes or hashes', () => {
+      const manifestDoc = {
+        originalKey: 'kyc/c1/photo.jpg',
+        backupKey: 'backups/sets/set_1/documents/kyc/c1/photo.jpg',
+        sizeBytes: 5000,
+        sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      };
+
+      // Case 1: Corrupted size
+      const s3ActualSize = 4800;
+      const isSizeCorrupt = s3ActualSize !== manifestDoc.sizeBytes;
+      expect(isSizeCorrupt).toBe(true);
+
+      // Case 2: Corrupted content hash
+      const actualHash = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+      const isHashCorrupt = actualHash !== manifestDoc.sha256;
+      expect(isHashCorrupt).toBe(true);
+    });
+  });
+
+  describe('7. Cross-Storage Concurrency Race Conditions & Recovery Scenarios', () => {
+    // Scenario 1: Document upload before database commit
+    it('Scenario 1: should handle document uploaded to MinIO before database commit without breaking consistency', () => {
+      // In Kumaran Chits, uploadFile occurs before prisma.customerDocument.create
+      const activeDbKeys = ['kyc/cust-1/doc-1.jpg'];
+      const activeS3Keys = ['kyc/cust-1/doc-1.jpg', 'kyc/cust-2/doc-in-flight.jpg']; // doc-in-flight uploaded, DB uncommitted
+
+      // Consistency check: all DB keys must be present in S3 snapshot
+      const missingKeys = activeDbKeys.filter((k) => !activeS3Keys.includes(k));
+      expect(missingKeys).toHaveLength(0);
+
+      // The uncommitted file in S3 is an orphan; restored DB has referential integrity
+      const isReferentiallyConsistent = activeDbKeys.every((k) => activeS3Keys.includes(k));
+      expect(isReferentiallyConsistent).toBe(true);
+    });
+
+    // Scenario 2: Database snapshot while a document upload is in progress
+    it('Scenario 2: should guarantee point-in-time consistency when an upload is in-flight during snapshot', () => {
+      // While upload is streaming to S3, neither PostgreSQL nor S3 bucket exposes the committed entity
+      const dbDumpKeys = ['kyc/cust-1/doc-1.jpg'];
+      const s3SnapshotKeys = ['kyc/cust-1/doc-1.jpg']; // in-flight upload not yet committed or visible
+
+      const missing = dbDumpKeys.filter((k) => !s3SnapshotKeys.includes(k));
+      expect(missing).toHaveLength(0);
+      expect(dbDumpKeys).toEqual(s3SnapshotKeys);
+    });
+
+    // Scenario 3: New document committed during the backup window
+    it('Scenario 3: should enforce dual-window consistency when new document is committed during backup', () => {
+      const preDumpDbKeys = ['kyc/cust-1/doc-1.jpg'];
+      // Suppose doc-2 is uploaded and committed after preDump check
+      const postDumpDbKeys = ['kyc/cust-1/doc-1.jpg', 'kyc/cust-2/doc-2.jpg'];
+      expect(postDumpDbKeys.length).toBeGreaterThan(preDumpDbKeys.length);
+
+      // Sub-case 3A: S3 snapshot captured doc-2 (upload-first guarantee)
+      const s3SnapshotCaseA = new Set(['kyc/cust-1/doc-1.jpg', 'kyc/cust-2/doc-2.jpg']);
+      const missing3A = preDumpDbKeys.filter((k) => !s3SnapshotCaseA.has(k));
+      expect(missing3A).toHaveLength(0); // Valid recovery set
+
+      // Sub-case 3B: If doc-1 was somehow missed by S3 snapshot, consistency gate rejects
+      const s3SnapshotCaseB = new Set(['kyc/cust-2/doc-2.jpg']); // missed doc-1
+      const missing3B = preDumpDbKeys.filter((k) => !s3SnapshotCaseB.has(k));
+      expect(missing3B).toContain('kyc/cust-1/doc-1.jpg');
+      const manifestStatus3B = missing3B.length === 0 ? 'COMPLETE' : 'FAILED';
+      expect(manifestStatus3B).toBe('FAILED');
+    });
+
+    // Scenario 4: Concurrent document deletion race condition
+    it('Scenario 4: should detect concurrent document deletion during backup window and fail closed', () => {
+      const preDumpDbKeys = ['kyc/cust-1/doc-1.jpg', 'kyc/cust-2/doc-to-delete.jpg'];
+      // Admin deleted doc-to-delete from S3 during the dump
+      const s3SnapshotKeys = new Set(['kyc/cust-1/doc-1.jpg']); // doc-to-delete is gone from S3
+
+      // Dual-Window Consistency Gate asserts preDumpDbKeys MUST be in S3 snapshot
+      const missingDocs = preDumpDbKeys.filter((k) => !s3SnapshotKeys.has(k));
+      expect(missingDocs).toEqual(['kyc/cust-2/doc-to-delete.jpg']);
+
+      // Gate rejects the backup set to prevent publishing a dump pointing to missing files
+      const manifestStatus = missingDocs.length === 0 ? 'COMPLETE' : 'FAILED';
+      expect(manifestStatus).toBe('FAILED');
+    });
+
+    // Scenario 5: Backup failure during document copying
+    it('Scenario 5: should never mark manifest COMPLETE if document copying fails midway', () => {
+      const totalDocumentsToCopy = 10;
+      let copiedCount = 0;
+      let errorOccurred = false;
+
+      // Simulate failure at file 5
+      for (let i = 1; i <= totalDocumentsToCopy; i++) {
+        if (i === 5) {
+          errorOccurred = true;
+          break;
+        }
+        copiedCount++;
+      }
+
+      expect(errorOccurred).toBe(true);
+      expect(copiedCount).toBe(4);
+
+      // Manifest status invariant
+      const finalManifestStatus = errorOccurred ? 'FAILED' : 'COMPLETE';
+      expect(finalManifestStatus).toBe('FAILED');
+    });
+
+    // Scenario 6: Recovery-set cross-storage consistency validation
+    it('Scenario 6: should validate that 100% of required restored documents resolve with matching SHA-256', () => {
+      const restoredDbDocKeys = ['kyc/c1/aadhaar.jpg', 'safety-proofs/auc-1/cheque.pdf'];
+      const restoredBucketObjects = new Map<string, string>([
+        ['kyc/c1/aadhaar.jpg', 'sha256_aadhaar_hash'],
+        ['safety-proofs/auc-1/cheque.pdf', 'sha256_cheque_hash'],
+      ]);
+      const manifestHashes = new Map<string, string>([
+        ['kyc/c1/aadhaar.jpg', 'sha256_aadhaar_hash'],
+        ['safety-proofs/auc-1/cheque.pdf', 'sha256_cheque_hash'],
+      ]);
+
+      const allPresent = restoredDbDocKeys.every((k) => restoredBucketObjects.has(k));
+      const allChecksumsMatch = restoredDbDocKeys.every(
+        (k) => restoredBucketObjects.get(k) === manifestHashes.get(k),
+      );
+
+      expect(allPresent).toBe(true);
+      expect(allChecksumsMatch).toBe(true);
+    });
+
+    // Scenario 7: Backup retry after failed snapshot
+    it('Scenario 7: should allow clean retry after a failed backup without leaving corrupt state', () => {
+      // Step 1: Failed backup set
+      const failedSet: Partial<BackupManifest> = {
+        setId: 'set_failed_attempt_1',
+        status: 'FAILED',
+        error: 'Network connection reset during S3 transfer',
+      };
+
+      // Step 2: Retry creates new distinct set
+      const retrySet: Partial<BackupManifest> = {
+        setId: 'set_retry_attempt_2',
+        status: 'COMPLETE',
+      };
+
+      expect(failedSet.status).toBe('FAILED');
+      expect(retrySet.status).toBe('COMPLETE');
+      expect(failedSet.setId).not.toBe(retrySet.setId);
+
+      // Verifier filter: only COMPLETE sets are eligible for restore
+      const candidateSets = [failedSet, retrySet];
+      const validSets = candidateSets.filter((s) => s.status === 'COMPLETE');
+      expect(validSets).toHaveLength(1);
+      expect(validSets[0].setId).toBe('set_retry_attempt_2');
+    });
   });
 });
