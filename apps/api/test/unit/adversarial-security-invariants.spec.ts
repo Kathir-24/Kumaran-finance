@@ -194,7 +194,9 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
           finalizedByUserId: mockCheckerId,
         });
 
-        const res = await auctionService.finalizeAuction(mockAuctionId, mockCheckerId);
+        const res = await auctionService.finalizeAuction(mockAuctionId, mockCheckerId, {
+          subscribersPresent: 14,
+        });
         expect(res).toBeDefined();
         expect(res?.status).toBe(AuctionStatus.COMPLETED);
         expect(res?.finalizedByUserId).toBe(mockCheckerId);

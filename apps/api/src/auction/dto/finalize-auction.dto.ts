@@ -23,10 +23,9 @@ export class FinalizeAuctionDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Signed by Foreman confirmation',
-    default: true,
+    description: 'Signed by Foreman confirmation (Form XVII minutes)',
   })
   @IsOptional()
   @IsBoolean()
-  signedByForeman?: boolean = true;
+  signedByForeman?: boolean;
 }

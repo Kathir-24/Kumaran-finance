@@ -43,9 +43,9 @@ export function AuctionFinalizeCard({
   const t = useTranslations('auctions');
   const user = useAuthStore((state) => state.user);
 
-  const [subscribersPresent, setSubscribersPresent] = React.useState<number>(14);
+  const [subscribersPresent, setSubscribersPresent] = React.useState<number | ''>('');
   const [notes, setNotes] = React.useState<string>('');
-  const [signedByForeman, setSignedByForeman] = React.useState<boolean>(true);
+  const [signedByForeman, setSignedByForeman] = React.useState<boolean>(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   // Maker-Checker Dual Control Invariant Check (Guardrail 10) & Legal Partner Guard (SEC-A)
@@ -80,7 +80,7 @@ export function AuctionFinalizeCard({
       return;
     }
 
-    if (subscribersPresent < 1) {
+    if (typeof subscribersPresent !== 'number' || subscribersPresent < 1) {
       setErrorMsg('At least 1 attending subscriber must be physically present in the auction proceedings.');
       return;
     }
@@ -166,8 +166,12 @@ export function AuctionFinalizeCard({
             <input
               type="number"
               min={1}
+              placeholder="e.g. 14"
               value={subscribersPresent}
-              onChange={(e) => setSubscribersPresent(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSubscribersPresent(val === '' ? '' : parseInt(val, 10));
+              }}
               disabled={!canFinalize || isSubmitting}
               className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white font-mono focus:border-emerald-500/60 focus:outline-none disabled:opacity-50"
             />

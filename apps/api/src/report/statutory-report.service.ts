@@ -373,6 +373,12 @@ export class StatutoryReportService {
             phone: true,
           },
         },
+        winningAuction: {
+          select: {
+            paymentReference: true,
+            disbursedAt: true,
+          },
+        },
         dues: {
           orderBy: { installmentMonth: 'asc' },
           include: {
@@ -397,6 +403,26 @@ export class StatutoryReportService {
       );
     }
 
+    // KC-09: Verified provenance for prize arrears offsets from immutable audit logs
+    const allDueIds = tickets.flatMap((t) => t.dues.map((d) => d.id));
+    const rawOffsetLogs =
+      allDueIds.length > 0 && typeof this.prisma.auditLog?.findMany === 'function'
+        ? await this.prisma.auditLog.findMany({
+            where: {
+              entityType: 'InstallmentDue',
+              action: 'PRIZE_ARREARS_OFFSET_ALLOCATED',
+              entityId: { in: allDueIds },
+            },
+            select: {
+              entityId: true,
+              timestamp: true,
+              newValue: true,
+            },
+          })
+        : [];
+    const offsetAuditLogs = rawOffsetLogs || [];
+    const offsetLogByDueId = new Map(offsetAuditLogs.map((log) => [log.entityId, log]));
+
     const ticketLedgers = tickets.map((t) => {
       let totalGrossDue = 0n;
       let totalDividendCredit = 0n;
@@ -417,6 +443,30 @@ export class StatutoryReportService {
         }
 
         const alloc = d.allocations[0];
+        const offsetLog = offsetLogByDueId.get(d.id);
+        const isPrizeArrearsOffset = Boolean(offsetLog);
+
+        let paymentDate: Date | null = null;
+        let receiptNumber: string | null = null;
+        let paymentMethod: string | null = null;
+
+        if (alloc) {
+          paymentDate = alloc.payment.createdAt;
+          receiptNumber = alloc.payment.receipt?.receiptNumber || null;
+          paymentMethod = alloc.payment.paymentMethod;
+        } else if (isPrizeArrearsOffset) {
+          // Exact settlement timestamp from immutable audit trail (never substitute due date)
+          paymentDate = offsetLog!.timestamp;
+          const voucherRef = t.winningAuction?.paymentReference;
+          receiptNumber = voucherRef ? `OFFSET-${voucherRef}` : 'PRIZE-OFFSET';
+          paymentMethod = 'PRIZE_ARREARS_OFFSET';
+        } else if (d.status === 'PAID') {
+          // Paid due without payment allocation or prize offset log (e.g. migration / accounting adjustment)
+          paymentDate = null;
+          receiptNumber = null;
+          paymentMethod = 'DIRECT_ADJUSTMENT';
+        }
+
         return {
           installmentMonth: d.installmentMonth,
           dueDate: d.dueDate,
@@ -425,9 +475,9 @@ export class StatutoryReportService {
           netPayableAmount: d.netPayableAmount,
           paidAmount: d.paidAmount,
           status: d.status,
-          paymentDate: alloc?.payment.createdAt || null,
-          receiptNumber: alloc?.payment.receipt?.receiptNumber || null,
-          paymentMethod: alloc?.payment.paymentMethod || null,
+          paymentDate,
+          receiptNumber,
+          paymentMethod,
         };
       });
 

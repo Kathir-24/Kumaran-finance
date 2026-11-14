@@ -85,11 +85,13 @@ export class InstallmentController {
     @Param('chitGroupId') chitGroupId: string,
     @Param('month', ParseIntPipe) month: number,
     @Body() dto?: GenerateDuesDto,
+    @CurrentUser() user?: JwtPayload,
   ) {
     return this.installmentService.generateMonthlyDues(
       chitGroupId,
       month,
       dto,
+      user?.sub,
     );
   }
 

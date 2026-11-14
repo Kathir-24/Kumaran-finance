@@ -100,5 +100,33 @@ This changelog records all production code, configuration, test, and documentati
   - `apps/api/test/unit/financial-boundary-fuzz.spec.ts` (30/30 passed)
   - `apps/api/test/unit/state-transition-retry.spec.ts` (20/20 passed)
   - `apps/api/test/unit/chaos-network-disconnect.spec.ts` (7/7 passed)
-  - All remaining 43 API suites passed.
+  - All remaining API suites passed.
   - All 14 Next.js Web test suites passed (353/353 passed).
+
+---
+
+## 4. Master Known-Issues Resolution (KC-01 through KC-13)
+
+| Issue ID | Domain | Severity | Primary Files Changed | Description of Changes |
+|---|---|:---:|---|---|
+| **KC-01** | Statutory Reporting | **HIGH** | `apps/api/src/report/statutory-report.service.ts`<br>`apps/api/test/unit/report.spec.ts` | Grouped Form XXI Ledger schedule per ticket and due to eliminate multi-payment allocation double-summation. |
+| **KC-02** | Legal Compliance | **CRITICAL** | `apps/api/src/auction/auction.service.ts`<br>`apps/api/src/auction/dto/finalize-auction.dto.ts`<br>`apps/web/src/components/auctions/auction-finalize-card.tsx`<br>`apps/api/test/unit/auction.spec.ts` | Removed silent defaults (`\|\| 1`, `?? 1`) for attendees and Foreman signatures. Enforced `@IsInt()`, `@Min(1)` with `BadRequestException` on missing/invalid input. |
+| **KC-03** | Audit Trail | **MEDIUM** | `apps/api/src/chit/chit.service.ts`<br>`apps/api/test/unit/chit.spec.ts` | Added atomic `tx.auditLog.create` (`CHIT_GROUP_ACTIVATED`) with `userId: checkerUserId` inside `withTransactionRetry`. |
+| **KC-04** | Audit Trail | **MEDIUM** | `apps/api/src/installment/installment.controller.ts`<br>`apps/api/src/installment/installment.service.ts`<br>`apps/api/test/unit/installment.spec.ts` | Added atomic `tx.auditLog.create` (`INSTALLMENT_DUES_GENERATED`) with `userId: actorUserId \|\| null` and `isIdempotentNoop` detection. |
+| **KC-05** | Security / RBAC | **CRITICAL** | `apps/api/src/common/guards/roles.guard.ts`<br>`apps/api/test/unit/adversarial-security-invariants.spec.ts` | Enforced `SEC-A` guardian requiring `user.isPartner === true` on all financial mutations. |
+| **KC-06** | Data Integrity | **MEDIUM** | `apps/api/src/chit/chit.service.ts`<br>`apps/api/test/unit/adversarial-security-invariants.spec.ts` | Added application-level pre-check for ADR-13 single ticket per customer limit returning HTTP 409 Conflict. |
+| **KC-07** | Timezone & Concurrency | **HIGH** | `apps/api/src/collection/collection.service.ts`<br>`apps/api/test/unit/collection.spec.ts` | Fixed `getIstDayRange` to format timestamps via `Asia/Kolkata` timezone; added `ORDER BY id FOR UPDATE` in `acknowledgeHandover`. |
+| **KC-08** | Financial State | **HIGH** | `apps/api/src/payment/payment.service.ts`<br>`apps/api/test/unit/payment.spec.ts` | Recalculated ticket arrears count and updated defaulter flag upon reversal approval. |
+| **KC-09** | Financial Provenance | **CRITICAL** | `apps/api/src/report/statutory-report.service.ts`<br>`apps/api/test/unit/report.spec.ts` | Extracted exact settlement timestamp and voucher reference from `AuditLog` (`PRIZE_ARREARS_OFFSET_ALLOCATED`); direct adjustments fall back to `paymentDate: null`. |
+| **KC-10** | Data Reconciliation | **LOW** | Database ground truth | Ground-truth SQL joins proved payments `8256296e` & `db653182` belong to Tickets #2 & #3. |
+| **KC-11** | Audit Reconciliation | **LOW** | Database ground truth | Reconciled exact immutable AuditLog UUIDs for Checkpoint 2F actions on disk. |
+| **KC-12** | E2E Browser Testing | **HIGH** | Docker web build, `apps/web/e2e/09-reports-registers.e2e.spec.ts` | Rebuilt `docker-web` container safely. Re-ran Playwright test suite 09: all 5/5 tests passed (10.6s). |
+| **KC-13** | Statutory PDF Geometry | **MEDIUM** | `apps/api/src/pdf/` templates | Verified exact page geometry (A5/A4) and embedded `NotoSansTamil` TrueType fonts. |
+
+### Final Test Execution Summary
+- **API Unit Test Suites**: 56/56 Passed (**891/891 tests, 100%**)
+- **Web Unit Test Suites**: 14/14 Passed (**353/353 tests, 100%**)
+- **E2E Playwright Suite 09**: 5/5 Passed (**100%**)
+- **Adversarial Security Suite**: 23/23 Passed (**100%**)
+- **TypeScript Typecheck**: 0 Errors (`api` and `web` clean)
+- **Database Non-Regression**: 0 Records Mutated (`chitflow_dev` and `KCA-UAT-01` intact)

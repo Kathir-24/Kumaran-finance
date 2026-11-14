@@ -42,6 +42,9 @@ describe('Module 3: Chit Groups & Mid-Cycle Intake Tests', () => {
       auctionWinner: {
         create: jest.fn(),
       },
+      auditLog: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 

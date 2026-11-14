@@ -486,6 +486,240 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       expect(ticketLedger.summary.totalNetPayable).toBe(8950n);
       expect(ticketLedger.summary.totalPaid).toBe(5000n);
       expect(ticketLedger.summary.totalOutstandingArrears).toBe(3950n);
+      expect(ticketLedger.monthlySchedule[0].paymentMethod).toBe('CASH');
+      expect(ticketLedger.monthlySchedule[0].receiptNumber).toBe('KC-REC-PRD-2026-00001');
+      expect(ticketLedger.monthlySchedule[0].paymentDate).toEqual(new Date('2026-01-15'));
+      expect(ticketLedger.monthlySchedule[1].paymentMethod).toBeNull();
+      expect(ticketLedger.monthlySchedule[1].receiptNumber).toBeNull();
+      expect(ticketLedger.monthlySchedule[1].paymentDate).toBeNull();
+    });
+
+    it('should correctly distinguish verified prize arrears offset from direct adjustments and unallocated settlements (KC-09)', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitGroup);
+
+      const offsetTimestamp = new Date('2026-11-14T19:42:47.365Z');
+      prismaMock.auditLog.findMany.mockResolvedValue([
+        {
+          entityId: 'due-002',
+          timestamp: offsetTimestamp,
+          action: 'PRIZE_ARREARS_OFFSET_ALLOCATED',
+          newValue: {
+            offsetAmount: '3950',
+            auctionWinnerId: 'win-001',
+          },
+        },
+      ]);
+
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: 'tick-002',
+          ticketNumber: 2,
+          isPrized: true,
+          consecutiveUnpaidMonths: 0,
+          status: 'ACTIVE',
+          winningAuction: {
+            paymentReference: 'SYNTHETIC-CHQ-UAT-2026-002',
+            disbursedAt: offsetTimestamp,
+          },
+          customer: {
+            id: 'c2',
+            customerCode: 'KC-CUST-00126',
+            fullName: 'Ramasamy K',
+            fullNameTamil: 'ராமசாமி',
+            phone: '9842100003',
+          },
+          dues: [
+            // Due 1: Normal Payment with allocation
+            {
+              id: 'due-001',
+              installmentMonth: 1,
+              dueDate: new Date('2026-10-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 0n,
+              netPayableAmount: 5000n,
+              paidAmount: 5000n,
+              status: 'PAID',
+              allocations: [
+                {
+                  payment: {
+                    createdAt: new Date('2026-10-12T10:00:00Z'),
+                    paymentMethod: 'CASH',
+                    receipt: { receiptNumber: 'KC-REC-PRD-2026-00430' },
+                  },
+                },
+              ],
+            },
+            // Due 2: Paid via Prize Arrears Offset (proven by audit log)
+            {
+              id: 'due-002',
+              installmentMonth: 2,
+              dueDate: new Date('2026-11-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 3950n,
+              status: 'PAID',
+              allocations: [],
+            },
+            // Due 3: Paid with no allocation and no offset log (e.g. direct adjustment)
+            {
+              id: 'due-003',
+              installmentMonth: 3,
+              dueDate: new Date('2026-12-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 3950n,
+              status: 'PAID',
+              allocations: [],
+            },
+            // Due 4: Unpaid
+            {
+              id: 'due-004',
+              installmentMonth: 4,
+              dueDate: new Date('2027-01-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 0n,
+              status: 'UNPAID',
+              allocations: [],
+            },
+          ],
+        },
+      ]);
+
+      const ledger = await reportService.getSubscriberLedgerFormXxi(
+        { chitGroupId: mockChitGroupId, ticketNumber: 2 },
+        superAdminUser,
+      );
+
+      const schedule = ledger.ledgers[0].monthlySchedule;
+      expect(schedule).toHaveLength(4);
+
+      // Due 1: Normal payment
+      expect(schedule[0].status).toBe('PAID');
+      expect(schedule[0].paymentMethod).toBe('CASH');
+      expect(schedule[0].receiptNumber).toBe('KC-REC-PRD-2026-00430');
+      expect(schedule[0].paymentDate).toEqual(new Date('2026-10-12T10:00:00Z'));
+
+      // Due 2: Verified Prize Arrears Offset (exact settlement timestamp, voucher ref, zero due-date substitution)
+      expect(schedule[1].status).toBe('PAID');
+      expect(schedule[1].paymentMethod).toBe('PRIZE_ARREARS_OFFSET');
+      expect(schedule[1].receiptNumber).toBe('OFFSET-SYNTHETIC-CHQ-UAT-2026-002');
+      expect(schedule[1].paymentDate).toEqual(offsetTimestamp);
+      expect(schedule[1].paymentDate).not.toEqual(new Date('2026-11-10')); // NOT the due date!
+
+      // Due 3: Paid due without allocation or offset log
+      expect(schedule[2].status).toBe('PAID');
+      expect(schedule[2].paymentMethod).toBe('DIRECT_ADJUSTMENT');
+      expect(schedule[2].receiptNumber).toBeNull();
+      expect(schedule[2].paymentDate).toBeNull(); // Never fabricate due date
+
+      // Due 4: Unpaid
+      expect(schedule[3].status).toBe('UNPAID');
+      expect(schedule[3].paymentMethod).toBeNull();
+      expect(schedule[3].receiptNumber).toBeNull();
+      expect(schedule[3].paymentDate).toBeNull();
+    });
+
+    it('KC-09: should handle multiple arrears offsets and missing or ambiguous provenance without inventing dates', async () => {
+      const offsetTimestamp1 = new Date('2026-11-14T19:40:00.000Z');
+      const offsetTimestamp2 = new Date('2026-12-15T11:20:00.000Z');
+
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitGroup);
+
+      // Audit logs for two distinct due offsets
+      prismaMock.auditLog.findMany.mockResolvedValue([
+        {
+          entityId: 'due-multi-002',
+          timestamp: offsetTimestamp1,
+          newValue: { offsetAmount: '3950', dueMonth: 2 },
+        },
+        {
+          entityId: 'due-multi-003',
+          timestamp: offsetTimestamp2,
+          newValue: { offsetAmount: '3950', dueMonth: 3 },
+        },
+      ]);
+
+      // Ticket with two offset-settled dues, one with missing voucher reference
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: 'ticket-multi-01',
+          ticketNumber: 5,
+          status: 'ACTIVE',
+          winningAuction: null, // Ambiguous/missing voucher reference
+          customer: {
+            id: 'c5',
+            customerCode: 'KC-CUST-00129',
+            fullName: 'Murugesan V',
+            fullNameTamil: 'முருகேசன்',
+            phone: '9842100005',
+          },
+          dues: [
+            {
+              id: 'due-multi-002',
+              installmentMonth: 2,
+              dueDate: new Date('2026-11-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 3950n,
+              status: 'PAID',
+              allocations: [],
+            },
+            {
+              id: 'due-multi-003',
+              installmentMonth: 3,
+              dueDate: new Date('2026-12-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 3950n,
+              status: 'PAID',
+              allocations: [],
+            },
+            {
+              id: 'due-multi-004-unproven',
+              installmentMonth: 4,
+              dueDate: new Date('2027-01-10'),
+              grossAmount: 5000n,
+              dividendDeduction: 1050n,
+              netPayableAmount: 3950n,
+              paidAmount: 3950n,
+              status: 'PAID',
+              allocations: [], // PAID but no allocation and no matching audit log
+            },
+          ],
+        },
+      ]);
+
+      const ledger = await reportService.getSubscriberLedgerFormXxi(
+        { chitGroupId: mockChitGroupId, ticketNumber: 5 },
+        superAdminUser,
+      );
+
+      const schedule = ledger.ledgers[0].monthlySchedule;
+      expect(schedule).toHaveLength(3);
+
+      // Multiple offset 1: fallback to PRIZE-OFFSET when voucher reference is null
+      expect(schedule[0].status).toBe('PAID');
+      expect(schedule[0].paymentMethod).toBe('PRIZE_ARREARS_OFFSET');
+      expect(schedule[0].receiptNumber).toBe('PRIZE-OFFSET');
+      expect(schedule[0].paymentDate).toEqual(offsetTimestamp1);
+
+      // Multiple offset 2: exact second timestamp
+      expect(schedule[1].status).toBe('PAID');
+      expect(schedule[1].paymentMethod).toBe('PRIZE_ARREARS_OFFSET');
+      expect(schedule[1].receiptNumber).toBe('PRIZE-OFFSET');
+      expect(schedule[1].paymentDate).toEqual(offsetTimestamp2);
+
+      // Unproven / ambiguous provenance: never invent date, flag as DIRECT_ADJUSTMENT
+      expect(schedule[2].status).toBe('PAID');
+      expect(schedule[2].paymentMethod).toBe('DIRECT_ADJUSTMENT');
+      expect(schedule[2].receiptNumber).toBeNull();
+      expect(schedule[2].paymentDate).toBeNull();
     });
 
     it('should restrict Customer persona to viewing their own ticket statement only', async () => {

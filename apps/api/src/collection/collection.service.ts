@@ -7,7 +7,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
+import { DueStatus, PaymentMethod, PaymentStatus, Role, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   acquirePaymentConcurrencyLocks,
@@ -52,6 +52,32 @@ export interface SyncOfflineQueueResponse {
   failureCount: number;
   synced: SyncedOfflineItemResult[];
   failed: FailedOfflineItemResult[];
+}
+
+/**
+ * Calculates exact UTC start and end bounds for a given calendar date in Indian Standard Time (Asia/Kolkata, UTC+05:30).
+ * Eliminates server-local timezone discrepancies across UTC production VPS hosts and local environments (KC-07).
+ */
+export function getIstDayRange(dateInput: string | Date): { start: Date; end: Date } {
+  let dateStr: string;
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput.trim())) {
+    dateStr = dateInput.trim();
+  } else {
+    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) {
+      throw new BadRequestException('Invalid date format for IST day calculation');
+    }
+    dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  }
+  const parts = dateStr.split('-').map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  // IST is UTC+5:30: Start 00:00:00.000 IST -> UTC prev day 18:30:00.000Z
+  const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) - (5 * 60 + 30) * 60 * 1000);
+  // End 23:59:59.999 IST -> UTC day 18:29:59.999Z
+  const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - (5 * 60 + 30) * 60 * 1000);
+  return { start, end };
 }
 
 @Injectable()
@@ -331,14 +357,21 @@ export class CollectionService {
    * Evening Cash Handover Batch Submission by Field Agent (Maker step).
    * Aggregates all unhanded cash collections collected by this agent.
    */
-  async submitHandover(collectorUserId: string, _dto?: SubmitHandoverDto) {
+  async submitHandover(collectorUserId: string, dto?: SubmitHandoverDto) {
+    const where: Prisma.PaymentWhereInput = {
+      recordedByUserId: collectorUserId,
+      paymentMethod: PaymentMethod.CASH,
+      cashHandoverStatus: 'PENDING_HANDOVER',
+      paymentStatus: PaymentStatus.SUCCESS,
+    };
+
+    if (dto?.date) {
+      const { start, end } = getIstDayRange(dto.date);
+      where.createdAt = { gte: start, lte: end };
+    }
+
     const pendingPayments = await this.prisma.payment.findMany({
-      where: {
-        recordedByUserId: collectorUserId,
-        paymentMethod: PaymentMethod.CASH,
-        cashHandoverStatus: 'PENDING_HANDOVER',
-        paymentStatus: PaymentStatus.SUCCESS,
-      },
+      where,
       include: {
         allocations: {
           include: {
@@ -460,7 +493,20 @@ export class CollectionService {
         },
       });
 
-      // 5. Immutable Audit Trail for Vault Deposit
+      // 5. Check remaining unhanded cash collections to identify partial handovers (KC-07)
+      const remainingPendingPayments = typeof tx.payment.count === 'function'
+        ? await tx.payment.count({
+            where: {
+              recordedByUserId: dto.collectorUserId,
+              paymentMethod: PaymentMethod.CASH,
+              cashHandoverStatus: 'PENDING_HANDOVER',
+              paymentStatus: PaymentStatus.SUCCESS,
+            },
+          })
+        : 0;
+      const isPartialHandover = remainingPendingPayments > 0;
+
+      // 6. Immutable Audit Trail for Vault Deposit
       await tx.auditLog.create({
         data: {
           userId: acknowledgerUserId,
@@ -472,6 +518,8 @@ export class CollectionService {
             acknowledgedByUserId: acknowledgerUserId,
             acknowledgedAmount: countedAmount.toString(),
             totalPaymentsAcknowledged: payments.length,
+            remainingPendingPayments,
+            isPartialHandover,
             paymentIds: dto.paymentIds,
             notes: dto.notes || null,
           },
@@ -485,6 +533,8 @@ export class CollectionService {
         acknowledgedByUserId: acknowledgerUserId,
         acknowledgedAmount: countedAmount,
         totalPaymentsAcknowledged: payments.length,
+        remainingPendingPayments,
+        isPartialHandover,
         acknowledgedAt,
         notes: dto.notes || 'Physically counted and verified currency notes.',
       };
@@ -499,9 +549,8 @@ export class CollectionService {
     currentUserId?: string,
     userRole?: Role,
   ) {
-    const targetDate = query?.date ? new Date(query.date) : new Date();
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+    const targetDate = query?.date || new Date();
+    const { start: startOfDay, end: endOfDay } = getIstDayRange(targetDate);
 
     const where: any = {
       createdAt: { gte: startOfDay, lte: endOfDay },

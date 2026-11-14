@@ -3,7 +3,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, Role } from '@prisma/client';
-import { CollectionService } from '../../src/collection/collection.service';
+import { CollectionService, getIstDayRange } from '../../src/collection/collection.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () => {
@@ -57,6 +57,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
         findMany: jest.fn(),
         create: jest.fn(),
         updateMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       paymentAllocation: {
         create: jest.fn(),
@@ -714,6 +715,50 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
 
       expect(result.receiptNumber).toBe('KC-REC-PRD-2026-00011');
       expect(result.paymentId).toBe('pmt-coll-01');
+    });
+  });
+
+  describe('KC-07: IST Calendar Date Range & Midnight Boundary Verification', () => {
+    it('should calculate exact UTC bounds for a date-only string (YYYY-MM-DD)', () => {
+      const { start, end } = getIstDayRange('2026-11-15');
+      expect(start.toISOString()).toBe('2026-11-14T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-15T18:29:59.999Z');
+    });
+
+    it('should correctly extract IST calendar day from UTC late-night timestamps crossing midnight', () => {
+      // 19:00:00 UTC on Nov 14 is 00:30:00 IST on Nov 15
+      const { start, end } = getIstDayRange('2026-11-14T19:00:00.000Z');
+      expect(start.toISOString()).toBe('2026-11-14T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-15T18:29:59.999Z');
+    });
+
+    it('should correctly handle offset-aware timestamp strings (+05:30)', () => {
+      const { start, end } = getIstDayRange('2026-11-15T00:15:00+05:30');
+      expect(start.toISOString()).toBe('2026-11-14T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-15T18:29:59.999Z');
+    });
+
+    it('should assign exact IST midnight boundary (18:30:00.000Z) to the new IST calendar day', () => {
+      const { start, end } = getIstDayRange('2026-11-14T18:30:00.000Z');
+      expect(start.toISOString()).toBe('2026-11-14T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-15T18:29:59.999Z');
+    });
+
+    it('should assign 1ms before IST midnight (18:29:59.999Z) to the preceding IST calendar day', () => {
+      const { start, end } = getIstDayRange('2026-11-14T18:29:59.999Z');
+      expect(start.toISOString()).toBe('2026-11-13T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-14T18:29:59.999Z');
+    });
+
+    it('should accept Date objects and format in Asia/Kolkata timezone', () => {
+      const dateObj = new Date('2026-11-15T04:30:00.000Z'); // 10:00 AM IST
+      const { start, end } = getIstDayRange(dateObj);
+      expect(start.toISOString()).toBe('2026-11-14T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-15T18:29:59.999Z');
+    });
+
+    it('should throw BadRequestException when given an invalid date string', () => {
+      expect(() => getIstDayRange('not-a-valid-date')).toThrow(BadRequestException);
     });
   });
 });

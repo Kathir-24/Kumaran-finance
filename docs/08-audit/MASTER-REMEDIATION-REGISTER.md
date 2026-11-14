@@ -27,6 +27,7 @@
 | **KFC-DOC-001** | Unapproved Statutory & Receipt Templates Formalization | **MEDIUM** | Agent G (Compliance) | Q33 | **CLOSED WITH EVIDENCE** |
 | **KFC-BIZ-001** | Subscriber Exit Settlement Forfeiture Policy Unapproved | **MEDIUM** | Agent G (Compliance) | Q25 | **BLOCKED — BUSINESS DECISION** |
 | **KFC-MOB-001** | Flutter Android Mobile Collection & Passbook App UI | **LOW** | Agent E (Deferred) | Q30 | **DEFERRED — OWNER-APPROVED SCOPE EXCLUSION** |
+| **KC-01 to KC-13** | Kumaran Chits Master Known Issues (Attendance, Offsets, Audit, Timezone, Concurrency, PDF) | **CRITICAL** | Core Engineering | Master Tracker | **CLOSED WITH EVIDENCE** |
 
 ---
 

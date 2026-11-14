@@ -588,6 +588,28 @@ export class ChitService {
           _count: { select: { tickets: true, auctions: true } },
         },
       });
+
+      // 4. Immutable Audit Trail (ADR-10 / KC-03)
+      await tx.auditLog.create({
+        data: {
+          userId: checkerUserId,
+          action: 'CHIT_GROUP_ACTIVATED',
+          entityType: 'ChitGroup',
+          entityId: id,
+          oldValue: {
+            status: currentChit.status,
+            foremanCommissionRate: currentChit.foremanCommissionRate?.toString() || null,
+          },
+          newValue: {
+            status: ChitStatus.ACTIVE,
+            foremanCommissionRate: FOREMAN_COMMISSION_PERCENT.toString(),
+            groupCode: currentChit.groupCode,
+            chitValue: currentChit.chitValue.toString(),
+            totalMonths: currentChit.totalMonths,
+          },
+        },
+      });
+
       return updatedChit;
     });
 

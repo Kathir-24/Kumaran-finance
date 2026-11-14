@@ -569,7 +569,14 @@ export class AuctionService {
         },
       });
 
-      // 3. Generate Statutory Auction Minutes
+      // 3. Generate Statutory Auction Minutes (Section 17 Tamil Nadu Chit Funds Rules)
+      const subscribersPresent = dto?.subscribersPresent;
+      if (typeof subscribersPresent !== 'number' || subscribersPresent < 1 || !Number.isInteger(subscribersPresent)) {
+        throw new BadRequestException(
+          'Statutory Invariant: Number of attending subscribers physically present must be explicitly recorded (minimum 1 subscriber)',
+        );
+      }
+
       const winnerName = currentAuction.winner.ticket.customer.fullName;
       const ticketNo = currentAuction.winner.ticket.ticketNumber;
       const discount = currentAuction.bidDiscount?.toString() || '0';
@@ -579,7 +586,7 @@ export class AuctionService {
         `KUMARAN FINANCE — STATUTORY AUCTION PROCEEDINGS (MONTH ${currentAuction.installmentMonth})\n` +
         `Group: ${currentAuction.chitGroup.groupName} (${currentAuction.chitGroup.groupCode})\n` +
         `Auction Date: ${currentAuction.auctionDate.toISOString().split('T')[0]}\n` +
-        `Subscribers Present: ${dto?.subscribersPresent || 1}\n` +
+        `Subscribers Present: ${subscribersPresent}\n` +
         `Winning Ticket: #${ticketNo} (${winnerName})\n` +
         `Winning Bid Discount: ₹${discount}\n` +
         `Foreman Commission (4.00%): ₹${currentAuction.foremanCommissionAmount?.toString() || '0'}\n` +
@@ -590,15 +597,15 @@ export class AuctionService {
       await tx.auctionMinutes.upsert({
         where: { auctionId },
         update: {
-          subscribersPresent: dto?.subscribersPresent || 1,
+          subscribersPresent,
           minutesText,
-          signedByForeman: dto?.signedByForeman ?? true,
+          signedByForeman: Boolean(dto?.signedByForeman),
         },
         create: {
           auctionId,
-          subscribersPresent: dto?.subscribersPresent || 1,
+          subscribersPresent,
           minutesText,
-          signedByForeman: dto?.signedByForeman ?? true,
+          signedByForeman: Boolean(dto?.signedByForeman),
         },
       });
 

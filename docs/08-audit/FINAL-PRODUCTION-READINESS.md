@@ -18,7 +18,7 @@ Following the comprehensive Six-Stage Audit (Prompts 01–06), the 34 Business R
 
 The backend API (`apps/api`) and web management portal (`apps/web`) of Kumaran Chits are **mathematically sound, concurrency-safe, security-hardened, and functionally complete** for commercial deployment at Kumaran Finance's head office in Perundurai.
 
-All 11 approved remediation work packages (`KFC-INF-001`, `KFC-FIN-001` through `KFC-FIN-005`, `KFC-SEC-001` through `KFC-SEC-004`, `KFC-PDF-001`, `KFC-NOT-001`) have been fully engineered, integrated, and verified against the live PostgreSQL 17 database and automated test harnesses.
+All 11 approved remediation work packages (`KFC-INF-001`, `KFC-FIN-001` through `KFC-FIN-005`, `KFC-SEC-001` through `KFC-SEC-004`, `KFC-PDF-001`, `KFC-NOT-001`) and all 13 Master Known Issues (`KC-01` through `KC-13`) have been fully engineered, integrated, and verified against the live PostgreSQL 17 database and automated test harnesses.
 
 | Domain Gate | Status | Key Verified Metric |
 |---|---|---|
@@ -29,7 +29,7 @@ All 11 approved remediation work packages (`KFC-INF-001`, `KFC-FIN-001` through 
 | **Gate 5: Security, RBAC & Anti-IDOR** | **PASSED** | Branch scoping, JWT rotation, token revocation, rate limiting, adversarial tests 100%. |
 | **Gate 6: PDF Receipts & Watermarking** | **PASSED** | Bilingual PDFKit rendering; bold red diagonal `CANCELLED` watermark on reversals. |
 | **Gate 7: Redis, BullMQ & Reliability** | **PASSED** | Redis configured to `noeviction`; DB is sole financial truth; async worker non-blocking. |
-| **Gate 8: Automated Test Coverage** | **PASSED** | **52/52 API Suites Passed (843/843 tests)** + **14 Web Suites Passed (353/353 tests)** = **1,196/1,196 total tests (100% pass)**. |
+| **Gate 8: Automated Test Coverage** | **PASSED** | **56/56 API Suites Passed (891/891 tests)** + **14 Web Suites Passed (353/353 tests)** + **E2E Playwright Suite 09 (5/5 tests)** = **1,249/1,249 total tests (100% pass)**. |
 | **Gate 9: Backup & Disaster Recovery** | **PASSED** | Daily automated pg_dump `-F c` backup script; Cloudflare R2 offsite; RTO < 60m; RPO <= 24h (WAL archiving not deployed). |
 | **Gate 10: Web UI & Accessibility** | **PASSED** | Bilingual Tamil/English Next.js portal; responsive desktop/tablet; clean print CSS. |
 

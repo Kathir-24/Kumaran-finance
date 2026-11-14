@@ -35,6 +35,7 @@ export class InstallmentService {
     chitGroupId: string,
     month: number,
     dto?: GenerateDuesDto,
+    actorUserId?: string,
   ) {
     const chit = await this.prisma.chitGroup.findUnique({
       where: { id: chitGroupId },
@@ -209,6 +210,26 @@ export class InstallmentService {
         );
         generatedDues.push(...createdDues);
       }
+
+      // Immutable Audit Log (ADR-10 / KC-04)
+      await tx.auditLog.create({
+        data: {
+          userId: actorUserId || null,
+          action: 'INSTALLMENT_DUES_GENERATED',
+          entityType: 'ChitGroup',
+          entityId: chitGroupId,
+          newValue: {
+            installmentMonth: month,
+            grossAmount: grossAmount.toString(),
+            dividendDeduction: dividendPerTicket.toString(),
+            netPayableAmount: netPayableAmount.toString(),
+            totalDuesScheduled: generatedDues.length,
+            duesCreatedCount: duesToCreate.length,
+            duesUpdatedCount: duesToUpdate.length,
+            isIdempotentNoop: duesToCreate.length === 0 && duesToUpdate.length === 0,
+          },
+        },
+      });
 
       return {
         chitGroupId,

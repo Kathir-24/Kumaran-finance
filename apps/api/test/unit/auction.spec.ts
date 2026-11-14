@@ -506,7 +506,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       const finalized = await auctionService.finalizeAuction(
         mockAuctionId,
         mockCheckerId, // Checker != Maker
-        { subscribersPresent: 18, notes: 'Auction conducted peacefully.' },
+        { subscribersPresent: 18, notes: 'Auction conducted peacefully.', signedByForeman: true },
       );
 
       expect(finalized).toBeDefined();
@@ -532,6 +532,26 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           }),
         }),
       );
+    });
+
+    it('should reject auction finalization when subscribersPresent is missing or less than 1 (KC-02)', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        installmentMonth: 2,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        winner: { ticketId: mockTicketId1, ticket: { ticketNumber: 3, customer: { fullName: 'Ramasamy' } } },
+        chitGroup: { groupName: 'Group A', groupCode: 'KCA-1L-20M-01', baseInstallment: 5000n },
+      });
+
+      await expect(
+        auctionService.finalizeAuction(mockAuctionId, mockCheckerId, {} as any),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        auctionService.finalizeAuction(mockAuctionId, mockCheckerId, { subscribersPresent: 0 } as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should enqueue auction result broadcast to notification-queue upon finalization', async () => {
@@ -585,6 +605,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       const finalized = await queuedAuctionService.finalizeAuction(
         mockAuctionId,
         mockCheckerId,
+        { subscribersPresent: 14 },
       );
 
       expect(finalized).toBeDefined();
@@ -655,6 +676,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       const finalized = await queuedAuctionService.finalizeAuction(
         mockAuctionId,
         mockCheckerId,
+        { subscribersPresent: 14 },
       );
 
       expect(finalized).toBeDefined();
@@ -707,7 +729,9 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       prismaMock.subscriberTicket.update.mockResolvedValue({});
       prismaMock.auctionMinutes.upsert.mockResolvedValue({});
 
-      await cachedAuctionService.finalizeAuction(mockAuctionId, mockCheckerId);
+      await cachedAuctionService.finalizeAuction(mockAuctionId, mockCheckerId, {
+        subscribersPresent: 14,
+      });
 
       expect(mockRedisClient.del).toHaveBeenCalledWith(
         expect.stringContaining('report:daybook:ALL:'),
