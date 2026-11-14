@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -757,6 +757,12 @@ export class ReportService {
    * Append-only log of dual-control actions with filters and customer self-scoping.
    */
   async getAuditLogs(query: QueryAuditLogsDto, requestingUser: JwtPayload) {
+    if (!requestingUser.roles || !requestingUser.roles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REQUIRED: Only Super Admin is authorized to view audit trail logs',
+      );
+    }
+
     const page = query.page || 1;
     const limit = query.limit || 50;
     const skip = (page - 1) * limit;

@@ -36,10 +36,10 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 | 81 | `/jobs/enqueue-reconciliation` | `POST` | Super Admin / Accountant | BullMQ enqueue to `reconciliation-queue` | **PASS (201)** |
 | 82 | `/jobs/send-auction-reminder/:id/:m` | `POST` | Super Admin / Manager | Broadcast reminder enqueue to `notification-queue` | **PASS (201)** |
 | 83 | `/jobs/run-pre-auction-scan` | `POST` | Super Admin / Manager | Scan scheduled auctions and enqueue reminders | **PASS (201)** |
-| 84 | `/jobs/repeatable-schedules` | `GET` | Super Admin / Auditor | Active BullMQ repeatable cron schedules in Redis | **PASS (200)** |
-| 85 | `/jobs/queue-status` | `GET` | Staff / Auditor | BullMQ queue health and job depth reports | **PASS (200)** |
-| 86 | `/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Push Notification & DLT SMS dispatch audit trail | **PASS (200)** |
-| 86B | `/reports/audit-logs` | `GET` | Super Admin / Auditor | Financial mutation audit trail verified against PostgreSQL `AuditLog` table (90 rows) | **PASS (200)** |
+| 84 | `/jobs/repeatable-schedules` | `GET` | Super Admin Only | Active BullMQ repeatable cron schedules in Redis | **PASS (200)** |
+| 85 | `/jobs/queue-status` | `GET` | Super Admin Only | BullMQ queue health and job depth reports | **PASS (200)** |
+| 86 | `/jobs/notification-audit-logs` | `GET` | Super Admin Only | Push Notification & DLT SMS dispatch audit trail | **PASS (200)** |
+| 86B | `/reports/audit-logs` | `GET` | Super Admin Only | Financial mutation audit trail verified against PostgreSQL `AuditLog` table (90 rows) | **PASS (200)** |
 | 87 | `/auctions/:id/minutes/pdf` | `GET` | Staff / Auditor | Statutory printable auction minutes layout | **PASS (200)** |
 
 *Cumulative Live Coverage: **111 / 111 Endpoints Fully Verified** (100% of Backend API Surface).*

@@ -245,7 +245,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/reports/form-xvii` | Form XVII: Auction Minutes Register | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/reports/form-xxi` | Form XXI: Subscriber Ledger Register | **Global** | **Branch Scope** | **Global** | 🚫 **Blocked** | **Own Ticket Only** | **Read-Only (Global)** |
 | `GET` | `/reports/defaulters` | Overdue members with 1M, 2M, 3M aging | **Global** | **Branch Scope** | **Global** | **Branch / Assigned** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `GET` | `/reports/audit-logs` | Immutable audit trail of dual-control actions | **Global** | **Branch Scope** | **Read-Only** | 🚫 **Blocked** | **Own History Only**| **Read-Only (Global)** |
+| `GET` | `/reports/audit-logs` | Immutable audit trail of dual-control actions | **Global (Super Admin Only)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 > [!NOTE]
 > All statutory register outputs (`form-xvii`, `form-xxi`, `form-xxii`) transparently include `statutoryStatus: 'UNVERIFIED-LEGAL'` per `compliance-checklist.md` §3 until physical specimens from the Registrar of Chits (Erode/Perundurai) are officially inspected.
@@ -332,9 +332,9 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/jobs/enqueue-reconciliation` | Enqueue payment reconciliation job onto BullMQ queue | Super Admin, Accountant |
 | `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | Super Admin, Branch Manager |
 | `POST` | `/jobs/run-pre-auction-scan` | Manually trigger pre-auction scan & reminder broadcast (default 3 days ahead) | Super Admin, Branch Manager |
-| `GET` | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | Super Admin, Auditor |
-| `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin, Branch Manager, Auditor |
-| `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | Super Admin, Auditor |
+| `GET` | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | Super Admin Only |
+| `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin Only |
+| `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | Super Admin Only |
 | `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin (`BULL_BOARD_USER` Basic Auth) |
 
 ---

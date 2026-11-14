@@ -191,7 +191,7 @@
 | `GET`  | `/reports/form-xvii` | Form XVII: Auction Minutes Consolidated Register (HTTP 304 ETag cached; `UNVERIFIED-LEGAL`) | Staff, Auditor |
 | `GET`  | `/reports/form-xxi` | Form XXI: Subscriber Ledger Register (`UNVERIFIED-LEGAL`) | Staff, Customer, Auditor |
 | `GET`  | `/reports/defaulters` | Overdue members with 1M, 2M, 3M aging buckets | Staff, Auditor |
-| `GET`  | `/reports/audit-logs` | Immutable audit trail of dual-control actions | Staff, Customer, Auditor |
+| `GET`  | `/reports/audit-logs` | Immutable audit trail of dual-control actions | `SUPER_ADMIN` only |
 
 ### 2.11 Component 1: Encrypted Storage Service (`/api/v1/storage`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -217,9 +217,9 @@
 | `POST` | `/jobs/enqueue-reconciliation` | Enqueue payment reconciliation job onto BullMQ queue | `SUPER_ADMIN`, `ACCOUNTANT` |
 | `POST` | `/jobs/send-auction-reminder/:chitGroupId/:month` | Broadcast bilingual upcoming auction reminder to subscribers | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/jobs/run-pre-auction-scan` | Manually trigger pre-auction scan & reminder broadcast (default 3 days ahead) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `GET`  | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | `SUPER_ADMIN`, `AUDITOR` |
-| `GET`  | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | `SUPER_ADMIN`, `BRANCH_MANAGER`, `AUDITOR` |
-| `GET`  | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | `SUPER_ADMIN`, `AUDITOR` |
+| `GET`  | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | `SUPER_ADMIN` only |
+| `GET`  | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | `SUPER_ADMIN` only |
+| `GET`  | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | `SUPER_ADMIN` only |
 | `GET/UI`| `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection & dead letter retry | Basic Auth (`BULL_BOARD_USER`) |
 
 ### 2.14 Foundation: System Health & Observability (`/`, `/health`, `/metrics`)

@@ -23,6 +23,7 @@ export default function ReportsHubPage() {
   const tCommon = useTranslations('common');
 
   const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
   const allowedRoles = ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
   const hasAccess = user?.roles?.some((r) => allowedRoles.includes(r));
 
@@ -84,15 +85,19 @@ export default function ReportsHubPage() {
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       tag: t('tagRiskRecovery'),
     },
-    {
-      title: t('auditLogs'),
-      description: t('auditLogsCardDesc'),
-      href: '/reports/audit-logs',
-      icon: ShieldCheck,
-      badgeText: tCommon('active'),
-      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      tag: t('tagAudit'),
-    },
+    ...(isSuperAdmin
+      ? [
+          {
+            title: t('auditLogs'),
+            description: t('auditLogsCardDesc'),
+            href: '/reports/audit-logs',
+            icon: ShieldCheck,
+            badgeText: tCommon('active'),
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            tag: t('tagAudit'),
+          },
+        ]
+      : []),
   ];
 
   return (

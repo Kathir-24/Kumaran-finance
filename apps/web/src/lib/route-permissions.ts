@@ -39,6 +39,7 @@ export const NAV_ROUTE_PERMISSIONS = {
   '/collections/handover': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
   '/reversals': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'],
   '/reports': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+  '/reports/audit-logs': ['SUPER_ADMIN'],
   '/instructions': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
   '/branches': ['SUPER_ADMIN'],
   '/users': ['SUPER_ADMIN'],

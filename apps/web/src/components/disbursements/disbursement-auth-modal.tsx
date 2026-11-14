@@ -117,6 +117,7 @@ export function DisbursementAuthModal({
   );
 
   const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isPartner = Boolean(user?.isPartner);
 
   const authorizeMutation = useMutation({
     mutationFn: async () => {
@@ -124,8 +125,8 @@ export function DisbursementAuthModal({
       if (isMaker) {
         throw new Error(t('makerGuardAlertDesc'));
       }
-      if (!isSuperAdmin) {
-        throw new Error('Only Super Admin (Partners) possess financial authority to authorize prize money disbursements');
+      if (!isSuperAdmin || !isPartner) {
+        throw new Error('Only verified legal partners (isPartner: true) possess financial authority to authorize prize money disbursements');
       }
 
       return unwrapApiResponse<unknown>(
@@ -182,6 +183,14 @@ export function DisbursementAuthModal({
                 <div className="font-semibold">{t('makerGuardAlertTitle')}</div>
                 <div className="text-amber-300/80 mt-0.5">{t('makerGuardAlertDesc')}</div>
               </div>
+            </div>
+          )}
+
+          {/* Legal Partner Guardrail (SEC-A) */}
+          {!isPartner && isSuperAdmin && (
+            <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>Only verified legal partners (isPartner: true) possess financial authority to authorize prize money disbursements.</span>
             </div>
           )}
 
@@ -273,7 +282,7 @@ export function DisbursementAuthModal({
           <Button
             type="button"
             onClick={() => authorizeMutation.mutate()}
-            disabled={isMaker || !isSuperAdmin || authorizeMutation.isPending}
+            disabled={isMaker || !isSuperAdmin || !isPartner || authorizeMutation.isPending}
             className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow"
           >
             {authorizeMutation.isPending ? (

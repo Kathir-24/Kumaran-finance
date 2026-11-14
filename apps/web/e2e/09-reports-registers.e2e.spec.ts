@@ -8,7 +8,7 @@ test.describe('Suite 09: Statutory Registers & CA Auditor Portal', () => {
     await auditorPage.goto('/reports', { waitUntil: 'domcontentloaded' });
     await expect(auditorPage.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
 
-    // Verify all 5 statutory registers are accessible
+    // Verify all 4 statutory registers are accessible to Auditor (Audit Logs strictly restricted to Super Admin)
     const cashBookLink = auditorPage.locator('a[href="/reports/cash-book"]').first();
     const minutesLink = auditorPage.locator('a[href="/reports/minutes"]').first();
     const ledgerLink = auditorPage.locator('a[href="/reports/ledger"]').first();
@@ -19,7 +19,7 @@ test.describe('Suite 09: Statutory Registers & CA Auditor Portal', () => {
     await expect(minutesLink).toBeVisible();
     await expect(ledgerLink).toBeVisible();
     await expect(defaultersLink).toBeVisible();
-    await expect(auditLogsLink).toBeVisible();
+    await expect(auditLogsLink).not.toBeVisible();
 
     // 2. Open Form XXII Cash Book
     await cashBookLink.click();
@@ -75,17 +75,17 @@ test.describe('Suite 09: Statutory Registers & CA Auditor Portal', () => {
   });
 
   test('5. CA Forensic Audit Trail renders immutable event stream with Maker-Checker badges', async ({
-    auditorPage,
+    managingPartnerPage,
   }) => {
-    await auditorPage.goto('/reports/audit-logs', { waitUntil: 'domcontentloaded' });
-    await expect(auditorPage.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
+    await managingPartnerPage.goto('/reports/audit-logs', { waitUntil: 'domcontentloaded' });
+    await expect(managingPartnerPage.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
 
     // Verify table or audit log container is rendered
-    const auditContainer = auditorPage.locator('table, main, [role="region"]').first();
+    const auditContainer = managingPartnerPage.locator('table, main, [role="region"]').first();
     await expect(auditContainer).toBeVisible();
 
     // Verify filter or search inputs exist
-    const searchOrFilter = auditorPage.locator('input').first();
+    const searchOrFilter = managingPartnerPage.locator('input').first();
     await expect(searchOrFilter).toBeVisible();
   });
 });

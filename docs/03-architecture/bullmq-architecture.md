@@ -189,9 +189,9 @@ Super Admin, Branch Managers, and Accountants can inspect and trigger jobs via a
 
 | Endpoint | Method | Role Required | Purpose |
 |---|:---:|---|---|
-| `/api/v1/jobs/queue-status` | `GET` | Staff / Auditor | Returns real-time job counts (waiting, active, completed, failed) across all 3 queues. |
-| `/api/v1/jobs/repeatable-schedules` | `GET` | Super Admin / Auditor | Lists active BullMQ cron schedules and next run times. |
-| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin / Auditor | Returns recent dispatches across Push and SMS (WhatsApp purged per Q34). |
+| `/api/v1/jobs/queue-status` | `GET` | Super Admin Only | Returns real-time job counts (waiting, active, completed, failed) across all 3 queues. |
+| `/api/v1/jobs/repeatable-schedules` | `GET` | Super Admin Only | Lists active BullMQ cron schedules and next run times. |
+| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin Only | Returns recent dispatches across Push and SMS (WhatsApp purged per Q34). |
 | `/api/v1/jobs/run-daily-arrears` | `POST` | Super Admin / Manager | Triggers synchronous on-demand arrears evaluation. |
 | `/api/v1/jobs/enqueue-daily-arrears` | `POST` | Super Admin | Enqueues arrears evaluation job to `daily-maintenance-queue`. |
 | `/api/v1/jobs/run-reconciliation` | `POST` | Super Admin / Accountant | Triggers synchronous on-demand payment reconciliation. |

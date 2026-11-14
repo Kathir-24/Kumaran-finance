@@ -22,11 +22,11 @@ Kumaran Chits employs a defense-in-depth security model designed specifically fo
 | Role | Business Persona | Scope & Allowed Operations | Prohibited Actions |
 |---|---|---|---|
 | **SUPER_ADMIN (isPartner=true)** | 4 Business Partners | Full company control, financial authorizations, payment reversals, auction finalizations, prize disbursements, defaulter removals. | Self-approval (`maker != checker`), bypassing audit log. |
-| **SUPER_ADMIN (isPartner=false)** | IT Administrator / System Admin | User onboarding, system configuration, infrastructure maintenance, audit log viewing. | Authorizing payouts, approving reversals, committing auctions, removing defaulters. |
-| **BRANCH_MANAGER** | Branch Head (Perundurai) | Branch staff supervision, customer onboarding, scheme viewing, auction conducting, physical handover supervision. | Finalizing auctions, authorizing prize payouts, approving reversals. |
-| **ACCOUNTANT** | Desk Accountant / Cashier | Counter cash receipt entry, UPI claim verification, cash handover acknowledgment, safety proof verification. | Payout authorization, payment reversal approval, auction finalization. |
-| **COLLECTION_AGENT** | Field Route Agent | Doorstep cash collection, collection batch submission, view assigned route customers. | Approving cash handover, modifying dues, viewing company financial reports. |
-| **AUDITOR** | Independent CA Auditor | Read-only access to general ledger, daybook, trial balance, auction minutes, and audit trails. | All write mutations (`POST`, `PUT`, `PATCH`, `DELETE`). |
+| **SUPER_ADMIN (isPartner=false)** | IT Administrator / System Admin | User onboarding, system configuration, infrastructure maintenance, audit log viewing, background queue inspection. | Authorizing payouts, approving reversals, committing auctions, removing defaulters. |
+| **BRANCH_MANAGER** | Branch Head (Perundurai) | Branch staff supervision, customer onboarding, scheme viewing, auction conducting, physical handover supervision. | Finalizing auctions, authorizing prize payouts, approving reversals, system audit logs. |
+| **ACCOUNTANT** | Desk Accountant / Cashier | Counter cash receipt entry, UPI claim verification, cash handover acknowledgment, safety proof verification. | Payout authorization, payment reversal approval, auction finalization, system audit logs. |
+| **COLLECTION_AGENT** | Field Route Agent | Doorstep cash collection, collection batch submission, view assigned route customers. | Approving cash handover, modifying dues, viewing company financial reports, system audit logs. |
+| **AUDITOR** | Independent CA Auditor | Read-only access to general ledger, Form XXII cash book, Form XXI subscriber ledgers, daybook, trial balance, and auction minutes. | All write mutations (`POST`, `PUT`, `PATCH`, `DELETE`), internal system audit logs, and background queues. |
 | **CUSTOMER** | Chit Subscriber | View own enrolled tickets, payment passbook, auction schedule, submit UPI payment claim. | Viewing other subscribers, viewing company ledgers, accessing staff endpoints. |
 
 ---

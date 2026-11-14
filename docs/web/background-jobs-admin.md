@@ -30,9 +30,9 @@ flowchart TD
 
 | Endpoint | Method | Role Required | Operational Purpose |
 |---|:---:|---|---|
-| `/api/v1/jobs/queue-status` | `GET` | Super Admin, Auditor, Branch Manager | Real-time task metrics (active, waiting, completed, failed, delayed, paused) |
-| `/api/v1/jobs/repeatable-schedules` | `GET` | Super Admin, Auditor | Lists automated Asia/Kolkata cron schedules and next execution timestamps |
-| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin, Auditor | Paginated audit trail of dispatched Push Notifications and DLT SMS messages |
+| `/api/v1/jobs/queue-status` | `GET` | Super Admin Only | Real-time task metrics (active, waiting, completed, failed, delayed, paused) |
+| `/api/v1/jobs/repeatable-schedules` | `GET` | Super Admin Only | Lists automated Asia/Kolkata cron schedules and next execution timestamps |
+| `/api/v1/jobs/notification-audit-logs` | `GET` | Super Admin Only | Paginated audit trail of dispatched Push Notifications and DLT SMS messages |
 | `/api/v1/jobs/run-daily-arrears` | `POST` | Super Admin, Branch Manager | Synchronous on-demand midnight arrears evaluation with optional `cutoffDate` |
 | `/api/v1/jobs/enqueue-daily-arrears` | `POST` | Super Admin | Enqueues arrears evaluation to `daily-maintenance-queue` |
 | `/api/v1/jobs/run-pre-auction-scan` | `POST` | Super Admin, Branch Manager | Scans auctions scheduled 3 days ahead and broadcasts bilingual notices |

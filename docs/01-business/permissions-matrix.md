@@ -33,7 +33,7 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | **Desk Accountant** | **Web Portal** (`apps/web/`) | Mobile App | High-density physical notebook transcription, Form XXII Cash Book, day books, voucher preparation. |
 | **Field Collection Agent** | **Mobile App** (`apps/mobile/`) | Web Portal (Dual Role) | 1-second fingerprint unlock, doorstep collections (< 30s), offline SQLite sync, evening cash handover. |
 | **Customer (Chit Subscriber)** | **Mobile App** (`apps/mobile/`) | Web Passbook (Optional) | Bilingual digital passbook, 1-tap UPI payments (GPay/PhonePe), dividend tracker, auction results. |
-| **Auditor (Chartered Accountant)** | **Web Portal** (`apps/web/`) | — | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, immutable audit logs. |
+| **Auditor (Chartered Accountant)** | **Web Portal** (`apps/web/`) | — | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, Trial Balance, Day Book, and statutory minutes. (Audit logs and system health telemetry are strictly restricted to Super Admin). |
 
 ---
 
@@ -70,7 +70,9 @@ The software implements a standardized, industry-standard set of personas. Kumar
 | | Authorize Prize Payout (Checker)| Yes | No | No | No | No | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | **Reports & Auditing** | View Financial Reports & Day Books| Global | Branch scope | Global | Dual role only | Own passbook | Read-only | `CONFIRMED-BY-DEVELOPER` |
 | | Export Reports / Ledgers | Yes | Branch scope | Global | Dual role only | Own statement | Read-only | `CONFIRMED-BY-DEVELOPER` |
-| | View Immutable Audit Logs | Global | Branch scope | Read-only | No | Own history | Read-only | `CONFIRMED-BY-DEVELOPER` |
+| | View Immutable Audit Logs | Yes (Super Admin only)| No | No | No | No | No | `CONFIRMED-BY-DEVELOPER` |
+| **System Health & Queues**| View BullMQ Status & Schedules | Yes (Super Admin only)| No | No | No | No | No | `CONFIRMED-BY-DEVELOPER` |
+| | View Notification Dispatch Logs | Yes (Super Admin only)| No | No | No | No | No | `CONFIRMED-BY-DEVELOPER` |
 
 ---
 

@@ -240,17 +240,11 @@ export class ReportController {
   }
 
   @Get('audit-logs')
-  @Roles(
-    Role.SUPER_ADMIN,
-    Role.BRANCH_MANAGER,
-    Role.ACCOUNTANT,
-    Role.AUDITOR,
-    Role.CUSTOMER,
-  )
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Immutable Audit Trail Register',
+    summary: 'Immutable Audit Trail Register (Super Admin strictly)',
     description:
-      'Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Customers can view their own account transaction logs only.',
+      'Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Allowed strictly: Super Admin.',
   })
   @ApiOkResponseEnvelope(AuditLogsReportResponseDto, { description: 'Audit trail records returned' })
   async getAuditLogs(

@@ -153,12 +153,24 @@ test('DEF-FE-03: Expired access token recovers via valid HttpOnly refresh token'
   });
 
   const allowedReports = await evaluateEdgeAuth({
-    pathname: '/reports/audit-logs',
+    pathname: '/reports/cash-book',
     accessToken: expiredAccess,
     refreshToken: validRefresh,
     jwtSecret: TEST_SECRET,
   });
   assert.deepEqual(allowedReports, { action: 'next' });
+
+  const forbiddenAuditLogs = await evaluateEdgeAuth({
+    pathname: '/reports/audit-logs',
+    accessToken: expiredAccess,
+    refreshToken: validRefresh,
+    jwtSecret: TEST_SECRET,
+  });
+  assert.deepEqual(forbiddenAuditLogs, {
+    action: 'redirect',
+    location: '/?error=forbidden',
+    clearStaleCookies: false,
+  });
 
   const forbiddenBranches = await evaluateEdgeAuth({
     pathname: '/branches',

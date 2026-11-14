@@ -582,6 +582,8 @@ class SanitizedUserDto {
   final List<String> roles;
   /// Assigned branch ID
   final String? branchId;
+  /// Whether the user is a verified statutory partner
+  final bool isPartner;
   /// Whether Microsoft Authenticator TOTP is enabled
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
@@ -595,6 +597,7 @@ class SanitizedUserDto {
     required this.phone,
     required this.roles,
     this.branchId,
+    this.isPartner = false,
     required this.isTotpEnabled,
     required this.hasMpin,
     this.lastLoginAt,
@@ -607,6 +610,7 @@ class SanitizedUserDto {
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       branchId: json['branchId']?.toString(),
+      isPartner: json['isPartner'] as bool? ?? false,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
       lastLoginAt: json['lastLoginAt']?.toString(),
@@ -620,6 +624,7 @@ class SanitizedUserDto {
     data['phone'] = phone;
     data['roles'] = roles;
     data['branchId'] = branchId;
+    data['isPartner'] = isPartner;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;
     data['lastLoginAt'] = lastLoginAt;
@@ -920,6 +925,7 @@ class UserProfileResponseDto {
     data['phone'] = phone;
     data['roles'] = roles;
     data['branchId'] = branchId;
+    data['isPartner'] = isPartner;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;
     data['lastLoginAt'] = lastLoginAt;
@@ -1375,6 +1381,8 @@ class UserResponseDto {
   final List<String> roles;
   /// Whether the staff account is active
   final bool isActive;
+  /// Whether the staff member is a verified statutory partner
+  final bool isPartner;
   /// Whether TOTP 2FA is active
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
@@ -1396,6 +1404,7 @@ class UserResponseDto {
     required this.phone,
     required this.roles,
     required this.isActive,
+    this.isPartner = false,
     required this.isTotpEnabled,
     required this.hasMpin,
     this.branchId,
@@ -1412,6 +1421,7 @@ class UserResponseDto {
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       isActive: json['isActive'] as bool? ?? false,
+      isPartner: json['isPartner'] as bool? ?? false,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
       branchId: json['branchId']?.toString(),
@@ -1429,6 +1439,7 @@ class UserResponseDto {
     data['phone'] = phone;
     data['roles'] = roles;
     data['isActive'] = isActive;
+    data['isPartner'] = isPartner;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;
     data['branchId'] = branchId;

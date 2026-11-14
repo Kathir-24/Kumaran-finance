@@ -25,10 +25,9 @@ The **Immutable Forensic Audit Trail Register (`/reports/audit-logs`)** provides
    - PostgreSQL `AuditLog` table is append-only, providing evidentiary weight for external auditors.
 3. **Dual-Control Maker-Checker Tracking (Guardrail 10)**:
    - Specifically flags sensitive dual-control actions (`AUCTION_FINALIZED`, `PAYMENT_REVERSED`, `CASH_HANDOVER_ACKNOWLEDGED`, `PRIZE_PAYOUT_AUTHORIZED`, `SAFETY_PROOF_VERIFIED`, `UPI_CLAIM_VERIFIED`) with visual maker-checker indicators.
-4. **Anti-IDOR / Anti-BOLA Privacy Scoping**:
-   - `Role.CUSTOMER`: Backend automatically scopes `where.userId = requestingUser.sub`. Subscribers inspect their own account activity history without cross-ticket leakage.
-   - `Role.BRANCH_MANAGER`: Automatically scopes records to staff within their branch office (`where.user = { branchId }`).
-   - `Role.SUPER_ADMIN` & `Role.AUDITOR`: Unrestricted company-wide audit trail.
+4. **Strict Super Admin Access Gate**:
+   - Access to the immutable audit trail is restricted strictly to `Role.SUPER_ADMIN` across backend controllers, services, and web edge middleware.
+   - Non-Super-Admin roles (Auditors, Branch Managers, Accountants, Customers) receive `403 Forbidden` and are blocked from reading internal system audit trails.
 5. **Pure Whole Rupee Math (Guardrail 2)**:
    - Currency amounts inside diff payloads (`oldValue`, `newValue`) operate exclusively on 64-bit integer Rupees (`bigint`), zero paise/floats.
 

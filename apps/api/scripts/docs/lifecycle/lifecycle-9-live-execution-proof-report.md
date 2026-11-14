@@ -34,7 +34,7 @@ Lifecycle 9 verifies the business reporting and statutory register core of Kumar
 | 64 | `/api/v1/reports/form-xvii` | `GET` | Super Admin / Accountant | **Form XVII**: Auction Minutes Register & Registrar Filing Date | **PASS (200)** |
 | 65 | `/api/v1/reports/form-xxi` | `GET` | Staff / Customer | **Form XXI**: 20-Month Continuous Subscriber Ledger Statement | **PASS (200)** |
 | 66 | `/api/v1/reports/defaulters` | `GET` | Staff / Agent / Auditor | Defaulters & Arrears Aging Register (1, 2, 3 months) | **PASS (200)** |
-| 67 | `/api/v1/reports/audit-logs` | `GET` | Staff / Auditor / Customer | Immutable Audit Trail Register matched with PostgreSQL | **PASS (200)** |
+| 67 | `/api/v1/reports/audit-logs` | `GET` | Super Admin Only | Immutable Audit Trail Register matched with PostgreSQL | **PASS (200)** |
 
 *Cumulative Live Coverage: **91 / 111 Endpoints** (82.0%).*
 

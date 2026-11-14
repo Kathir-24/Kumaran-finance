@@ -25,7 +25,7 @@ import type { PendingReversalItem } from './reversal-action-dialogs';
 
 interface ReversalApprovalTableProps {
   reversals: PendingReversalItem[];
-  currentUser: { id: string; name?: string; roles?: string[] } | null;
+  currentUser: { id: string; name?: string; roles?: string[]; isPartner?: boolean } | null;
   onApprove: (item: PendingReversalItem) => void;
   onReject: (item: PendingReversalItem) => void;
 }
@@ -49,6 +49,8 @@ export function ReversalApprovalTable({
   }
 
   const isSuperAdmin = Boolean(currentUser?.roles?.includes('SUPER_ADMIN'));
+  const isPartner = Boolean(currentUser?.isPartner);
+  const canApprove = isSuperAdmin && isPartner;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-lg">
@@ -114,8 +116,8 @@ export function ReversalApprovalTable({
                         <ShieldAlert className="h-3 w-3 text-amber-400" />
                         {t('makerGuardBadge')}
                       </div>
-                    ) : !isSuperAdmin ? (
-                      <span className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1">
+                    ) : !canApprove ? (
+                      <span className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1" title={!isPartner ? "Only verified legal partners (isPartner: true) can approve reversals" : t('partnerAuthorityRequired')}>
                         <Lock className="h-3 w-3" />
                         {t('partnerAuthorityRequired')}
                       </span>

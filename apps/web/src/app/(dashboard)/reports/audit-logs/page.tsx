@@ -50,12 +50,9 @@ export default function AuditLogsReportPage() {
   // Diff inspection modal state
   const [activeDiffLog, setActiveDiffLog] = useState<AuditLogItem | null>(null);
 
-  const isCustomer = user?.roles?.includes('CUSTOMER') && !user?.roles?.includes('SUPER_ADMIN');
-  const hasAccess = Boolean(
-    user?.roles?.some((r) =>
-      ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'CUSTOMER'].includes(r)
-    )
-  );
+  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
+  const isCustomer = false;
+  const hasAccess = isSuperAdmin;
 
   // 1. Fetch Staff Users for Actor Filter Dropdown
   const { data: staffUsers = [] } = useQuery<StaffUserRaw[]>({

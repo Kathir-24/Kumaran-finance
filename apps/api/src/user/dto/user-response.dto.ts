@@ -20,6 +20,9 @@ export class UserResponseDto {
   })
   roles: Role[];
 
+  @ApiProperty({ example: true, description: 'Whether the staff member is a verified business partner', required: false })
+  isPartner?: boolean;
+
   @ApiProperty({ example: true, description: 'Whether the staff account is active' })
   isActive: boolean;
 

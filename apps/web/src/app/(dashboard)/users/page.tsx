@@ -108,7 +108,7 @@ export default function UsersDirectoryPage() {
 
   // KPI Calculations
   const activeCount = users.filter((u) => u.isActive).length;
-  const partnerCount = users.filter((u) => u.roles.includes('SUPER_ADMIN')).length;
+  const partnerCount = users.filter((u) => Boolean(u.isPartner)).length;
   const agentCount = users.filter((u) => u.roles.includes('COLLECTION_AGENT')).length;
 
   return (

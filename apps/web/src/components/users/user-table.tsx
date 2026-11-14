@@ -38,6 +38,7 @@ export interface UserItem {
   name: string;
   phone: string;
   roles: string[];
+  isPartner?: boolean;
   isActive: boolean;
   isTotpEnabled: boolean;
   hasMpin: boolean;
@@ -198,15 +199,25 @@ export function UserTable({
                     {/* Assigned Roles (Dual Roles Support) */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-wrap gap-1 max-w-[240px]">
+                        {u.isPartner && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border font-mono bg-amber-950/60 text-amber-300 border-amber-500/50 shadow-sm"
+                            title="Verified Legal Partner (Partnership Deed Stakeholder)"
+                          >
+                            ★ PARTNER
+                          </span>
+                        )}
                         {u.roles.map((r) => (
                           <span
                             key={r}
                             className={cn(
                               'inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium border font-mono',
-                              ROLE_BADGE_STYLES[r] || 'bg-slate-800 text-slate-300 border-slate-700'
+                              r === 'SUPER_ADMIN' && !u.isPartner
+                                ? 'bg-purple-950/60 text-purple-300 border-purple-800/60'
+                                : ROLE_BADGE_STYLES[r] || 'bg-slate-800 text-slate-300 border-slate-700'
                             )}
                           >
-                            {r}
+                            {r === 'SUPER_ADMIN' && !u.isPartner ? 'SUPER_ADMIN (ADMIN)' : r}
                           </span>
                         ))}
                       </div>

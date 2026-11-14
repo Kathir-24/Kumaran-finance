@@ -47,8 +47,8 @@ test('1. Statutory Immutability Invariant: Audit logs are strictly read-only wit
 // ------------------------------------------------------------------------------
 // Invariant 2: RBAC Persona Authorization
 // ------------------------------------------------------------------------------
-test('2. RBAC Persona Authorization: Restricts audit register strictly to authorized personas', () => {
-  const permittedRoles = ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'CUSTOMER'];
+test('2. RBAC Persona Authorization: Restricts audit register strictly to SUPER_ADMIN only', () => {
+  const permittedRoles = ['SUPER_ADMIN'];
 
   const checkAccess = (roles: string[]): boolean => {
     return roles.some((r) => permittedRoles.includes(r));
@@ -56,15 +56,15 @@ test('2. RBAC Persona Authorization: Restricts audit register strictly to author
 
   // Managing Partner (Super Admin)
   assert.equal(checkAccess(['SUPER_ADMIN']), true);
-  // Independent CA Auditor
-  assert.equal(checkAccess(['AUDITOR']), true);
-  // Head Office Branch Manager
-  assert.equal(checkAccess(['BRANCH_MANAGER']), true);
-  // Desk Accountant
-  assert.equal(checkAccess(['ACCOUNTANT']), true);
-  // Subscriber (Scoped)
-  assert.equal(checkAccess(['CUSTOMER']), true);
-  // Field Collection Agent (Not permitted for company-wide audit viewer)
+  // Independent CA Auditor - restricted
+  assert.equal(checkAccess(['AUDITOR']), false);
+  // Head Office Branch Manager - restricted
+  assert.equal(checkAccess(['BRANCH_MANAGER']), false);
+  // Desk Accountant - restricted
+  assert.equal(checkAccess(['ACCOUNTANT']), false);
+  // Subscriber - restricted
+  assert.equal(checkAccess(['CUSTOMER']), false);
+  // Field Collection Agent - restricted
   assert.equal(checkAccess(['COLLECTION_AGENT']), false);
   // Unauthenticated / Anonymous Guest
   assert.equal(checkAccess([]), false);

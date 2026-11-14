@@ -158,8 +158,9 @@ flowchart LR
   - `POST /jobs/run-reconciliation` & `POST /jobs/enqueue-reconciliation`: Restricted strictly to `SUPER_ADMIN` and `ACCOUNTANT`.
   - `POST /jobs/send-auction-reminder/:chitGroupId/:month`: Restricted to `SUPER_ADMIN` and `BRANCH_MANAGER`.
 - **Health & Audit Endpoints**:
-  - `GET /jobs/queue-status`: Restricted to `SUPER_ADMIN`, `BRANCH_MANAGER`, and `AUDITOR`.
-  - `GET /jobs/notification-audit-logs`: Restricted strictly to `SUPER_ADMIN` and `AUDITOR`.
+  - `GET /jobs/queue-status`: Restricted strictly to `SUPER_ADMIN` only.
+  - `GET /jobs/notification-audit-logs`: Restricted strictly to `SUPER_ADMIN` only.
+  - `GET /jobs/repeatable-schedules`: Restricted strictly to `SUPER_ADMIN` only.
 
 ### 4.2 Queue Isolation & Mathematical Precision
 - **Whole Rupee Invariant in Redis**: Redis message payloads serialize monetary amounts as strings (`amountPaid: '3750'`) to prevent IEEE 754 floating-point conversion leaks during JSON serialization.

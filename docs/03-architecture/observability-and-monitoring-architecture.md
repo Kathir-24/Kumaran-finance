@@ -402,13 +402,12 @@ Every critical mutation in the codebase automatically writes an append-only entr
 | `DISBURSEMENT_COMMITTED` | Cash/NEFT disbursement released | Disbursing officer user ID |
 | `CUSTOMER_DOCUMENT_DELETED` | KYC scan purged from storage | Authorizing admin user ID |
 
-### 5.3 Audit Query Endpoints & Customer Privacy
+### 5.3 Audit Query Endpoints & Access Boundaries
 * **`GET /api/v1/reports/audit-logs`**:
   - Paginated audit trail with filters by `action`, `entityType`, and date range.
-  - **Customer Self-Isolation**: If caller has `Role.CUSTOMER`, the service automatically forces `where.userId = currentUser.sub`. Subscribers can **never** view staff actions or other subscribers' records.
-  - Super Admin and Auditor have global company-wide read oversight.
+  - **Super Admin Exclusive Access**: Restricted strictly to `Role.SUPER_ADMIN` across controller and service layers. Non-Super-Admin roles (Auditors, Customers, Accountants, Branch Managers) receive `403 Forbidden`.
 * **`GET /api/v1/jobs/notification-audit-logs`**:
-  - Detailed audit trail of all outbound FCM Push Notifications and DLT SMS messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`).
+  - Detailed audit trail of all outbound FCM Push Notifications and DLT SMS messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`). Restricted strictly to `Role.SUPER_ADMIN`.
 
 ### 5.4 Storage Lifecycle & Retention Guarantees
 * **Financial & Regulatory Audit Trail (`AuditLog`)**:
@@ -501,6 +500,6 @@ Time:        3.642 s
 | **1. Metrics** | `prom-client` | `GET /metrics` | `MetricsAuthGuard` (Basic Auth) | **₹0** | ✅ 100% Verified |
 | **2. Error Tracking** | `@sentry/nestjs` | `GET /health/sentry-test` | Safe-Bypass / DPDP Sanitizer | **₹0** | ✅ 100% Verified |
 | **3. Queue UI** | `@bull-board/express` | `GET /admin/queues/` | `BullBoardAuthMiddleware` (Basic Auth) | **₹0** | ✅ 100% Verified |
-| **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Customer Scoping | **₹0** | ✅ 100% Verified |
+| **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Super Admin Only | **₹0** | ✅ 100% Verified |
 | **Liveness Probe** | Core NestJS | `GET /health` | Public / Container Probe | **₹0** | ✅ 100% Verified |
 | **Live Alert Stream**| Server-Sent Events | `GET /reports/approvals-stream` | `JwtAuthGuard` (Staff Only) | **₹0** | ✅ 100% Verified |

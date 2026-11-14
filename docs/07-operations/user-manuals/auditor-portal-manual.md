@@ -188,26 +188,22 @@ flowchart TD
 
 ---
 
-## 9. Auditing BullMQ Background Cron Schedules & Logs
+## 9. System Infrastructure Administration & Telemetry Boundary
 
-```mermaid
-flowchart TD
-    NavJobs["Navigate: System -> Background Jobs & Schedules"] --> InspectSchedules["Inspect Repeatable Cron Schedules:"]
-    InspectSchedules --> DailyArrears["1. CRON_DAILY_ARREARS = '1 0 * * *' (00:01 AM IST)\nVerifies nightly recalculation of member dues & 3M defaulter tagging"]
-    InspectSchedules --> Recon["2. CRON_DAILY_RECONCILIATION = '0 6 * * *' (06:00 AM IST)\nVerifies automated morning payment gateway audit"]
-    InspectSchedules --> Notifications["3. Notification Queue Audit Logs\nInspect bilingual receipt deliveries, push success rate & DLT SMS fallback"]
-    Notifications --> CompleteAudit["Sign off Annual Statutory Audit Certificate"]
-```
+> [!NOTE]
+> **Super Admin Infrastructure Boundary**:  
+> In accordance with Kumaran Finance's zero-trust security policy, background queue telemetry (`GET /jobs/*`) and internal system audit logs (`GET /reports/audit-logs`) are restricted strictly to **Super Admin** users (IT Administrators & Managing Partners).  
+> The CA Auditor portal focuses exclusively on **independent financial books and statutory registers** (Form XXII Cash Book, Form XXI Subscriber Ledgers, Form XVII Minutes, Day Book, and Trial Balance), ensuring forensic audit separation from internal IT operations.
 
-### Step-by-Step Instructions:
-1. Open **System $\to$ Background Jobs & Schedules** (`GET /jobs/repeatable-schedules`).
-2. Verify active cron schedules:
+### Super Admin Maintenance Scrutiny:
+Super Admin administrators oversee background queues and automated schedules directly:
+1. Verify active cron schedules via **System $\to$ Background Jobs & Schedules** (`GET /jobs/repeatable-schedules`):
    - **Daily Arrears Calculation**: Stamped at **00:01 AM IST (`1 0 * * *`)** to prevent arrears accumulation errors.
    - **Payment Gateway Reconciliation**: Stamped at **06:00 AM IST (`0 6 * * *`)**.
-3. Open **Notification Delivery Audit Logs** (`GET /jobs/notification-audit-logs`):
+2. Inspect **Notification Delivery Audit Logs** (`GET /jobs/notification-audit-logs`):
    - Review push notification delivery success rates.
    - Verify that fallback SMS was dispatched for keypad-phone subscribers.
-4. Issue the formal statutory audit sign-off for Kumaran Finance.
+3. Auditors verify financial ledger entries produced by these jobs directly within Form XXII and Form XXI without requiring direct infrastructure-level queue access.
 
 ---
 

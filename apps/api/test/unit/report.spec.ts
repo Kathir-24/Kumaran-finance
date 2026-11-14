@@ -624,7 +624,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
 
       const audit = await reportService.getAuditLogs(
         { action: 'PAYMENT_REVERSED', page: 1, limit: 50 },
-        auditorUser,
+        superAdminUser,
       );
 
       expect(audit.pagination.totalRecords).toBe(1);
@@ -632,35 +632,14 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       expect(audit.logs[0].performedBy?.name).toBe('Partner A');
     });
 
-    it('should restrict Customer to viewing only their own audit logs', async () => {
-      prismaMock.auditLog.count.mockResolvedValue(1);
-      prismaMock.auditLog.findMany.mockResolvedValue([
-        {
-          id: 'log-cust-001',
-          action: 'ONLINE_PAYMENT_INITIATED',
-          entityType: 'Payment',
-          entityId: 'pay-cust-001',
-          timestamp: new Date('2026-10-18T10:00:00Z'),
-          ipAddress: '106.51.10.22',
-          user: {
-            id: customerUser.sub,
-            name: 'Customer Account',
-            phone: customerUser.phone,
-            roles: [Role.CUSTOMER],
-          },
-          oldValue: null,
-          newValue: null,
-        },
-      ]);
+    it('should reject non-Super Admin (Auditor, Customer) attempting to view audit logs (403 Forbidden)', async () => {
+      await expect(
+        reportService.getAuditLogs({ page: 1, limit: 50 }, auditorUser),
+      ).rejects.toThrow(ForbiddenException);
 
-      const audit = await reportService.getAuditLogs({ page: 1, limit: 50 }, customerUser);
-
-      expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ userId: customerUser.sub }),
-        }),
-      );
-      expect(audit.logs.length).toBe(1);
+      await expect(
+        reportService.getAuditLogs({ page: 1, limit: 50 }, customerUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

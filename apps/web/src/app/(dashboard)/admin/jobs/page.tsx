@@ -41,8 +41,7 @@ export default function BackgroundJobsPage() {
 
   const user = useAuthStore((s) => s.user);
   const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
-  const isAuditor = Boolean(user?.roles?.includes('AUDITOR'));
-  const hasAccess = isSuperAdmin || isAuditor;
+  const hasAccess = isSuperAdmin;
 
   const [auditLimit, setAuditLimit] = React.useState(50);
   const [_lastRefreshedAt, setLastRefreshedAt] = React.useState<Date>(new Date());

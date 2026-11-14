@@ -10,6 +10,7 @@ import {
   IdCard,
   Loader2,
   Phone,
+  Shield,
   Sparkles,
   User,
 } from 'lucide-react';
@@ -232,6 +233,18 @@ export function UserForm() {
                     );
                   })}
                 </div>
+
+                {selectedRoles.includes('SUPER_ADMIN') && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-2.5 text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2 mt-2">
+                    <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-amber-300">Administrative Super Admin (isPartner: false):</span>
+                      <span className="ml-1 text-slate-300">
+                        This account will have full IT and system administration access (user management, audit logs, background queues). Legal partner privileges (auction finalization, prize payouts, payment reversals) require statutory partnership deed verification and cannot be assigned here.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Initial Temporary Password */}
@@ -325,7 +338,7 @@ export function UserForm() {
                       key={r}
                       className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-mono font-medium border bg-slate-800 text-slate-200 border-slate-700"
                     >
-                      {r}
+                      {r === 'SUPER_ADMIN' ? 'SUPER_ADMIN (ADMIN)' : r}
                     </span>
                   ))}
                 </div>

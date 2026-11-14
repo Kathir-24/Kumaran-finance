@@ -272,19 +272,18 @@ To complete the statutory audit report:
 
 ---
 
-### Journey 7: Auditing BullMQ Background Cron Schedules & Notification Audit Logs
+### Journey 7: Auditing Background Job Financial Ledger Outcomes
 
 To verify that automated background jobs execute according to statutory rules without missing runs:
 
-1. **Inspect Repeatable Schedulers**:
-   - Navigate to **System Audit $\to$ Background Schedulers** (`GET /jobs/repeatable-schedules`).
-   - The auditor verifies the registered cron jobs and next execution timestamps:
-     - `CRON_DAILY_ARREARS` (`1 0 * * *`): Runs at **00:01 AM IST** every midnight, marking unpaid items overdue and tagging 3M defaults.
-     - `CRON_SETTLEMENT_RECONCILIATION` (`0 6 * * *`): Runs at **06:00 AM IST** daily, matching gateway payouts to bank receipts.
-     - `CRON_PRE_AUCTION_REMINDERS` (`0 9 * * *`): Runs at **09:00 AM IST**, dispatching push and SMS reminders 3 days ahead of auctions.
-2. **Inspect Dispatched Notification History**:
-   - Navigate to **System Audit $\to$ Notification Delivery Registry** (`GET /jobs/notification-audit-logs`).
-   - The auditor inspects dispatched bilingual SMS and Push alerts, verifying that payment receipts, auction results, and 3-month statutory arrears warnings were delivered promptly to subscriber phone numbers.
+> [!NOTE]
+> **Super Admin Infrastructure Boundary**: Under Kumaran Finance's zero-trust security policy, direct infrastructure queue telemetry (`GET /jobs/*`) and internal system audit logs (`GET /reports/audit-logs`) are restricted strictly to **Super Admin** users (IT Administrators & Managing Partners).  
+> The CA Auditor verifies background job outcomes exclusively through the resulting financial books and statutory ledgers:
+
+1. **Verify Daily Arrears Evaluation Outcomes**:
+   - The auditor reviews the **Defaulters & Arrears Aging Register** (`/reports/defaulters`) to verify that the automated nightly job (`CRON_DAILY_ARREARS` at **00:01 AM IST**) correctly flagged 1M, 2M, and 3M overdue subscribers without calculation errors.
+2. **Verify Settlement Reconciliation Outcomes**:
+   - The auditor inspects the **Form XXII Cash Book** (`/reports/cash-book`) and **Day Book** (`/reports/day-book`) to verify that gateway settlements (`CRON_SETTLEMENT_RECONCILIATION` at **06:00 AM IST**) match bank bank deposits and physical safe cash.
 
 ---
 

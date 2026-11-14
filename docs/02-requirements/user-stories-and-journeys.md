@@ -705,15 +705,15 @@ flowchart TD
 
 ### 4.6 Independent Auditor (Chartered Accountant) User Stories
 
-#### US-AUD-1: Forensic Audit Trail Inspection (`AuditLog` Filters & Diffs)
+#### US-AUD-1: Audit Log Security Gate & Forensic Ledger Scrutiny
 - **As a**: Independent Chartered Accountant / Statutory Auditor
-- **I want to**: Inspect the append-only `AuditLog` table with multi-criteria filters (user, entity, action, date range)
-- **So that**: All high-risk financial modifications, payment reversals, and payout approvals can be forensically audited with before-and-after snapshots.
+- **I want to**: Verify that financial books are scrutinized via statutory registers while internal audit trails remain restricted to Super Admin
+- **So that**: Audit separation of duties is maintained between internal IT infrastructure administration and independent financial verification.
 - **Acceptance Criteria**:
   - **Given** I am logged in with `AUDITOR` role,
-  - **When** I call `GET /reports/audit-logs`,
-  - **Then** system returns full forensic log entries showing actor ID, timestamp, IP address, old value JSON, and new value JSON;
-  - **Zero-Write**: System blocks any attempt to modify or delete audit log entries.
+  - **When** I attempt to call `GET /reports/audit-logs`,
+  - **Then** system rejects the request with `403 Forbidden: SUPER_ADMIN_REQUIRED`;
+  - **Statutory Registers**: The auditor scrutinizes financial entries exclusively through Form XXII Cash Book, Form XXI Subscriber Ledgers, Form XVII Minutes, Day Book, and Trial Balance.
 
 #### US-AUD-2: Statutory Form XXII Cash Book Safe Balance Verification
 - **As a**: Independent Auditor
@@ -766,15 +766,15 @@ flowchart TD
   - **When** attempting any `@Post`, `@Patch`, or `@Delete` endpoint across all 18 controllers,
   - **Then** `RolesGuard` immediately rejects the request with `403 Forbidden: Insufficient role permissions`.
 
-#### US-AUD-7: BullMQ Repeatable Background Cron Schedules & Notification Audit Logs
+#### US-AUD-7: Infrastructure Boundary & Background Cron Financial Verification
 - **As a**: Independent Auditor
-- **I want to**: Inspect active BullMQ background workers, cron execution patterns, and dispatched notification audit history
-- **So that**: Automated 00:01 AM arrears recalculations, 06:00 AM settlement reconciliations, and DLT SMS logs can be verified for statutory integrity.
+- **I want to**: Verify the financial consequences of automated background jobs while infrastructure telemetry remains restricted to Super Admin
+- **So that**: Forensic verification focuses on financial ledger accuracy rather than raw queue internals.
 - **Acceptance Criteria**:
   - **Given** I am logged in with `AUDITOR` role,
-  - **When** calling `GET /jobs/repeatable-schedules` and `GET /jobs/queue-status`,
-  - **Then** system returns active cron patterns (`CRON_DAILY_ARREARS`, `CRON_SETTLEMENT_RECONCILIATION`) and queue health metrics;
-  - **When** calling `GET /jobs/notification-audit-logs`, system returns dispatched Push and DLT SMS audit history.
+  - **When** calling `GET /jobs/repeatable-schedules`, `GET /jobs/queue-status`, or `GET /jobs/notification-audit-logs`,
+  - **Then** `RolesGuard` rejects the request with `403 Forbidden: Insufficient role permissions` (restricted strictly to `SUPER_ADMIN`);
+  - **Ledger Verification**: The auditor verifies that automated 00:01 AM arrears recalculations and 06:00 AM settlement reconciliations accurately reflect in Form XXII Cash Book and Form XXI Ledgers.
 
 #### US-AUD-8: Presigned S3 Document Inspection for Safety Proof Cheques & KYC Scans
 - **As a**: Independent Auditor

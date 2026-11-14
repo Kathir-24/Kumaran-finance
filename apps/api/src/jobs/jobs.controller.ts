@@ -170,9 +170,9 @@ export class JobsController {
   }
 
   @Get('queue-status')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.AUDITOR)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get BullMQ queue health and job counts',
+    summary: 'Get BullMQ queue health and job counts (Super Admin strictly)',
   })
   @ApiOkResponseEnvelope(QueueStatusReportDto, { isArray: true, description: 'BullMQ queue health reports' })
   async getQueueStatus() {
@@ -180,9 +180,9 @@ export class JobsController {
   }
 
   @Get('notification-audit-logs')
-  @Roles(Role.SUPER_ADMIN, Role.AUDITOR)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get audit logs of dispatched Push Notifications and DLT SMS messages',
+    summary: 'Get audit logs of dispatched Push Notifications and DLT SMS messages (Super Admin strictly)',
   })
   @ApiQuery({
     name: 'limit',
@@ -215,9 +215,9 @@ export class JobsController {
   }
 
   @Get('repeatable-schedules')
-  @Roles(Role.SUPER_ADMIN, Role.AUDITOR)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'List active BullMQ repeatable cron jobs and next execution timestamps',
+    summary: 'List active BullMQ repeatable cron jobs and next execution timestamps (Super Admin strictly)',
   })
   @ApiOkResponseEnvelope(RepeatableScheduleDto, { isArray: true, description: 'Active repeatable schedules' })
   async getRepeatableSchedules(): Promise<RepeatableScheduleDto[]> {
