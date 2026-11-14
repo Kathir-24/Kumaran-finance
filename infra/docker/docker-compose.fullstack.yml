@@ -277,10 +277,10 @@ services:
         echo "[INIT] Initializing Automated Nightly Backup Cron Runner (02:00 AM IST)..."
         # Install standard S3-compatible protocol CLI client
         apk add --no-cache aws-cli
-        chmod +x /scripts/backup-cron-job.sh
         
         # Schedule cron at 02:00 AM IST (20:30 UTC = 30 20 * * *)
-        echo "30 20 * * * /scripts/backup-cron-job.sh >> /var/log/backup-cron.log 2>&1" > /etc/crontabs/root
+        # Note: Executed via explicit /bin/sh to respect read-only mounted /scripts volume
+        echo "30 20 * * * /bin/sh /scripts/backup-cron-job.sh >> /var/log/backup-cron.log 2>&1" > /etc/crontabs/root
         
         # Start crond daemon in foreground with log level 2
         crond -f -l 2

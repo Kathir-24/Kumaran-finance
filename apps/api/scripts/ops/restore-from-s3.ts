@@ -1,5 +1,5 @@
 // ==============================================================================
-// Kumaran Chits — Restore Database from S3 Backup Archive
+// Kumaran Chits — Restore Database & Documents from S3 Archive
 // Product: Kumaran Chits (Kumaran Finance, Perundurai, Tamil Nadu)
 // Compliance: docs/06-devops/infrastructure-and-drp.md (§3.1, §3.3)
 // ==============================================================================
@@ -7,70 +7,54 @@
 import {
   GetObjectCommand,
   ListObjectsV2Command,
+  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { execSync } from 'child_process';
-import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Readable } from 'stream';
+import { BackupManifest } from './backup-manifest.types';
+import {
+  computeSha256,
+  createS3Client,
+  ensureBucketExists,
+  listBackupSets,
+  readManifest,
+  resolveS3Config,
+  streamToBuffer,
+} from './backup-utils';
 
-const envPath = path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  dotenv.config();
-}
+export async function listS3Backups(): Promise<
+  { key: string; size: number; lastModified?: Date; setId?: string; isSet?: boolean; manifest?: BackupManifest | null }[]
+> {
+  const config = resolveS3Config();
+  const s3Client = createS3Client(config);
 
-function resolveConfig() {
-  const bucket = process.env.S3_BUCKET || 'kumaran-chits-private';
+  const sets = await listBackupSets(s3Client, config.bucket);
+  const results: {
+    key: string;
+    size: number;
+    lastModified?: Date;
+    setId?: string;
+    isSet?: boolean;
+    manifest?: BackupManifest | null;
+  }[] = [];
 
-  const region = process.env.S3_REGION || 'ap-south-1';
+  for (const set of sets) {
+    if (set.manifest) {
+      results.push({
+        key: set.manifest.database.s3Key,
+        size: set.manifest.database.sizeBytes,
+        lastModified: set.timestamp,
+        setId: set.setId,
+        isSet: true,
+        manifest: set.manifest,
+      });
+    }
+  }
 
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID || 'chitflow_admin';
-
-  const secretAccessKey =
-    process.env.S3_SECRET_ACCESS_KEY || 'chitflow_storage_secret';
-
-  const endpoint = process.env.S3_ENDPOINT;
-
-  const rawForcePath = process.env.S3_FORCE_PATH_STYLE;
-  const forcePathStyle =
-    rawForcePath !== undefined
-      ? rawForcePath === 'true' || rawForcePath === '1'
-      : !!endpoint;
-
-  return {
-    bucket,
-    region,
-    accessKeyId,
-    secretAccessKey,
-    endpoint: endpoint || undefined,
-    forcePathStyle,
-  };
-}
-
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
-    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on('error', (err) => reject(err));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
-
-export async function listS3Backups(): Promise<{ key: string; size: number; lastModified?: Date }[]> {
-  const config = resolveConfig();
-  const s3Client = new S3Client({
-    region: config.region,
-    endpoint: config.endpoint,
-    forcePathStyle: config.forcePathStyle,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  });
-
+  // Also query legacy dumps under backups/db/
   const listResponse = await s3Client.send(
     new ListObjectsV2Command({
       Bucket: config.bucket,
@@ -78,44 +62,59 @@ export async function listS3Backups(): Promise<{ key: string; size: number; last
     }),
   );
 
-  if (!listResponse.Contents || listResponse.Contents.length === 0) {
-    return [];
+  if (listResponse.Contents) {
+    for (const obj of listResponse.Contents) {
+      if (obj.Key && obj.Key.endsWith('.dump')) {
+        results.push({
+          key: obj.Key,
+          size: obj.Size || 0,
+          lastModified: obj.LastModified,
+          isSet: false,
+        });
+      }
+    }
   }
 
-  return listResponse.Contents.filter((obj) => obj.Key && obj.Key.endsWith('.dump'))
-    .map((obj) => ({
-      key: obj.Key!,
-      size: obj.Size || 0,
-      lastModified: obj.LastModified,
-    }))
-    .sort((a, b) => {
-      const timeA = a.lastModified ? a.lastModified.getTime() : 0;
-      const timeB = b.lastModified ? b.lastModified.getTime() : 0;
-      return timeB - timeA; // Newest first
-    });
+  return results.sort((a, b) => {
+    const timeA = a.lastModified ? a.lastModified.getTime() : 0;
+    const timeB = b.lastModified ? b.lastModified.getTime() : 0;
+    return timeB - timeA;
+  });
 }
 
-export async function restoreFromS3(targetKey?: string): Promise<string> {
-  const config = resolveConfig();
-  const s3Client = new S3Client({
-    region: config.region,
-    endpoint: config.endpoint,
-    forcePathStyle: config.forcePathStyle,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  });
+export async function restoreDatabaseFromS3(options?: {
+  targetKey?: string;
+  setId?: string;
+  targetDbName?: string;
+  skipChecksumCheck?: boolean;
+}): Promise<{ restoredKey: string; targetDb: string; dumpSizeBytes: number }> {
+  const config = resolveS3Config();
+  const s3Client = createS3Client(config);
+  const targetDb = options?.targetDbName || process.env.POSTGRES_DB || 'chitflow_dev';
 
-  let keyToRestore = targetKey;
-  if (!keyToRestore) {
-    console.log(`[RESTORE] No S3 key specified. Fetching latest available backup...`);
+  let keyToRestore = options?.targetKey;
+  let expectedSha256: string | undefined;
+
+  if (options?.setId) {
+    const manifestKey = `backups/sets/${options.setId}/manifest.json`;
+    const manifest = await readManifest(s3Client, config.bucket, manifestKey);
+    if (!manifest) {
+      throw new Error(`[ERROR] Manifest not found for set ID: ${options.setId}`);
+    }
+    keyToRestore = manifest.database.s3Key;
+    expectedSha256 = manifest.database.sha256;
+  } else if (!keyToRestore) {
+    console.log(`[RESTORE] No backup key specified. Finding latest verified backup set...`);
     const backups = await listS3Backups();
     if (backups.length === 0) {
-      throw new Error(`[ERROR] No database backups found in bucket '${config.bucket}' under prefix 'backups/db/'`);
+      throw new Error(`[ERROR] No backups found in bucket '${config.bucket}'`);
     }
-    keyToRestore = backups[0].key;
-    console.log(`[RESTORE] Selected latest backup: ${keyToRestore} (${backups[0].size} bytes)`);
+    const latest = backups[0];
+    keyToRestore = latest.key;
+    if (latest.manifest) {
+      expectedSha256 = latest.manifest.database.sha256;
+    }
+    console.log(`[RESTORE] Selected latest backup: ${keyToRestore} (${latest.size} bytes)`);
   }
 
   console.log(`[RESTORE] Downloading backup from S3: s3://${config.bucket}/${keyToRestore}`);
@@ -132,7 +131,18 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
 
   const dumpBuffer = await streamToBuffer(getResponse.Body as Readable);
 
-  // Write temporary local file (repo root infra/backups/)
+  // Validate Checksum if manifest metadata is available
+  if (expectedSha256 && !options?.skipChecksumCheck) {
+    const actualSha256 = computeSha256(dumpBuffer);
+    if (actualSha256 !== expectedSha256) {
+      throw new Error(
+        `[SECURITY ERROR] Checksum mismatch! Backup file may be corrupted or tampered.\nExpected: ${expectedSha256}\nActual:   ${actualSha256}`,
+      );
+    }
+    console.log(`[RESTORE] Checksum verified: SHA-256 matches manifest.`);
+  }
+
+  // Write temporary local file
   const tempDir = path.resolve(__dirname, '../../../../infra/backups');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -143,7 +153,7 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
 
   try {
     fs.writeFileSync(localFilePath, dumpBuffer);
-    console.log(`[RESTORE] Downloaded ${dumpBuffer.length} bytes to ${localFilePath}`);
+    console.log(`[RESTORE] Staged ${dumpBuffer.length} bytes at ${localFilePath}`);
 
     // Restore into Postgres
     const isDockerRunning = (() => {
@@ -157,18 +167,19 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
       }
     })();
 
-    console.log(`[RESTORE] Executing pg_restore --clean...`);
+    console.log(`[RESTORE] Executing pg_restore --clean into database '${targetDb}'...`);
     if (isDockerRunning) {
       execSync(`docker cp "${localFilePath}" "chitflow-db:/tmp/${fileName}"`, { stdio: 'inherit' });
       execSync(
-        `docker exec chitflow-db pg_restore -U chitflow -d chitflow_dev --clean --if-exists "/tmp/${fileName}"`,
+        `docker exec chitflow-db pg_restore -U chitflow -d "${targetDb}" --clean --if-exists "/tmp/${fileName}"`,
         { stdio: 'inherit' },
       );
-      execSync(`docker exec chitflow-db rm "/tmp/${fileName}"`, { stdio: 'ignore' });
+      execSync(`docker exec chitflow-db rm -f "/tmp/${fileName}"`, { stdio: 'ignore' });
     } else {
-      const dbUrl =
+      const dbUrl = (
         process.env.DATABASE_URL ||
-        'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public';
+        'postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public'
+      ).replace(/\/chitflow_dev\?/, `/${targetDb}?`);
       execSync(`pg_restore -d "${dbUrl}" --clean --if-exists "${localFilePath}"`, { stdio: 'inherit' });
     }
   } finally {
@@ -177,8 +188,84 @@ export async function restoreFromS3(targetKey?: string): Promise<string> {
     }
   }
 
-  console.log(`[SUCCESS] Database successfully restored from ${keyToRestore}!`);
-  return keyToRestore;
+  console.log(`[SUCCESS] Database successfully restored into '${targetDb}' from ${keyToRestore}!`);
+  return {
+    restoredKey: keyToRestore,
+    targetDb,
+    dumpSizeBytes: dumpBuffer.length,
+  };
+}
+
+/**
+ * Restores documents from a backup set into a target MinIO bucket.
+ * Non-destructive: preserves original keys and verifies checksums.
+ */
+export async function restoreDocumentsFromSet(
+  setId: string,
+  targetBucket: string,
+): Promise<{ restoredCount: number; failedCount: number; errors: string[] }> {
+  const config = resolveS3Config();
+  const s3Client = createS3Client(config);
+
+  await ensureBucketExists(s3Client, targetBucket);
+
+  const manifestKey = `backups/sets/${setId}/manifest.json`;
+  const manifest = await readManifest(s3Client, config.bucket, manifestKey);
+
+  if (!manifest) {
+    throw new Error(`[ERROR] Manifest not found for set ID: ${setId}`);
+  }
+
+  console.log(`[RESTORE-DOCS] Restoring ${manifest.documents.totalCount} documents from set '${setId}' to bucket '${targetBucket}'...`);
+
+  let restoredCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
+
+  for (const doc of manifest.documents.files) {
+    try {
+      const getRes = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: doc.backupKey,
+        }),
+      );
+
+      if (!getRes.Body) {
+        throw new Error(`Empty body for backup key: ${doc.backupKey}`);
+      }
+
+      const buffer = await streamToBuffer(getRes.Body as Readable);
+      const sha256 = computeSha256(buffer);
+
+      if (sha256 !== doc.sha256) {
+        throw new Error(`Checksum mismatch on ${doc.backupKey}: expected ${doc.sha256}, got ${sha256}`);
+      }
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: doc.originalKey,
+          Body: buffer,
+          ContentType: doc.mimeType || 'application/octet-stream',
+        }),
+      );
+
+      restoredCount++;
+    } catch (err: any) {
+      failedCount++;
+      errors.push(`${doc.originalKey}: ${err.message}`);
+    }
+  }
+
+  console.log(`[RESTORE-DOCS] Completed: ${restoredCount} restored, ${failedCount} failed.`);
+  return { restoredCount, failedCount, errors };
+}
+
+// Default export wrapper for backward compatibility
+export async function restoreFromS3(targetKey?: string): Promise<string> {
+  const res = await restoreDatabaseFromS3({ targetKey });
+  return res.restoredKey;
 }
 
 if (require.main === module) {
@@ -188,13 +275,15 @@ if (require.main === module) {
   if (args.includes('--list')) {
     listS3Backups()
       .then((backups) => {
-        console.log(`\n=== Kumaran Chits S3 Database Backups ===`);
+        console.log(`\n=== Kumaran Chits S3 Backups & Recovery Sets ===`);
         if (backups.length === 0) {
           console.log(`No backups found.`);
         } else {
           backups.forEach((b, idx) => {
+            const setTag = b.isSet ? `[RECOVERY SET: ${b.setId}]` : '[LEGACY DUMP]';
+            const docsTag = b.manifest ? `| Docs: ${b.manifest.documents.totalCount}` : '';
             console.log(
-              `[${idx + 1}] ${b.key} | ${b.size} bytes | ${
+              `[${idx + 1}] ${setTag} ${b.key} | ${b.size} bytes ${docsTag} | ${
                 b.lastModified ? b.lastModified.toISOString() : 'Unknown date'
               }`,
             );

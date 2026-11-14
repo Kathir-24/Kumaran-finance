@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Company Reality**: 1 physical branch office (Head Office: Perundurai, Erode, Tamil Nadu), 4 equal partners, 1 desk accountant/cashier, 2–3 field collection agents, known subscribers, physical notebook onboarding.  
 > **Primary Target Hosting**: Any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, etc.) + Cloudflare R2 (S3-Compatible Object Storage with ₹0 egress fees)  
-> **Availability Targets**: $\text{RPO} \le 15\text{ minutes}$, $\text{RTO} \le 2\text{ hours}$
+> **Availability Targets**: $\text{RPO} \le 24\text{ hours}$ (Daily Nightly Snapshot), $\text{RTO} \le 2\text{ hours}$ (Automated Recovery Drill)
 
 ---
 
@@ -123,13 +123,13 @@ S3_FORCE_PATH_STYLE=false
 ### 3.1 Recovery Metrics
 | Metric | Target | How It Is Achieved |
 |---|---|---|
-| **Recovery Point Objective (RPO)** | **$\le 15$ minutes** | PostgreSQL continuous Write-Ahead Log (WAL) archiving and automated nightly database dumps via `chitflow-backup-cron`. |
-| **Recovery Time Objective (RTO)** | **$\le 2$ hours** | Automated database snapshot restore via `restore-db.sh` / `restore-from-s3.sh` and Docker container rebuild. |
+| **Recovery Point Objective (RPO)** | **$\le 24$ hours** | Automated nightly unified recovery set snapshot (`pg_dump -F c` + MinIO document snapshot + atomic manifest) via `chitflow-backup-cron` at 02:00 AM IST. Note: Continuous WAL archiving (PITR) is a planned production enhancement. |
+| **Recovery Time Objective (RTO)** | **$\le 2$ hours** | Automated database & document snapshot restore via `pnpm db:restore:s3` and Docker container rebuild (benchmarked at ~3.6s in automated drill). |
 
-### 4.2 Backup Lifecycle & Retention Schedule
-1. **Automated Nightly Snapshot**: Full encrypted `pg_dump` taken every night at 02:00 AM IST by `chitflow-backup-cron`, verified, and uploaded to offsite S3-compatible storage (Cloudflare R2 / MinIO).
+### 3.2 Backup Lifecycle & Retention Schedule
+1. **Automated Nightly Snapshot**: Full unified recovery set taken every night at 02:00 AM IST by `chitflow-backup-cron`, verified with SHA-256 checksums, and uploaded to S3-compatible storage.
 2. **Local Retention Buffer**: Last 7 daily backup dumps retained on host SSD for sub-minute disaster recovery.
-3. **Offsite S3 Replication**: Encrypted archives retained offsite for **30 days** in S3-compatible object storage with versioning enabled to eliminate local hardware failure risks.
+3. **Offsite S3 Replication**: Recovery sets retained for **30 days** in S3-compatible object storage with pruner protection ensuring the latest valid set is never deleted.
 
 ### 3.3 Quarterly Disaster Recovery Drill Procedure
 Once every 90 days (or on demand during audits), the developer and Kumaran Finance administrator execute this automated drill:
@@ -144,16 +144,21 @@ powershell -ExecutionPolicy Bypass -File infra/scripts/drp-drill.ps1
 
 **Automated Drill Execution Flow**:
 1. Captures baseline entity counts from the source database (`chitflow_dev`).
-2. Triggers an automated S3/MinIO binary backup with timestamp and AES256 server-side encryption (`RPO Phase`).
-3. Provisions a completely isolated target database (`chitflow_drp_drill`), preserving active developer data.
+2. Triggers an automated S3/MinIO binary backup set with timestamp and SHA-256 checksums (`RPO Phase`).
+3. Provisions a completely isolated target database (`chitflow_drp_drill`) and isolated bucket (`kumaran-chits-drill`), preserving active developer data.
 4. Downloads the S3 dump and restores via `pg_restore`, benchmarking recovery time against the 2-hour RTO standard (`RTO Phase`).
-5. Executes 5 strict mathematical & financial invariant assertions on the restored database:
-   - **Assertion 1**: Entity Row Parity (Users, Customers, Groups, Tickets, Dues, Payments).
+5. Restores all application documents into `kumaran-chits-drill` and validates checksums.
+6. Executes strict mathematical, statutory, and security invariant assertions on the restored database:
+   - **Assertion 1**: Entity Row Parity (Users, Customers, Groups, Tickets, Dues, Payments, AuditLogs).
    - **Assertion 2**: 4.00% Foreman Commission Freeze (ADR-04).
    - **Assertion 3**: Max 1 Ticket per subscriber per chit group (ADR-13).
    - **Assertion 4**: Pure whole-rupee `BigInt` math (zero floats, zero fractional paise).
    - **Assertion 5**: Accounting balance equation: $\sum \text{Dues Generated} = \sum \text{Payments} + \text{Remaining Unpaid Dues}$.
-6. Drops `chitflow_drp_drill` cleanly and outputs an audit compliance report.
+   - **Assertion 6**: Maker != Checker Reversal Separation of Duties (ADR-10).
+   - **Assertion 7**: Database-level `AuditLog` append-only immutability triggers (rejects UPDATE/DELETE).
+   - **Assertion 8**: Non-regenerable document integrity (100% of customer KYC & security attachments present).
+   - **Assertion 9**: Worker & Queue sandboxing isolation (zero job replay or active queue access).
+7. Drops `chitflow_drp_drill` and `kumaran-chits-drill` cleanly and outputs an audit compliance report.
 
 ### 3.4 Local & Branch Database Backup / Restore Runbook
 For on-premise branch operations and local developer testing, automated scripts in `infra/scripts/` provide immediate snapshot capabilities:

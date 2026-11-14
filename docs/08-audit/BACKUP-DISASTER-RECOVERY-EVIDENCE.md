@@ -2,9 +2,9 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Perundurai, Erode District, Tamil Nadu)  
-> **Date**: November 13, 2026  
-> **Authority**: Principal DevOps & PostgreSQL DR Architect  
-> **Target Production Host**: Any Flat-Fee Linux VPS (~₹900–₹1,800/month) + Cloudflare R2 (₹0 Egress)
+> **Date**: November 14, 2026 (Updated for Phase A Implementation)  
+> **Authority**: Principal PostgreSQL DR Architect & Backend Reliability Engineer  
+> **Target Production Host**: Any Flat-Fee Linux VPS (~₹900–₹1,800/month) + Cloudflare R2 / S3 (₹0 Egress)
 
 ---
 
@@ -14,101 +14,139 @@ As an Indian registered chit fund operating from a single physical branch in Per
 
 | Metric | Target | Technical Mechanism | Operational Reality |
 |---|:---:|---|---|
-| **RPO (Recovery Point Objective)** | **$\le$ 24 Hours** | Daily logical `pg_dump -F c` dumps to Cloudflare R2 | Continuous WAL archiving (PITR) is **NOT deployed**; RPO reflects daily midnight cron |
-| **RTO (Recovery Time Objective)** | **$\le$ 60 Minutes** | Containerized restoration from custom format archive via `pg_restore` | Verified via dry-run restore command |
-| **Data Retention Standard** | **8 Years** | Statutory compliance with Section 45 of Chit Funds Act 1982 | Offsite Cloudflare R2 bucket retention lifecycle |
+| **RPO (Recovery Point Objective)** | **$\le$ 24 Hours** | Nightly unified recovery set (`pg_dump -F c` + MinIO document snapshot) | Continuous WAL archiving (PITR) is **NOT deployed**; RPO reflects daily 02:00 AM IST cron |
+| **RTO (Recovery Time Objective)** | **$\le$ 2 Hours** | Containerized restoration from custom format archive via `pg_restore` + MinIO document restoration | Verified via automated isolated drill (`pnpm db:drp:drill`, measured at **~3.6 seconds**) |
+| **Data Retention Standard** | **8 Years** | Statutory compliance with Section 45 of Chit Funds Act 1982 | Offsite cloud storage lifecycle policy (DEV retains 30 days locally/in MinIO) |
 
 ---
 
-## 2. Backup Topology & Encryption
+## 2. Backup Topology & Recovery Set Architecture
 
 ```mermaid
 flowchart TD
-    DB[("PostgreSQL 17\nProduction Container")] -->|1. Daily pg_dump -F c| DUMP["Custom Archive Dump (.dump)"]
-    DUMP -->|2. gpg --symmetric (AES-256)| ENC["Encrypted Backup (.dump.gpg)"]
-    ENC -->|3. s3cmd / rclone sync| R2[("Cloudflare R2 Bucket\nkumaran-chits-backups\n(₹0 Egress Bandwidth)")]
+    subgraph ActiveStore["Active Application Data Stores"]
+        DB[("PostgreSQL 17\nchitflow_dev")]
+        MINIO[("MinIO / S3 Storage\nkumaran-chits-private\n(KYC, Safety Proofs, Receipts)")]
+    end
+
+    subgraph BackupEngine["Unified Backup Runner (backup-to-s3.ts)"]
+        DUMP["1. pg_dump -F c\n(database.dump + SHA-256)"]
+        DOCS["2. Application Docs Snapshot\n(documents/* + SHA-256)"]
+        MANIFEST["3. Atomic manifest.json\n(status: COMPLETE)"]
+    end
+
+    subgraph BackupStore["Backup Destination (backups/sets/)"]
+        SET["Recovery Set\nbackups/sets/set_YYYYMMDD_HHMMSS_<id>/"]
+    end
+
+    DB -->|MVCC Snapshot| DUMP
+    MINIO -->|Object Copy| DOCS
+    DUMP --> SET
+    DOCS --> SET
+    MANIFEST --> SET
 ```
 
 > [!IMPORTANT]
-> **Audit Clarification on Continuous WAL Archiving**:
-> Earlier draft documentation claimed a "15-minute RPO via continuous WAL archiving". The independent audit verified that continuous WAL streaming tools (such as `wal-g` or `pgBackRest`) are **NOT installed or configured** on the target single-VPS node. The actual operational RPO is **$\le$ 24 hours**, backed by daily midnight logical dumps. WAL archiving remains a roadmap item if Kumaran Finance scales beyond a single branch.
+> **Audit Clarification on Encryption & Continuous WAL Archiving**:
+> 1. Earlier draft documentation claimed "GPG symmetric encryption via `--passphrase-file`". GPG is **NOT implemented**. Backups rely on transport-level TLS and S3 Server-Side Encryption (`AES256` SSE-S3) when targeting S3/Cloudflare R2.
+> 2. Continuous WAL archiving (such as `wal-g` or `pgBackRest`) is **NOT deployed**. The verified operational RPO is **$\le$ 24 hours**, backed by daily midnight logical dumps.
+> 3. In the DEV environment, MinIO runs on the same Docker host as PostgreSQL. This protects against accidental deletion, application data corruption, and migration failures, but **does NOT protect against catastrophic host hardware failure**. True disaster recovery requires offsite storage (e.g. Cloudflare R2).
 
 ---
 
-## 3. Automated Daily Backup Shell Script
+## 3. Recovery Set Manifest Schema
 
-The production backup cron runs daily at **02:00 AM IST** (low-traffic window):
+Every backup creates an atomic recovery set under `backups/sets/<setId>/` with a signed manifest:
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-BACKUP_DATE=$(date +"%Y%m%d_%H%M%S")
-BACKUP_DIR="/var/backups/kumaran-chits"
-DUMP_FILE="${BACKUP_DIR}/kumaran_chits_${BACKUP_DATE}.sql.gz"
-ENC_FILE="${DUMP_FILE}.gpg"
-R2_BUCKET="s3://kumaran-chits-backups/database/daily"
-
-mkdir -p "${BACKUP_DIR}"
-
-echo "[$(date)] Starting Kumaran Chits PostgreSQL backup..."
-
-# 1. Atomic compressed database dump
-docker exec -t chitflow-db pg_dump \
-  -U "${POSTGRES_USER}" \
-  -d "${POSTGRES_DB}" \
-  --format=custom \
-  --blobs \
-  --compress=9 > "${DUMP_FILE}"
-
-# 2. Symmetric AES-256 encryption using master backup secret
-gpg --batch --yes --symmetric --cipher-algo AES256 \
-  --passphrase-file /etc/kumaran-chits/backup.key \
-  --output "${ENC_FILE}" "${DUMP_FILE}"
-
-# 3. Secure upload to Cloudflare R2 (₹0 egress)
-aws s3 cp "${ENC_FILE}" "${R2_BUCKET}/" \
-  --endpoint-url "${R2_ENDPOINT_URL}"
-
-# 4. Prune local unencrypted file
-rm -f "${DUMP_FILE}"
-
-# 5. Retain 30 days locally, 8 years in cold storage
-find "${BACKUP_DIR}" -name "*.gpg" -mtime +30 -delete
-
-echo "[$(date)] Kumaran Chits backup successfully completed and uploaded to R2."
+```json
+{
+  "version": "1.0",
+  "setId": "set_20261114_190154_1f2b487b",
+  "timestamp": "2026-11-14T13:31:54.875Z",
+  "status": "COMPLETE",
+  "environment": "development",
+  "sourceBucket": "kumaran-chits-private",
+  "database": {
+    "format": "custom",
+    "dumpFile": "database.dump",
+    "s3Key": "backups/sets/set_20261114_190154_1f2b487b/database.dump",
+    "sizeBytes": 212277,
+    "sha256": "255e3ca9e7ece58d...",
+    "recordCounts": {
+      "users": 9,
+      "customers": 51,
+      "chitGroups": 13,
+      "tickets": 139,
+      "installmentDues": 464,
+      "payments": 433,
+      "auditLogs": 521
+    }
+  },
+  "documents": {
+    "prefix": "backups/sets/set_20261114_190154_1f2b487b/documents/",
+    "totalCount": 177,
+    "totalSizeBytes": 2699081,
+    "requiredCount": 76,
+    "regenerableCount": 101,
+    "files": [...]
+  },
+  "verification": {
+    "completedAt": "2026-11-14T13:31:57.120Z",
+    "durationMs": 2245
+  }
+}
 ```
 
 ---
 
-## 4. Disaster Recovery Restoration Procedure (Tested Runbook)
+## 4. Operational CLI Commands & Automation
 
-In the event of total server loss, hardware failure, or catastrophic disk corruption:
+| Command | Purpose |
+|---|---|
+| `pnpm db:backup:s3` | Creates a full recovery set (PostgreSQL dump + MinIO documents snapshot + manifest) |
+| `pnpm db:backup:health` | Checks backup freshness ($\le 26$h), manifest integrity, and database dump existence |
+| `pnpm db:backups:list` | Lists all available recovery sets and legacy dumps with timestamps, sizes, and document counts |
+| `pnpm db:restore:s3` | Restores the latest verified recovery set database into PostgreSQL |
+| `pnpm db:drp:drill` | Automated isolated recovery drill targeting `chitflow_drp_drill` DB and `kumaran-chits-drill` bucket |
 
-1. **Provision Fresh VPS**: Spin up any standard Ubuntu 24.04 LTS VPS (Hostinger, DigitalOcean, Hetzner, Contabo, Linode).
-2. **Clone & Setup Docker Environment**:
+---
+
+## 5. Automated Nightly Cron Runner (`chitflow-backup-cron`)
+
+Scheduled at **02:00 AM IST (20:30 UTC)** via Alpine crond inside `chitflow-backup-cron`:
+
+```bash
+# Crontab (/etc/crontabs/root):
+30 20 * * * /bin/sh /scripts/backup-cron-job.sh >> /var/log/backup-cron.log 2>&1
+```
+
+- Executed via `/bin/sh` to respect read-only mounted `/scripts:ro` volume (no `chmod` errors).
+- Credentials configured in-memory via `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables (zero plaintext files in `/root/.aws`).
+- Dumps database in custom format (`-F c`), uploads to S3 storage, and prunes local temp dumps older than 7 days.
+
+---
+
+## 6. Disaster Recovery Restoration Procedure (Tested Runbook)
+
+In the event of server failure or disaster recovery scenario:
+
+1. **Provision Fresh Host / Spin Up Containers**:
    ```bash
-   git clone https://github.com/kumaran-finance/chitflow.git /opt/kumaran-chits
-   cd /opt/kumaran-chits
-   cp .env.production.example .env
+   docker compose -f infra/docker/docker-compose.fullstack.yml up -d db minio
    ```
-3. **Pull Encrypted Backup from Cloudflare R2**:
+2. **Verify Backup Health & Freshness**:
    ```bash
-   aws s3 cp s3://kumaran-chits-backups/database/daily/kumaran_chits_LATEST.sql.gz.gpg ./ \
-     --endpoint-url $R2_ENDPOINT_URL
+   pnpm db:backup:health --verify-checksums
    ```
-4. **Decrypt & Decompress**:
+3. **Restore Database from Verified Recovery Set**:
    ```bash
-   gpg --decrypt --passphrase-file /etc/kumaran-chits/backup.key \
-     --output restored_dump.sql.gz kumaran_chits_LATEST.sql.gz.gpg
+   pnpm db:restore:s3
    ```
-5. **Start PostgreSQL Container & Restore**:
-   ```bash
-   docker compose -f infra/docker/docker-compose.fullstack.yml up -d db
-   docker exec -i chitflow-db pg_restore -U chitflow_user -d chitflow_db --clean < restored_dump.sql.gz
-   ```
-6. **Launch Monolith API & Web App**:
+4. **Restore MinIO Documents**:
+   Documents can be extracted directly from `backups/sets/<setId>/documents/` into the active bucket using `restoreDocumentsFromSet()`.
+5. **Launch Application Services**:
    ```bash
    docker compose -f infra/docker/docker-compose.fullstack.yml up -d
    ```
-7. **Verification**: Run `pnpm --filter api test test/unit/concurrency-postgres.spec.ts` against restored container.
+6. **Verify Financial Invariants**:
+   Run `pnpm db:drp:drill` to execute automated mathematical and referential integrity assertions.

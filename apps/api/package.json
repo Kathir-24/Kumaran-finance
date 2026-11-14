@@ -28,6 +28,7 @@
     "config:verify": "node -e \"const { execFileSync } = require('child_process'); const path = require('path'); const root = path.resolve('..', '..'); if (process.platform === 'win32') { execFileSync('powershell', ['-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'infra/scripts/verify-config.ps1')], { cwd: root, stdio: 'inherit' }); } else { execFileSync('bash', [path.join(root, 'infra/scripts/verify-config.sh')], { cwd: root, stdio: 'inherit' }); }\"",
     "openapi:export": "ts-node scripts/codegen/export-openapi.ts",
     "db:backup:s3": "ts-node scripts/ops/backup-to-s3.ts",
+    "db:backup:health": "ts-node scripts/ops/backup-health.ts",
     "db:restore:s3": "ts-node scripts/ops/restore-from-s3.ts",
     "db:drp-drill": "ts-node scripts/ops/drp-drill.ts",
     "test:stress": "ts-node scripts/stress/verify-concurrency-stress.ts",
