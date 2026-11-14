@@ -179,12 +179,12 @@ flowchart TD
 ```
 
 ### Step-by-Step Instructions:
-1. Open **Reports $\to$ Statutory Registers**.
+1. Open **Reports $\to$ Statutory Registers** (or directly access `/reports/minutes`, `/reports/ledger`, or `/reports/cash-book`).
 2. Select the chit group and export the required statutory forms:
-   - **Form XVII**: Auction Minutes including attendee roll, winning bid, and Foreman signature.
-   - **Form XXI**: 20-Month Subscriber Passbook Ledger.
-   - **Form XXII**: Daily Cash Book register.
-3. Click **"Export Certified PDF"** (`GET /reports/form-xvii`). The generated PDF contains official formatting ready for submission to the Chit Registrar.
+   - **Form XVII (Auction Minutes Register)**: Navigate to `/reports/minutes`. For any finalized auction month, click **"Download PDF"** to receive the official Form XVII statutory PDF (`application/pdf`) streamed securely as an authenticated blob via the Next.js BFF proxy. Click **"Print Sheet"** for high-contrast print layout without dashboard chrome.
+   - **Form XXI (Subscriber Ledgers & Passbook)**: Navigate to `/reports/ledger`. Filter by subscriber ticket number and click the **"PDF"** button on any subscriber ledger card (`downloadPassbookPdf`) to download their continuous 20-month schedule. Alternatively, click **"Print Passbook"** to print directly or **"Export CSV"** for external spreadsheet import.
+   - **Form XXII (Day Book / Cash Book)**: Navigate to `/reports/cash-book`. Review the 12-column ledger for any operational date and click **"Print Sheet"** or **"Export CSV"** to reconcile against physical bank statements.
+3. All statutory PDFs are delivered directly to the browser as binary blobs with zero pop-up blocker warnings, zero CORS headers, and zero internal Docker DNS resolution errors.
 
 ---
 

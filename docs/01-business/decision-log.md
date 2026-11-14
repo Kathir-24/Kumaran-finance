@@ -91,13 +91,15 @@
 
 ---
 
-### ADR-11: Physical Passbook Primacy & Smart Digital Receipts (`CONFIRMED-BY-DEVELOPER`)
+### ADR-11: Physical Passbook Primacy, Statutory PDF Streaming & Clean Print Architecture (`CONFIRMED-BY-DEVELOPER`)
 - **Ground Truth**: In Kumaran Finance operations, the customer's physical paper passbook (சீட்டு பாஸ்புக்) is their primary, legally acknowledged proof of installment payment. At doorstep collections, the agent enters the date, amount, and signs with a pen. Loose paper receipt slips are completely eliminated.
 - **6-Column Passbook Ledger Standard**: The physical passbook and software digital passbook maintain identical columns:
   $$\text{Month \#} \mid \text{Payment Date (Cycle Start)} \mid \text{Paid Date (Doorstep)} \mid \text{Amount Paid } (I_{net}) \mid \text{Dividend } (Div) \mid \text{Total } (I_{base})$$
   Invariant: $\text{Amount Paid} + \text{Dividend} = \text{Total Base Installment}$ on every row.
 - **Software Role**: Every transaction generates a sequential receipt number (`KC-REC-...`) solely for company ledger integrity (Form XXII Cash Book), evening handover reconciliation, and dispute backup.
 - **Delivery & Asynchronous Queueing**: Counter payments (`POST /payments`) and field collections (`POST /collections/record`) immediately commit financial records to PostgreSQL and asynchronously enqueue a background receipt dispatch to BullMQ (`notification-queue` / `JOB_DISPATCH_PAYMENT_RECEIPT`). Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt fallback.
+- **BFF Blob PDF Delivery Architecture**: To guarantee zero popup blocker interceptions, zero cross-origin CORS barriers, and eliminate internal Docker hostname failures (`ERR_NAME_NOT_RESOLVED`), all statutory PDF downloads (Form XVII Minutes, Form XXI Passbooks, A5 Subscription Receipts, and Prize Vouchers) route directly through the Next.js BFF proxy (`/bff/api/v1/[...path]`). The web client consumes these endpoints via `@kumaran/api-client` (`parseAs: 'blob'`) and triggers instant browser downloads via transient DOM anchors (`triggerBlobDownload`) with deterministic object URL revocation.
+- **High-Contrast `@media print` Stylesheet**: Browser printing (`window.print()`) for statutory registers (Form XXII Day Book, Form XXI Subscriber Ledgers, Form XVII Minutes) cleanly strips dark-mode dashboards, sidebars, topbar navigation, and buttons, rendering crisp black-on-white tables matching official A4/A5 paper records without chrome bleed.
 
 ---
 

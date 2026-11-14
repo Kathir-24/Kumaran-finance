@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
+import { downloadMinutesPdf } from '@/lib/pdf-download';
 
 export interface AuctionMinutesData {
   id: string;
@@ -47,9 +47,9 @@ interface AuctionMinutesCardProps {
 
 export function AuctionMinutesCard({
   auctionId,
-  groupCode: _groupCode,
+  groupCode,
   groupName: _groupName,
-  installmentMonth: _installmentMonth,
+  installmentMonth,
   auctionDate,
   chitValue: _chitValue,
   bidDiscount: _bidDiscount,
@@ -78,25 +78,12 @@ export function AuctionMinutesCard({
   const handleDownloadPdf = async () => {
     setIsDownloading(true);
     try {
-      const response = await unwrapApiResponse<{ presignedUrl?: string }>(
-        apiClient.GET('/api/v1/pdf/minutes/{auctionId}', {
-          params: {
-            path: { auctionId },
-            query: { download: true },
-          },
-        }),
+      await downloadMinutesPdf(
+        auctionId,
+        `form-xvii-minutes-${groupCode}-m${installmentMonth}.pdf`,
       );
-
-      if (response?.presignedUrl) {
-        window.open(response.presignedUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        // Fallback: direct streaming URL via BFF
-        const streamUrl = `${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`;
-        window.open(streamUrl, '_blank', 'noopener,noreferrer');
-      }
-    } catch {
-      // Direct stream fallback via BFF
-      window.open(`${getApiBaseUrl()}/api/v1/pdf/minutes/${auctionId}`, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('Failed to download Form XVII PDF', err);
     } finally {
       setIsDownloading(false);
     }

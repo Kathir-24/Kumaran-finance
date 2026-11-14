@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table';
 import { formatRupee } from '@/lib/currency';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { downloadPassbookPdf } from '@/lib/pdf-download';
 import { queryKeys } from '@/lib/query-keys';
 import type { CustomerTicketHolding } from './customer-tickets-tab';
 
@@ -99,17 +100,11 @@ export function CustomerPassbookTab({
     if (!activeTicketId) return;
     setIsDownloading(true);
     try {
-      const res = await unwrapApiResponse<{ presignedUrl?: string }>(
-        apiClient.GET('/api/v1/pdf/passbook/{ticketId}', {
-          params: {
-            path: { ticketId: activeTicketId },
-            query: { download: true },
-          },
-        }),
-      );
-      if (res?.presignedUrl) {
-        window.open(res.presignedUrl, '_blank');
-      }
+      const activeTicket = tickets.find((t) => t.id === activeTicketId);
+      const filename = activeTicket
+        ? `form-xxi-passbook-${activeTicket.chitGroup.groupCode}-t${activeTicket.ticketNumber}.pdf`
+        : `form-xxi-passbook-${activeTicketId.slice(0, 8)}.pdf`;
+      await downloadPassbookPdf(activeTicketId, filename);
     } catch (err) {
       console.error('Failed to generate Passbook PDF', err);
     } finally {

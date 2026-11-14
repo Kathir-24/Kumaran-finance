@@ -310,3 +310,18 @@ flowchart TD
   2. Requests a 300s presigned PUT URL from `POST /api/v1/storage/presigned-upload-url` via `apiClient` (`HttpOnly` BFF cookies).
   3. Executes `PUT` directly to S3/R2 (`credentials: 'omit'`, exact signed headers, `120_000ms` abort timer) or `/bff/api/v1/storage/upload/*key` (`credentials: 'same-origin'`) when `STORAGE_DRIVER=local` is active.
   4. Finalizes DB metadata exclusively on `2xx` upload success via `POST /customers/:id/documents/confirm` or `POST /disbursements/auction/:auctionId/confirm-safety-proof`.
+
+### 7. Unified Statutory PDF Blob Streaming & High-Contrast Print Architecture
+- **Authenticated BFF Blob Downloads (`lib/pdf-download.ts`)**:
+  - All statutory documents (Form XVII Auction Minutes, Form XXI Subscriber Passbook, A5 Subscription Receipt, Prize Payout Voucher) are delivered as binary PDF blobs (`application/pdf`) streamed through the Next.js BFF proxy (`/bff/api/v1/pdf/*`).
+  - Requests are invoked via typed `@kumaran/api-client` passing `parseAs: 'blob'`, avoiding raw `fetch()` or separate token headers.
+  - The browser download is triggered cleanly by creating a transient hidden anchor `<a download="filename">`, invoking `.click()`, and deterministically revoking `URL.revokeObjectURL(objectUrl)` in a `finally` block.
+  - **Eliminates Failure Modes**:
+    1. Zero popup blocker interceptions (replaces delayed/asynchronous `window.open` calls).
+    2. Zero raw JSON text displays (replaces unintended non-PDF API endpoints).
+    3. Zero internal network crashes (`ERR_NAME_NOT_RESOLVED` caused by local Docker MinIO hostnames `http://minio:9000`).
+- **High-Contrast `@media print` Stylesheet (`app/globals.css`)**:
+  - Standardizes browser printing across all statutory registers (`/reports/cash-book`, `/reports/ledger`, `/reports/minutes`, and `/reports/audit-logs`).
+  - Automatically hides dashboard chrome (`nav`, `header`, `aside`, `footer`, `button:not(.print:show)`, `.print:hidden`).
+  - Resets all dark backgrounds (`bg-slate-950`, `bg-slate-900`) to pure `#ffffff` and text colors to high-contrast `#0f172a` black/slate.
+  - Formats tables with `page-break-inside: auto` and `thead { display: table-header-group }` for multi-page paper ledger printing without text truncation or overflow clipping.

@@ -14,9 +14,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
-import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
 import { downloadCsv } from '@/lib/csv-export';
+import { downloadMinutesPdf } from '@/lib/pdf-download';
 import { FormXviiKpiBar } from '@/components/reports/form-xvii-kpi-bar';
 import {
   FormXviiAuctionRecord,
@@ -161,9 +162,11 @@ function FormXviiMinutesContent() {
     }
   };
 
-  const handleDownloadPdf = (auctionId: string) => {
-    if (typeof window !== 'undefined') {
-      window.open(`${getApiBaseUrl()}/api/v1/auctions/${auctionId}/minutes/pdf`, '_blank');
+  const handleDownloadPdf = async (auctionId: string) => {
+    try {
+      await downloadMinutesPdf(auctionId, `form-xvii-minutes-${auctionId.slice(0, 8)}.pdf`);
+    } catch (err) {
+      console.error('Failed to download Form XVII PDF', err);
     }
   };
 

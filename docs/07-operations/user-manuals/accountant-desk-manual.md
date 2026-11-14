@@ -100,7 +100,12 @@ flowchart TD
    - The system **strictly rejects partial payments** (e.g., ₹2,000) and **advance balances**.
 6. Select Payment Mode: **`CASH`** (or `UPI` if scanned via office counter QR).
 7. Click **"Submit & Issue Receipt"** (`POST /payments`).
-8. The system instantly generates the official sequential receipt number (e.g., `KC-REC-PRD-2026-00124`) and sends a free push notification to the customer's mobile app.
+8. Click **"Submit & Issue Receipt"** (`POST /payments`).
+9. The system instantly generates the official sequential receipt number (e.g., `KC-REC-PRD-2026-00124`) and sends a free push notification to the customer's mobile app.
+10. **Receipt Printing & Passbook PDF Download**:
+    - Click **"Print A5 Receipt"** to print the official bilingual counter receipt slip formatted exactly for A5 paper.
+    - Click **"Download PDF"** to save an offline copy (`downloadReceiptPdf`) delivered directly as an authenticated binary blob via the BFF proxy.
+    - If the customer requests their 20-month continuous statement, open their profile, navigate to the **Form XXI Passbook** tab, and click **"Download Passbook PDF"** (`downloadPassbookPdf`) to hand them an official signed ledger copy.
 
 ---
 
@@ -295,7 +300,9 @@ flowchart TD
 4. Review the 12-Column Cash Balance:
    - **Opening Cash** + **Total Receipts** (Walk-in cash + Agent handovers) - **Total Disbursements** (Prize payouts + Expenses) = **Closing Cash Balance**.
 5. Confirm that the physical notes inside the safe match the software balance to the exact rupee.
-6. Click **"Export PDF"**, print the daily cash sheet, sign your initials alongside the Partner's signature, and lock the vault.
+6. Click **"Print Sheet"**: The built-in `@media print` stylesheet automatically hides all sidebars, topbar navigation, and dark-mode styling, rendering a high-contrast black-on-white 12-column daily cash sheet suitable for paper filing.
+7. Click **"Export CSV"** if a digital spreadsheet is required for ledger audit reconciliation.
+8. Sign your initials alongside the Partner's signature on the physical printed sheet and lock the vault.
 
 ---
 

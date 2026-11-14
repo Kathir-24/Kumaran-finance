@@ -180,6 +180,11 @@ flowchart TD
    - Calculates the **Universal Equal Dividend**: allocated equally across **all members in the chit group, INCLUDING the auction winner**.
    - Uniformly sets next month's net installment: $I_{net} = I_{base} - Div_{ticket}$.
    - Publishes the statutory **Form XVII Minutes** ready for printing, physical signatures, and filing with the Chit Registrar.
+5. **Downloading & Printing Form XVII Minutes**:
+   - Navigate to `/reports/minutes` or open the auction card on Web.
+   - Click **"Download PDF"**: Instantly downloads the official Form XVII statutory PDF (`application/pdf`) streamed securely via the BFF pipeline without pop-up blockers or raw JSON display bugs.
+   - Alternatively, click **"Print Sheet"**: Triggers clean `@media print` formatting, hiding web navigation and rendering a high-contrast black-on-white proceedings sheet.
+   - Print two physical copies on branch paper, obtain signatures from the Foreman and subscribers present, and file one copy with the Chit Registrar within the 21-day statutory window. Once filed, click **"Record Registrar Filing"** to enter the Challan reference number.
 
 ---
 

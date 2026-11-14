@@ -4,11 +4,15 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Award,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
+import { downloadPassbookPdf } from '@/lib/pdf-download';
 import { FormXxiKpiBar } from './form-xxi-kpi-bar';
 
 export interface FormXxiMonthlyScheduleItem {
@@ -53,8 +57,23 @@ interface FormXxiTableProps {
 
 export function FormXxiTable({ ledger }: FormXxiTableProps) {
   const t = useTranslations('reports.ledger');
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
   const { customer, summary, monthlySchedule } = ledger;
+
+  const handleDownloadPdf = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadPassbookPdf(
+        ledger.ticketId,
+        `form-xxi-passbook-t${ledger.ticketNumber}-${customer.customerCode}.pdf`,
+      );
+    } catch (err) {
+      console.error('Failed to download Form XXI PDF', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="space-y-4 print:space-y-2">
@@ -97,9 +116,25 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
               </div>
             </div>
 
-            <Badge variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10 w-fit text-xs">
-              Form XXI Passbook
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10 w-fit text-xs">
+                Form XXI Passbook
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isDownloading}
+                onClick={handleDownloadPdf}
+                className="h-7 text-xs gap-1 border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 print:hidden"
+              >
+                {isDownloading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="h-3 w-3" />
+                )}
+                <span>PDF</span>
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 space-y-4">

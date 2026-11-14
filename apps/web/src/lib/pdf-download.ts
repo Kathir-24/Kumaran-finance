@@ -67,3 +67,35 @@ export async function downloadVoucherPdf(
     deps,
   );
 }
+
+export async function downloadMinutesPdf(
+  auctionId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  await downloadPdfAndSave(
+    client.GET('/api/v1/pdf/minutes/{auctionId}', {
+      params: { path: { auctionId } },
+      parseAs: 'blob',
+    }),
+    filename,
+    deps,
+  );
+}
+
+export async function downloadPassbookPdf(
+  ticketId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  await downloadPdfAndSave(
+    client.GET('/api/v1/pdf/passbook/{ticketId}', {
+      params: { path: { ticketId } },
+      parseAs: 'blob',
+    }),
+    filename,
+    deps,
+  );
+}

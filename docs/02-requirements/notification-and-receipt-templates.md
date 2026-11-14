@@ -199,7 +199,8 @@ To maintain the leanest possible operational expenditure and eliminate third-par
 
 ### 5.2 Delivery & Export Methods
 - **Web Admin Portal (Desktop PC)**:
-  - **"Download PDF"**: Generates official A4 PDF formatted with Kumaran Finance letterhead for office filing or printing for a visiting customer.
+  - **"Download PDF" (Authenticated Binary Blobs)**: Generates official PDF formatted with Kumaran Finance letterhead for office filing or printing. Downloads are executed via typed `@kumaran/api-client` (`parseAs: 'blob'`) routing through the Next.js BFF proxy (`/bff/api/v1/pdf/...`) directly to the browser. Avoids pop-up blockers, CORS restrictions, and internal Docker/MinIO DNS resolution issues.
+  - **"Print Sheet / Passbook" (Clean `@media print` Layout)**: Triggers native `window.print()` using dedicated print stylesheets. Automatically strips sidebars, topbar navigation, buttons, and dark-mode styling into crisp, high-contrast black-on-white tables matching physical ledger paper.
   - **"Export Excel / CSV"**: Structured tabular export for the CA Auditor to import into Tally or spreadsheet tools.
 - **Mobile App (For Partners on the Move)**:
   - **"Share Statement / Summary"**: Uses the native Android share sheet to transfer the generated PDF via WhatsApp, Bluetooth, or messaging without recurring API costs.

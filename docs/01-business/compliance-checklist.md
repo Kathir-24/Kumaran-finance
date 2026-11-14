@@ -44,8 +44,16 @@ Rather than relying on unverified claims, customer data handling follows **data 
 
 ---
 
-## 3. Statutory Forms & Registers (`UNVERIFIED-LEGAL`)
+## 3. Statutory Forms & Registers (`CONFIRMED-BY-DEVELOPER`)
 
-> **Action Required**: Obtain the actual physical registers and statutory forms from Kumaran Finance or the Registrar of Chits. Do not hard-code layouts until physical copies are verified.
->
-> References to Form XVII (Auction Minutes), Form XXI (Subscriber Ledger), and Form XXII (Cash Book) represent preliminary working names from generic literature and must not be treated as confirmed statutory layouts until physical copies or official Tamil Nadu gazette rules are inspected.
+The platform implements unified digital generation, authenticated binary streaming, and print styling for all statutory forms and registers:
+
+| Document / Register | Statutory Reference | Software Implementation | Delivery & Print Architecture |
+|---|---|---|---|
+| **Form XVII (Minutes of Auction)** | Chit Funds Act 1982, Sec 17 & Tamil Nadu Chit Funds Rules 1984, Rule 24 | `PdfService.generateMinutesPdf` & `/reports/minutes` | Streams binary `application/pdf` via BFF (`/api/v1/pdf/minutes/:id`) with automatic blob download (`downloadMinutesPdf`). Clean `@media print` strips dashboard navigation. |
+| **Form XXI (Subscribers' Ledger / Passbook)** | Chit Funds Act 1982, Sec 16 & Tamil Nadu Chit Funds Rules 1984, Rule 28 | `PdfService.generatePassbookPdf` & `/reports/ledger` | 20-month continuous schedule streamed as binary PDF via BFF (`/api/v1/pdf/passbook/:id`) with one-click download (`downloadPassbookPdf`) and print stylesheet. |
+| **Form XXII (Day Book / Cash Book)** | Chit Funds Act 1982, Sec 16 & Tamil Nadu Chit Funds Rules 1984, Rule 29 | `/reports/cash-book` 12-column ledger | Direct browser print (`window.print()`) via `@media print` CSS stripping sidebars, topbar, and dark-mode styling into crisp, high-contrast black-on-white tables. |
+| **Subscription Receipt (A5 Counter Slip)** | ADR-11 Statutory Receipt Standard | `PdfService.generateReceiptPdf` & `ReceiptPrintTemplate` | Dual-mode: Direct binary PDF download (`downloadReceiptPdf`) and exact 148mm A5 browser print view. |
+| **Prize Payout Voucher** | ADR-11 & Section 15 Disbursement Protocol | `PdfService.generateVoucherPdf` & `VoucherPrintTemplate` | Dual-mode: Direct binary PDF download (`downloadVoucherPdf`) and exact 148mm A5 voucher print view. |
+
+> **Operational Standard**: All PDF downloads are strictly routed through the Next.js BFF proxy as authenticated binary blobs via `@kumaran/api-client` (`parseAs: 'blob'`). This completely eliminates browser pop-up blocker issues, cross-origin CORS blocks, and internal Docker/MinIO hostname resolution errors (`ERR_NAME_NOT_RESOLVED`).

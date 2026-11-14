@@ -14,6 +14,8 @@ import { KumaranApiError, unwrapApiResponse } from '../src/lib/api-client.ts';
 import {
   downloadReceiptPdf,
   downloadVoucherPdf,
+  downloadMinutesPdf,
+  downloadPassbookPdf,
   triggerBlobDownload,
 } from '../src/lib/pdf-download.ts';
 
@@ -98,14 +100,33 @@ test('DEF-FE-05 (N2): pdf-download downloads authenticated PDF blobs via apiClie
     triggerDownload: (blob, filename) => downloads.push({ blob, filename }),
   });
 
-  assert.equal(calls.length, 2);
+  await downloadMinutesPdf('auc-789', 'form-xvii-minutes-auc-789.pdf', {
+    getClient: () => mockClient,
+    triggerDownload: (blob, filename) => downloads.push({ blob, filename }),
+  });
+
+  await downloadPassbookPdf('tkt-101', 'form-xxi-passbook-tkt-101.pdf', {
+    getClient: () => mockClient,
+    triggerDownload: (blob, filename) => downloads.push({ blob, filename }),
+  });
+
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].url, '/api/v1/pdf/receipt/{paymentId}');
   assert.deepEqual(calls[0].opts, { params: { path: { paymentId: 'pay-123' } }, parseAs: 'blob' });
   assert.equal(calls[1].url, '/api/v1/pdf/voucher/{auctionId}');
   assert.deepEqual(calls[1].opts, { params: { path: { auctionId: 'auc-456' } }, parseAs: 'blob' });
+  assert.equal(calls[2].url, '/api/v1/pdf/minutes/{auctionId}');
+  assert.deepEqual(calls[2].opts, { params: { path: { auctionId: 'auc-789' } }, parseAs: 'blob' });
+  assert.equal(calls[3].url, '/api/v1/pdf/passbook/{ticketId}');
+  assert.deepEqual(calls[3].opts, { params: { path: { ticketId: 'tkt-101' } }, parseAs: 'blob' });
   assert.deepEqual(
     downloads.map((d) => d.filename),
-    ['receipt-KC-REC-001.pdf', 'prize-voucher-auc-456.pdf'],
+    [
+      'receipt-KC-REC-001.pdf',
+      'prize-voucher-auc-456.pdf',
+      'form-xvii-minutes-auc-789.pdf',
+      'form-xxi-passbook-tkt-101.pdf',
+    ],
   );
 
   // Verify triggerBlobDownload revokes object URL and removes anchor even when click throws
