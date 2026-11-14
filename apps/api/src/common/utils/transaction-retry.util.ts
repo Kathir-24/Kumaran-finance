@@ -33,7 +33,10 @@ export function isTransientTransactionError(err: any): boolean {
     (code === 'P2002' &&
       (message.includes('receiptNumber') ||
         message.includes('Receipt_receiptNumber_key') ||
-        metaTarget.includes('receiptNumber'))) || // Sequential receipt generation collision retry
+        metaTarget.includes('receiptNumber') ||
+        message.includes('customerCode') ||
+        message.includes('Customer_customerCode_key') ||
+        metaTarget.includes('customerCode'))) || // Sequential receipt/customer generation collision retry
     message.includes('deadlock detected') ||
     message.includes('could not serialize access') ||
     message.includes('Transaction failed due to a write conflict')

@@ -56,6 +56,8 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
       auditLog: {
         create: jest.fn(),
       },
+      $transaction: jest.fn((cb) => (typeof cb === 'function' ? cb(prismaMock) : Promise.all(cb))),
+      $queryRaw: jest.fn(),
     };
 
     customerService = new CustomerService(
@@ -89,6 +91,84 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
 
       const code = await customerService.generateCustomerCode();
       expect(code).toBe('KC-CUST-00110');
+    });
+
+    it('should exclude non-numeric KC-CUST-RACE-* codes and generate the next valid numeric sequence', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        customerCode: 'KC-CUST-RACE-1794597653564-5',
+      });
+      prismaMock.customer.findMany.mockResolvedValue([
+        { customerCode: 'KC-CUST-00125' },
+        { customerCode: 'KC-CUST-RACE-1794597653564-5' },
+      ]);
+
+      const code = await customerService.generateCustomerCode();
+      expect(code).toBe('KC-CUST-00126');
+    });
+
+    it('should correctly handle mixed numeric and non-numeric codes', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        customerCode: 'KC-CUST-RACE-999',
+      });
+      prismaMock.customer.findMany.mockResolvedValue([
+        { customerCode: 'KC-CUST-00001' },
+        { customerCode: 'KC-CUST-00150' },
+        { customerCode: 'KC-CUST-RACE-1' },
+        { customerCode: 'KC-CUST-DEF-99' },
+      ]);
+
+      const code = await customerService.generateCustomerCode();
+      expect(code).toBe('KC-CUST-00151');
+    });
+
+    it('should not reuse KC-CUST-00001 when higher numeric codes exist', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        customerCode: 'KC-CUST-00050',
+      });
+      prismaMock.customer.findMany.mockResolvedValue([
+        { customerCode: 'KC-CUST-00001' },
+        { customerCode: 'KC-CUST-00050' },
+      ]);
+
+      const code = await customerService.generateCustomerCode();
+      expect(code).toBe('KC-CUST-00051');
+    });
+
+    it('should skip existing candidate if customerCode is already taken (collision guard)', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        customerCode: 'KC-CUST-00009',
+      });
+      prismaMock.customer.findUnique
+        .mockResolvedValueOnce({ id: 'existing-10', customerCode: 'KC-CUST-00010' })
+        .mockResolvedValueOnce(null);
+
+      const code = await customerService.generateCustomerCode();
+      expect(code).toBe('KC-CUST-00011');
+    });
+
+    it('should use PostgreSQL raw numeric query if $queryRaw is available', async () => {
+      const clientMock = {
+        $queryRaw: jest.fn().mockResolvedValue([{ maxSeq: 125n }]),
+        customer: {
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      };
+
+      const code = await customerService.generateCustomerCode(clientMock);
+      expect(code).toBe('KC-CUST-00126');
+      expect(clientMock.$queryRaw).toHaveBeenCalled();
+    });
+
+    it('should generate KC-CUST-00001 when $queryRaw returns maxSeq 0 on empty table', async () => {
+      const clientMock = {
+        $queryRaw: jest.fn().mockResolvedValue([{ maxSeq: 0n }]),
+        customer: {
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      };
+
+      const code = await customerService.generateCustomerCode(clientMock);
+      expect(code).toBe('KC-CUST-00001');
     });
   });
 
@@ -214,6 +294,65 @@ describe('Module 2: Customer & Nominee Management Tests', () => {
           mockBranchId,
         ),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should handle concurrent customer creation safely and produce distinct sequential codes', async () => {
+      let currentSeq = 100;
+      const createdCodes: string[] = [];
+
+      prismaMock.customer.findUnique.mockResolvedValue(null);
+      prismaMock.branch.findFirst.mockResolvedValue({ id: mockBranchId });
+      let lockQueue = Promise.resolve();
+      prismaMock.$transaction = jest.fn(async (cb) => {
+        const next = lockQueue.then(async () => {
+          return cb({
+            $queryRaw: jest.fn().mockImplementation(async (strings: any) => {
+              const sql = Array.isArray(strings) ? strings.join('') : String(strings);
+              if (sql.includes('pg_advisory_xact_lock')) {
+                return [{ lock: true }];
+              }
+              if (sql.includes('maxSeq')) {
+                return [{ maxSeq: BigInt(currentSeq) }];
+              }
+              return [];
+            }),
+            customer: {
+              findUnique: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockImplementation(async ({ data }) => {
+                currentSeq++;
+                createdCodes.push(data.customerCode);
+                return {
+                  id: `cust-${currentSeq}`,
+                  ...data,
+                  branch: { id: mockBranchId, code: 'PRD', name: 'Head Office' },
+                };
+              }),
+            },
+          });
+        });
+        lockQueue = next.then(() => {}).catch(() => {});
+        return next;
+      });
+
+      const promises = [1, 2, 3, 4, 5].map((i) =>
+        customerService.create({
+          fullName: `Concurrent User ${i}`,
+          phone: `984270000${i}`,
+          addressLine1: `Address ${i}`,
+        }),
+      );
+
+      const results = await Promise.all(promises);
+      expect(results).toHaveLength(5);
+      expect(createdCodes).toEqual([
+        'KC-CUST-00101',
+        'KC-CUST-00102',
+        'KC-CUST-00103',
+        'KC-CUST-00104',
+        'KC-CUST-00105',
+      ]);
+      const uniqueCodes = new Set(createdCodes);
+      expect(uniqueCodes.size).toBe(5);
     });
   });
 

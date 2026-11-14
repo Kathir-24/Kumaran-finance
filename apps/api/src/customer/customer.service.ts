@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
 import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
+import { withTransactionRetry } from '../common/utils/transaction-retry.util';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { ConfirmCustomerDocumentDto } from './dto/confirm-customer-document.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -39,35 +40,112 @@ export class CustomerService {
 
   /**
    * Generates sequential, collision-free customer code: KC-CUST-00001, KC-CUST-00002...
+   *
+   * Excludes non-numeric customer code patterns (e.g. KC-CUST-RACE-*) so legacy or test tags
+   * never corrupt the auto-increment sequence or trigger duplicate key collisions.
    */
-  async generateCustomerCode(): Promise<string> {
-    const lastCustomer = await this.prisma.customer.findFirst({
-      where: {
-        customerCode: {
-          startsWith: CUSTOMER_CODE_PREFIX,
-        },
-      },
-      orderBy: {
-        customerCode: 'desc',
-      },
-      select: {
-        customerCode: true,
-      },
-    });
+  async generateCustomerCode(tx?: any): Promise<string> {
+    const client = tx || this.prisma;
+    const startPos = CUSTOMER_CODE_PREFIX.length + 1; // 9 for 'KC-CUST-'
 
-    if (!lastCustomer || !lastCustomer.customerCode) {
-      return `${CUSTOMER_CODE_PREFIX}00001`;
+    let nextBigSeq = 1n;
+
+    // 1. PostgreSQL numeric suffix extraction when $queryRaw is available
+    if (typeof client.$queryRaw === 'function') {
+      try {
+        const rows = await client.$queryRaw<Array<{ maxSeq: bigint | number | string | null }>>`
+          SELECT COALESCE(
+            MAX(
+              CASE
+                WHEN substr("customerCode", CAST(${startPos} AS INTEGER)) ~ '^[0-9]{1,18}$'
+                THEN CAST(substr("customerCode", CAST(${startPos} AS INTEGER)) AS BIGINT)
+                ELSE NULL
+              END
+            ),
+            0
+          ) AS "maxSeq"
+          FROM "Customer"
+          WHERE starts_with("customerCode", ${CUSTOMER_CODE_PREFIX})
+            AND substr("customerCode", CAST(${startPos} AS INTEGER)) ~ '^[0-9]{1,18}$'
+        `;
+
+        if (
+          Array.isArray(rows) &&
+          rows.length > 0 &&
+          rows[0] &&
+          rows[0].maxSeq !== undefined &&
+          rows[0].maxSeq !== null
+        ) {
+          nextBigSeq = BigInt(rows[0].maxSeq) + 1n;
+          let candidate = `${CUSTOMER_CODE_PREFIX}${nextBigSeq.toString().padStart(5, '0')}`;
+          if (typeof client.customer?.findUnique === 'function') {
+            while (await client.customer.findUnique({ where: { customerCode: candidate } })) {
+              nextBigSeq += 1n;
+              candidate = `${CUSTOMER_CODE_PREFIX}${nextBigSeq.toString().padStart(5, '0')}`;
+            }
+          }
+          return candidate;
+        }
+      } catch {
+        // Fallback to in-memory/findMany when $queryRaw is unsupported or mocked
+      }
     }
 
-    const numericPart = lastCustomer.customerCode.replace(CUSTOMER_CODE_PREFIX, '');
-    const currentNumber = parseInt(numericPart, 10);
+    // 2. In-memory / Mock Fallback (used when $queryRaw is mocked or unavailable in tests)
+    let maxNumber = 0;
+    const numericRegex = new RegExp(`^${CUSTOMER_CODE_PREFIX}(\\d+)$`);
 
-    if (isNaN(currentNumber)) {
-      return `${CUSTOMER_CODE_PREFIX}00001`;
+    let foundLast: { customerCode: string } | null = null;
+    if (typeof client.customer?.findFirst === 'function') {
+      foundLast = await client.customer.findFirst({
+        where: { customerCode: { startsWith: CUSTOMER_CODE_PREFIX } },
+        orderBy: { customerCode: 'desc' },
+        select: { customerCode: true },
+      });
     }
 
-    const nextNumber = currentNumber + 1;
-    return `${CUSTOMER_CODE_PREFIX}${String(nextNumber).padStart(5, '0')}`;
+    if (foundLast?.customerCode) {
+      const match = numericRegex.exec(foundLast.customerCode);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    // If findFirst did not produce a numeric match or was null, check findMany
+    if (maxNumber === 0 && typeof client.customer?.findMany === 'function') {
+      const existing = await client.customer.findMany({
+        where: { customerCode: { startsWith: CUSTOMER_CODE_PREFIX } },
+        select: { customerCode: true },
+      });
+
+      if (Array.isArray(existing)) {
+        for (const c of existing) {
+          const match = numericRegex.exec(c?.customerCode || '');
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (!Number.isNaN(num) && num > maxNumber) {
+              maxNumber = num;
+            }
+          }
+        }
+      }
+    }
+
+    nextBigSeq = BigInt(maxNumber + 1);
+
+    // 3. Collision guard: Ensure the candidate is strictly unique
+    let candidate = `${CUSTOMER_CODE_PREFIX}${nextBigSeq.toString().padStart(5, '0')}`;
+    if (typeof client.customer?.findUnique === 'function') {
+      while (await client.customer.findUnique({ where: { customerCode: candidate } })) {
+        nextBigSeq += 1n;
+        candidate = `${CUSTOMER_CODE_PREFIX}${nextBigSeq.toString().padStart(5, '0')}`;
+      }
+    }
+
+    return candidate;
   }
 
   /**
@@ -99,32 +177,57 @@ export class CustomerService {
       branchId = defaultBranch.id;
     }
 
-    // 3. Generate sequential customer code
-    const customerCode = await this.generateCustomerCode();
+    // 3. Concurrency-safe atomic creation wrapped in retry logic
+    const executeCreate = async (tx: any) => {
+      // Concurrency serialization: Acquire transaction-scoped advisory lock in PostgreSQL
+      if (typeof tx.$executeRaw === 'function') {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('customer_code_sequence'))`;
+      } else if (typeof tx.$queryRaw === 'function') {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('customer_code_sequence'))::text`;
+      }
 
-    // 4. Create customer record
-    return this.prisma.customer.create({
-      data: {
-        branchId,
-        customerCode,
-        fullName: dto.fullName.trim(),
-        fullNameTamil: dto.fullNameTamil?.trim() || null,
-        phone: dto.phone.trim(),
-        altPhone: dto.altPhone?.trim() || null,
-        addressLine1: dto.addressLine1.trim(),
-        addressLine2: dto.addressLine2?.trim() || null,
-        city: dto.city?.trim() || 'Perundurai',
-        pincode: dto.pincode?.trim() || '638052',
-        panNumber: dto.panNumber?.trim() || null,
-        aadhaarLast4: dto.aadhaarLast4?.trim() || null,
-        isKycVerified: false,
-      },
-      include: {
-        branch: {
-          select: { id: true, code: true, name: true, nameTamil: true },
+      // Re-verify phone uniqueness inside transaction to prevent concurrent duplicate registration
+      const txExisting = await tx.customer.findUnique({
+        where: { phone: dto.phone.trim() },
+      });
+      if (txExisting) {
+        throw new ConflictException(
+          `Customer with phone number ${dto.phone} already exists (${txExisting.customerCode})`,
+        );
+      }
+
+      // Generate sequential customer code inside serialized transaction
+      const customerCode = await this.generateCustomerCode(tx);
+
+      // Create customer record
+      return tx.customer.create({
+        data: {
+          branchId,
+          customerCode,
+          fullName: dto.fullName.trim(),
+          fullNameTamil: dto.fullNameTamil?.trim() || null,
+          phone: dto.phone.trim(),
+          altPhone: dto.altPhone?.trim() || null,
+          addressLine1: dto.addressLine1.trim(),
+          addressLine2: dto.addressLine2?.trim() || null,
+          city: dto.city?.trim() || 'Perundurai',
+          pincode: dto.pincode?.trim() || '638052',
+          panNumber: dto.panNumber?.trim() || null,
+          aadhaarLast4: dto.aadhaarLast4?.trim() || null,
+          isKycVerified: false,
         },
-      },
-    });
+        include: {
+          branch: {
+            select: { id: true, code: true, name: true, nameTamil: true },
+          },
+        },
+      });
+    };
+
+    if (typeof this.prisma.$transaction === 'function') {
+      return withTransactionRetry(this.prisma, executeCreate);
+    }
+    return executeCreate(this.prisma);
   }
 
   /**

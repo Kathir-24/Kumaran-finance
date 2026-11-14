@@ -43,6 +43,23 @@ describe('TransactionRetryUtil (Deadlock & Transient Conflict Recovery)', () => 
       expect(isTransientTransactionError(err)).toBe(true);
     });
 
+    it('RETRY-04C: identifies P2002 on customerCode as transient retry candidate', () => {
+      const err = {
+        code: 'P2002',
+        message: 'Unique constraint failed on the fields: (`customerCode`)',
+      };
+      expect(isTransientTransactionError(err)).toBe(true);
+    });
+
+    it('RETRY-04D: identifies P2002 via Prisma meta.target containing customerCode', () => {
+      const err = {
+        code: 'P2002',
+        meta: { target: ['customerCode'] },
+        message: 'Unique constraint failed',
+      };
+      expect(isTransientTransactionError(err)).toBe(true);
+    });
+
     it('RETRY-05: rejects P2002 on idempotencyKey or transactionRef from retry', () => {
       const err1 = {
         code: 'P2002',
