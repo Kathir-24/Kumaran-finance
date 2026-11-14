@@ -71,35 +71,39 @@ export class PayoutVoucherTemplate {
 
       // Financial Breakdown Box
       const boxY = doc.y;
-      doc.rect(25, boxY, pageWidth, 60).fillAndStroke('#f8f9fa', '#ced4da');
+      const boxHeight = 64;
+      doc.rect(25, boxY, pageWidth, boxHeight).fillAndStroke('#f8f9fa', '#ced4da');
       doc.fillColor('#000');
 
       doc.font(boldFont).fontSize(9).text('நிதி விவரங்கள் / FINANCIAL DETAILS:', 35, boxY + 8);
       doc.font(regularFont).fontSize(9);
-      doc.text(`மொத்த சீட்டு மதிப்பு / Chit Value: ₹ ${data.chitValue.toLocaleString('en-IN')}`, 35, boxY + 24);
-      doc.text(`ஏல கழிவு / Bid Discount: ₹ ${data.bidDiscount.toLocaleString('en-IN')}`, 35, boxY + 40);
+      doc.text(`மொத்த சீட்டு மதிப்பு / Chit Value: ₹ ${data.chitValue.toLocaleString('en-IN')}`, 35, boxY + 25);
+      doc.text(`ஏல கழிவு / Bid Discount: ₹ ${data.bidDiscount.toLocaleString('en-IN')}`, 35, boxY + 43);
 
-      doc.font(boldFont).fontSize(10);
-      doc.text(`நிகர பரிசு தொகை / NET PRIZE: ₹ ${data.netPrizeMoney.toLocaleString('en-IN')}`, 300, boxY + 24);
+      const rightBoxX = 295;
+      const rightBoxWidth = pageWidth - (rightBoxX - 25) - 10;
+      doc.font(boldFont).fontSize(9.5);
+      doc.text(`நிகர பரிசு தொகை / NET PRIZE: ₹ ${data.netPrizeMoney.toLocaleString('en-IN')}`, rightBoxX, boxY + 8, { width: rightBoxWidth });
       doc.font(regularFont).fontSize(8.5);
-      doc.text(`முறை / Mode: ${data.disbursementMode}`, 300, boxY + 40);
-      doc.text(`குறிப்பு எண் / Ref: ${data.paymentReference}`, 420, boxY + 40);
+      doc.text(`முறை / Mode: ${data.disbursementMode}`, rightBoxX, boxY + 26, { width: rightBoxWidth });
+      doc.text(`குறிப்பு எண் / Ref: ${data.paymentReference}`, rightBoxX, boxY + 43, { width: rightBoxWidth });
 
-      doc.y = boxY + 68;
+      doc.x = 25;
+      doc.y = boxY + boxHeight + 8;
 
       // Words
       doc.font(regularFont).fontSize(8.5);
-      doc.text(`தொகை (சொற்களில்): ${RupeeWordsHelper.toTamilWords(data.netPrizeMoney)}`);
-      doc.text(`In Words: ${RupeeWordsHelper.toEnglishWords(data.netPrizeMoney)}`);
+      doc.text(`தொகை (சொற்களில்): ${RupeeWordsHelper.toTamilWords(data.netPrizeMoney)}`, 25, doc.y, { width: pageWidth });
+      doc.text(`In Words: ${RupeeWordsHelper.toEnglishWords(data.netPrizeMoney)}`, 25, doc.y + 2, { width: pageWidth });
       doc.moveDown(0.4);
 
       // Safety Proof Checklist Stamp (ADR-15)
-      doc.font(boldFont).fontSize(8.5).text('நிறுவன பாதுகாப்பு சரிபார்ப்பு / COMPANY SAFETY PROOF CHECKLIST (ADR-15):');
+      doc.font(boldFont).fontSize(8.5).text('நிறுவன பாதுகாப்பு சரிபார்ப்பு / COMPANY SAFETY PROOF CHECKLIST (ADR-15):', 25, doc.y, { width: pageWidth });
       doc.font(regularFont).fontSize(8);
       const agr = data.agreementSigned ? 'சரி / YES' : 'இல்லை / NO';
       const nom = data.nomineeSigned ? 'சரி / YES' : 'இல்லை / NO';
       const chq = data.blankChequeDetails ? `காசோலை / Cheques (${data.blankChequeDetails})` : 'தேவையில்லை / N/A';
-      doc.text(`• ஒப்பந்தம் / Agreement Signed: [ ${agr} ]   • வாரிசு கையொப்பம் / Nominee Signed: [ ${nom} ]   • பாதுகாப்பு / Security: [ ${chq} ]`);
+      doc.text(`• ஒப்பந்தம் / Agreement Signed: [ ${agr} ]   • வாரிசு கையொப்பம் / Nominee Signed: [ ${nom} ]   • பாதுகாப்பு / Security: [ ${chq} ]`, 25, doc.y + 2, { width: pageWidth });
       doc.moveDown(0.8);
 
       // Signature Blocks (Dual Control)

@@ -66,21 +66,29 @@ export class SubscriptionReceiptTemplate {
       // 3. Receipt Metadata Grid (2-Column)
       const metaStartY = doc.y;
       const colWidth = (pageWidth - 10) / 2;
+      const rightColX = leftX + colWidth + 10;
 
       // Left Column: Receipt & Transaction Info
       const dateStr = data.date.toISOString().split('T')[0];
       doc.font(regularFont).fontSize(8);
-      doc.text(`ரசீது எண் / Receipt No: ${data.receiptNumber}`, leftX, metaStartY);
-      doc.text(`தேதி / Date: ${dateStr}`, leftX, doc.y + 2);
-      doc.text(`கட்டண முறை / Mode: ${data.paymentMethod}`, leftX, doc.y + 2);
+      doc.text(`ரசீது எண் / Receipt No: ${data.receiptNumber}`, leftX, metaStartY, { width: colWidth });
+      const recEndY = doc.y;
+      doc.text(`தேதி / Date: ${dateStr}`, leftX, recEndY + 2, { width: colWidth });
+      const dateEndY = doc.y;
+      doc.text(`கட்டண முறை / Mode: ${data.paymentMethod}`, leftX, dateEndY + 2, { width: colWidth });
+      const leftEndY = doc.y;
 
       // Right Column: Scheme & Ticket Info
-      const rightColX = leftX + colWidth + 10;
-      doc.text(`சீட்டு குழு / Chit Group: ${data.groupCode}`, rightColX, metaStartY);
-      doc.text(`தவணை மாதம் / Month: ${data.installmentMonth} / ${data.durationMonths}`, rightColX, doc.y + 2);
-      doc.text(`டிக்கெட் எண் / Ticket No: #${data.ticketNumber}`, rightColX, doc.y + 2);
+      doc.text(`சீட்டு குழு / Chit Group: ${data.groupCode}`, rightColX, metaStartY, { width: colWidth });
+      const groupEndY = doc.y;
+      doc.text(`தவணை மாதம் / Month: ${data.installmentMonth} / ${data.durationMonths}`, rightColX, groupEndY + 2, { width: colWidth });
+      const monthEndY = doc.y;
+      doc.text(`டிக்கெட் எண் / Ticket No: #${data.ticketNumber}`, rightColX, monthEndY + 2, { width: colWidth });
+      const rightEndY = doc.y;
 
-      doc.moveDown(0.8);
+      const metaEndY = Math.max(leftEndY, rightEndY);
+      doc.y = metaEndY + 6;
+      doc.x = leftX;
       doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).strokeColor('#E0E0E0').lineWidth(0.5).stroke();
       doc.moveDown(0.5);
 
@@ -154,9 +162,13 @@ export class SubscriptionReceiptTemplate {
 
       currentY += 25;
       doc.fontSize(6.5).fillColor('#555555');
-      doc.text('* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. / This is a computer-generated digital receipt.', leftX, currentY, { align: 'center', width: pageWidth });
-      doc.text('* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).', leftX, currentY + 9, { align: 'center', width: pageWidth });
-      doc.text('* The primary acknowledged legal proof of payment is the signed physical paper passbook.', leftX, currentY + 18, { align: 'center', width: pageWidth });
+      doc.x = leftX;
+      doc.y = currentY;
+      doc.text('* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. / This is a computer-generated digital receipt.', { align: 'center', width: pageWidth });
+      doc.moveDown(0.2);
+      doc.text('* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).', { align: 'center', width: pageWidth });
+      doc.moveDown(0.2);
+      doc.text('* The primary acknowledged legal proof of payment is the signed physical paper passbook.', { align: 'center', width: pageWidth });
 
       // KFC-PDF-001: Bold Red Diagonal Cancelled Watermark for Reversed Payments (ADR-07 & Q22)
       if (data.isCancelled) {

@@ -117,7 +117,7 @@ services:
       S3_BUCKET: ${MINIO_DEFAULT_BUCKET:-kumaran-chits-private}
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-at-least-64-characters-long-for-local-docker-fullstack-testing}
+      JWT_SECRET: ${JWT_SECRET:-kumaran-chits-dev-secret-key-replace-in-production-2026}
       JWT_EXPIRES_IN: 15m
       REFRESH_TOKEN_EXPIRES_IN: 7d
       DEFAULT_FOREMAN_COMMISSION_PERCENT: 4.00
@@ -168,7 +168,7 @@ services:
       S3_BUCKET: ${MINIO_DEFAULT_BUCKET:-kumaran-chits-private}
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-at-least-64-characters-long-for-local-docker-fullstack-testing}
+      JWT_SECRET: ${JWT_SECRET:-kumaran-chits-dev-secret-key-replace-in-production-2026}
       JWT_EXPIRES_IN: 15m
       REFRESH_TOKEN_EXPIRES_IN: 7d
       DEFAULT_FOREMAN_COMMISSION_PERCENT: 4.00
@@ -204,7 +204,7 @@ services:
       INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       NEXT_PUBLIC_BULL_BOARD_URL: ${NEXT_PUBLIC_BULL_BOARD_URL:-http://localhost:3000/admin/queues}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-at-least-64-characters-long-for-local-docker-fullstack-testing}
+      JWT_SECRET: ${JWT_SECRET:-kumaran-chits-dev-secret-key-replace-in-production-2026}
       # COOKIE_SECURE: "true" # Optional explicit override; otherwise driven by X-Forwarded-Proto https
       NEXT_TELEMETRY_DISABLED: "1"
     ports:

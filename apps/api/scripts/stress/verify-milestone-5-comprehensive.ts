@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const BASE_URL = 'http://127.0.0.1:3000/api/v1';
-const JWT_SECRET = 'dev-secret-key-at-least-64-characters-long-for-local-docker-fullstack-testing';
+const JWT_SECRET = process.env.JWT_SECRET || 'kumaran-chits-dev-secret-key-replace-in-production-2026';
 
 function queryDb(sql: string): string {
   try {

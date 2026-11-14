@@ -83,51 +83,55 @@ export class FormXviiMinutesTemplate {
       doc.rect(35, tableY, pageWidth, 68).fillAndStroke('#f8f9fa', '#ced4da');
       doc.fillColor('#000');
 
+      const colValX = 360;
+      const colValWidth = pageWidth - (colValX - 35) - 15;
+
       doc.font(regularFont).fontSize(8.5);
       doc.text(`வெற்றி பெற்ற ஏல கழிவு / Winning Bid Discount (Max 25%):`, 45, tableY + 8);
-      doc.font(boldFont).text(`₹ ${data.bidDiscount.toLocaleString('en-IN')}`, 380, tableY + 8);
+      doc.font(boldFont).text(`₹ ${data.bidDiscount.toLocaleString('en-IN')}`, colValX, tableY + 8, { width: colValWidth, align: 'right' });
 
       doc.font(regularFont).text(`நிறுவன முகவர் கழிவு / Foreman Commission (4%):`, 45, tableY + 22);
-      doc.font(boldFont).text(`₹ ${data.foremanCommissionAmount.toLocaleString('en-IN')}`, 380, tableY + 22);
+      doc.font(boldFont).text(`₹ ${data.foremanCommissionAmount.toLocaleString('en-IN')}`, colValX, tableY + 22, { width: colValWidth, align: 'right' });
 
       doc.font(regularFont).text(`பகிர்ந்தளிக்கப்படும் மொத்த லாபப்பங்கு / Total Universal Dividend:`, 45, tableY + 36);
-      doc.font(boldFont).text(`₹ ${data.totalDividend.toLocaleString('en-IN')}`, 380, tableY + 36);
+      doc.font(boldFont).text(`₹ ${data.totalDividend.toLocaleString('en-IN')}`, colValX, tableY + 36, { width: colValWidth, align: 'right' });
 
       doc.font(regularFont).text(`ஒரு டிக்கெட்டுக்கான லாபப்பங்கு / Dividend Per Ticket:`, 45, tableY + 50);
-      doc.font(boldFont).text(`₹ ${data.dividendPerTicket.toLocaleString('en-IN')}`, 380, tableY + 50);
+      doc.font(boldFont).text(`₹ ${data.dividendPerTicket.toLocaleString('en-IN')}`, colValX, tableY + 50, { width: colValWidth, align: 'right' });
 
+      doc.x = 35;
       doc.y = tableY + 76;
 
       doc.font(boldFont).fontSize(9.5);
-      doc.text(`வெற்றியாளருக்கான பரிசு தொகை / Prize Money: ₹ ${data.prizeMoney.toLocaleString('en-IN')}`);
-      doc.text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: ₹ ${data.nextMonthNetInstallment.toLocaleString('en-IN')} (அனைவருக்கும் / For All Members)`);
+      doc.text(`வெற்றியாளருக்கான பரிசு தொகை / Prize Money: ₹ ${data.prizeMoney.toLocaleString('en-IN')}`, 35, doc.y, { width: pageWidth });
+      doc.text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: ₹ ${data.nextMonthNetInstallment.toLocaleString('en-IN')} (அனைவருக்கும் / For All Members)`, 35, doc.y + 2, { width: pageWidth });
       doc.moveDown(0.5);
 
       // Winner Details Box
-      doc.font(boldFont).fontSize(9).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:');
+      doc.font(boldFont).fontSize(9).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:', 35, doc.y, { width: pageWidth });
       doc.font(regularFont).fontSize(8.5);
       const nameTamil = data.winnerNameTamil ? ` / ${data.winnerNameTamil}` : '';
-      doc.text(`டிக்கெட் / Ticket: #${data.winnerTicketNumber} | பெயர் / Name: ${data.winnerName}${nameTamil}`);
-      doc.text(`குறியீடு / Code: ${data.winnerCustomerCode} | தொலைபேசி / Mobile: ${data.winnerPhone}`);
+      doc.text(`டிக்கெட் / Ticket: #${data.winnerTicketNumber} | பெயர் / Name: ${data.winnerName}${nameTamil}`, 35, doc.y + 2, { width: pageWidth });
+      doc.text(`குறியீடு / Code: ${data.winnerCustomerCode} | தொலைபேசி / Mobile: ${data.winnerPhone}`, 35, doc.y + 2, { width: pageWidth });
       doc.moveDown(0.4);
 
       // Tie-Breaker Table if applicable (Option A)
       if (data.wasTieBreakWinner && data.tiedBidders && data.tiedBidders.length > 0) {
-        doc.font(boldFont).fontSize(8.5).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW (OPTION A):');
+        doc.font(boldFont).fontSize(8.5).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW (OPTION A):', 35, doc.y, { width: pageWidth });
         doc.font(regularFont).fontSize(8);
-        doc.text('அதிகபட்ச கழிவான 25% ஏலம் கேட்டவர்களிடையே நேரில் டோக்கன் குலுக்கல் மூலம் வெற்றியாளர் தேர்வு செய்யப்பட்டார்:');
+        doc.text('அதிகபட்ச கழிவான 25% ஏலம் கேட்டவர்களிடையே நேரில் டோக்கன் குலுக்கல் மூலம் வெற்றியாளர் தேர்வு செய்யப்பட்டார்:', 35, doc.y + 2, { width: pageWidth });
 
         data.tiedBidders.forEach((tb) => {
           const status = tb.isWinner ? '[வெற்றியாளர் / WINNER]' : '[பங்கேற்றவர் / Participant]';
-          doc.text(`  • டோக்கன் #${tb.tokenNumberDrawn ?? 'N/A'}: டிக்கெட் #${tb.ticketNumber} - ${tb.customerName} ${status}`);
+          doc.text(`  • டோக்கன் #${tb.tokenNumberDrawn ?? 'N/A'}: டிக்கெட் #${tb.ticketNumber} - ${tb.customerName} ${status}`, 35, doc.y + 2, { width: pageWidth });
         });
         doc.moveDown(0.4);
       }
 
       // Minutes Proceedings Text
-      doc.font(boldFont).fontSize(8.5).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:');
+      doc.font(boldFont).fontSize(8.5).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:', 35, doc.y, { width: pageWidth });
       doc.font(regularFont).fontSize(8);
-      doc.text(data.minutesText || 'ஏலம் முறைப்படி அமைதியான முறையில் உறுப்பினர்கள் முன்னிலையில் நடத்தப்பட்டது.');
+      doc.text(data.minutesText || 'ஏலம் முறைப்படி அமைதியான முறையில் உறுப்பினர்கள் முன்னிலையில் நடத்தப்பட்டது.', 35, doc.y + 2, { width: pageWidth });
       doc.moveDown(1.2);
 
       // Signatures

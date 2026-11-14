@@ -87,21 +87,22 @@ export class FormXxiPassbookTemplate {
 
       // Table Header
       const tableHeadY = doc.y;
-      doc.rect(30, tableHeadY, pageWidth, 18).fillAndStroke('#343a40', '#343a40');
-      doc.fillColor('#fff').font(boldFont).fontSize(7.5);
+      const headHeight = 22;
+      doc.rect(30, tableHeadY, pageWidth, headHeight).fillAndStroke('#343a40', '#343a40');
+      doc.fillColor('#fff').font(boldFont).fontSize(6.8);
 
-      doc.text('மாதம் / Month', 35, tableHeadY + 5);
-      doc.text('தவணை தேதி / Due Date', 100, tableHeadY + 5);
-      doc.text('அடிப்படை / Gross', 190, tableHeadY + 5);
-      doc.text('லாபப்பங்கு / Div', 270, tableHeadY + 5);
-      doc.text('நிகர தொகை / Net', 350, tableHeadY + 5);
-      doc.text('செலுத்தியது / Paid', 430, tableHeadY + 5);
-      doc.text('கட்டிய தேதி / Paid Date', 510, tableHeadY + 5);
-      doc.text('ரசீது எண் / Receipt No', 600, tableHeadY + 5);
-      doc.text('நிலை / Status', 710, tableHeadY + 5);
+      doc.text('மாதம் / Month', 35, tableHeadY + 3, { width: 55, align: 'left' });
+      doc.text('தவணை தேதி / Due Date', 95, tableHeadY + 3, { width: 85, align: 'center' });
+      doc.text('அடிப்படை / Gross', 185, tableHeadY + 3, { width: 75, align: 'right' });
+      doc.text('லாபப்பங்கு / Div', 265, tableHeadY + 3, { width: 75, align: 'right' });
+      doc.text('நிகர தொகை / Net', 345, tableHeadY + 3, { width: 75, align: 'right' });
+      doc.text('செலுத்தியது / Paid', 425, tableHeadY + 3, { width: 80, align: 'right' });
+      doc.text('கட்டிய தேதி / Paid Date', 510, tableHeadY + 3, { width: 85, align: 'center' });
+      doc.text('ரசீது எண் / Receipt No', 600, tableHeadY + 3, { width: 125, align: 'center' });
+      doc.text('நிலை / Status', 730, tableHeadY + 3, { width: 75, align: 'center' });
 
       doc.fillColor('#000').font(regularFont).fontSize(7);
-      let curY = tableHeadY + 18;
+      let curY = tableHeadY + headHeight;
 
       data.schedule.forEach((row, idx) => {
         const bg = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
@@ -112,29 +113,30 @@ export class FormXxiPassbookTemplate {
         const paidStr = row.paymentDate ? row.paymentDate.toISOString().split('T')[0] : '-';
         const recStr = row.receiptNumber || '-';
 
-        doc.text(`மாதம் ${row.installmentMonth}`, 35, curY + 4);
-        doc.text(dueStr, 100, curY + 4);
-        doc.text(`₹ ${row.grossAmount.toLocaleString('en-IN')}`, 190, curY + 4);
-        doc.text(`- ₹ ${row.dividendDeduction.toLocaleString('en-IN')}`, 270, curY + 4);
-        doc.text(`₹ ${row.netPayableAmount.toLocaleString('en-IN')}`, 350, curY + 4);
-        doc.text(`₹ ${row.paidAmount.toLocaleString('en-IN')}`, 430, curY + 4);
-        doc.text(paidStr, 510, curY + 4);
-        doc.text(recStr, 600, curY + 4);
+        doc.text(`மாதம் ${row.installmentMonth}`, 35, curY + 4, { width: 55, align: 'left' });
+        doc.text(dueStr, 95, curY + 4, { width: 85, align: 'center' });
+        doc.text(`₹ ${row.grossAmount.toLocaleString('en-IN')}`, 185, curY + 4, { width: 75, align: 'right' });
+        doc.text(`- ₹ ${row.dividendDeduction.toLocaleString('en-IN')}`, 265, curY + 4, { width: 75, align: 'right' });
+        doc.text(`₹ ${row.netPayableAmount.toLocaleString('en-IN')}`, 345, curY + 4, { width: 75, align: 'right' });
+        doc.text(`₹ ${row.paidAmount.toLocaleString('en-IN')}`, 425, curY + 4, { width: 80, align: 'right' });
+        doc.text(paidStr, 510, curY + 4, { width: 85, align: 'center' });
+        doc.text(recStr, 600, curY + 4, { width: 125, align: 'center' });
 
         if (row.status === 'PAID') {
-          doc.fillColor('#28a745').text('PAID', 710, curY + 4);
+          doc.fillColor('#28a745').text('PAID', 730, curY + 4, { width: 75, align: 'center' });
         } else if (row.status === 'OVERDUE') {
-          doc.fillColor('#dc3545').text('OVERDUE', 710, curY + 4);
+          doc.fillColor('#dc3545').text('OVERDUE', 730, curY + 4, { width: 75, align: 'center' });
         } else {
-          doc.fillColor('#6c757d').text('UNPAID', 710, curY + 4);
+          doc.fillColor('#6c757d').text('UNPAID', 730, curY + 4, { width: 75, align: 'center' });
         }
         doc.fillColor('#000');
 
         curY += 16;
       });
 
-      doc.y = curY + 10;
-      doc.font(regularFont).fontSize(7).text('* கணினி மூலம் உருவாக்கப்பட்ட அதிகாரப்பூர்வ சந்தாதாரர் பேரேடு. This is a computer-generated passbook statement.', { align: 'center', width: pageWidth });
+      doc.x = 30;
+      doc.y = curY + 12;
+      doc.font(regularFont).fontSize(7).text('* கணினி மூலம் உருவாக்கப்பட்ட அதிகாரப்பூர்வ சந்தாதாரர் பேரேடு. This is a computer-generated passbook statement.', 30, doc.y, { align: 'center', width: pageWidth });
 
       doc.end();
     });
