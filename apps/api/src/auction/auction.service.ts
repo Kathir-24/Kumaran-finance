@@ -32,6 +32,7 @@ import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
 import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApproveAuctionCorrectionDto,
   RequestAuctionCorrectionDto,
@@ -743,10 +744,39 @@ export class AuctionService {
   }
 
   /**
-   * Lists all past and scheduled auctions for a chit group
+   * Lists all past and scheduled auctions for a chit group.
+   * Enforces group membership scoping and fellow subscriber PII masking (F08).
    */
-  async getGroupAuctions(chitGroupId: string) {
-    return this.prisma.auction.findMany({
+  async getGroupAuctions(chitGroupId: string, currentUser?: JwtPayload) {
+    if (currentUser) {
+      if (
+        currentUser.roles.includes(Role.CUSTOMER) &&
+        !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+      ) {
+        const ownTicket = await this.prisma.subscriberTicket.findFirst({
+          where: { chitGroupId, customerId: currentUser.sub },
+          select: { id: true },
+        });
+        if (!ownTicket) {
+          throw new ForbiddenException('Access denied: You do not belong to this chit scheme');
+        }
+      } else if (
+        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        !currentUser.roles.includes(Role.SUPER_ADMIN) &&
+        !currentUser.roles.includes(Role.AUDITOR) &&
+        currentUser.branchId
+      ) {
+        const chit = await this.prisma.chitGroup.findUnique({
+          where: { id: chitGroupId },
+          select: { branchId: true },
+        });
+        if (chit?.branchId && chit.branchId !== currentUser.branchId) {
+          throw new ForbiddenException('Access denied: Chit scheme belongs to another branch');
+        }
+      }
+    }
+
+    const auctions = await this.prisma.auction.findMany({
       where: { chitGroupId },
       orderBy: { installmentMonth: 'asc' },
       include: {
@@ -763,6 +793,35 @@ export class AuctionService {
         minutes: true,
       },
     });
+
+    if (
+      currentUser &&
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+    ) {
+      return auctions.map((a) => {
+        if (!a.winner || !a.winner.ticket) return a;
+        const isOwnWinningTicket = a.winner.ticket.customerId === currentUser.sub;
+        if (isOwnWinningTicket) return a;
+        return {
+          ...a,
+          winner: {
+            ...a.winner,
+            ticket: {
+              ...a.winner.ticket,
+              customer: a.winner.ticket.customer
+                ? {
+                    ...a.winner.ticket.customer,
+                    phone: '+91 ******0000',
+                  }
+                : null,
+            },
+          },
+        };
+      });
+    }
+
+    return auctions;
   }
 
   /**

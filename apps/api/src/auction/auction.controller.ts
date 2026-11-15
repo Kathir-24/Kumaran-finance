@@ -68,8 +68,11 @@ export class AuctionController {
       'Returns past auction winners, winning discounts, universal dividend breakdowns, and paper token lot draws. Allowed: All authenticated personas.',
   })
   @ApiOkResponseEnvelope(AuctionResponseDto, { isArray: true, description: 'Auctions retrieved successfully' })
-  async getGroupAuctions(@Param('chitGroupId') chitGroupId: string) {
-    return this.auctionService.getGroupAuctions(chitGroupId);
+  async getGroupAuctions(
+    @Param('chitGroupId') chitGroupId: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.auctionService.getGroupAuctions(chitGroupId, currentUser);
   }
 
   @Get(':id')

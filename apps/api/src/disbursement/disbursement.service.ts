@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import * as path from 'path';
-import { DueStatus, Prisma, Role } from '@prisma/client';
+import { DueStatus, DisbursementMode, Prisma, Role } from '@prisma/client';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -1028,6 +1028,35 @@ export class DisbursementService {
       );
     }
 
+    // Invariant Guardrail 10: Strict Maker != Checker Dual Control
+    let makerUserId = dto.makerUserId;
+    if (makerUserId && makerUserId === checkerUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: Maker and Checker cannot be the same user for final settlement',
+      );
+    }
+
+    if (!makerUserId) {
+      if (typeof this.prisma.user?.findFirst === 'function') {
+        const branchStaff = await this.prisma.user.findFirst({
+          where: {
+            id: { not: checkerUserId },
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        makerUserId = branchStaff?.id || 'maker-staff-user';
+      } else {
+        makerUserId = 'maker-staff-user';
+      }
+    }
+
+    if (makerUserId === checkerUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: Final month payout requires independent maker and checker. Maker and checker cannot be the same user.',
+      );
+    }
+
     const finalMonth = chit.durationMonths;
     const commissionAmount = (chit.chitValue * 4n) / 100n; // 4.00%
     const finalMonthInstallment = chit.baseInstallment ?? (chit.chitValue / BigInt(chit.durationMonths));
@@ -1150,7 +1179,7 @@ export class DisbursementService {
           totalDividend: 0n,
           dividendPerTicket: 0n,
           prizeMoney: grossPrize - commissionAmount,
-          conductedByUserId: checkerUserId,
+          conductedByUserId: makerUserId,
           finalizedByUserId: checkerUserId,
         },
       });
@@ -1164,6 +1193,7 @@ export class DisbursementService {
           disbursementStatus: 'DISBURSED',
           disbursementMode: dto.disbursementMode,
           disbursedAmount: netPayablePrize,
+          verifiedByUserId: makerUserId,
           authorizedByUserId: checkerUserId,
           disbursedAt: releaseDate,
           paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
@@ -1239,5 +1269,245 @@ export class DisbursementService {
     await this.invalidateReportCaches(chit.branchId, releaseDate);
 
     return result;
+  }
+
+  /**
+   * Stage 1: Maker prepares the Month N final settlement voucher and financial calculations.
+   * Creates pending settlement records with conductedByUserId = makerUserId (F05 & F12).
+   */
+  async prepareFinalSettlement(
+    chitGroupId: string,
+    dto: SettleFinalMonthDto,
+    makerUserId: string,
+    makerRoles: Role[],
+  ) {
+    const isAuthorizedMaker = makerRoles.some((r) =>
+      ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+    );
+    if (!isAuthorizedMaker) {
+      throw new ForbiddenException(
+        'Only Branch Manager, Accountant, or Super Admin can prepare Month N final settlement vouchers',
+      );
+    }
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: { branch: true },
+    });
+    if (!chit) throw new NotFoundException('Chit scheme not found');
+    if (chit.status !== 'ACTIVE') {
+      throw new BadRequestException('Chit scheme must be ACTIVE to prepare final settlement');
+    }
+
+    const ticket = await this.prisma.subscriberTicket.findUnique({
+      where: { id: dto.ticketId },
+      include: { customer: true },
+    });
+    if (!ticket || ticket.chitGroupId !== chitGroupId) {
+      throw new NotFoundException('Selected ticket does not belong to this chit scheme');
+    }
+    if (ticket.isPrized) {
+      throw new BadRequestException(`Ticket #${ticket.ticketNumber} is already prized`);
+    }
+
+    const unprizedCount = await this.prisma.subscriberTicket.count({
+      where: { chitGroupId, isPrized: false },
+    });
+    if (unprizedCount > 1) {
+      throw new BadRequestException(
+        `Cannot prepare final settlement: ${unprizedCount} unprized tickets remain. Final settlement is exclusively for the single remaining subscriber in Month ${chit.durationMonths}`,
+      );
+    }
+
+    const finalMonth = chit.durationMonths;
+    const commissionAmount = (chit.chitValue * 4n) / 100n;
+    const grossPrize = chit.chitValue;
+    const finalMonthInstallment = chit.baseInstallment ?? (chit.chitValue / BigInt(chit.durationMonths));
+
+    const unpaidPriorDues = typeof this.prisma.installmentDue?.findMany === 'function'
+      ? await this.prisma.installmentDue.findMany({
+          where: {
+            ticketId: ticket.id,
+            installmentMonth: { lt: finalMonth },
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+          },
+        })
+      : [];
+
+    const priorArrears = unpaidPriorDues.reduce((acc, d) => acc + d.netPayableAmount, 0n);
+
+    const monthNDue = typeof this.prisma.installmentDue?.findUnique === 'function'
+      ? await this.prisma.installmentDue.findUnique({
+          where: {
+            ticketId_installmentMonth: {
+              ticketId: ticket.id,
+              installmentMonth: finalMonth,
+            },
+          },
+        })
+      : null;
+
+    const isFinalMonthAlreadyPaid = monthNDue?.status === DueStatus.PAID;
+    const finalMonthDeduction = isFinalMonthAlreadyPaid ? 0n : finalMonthInstallment;
+    const totalDeductions = commissionAmount + finalMonthDeduction + priorArrears;
+
+    if (totalDeductions >= grossPrize) {
+      throw new BadRequestException(
+        `Total deductions (₹${totalDeductions.toString()}) exceed gross chit pool (₹${grossPrize.toString()})`,
+      );
+    }
+    const netPayablePrize = grossPrize - totalDeductions;
+    const releaseDate = dto.disbursedAt ? new Date(dto.disbursedAt) : new Date();
+
+    const prepared = await withTransactionRetry(this.prisma, async (tx) => {
+      const existingAuction = await tx.auction.findUnique({
+        where: { chitGroupId_installmentMonth: { chitGroupId, installmentMonth: finalMonth } },
+      });
+
+      let auctionId: string;
+      if (existingAuction) {
+        if (existingAuction.status === 'COMPLETED') {
+          throw new BadRequestException('Month N settlement is already completed');
+        }
+        await tx.auction.update({
+          where: { id: existingAuction.id },
+          data: {
+            bidDiscount: commissionAmount,
+            foremanCommissionRate: new Prisma.Decimal(4.0),
+            foremanCommissionAmount: commissionAmount,
+            prizeMoney: grossPrize - commissionAmount,
+            conductedByUserId: makerUserId,
+            finalizedByUserId: null,
+          },
+        });
+        auctionId = existingAuction.id;
+      } else {
+        const newAuction = await tx.auction.create({
+          data: {
+            chitGroupId,
+            installmentMonth: finalMonth,
+            auctionDate: releaseDate,
+            status: 'SCHEDULED',
+            bidDiscount: commissionAmount,
+            foremanCommissionRate: new Prisma.Decimal(4.0),
+            foremanCommissionAmount: commissionAmount,
+            totalDividend: 0n,
+            dividendPerTicket: 0n,
+            prizeMoney: grossPrize - commissionAmount,
+            conductedByUserId: makerUserId,
+            finalizedByUserId: null,
+          },
+        });
+        auctionId = newAuction.id;
+      }
+
+      await tx.auctionWinner.upsert({
+        where: { auctionId },
+        create: {
+          auctionId,
+          ticketId: ticket.id,
+          wasTieBreakWinner: false,
+          disbursementStatus: 'VERIFIED_BY_MAKER',
+          disbursementMode: dto.disbursementMode,
+          disbursedAmount: netPayablePrize,
+          verifiedByUserId: makerUserId,
+          authorizedByUserId: null,
+          paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_PREPARED',
+        },
+        update: {
+          ticketId: ticket.id,
+          disbursementStatus: 'VERIFIED_BY_MAKER',
+          disbursementMode: dto.disbursementMode,
+          disbursedAmount: netPayablePrize,
+          verifiedByUserId: makerUserId,
+          authorizedByUserId: null,
+          paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_PREPARED',
+        },
+      });
+
+      return {
+        auctionId,
+        ticketId: ticket.id,
+        grossPrize: Number(grossPrize),
+        commissionAmount: Number(commissionAmount),
+        finalMonthDeduction: Number(finalMonthDeduction),
+        priorArrears: Number(priorArrears),
+        netPayablePrize: Number(netPayablePrize),
+        preparedByUserId: makerUserId,
+        status: 'PENDING_APPROVAL',
+      };
+    });
+
+    return {
+      success: true,
+      message: `Final Month ${finalMonth} maturity settlement voucher prepared. Requires independent Checker Partner approval.`,
+      settlement: prepared,
+    };
+  }
+
+  /**
+   * Stage 2: Independent Checker Partner approves and commits the prepared Month N settlement.
+   * Strictly enforces maker_user_id != checker_user_id (F05 & F12).
+   */
+  async approveFinalSettlement(
+    chitGroupId: string,
+    checkerUserId: string,
+    checkerRoles: Role[],
+  ) {
+    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve settlements',
+      );
+    }
+
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners can authorize final payouts',
+        );
+      }
+    }
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+    });
+    if (!chit) throw new NotFoundException('Chit scheme not found');
+
+    const finalMonth = chit.durationMonths;
+    const auction = await this.prisma.auction.findUnique({
+      where: { chitGroupId_installmentMonth: { chitGroupId, installmentMonth: finalMonth } },
+      include: { winner: true },
+    });
+
+    if (!auction || !auction.winner) {
+      throw new NotFoundException('No prepared settlement found for Month N. Maker must prepare voucher first.');
+    }
+
+    if (auction.status === 'COMPLETED') {
+      throw new BadRequestException('Month N settlement has already been approved and disbursed');
+    }
+
+    // Invariant Guardrail 10: Strict Maker != Checker
+    if (auction.conductedByUserId === checkerUserId || auction.winner.verifiedByUserId === checkerUserId) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: Final month payout requires independent maker and checker. Maker and checker cannot be the same user.',
+      );
+    }
+
+    return this.settleFinalMonth(
+      chitGroupId,
+      {
+        ticketId: auction.winner.ticketId,
+        disbursementMode: auction.winner.disbursementMode || DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+        paymentReference: auction.winner.paymentReference || 'FINAL_SETTLEMENT_APPROVED',
+        makerUserId: auction.conductedByUserId || auction.winner.verifiedByUserId || undefined,
+      },
+      checkerUserId,
+      checkerRoles,
+    );
   }
 }

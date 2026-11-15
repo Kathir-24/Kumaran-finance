@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -551,7 +552,7 @@ export class ChitService {
               totalDividend: 0n,
               dividendPerTicket: 0n,
               prizeMoney: currentChit.chitValue,
-              conductedByUserId: checkerUserId,
+              conductedByUserId: null, // Month 1 has no auction (statutory company pool)
               finalizedByUserId: checkerUserId,
             },
           });
@@ -874,19 +875,44 @@ export class ChitService {
   }
 
   /**
-   * Get all tickets assigned to a chit group
+   * Get all tickets assigned to a chit group.
+   * Enforces group membership verification and fellow subscriber PII masking (F08).
    */
-  async getTickets(chitGroupId: string) {
+  async getTickets(chitGroupId: string, currentUser?: JwtPayload) {
     const chit = await this.prisma.chitGroup.findUnique({
       where: { id: chitGroupId },
-      select: { id: true, groupCode: true, totalTickets: true },
+      select: { id: true, groupCode: true, totalTickets: true, branchId: true },
     });
 
     if (!chit) {
       throw new NotFoundException('Chit scheme not found');
     }
 
-    return this.prisma.subscriberTicket.findMany({
+    if (currentUser) {
+      if (
+        currentUser.roles.includes(Role.CUSTOMER) &&
+        !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+      ) {
+        const ownTicket = await this.prisma.subscriberTicket.findFirst({
+          where: { chitGroupId, customerId: currentUser.sub },
+          select: { id: true },
+        });
+        if (!ownTicket) {
+          throw new ForbiddenException('Access denied: You do not belong to this chit scheme');
+        }
+      } else if (
+        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        !currentUser.roles.includes(Role.SUPER_ADMIN) &&
+        !currentUser.roles.includes(Role.AUDITOR) &&
+        currentUser.branchId
+      ) {
+        if (chit.branchId && chit.branchId !== currentUser.branchId) {
+          throw new ForbiddenException('Access denied: Chit scheme belongs to another branch');
+        }
+      }
+    }
+
+    const tickets = await this.prisma.subscriberTicket.findMany({
       where: { chitGroupId },
       orderBy: { ticketNumber: 'asc' },
       include: {
@@ -901,6 +927,32 @@ export class ChitService {
         },
       },
     });
+
+    if (
+      currentUser &&
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+    ) {
+      return tickets.map((t) => {
+        if (t.customerId === currentUser.sub) {
+          return t;
+        }
+        return {
+          ...t,
+          customer: t.customer
+            ? {
+                id: 'MASKED',
+                customerCode: 'KC-CUST-RESERVED',
+                fullName: `Subscriber (Ticket #${t.ticketNumber})`,
+                fullNameTamil: null,
+                phone: '+91 ******0000',
+              }
+            : null,
+        };
+      });
+    }
+
+    return tickets;
   }
 
   /**

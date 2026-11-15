@@ -275,6 +275,54 @@ export class DisbursementController {
     return this.disbursementService.getBilingualVoucher(auctionId, currentUser);
   }
 
+  @Post('group/:chitGroupId/prepare-final-settlement')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Maker: Prepare Month N final settlement voucher and financial breakdown',
+    description:
+      'Stage 1: Calculates Month N arrears, base installment deduction, 4% commission, and net prize payable. Creates pending settlement record with conductedByUserId = makerUserId. Requires independent Checker approval.',
+  })
+  @ApiOkResponseEnvelope(FinalSettlementResponseDto, { description: 'Final settlement voucher prepared' })
+  @ApiResponse({ status: 400, description: 'Invalid settlement request or unprized tickets > 1' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Insufficient maker permissions' })
+  @ApiResponse({ status: 404, description: 'Chit group or ticket not found' })
+  async prepareFinalSettlement(
+    @Param('chitGroupId') chitGroupId: string,
+    @Body() dto: SettleFinalMonthDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.disbursementService.prepareFinalSettlement(
+      chitGroupId,
+      dto,
+      currentUser.sub,
+      currentUser.roles,
+    );
+  }
+
+  @Post('group/:chitGroupId/approve-final-settlement')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Checker: Authorize and disburse prepared Month N settlement (Maker != Checker)',
+    description:
+      'Stage 2: Independent Checker Partner verifies prepared settlement calculations and executes payout. Strictly enforces maker != checker. Transitions scheme to COMPLETED.',
+  })
+  @ApiOkResponseEnvelope(FinalSettlementResponseDto, { description: 'Final month settlement approved and disbursed' })
+  @ApiResponse({ status: 400, description: 'Invalid settlement request or already completed' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Partner exclusivity or Maker == Checker violation' })
+  @ApiResponse({ status: 404, description: 'Prepared settlement not found' })
+  async approveFinalSettlement(
+    @Param('chitGroupId') chitGroupId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.disbursementService.approveFinalSettlement(
+      chitGroupId,
+      currentUser.sub,
+      currentUser.roles,
+    );
+  }
+
   @Post('group/:chitGroupId/final-settlement')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.SUPER_ADMIN)

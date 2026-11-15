@@ -12,6 +12,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Optional,
   Param,
   Post,
   Put,
@@ -30,6 +31,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -62,7 +64,10 @@ import { StorageService } from './storage.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('storage')
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    @Optional() private readonly prisma?: PrismaService,
+  ) {}
 
   @Post('presigned-upload-url')
   @Roles(
@@ -263,7 +268,7 @@ export class StorageController {
         ? rawKey
         : '';
     const sanitizedKey = StorageKeyHelper.sanitizeKey(rawKeyStr);
-    DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser);
+    await DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser, this.prisma);
 
     if (
       String(stream) !== 'true' &&

@@ -194,8 +194,11 @@ export class ChitController {
     description: 'Lists all assigned tickets (1..N) with customer names and prized status. Allowed: All authenticated personas.',
   })
   @ApiOkResponseEnvelope(TicketResponseDto, { isArray: true, description: 'Tickets list retrieved' })
-  async getTickets(@Param('id') chitGroupId: string) {
-    return this.chitService.getTickets(chitGroupId);
+  async getTickets(
+    @Param('id') chitGroupId: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.chitService.getTickets(chitGroupId, currentUser);
   }
 
   @Post(':id/activate')

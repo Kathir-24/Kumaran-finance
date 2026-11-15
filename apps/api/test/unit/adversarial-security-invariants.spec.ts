@@ -778,7 +778,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
   // 6. ANTI-BOLA / IDOR PERMISSION BOUNDARIES
   // =========================================================================
   describe('6. Anti-BOLA / IDOR Protection Boundaries', () => {
-    it('Customer A token viewing Customer B KYC document throws 403 Forbidden', () => {
+    it('Customer A token viewing Customer B KYC document throws 403 Forbidden', async () => {
       const customerAPayload = {
         sub: mockCustomer1Id,
         phone: mockCustomer1Phone,
@@ -788,12 +788,12 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       };
 
       // Customer A tries to access Customer B KYC folder
-      expect(() => {
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess(
           `kyc/${mockCustomer2Id}/aadhaar.pdf`,
           customerAPayload,
-        );
-      }).toThrow(
+        ),
+      ).rejects.toThrow(
         new ForbiddenException('Access denied: You can only view your own KYC documents'),
       );
     });
@@ -819,7 +819,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       );
     });
 
-    it('Field Collection Agent attempting to download KYC documents throws 403 Forbidden', () => {
+    it('Field Collection Agent attempting to download KYC documents throws 403 Forbidden', async () => {
       const agentPayload = {
         sub: mockCollectorId,
         phone: '9876543214',
@@ -828,12 +828,12 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         tokenType: 'access' as const,
       };
 
-      expect(() => {
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess(
           `kyc/${mockCustomer1Id}/pan.pdf`,
           agentPayload,
-        );
-      }).toThrow(
+        ),
+      ).rejects.toThrow(
         new ForbiddenException(
           'Access denied: Field collection agents cannot access customer KYC scans',
         ),

@@ -579,44 +579,82 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 
 ---
 
-### 3.13 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Month N Settlement - `KFC-FIN-001`)
+### 3.13 Month N Final Maturity Settlement — Two-Stage Dual-Control Endpoints (`F05`, `F12`, `KFC-FIN-001`)
+
+To strictly enforce **Guardrail 10 (Maker-Checker Separation of Duties)** and **ADR-21 (Verified Partner Identity)** on Month N maturity payouts, final settlement operates via two discrete lifecycle stages:
+
+#### 3.13.1 `POST /api/v1/disbursements/group/:chitGroupId/prepare-final-settlement` (Stage 1: Maker Preparation)
 - **HTTP Method**: `POST`
-- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN`, `Role.BRANCH_MANAGER`, `Role.ACCOUNTANT`)
 - **Path Parameter**: `chitGroupId` — Chit Group UUID
-- **Description**: Settles the final month ($N$) prize directly to the sole remaining unprized subscriber without conducting an auction.
-- **Formula**:
-  $$\text{Net Payable Amount} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$$
-  *(where $\text{finalMonthDeduction} = I_{\text{base}}$ if Month $N$ installment is unpaid, marking it `PAID` with ₹91,000 net on ₹1L chit; or $0$ if already paid at the branch desk with ₹96,000 net, eliminating double collection under `FIN-B`)*
-- **Request Body (`FinalMonthSettlementDto`)**:
+- **Description**: Stage 1 Maker preparation. Calculates Month N arrears, base installment deduction, 4.00% commission, and net prize payable. Creates pending settlement record with `conductedByUserId = makerUserId` and winner `disbursementStatus = 'VERIFIED_BY_MAKER'`.
+- **Request Body (`SettleFinalMonthDto`)**:
   ```json
   {
-    "paymentMethod": "NEFT",
-    "notes": "Month 20 final scheme settlement for unprized ticket #20."
+    "ticketId": "91ab7281-d301-44aa-99bb-cf1928374619",
+    "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
+    "paymentReference": "IOB-CHQ-FINAL-999",
+    "notes": "Month 20 final scheme settlement prepared for unprized ticket #20."
   }
   ```
-- **Success Response (`HTTP 201 Created`)**:
+- **Success Response (`HTTP 200 OK`)**:
   ```json
   {
     "success": true,
-    "statusCode": 201,
+    "statusCode": 200,
     "data": {
       "success": true,
-      "message": "Month 20 final settlement successfully completed.",
-      "disbursementId": "d4a08192-38ef-4a11-b452-e91823761234",
-      "chitGroupId": "8e312a01-b654-4ef8-a281-d21884619384",
-      "ticketId": "91ab7281-d301-44aa-99bb-cf1928374619",
-      "subscriberName": "M. Sivakumar",
-      "chitValue": 100000,
-      "foremanCommission": 4000,
-      "monthNInstallmentDeducted": 5000,
-      "priorArrearsDeducted": 0,
-      "netPayableAmount": 91000,
-      "paymentMethod": "NEFT",
-      "monthNInstallmentStatus": "PAID",
-      "groupStatus": "COMPLETED"
+      "message": "Final Month 20 maturity settlement voucher prepared. Requires independent Checker Partner approval.",
+      "settlement": {
+        "chitGroupId": "8e312a01-b654-4ef8-a281-d21884619384",
+        "ticketId": "91ab7281-d301-44aa-99bb-cf1928374619",
+        "grossPrize": 100000,
+        "commissionAmount": 4000,
+        "finalMonthDeduction": 5000,
+        "priorArrears": 0,
+        "netPayablePrize": 91000,
+        "preparedByUserId": "user-bm-prd-001",
+        "status": "PENDING_APPROVAL"
+      }
     }
   }
   ```
+
+#### 3.13.2 `POST /api/v1/disbursements/group/:chitGroupId/approve-final-settlement` (Stage 2: Checker Approval)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with verified partner identity `isPartner: true`)
+- **Path Parameter**: `chitGroupId` — Chit Group UUID
+- **Description**: Stage 2 Checker approval. Verifies the prepared voucher. Strictly enforces **`maker_user_id != checker_user_id`** (rejects with HTTP 403 `MAKER_CHECKER_VIOLATION` if checker is the user who prepared it). Commits the payout, marks Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`. Database PostgreSQL `CHECK` constraint `chk_auction_maker_checker` backs this at database level.
+- **Success Response (`HTTP 200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "statusCode": 200,
+    "data": {
+      "message": "Final Month 20 maturity settlement successfully executed for Ticket #20 (M. Sivakumar). Scheme marked as COMPLETED.",
+      "settlement": {
+        "chitGroupId": "8e312a01-b654-4ef8-a281-d21884619384",
+        "installmentMonth": 20,
+        "ticketNumber": 20,
+        "customerName": "M. Sivakumar",
+        "grossPrize": 100000,
+        "foremanCommission": 4000,
+        "finalMonthInstallment": 5000,
+        "priorArrearsDeducted": 0,
+        "netPrizeMoney": 91000,
+        "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
+        "paymentReference": "IOB-CHQ-FINAL-999",
+        "disbursedAt": "2026-11-15T07:15:00.000Z",
+        "auctionId": "auc-final-001"
+      }
+    }
+  }
+  ```
+
+#### 3.13.3 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Direct Settlement with Maker DTO)
+- **HTTP Method**: `POST`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with `isPartner: true`)
+- **Description**: Supports direct atomic final settlement when a distinct `makerUserId` (e.g. Branch Manager or Accountant) is supplied in `SettleFinalMonthDto`. Strictly enforces `makerUserId !== checkerUserId`.
 
 ---
 

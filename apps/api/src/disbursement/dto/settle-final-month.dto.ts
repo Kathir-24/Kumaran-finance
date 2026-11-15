@@ -43,4 +43,12 @@ export class SettleFinalMonthDto {
   @IsOptional()
   @IsString()
   disbursedAt?: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440001',
+    description: 'Distinct staff user ID who prepared the settlement voucher (Maker != Checker)',
+  })
+  @IsOptional()
+  @IsUUID()
+  makerUserId?: string;
 }

@@ -231,14 +231,28 @@ export class CustomerService {
   }
 
   /**
-   * Search and list customers with pagination and optional KYC filter
+   * Search and list customers with pagination and optional KYC filter (F07).
+   * Enforces branch-scoping for Branch Managers and Collection Agents.
    */
-  async findAll(query: QueryCustomerDto) {
+  async findAll(query: QueryCustomerDto, currentUser?: JwtPayload) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.CustomerWhereInput = {};
+
+    if (currentUser) {
+      const isGlobalStaff = currentUser.roles?.some((r) =>
+        r === Role.SUPER_ADMIN || r === Role.AUDITOR || r === Role.ACCOUNTANT,
+      );
+      if (!isGlobalStaff) {
+        if (currentUser.roles?.includes(Role.CUSTOMER)) {
+          where.id = currentUser.sub;
+        } else if (currentUser.branchId) {
+          where.branchId = currentUser.branchId;
+        }
+      }
+    }
 
     if (query.search && query.search.trim().length > 0) {
       const search = query.search.trim();
@@ -273,7 +287,7 @@ export class CustomerService {
     ]);
 
     return {
-      data,
+      data: data.map((c) => this.sanitizeCustomer(c, currentUser)),
       total,
       page,
       limit,
@@ -282,9 +296,10 @@ export class CustomerService {
   }
 
   /**
-   * Retrieves single customer profile with linked nominees, active chits, and KYC documents
+   * Retrieves single customer profile with linked nominees, active chits, and KYC documents (F07).
+   * Enforces branch boundaries and Anti-BOLA ownership.
    */
-  async findOne(id: string) {
+  async findOne(id: string, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
       include: {
@@ -324,7 +339,46 @@ export class CustomerService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    return customer;
+    if (currentUser) {
+      const isGlobalStaff = currentUser.roles?.some((r) =>
+        r === Role.SUPER_ADMIN || r === Role.AUDITOR || r === Role.ACCOUNTANT,
+      );
+      if (!isGlobalStaff) {
+        if (currentUser.roles?.includes(Role.CUSTOMER)) {
+          if (currentUser.sub !== id) {
+            throw new ForbiddenException('Subscribers are only permitted to view their own profile');
+          }
+        } else if (currentUser.branchId && customer.branchId !== currentUser.branchId) {
+          throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');
+        }
+      }
+    }
+
+    return this.sanitizeCustomer(customer, currentUser);
+  }
+
+  /**
+   * Sanitizes customer data by completely stripping internal authentication tokens,
+   * hashes, and conditionally masking PII for field agents and unauthorized personas (F07).
+   */
+  private sanitizeCustomer(customer: any, currentUser?: JwtPayload): any {
+    if (!customer) return customer;
+    const {
+      refreshTokenHash: _refreshTokenHash,
+      fcmToken: _fcmToken,
+      tokenRevokedBefore: _tokenRevokedBefore,
+      ...safeCustomer
+    } = customer;
+
+    const isFullAccess = currentUser?.roles?.some((r) =>
+      r === Role.SUPER_ADMIN || r === Role.AUDITOR || (r === Role.CUSTOMER && currentUser.sub === customer.id),
+    );
+
+    if (!isFullAccess && safeCustomer.panNumber) {
+      safeCustomer.panNumber = `${safeCustomer.panNumber.slice(0, 2)}XXXXX${safeCustomer.panNumber.slice(-3)}`;
+    }
+
+    return safeCustomer;
   }
 
   /**

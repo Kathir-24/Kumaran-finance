@@ -100,8 +100,11 @@ export class CustomerController {
       'Returns paginated customer list with keyword search (name, phone, code) and optional KYC status filter. Allowed: Staff, Auditor.',
   })
   @ApiPaginatedResponseEnvelope(CustomerListItemDto, { description: 'Customer list retrieved' })
-  async findAll(@Query() query: QueryCustomerDto) {
-    return this.customerService.findAll(query);
+  async findAll(
+    @Query() query: QueryCustomerDto,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.customerService.findAll(query, currentUser);
   }
 
   @Get(':id')
@@ -122,10 +125,11 @@ export class CustomerController {
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() currentUser: JwtPayload,
+    @CurrentUser() currentUser?: JwtPayload,
   ) {
     // Customer persona can only access their own profile
     if (
+      currentUser &&
       currentUser.roles.includes(Role.CUSTOMER) &&
       !currentUser.roles.some((r) => r !== Role.CUSTOMER) &&
       currentUser.sub !== id
@@ -135,7 +139,7 @@ export class CustomerController {
       );
     }
 
-    return this.customerService.findOne(id);
+    return this.customerService.findOne(id, currentUser);
   }
 
   @Patch(':id')

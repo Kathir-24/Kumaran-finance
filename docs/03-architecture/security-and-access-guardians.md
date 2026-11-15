@@ -291,3 +291,35 @@ flowchart TD
   2. **Checker Approval**: Partner B reviews and approves (`POST /tickets/:id/remove-defaulter/approve`).
   3. **Hard Guard**: Server enforces `ticket.removalRequestedByUserId !== approvingPartnerUserId` (`maker != checker`), rejecting self-approvals with `HTTP 403 Forbidden`.
   4. **Exit Settlement Fail-Closed**: Under Q25, financial exit settlement calculation fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` until the exact statutory damages formula is confirmed in writing by the business owner.
+
+### 7.7 Month N Maturity Settlement Dual-Control & Database Check Constraints (F05 & F12)
+- **Problem Solved**: Month N maturity payouts previously relied on a single-stage execution where the caller was simultaneously recorded as Maker and Checker. Furthermore, migrations lacked database-level check constraints enforcing `maker_user_id != checker_user_id`.
+- **Implementation**:
+  1. **Two-Stage Settlement Lifecycle**:
+     - **Stage 1 (Maker Preparation)**: `POST /disbursements/group/:id/prepare-final-settlement` (Roles: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`). Calculates Month N arrears, base installment deduction, 4.00% commission, and net prize payable. Creates pending settlement record with `conductedByUserId = makerUserId` and winner `disbursementStatus = 'VERIFIED_BY_MAKER'`.
+     - **Stage 2 (Checker Approval)**: `POST /disbursements/group/:id/approve-final-settlement` (Roles: `SUPER_ADMIN` with verified partner identity `isPartner: true`). Strictly enforces **`maker_user_id != checker_user_id`** (rejects with HTTP 403 `MAKER_CHECKER_VIOLATION` if checker is the user who prepared it). Commits the payout, marks Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`.
+  2. **PostgreSQL Database-Level CHECK Constraints**:
+     - Applied via migration `20261115040000_maker_checker_check_constraints`:
+       - `chk_auction_maker_checker`: `CHECK (conductedByUserId IS NULL OR finalizedByUserId IS NULL OR conductedByUserId <> finalizedByUserId)`
+       - `chk_winner_maker_checker`: `CHECK (verifiedByUserId IS NULL OR authorizedByUserId IS NULL OR verifiedByUserId <> authorizedByUserId)`
+       - `chk_reversal_maker_checker`: `CHECK (approvedByUserId IS NULL OR initiatedByUserId <> approvedByUserId)`
+     - Ensures that even if an application bug or maintenance script attempts a self-approval, PostgreSQL rejects the mutation at the database engine level with SQLSTATE `23514`.
+
+### 7.8 Passbook Ownership, Customer Scoping & Domain Branch Derivation (F06, F07, F08, F09)
+- **F06 (Storage Guardians & Passbook Ownership)**:
+  - `DocumentAccessHelper.assertStorageKeyAccess` now explicitly parses `passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf` keys. Customers are restricted strictly to tickets they own in PostgreSQL (`where: { chitGroupId, ticketNumber, customerId: user.sub }`).
+  - Field Collection Agents are barred from raw passbook downloads (must use authorized app flows).
+  - Branch Managers accessing `passbooks/` or `kyc/` must match the branch assigned to the chit scheme or customer profile.
+  - Strict **Default-Deny**: Any unapproved storage key prefix (e.g. `temp/`, `exports/`, unrecognized categories) triggers immediate `HTTP 403 Forbidden`.
+- **F07 (Customer Scoping & Response Allowlists)**:
+  - Customer listing (`findAll`) and detail (`findOne`) pass caller context:
+    - Branch Managers and Collection Agents are scoped strictly to `where.branchId = currentUser.branchId`.
+    - Customers are scoped strictly to `where.id = currentUser.sub`.
+  - Sensitive internal tokens (`refreshTokenHash`, `fcmToken`, `tokenRevokedBefore`) are completely stripped from all API responses. Non-admin callers receive masked PAN numbers (`ABXXXXX34F`).
+- **F08 (Chit & Auction Group Scoping & PII Masking)**:
+  - `ChitService.getTickets()` and `AuctionService.getGroupAuctions()` enforce group membership: customers who do not own a ticket in the chit scheme are rejected with `HTTP 403 Forbidden`.
+  - For enrolled customers, fellow subscribers' phone numbers are masked as `+91 ******0000` and subscriber names as `Subscriber (Ticket #X)`. Winner phones in auction listings are masked for non-winning subscribers.
+- **F09 (Domain Branch Derivation & Cross-Branch Boundaries)**:
+  - Payment and collection writes (`CollectionService.recordCollection`, `PaymentService.recordPayment`) derive accounting branches strictly from the authoritative domain record (`ticket.chitGroup.branchId`), eliminating arbitrary caller branch injection.
+  - Cross-branch writes are strictly barred: callers from Branch A attempting to record collections or payments for Branch B tickets are rejected with `HTTP 403 CROSS_BRANCH_FORBIDDEN`.
+  - Idempotency replay pre-authorization validates caller branch identity before returning duplicate payment data.

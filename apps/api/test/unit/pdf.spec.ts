@@ -662,61 +662,65 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
   });
 
   describe('8. DocumentAccessHelper Storage Key Category Access', () => {
-    it('should allow Super Admin and Auditor full access to any key', () => {
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('kyc/cust-1/aadhaar.pdf', superAdminUser);
-        DocumentAccessHelper.assertStorageKeyAccess('safety-proof/group-1/cheque.pdf', auditorUser);
-      }).not.toThrow();
+    it('should allow Super Admin and Auditor full access to any key', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('kyc/cust-1/aadhaar.pdf', superAdminUser),
+      ).resolves.toBeUndefined();
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proof/group-1/cheque.pdf', auditorUser),
+      ).resolves.toBeUndefined();
     });
 
-    it('should prevent collection agents from accessing customer KYC files', () => {
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('kyc/cust-1/aadhaar.pdf', collectionAgent1);
-      }).toThrow(ForbiddenException);
+    it('should prevent collection agents from accessing customer KYC files', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('kyc/cust-1/aadhaar.pdf', collectionAgent1),
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should prevent customer from accessing another customer KYC file', () => {
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('kyc/other-cust-id/pan.pdf', customerSundaram);
-      }).toThrow(ForbiddenException);
+    it('should prevent customer from accessing another customer KYC file', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('kyc/other-cust-id/pan.pdf', customerSundaram),
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow customer to access their own KYC folder', () => {
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess(`kyc/${customerSundaram.sub}/aadhaar.pdf`, customerSundaram);
-      }).not.toThrow();
+    it('should allow customer to access their own KYC folder', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(`kyc/${customerSundaram.sub}/aadhaar.pdf`, customerSundaram),
+      ).resolves.toBeUndefined();
     });
 
-    it('should prevent customer and collection agents from accessing internal safety-proof and minutes keys', () => {
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('minutes/group-1/m4.pdf', customerSundaram);
-      }).toThrow(ForbiddenException);
+    it('should prevent customer and collection agents from accessing internal safety-proof and minutes keys', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('minutes/group-1/m4.pdf', customerSundaram),
+      ).rejects.toThrow(ForbiddenException);
 
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('safety-proof/auc-1/cheque.pdf', collectionAgent1);
-      }).toThrow(ForbiddenException);
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('safety-proof/auc-1/cheque.pdf', collectionAgent1),
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should restrict direct storage access to receipts and vouchers for customer and collection agents', () => {
+    it('should restrict direct storage access to receipts and vouchers for customer and collection agents', async () => {
       // Customer blocked from raw storage path
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', customerSundaram);
-      }).toThrow(ForbiddenException);
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', customerSundaram),
+      ).rejects.toThrow(ForbiddenException);
 
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', customerSundaram);
-      }).toThrow(ForbiddenException);
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', customerSundaram),
+      ).rejects.toThrow(ForbiddenException);
 
       // Collection agent blocked from raw storage path
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', collectionAgent1);
-      }).toThrow(ForbiddenException);
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', collectionAgent1),
+      ).rejects.toThrow(ForbiddenException);
 
       // Super Admin and Auditor permitted
-      expect(() => {
-        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', superAdminUser);
-        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', auditorUser);
-      }).not.toThrow();
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('receipts/PRD/2026/KC-REC-001.pdf', superAdminUser),
+      ).resolves.toBeUndefined();
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess('vouchers/PRD/2026/KC-VOU-001.pdf', auditorUser),
+      ).resolves.toBeUndefined();
     });
   });
 

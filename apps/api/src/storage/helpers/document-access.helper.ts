@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
+import { PrismaService } from '../../prisma/prisma.service';
 
 export class DocumentAccessHelper {
   /**
@@ -217,12 +218,35 @@ export class DocumentAccessHelper {
   /**
    * Validates access to raw storage keys based on directory category.
    */
-  static assertStorageKeyAccess(key: string, user: JwtPayload): void {
+  /**
+   * Validates access to raw storage keys based on directory category, ownership, and branch boundaries (F06).
+   */
+  static async assertStorageKeyAccess(
+    key: string,
+    user: JwtPayload,
+    prisma?: PrismaService,
+  ): Promise<void> {
+    // Strict Default-Deny on unapproved prefixes (F06)
+    const APPROVED_PREFIXES = [
+      'kyc/',
+      'passbooks/',
+      'minutes/',
+      'safety-proof/',
+      'safety-proofs/',
+      'receipts/',
+      'vouchers/',
+    ];
+    if (!APPROVED_PREFIXES.some((p) => key.startsWith(p))) {
+      throw new ForbiddenException(
+        'Access denied: Unknown or unauthorized storage category',
+      );
+    }
+
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
       user.roles.includes(Role.AUDITOR)
     ) {
-      return; // Global oversight
+      return; // Global oversight for approved storage categories
     }
 
     if (key.startsWith('kyc/')) {
@@ -238,6 +262,70 @@ export class DocumentAccessHelper {
           throw new ForbiddenException(
             'Access denied: You can only view your own KYC documents',
           );
+        }
+      }
+      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        const customerId = key.split('/')[1];
+        if (customerId) {
+          const cust = await prisma.customer.findUnique({
+            where: { id: customerId },
+            select: { branchId: true },
+          });
+          if (cust && cust.branchId && cust.branchId !== user.branchId) {
+            throw new ForbiddenException(
+              'Access denied: Customer does not belong to your assigned branch',
+            );
+          }
+        }
+      }
+      return;
+    }
+
+    if (key.startsWith('passbooks/')) {
+      if (user.roles.includes(Role.CUSTOMER)) {
+        // Format: passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf
+        const parts = key.split('/');
+        const chitGroupId = parts[1];
+        const ticketFile = parts[2] || '';
+        const ticketNumMatch = ticketFile.match(/ticket-(\d+)/);
+        const ticketNumber = ticketNumMatch ? parseInt(ticketNumMatch[1], 10) : null;
+
+        if (prisma && chitGroupId && ticketNumber !== null) {
+          const ticket = await prisma.subscriberTicket.findFirst({
+            where: {
+              chitGroupId,
+              ticketNumber,
+              customerId: user.sub,
+            },
+            select: { id: true },
+          });
+          if (!ticket) {
+            throw new ForbiddenException(
+              'Access denied: You can only view passbooks for your own subscriber tickets',
+            );
+          }
+        } else {
+          throw new ForbiddenException(
+            'Access denied: You can only view passbooks for your own subscriber tickets',
+          );
+        }
+      } else if (user.roles.includes(Role.COLLECTION_AGENT)) {
+        throw new ForbiddenException(
+          'Access denied: Field agents cannot download raw passbooks via direct storage routes',
+        );
+      } else if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        const parts = key.split('/');
+        const chitGroupId = parts[1];
+        if (chitGroupId) {
+          const chit = await prisma.chitGroup.findUnique({
+            where: { id: chitGroupId },
+            select: { branchId: true },
+          });
+          if (chit && chit.branchId && chit.branchId !== user.branchId) {
+            throw new ForbiddenException(
+              'Access denied: Chit scheme does not belong to your assigned branch',
+            );
+          }
         }
       }
       return;
@@ -258,6 +346,7 @@ export class DocumentAccessHelper {
           'Access denied: Field agents cannot access internal company safety or minutes files',
         );
       }
+      return;
     }
 
     if (key.startsWith('receipts/') || key.startsWith('vouchers/')) {
@@ -271,7 +360,13 @@ export class DocumentAccessHelper {
           'Access denied: Direct storage file access is restricted for collection agents',
         );
       }
+      return;
     }
+
+    // Strict Default-Deny on unapproved prefixes (F06)
+    throw new ForbiddenException(
+      'Access denied: Unknown or unauthorized storage category',
+    );
   }
 
   /**

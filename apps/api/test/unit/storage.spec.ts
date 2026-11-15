@@ -636,19 +636,19 @@ describe('Component 1: Encrypted Storage Service Tests', () => {
       ).rejects.toThrow(/exceeds maximum allowed size/i);
     });
 
-    it('supports both singular safety-proof/ and legacy safety-proofs/ keys in DocumentAccessHelper', () => {
-      expect(() =>
+    it('supports both singular safety-proof/ and legacy safety-proofs/ keys in DocumentAccessHelper', async () => {
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess('safety-proof/auc-1/chq.jpg', accountantUser),
-      ).not.toThrow();
-      expect(() =>
+      ).resolves.toBeUndefined();
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', accountantUser),
-      ).not.toThrow();
-      expect(() =>
+      ).resolves.toBeUndefined();
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', customerUser),
-      ).toThrow(ForbiddenException);
-      expect(() =>
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
         DocumentAccessHelper.assertStorageKeyAccess('safety-proofs/auc-1/chq.jpg', agentUser),
-      ).toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('exposes exact AWS S3 SSE headers vs custom R2 headers for presigned PUT parity', () => {

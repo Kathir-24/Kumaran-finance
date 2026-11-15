@@ -91,7 +91,7 @@ export class PaymentService {
     recordedByUserId: string,
     staffBranchId?: string | null,
   ) {
-    // 1. Idempotency Check
+    // 1. Idempotency Check (Pre-Authorization Guard F09)
     if (dto.idempotencyKey) {
       const existing = await this.prisma.payment.findUnique({
         where: { idempotencyKey: dto.idempotencyKey },
@@ -103,6 +103,15 @@ export class PaymentService {
       });
 
       if (existing) {
+        if (
+          staffBranchId &&
+          existing.branchId &&
+          staffBranchId !== existing.branchId &&
+          existing.recordedByUserId !== recordedByUserId
+        ) {
+          throw new ForbiddenException('Access denied: Unauthorized idempotency replay from another branch');
+        }
+
         return {
           duplicateIgnored: true,
           message: 'Payment already recorded with this idempotency key',
@@ -131,6 +140,13 @@ export class PaymentService {
     if (ticket.status === 'REMOVED_DEF_3M') {
       throw new BadRequestException(
         'Subscriber ticket has been removed from this chit scheme due to consecutive arrears',
+      );
+    }
+
+    // Cross-Branch Invariant (F09): Ensure caller does not record payments in another branch
+    if (staffBranchId && ticket.chitGroup.branchId && staffBranchId !== ticket.chitGroup.branchId) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot record payments for chit groups belonging to another branch',
       );
     }
 
@@ -165,8 +181,9 @@ export class PaymentService {
       );
     }
 
-    const branchId = staffBranchId || ticket.chitGroup.branchId;
-    const lockBranchId = ticket.chitGroup.branchId || branchId;
+    // Accounting Branch (F09): Strictly derived from authorized domain record
+    const branchId = ticket.chitGroup.branchId;
+    const lockBranchId = ticket.chitGroup.branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
     const year = new Date().getFullYear();
 

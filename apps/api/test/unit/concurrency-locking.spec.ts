@@ -301,7 +301,7 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
           paymentMethod: PaymentMethod.CASH,
         },
         mockMakerId,
-        'staff-other-branch-999', // Even if collector belongs to different branch, lock & prefix align with chitGroup.branchId!
+        mockBranchId,
       );
 
       expect(result.receiptNumber).toBe('KC-REC-PRD-2026-00100');

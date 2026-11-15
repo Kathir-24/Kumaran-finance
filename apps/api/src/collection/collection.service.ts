@@ -99,7 +99,7 @@ export class CollectionService {
     collectorUserId: string,
     staffBranchId?: string | null,
   ) {
-    // 1. Idempotency Check for Rural Offline Sync Deduplication
+    // 1. Idempotency Check for Rural Offline Sync Deduplication (Pre-Authorization Guard F09)
     if (dto.idempotencyKey) {
       const existingPayment = await this.prisma.payment.findUnique({
         where: { idempotencyKey: dto.idempotencyKey },
@@ -110,6 +110,15 @@ export class CollectionService {
       });
 
       if (existingPayment) {
+        if (
+          staffBranchId &&
+          existingPayment.branchId &&
+          staffBranchId !== existingPayment.branchId &&
+          existingPayment.recordedByUserId !== collectorUserId
+        ) {
+          throw new ForbiddenException('Access denied: Unauthorized idempotency replay from another branch');
+        }
+
         return {
           duplicateIgnored: true,
           message: 'Payment already recorded with this idempotency key',
@@ -145,6 +154,13 @@ export class CollectionService {
       );
     }
 
+    // Cross-Branch Invariant (F09): Ensure caller does not record collection in another branch
+    if (staffBranchId && ticket.chitGroup.branchId && staffBranchId !== ticket.chitGroup.branchId) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot record collections for chit groups belonging to another branch',
+      );
+    }
+
     // 3. Find Target Installment Due
     const due = await this.prisma.installmentDue.findUnique({
       where: {
@@ -176,8 +192,9 @@ export class CollectionService {
       );
     }
 
-    const branchId = staffBranchId || ticket.chitGroup.branchId;
-    const lockBranchId = ticket.chitGroup.branchId || branchId;
+    // Accounting Branch (F09): Strictly derived from authorized domain record
+    const branchId = ticket.chitGroup.branchId;
+    const lockBranchId = ticket.chitGroup.branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
     const year = new Date().getFullYear();
 
