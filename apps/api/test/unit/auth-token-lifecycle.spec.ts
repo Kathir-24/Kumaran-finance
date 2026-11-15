@@ -519,8 +519,15 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       );
     });
 
-    it('JWT-CACHE-01: should return payload directly on Redis cache hit (ACTIVE) with zero DB queries', async () => {
-      redisClientMock.get.mockResolvedValue('ACTIVE');
+    it('JWT-CACHE-01: should return payload directly on Redis cache hit with zero DB queries', async () => {
+      redisClientMock.get.mockResolvedValue(
+        JSON.stringify({
+          status: 'ACTIVE',
+          tokenRevokedBeforeMs: null,
+          roles: [Role.SUPER_ADMIN],
+          isPartner: true,
+        }),
+      );
 
       const payload = {
         sub: 'user-001',
@@ -563,7 +570,13 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
 
       redisClientMock.get.mockImplementation(async (key: string) => {
         if (key === 'auth:revoked_before:user-001') return String(logoutCutoffMs);
-        if (key === 'user:status:user-001') return 'ACTIVE';
+        if (key === 'user:status:user-001') {
+          return JSON.stringify({
+            status: 'ACTIVE',
+            roles: [Role.SUPER_ADMIN],
+            isPartner: true,
+          });
+        }
         return null;
       });
 
@@ -625,7 +638,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       });
       expect(redisClientMock.set).toHaveBeenCalledWith(
         'user:status:user-001',
-        'ACTIVE',
+        expect.stringContaining('"status":"ACTIVE"'),
         'EX',
         120,
       );

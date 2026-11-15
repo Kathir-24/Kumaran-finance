@@ -63,9 +63,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           if (cachedRaw === 'INACTIVE') {
             throw new UnauthorizedException('User account is deactivated or no longer exists');
           }
-          if (cachedRaw === 'ACTIVE') {
-            return payload;
-          }
           if (cachedRaw.startsWith('{')) {
             const cached = JSON.parse(cachedRaw);
             if (cached.status === 'INACTIVE') {
@@ -74,8 +71,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             if (cached.status === 'ACTIVE') {
               if (
                 cached.tokenRevokedBeforeMs &&
-                payload.iat &&
-                payload.iat * 1000 < cached.tokenRevokedBeforeMs
+                isTokenIssuedBeforeRevocation(payload, String(cached.tokenRevokedBeforeMs))
               ) {
                 throw new UnauthorizedException(
                   'Session terminated or credentials updated. Please sign in again.',
@@ -90,6 +86,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
               return payload;
             }
           }
+          // Legacy plain string 'ACTIVE' is treated as cache miss to upgrade to structured JSON
         }
       } catch (err: any) {
         if (err instanceof UnauthorizedException) {
@@ -117,8 +114,35 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           ) {
             throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
           }
+          // F04: Scoped session revocation check in PostgreSQL for customers
+          if (payload.clientType && typeof (this.prisma as any).session?.findFirst === 'function') {
+            const session = await (this.prisma as any).session.findFirst({
+              where: { customerId: payload.sub, clientType: payload.clientType },
+              select: { revokedAt: true, expiresAt: true, refreshTokenHash: true },
+            });
+            if (session) {
+              if (
+                session.revokedAt &&
+                isTokenIssuedBeforeRevocation(payload, session.revokedAt.getTime().toString())
+              ) {
+                throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+              }
+              if (!session.refreshTokenHash && session.revokedAt) {
+                throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+              }
+              if (session.expiresAt && session.expiresAt.getTime() <= Date.now()) {
+                throw new UnauthorizedException('Session terminated or expired. Please sign in again.');
+              }
+            }
+          }
           if (useRedis && redis) {
-            await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
+            const customerStatusData = JSON.stringify({
+              status: 'ACTIVE',
+              tokenRevokedBeforeMs: customer.tokenRevokedBefore?.getTime() ?? null,
+              roles: [Role.CUSTOMER],
+              isPartner: false,
+            });
+            await redis.set(cacheKey, customerStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
           }
           return payload;
         }
@@ -137,11 +161,39 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Session terminated or credentials updated. Please sign in again.');
     }
 
+    // F04: Scoped session revocation check in PostgreSQL for users
+    if (payload.clientType && typeof (this.prisma as any).session?.findFirst === 'function') {
+      const session = await (this.prisma as any).session.findFirst({
+        where: { userId: payload.sub, clientType: payload.clientType },
+        select: { revokedAt: true, expiresAt: true, refreshTokenHash: true },
+      });
+      if (session) {
+        if (
+          session.revokedAt &&
+          isTokenIssuedBeforeRevocation(payload, session.revokedAt.getTime().toString())
+        ) {
+          throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+        }
+        if (!session.refreshTokenHash && session.revokedAt) {
+          throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+        }
+        if (session.expiresAt && session.expiresAt.getTime() <= Date.now()) {
+          throw new UnauthorizedException('Session terminated or expired. Please sign in again.');
+        }
+      }
+    }
+
     payload.roles = user.roles;
     payload.isPartner = user.isPartner;
 
     if (useRedis && redis) {
-      await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
+      const userStatusData = JSON.stringify({
+        status: 'ACTIVE',
+        tokenRevokedBeforeMs: user.tokenRevokedBefore?.getTime() ?? null,
+        roles: user.roles,
+        isPartner: user.isPartner,
+      });
+      await redis.set(cacheKey, userStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
     }
 
     return payload;

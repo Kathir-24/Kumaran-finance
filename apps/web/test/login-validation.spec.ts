@@ -116,4 +116,75 @@ test('Login Flow: Discerning 2FA BFF challenge response vs direct full login res
 
   const isDirect = Boolean(directLoginResponse.success && directLoginResponse.user);
   assert.equal(isDirect, true);
+
+  // Response branch C: First-time onboarding password setup required (F16)
+  const onboardingResponse = {
+    success: true,
+    mustChangePassword: true,
+    message: 'Initial temporary password detected. You must configure a new permanent password to complete onboarding.',
+  };
+
+  const isOnboarding = Boolean(onboardingResponse.mustChangePassword);
+  assert.equal(isOnboarding, true);
+  assert.equal('tempToken' in onboardingResponse, false); // Stored in HttpOnly cookie
+});
+
+test('Onboarding Validation (F16): Requires min 8 chars, complexity, and matching confirm password', () => {
+  const onboardingTestSchema = z
+    .object({
+      newPassword: z
+        .string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$/, 'Complexity required'),
+      confirmPassword: z.string().min(1, 'Password required'),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    });
+
+  // Valid complex matching passwords
+  assert.equal(
+    onboardingTestSchema.safeParse({
+      newPassword: 'StrongPassword#2026',
+      confirmPassword: 'StrongPassword#2026',
+    }).success,
+    true,
+  );
+
+  // Mismatched passwords rejected
+  assert.equal(
+    onboardingTestSchema.safeParse({
+      newPassword: 'StrongPassword#2026',
+      confirmPassword: 'DifferentPassword#2026',
+    }).success,
+    false,
+  );
+
+  // Too short (< 8 chars) rejected
+  assert.equal(
+    onboardingTestSchema.safeParse({
+      newPassword: 'Short1!',
+      confirmPassword: 'Short1!',
+    }).success,
+    false,
+  );
+
+  // Missing special char rejected
+  assert.equal(
+    onboardingTestSchema.safeParse({
+      newPassword: 'NoSpecialChar2026',
+      confirmPassword: 'NoSpecialChar2026',
+    }).success,
+    false,
+  );
+
+  // Missing uppercase rejected
+  assert.equal(
+    onboardingTestSchema.safeParse({
+      newPassword: 'lowercase123#password',
+      confirmPassword: 'lowercase123#password',
+    }).success,
+    false,
+  );
 });

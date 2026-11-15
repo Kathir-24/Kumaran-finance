@@ -115,6 +115,16 @@ export function LoginForm() {
         return;
       }
 
+      // Branch 0: Staff user requires initial password onboarding (HttpOnly kc_onboarding_token cookie set by BFF)
+      if (response?.mustChangePassword) {
+        const onboardingTarget =
+          redirectUrl && redirectUrl !== '/'
+            ? `/onboarding?redirect=${encodeURIComponent(redirectUrl)}`
+            : '/onboarding';
+        router.push(onboardingTarget);
+        return;
+      }
+
       // Branch 1: Staff user requires Microsoft Authenticator 2FA (HttpOnly cookie set by BFF)
       if (response?.requireTotp) {
         setPendingTotp(true);

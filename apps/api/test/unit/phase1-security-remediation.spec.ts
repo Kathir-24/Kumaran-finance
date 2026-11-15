@@ -57,7 +57,7 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
         }
         return count;
       }),
-      ttl: jest.fn(async () => 300),
+      ttl: jest.fn(async (key: string) => (redisStore.has(key) ? 300 : -2)),
       incr: jest.fn(async (key: string) => {
         const val = (parseInt(redisStore.get(key) || '0', 10) + 1).toString();
         redisStore.set(key, val);
@@ -87,6 +87,7 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
       },
       session: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         upsert: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -262,6 +263,33 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
           { mpin: '654321' },
           `Bearer ${accessToken}`,
         ),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject setMpin with setupToken when setupToken was issued before user.tokenRevokedBefore (F01)', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000) - 60;
+      const setupToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'mpin_setup',
+        iat: issuedAt,
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: new Date(Date.now() - 10000),
+        mustChangePassword: false,
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      await expect(
+        authController.setMpin({
+          setupToken,
+          mpin: '123456',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -488,6 +516,88 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    it('F04: refreshToken rejects with 401 when Session table indicates revoked session even if Redis has stale hash', async () => {
+      const refreshToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.ACCOUNTANT],
+        branchId: mockBranchId,
+        tokenType: 'refresh',
+        clientType: 'WEB',
+      });
+
+      const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: null,
+        refreshTokenHash: refreshHash,
+      });
+
+      // Redis still holds a stale hash because Redis eviction failed
+      redisClientMock.get.mockImplementation(async (key: string) => {
+        if (key === `auth:session:${mockUserId}:WEB`) return refreshHash;
+        return null;
+      });
+
+      // PostgreSQL Session table authoritative record indicates revoked session
+      prismaMock.session.findUnique.mockResolvedValue({
+        id: 'session-001',
+        userId: mockUserId,
+        clientType: 'WEB',
+        refreshTokenHash: null,
+        revokedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+
+      await expect(
+        authService.refreshToken({
+          refreshToken,
+          clientType: 'WEB',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('F04: scoped logout on WEB invalidates access token in JwtStrategy when Redis is cold via PostgreSQL Session row', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000) - 100;
+      const accessTokenPayload = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.ACCOUNTANT],
+        branchId: mockBranchId,
+        tokenType: 'access' as const,
+        clientType: 'WEB',
+        iat: issuedAt,
+        issuedAtMs: issuedAt * 1000,
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        isPartner: false,
+        tokenRevokedBefore: null, // Global cutoff was not set (scoped logout only)
+        roles: [Role.ACCOUNTANT],
+      });
+
+      // Redis is completely cold / offline
+      redisClientMock.get.mockResolvedValue(null);
+
+      // PostgreSQL Session indicates WEB session was revoked after token was issued
+      prismaMock.session.findFirst.mockResolvedValue({
+        id: 'session-001',
+        userId: mockUserId,
+        clientType: 'WEB',
+        refreshTokenHash: null,
+        revokedAt: new Date(issuedAt * 1000 + 5000), // Revoked 5 seconds after issuance
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+
+      await expect(jwtStrategy.validate(accessTokenPayload)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
     it('resetPassword propagates error and rolls back if database transaction fails', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: mockUserId,
@@ -696,6 +806,36 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
       await expect(
         authService.enableTotp(mockUserId, { secret, code }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('F10: enableTotp allows bounded retry on mistyped code without destroying challenge, and destroys on 3rd failure', async () => {
+      const secret = generateSecret();
+      const validCode = generateSync({ secret });
+
+      await redisClientMock.set(`auth:totp_setup:${mockUserId}`, secret);
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isTotpEnabled: false,
+        passwordHash: defaultPasswordHash,
+      });
+
+      // Attempt 1: Mistyped code -> throws BadRequestException, but challenge is retained!
+      await expect(
+        authService.enableTotp(mockUserId, { secret, code: '000000' }),
+      ).rejects.toThrow('2 attempt(s) remaining');
+      expect(await redisClientMock.get(`auth:totp_setup:${mockUserId}`)).toBe(secret);
+
+      // Attempt 2: Another mistyped code -> throws, challenge still retained
+      await expect(
+        authService.enableTotp(mockUserId, { secret, code: '111111' }),
+      ).rejects.toThrow('1 attempt(s) remaining');
+      expect(await redisClientMock.get(`auth:totp_setup:${mockUserId}`)).toBe(secret);
+
+      // Successful attempt with valid code before 3rd failure -> succeeds and destroys challenge
+      const res = await authService.enableTotp(mockUserId, { secret, code: validCode });
+      expect(res.success).toBe(true);
+      expect(await redisClientMock.get(`auth:totp_setup:${mockUserId}`)).toBeNull();
     });
   });
 
@@ -990,6 +1130,90 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
         authService.loginMpin({
           phone: '9842100001',
           mpin: '123456',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('F16: verifyOtp blocks full token issuance when staff user.mustChangePassword is true, returning onboarding_restricted tempToken', async () => {
+      const otpCode = '123456';
+      const testPhone = '9842100099';
+      const hashedOtp = crypto.createHash('sha256').update(otpCode).digest('hex');
+
+      // Clear any potential lockout and setup active OTP session in Redis
+      await redisClientMock.del(`auth:lockout:${testPhone}`);
+      await redisClientMock.set(
+        `auth:otp:${testPhone}`,
+        JSON.stringify({
+          entityId: mockUserId,
+          phone: testPhone,
+          name: 'Staff A',
+          roles: [Role.COLLECTION_AGENT],
+          branchId: mockBranchId,
+          hashedOtp,
+          attempts: 0,
+          expiresAt: Date.now() + 300000,
+          isCustomer: false,
+        }),
+      );
+
+      const mpinHash = await bcrypt.hash('123456', 12);
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        phone: testPhone,
+        isActive: true,
+        mpinHash,
+        mustChangePassword: true, // User still needs to change temporary password!
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+      });
+
+      const res: any = await authService.verifyOtp({
+        phone: testPhone,
+        otp: otpCode,
+      });
+
+      expect(res.verified).toBe(true);
+      expect(res.mustChangePassword).toBe(true);
+      expect(res).toHaveProperty('tempToken');
+      expect(res).not.toHaveProperty('accessToken');
+      expect(res).not.toHaveProperty('refreshToken');
+
+      const payload: any = jwtService.verify(res.tempToken);
+      expect(payload.tokenType).toBe('onboarding_restricted');
+    });
+
+    it('F16: verifyOtp rejects with 401 when staff account is deactivated', async () => {
+      const otpCode = '123456';
+      const testPhone = '9842100098';
+      const hashedOtp = crypto.createHash('sha256').update(otpCode).digest('hex');
+
+      await redisClientMock.del(`auth:lockout:${testPhone}`);
+      await redisClientMock.set(
+        `auth:otp:${testPhone}`,
+        JSON.stringify({
+          entityId: mockUserId,
+          phone: testPhone,
+          name: 'Staff Deactivated',
+          roles: [Role.COLLECTION_AGENT],
+          branchId: mockBranchId,
+          hashedOtp,
+          attempts: 0,
+          expiresAt: Date.now() + 300000,
+          isCustomer: false,
+        }),
+      );
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        phone: testPhone,
+        isActive: false, // Deactivated!
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      await expect(
+        authService.verifyOtp({
+          phone: testPhone,
+          otp: otpCode,
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
