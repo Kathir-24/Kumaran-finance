@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { generateSecret, generateSync } from 'otplib';
 import { AuthController } from '../../src/auth/auth.controller';
 import { AuthService } from '../../src/auth/auth.service';
+import { JwtPayload } from '../../src/auth/interfaces/jwt-payload.interface';
 import { JwtStrategy } from '../../src/auth/strategies/jwt.strategy';
 import { UserController } from '../../src/user/user.controller';
 import { UserService } from '../../src/user/user.service';
@@ -64,6 +65,20 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
         return parseInt(val, 10);
       }),
       expire: jest.fn(async () => 1),
+      eval: jest.fn(async (script: string, numkeys: number, ...args: any[]) => {
+        const keys = args.slice(0, numkeys);
+        const scriptArgs = args.slice(numkeys);
+        if (script.includes('redis.call("get", KEYS[1]) == ARGV[1]')) {
+          const keyVal = redisStore.get(keys[0]);
+          if (keyVal === scriptArgs[0]) {
+            redisStore.delete(keys[0]);
+            if (keys[1]) redisStore.delete(keys[1]);
+            return 1;
+          }
+          return 0;
+        }
+        return 0;
+      }),
     };
 
     redisProviderMock = {
@@ -1216,6 +1231,227 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
           otp: otpCode,
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('F04 / F10: Edge-Case Security Remediation (Defects 2, 3, 4)', () => {
+    it('Defect 2: MOBILE cache hit does not authorize revoked WEB access token (family-scoped cache isolation)', async () => {
+      const now = Date.now();
+      const mobilePayload: JwtPayload = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        clientType: 'MOBILE',
+        sid: 'mobile-sid-1',
+        issuedAtMs: now,
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        isPartner: false,
+        tokenRevokedBefore: null,
+        roles: [Role.COLLECTION_AGENT],
+      });
+      prismaMock.session.findFirst.mockResolvedValue({
+        id: 'mobile-sid-1',
+        revokedAt: null,
+        expiresAt: new Date(now + 86400000),
+        refreshTokenHash: 'hash-mobile',
+        createdAt: new Date(now - 1000),
+      });
+
+      // 1. MOBILE request validates and populates user:status:mockUserId:MOBILE cache
+      const validatedMobile = await jwtStrategy.validate(mobilePayload);
+      expect(validatedMobile.sub).toBe(mockUserId);
+      expect(await redisClientMock.get(`user:status:${mockUserId}:MOBILE`)).toBeTruthy();
+
+      // 2. WEB request arrives with an active user but revoked WEB session in DB
+      const webPayload: JwtPayload = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        clientType: 'WEB',
+        sid: 'web-sid-1',
+        issuedAtMs: now,
+      };
+
+      prismaMock.session.findFirst.mockImplementation(async ({ where }: any) => {
+        if (where.clientType === 'WEB') {
+          return {
+            id: 'web-sid-1',
+            revokedAt: new Date(now), // WEB session revoked!
+            expiresAt: new Date(now + 86400000),
+            refreshTokenHash: null,
+            createdAt: new Date(now - 5000),
+          };
+        }
+        return null;
+      });
+
+      // Assert: Must NOT return MOBILE cache hit; must consult DB for WEB and throw 401
+      await expect(jwtStrategy.validate(webPayload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or logged out. Please sign in again.'),
+      );
+    });
+
+    it('Defect 2: validateAuthenticatedAccessToken validates persisted PostgreSQL session when Redis is cold', async () => {
+      const now = Date.now();
+      const token = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        clientType: 'WEB',
+        sid: 'web-sid-1',
+        issuedAtMs: now - 1000,
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        mustChangePassword: false,
+        tokenRevokedBefore: null,
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      prismaMock.session.findFirst.mockResolvedValue({
+        id: 'web-sid-1',
+        revokedAt: new Date(now), // Session revoked in PostgreSQL!
+        expiresAt: new Date(now + 86400000),
+        refreshTokenHash: null,
+        createdAt: new Date(now - 10000),
+      });
+
+      await expect(authService.validateAuthenticatedAccessToken(token)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or logged out. Please sign in again.'),
+      );
+    });
+
+    it('Defect 3: Replacement login does not resurrect older access tokens even after revokedAt is reset to null', async () => {
+      const pastTime = Date.now() - 50000;
+      const token1Payload: JwtPayload = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        clientType: 'WEB',
+        sid: 'old-session-uuid-1',
+        issuedAtMs: pastTime,
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        isPartner: false,
+        tokenRevokedBefore: null,
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      // Replacement login occurred: session row has revokedAt: null, but id is now new-session-uuid-2
+      prismaMock.session.findFirst.mockResolvedValue({
+        id: 'new-session-uuid-2', // New session ID from replacement login
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+        refreshTokenHash: 'new-hash',
+        createdAt: new Date(Date.now() - 1000),
+      });
+
+      // Cold Redis (no cache hit)
+      await redisClientMock.del(`user:status:${mockUserId}:WEB`);
+
+      // Older token from previous session must be rejected with superseded exception
+      await expect(jwtStrategy.validate(token1Payload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or superseded. Please sign in again.'),
+      );
+    });
+
+    it('Defect 3: Access token with outdated sid is rejected on status cache hit', async () => {
+      const now = Date.now();
+      const oldPayload: JwtPayload = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        clientType: 'WEB',
+        sid: 'old-session-uuid-1',
+        issuedAtMs: now,
+      };
+
+      // Status cache hit in Redis contains newer session sid: new-session-uuid-2
+      await redisClientMock.set(
+        `user:status:${mockUserId}:WEB`,
+        JSON.stringify({
+          status: 'ACTIVE',
+          tokenRevokedBeforeMs: null,
+          roles: [Role.COLLECTION_AGENT],
+          isPartner: false,
+          sid: 'new-session-uuid-2',
+        }),
+      );
+
+      await expect(jwtStrategy.validate(oldPayload)).rejects.toThrow(
+        new UnauthorizedException('Session terminated or superseded. Please sign in again.'),
+      );
+    });
+
+    it('Defect 4: Concurrent TOTP setup calls are atomic; second claim fails closed without double-writing', async () => {
+      const secret = generateSecret();
+      const totpCode = generateSync({ secret });
+      const challengeKey = `auth:totp_setup:${mockUserId}`;
+
+      await redisClientMock.set(challengeKey, secret);
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isTotpEnabled: false,
+        passwordHash: await bcrypt.hash('Password123!', 10),
+      });
+      prismaMock.user.update.mockResolvedValue({ id: mockUserId, isTotpEnabled: true });
+
+      // Execute two concurrent claims simultaneously
+      const [res1, res2] = await Promise.allSettled([
+        authService.enableTotp(mockUserId, {
+          secret,
+          code: totpCode,
+        }),
+        authService.enableTotp(mockUserId, {
+          secret,
+          code: totpCode,
+        }),
+      ]);
+
+      const fulfilled = [res1, res2].filter((r) => r.status === 'fulfilled');
+      const rejected = [res1, res2].filter((r) => r.status === 'rejected');
+
+      // Exactly one succeeds and exactly one fails closed
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(BadRequestException);
+      // Ensure PostgreSQL user update was called only for the single winning execution:
+      // (1) update totpSecret & isTotpEnabled, (2) revoke active sessions
+      expect(prismaMock.user.update).toHaveBeenCalledTimes(2);
+      expect(prismaMock.user.update).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: { id: mockUserId },
+          data: expect.objectContaining({ isTotpEnabled: true }),
+        }),
+      );
+      expect(prismaMock.user.update).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          where: { id: mockUserId },
+          data: expect.objectContaining({ refreshTokenHash: null }),
+        }),
+      );
     });
   });
 });

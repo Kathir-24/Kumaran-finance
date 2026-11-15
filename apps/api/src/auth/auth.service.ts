@@ -380,9 +380,35 @@ export class AuthService {
     }
 
     // Code verified successfully: atomically consume the setup challenge and attempts
+    // F10: Atomic compare-and-delete prevents race conditions and concurrent double-claims
     if (useRedis && redis) {
-      await redis.del(challengeKey, attemptsKey).catch(() => {});
+      const claimLua = `
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+          redis.call("del", KEYS[1])
+          redis.call("del", KEYS[2])
+          return 1
+        else
+          return 0
+        end
+      `;
+      let claimed: number = 0;
+      if (typeof (redis as any).eval === 'function') {
+        claimed = Number(await (redis as any).eval(claimLua, 2, challengeKey, attemptsKey, dto.secret));
+      } else {
+        const val = await redis.get(challengeKey);
+        if (val === dto.secret) {
+          await redis.del(challengeKey, attemptsKey);
+          claimed = 1;
+        }
+      }
+      if (claimed !== 1) {
+        throw new BadRequestException('TOTP setup challenge has already been consumed or expired.');
+      }
     } else {
+      const stored = this.localTotpSetupStore.get(challengeKey);
+      if (stored !== dto.secret) {
+        throw new BadRequestException('TOTP setup challenge has already been consumed or expired.');
+      }
       this.localTotpSetupStore.delete(challengeKey);
       this.localTotpAttemptsStore.delete(attemptsKey);
     }
@@ -1206,6 +1232,39 @@ export class AuthService {
       throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
     }
 
+    // F04: Validate persisted scoped session state in PostgreSQL
+    if (payload.clientType && typeof (this.prisma as any).session?.findFirst === 'function') {
+      const session = await (this.prisma as any).session.findFirst({
+        where: {
+          OR: [
+            { userId: payload.sub, clientType: payload.clientType },
+            { customerId: payload.sub, clientType: payload.clientType },
+          ],
+        },
+        select: { id: true, revokedAt: true, expiresAt: true, refreshTokenHash: true, createdAt: true },
+      });
+      if (session) {
+        if (
+          session.revokedAt &&
+          isTokenIssuedBeforeRevocation(payload, session.revokedAt.getTime().toString())
+        ) {
+          throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+        }
+        if (!session.refreshTokenHash && session.revokedAt) {
+          throw new UnauthorizedException('Session terminated or logged out. Please sign in again.');
+        }
+        if (session.expiresAt && session.expiresAt.getTime() <= Date.now()) {
+          throw new UnauthorizedException('Session terminated or expired. Please sign in again.');
+        }
+        if (payload.sid && session.id && payload.sid !== session.id) {
+          throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+        }
+        if (session.createdAt && isTokenIssuedBeforeRevocation(payload, session.createdAt.getTime().toString())) {
+          throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+        }
+      }
+    }
+
     if (user.mustChangePassword) {
       throw new BadRequestException('Initial password setup required before configuring MPIN.');
     }
@@ -1233,6 +1292,7 @@ export class AuthService {
     clientType: string = 'MOBILE',
   ) {
     const issuedAtMs = Date.now();
+    const sid = crypto.randomUUID();
     const accessPayload: JwtPayload = {
       sub: customer.id,
       phone: customer.phone,
@@ -1240,6 +1300,7 @@ export class AuthService {
       branchId: customer.branchId,
       tokenType: 'access',
       clientType,
+      sid,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1251,6 +1312,7 @@ export class AuthService {
       branchId: customer.branchId,
       tokenType: 'refresh',
       clientType,
+      sid,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1283,16 +1345,20 @@ export class AuthService {
           },
         },
         create: {
+          id: sid,
           customerId: customer.id,
           clientType,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
+          createdAt: now,
         },
         update: {
+          id: sid,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
+          createdAt: now,
         },
       });
     }
@@ -1514,6 +1580,9 @@ export class AuthService {
           }
           throw new UnauthorizedException('Session has been revoked or expired');
         }
+        if (payload.sid && session.id && payload.sid !== session.id) {
+          throw new UnauthorizedException('Session has been superseded. Please sign in again.');
+        }
         storedHash = session.refreshTokenHash;
       } else {
         if (useRedis && redis) {
@@ -1587,6 +1656,9 @@ export class AuthService {
         }
         throw new UnauthorizedException('Session has been revoked or expired');
       }
+      if (payload.sid && session.id && payload.sid !== session.id) {
+        throw new UnauthorizedException('Session has been superseded. Please sign in again.');
+      }
       storedHash = session.refreshTokenHash;
     } else {
       if (useRedis && redis) {
@@ -1657,6 +1729,7 @@ export class AuthService {
       if (useRedis && redis) {
         await redis.del(`auth:session:${userId}:${clientType}`).catch(() => {});
         await redis.del(`user:status:${userId}`).catch(() => {});
+        await redis.del(`user:status:${userId}:${clientType}`).catch(() => {});
         await redis.set(
           `auth:revoked_before:${userId}:${clientType}`,
           revokedAtMs,
@@ -1711,6 +1784,9 @@ export class AuthService {
       if (useRedis && redis) {
         await redis.del(
           `user:status:${userId}`,
+          `user:status:${userId}:WEB`,
+          `user:status:${userId}:MOBILE`,
+          `user:status:${userId}:DESKTOP`,
           `auth:session:${userId}:WEB`,
           `auth:session:${userId}:MOBILE`,
           `auth:session:${userId}:DESKTOP`,
@@ -1861,6 +1937,7 @@ export class AuthService {
    */
   private async generateAuthTokens(user: User, clientType: string = 'WEB') {
     const issuedAtMs = Date.now();
+    const sid = crypto.randomUUID();
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
@@ -1869,6 +1946,7 @@ export class AuthService {
       branchId: user.branchId,
       tokenType: 'access',
       clientType,
+      sid,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1881,6 +1959,7 @@ export class AuthService {
       branchId: user.branchId,
       tokenType: 'refresh',
       clientType,
+      sid,
       jti: crypto.randomUUID(),
       issuedAtMs,
     };
@@ -1895,6 +1974,7 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
 
     const refreshTokenHash = await this.hashRefreshToken(refreshToken);
+    const now = new Date();
 
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
@@ -1912,16 +1992,20 @@ export class AuthService {
           },
         },
         create: {
+          id: sid,
           userId: user.id,
           clientType,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
+          createdAt: now,
         },
         update: {
+          id: sid,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
+          createdAt: now,
         },
       });
     }

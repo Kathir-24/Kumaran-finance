@@ -425,3 +425,91 @@ test('DEF-FE-08: Edge Middleware guards /2fa using cryptographic HttpOnly kc_tot
   assert.match(middlewareSource, /COOKIE_TOTP_PENDING/);
   assert.match(middlewareSource, /decision\.clearPendingTotpCookie/);
 });
+
+test('F16: Edge Middleware /onboarding Route Gating & Onboarding Token Lifecycle', async () => {
+  const validOnboardingToken = await signTestJwt({
+    sub: 'new-user-001',
+    roles: ['COLLECTION_AGENT'],
+    tokenType: 'onboarding_restricted',
+  });
+
+  const expiredOnboardingToken = await signTestJwt(
+    {
+      sub: 'new-user-001',
+      roles: ['COLLECTION_AGENT'],
+      tokenType: 'onboarding_restricted',
+    },
+    { expiresIn: -10 },
+  );
+
+  const wrongAccessToken = await signTestJwt({
+    sub: 'new-user-001',
+    roles: ['COLLECTION_AGENT'],
+    tokenType: 'access',
+  });
+
+  // 1. Valid onboarding cookie on /onboarding allows access
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/onboarding',
+      onboardingToken: validOnboardingToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    { action: 'next' },
+  );
+
+  // 2. Direct access to /onboarding without token redirects to /login?reason=missing_temp_token
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/onboarding',
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=missing_temp_token',
+      clearStaleCookies: false,
+    },
+  );
+
+  // 3. Expired onboarding token redirects to /login?reason=temp_session_expired
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/onboarding',
+      onboardingToken: expiredOnboardingToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=temp_session_expired',
+      clearStaleCookies: false,
+    },
+  );
+
+  // 4. Token type substitution: access token passed as onboarding token fails closed
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/onboarding',
+      onboardingToken: wrongAccessToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/login?reason=temp_session_expired',
+      clearStaleCookies: false,
+    },
+  );
+
+  // 5. Already authenticated user on /onboarding redirects cleanly to dashboard
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/onboarding',
+      accessToken: wrongAccessToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/',
+      clearStaleCookies: false,
+    },
+  );
+});

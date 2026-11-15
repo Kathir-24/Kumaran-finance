@@ -39,7 +39,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
-    const cacheKey = `user:status:${payload.sub}`;
+    const cacheKey = payload.clientType
+      ? `user:status:${payload.sub}:${payload.clientType}`
+      : `user:status:${payload.sub}`;
 
     // Fast Path 1: Check if user or client-family session has been revoked
     if (useRedis && redis) {
@@ -76,6 +78,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
                 throw new UnauthorizedException(
                   'Session terminated or credentials updated. Please sign in again.',
                 );
+              }
+              if (cached.sid && payload.sid && cached.sid !== payload.sid) {
+                throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
               }
               if (cached.roles) {
                 payload.roles = cached.roles;
@@ -118,7 +123,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           if (payload.clientType && typeof (this.prisma as any).session?.findFirst === 'function') {
             const session = await (this.prisma as any).session.findFirst({
               where: { customerId: payload.sub, clientType: payload.clientType },
-              select: { revokedAt: true, expiresAt: true, refreshTokenHash: true },
+              select: { id: true, revokedAt: true, expiresAt: true, refreshTokenHash: true, createdAt: true },
             });
             if (session) {
               if (
@@ -133,6 +138,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
               if (session.expiresAt && session.expiresAt.getTime() <= Date.now()) {
                 throw new UnauthorizedException('Session terminated or expired. Please sign in again.');
               }
+              if (payload.sid && session.id && payload.sid !== session.id) {
+                throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+              }
+              if (session.createdAt && isTokenIssuedBeforeRevocation(payload, session.createdAt.getTime().toString())) {
+                throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+              }
             }
           }
           if (useRedis && redis) {
@@ -141,6 +152,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
               tokenRevokedBeforeMs: customer.tokenRevokedBefore?.getTime() ?? null,
               roles: [Role.CUSTOMER],
               isPartner: false,
+              sid: payload.sid ?? null,
             });
             await redis.set(cacheKey, customerStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
           }
@@ -165,7 +177,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (payload.clientType && typeof (this.prisma as any).session?.findFirst === 'function') {
       const session = await (this.prisma as any).session.findFirst({
         where: { userId: payload.sub, clientType: payload.clientType },
-        select: { revokedAt: true, expiresAt: true, refreshTokenHash: true },
+        select: { id: true, revokedAt: true, expiresAt: true, refreshTokenHash: true, createdAt: true },
       });
       if (session) {
         if (
@@ -180,6 +192,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         if (session.expiresAt && session.expiresAt.getTime() <= Date.now()) {
           throw new UnauthorizedException('Session terminated or expired. Please sign in again.');
         }
+        if (payload.sid && session.id && payload.sid !== session.id) {
+          throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+        }
+        if (session.createdAt && isTokenIssuedBeforeRevocation(payload, session.createdAt.getTime().toString())) {
+          throw new UnauthorizedException('Session terminated or superseded. Please sign in again.');
+        }
       }
     }
 
@@ -192,6 +210,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         tokenRevokedBeforeMs: user.tokenRevokedBefore?.getTime() ?? null,
         roles: user.roles,
         isPartner: user.isPartner,
+        sid: payload.sid ?? null,
       });
       await redis.set(cacheKey, userStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
     }

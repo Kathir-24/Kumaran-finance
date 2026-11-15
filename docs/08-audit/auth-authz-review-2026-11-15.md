@@ -27,13 +27,19 @@ Review date: 2026-11-15. Repository: Kumaran Finance / Kumaran Chits.
 | **F15** | Medium | SSE approvals stream lacks mid-flight auth check | Phase 3 | Scheduled | Periodic active-session heartbeat validator |
 | **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED & HARDENED** | Atomic single-use onboarding token consumption, `mustChangePassword` enforced on both MPIN login and `verifyOtp`, TOTP requirement preserved on onboarding completion, and Next.js BFF HttpOnly cookie onboarding flow with `/onboarding` UI |
 
-*Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (34/34 passed).  
+*Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (39/39 passed).  
 *Phase 2 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (22/22 passed).  
 *Auth Token Lifecycle Suite*: [`apps/api/test/unit/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth-token-lifecycle.spec.ts) (25/25 passed).  
-*Full Regression Suite*: 955 API tests (58 suites) + 357 Web tests (14 suites) passing with 0 failures.  
+*Full Regression Suite*: 960 API tests (58 suites) + 358 Web tests (14 suites) passing with 0 failures.  
 *Database Migrations*:  
 1. `20261115030000_auth_revocation_and_session_vault` deployed to PostgreSQL 17.  
 2. `20261115040000_maker_checker_check_constraints` deployed to PostgreSQL 17.
+
+### Edge-Case Hardening Addendum (2026-11-15 Final Pass)
+1. **Edge Middleware `/onboarding` Route Gate (F16)**: Next.js edge auth middleware (`apps/web/src/lib/edge-auth.ts`, `apps/web/src/middleware.ts`) was updated to recognize `/onboarding` as a valid authentication journey route, evaluating the dedicated `kc_onboarding_token` (`tokenType: 'onboarding_restricted'`). Unauthenticated users with a valid restricted token are granted access to set their password, while visitors without a valid onboarding cookie are redirected to `/login?reason=missing_temp_token`.
+2. **Device-Family Scoped Status Caching (F04)**: Cache keys in `JwtStrategy` are scoped to the client family (`user:status:${sub}:${clientType}`), eliminating cross-family cache contamination where a `MOBILE` session previously populated an `ACTIVE` status that allowed a revoked `WEB` access token to bypass validation. In addition, `authService.validateAuthenticatedAccessToken()` now validates the persisted PostgreSQL `Session` row for the client family.
+3. **Session Identity Binding (`sid`) & Replacement-Login Isolation (F04)**: Access and refresh tokens carry a cryptographic session UUID (`sid`). Login updates the PostgreSQL `Session` record with the new `sid` and `createdAt`. Any access token issued prior to logout or replacement login is immediately rejected (`session.id !== payload.sid`), eliminating session resurrection even after `Session.revokedAt` is reset to null by a subsequent login.
+4. **Atomic TOTP Challenge Claim Lua Script (F10)**: In `authService.enableTotp()`, challenge consumption executes an atomic compare-and-delete Lua script (`if redis.call("get", KEYS[1]) == ARGV[1] then redis.call("del", KEYS[1], KEYS[2]) return 1 else return 0 end`). Concurrent confirmation requests fail-closed: exactly one request claims the challenge, while concurrent requests receive `400 Bad Request` without double-writing or factor collision.
 
 Severity reflects potential impact and required access, not evidence of exploitation. These are repository findings; no claim is made that the application has been attacked or that every deployment exposes every path.
 

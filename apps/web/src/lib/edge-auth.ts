@@ -15,6 +15,7 @@ export interface EdgeAuthParams {
   accessToken?: string;
   refreshToken?: string;
   totpPendingToken?: string;
+  onboardingToken?: string;
   jwtSecret?: string;
 }
 
@@ -28,6 +29,13 @@ export type EdgeAuthDecision =
     };
 
 export interface TotpPendingEvaluation {
+  valid: boolean;
+  expired: boolean;
+  hadToken: boolean;
+  secretConfigured: boolean;
+}
+
+export interface OnboardingEvaluation {
   valid: boolean;
   expired: boolean;
   hadToken: boolean;
@@ -77,7 +85,9 @@ export function sanitizeSafeRedirectPath(redirectParam?: string | null): string 
     trimmed === '/login' ||
     trimmed.startsWith('/login?') ||
     trimmed === '/2fa' ||
-    trimmed.startsWith('/2fa?')
+    trimmed.startsWith('/2fa?') ||
+    trimmed === '/onboarding' ||
+    trimmed.startsWith('/onboarding?')
   ) {
     return '/';
   }
@@ -87,7 +97,7 @@ export function sanitizeSafeRedirectPath(redirectParam?: string | null): string 
 async function verifySingleJwt(
   token: string,
   secretKey: Uint8Array,
-  expectedType: 'access' | 'refresh' | 'totp_pending',
+  expectedType: 'access' | 'refresh' | 'totp_pending' | 'onboarding_restricted',
 ): Promise<SingleJwtVerification> {
   try {
     const { payload } = await jwtVerify(token, secretKey, {
@@ -178,6 +188,45 @@ export async function verifyTotpPendingJwt(
   };
 }
 
+/**
+ * Cryptographically verifies an HttpOnly `kc_onboarding_token` JWT (F16).
+ * Fails closed if JWT_SECRET is unset or if `tokenType !== 'onboarding_restricted'`.
+ */
+export async function verifyOnboardingJwt(
+  token?: string,
+  explicitSecret?: string,
+): Promise<OnboardingEvaluation> {
+  const cleanToken = token?.trim();
+  const hadToken = Boolean(cleanToken);
+  const secretKey = resolveJwtSecretKey(explicitSecret);
+
+  if (!secretKey) {
+    return {
+      valid: false,
+      expired: false,
+      hadToken,
+      secretConfigured: false,
+    };
+  }
+
+  if (!cleanToken) {
+    return {
+      valid: false,
+      expired: false,
+      hadToken: false,
+      secretConfigured: true,
+    };
+  }
+
+  const result = await verifySingleJwt(cleanToken, secretKey, 'onboarding_restricted');
+  return {
+    valid: Boolean(result.valid && result.sub),
+    expired: result.expired,
+    hadToken: true,
+    secretConfigured: true,
+  };
+}
+
 async function verifyEdgeTokens(
   accessToken?: string,
   refreshToken?: string,
@@ -253,6 +302,7 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
     accessToken,
     refreshToken,
     totpPendingToken,
+    onboardingToken,
     jwtSecret,
   } = params;
 
@@ -262,11 +312,32 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
 
   const isLoginPage = pathname === '/login' || pathname.startsWith('/login/');
   const isTwoFactorPage = pathname === '/2fa' || pathname.startsWith('/2fa/');
-  const isAuthPage = isLoginPage || isTwoFactorPage;
+  const isOnboardingPage = pathname === '/onboarding' || pathname.startsWith('/onboarding/');
+  const isAuthPage = isLoginPage || isTwoFactorPage || isOnboardingPage;
 
   const auth = await verifyEdgeTokens(accessToken, refreshToken, jwtSecret);
 
   if (!auth.authenticated) {
+    if (isOnboardingPage) {
+      const onboarding = await verifyOnboardingJwt(onboardingToken, jwtSecret);
+      if (onboarding.valid) {
+        return { action: 'next' };
+      }
+
+      const reason = onboarding.hadToken ? 'temp_session_expired' : 'missing_temp_token';
+      const safeRedirect = sanitizeSafeRedirectPath(redirectParam);
+      const loginQuery =
+        safeRedirect !== '/'
+          ? `reason=${reason}&redirect=${encodeURIComponent(safeRedirect)}`
+          : `reason=${reason}`;
+
+      return {
+        action: 'redirect',
+        location: `/login?${loginQuery}`,
+        clearStaleCookies: auth.hadTokens && auth.secretConfigured,
+      };
+    }
+
     if (isTwoFactorPage) {
       const pending = await verifyTotpPendingJwt(totpPendingToken, jwtSecret);
       if (pending.valid) {

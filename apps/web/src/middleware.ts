@@ -10,6 +10,7 @@ import {
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
   COOKIE_TOTP_PENDING,
+  COOKIE_ONBOARDING_TOKEN,
   getClearedCookieOptions,
   shouldUseSecureCookies,
 } from './lib/auth-cookies.ts';
@@ -25,6 +26,7 @@ export async function middleware(request: NextRequest) {
     accessToken: request.cookies.get(COOKIE_ACCESS_TOKEN)?.value,
     refreshToken: request.cookies.get(COOKIE_REFRESH_TOKEN)?.value,
     totpPendingToken: request.cookies.get(COOKIE_TOTP_PENDING)?.value,
+    onboardingToken: request.cookies.get(COOKIE_ONBOARDING_TOKEN)?.value,
   });
 
   if (decision.action === 'next') {
