@@ -6,30 +6,31 @@ Review date: 2026-11-15. Repository: Kumaran Finance / Kumaran Chits.
 
 **The current implementation is actively undergoing phased security remediation.** The review originally identified 16 findings: **1 Critical, 12 High, and 3 Medium**. 
 
-### Remediation Status (Phase 1 & Phase 2 Completed: 2026-11-15)
+### Remediation Status (Phase 1 & Phase 2 Fully Hardened: 2026-11-15)
 
 | ID | Severity | Finding Summary | Remediation Phase | Status | Verification Reference |
 |---|---|---|---|---|---|
-| **F01** | **Critical** | Pending TOTP tokens can set an MPIN and bypass second factor | **Phase 1** | **RESOLVED** | `POST /auth/mobile/set-mpin` checks `tokenType: access` & single-use `SET NX` |
-| **F02** | High | Admin password resets leave active sessions usable | **Phase 1** | **RESOLVED** | PostgreSQL `tokenRevokedBefore` + Redis session purging |
-| **F03** | High | Removing roles does not remove privileges from existing tokens | **Phase 1** | **RESOLVED** | Role sync on DB fetch + session revocation on `updateRoles()` |
-| **F04** | High | Scoped logout resurrects refresh session after 15m | **Phase 1** | **RESOLVED** | Dedicated `Session` model + clientType token binding |
-| **F05** | High | Final-month settlement maker == checker | **Phase 2** | **RESOLVED** | Stage 1 `prepare-final-settlement` + Stage 2 `approve-final-settlement` (`maker != checker`) |
-| **F06** | High | Storage access bypasses passbook ownership & branch | **Phase 2** | **RESOLVED** | Passbook ticket ownership verification, KYC branch checks, strict default-deny |
-| **F07** | High | Customer search & detail expose unscoped records & PII | **Phase 2** | **RESOLVED** | Caller context scoping, `refreshTokenHash`/`fcmToken` stripping, masked PAN |
-| **F08** | High | Ticket/auction endpoints expose other subscribers' PII | **Phase 2** | **RESOLVED** | Chit group membership enforcement + fellow subscriber phone/name masking |
-| **F09** | High | Payment & collection writes lack agent/branch checks | **Phase 2** | **RESOLVED** | Domain branch from `ticket.chitGroup.branchId`, `CROSS_BRANCH_FORBIDDEN` |
-| **F10** | High | Existing TOTP factor can be replaced with only access token | **Phase 1** | **RESOLVED** | Server challenge in Redis + current password required for replacement |
+| **F01** | **Critical** | Pending TOTP tokens can set an MPIN and bypass second factor | **Phase 1** | **RESOLVED & HARDENED** | `validateAuthenticatedAccessToken` checks `tokenType: access`, durable revocation cutoff, `mustChangePassword`, and single-use setup challenge with fail-closed store |
+| **F02** | High | Admin password resets leave active sessions usable | **Phase 1** | **RESOLVED & HARDENED** | Transactional `resetPassword` & `updateRoles` combining user mutation and PostgreSQL `Session` revocation in single `$transaction`; database write errors propagate visibly |
+| **F03** | High | Removing roles does not remove privileges from existing tokens | **Phase 1** | **RESOLVED & HARDENED** | Structured Redis cache with `tokenRevokedBeforeMs` validation, role/isPartner synchronization, and reliable status cache eviction on mutations |
+| **F04** | High | Scoped logout resurrects refresh session after 15m | **Phase 1** | **RESOLVED & HARDENED** | Dedicated PostgreSQL `Session` table enforcement; global `user.refreshTokenHash` fallback completely removed; revoked sessions strictly rejected |
+| **F05** | High | Final-month settlement maker == checker | **Phase 2** | **RESOLVED & HARDENED** | Stage 1 `prepare-final-settlement` + Stage 2 `approve-final-settlement` (`maker != checker` enforced in code & DB) |
+| **F06** | High | Storage access bypasses passbook ownership & branch | **Phase 2** | **RESOLVED & HARDENED** | Passbook ticket ownership verification (`passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf`), KYC branch checks, strict default-deny |
+| **F07** | High | Customer search & detail expose unscoped records & PII | **Phase 2** | **RESOLVED & HARDENED** | Caller context scoping, `refreshTokenHash`/`fcmToken`/`tokenRevokedBefore` stripping, masked PAN |
+| **F08** | High | Ticket/auction endpoints expose other subscribers' PII | **Phase 2** | **RESOLVED & HARDENED** | Chit group membership enforcement + fellow subscriber phone masking (`+91 ******0000`) |
+| **F09** | High | Payment & collection writes lack agent/branch checks | **Phase 2** | **RESOLVED & HARDENED** | Domain accounting branch derived from `ticket.chitGroup.branchId`, `CROSS_BRANCH_FORBIDDEN` |
+| **F10** | High | Existing TOTP factor can be replaced with only access token | **Phase 1** | **RESOLVED & HARDENED** | Atomic challenge consumption from Redis (`getdel`), fail-closed on disconnected store, and current password required for factor replacement |
 | **F11** | High | Queue dashboard auth detached from Super Admin identity | Phase 3 | Scheduled | Native Super Admin session guard on Bull Board |
-| **F12** | High | Database maker-checker constraints absent | **Phase 2** | **RESOLVED** | PostgreSQL CHECK constraints (`chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) |
+| **F12** | High | Database maker-checker constraints absent | **Phase 2** | **RESOLVED & HARDENED** | PostgreSQL CHECK constraints (`chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) |
 | **F13** | Medium | SMS OTP race condition allows attempt exhaustion bypass | Phase 3 | Scheduled | Atomic Redis Lua OTP attempt tracking |
 | **F14** | Medium | Mobile app refresh loop causes cascade 401 | Phase 3 | Scheduled | Single-flight refresh mutex in Flutter Dio interceptor |
 | **F15** | Medium | SSE approvals stream lacks mid-flight auth check | Phase 3 | Scheduled | Periodic active-session heartbeat validator |
-| **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED** | Random temp password + `mustChangePassword` + `POST /auth/complete-onboarding` |
+| **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED & HARDENED** | Atomic single-use onboarding token consumption, `mustChangePassword` guard on MPIN login, TOTP requirement preserved on onboarding completion, and Next.js BFF HttpOnly cookie onboarding flow |
 
-*Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (14/14 passed, Commit `7e852c91`).  
+*Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (28/28 passed).  
 *Phase 2 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (22/22 passed).  
-*Full Regression Suite*: 935 API tests + 353 Web tests passing with 0 failures.  
+*Auth Token Lifecycle Suite*: [`apps/api/test/unit/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth-token-lifecycle.spec.ts) (25/25 passed).  
+*Full Regression Suite*: 949 API tests (58 suites) + 356 Web tests (14 suites) passing with 0 failures.  
 *Database Migrations*:  
 1. `20261115030000_auth_revocation_and_session_vault` deployed to PostgreSQL 17.  
 2. `20261115040000_maker_checker_check_constraints` deployed to PostgreSQL 17.

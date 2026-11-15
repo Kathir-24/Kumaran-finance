@@ -11,8 +11,10 @@ import {
   COOKIE_REFRESH_TOKEN,
   COOKIE_SESSION_ACTIVE,
   COOKIE_TOTP_PENDING,
+  COOKIE_ONBOARDING_TOKEN,
   getAccessTokenCookieOptions,
   getClearedCookieOptions,
+  getOnboardingTokenCookieOptions,
   getRefreshTokenCookieOptions,
   getSessionActiveCookieOptions,
   getTotpPendingCookieOptions,
@@ -186,4 +188,23 @@ export function applyTotpPendingCookie(
  */
 export function clearTotpPendingCookie(response: NextResponse, isSecure?: boolean): void {
   response.cookies.set(COOKIE_TOTP_PENDING, '', getClearedCookieOptions(true, isSecure));
+}
+
+/**
+ * Stores the 15-minute restricted onboarding challenge JWT in an HttpOnly cookie.
+ */
+export function applyOnboardingCookie(
+  response: NextResponse,
+  tempToken: string,
+  isSecure?: boolean,
+): void {
+  const opts = getOnboardingTokenCookieOptions(isSecure);
+  response.cookies.set(opts.name, tempToken, opts);
+}
+
+/**
+ * Expires the restricted onboarding challenge cookie immediately (Max-Age=0).
+ */
+export function clearOnboardingCookie(response: NextResponse, isSecure?: boolean): void {
+  response.cookies.set(COOKIE_ONBOARDING_TOKEN, '', getClearedCookieOptions(true, isSecure));
 }

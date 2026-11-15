@@ -8,7 +8,6 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -315,12 +314,7 @@ export class AuthController {
     let userId: string | undefined;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
-      const payload = this.authService.verifyToken(token);
-      if (payload.tokenType !== 'access') {
-        throw new UnauthorizedException(
-          'Invalid token purpose for MPIN change. Full access token required.',
-        );
-      }
+      const payload = await this.authService.validateAuthenticatedAccessToken(token);
       userId = payload.sub;
     }
     return this.authService.setMpin(userId, dto);

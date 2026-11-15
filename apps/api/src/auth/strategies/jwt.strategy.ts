@@ -55,15 +55,41 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-    // Fast Path 2: Check high-throughput Redis status cache (120s TTL)
+    // Fast Path 2: Check high-throughput Redis authorization status cache (120s TTL)
     if (useRedis && redis) {
       try {
-        const cachedStatus = await redis.get(cacheKey);
-        if (cachedStatus === 'ACTIVE') {
-          return payload;
-        }
-        if (cachedStatus === 'INACTIVE') {
-          throw new UnauthorizedException('User account is deactivated or no longer exists');
+        const cachedRaw = await redis.get(cacheKey);
+        if (cachedRaw) {
+          if (cachedRaw === 'INACTIVE') {
+            throw new UnauthorizedException('User account is deactivated or no longer exists');
+          }
+          if (cachedRaw === 'ACTIVE') {
+            return payload;
+          }
+          if (cachedRaw.startsWith('{')) {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.status === 'INACTIVE') {
+              throw new UnauthorizedException('User account is deactivated or no longer exists');
+            }
+            if (cached.status === 'ACTIVE') {
+              if (
+                cached.tokenRevokedBeforeMs &&
+                payload.iat &&
+                payload.iat * 1000 < cached.tokenRevokedBeforeMs
+              ) {
+                throw new UnauthorizedException(
+                  'Session terminated or credentials updated. Please sign in again.',
+                );
+              }
+              if (cached.roles) {
+                payload.roles = cached.roles;
+              }
+              if (typeof cached.isPartner === 'boolean') {
+                payload.isPartner = cached.isPartner;
+              }
+              return payload;
+            }
+          }
         }
       } catch (err: any) {
         if (err instanceof UnauthorizedException) {

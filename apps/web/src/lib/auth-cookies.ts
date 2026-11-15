@@ -7,6 +7,7 @@ export const COOKIE_ACCESS_TOKEN = 'kc_access_token';
 export const COOKIE_REFRESH_TOKEN = 'kc_refresh_token';
 export const COOKIE_SESSION_ACTIVE = 'kc_session_active';
 export const COOKIE_TOTP_PENDING = 'kc_totp_pending_token';
+export const COOKIE_ONBOARDING_TOKEN = 'kc_onboarding_token';
 
 export interface CookieSecurityContext {
   headers?: {
@@ -106,6 +107,20 @@ export function getTotpPendingCookieOptions(isSecure?: boolean) {
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 5 * 60, // 5 minutes matching backend JWT expiry
+  };
+}
+
+/**
+ * Restricted staff onboarding challenge JWT cookie options (15 minutes TTL, HttpOnly).
+ */
+export function getOnboardingTokenCookieOptions(isSecure?: boolean) {
+  return {
+    name: COOKIE_ONBOARDING_TOKEN,
+    httpOnly: true,
+    secure: isSecure ?? shouldUseSecureCookies(),
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 15 * 60, // 15 minutes matching backend onboarding JWT expiry
   };
 }
 

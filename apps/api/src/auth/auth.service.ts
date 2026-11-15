@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -76,6 +77,9 @@ export class AuthService {
   private readonly lockoutStore = new Map<string, number>();
   private readonly dailyQuotaStore = new Map<string, { count: number; expiresAt: number }>();
   private readonly inFlightRefreshes = new Map<string, Promise<any>>();
+  private readonly consumedSetupTokens = new Set<string>();
+  private readonly consumedOnboardingTokens = new Set<string>();
+  private readonly localTotpSetupStore = new Map<string, string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -193,6 +197,7 @@ export class AuthService {
     const result = verifySync({
       token: dto.totpCode,
       secret,
+      epochTolerance: 30,
     });
 
     if (!result.valid) {
@@ -231,6 +236,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid phone or MPIN not configured');
     }
 
+    if (user.mustChangePassword) {
+      throw new UnauthorizedException(
+        'Initial password setup required. Please log in with your temporary password and complete onboarding.',
+      );
+    }
+
     const isMpinValid = await bcrypt.compare(dto.mpin, user.mpinHash);
     if (!isMpinValid) {
       throw new UnauthorizedException('Invalid phone or MPIN');
@@ -258,10 +269,16 @@ export class AuthService {
       secret,
     });
 
+    const hasRedisProvider = Boolean(this.redisProvider);
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (hasRedisProvider && (!useRedis || !redis)) {
+      throw new ServiceUnavailableException('2FA setup service is temporarily unavailable');
+    }
     if (useRedis && redis) {
       await redis.set(`auth:totp_setup:${userId}`, secret, 'EX', 600);
+    } else {
+      this.localTotpSetupStore.set(`auth:totp_setup:${userId}`, secret);
     }
 
     return {
@@ -286,19 +303,11 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
+    const hasRedisProvider = Boolean(this.redisProvider);
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
-
-    if (useRedis && redis) {
-      const cachedSetupSecret = await redis.get(`auth:totp_setup:${userId}`);
-      if (!cachedSetupSecret) {
-        throw new BadRequestException(
-          'TOTP setup challenge expired or not initiated. Please call /auth/totp/setup first.',
-        );
-      }
-      if (cachedSetupSecret !== dto.secret) {
-        throw new BadRequestException('Provided secret does not match the active setup challenge.');
-      }
+    if (hasRedisProvider && (!useRedis || !redis)) {
+      throw new ServiceUnavailableException('2FA verification service is temporarily unavailable');
     }
 
     // Factor replacement guard: require current password if already enrolled
@@ -314,9 +323,36 @@ export class AuthService {
       }
     }
 
+    // Atomically consume setup challenge once to prevent concurrent replay
+    const challengeKey = `auth:totp_setup:${userId}`;
+    let cachedSetupSecret: string | null = null;
+    if (useRedis && redis) {
+      cachedSetupSecret =
+        typeof (redis as any).getdel === 'function'
+          ? await (redis as any).getdel(challengeKey)
+          : await (async () => {
+              const val = await redis.get(challengeKey);
+              if (val) await redis.del(challengeKey);
+              return val;
+            })();
+    } else {
+      cachedSetupSecret = this.localTotpSetupStore.get(challengeKey) ?? null;
+      this.localTotpSetupStore.delete(challengeKey);
+    }
+
+    if (!cachedSetupSecret) {
+      throw new BadRequestException(
+        'TOTP setup challenge expired or not initiated. Please call /auth/totp/setup first.',
+      );
+    }
+    if (cachedSetupSecret !== dto.secret) {
+      throw new BadRequestException('Provided secret does not match the active setup challenge.');
+    }
+
     const result = verifySync({
       token: dto.code,
       secret: dto.secret,
+      epochTolerance: 30,
     });
 
     if (!result.valid) {
@@ -337,10 +373,6 @@ export class AuthService {
         isTotpEnabled: true,
       },
     });
-
-    if (useRedis && redis) {
-      await redis.del(`auth:totp_setup:${userId}`).catch(() => {});
-    }
 
     // Revoke previous sessions on factor change to contain any hijacked chains
     await this.revokeUserSessions(userId);
@@ -898,17 +930,29 @@ export class AuthService {
         );
       }
 
-      // Check single-use consumption in Redis
+      // Check single-use consumption in Redis (fail closed if Redis is unavailable)
+      const hasRedisProvider = Boolean(this.redisProvider);
       const redis = this.redisProvider?.getClient();
       const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+      if (hasRedisProvider && (!useRedis || !redis)) {
+        throw new ServiceUnavailableException('Setup verification store is temporarily unavailable');
+      }
+
+      const tokenKey = `auth:consumed_setup_token:${payload.jti || payload.sub + ':' + (payload.iat || Date.now())}`;
       if (useRedis && redis) {
-        const tokenKey = `auth:consumed_setup_token:${payload.jti || payload.sub + ':' + (payload.iat || Date.now())}`;
         const setOk = await redis.set(tokenKey, '1', 'EX', 600, 'NX');
         if (setOk !== 'OK') {
           throw new UnauthorizedException(
             'MPIN setup token has already been consumed. Please request a new OTP.',
           );
         }
+      } else {
+        if (this.consumedSetupTokens.has(tokenKey)) {
+          throw new UnauthorizedException(
+            'MPIN setup token has already been consumed. Please request a new OTP.',
+          );
+        }
+        this.consumedSetupTokens.add(tokenKey);
       }
 
       targetUserId = payload.sub;
@@ -924,6 +968,10 @@ export class AuthService {
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User account invalid or deactivated');
+    }
+
+    if (user.mustChangePassword) {
+      throw new BadRequestException('Initial password setup required before configuring MPIN.');
     }
 
     const mpinHash = await bcrypt.hash(dto.mpin, BCRYPT_SALT_ROUNDS);
@@ -971,6 +1019,39 @@ export class AuthService {
       throw new UnauthorizedException('User account invalid or deactivated');
     }
 
+    if (!user.mustChangePassword) {
+      throw new BadRequestException('Onboarding has already been completed for this account');
+    }
+
+    if (
+      user.tokenRevokedBefore &&
+      isTokenIssuedBeforeRevocation(payload, user.tokenRevokedBefore.getTime().toString())
+    ) {
+      throw new UnauthorizedException('Onboarding session has been revoked');
+    }
+
+    // Atomically consume onboarding token to prevent token reuse
+    const hasRedisProvider = Boolean(this.redisProvider);
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (hasRedisProvider && (!useRedis || !redis)) {
+      throw new ServiceUnavailableException('Onboarding verification store is temporarily unavailable');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(dto.tempToken).digest('hex');
+    const consumedKey = `auth:consumed_onboarding:${tokenHash}`;
+    if (useRedis && redis) {
+      const setRes = await redis.set(consumedKey, '1', 'EX', 900, 'NX');
+      if (setRes !== 'OK') {
+        throw new UnauthorizedException('Onboarding token has already been consumed');
+      }
+    } else {
+      if (this.consumedOnboardingTokens.has(consumedKey)) {
+        throw new UnauthorizedException('Onboarding token has already been consumed');
+      }
+      this.consumedOnboardingTokens.add(consumedKey);
+    }
+
     const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
 
     const updatedUser = await this.prisma.user.update({
@@ -983,7 +1064,70 @@ export class AuthService {
 
     await this.revokeUserSessions(user.id);
 
+    if (updatedUser.isTotpEnabled) {
+      const totpPayload: JwtPayload = {
+        sub: updatedUser.id,
+        phone: updatedUser.phone,
+        roles: updatedUser.roles,
+        branchId: updatedUser.branchId,
+        tokenType: 'totp_pending',
+      };
+      const tempToken = this.jwtService.sign(totpPayload, { expiresIn: '5m' });
+      return {
+        requiresTotp: true,
+        tempToken,
+        message: 'Password set successfully. Two-factor authentication code required.',
+      };
+    }
+
     return this.generateAuthTokens(updatedUser, 'WEB');
+  }
+
+  /**
+   * Validates an access token and asserts account is active, non-revoked, and meets authentication prerequisites.
+   */
+  async validateAuthenticatedAccessToken(token: string): Promise<JwtPayload> {
+    let payload: JwtPayload;
+    try {
+      payload = this.verifyToken(token);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired access token');
+    }
+
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedException(
+        'Invalid token purpose for MPIN change. Full access token required.',
+      );
+    }
+
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    if (useRedis && redis) {
+      if (await isTokenRevokedInRedis(redis, payload)) {
+        throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
+      }
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User account invalid or deactivated');
+    }
+
+    if (
+      user.tokenRevokedBefore &&
+      isTokenIssuedBeforeRevocation(payload, user.tokenRevokedBefore.getTime().toString())
+    ) {
+      throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
+    }
+
+    if (user.mustChangePassword) {
+      throw new BadRequestException('Initial password setup required before configuring MPIN.');
+    }
+
+    return payload;
   }
 
   /**
@@ -1280,15 +1424,19 @@ export class AuthService {
       if (useRedis && redis) {
         storedHash = await redis.get(`auth:session:${customer.id}:${clientType}`);
       }
-      if (!storedHash && typeof (this.prisma as any).session?.findUnique === 'function') {
-        const session = await (this.prisma as any).session.findUnique({
-          where: { customerId_clientType: { customerId: customer.id, clientType } },
-        });
-        if (session && !session.revokedAt && session.expiresAt > new Date()) {
-          storedHash = session.refreshTokenHash;
+      if (typeof (this.prisma as any).session?.findUnique === 'function') {
+        if (!storedHash) {
+          const session = await (this.prisma as any).session.findUnique({
+            where: { customerId_clientType: { customerId: customer.id, clientType } },
+          });
+          if (session) {
+            if (session.revokedAt || session.expiresAt <= new Date()) {
+              throw new UnauthorizedException('Session has been revoked or expired');
+            }
+            storedHash = session.refreshTokenHash;
+          }
         }
-      }
-      if (!storedHash) {
+      } else if (!storedHash) {
         storedHash = customer.refreshTokenHash;
       }
 
@@ -1348,15 +1496,19 @@ export class AuthService {
     if (useRedis && redis) {
       storedHash = await redis.get(`auth:session:${user.id}:${clientType}`);
     }
-    if (!storedHash && typeof (this.prisma as any).session?.findUnique === 'function') {
-      const session = await (this.prisma as any).session.findUnique({
-        where: { userId_clientType: { userId: user.id, clientType } },
-      });
-      if (session && !session.revokedAt && session.expiresAt > new Date()) {
-        storedHash = session.refreshTokenHash;
+    if (typeof (this.prisma as any).session?.findUnique === 'function') {
+      if (!storedHash) {
+        const session = await (this.prisma as any).session.findUnique({
+          where: { userId_clientType: { userId: user.id, clientType } },
+        });
+        if (session) {
+          if (session.revokedAt || session.expiresAt <= new Date()) {
+            throw new UnauthorizedException('Session has been revoked or expired');
+          }
+          storedHash = session.refreshTokenHash;
+        }
       }
-    }
-    if (!storedHash) {
+    } else if (!storedHash) {
       storedHash = user.refreshTokenHash;
     }
 
@@ -1414,7 +1566,7 @@ export class AuthService {
             refreshTokenHash: null,
             revokedAt: now,
           },
-        }).catch(() => {});
+        });
       }
 
       if (useRedis && redis) {
@@ -1440,7 +1592,7 @@ export class AuthService {
             refreshTokenHash: null,
             fcmToken: null,
           },
-        }).catch(() => {});
+        });
       } else {
         const customer = await this.prisma.customer.findUnique({
           where: { id: userId },
@@ -1454,7 +1606,7 @@ export class AuthService {
               refreshTokenHash: null,
               fcmToken: null,
             },
-          }).catch(() => {});
+          });
         }
       }
 
@@ -1467,7 +1619,7 @@ export class AuthService {
             refreshTokenHash: null,
             revokedAt: now,
           },
-        }).catch(() => {});
+        });
       }
 
       if (useRedis && redis) {

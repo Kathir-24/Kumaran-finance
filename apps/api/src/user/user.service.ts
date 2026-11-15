@@ -31,7 +31,6 @@ export class UserService {
    */
   async revokeUserSessions(userId: string): Promise<void> {
     const now = new Date();
-    const revokedAtMs = Date.now().toString();
 
     // 1. Authoritative DB Invalidation
     await this.prisma.user.update({
@@ -41,7 +40,7 @@ export class UserService {
         refreshTokenHash: null,
         fcmToken: null,
       },
-    }).catch(() => {});
+    });
 
     if (typeof (this.prisma as any).session?.updateMany === 'function') {
       await (this.prisma as any).session.updateMany({
@@ -50,13 +49,18 @@ export class UserService {
           refreshTokenHash: null,
           revokedAt: now,
         },
-      }).catch(() => {});
+      });
     }
 
     // 2. High-Throughput Redis Invalidation
+    await this.purgeRedisSessions(userId, now);
+  }
+
+  private async purgeRedisSessions(userId: string, revokedAt: Date = new Date()): Promise<void> {
     if (this.redisProvider?.getIsConnected()) {
       const client = this.redisProvider.getClient();
       if (client) {
+        const revokedAtMs = revokedAt.getTime().toString();
         await client.del(`user:status:${userId}`).catch(() => {});
         await client.del(
           `auth:session:${userId}:WEB`,
@@ -283,19 +287,42 @@ export class UserService {
       throw new NotFoundException(`Staff user with ID ${id} not found`);
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        roles: dto.roles,
-      },
-      include: {
-        branch: {
-          select: { id: true, code: true, name: true, nameTamil: true },
+    const now = new Date();
+    const updateFn = async (tx: any) => {
+      const res = await tx.user.update({
+        where: { id },
+        data: {
+          roles: dto.roles,
+          tokenRevokedBefore: now,
+          refreshTokenHash: null,
+          fcmToken: null,
         },
-      },
-    });
+        include: {
+          branch: {
+            select: { id: true, code: true, name: true, nameTamil: true },
+          },
+        },
+      });
 
-    await this.revokeUserSessions(id);
+      if (typeof tx.session?.updateMany === 'function') {
+        await tx.session.updateMany({
+          where: { userId: id },
+          data: {
+            refreshTokenHash: null,
+            revokedAt: now,
+          },
+        });
+      }
+
+      return res;
+    };
+
+    const updated =
+      typeof (this.prisma as any).$transaction === 'function'
+        ? await this.prisma.$transaction(updateFn)
+        : await updateFn(this.prisma);
+
+    await this.purgeRedisSessions(id, now);
 
     return this.sanitizeUser(updated);
   }
@@ -315,16 +342,38 @@ export class UserService {
 
     const tempPassword = dto.temporaryPassword?.trim() || `Temp#${crypto.randomBytes(4).toString('hex')}!`;
     const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_SALT_ROUNDS);
+    const now = new Date();
 
-    await this.prisma.user.update({
-      where: { id },
-      data: {
-        passwordHash,
-        mustChangePassword: true,
-      },
-    });
+    const resetFn = async (tx: any) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          passwordHash,
+          mustChangePassword: true,
+          tokenRevokedBefore: now,
+          refreshTokenHash: null,
+          fcmToken: null,
+        },
+      });
 
-    await this.revokeUserSessions(id);
+      if (typeof tx.session?.updateMany === 'function') {
+        await tx.session.updateMany({
+          where: { userId: id },
+          data: {
+            refreshTokenHash: null,
+            revokedAt: now,
+          },
+        });
+      }
+    };
+
+    if (typeof (this.prisma as any).$transaction === 'function') {
+      await this.prisma.$transaction(resetFn);
+    } else {
+      await resetFn(this.prisma);
+    }
+
+    await this.purgeRedisSessions(id, now);
 
     return {
       success: true,

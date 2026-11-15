@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -71,6 +72,7 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
     };
 
     prismaMock = {
+      $transaction: jest.fn(async (cb: any) => (typeof cb === 'function' ? cb(prismaMock) : Promise.all(cb))),
       user: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
@@ -236,6 +238,76 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
       expect(res.success).toBe(true);
       expect(res).not.toHaveProperty('accessToken');
     });
+
+    it('should reject setMpin with Bearer token when token was issued before user.tokenRevokedBefore', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000) - 60;
+      const accessToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        iat: issuedAt,
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: new Date(Date.now() - 10000),
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      await expect(
+        authController.setMpin(
+          { mpin: '654321' },
+          `Bearer ${accessToken}`,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject setMpin with setupToken when Redis provider is disconnected (fail-closed)', async () => {
+      const setupToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'mpin_setup',
+      });
+
+      jest.spyOn(redisProviderMock, 'getIsConnected').mockReturnValueOnce(false);
+
+      await expect(
+        authController.setMpin({
+          setupToken,
+          mpin: '123456',
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('should reject setMpin when user.mustChangePassword is true', async () => {
+      const accessToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'access',
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: null,
+        mustChangePassword: true,
+        roles: [Role.COLLECTION_AGENT],
+      });
+
+      await expect(
+        authController.setMpin(
+          { mpin: '654321' },
+          `Bearer ${accessToken}`,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   // =========================================================================
@@ -347,6 +419,87 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('refreshToken rejects with 401 when Session table indicates revoked session, eliminating global hash fallback', async () => {
+      const refreshToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.ACCOUNTANT],
+        branchId: mockBranchId,
+        tokenType: 'refresh',
+        clientType: 'WEB',
+      });
+
+      const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: null,
+        refreshTokenHash: refreshHash,
+      });
+
+      redisClientMock.get.mockResolvedValue(null);
+
+      prismaMock.session.findUnique.mockResolvedValue({
+        id: 'session-001',
+        userId: mockUserId,
+        clientType: 'WEB',
+        refreshTokenHash: refreshHash,
+        revokedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+
+      await expect(
+        authService.refreshToken({
+          refreshToken,
+          clientType: 'WEB',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('refreshToken rejects with 401 when no Session row exists in PostgreSQL and Redis is cold', async () => {
+      const refreshToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.ACCOUNTANT],
+        branchId: mockBranchId,
+        tokenType: 'refresh',
+        clientType: 'WEB',
+      });
+
+      const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        tokenRevokedBefore: null,
+        refreshTokenHash: refreshHash,
+      });
+
+      redisClientMock.get.mockResolvedValue(null);
+      prismaMock.session.findUnique.mockResolvedValue(null);
+
+      await expect(
+        authService.refreshToken({
+          refreshToken,
+          clientType: 'WEB',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('resetPassword propagates error and rolls back if database transaction fails', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        name: 'Accountant Staff',
+      });
+
+      prismaMock.$transaction.mockRejectedValueOnce(new Error('PostgreSQL Transaction Failed'));
+
+      await expect(
+        userService.resetPassword(mockUserId, {}, mockAdminId),
+      ).rejects.toThrow('PostgreSQL Transaction Failed');
+    });
   });
 
   // =========================================================================
@@ -400,6 +553,32 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
       const validatedPayload = await jwtStrategy.validate(payload);
       expect(validatedPayload.roles).toEqual([Role.ACCOUNTANT]);
       expect(validatedPayload.roles).not.toContain(Role.SUPER_ADMIN);
+    });
+
+    it('JwtStrategy rejects token when structured Redis cache has newer tokenRevokedBeforeMs', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000) - 30;
+      const payload: any = {
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.SUPER_ADMIN],
+        branchId: mockBranchId,
+        tokenType: 'access',
+        iat: issuedAt,
+      };
+
+      await redisClientMock.set(
+        `user:status:${mockUserId}`,
+        JSON.stringify({
+          status: 'ACTIVE',
+          tokenRevokedBeforeMs: (issuedAt + 10) * 1000,
+          roles: [Role.ACCOUNTANT],
+          isPartner: false,
+        }),
+      );
+
+      await expect(jwtStrategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -473,6 +652,50 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
           }),
         }),
       );
+    });
+
+    it('setupTotp and enableTotp throw ServiceUnavailableException when Redis is offline (fail-closed)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        phone: '9842100001',
+        isTotpEnabled: false,
+      });
+
+      jest.spyOn(redisProviderMock, 'getIsConnected').mockReturnValue(false);
+
+      await expect(authService.setupTotp(mockUserId)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+
+      await expect(
+        authService.enableTotp(mockUserId, {
+          secret: 'JBSWY3DPEHPK3PXP',
+          code: '123456',
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('enableTotp consumes challenge once and rejects replayed attempts', async () => {
+      const secret = generateSecret();
+      const code = generateSync({ secret });
+
+      await redisClientMock.set(`auth:totp_setup:${mockUserId}`, secret);
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isTotpEnabled: false,
+        passwordHash: defaultPasswordHash,
+      });
+      prismaMock.user.update.mockResolvedValue({});
+
+      // First call succeeds
+      const res = await authService.enableTotp(mockUserId, { secret, code });
+      expect(res.success).toBe(true);
+
+      // Replay attempt with same challenge throws BadRequestException
+      await expect(
+        authService.enableTotp(mockUserId, { secret, code }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -600,6 +823,175 @@ describe('Phase 1 Security Remediation: Adversarial Verification (F01, F02, F03,
           }),
         }),
       );
+    });
+
+    it('completeOnboarding rejects replayed onboarding token with 401 when already consumed', async () => {
+      const tempToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'onboarding_restricted',
+      });
+
+      const mockUser: User = {
+        id: mockUserId,
+        branchId: mockBranchId,
+        name: 'New Staff',
+        phone: '9842100001',
+        passwordHash: defaultPasswordHash,
+        roles: [Role.COLLECTION_AGENT],
+        isPartner: false,
+        isActive: true,
+        totpSecret: null,
+        isTotpEnabled: false,
+        mpinHash: null,
+        refreshTokenHash: null,
+        fcmToken: null,
+        lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue({
+        ...mockUser,
+        mustChangePassword: false,
+      });
+
+      // First consumption succeeds
+      const firstRes = await authController.completeOnboarding({
+        tempToken,
+        newPassword: 'MyPermanentStrongPassword#2026',
+      });
+      expect(firstRes).toHaveProperty('accessToken');
+
+      // Second replay attempt with identical token is rejected
+      await expect(
+        authController.completeOnboarding({
+          tempToken,
+          newPassword: 'MyPermanentStrongPassword#2026',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('completeOnboarding rejects with 400 if user.mustChangePassword is already false', async () => {
+      const tempToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'onboarding_restricted',
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        mustChangePassword: false, // Already completed
+      });
+
+      await expect(
+        authController.completeOnboarding({
+          tempToken,
+          newPassword: 'AnotherStrongPassword#2026',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('completeOnboarding rejects with 401 if token was issued before user.tokenRevokedBefore', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000) - 120;
+      const tempToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'onboarding_restricted',
+        iat: issuedAt,
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        isActive: true,
+        mustChangePassword: true,
+        tokenRevokedBefore: new Date(Date.now() - 30000), // Newer revocation timestamp
+      });
+
+      await expect(
+        authController.completeOnboarding({
+          tempToken,
+          newPassword: 'AnotherStrongPassword#2026',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('completeOnboarding issues totp_pending token instead of normal tokens if user has isTotpEnabled', async () => {
+      const tempToken = jwtService.sign({
+        sub: mockUserId,
+        phone: '9842100001',
+        roles: [Role.COLLECTION_AGENT],
+        branchId: mockBranchId,
+        tokenType: 'onboarding_restricted',
+      });
+
+      const mockUserWithTotp: User = {
+        id: mockUserId,
+        branchId: mockBranchId,
+        name: 'Staff with 2FA',
+        phone: '9842100001',
+        passwordHash: defaultPasswordHash,
+        roles: [Role.COLLECTION_AGENT],
+        isPartner: false,
+        isActive: true,
+        totpSecret: 'encrypted-secret',
+        isTotpEnabled: true,
+        mpinHash: null,
+        refreshTokenHash: null,
+        fcmToken: null,
+        lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUserWithTotp);
+      prismaMock.user.update.mockResolvedValue({
+        ...mockUserWithTotp,
+        mustChangePassword: false,
+      });
+
+      const res: any = await authController.completeOnboarding({
+        tempToken,
+        newPassword: 'MyPermanentStrongPassword#2026',
+      });
+
+      expect(res.requiresTotp).toBe(true);
+      expect(res).toHaveProperty('tempToken');
+      expect(res).not.toHaveProperty('accessToken');
+      expect(res).not.toHaveProperty('refreshToken');
+
+      const decoded: any = jwtService.verify(res.tempToken);
+      expect(decoded.tokenType).toBe('totp_pending');
+    });
+
+    it('loginMpin rejects login with 401 when user.mustChangePassword is true', async () => {
+      const mpinHash = await bcrypt.hash('123456', 12);
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockUserId,
+        phone: '9842100001',
+        isActive: true,
+        mpinHash,
+        mustChangePassword: true, // Pending onboarding
+      });
+
+      await expect(
+        authService.loginMpin({
+          phone: '9842100001',
+          mpin: '123456',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

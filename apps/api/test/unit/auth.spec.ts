@@ -304,14 +304,16 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
     });
 
     it('should encrypt totpSecret with AES-256-GCM before storing in database', async () => {
-      const rawSecret = generateSecret();
-      const code = generateSync({ secret: rawSecret });
-
       prismaMock.user.findUnique.mockResolvedValue({
         id: mockUserId,
+        phone: '9876543210',
         isTotpEnabled: false,
       });
       prismaMock.user.update.mockResolvedValue({});
+
+      const setupRes = await authService.setupTotp(mockUserId);
+      const rawSecret = setupRes.secret;
+      const code = generateSync({ secret: rawSecret });
 
       const res = await authService.enableTotp(mockUserId, { secret: rawSecret, code });
       expect(res.success).toBe(true);

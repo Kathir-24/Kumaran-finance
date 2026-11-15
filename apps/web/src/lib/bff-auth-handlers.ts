@@ -9,13 +9,16 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_REFRESH_TOKEN,
   COOKIE_TOTP_PENDING,
+  COOKIE_ONBOARDING_TOKEN,
   getBackendApiUrl,
   shouldUseSecureCookies,
 } from './auth-cookies.ts';
 import {
+  applyOnboardingCookie,
   applyRefreshedCookies,
   applyTotpPendingCookie,
   clearAuthCookies,
+  clearOnboardingCookie,
   clearTotpPendingCookie,
   executeBffRefresh,
   invalidateBffRefreshCache,
@@ -82,6 +85,19 @@ export async function handleBffLoginPost(
 
     const authData = responsePayload.data || responsePayload;
 
+    // Case 0: First-login onboarding password change required -> enclose tempToken in HttpOnly cookie
+    if ((authData.mustChangePassword || authData.must_change_password) && authData.tempToken) {
+      const response = createJsonResponse({
+        success: true,
+        mustChangePassword: true,
+        message:
+          authData.message ||
+          'Initial temporary password detected. You must configure a new permanent password to complete onboarding.',
+      });
+      applyOnboardingCookie(response, authData.tempToken, isSecure);
+      return response;
+    }
+
     // Case 1: 2FA TOTP is required -> enclose tempToken strictly in HttpOnly cookie
     if (authData.requireTotp && authData.tempToken) {
       const response = createJsonResponse({
@@ -89,6 +105,7 @@ export async function handleBffLoginPost(
         requireTotp: true,
       });
       applyTotpPendingCookie(response, authData.tempToken, isSecure);
+      clearOnboardingCookie(response, isSecure);
       return response;
     }
 
@@ -105,6 +122,7 @@ export async function handleBffLoginPost(
         isSecure,
       );
       clearTotpPendingCookie(response, isSecure);
+      clearOnboardingCookie(response, isSecure);
       return response;
     }
 
@@ -355,5 +373,93 @@ export async function handleBffLogoutPost(
     clearAuthCookies(errorResponse, isSecure);
     clearTotpPendingCookie(errorResponse, isSecure);
     return errorResponse;
+  }
+}
+
+/**
+ * Handles POST /api/auth/complete-onboarding:
+ * Reads `tempToken` strictly from the HttpOnly `kc_onboarding_token` cookie (falling back to body),
+ * forwards to backend /complete-onboarding, and hydrates session cookies on success.
+ */
+export async function handleBffCompleteOnboardingPost(
+  request: NextRequest,
+  createJsonResponse: BffJsonResponseFactory,
+  overrides?: BffRouteContextOverrides,
+): Promise<NextResponse> {
+  const isSecure = overrides?.isSecure ?? shouldUseSecureCookies(request);
+  const forwardHeaders =
+    overrides?.forwardHeaders ??
+    buildBffForwardHeaders(request.headers, { contentType: 'application/json' });
+
+  try {
+    const body = await request.json();
+    const tokenFromCookie = request.cookies.get(COOKIE_ONBOARDING_TOKEN)?.value?.trim();
+    const tempToken = tokenFromCookie || body.tempToken;
+
+    if (!tempToken) {
+      const expiredResponse = createJsonResponse(
+        {
+          success: false,
+          sessionExpired: true,
+          message:
+            'Onboarding session expired or missing. Please log in again with your temporary password.',
+        },
+        { status: 401 },
+      );
+      clearOnboardingCookie(expiredResponse, isSecure);
+      return expiredResponse;
+    }
+
+    const backendUrl = getBackendApiUrl();
+    const backendRes = await fetch(`${backendUrl}/api/v1/auth/complete-onboarding`, {
+      method: 'POST',
+      headers: forwardHeaders,
+      body: JSON.stringify({
+        tempToken,
+        newPassword: body.newPassword,
+      }),
+    });
+
+    const responsePayload = await backendRes.json();
+    if (!backendRes.ok) {
+      return createJsonResponse(responsePayload, { status: backendRes.status });
+    }
+
+    const authData = responsePayload.data || responsePayload;
+
+    // Case 1: 2FA required after password update
+    if ((authData.requireTotp || authData.requiresTotp) && authData.tempToken) {
+      const response = createJsonResponse({
+        success: true,
+        requireTotp: true,
+        message: authData.message,
+      });
+      applyTotpPendingCookie(response, authData.tempToken, isSecure);
+      clearOnboardingCookie(response, isSecure);
+      return response;
+    }
+
+    // Case 2: Full authentication succeeded
+    if (authData.accessToken && authData.user) {
+      const response = createJsonResponse({
+        success: true,
+        user: authData.user,
+        message: authData.message,
+      });
+      applyRefreshedCookies(
+        response,
+        { accessToken: authData.accessToken, refreshToken: authData.refreshToken },
+        isSecure,
+      );
+      clearOnboardingCookie(response, isSecure);
+      clearTotpPendingCookie(response, isSecure);
+      return response;
+    }
+
+    return createJsonResponse(responsePayload, { status: 200 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Onboarding completion failed';
+    console.error('[BFF Complete Onboarding] Request error:', error);
+    return createJsonResponse({ success: false, message }, { status: 500 });
   }
 }
