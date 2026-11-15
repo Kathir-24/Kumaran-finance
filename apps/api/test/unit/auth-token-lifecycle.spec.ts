@@ -459,9 +459,19 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
           data: expect.objectContaining({
             phone: '9842199999',
             refreshTokenHash: null,
+            tokenRevokedBefore: expect.any(Date),
           }),
         }),
       );
+      if (typeof (prismaMock as any).session?.updateMany === 'function') {
+        expect((prismaMock as any).session.updateMany).toHaveBeenCalledWith({
+          where: { customerId: mockCustomerId },
+          data: expect.objectContaining({
+            refreshTokenHash: null,
+            revokedAt: expect.any(Date),
+          }),
+        });
+      }
     });
 
     it('CustomerService.update preserves refreshTokenHash when phone number is NOT changed', async () => {

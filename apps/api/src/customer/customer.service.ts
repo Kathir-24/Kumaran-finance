@@ -418,6 +418,17 @@ export class CustomerService {
       dto.phone && dto.phone.trim() !== customer.phone,
     );
 
+    const now = new Date();
+    if (isPhoneChanged && typeof (this.prisma as any).session?.updateMany === 'function') {
+      await (this.prisma as any).session.updateMany({
+        where: { customerId: id },
+        data: {
+          refreshTokenHash: null,
+          revokedAt: now,
+        },
+      });
+    }
+
     return this.prisma.customer.update({
       where: { id },
       data: {
@@ -432,7 +443,7 @@ export class CustomerService {
         panNumber: dto.panNumber?.trim(),
         aadhaarLast4: dto.aadhaarLast4?.trim(),
         version: { increment: 1 },
-        ...(isPhoneChanged ? { refreshTokenHash: null } : {}),
+        ...(isPhoneChanged ? { refreshTokenHash: null, tokenRevokedBefore: now } : {}),
       },
       include: {
         branch: {
