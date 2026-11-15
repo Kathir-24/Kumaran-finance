@@ -332,3 +332,21 @@ flowchart TD
 - **Device-Family Scoped Status Caching (F04)**: Redis cache keys in `JwtStrategy` are scoped per device family (`user:status:${sub}:${clientType}`), eliminating cross-family cache contamination. `validateAuthenticatedAccessToken` validates the persisted PostgreSQL `Session` row for the client family.
 - **Session Identity Binding (`sid`) (F04)**: Access and refresh tokens carry a cryptographic session UUID (`sid`). Login updates the PostgreSQL `Session` record with the new `sid`. Any access token issued prior to logout or replacement login is immediately rejected (`session.id !== payload.sid`), eliminating session resurrection.
 - **Atomic TOTP Challenge Claim Lua Script (F10)**: In `authService.enableTotp()`, challenge consumption executes an atomic compare-and-delete Lua script. Concurrent confirmation requests fail-closed: exactly one request claims the challenge, while concurrent requests receive `400 Bad Request` without double-writing or factor collision.
+
+### 7.10 Concurrency, Queues & Mobile Client Resilience (F11, F13, F14, F15)
+- **F11 (Bull Board Super Admin Session Authentication & Metrics Hardening)**:
+  - Mounted under `/admin/queues`, `BullBoardAuthMiddleware` requires an active `Role.SUPER_ADMIN` JWT session (supporting Authorization Bearer header, `?token=` query param, or `access_token` cookie).
+  - Validates active account status and fast-path Redis/PostgreSQL revocation cutoffs (`auth:revoked:${sub}`) on every dashboard navigation.
+  - The insecure default credentials fallback (`admin:chitflow_secret`) has been completely eliminated. Production startup and `MetricsAuthGuard` enforce strict rejection of default credentials.
+- **F13 (Atomic Concurrency-Safe OTP Verification via Redis Lua Script)**:
+  - In `AuthService.verifyOtp`, the non-atomic read-modify-write sequence has been replaced with an atomic Redis Lua script (`verifyOtpLua`).
+  - Evaluates lockout status, existence, expiration, SHA-256 hash comparison, attempt increment, 3-attempt lockout trigger (`auth:otp:lockout:<phone>`, 300s TTL), and single-use session consumption in 1 single atomic Redis execution.
+  - Concurrency immunity: parallel brute-force guesses cannot bypass attempt tracking, and concurrent valid guesses cannot consume the same OTP session twice.
+- **F14 (Mobile Client Single-Flight Refresh Mutex & Transparent 401 Replay)**:
+  - Dart `AuthSessionManager` implements a single-flight refresh mutex (`_inFlightRefresh`), ensuring multiple concurrent 401 responses coalesce into exactly one `/auth/refresh` request with `clientType: 'MOBILE'`.
+  - `KumaranMobileApiClient.request` automatically triggers single-flight rotation on 401, invokes `onTokenRefreshed` to persist updated tokens, and replays the original HTTP request transparently with re-entrancy prevention (`isRetry: true`).
+- **F15 (SSE Approvals Stream Authorization Lifecycle Guard)**:
+  - `/reports/pending-approvals/stream` executes `ReportService.assertStreamAuthorization` on each 15-second interval tick before serving approval summaries.
+  - Validates that `now < exp`, verifies fast-path Redis revocation cutoffs, checks database `user.isActive`, and confirms active `SUPER_ADMIN` or `BRANCH_MANAGER` roles.
+  - Throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the SSE connection on token expiry, logout, or permission changes, eliminating zombie data leaks.
+
