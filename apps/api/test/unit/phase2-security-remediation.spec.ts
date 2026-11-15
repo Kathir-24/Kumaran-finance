@@ -58,6 +58,22 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
     tokenType: 'access' as const,
   };
 
+  const branchManagerNoBranch: JwtPayload = {
+    sub: 'user-bm-nobranch-001',
+    phone: '+919876543219',
+    roles: [Role.BRANCH_MANAGER],
+    branchId: null,
+    tokenType: 'access' as const,
+  };
+
+  const collectionAgentNoBranch: JwtPayload = {
+    sub: 'user-agent-nobranch-001',
+    phone: '+919876543218',
+    roles: [Role.COLLECTION_AGENT],
+    branchId: null,
+    tokenType: 'access' as const,
+  };
+
   const customerAlice: JwtPayload = {
     sub: 'cust-alice-001',
     phone: '+919443322110',
@@ -634,6 +650,95 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
         ),
       ).rejects.toThrow(/Customer does not belong to your assigned branch/i);
     });
+
+    it('F06-11: Branch Manager with missing branchId throws 403 on assertStorageKeyAccess (fail-closed)', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'passbooks/group-001/ticket-1/passbook.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'kyc/cust-001/aadhaar.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'minutes/auc-001/minutes.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'receipts/KC-REC-PRD-2026-00001.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+    });
+
+    it('F06-12: Branch Manager with missing branchId throws 403 on assertStorageUploadAccess (fail-closed)', async () => {
+      await expect(
+        DocumentAccessHelper.assertStorageUploadAccess(
+          'kyc/cust-alice-001/pan.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        DocumentAccessHelper.assertStorageUploadAccess(
+          'safety-proof/auc-001/cheque.pdf',
+          branchManagerNoBranch,
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+    });
+
+    it('F06-13: Branch Manager with missing branchId throws 403 on raw PDF helper methods', () => {
+      expect(() =>
+        DocumentAccessHelper.assertReceiptAccess(
+          { branchId: 'branch-prd-001', recordedByUserId: 'user-agent-001' } as any,
+          branchManagerNoBranch,
+        ),
+      ).toThrow(/Access denied/i);
+
+      expect(() =>
+        DocumentAccessHelper.assertVoucherAccess(
+          { id: 'win-1', auction: { chitGroup: { branchId: 'branch-prd-001' } } } as any,
+          branchManagerNoBranch,
+        ),
+      ).toThrow(/Access denied/i);
+
+      expect(() =>
+        DocumentAccessHelper.assertMinutesAccess(
+          { id: 'auc-1', chitGroup: { branchId: 'branch-prd-001' } } as any,
+          branchManagerNoBranch,
+        ),
+      ).toThrow(/Access denied/i);
+
+      expect(() =>
+        DocumentAccessHelper.assertPassbookAccess(
+          { id: 't-1', chitGroup: { branchId: 'branch-prd-001' } } as any,
+          branchManagerNoBranch,
+        ),
+      ).toThrow(/Access denied/i);
+
+      expect(() =>
+        DocumentAccessHelper.assertCustomerAccess(
+          { id: 'cust-1', branchId: 'branch-prd-001' },
+          branchManagerNoBranch,
+        ),
+      ).toThrow(/Access denied/i);
+    });
   });
 
   // ============================================================================
@@ -801,6 +906,39 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
       const customer = (await customerService.findOne('cust-alice-001', collectionAgentPrd)) as any;
       expect(customer.fullName).toBe('Alice Walker');
       expect(customer.panNumber).toBeUndefined();
+    });
+
+    it('F07-8: Branch Manager with missing branchId throws 403 on findAll and findOne (fail-closed)', async () => {
+      await expect(
+        customerService.findAll({}, branchManagerNoBranch),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'cust-alice-001',
+        fullName: 'Alice Walker',
+        branchId: 'branch-prd-001',
+      });
+
+      await expect(
+        customerService.findOne('cust-alice-001', branchManagerNoBranch),
+      ).rejects.toThrow(/Access denied: Customer does not belong to your assigned branch/i);
+    });
+
+    it('F07-9: Collection Agent with missing branchId throws 403 on findAll and findOne (fail-closed)', async () => {
+      await expect(
+        customerService.findAll({}, collectionAgentNoBranch),
+      ).rejects.toThrow(/Collection agent must have an assigned branch/i);
+
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'cust-alice-001',
+        fullName: 'Alice Walker',
+        branchId: 'branch-prd-001',
+        tickets: [{ status: 'ACTIVE', chitGroup: { branchId: 'branch-prd-001', status: 'ACTIVE' } }],
+      });
+
+      await expect(
+        customerService.findOne('cust-alice-001', collectionAgentNoBranch),
+      ).rejects.toThrow(/Access denied: Customer does not belong to your assigned branch/i);
     });
   });
 
@@ -995,6 +1133,76 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
       expect(result.winner!.ticket.customer!.phone).toBe('+91 ******0000');
       expect(result.tieBidders![0].ticket.customer!.phone).toBe('+91 ******0000');
     });
+
+    it('F08-8: Collection Agent from another branch calling ChitService.getTickets throws 403', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        id: 'group-001',
+        branchId: 'branch-prd-001', // PRD branch
+      });
+
+      await expect(
+        chitService.getTickets('group-001', collectionAgentErd), // ERD agent
+      ).rejects.toThrow(/Access denied: Chit scheme belongs to another branch/i);
+    });
+
+    it('F08-9: Collection Agent from another branch calling AuctionService.getGroupAuctions throws 403', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        id: 'group-001',
+        branchId: 'branch-prd-001', // PRD branch
+      });
+
+      await expect(
+        auctionService.getGroupAuctions('group-001', collectionAgentErd), // ERD agent
+      ).rejects.toThrow(/Access denied: Chit scheme belongs to another branch/i);
+    });
+
+    it('F08-10: Collection Agent from another branch calling AuctionService.findOne throws 403', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroupId: 'group-001',
+        chitGroup: { id: 'group-001', branchId: 'branch-prd-001' }, // PRD branch
+      });
+
+      await expect(
+        auctionService.findOne('auc-001', collectionAgentErd), // ERD agent
+      ).rejects.toThrow(/Access denied: Chit scheme belongs to another branch/i);
+    });
+
+    it('F08-11: Branch Manager and Collection Agent with missing branchId throw 403 on getTickets, getGroupAuctions, findOne', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        id: 'group-001',
+        branchId: 'branch-prd-001',
+      });
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroupId: 'group-001',
+        chitGroup: { id: 'group-001', branchId: 'branch-prd-001' },
+      });
+
+      await expect(
+        chitService.getTickets('group-001', branchManagerNoBranch),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        auctionService.getGroupAuctions('group-001', branchManagerNoBranch),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        auctionService.findOne('auc-001', branchManagerNoBranch),
+      ).rejects.toThrow(/Branch manager must have an assigned branch/i);
+
+      await expect(
+        chitService.getTickets('group-001', collectionAgentNoBranch),
+      ).rejects.toThrow(/Collection agent must have an assigned branch/i);
+
+      await expect(
+        auctionService.getGroupAuctions('group-001', collectionAgentNoBranch),
+      ).rejects.toThrow(/Collection agent must have an assigned branch/i);
+
+      await expect(
+        auctionService.findOne('auc-001', collectionAgentNoBranch),
+      ).rejects.toThrow(/Collection agent must have an assigned branch/i);
+    });
   });
 
   // ============================================================================
@@ -1018,6 +1226,7 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
         },
         payment: {
           findUnique: jest.fn(),
+          findMany: jest.fn(),
           create: jest.fn(),
         },
         paymentAllocation: {
@@ -1259,6 +1468,78 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
           'branch-prd-001',
         ),
       ).rejects.toThrow(/You can only query or replay your own payment records/i);
+    });
+
+    it('F09-7: CollectionService.syncOfflineQueue rejects another agent idempotency replay and routes to failed array without leaking details', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pay-existing-other-agent',
+          idempotencyKey: 'offline-idemp-other',
+          amount: BigInt(5000),
+          recordedByUserId: 'user-agent-prd-OTHER', // Stolen key from another agent!
+          branchId: 'branch-prd-001',
+          createdAt: new Date(),
+          receipt: { receiptNumber: 'KC-REC-PRD-2026-99999' },
+        },
+      ]);
+
+      const result = await collectionService.syncOfflineQueue(
+        {
+          items: [
+            {
+              idempotencyKey: 'offline-idemp-other',
+              ticketId: 'ticket-001',
+              installmentMonth: 1,
+              amount: 5000,
+              paymentMethod: 'CASH',
+              collectedAt: new Date().toISOString(),
+            },
+          ],
+        },
+        collectionAgentPrd.sub, // Current agent
+        collectionAgentPrd.branchId,
+      );
+
+      expect(result.synced).toHaveLength(0);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].errorCode).toBe('FORBIDDEN');
+      expect(result.failed[0].errorMessage).toMatch(/You can only query or replay your own collection records/i);
+    });
+
+    it('F09-8: CollectionService.syncOfflineQueue rejects cross-branch idempotency replay and routes to failed array', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pay-existing-erd',
+          idempotencyKey: 'offline-idemp-erd',
+          amount: BigInt(5000),
+          recordedByUserId: collectionAgentPrd.sub,
+          branchId: 'branch-erd-002', // Belongs to ERD branch!
+          createdAt: new Date(),
+          receipt: { receiptNumber: 'KC-REC-ERD-2026-00001' },
+        },
+      ]);
+
+      const result = await collectionService.syncOfflineQueue(
+        {
+          items: [
+            {
+              idempotencyKey: 'offline-idemp-erd',
+              ticketId: 'ticket-001',
+              installmentMonth: 1,
+              amount: 5000,
+              paymentMethod: 'CASH',
+              collectedAt: new Date().toISOString(),
+            },
+          ],
+        },
+        collectionAgentPrd.sub,
+        collectionAgentPrd.branchId, // PRD branch
+      );
+
+      expect(result.synced).toHaveLength(0);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].errorCode).toBe('CROSS_BRANCH_FORBIDDEN');
+      expect(result.failed[0].errorMessage).toMatch(/Unauthorized idempotency replay from another branch/i);
     });
   });
 });

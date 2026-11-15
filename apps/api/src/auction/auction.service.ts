@@ -761,16 +761,24 @@ export class AuctionService {
           throw new ForbiddenException('Access denied: You do not belong to this chit scheme');
         }
       } else if (
-        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        (currentUser.roles.includes(Role.BRANCH_MANAGER) ||
+          currentUser.roles.includes(Role.COLLECTION_AGENT)) &&
         !currentUser.roles.includes(Role.SUPER_ADMIN) &&
         !currentUser.roles.includes(Role.AUDITOR) &&
-        currentUser.branchId
+        !currentUser.roles.includes(Role.ACCOUNTANT)
       ) {
+        if (!currentUser.branchId) {
+          throw new ForbiddenException(
+            currentUser.roles.includes(Role.BRANCH_MANAGER)
+              ? 'Access denied: Branch manager must have an assigned branch'
+              : 'Access denied: Collection agent must have an assigned branch',
+          );
+        }
         const chit = await this.prisma.chitGroup.findUnique({
           where: { id: chitGroupId },
           select: { branchId: true },
         });
-        if (chit?.branchId && chit.branchId !== currentUser.branchId) {
+        if (!chit || !chit.branchId || chit.branchId !== currentUser.branchId) {
           throw new ForbiddenException('Access denied: Chit scheme belongs to another branch');
         }
       }
@@ -897,12 +905,20 @@ export class AuctionService {
           throw new ForbiddenException('Access denied: You do not belong to this chit scheme');
         }
       } else if (
-        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        (currentUser.roles.includes(Role.BRANCH_MANAGER) ||
+          currentUser.roles.includes(Role.COLLECTION_AGENT)) &&
         !currentUser.roles.includes(Role.SUPER_ADMIN) &&
         !currentUser.roles.includes(Role.AUDITOR) &&
-        currentUser.branchId
+        !currentUser.roles.includes(Role.ACCOUNTANT)
       ) {
-        if (auction.chitGroup?.branchId && auction.chitGroup.branchId !== currentUser.branchId) {
+        if (!currentUser.branchId) {
+          throw new ForbiddenException(
+            currentUser.roles.includes(Role.BRANCH_MANAGER)
+              ? 'Access denied: Branch manager must have an assigned branch'
+              : 'Access denied: Collection agent must have an assigned branch',
+          );
+        }
+        if (!auction.chitGroup?.branchId || auction.chitGroup.branchId !== currentUser.branchId) {
           throw new ForbiddenException('Access denied: Chit scheme belongs to another branch');
         }
       }

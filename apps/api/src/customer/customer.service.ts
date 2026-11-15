@@ -252,16 +252,23 @@ export class CustomerService {
           currentUser.roles?.includes(Role.COLLECTION_AGENT) &&
           !currentUser.roles.includes(Role.BRANCH_MANAGER)
         ) {
-          // Collection agents are scoped strictly to customers with active tickets in the agent's branch
-          where.branchId = currentUser.branchId || undefined;
+          if (!currentUser.branchId) {
+            throw new ForbiddenException('Access denied: Collection agent must have an assigned branch');
+          }
+          where.branchId = currentUser.branchId;
           where.tickets = {
             some: {
               chitGroup: {
-                branchId: currentUser.branchId || undefined,
+                branchId: currentUser.branchId,
                 status: 'ACTIVE',
               },
             },
           };
+        } else if (currentUser.roles?.includes(Role.BRANCH_MANAGER)) {
+          if (!currentUser.branchId) {
+            throw new ForbiddenException('Access denied: Branch manager must have an assigned branch');
+          }
+          where.branchId = currentUser.branchId;
         } else if (currentUser.branchId) {
           where.branchId = currentUser.branchId;
         }
@@ -366,7 +373,7 @@ export class CustomerService {
           currentUser.roles?.includes(Role.COLLECTION_AGENT) &&
           !currentUser.roles.includes(Role.BRANCH_MANAGER)
         ) {
-          if (currentUser.branchId && customer.branchId !== currentUser.branchId) {
+          if (!currentUser.branchId || customer.branchId !== currentUser.branchId) {
             throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');
           }
           const hasActiveTicketInBranch = customer.tickets?.some(
@@ -377,6 +384,10 @@ export class CustomerService {
             throw new ForbiddenException(
               'Access denied: Customer is not assigned to your active collection purview',
             );
+          }
+        } else if (currentUser.roles?.includes(Role.BRANCH_MANAGER)) {
+          if (!currentUser.branchId || customer.branchId !== currentUser.branchId) {
+            throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');
           }
         } else if (currentUser.branchId && customer.branchId !== currentUser.branchId) {
           throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');

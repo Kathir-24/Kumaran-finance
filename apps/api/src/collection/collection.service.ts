@@ -742,6 +742,30 @@ export class CollectionService {
     for (const item of dto.items) {
       if (item.idempotencyKey && preExistingMap.has(item.idempotencyKey)) {
         const existing = preExistingMap.get(item.idempotencyKey)!;
+        if (existing.recordedByUserId !== collectorUserId) {
+          failed.push({
+            idempotencyKey: item.idempotencyKey,
+            ticketId: item.ticketId,
+            installmentMonth: item.installmentMonth,
+            amount: item.amount,
+            errorCode: 'FORBIDDEN',
+            errorMessage:
+              'Access denied: You can only query or replay your own collection records',
+          });
+          continue;
+        }
+        if (staffBranchId && existing.branchId && staffBranchId !== existing.branchId) {
+          failed.push({
+            idempotencyKey: item.idempotencyKey,
+            ticketId: item.ticketId,
+            installmentMonth: item.installmentMonth,
+            amount: item.amount,
+            errorCode: 'CROSS_BRANCH_FORBIDDEN',
+            errorMessage:
+              'Access denied: Unauthorized idempotency replay from another branch',
+          });
+          continue;
+        }
         synced.push({
           idempotencyKey: item.idempotencyKey,
           paymentId: existing.id,

@@ -27,7 +27,7 @@ export class DocumentAccessHelper {
       user.roles.includes(Role.BRANCH_MANAGER) &&
       !user.roles.includes(Role.SUPER_ADMIN)
     ) {
-      if (user.branchId && payment.branchId !== user.branchId) {
+      if (!user.branchId || payment.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Access denied: This receipt belongs to another branch office',
         );
@@ -95,7 +95,7 @@ export class DocumentAccessHelper {
       user.roles.includes(Role.BRANCH_MANAGER) &&
       !user.roles.includes(Role.SUPER_ADMIN)
     ) {
-      if (user.branchId && winner.auction.chitGroup.branchId !== user.branchId) {
+      if (!user.branchId || winner.auction.chitGroup.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Access denied: This payout voucher belongs to another branch office',
         );
@@ -151,7 +151,7 @@ export class DocumentAccessHelper {
       user.roles.includes(Role.BRANCH_MANAGER) &&
       !user.roles.includes(Role.SUPER_ADMIN)
     ) {
-      if (user.branchId && auction.chitGroup.branchId !== user.branchId) {
+      if (!user.branchId || auction.chitGroup.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Access denied: Auction minutes belong to another branch office',
         );
@@ -195,7 +195,7 @@ export class DocumentAccessHelper {
       user.roles.includes(Role.BRANCH_MANAGER) &&
       !user.roles.includes(Role.SUPER_ADMIN)
     ) {
-      if (user.branchId && ticket.chitGroup.branchId !== user.branchId) {
+      if (!user.branchId || ticket.chitGroup.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Access denied: Subscriber passbook belongs to another branch office',
         );
@@ -264,14 +264,22 @@ export class DocumentAccessHelper {
           );
         }
       }
-      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         const customerId = key.split('/')[1];
         if (customerId) {
           const cust = await prisma.customer.findUnique({
             where: { id: customerId },
             select: { branchId: true },
           });
-          if (cust && cust.branchId && cust.branchId !== user.branchId) {
+          if (!cust || !cust.branchId || cust.branchId !== user.branchId) {
             throw new ForbiddenException(
               'Access denied: Customer does not belong to your assigned branch',
             );
@@ -313,7 +321,15 @@ export class DocumentAccessHelper {
         throw new ForbiddenException(
           'Access denied: Field agents cannot download raw passbooks via direct storage routes',
         );
-      } else if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      } else if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         const parts = key.split('/');
         const chitGroupId = parts[1];
         if (chitGroupId) {
@@ -321,7 +337,7 @@ export class DocumentAccessHelper {
             where: { id: chitGroupId },
             select: { branchId: true },
           });
-          if (chit && chit.branchId && chit.branchId !== user.branchId) {
+          if (!chit || !chit.branchId || chit.branchId !== user.branchId) {
             throw new ForbiddenException(
               'Access denied: Chit scheme does not belong to your assigned branch',
             );
@@ -346,7 +362,15 @@ export class DocumentAccessHelper {
           'Access denied: Field agents cannot access internal company safety or minutes files',
         );
       }
-      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         // Format: minutes/{auctionId}/... or safety-proof/{auctionId}/...
         const parts = key.split('/');
         const auctionId = parts[1];
@@ -355,7 +379,7 @@ export class DocumentAccessHelper {
             where: { id: auctionId },
             select: { chitGroup: { select: { branchId: true } } },
           });
-          if (auction?.chitGroup?.branchId && auction.chitGroup.branchId !== user.branchId) {
+          if (!auction || !auction.chitGroup?.branchId || auction.chitGroup.branchId !== user.branchId) {
             throw new ForbiddenException(
               'Access denied: Auction minutes or safety proofs belong to another branch',
             );
@@ -376,7 +400,15 @@ export class DocumentAccessHelper {
           'Access denied: Direct storage file access is restricted for collection agents',
         );
       }
-      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         // Format: receipts/{receiptNumber}.pdf or receipts/branchCode/year/receipt.pdf
         const fileName = key.split('/').pop() || '';
         const receiptMatch = fileName.match(/^KC-REC-([A-Z0-9]+)-/);
@@ -386,7 +418,7 @@ export class DocumentAccessHelper {
             where: { id: user.branchId },
             select: { code: true },
           });
-          if (branch && branch.code !== branchCode) {
+          if (!branch || branch.code !== branchCode) {
             throw new ForbiddenException(
               'Access denied: Receipt belongs to another branch',
             );
@@ -416,14 +448,22 @@ export class DocumentAccessHelper {
     );
 
     if (key.startsWith('kyc/')) {
-      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         const customerId = key.split('/')[1];
         if (customerId) {
           const cust = await prisma.customer.findUnique({
             where: { id: customerId },
             select: { branchId: true },
           });
-          if (cust && cust.branchId && cust.branchId !== user.branchId) {
+          if (!cust || !cust.branchId || cust.branchId !== user.branchId) {
             throw new ForbiddenException(
               'Access denied: Customer does not belong to your assigned branch',
             );
@@ -456,14 +496,22 @@ export class DocumentAccessHelper {
           'Access denied: Only Super Admin, Branch Manager, or Accountant can upload safety proofs',
         );
       }
-      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+      if (
+        user.roles.includes(Role.BRANCH_MANAGER) &&
+        !user.roles.includes(Role.SUPER_ADMIN)
+      ) {
+        if (!user.branchId || !prisma) {
+          throw new ForbiddenException(
+            'Access denied: Branch manager must have an assigned branch',
+          );
+        }
         const auctionId = key.split('/')[1];
         if (auctionId) {
           const auction = await prisma.auction.findUnique({
             where: { id: auctionId },
             select: { chitGroup: { select: { branchId: true } } },
           });
-          if (auction?.chitGroup?.branchId && auction.chitGroup.branchId !== user.branchId) {
+          if (!auction || !auction.chitGroup?.branchId || auction.chitGroup.branchId !== user.branchId) {
             throw new ForbiddenException(
               'Access denied: Auction belongs to another branch',
             );
@@ -503,7 +551,7 @@ export class DocumentAccessHelper {
       user.roles.includes(Role.BRANCH_MANAGER) &&
       !user.roles.includes(Role.SUPER_ADMIN)
     ) {
-      if (user.branchId && customer.branchId !== user.branchId) {
+      if (!user.branchId || customer.branchId !== user.branchId) {
         throw new ForbiddenException(
           'BOLA_VIOLATION: Access denied. Customer profile and KYC documents belong to another branch office',
         );
