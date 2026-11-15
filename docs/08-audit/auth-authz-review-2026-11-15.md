@@ -20,17 +20,19 @@ Review date: 2026-11-15. Repository: Kumaran Finance / Kumaran Chits.
 | **F08** | High | Ticket/auction endpoints expose other subscribers' PII | **Phase 2** | **RESOLVED & HARDENED** | Chit group membership enforcement + fellow subscriber phone masking (`+91 ******0000`) |
 | **F09** | High | Payment & collection writes lack agent/branch checks | **Phase 2** | **RESOLVED & HARDENED** | Domain accounting branch derived from `ticket.chitGroup.branchId`, `CROSS_BRANCH_FORBIDDEN` |
 | **F10** | High | Existing TOTP factor can be replaced with only access token | **Phase 1** | **RESOLVED & HARDENED** | Bounded retries (3 attempts) on mistyped codes without destroying setup challenge; atomic deletion on valid code verification; password required for factor replacement |
-| **F11** | High | Queue dashboard auth detached from Super Admin identity | Phase 3 | Scheduled | Native Super Admin session guard on Bull Board |
+| **F11** | High | Queue dashboard auth detached from Super Admin identity | **Phase 4** | **RESOLVED & HARDENED** | Native Super Admin session guard on Bull Board (`/admin/queues`) requiring active Super Admin JWT (Bearer, query, cookie); elimination of default fallback credentials (`admin:chitflow_secret`) |
 | **F12** | High | Database maker-checker constraints absent | **Phase 2** | **RESOLVED & HARDENED** | PostgreSQL CHECK constraints (`chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) |
-| **F13** | Medium | SMS OTP race condition allows attempt exhaustion bypass | Phase 3 | Scheduled | Atomic Redis Lua OTP attempt tracking |
-| **F14** | Medium | Mobile app refresh loop causes cascade 401 | Phase 3 | Scheduled | Single-flight refresh mutex in Flutter Dio interceptor |
-| **F15** | Medium | SSE approvals stream lacks mid-flight auth check | Phase 3 | Scheduled | Periodic active-session heartbeat validator |
+| **F13** | Medium | SMS OTP race condition allows attempt exhaustion bypass | **Phase 4** | **RESOLVED & HARDENED** | Atomic Redis Lua OTP attempt tracking, lockout threshold enforcement, and atomic single-use consumption script |
+| **F14** | Medium | Mobile app refresh loop causes cascade 401 | **Phase 5** | **RESOLVED & HARDENED** | Single-flight refresh mutex in Dart `AuthSessionManager`, transparent 401 token rotation & request replay with `clientType: 'MOBILE'` |
+| **F15** | Medium | SSE approvals stream lacks mid-flight auth check | **Phase 4** | **RESOLVED & HARDENED** | Mid-flight session validator & access token expiry cutoff (`assertStreamAuthorization`) on each SSE interval in `ReportService` and `ReportController` |
 | **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED & HARDENED** | Atomic single-use onboarding token consumption, `mustChangePassword` enforced on both MPIN login and `verifyOtp`, TOTP requirement preserved on onboarding completion, and Next.js BFF HttpOnly cookie onboarding flow with `/onboarding` UI |
 
 *Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (39/39 passed).  
-*Phase 2 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (36/36 passed).  
+*Phase 2 & 3 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (47/47 passed).  
+*Phase 4 Automated Test Suite*: [`apps/api/test/unit/phase4-concurrency-queues-sse.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase4-concurrency-queues-sse.spec.ts) (16/16 passed).  
+*Phase 5 Mobile Test Suite*: [`apps/mobile/test/auth_refresh_test.dart`](file:///u:/Kumaran-finance/apps/mobile/test/auth_refresh_test.dart) (4/4 passed).  
 *Auth Token Lifecycle Suite*: [`apps/api/test/unit/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth-token-lifecycle.spec.ts) (25/25 passed).  
-*Full Regression Suite*: 986 API tests (59 suites) + 358 Web tests (14 suites) passing with 0 failures.  
+*Full Regression Suite*: 1,013 API tests (60 suites) + 358 Web tests (14 suites) passing with 0 failures.  
 *PostgreSQL 17 Integration Suites*: 15 DB engine constraints (`08-maker-checker-db-constraints.e2e-spec.ts`) + 6 lifecycle tests (`07-postgres-redis-lifecycle.e2e-spec.ts`) passed.  
 *Database Migrations*:  
 1. `20261115030000_auth_revocation_and_session_vault` deployed to PostgreSQL 17.  
