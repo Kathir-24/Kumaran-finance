@@ -29,7 +29,7 @@ All 11 approved remediation work packages (`KFC-INF-001`, `KFC-FIN-001` through 
 | **Gate 5: Security, RBAC & Anti-IDOR** | **PASSED** | Branch scoping, JWT rotation, token revocation, rate limiting, adversarial tests 100%. |
 | **Gate 6: PDF Receipts & Watermarking** | **PASSED** | Bilingual PDFKit rendering; bold red diagonal `CANCELLED` watermark on reversals. |
 | **Gate 7: Redis, BullMQ & Reliability** | **PASSED** | Redis configured to `noeviction`; DB is sole financial truth; async worker non-blocking. |
-| **Gate 8: Automated Test Coverage** | **PASSED** | **56/56 API Suites Passed (891/891 tests)** + **14 Web Suites Passed (353/353 tests)** + **E2E Playwright Suite 09 (5/5 tests)** = **1,249/1,249 total tests (100% pass)**. |
+| **Gate 8: Automated Test Coverage** | **PASSED** | **59 API Suites Passed (986/986 tests)** + **14 Web Suites Passed (358/358 tests)** + **Real DB Constraints & Lifecycle Suites (21/21 tests)** = **1,365 total passing automated tests (100% pass, 0 failures)**. |
 | **Gate 9: Backup & Disaster Recovery** | **PASSED** | Daily automated pg_dump `-F c` backup script; Cloudflare R2 offsite; RTO < 60m; RPO <= 24h (WAL archiving not deployed). |
 | **Gate 10: Web UI & Accessibility** | **PASSED** | Bilingual Tamil/English Next.js portal; responsive desktop/tablet; clean print CSS. |
 
@@ -107,8 +107,8 @@ flowchart TD
 - **Result**: **PASS**
 
 ### Gate 8: Automated Test Coverage & Quality Verification
-- **Evaluation**: The repository contains 52 comprehensive unit and integration test suites covering domain math, API contracts, concurrency, security invariants, background queues, and storage drivers (843 passed in API), alongside 14 Next.js web test suites (353 passed in Web). Total automated test suite: 1,196 passed, 0 failed.
-- **Evidence**: [CI-CD-TEST-EXECUTION-EVIDENCE.md](file:///u:/Kumaran-finance/docs/08-audit/CI-CD-TEST-EXECUTION-EVIDENCE.md).
+- **Evaluation**: The repository contains 59 comprehensive API unit and integration test suites covering domain math, API contracts, concurrency, security invariants, background queues, session vault lifecycle, and storage drivers (986 passed in API), alongside 14 Next.js web test suites (358 passed in Web) and real PostgreSQL 17 / Redis 7 integration suites (21 passed). Total automated test suite: 1,365 passed, 0 failed.
+- **Evidence**: [CI-CD-TEST-EXECUTION-EVIDENCE.md](file:///u:/Kumaran-finance/docs/08-audit/CI-CD-TEST-EXECUTION-EVIDENCE.md), [auth-authz-review-2026-11-15.md](file:///u:/Kumaran-finance/docs/08-audit/auth-authz-review-2026-11-15.md), and [SECURITY-MAKER-CHECKER-EVIDENCE.md](file:///u:/Kumaran-finance/docs/08-audit/SECURITY-MAKER-CHECKER-EVIDENCE.md).
 - **Result**: **PASS**
 
 ### Gate 9: Backup, Disaster Recovery & High Availability

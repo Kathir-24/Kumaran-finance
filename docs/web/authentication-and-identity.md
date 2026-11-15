@@ -42,25 +42,28 @@ apps/web/src/
 ├── app/(auth)/
 │   ├── layout.tsx                              # Auth workstation layout with monograms & locale switch
 │   ├── login/page.tsx                          # /login entrypoint wrapped in Suspense boundary
-│   └── 2fa/page.tsx                            # /2fa entrypoint wrapped in Suspense boundary
+│   ├── 2fa/page.tsx                            # /2fa entrypoint wrapped in Suspense boundary
+│   └── onboarding/page.tsx                     # /onboarding entrypoint for first-time password setup (F16)
 ├── app/
 │   ├── api/auth/
 │   │   ├── login/route.ts                      # BFF login handler setting HttpOnly session cookies
 │   │   ├── verify-totp/route.ts                # BFF 2FA TOTP verification handler setting HttpOnly cookies
+│   │   ├── onboarding/route.ts                 # BFF onboarding handler consuming kc_onboarding_token
 │   │   ├── session/route.ts                    # BFF session hydration sharing coalesced refresh & symmetric cookie clearing
 │   │   └── logout/route.ts                     # BFF logout handler invalidating Redis/BFF caches & cookies
 │   └── bff/api/v1/[...path]/route.ts           # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
 ├── lib/
-│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution (COOKIE_SECURE env / proxy proto) & kc_totp_pending_token options
+│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution & kc_totp_pending_token / kc_onboarding_token options
 │   ├── bff-auth-handlers.ts                    # Shared BFF login, HttpOnly verify-totp, session, and logout route cores (DEF-FE-08)
 │   ├── bff-api-proxy.ts                        # Shared BFF proxy handler with unbuffered SSE pass-through
 │   ├── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
-│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT & /2fa totp_pending verifier & redirect sanitizer
+│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT, /2fa & /onboarding route verifiers
 │   └── route-permissions.ts                    # Single canonical RBAC route permissions source of truth
 ├── stores/
 │   └── auth-store.ts                           # Re-entrancy-guarded logout, non-secret pendingTotp flag & zero-storage hydration
 ├── components/auth/
-│   ├── login-form.tsx                          # Phone+Password form, 2FA fork, tempSessionExpired notice & active session redirect
+│   ├── login-form.tsx                          # Phone+Password form, 2FA fork, onboarding redirect & active session redirect
+│   ├── onboarding-form.tsx                     # First-login password setup form with confirmation & strength validation
 │   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste, cookie-backed guards & Back-to-Login purge
 │   ├── totp-enrollment-modal.tsx               # 3-step setup modal with SVG QR code & 1-click Base32 copy
 │   ├── totp-disable-modal.tsx                  # Password-verified 2FA deactivation modal
@@ -103,6 +106,22 @@ sequenceDiagram
         API-->>BFF: 200 OK { accessToken, refreshToken, user }
         BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + Clear kc_totp_pending_token + { user }
         Web->>Staff: setAuth(user) & Navigate to /dashboard
+    else Staff requires onboarding (mustChangePassword: true)
+        API-->>BFF: 200 OK { mustChangePassword: true, tempToken: "jwt..." }
+        BFF-->>Web: Set-Cookie HttpOnly (kc_onboarding_token, 15m) + { success: true, mustChangePassword: true }
+        Web->>Web: Navigate to /onboarding (Edge verifies kc_onboarding_token)
+        Staff->>Web: Enter new strong password
+        Web->>BFF: POST /api/auth/onboarding { newPassword } (+ HttpOnly cookie)
+        BFF->>API: POST /api/v1/auth/onboarding/complete-web { newPassword }
+        alt Staff also requires 2FA enrollment
+            API-->>BFF: 200 OK { requireTotp: true, tempToken }
+            BFF-->>Web: Set-Cookie HttpOnly (kc_totp_pending_token) + Clear kc_onboarding_token
+            Web->>Web: Navigate to /2fa
+        else Direct Session Completion
+            API-->>BFF: 200 OK { accessToken, refreshToken, user }
+            BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + Clear kc_onboarding_token + { user }
+            Web->>Staff: setAuth(user) & Navigate to /dashboard
+        end
     else Direct Authentication (2FA not required)
         API-->>BFF: 200 OK { accessToken, refreshToken, user }
         BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + { user }

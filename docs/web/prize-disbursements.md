@@ -26,7 +26,10 @@ In Kumaran Chits, prize money disbursement to an auction winner is a high-liabil
    - Cashier/Accountant executes the final disbursement release with mandatory `paymentReference`.
    - Monospace & bilingual voucher dialog with direct browser print (`window.print()`) and official A4/A5 PDF download via `GET /api/v1/pdf/voucher/:auctionId`.
    - **Prior Arrears Auto-Offset (`KFC-FIN-003`, `KFC-FIN-004`)**: Unpaid installments are automatically queried and deducted from the gross prize snapshot; payout overrides deviating from authorized net entitlement fail closed (`PAYOUT_OVERRIDE_NOT_PERMITTED`).
-   - **Month $N$ Final Maturity Settlement (`KFC-FIN-001`, `FIN-B`)**: Directly settles the final unprized subscriber pool without auction ($D = 0, P = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$) via `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (paying ₹91,000 if Month $N$ due was unpaid and marking it `PAID`; or ₹96,000 if already paid at the branch counter).
+   - **Month $N$ Final Maturity Settlement Two-Stage Workflow (`KFC-FIN-001`, `FIN-B`, `F05`)**: Directly settles the final unprized subscriber pool without auction ($D = 0, P = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$) via two-stage dual control:
+     1. **Stage 1 (Maker Preparation)**: `POST /api/v1/disbursements/group/:chitGroupId/prepare-final-settlement` (Staff calculates deductions, produces voucher preview).
+     2. **Stage 2 (Checker Approval)**: `POST /api/v1/disbursements/group/:chitGroupId/approve-final-settlement` (Independent partner signs off, `isPartner: true`, `maker != checker`; marks Month $N$ due `PAID`).
+     3. **Direct Settlement**: `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Combined execution with verified `makerUserId`). Net payout is ₹91,000 if Month $N$ due was unpaid; or ₹96,000 if already paid at the branch counter.
 
 ---
 
@@ -69,7 +72,9 @@ flowchart TD
 | `POST` | `/api/v1/disbursements/auction/:auctionId/disburse` | Cashier releases payout with mandatory `paymentReference` | `SUPER_ADMIN`, `ACCOUNTANT` | `DisbursementReleaseModal` |
 | `GET` | `/api/v1/disbursements/auction/:auctionId/voucher` | Formatted bilingual voucher parameters and monospace text | Staff & Auditor | `BilingualVoucherDialog` |
 | `GET` | `/api/v1/pdf/voucher/:auctionId` | Streams official bilingual A4/A5 PDF voucher for member physical signing | Staff & Auditor | `BilingualVoucherDialog` |
-| `POST` | `/api/v1/disbursements/group/:chitGroupId/final-settlement` | Executes Month N maturity settlement ($P = V - C_f$) to final unprized subscriber | `SUPER_ADMIN` strictly | `FinalSettlementModal` |
+| `POST` | `/api/v1/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Prepares Month N maturity payout snapshot & voucher | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` | `FinalSettlementModal` |
+| `POST` | `/api/v1/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approves & disburses Month N payout (`isPartner: true`, `maker != checker`) | `SUPER_ADMIN` (Partner) | `FinalSettlementModal` |
+| `POST` | `/api/v1/disbursements/group/:chitGroupId/final-settlement` | Executes Month N maturity settlement ($P = V - C_f$) to final unprized subscriber | `SUPER_ADMIN` (Partner) | `FinalSettlementModal` |
 
 ---
 

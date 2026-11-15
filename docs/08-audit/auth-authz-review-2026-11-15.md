@@ -28,18 +28,26 @@ Review date: 2026-11-15. Repository: Kumaran Finance / Kumaran Chits.
 | **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED & HARDENED** | Atomic single-use onboarding token consumption, `mustChangePassword` enforced on both MPIN login and `verifyOtp`, TOTP requirement preserved on onboarding completion, and Next.js BFF HttpOnly cookie onboarding flow with `/onboarding` UI |
 
 *Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (39/39 passed).  
-*Phase 2 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (22/22 passed).  
+*Phase 2 Automated Test Suite*: [`apps/api/test/unit/phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts) (36/36 passed).  
 *Auth Token Lifecycle Suite*: [`apps/api/test/unit/auth-token-lifecycle.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/auth-token-lifecycle.spec.ts) (25/25 passed).  
-*Full Regression Suite*: 960 API tests (58 suites) + 358 Web tests (14 suites) passing with 0 failures.  
+*Full Regression Suite*: 986 API tests (59 suites) + 358 Web tests (14 suites) passing with 0 failures.  
+*PostgreSQL 17 Integration Suites*: 15 DB engine constraints (`08-maker-checker-db-constraints.e2e-spec.ts`) + 6 lifecycle tests (`07-postgres-redis-lifecycle.e2e-spec.ts`) passed.  
 *Database Migrations*:  
 1. `20261115030000_auth_revocation_and_session_vault` deployed to PostgreSQL 17.  
-2. `20261115040000_maker_checker_check_constraints` deployed to PostgreSQL 17.
+2. `20261115040000_maker_checker_check_constraints` deployed to PostgreSQL 17.  
+3. `20261115060000_complete_maker_checker_constraints` deployed to PostgreSQL 17.
 
 ### Edge-Case Hardening Addendum (2026-11-15 Final Pass)
 1. **Edge Middleware `/onboarding` Route Gate (F16)**: Next.js edge auth middleware (`apps/web/src/lib/edge-auth.ts`, `apps/web/src/middleware.ts`) was updated to recognize `/onboarding` as a valid authentication journey route, evaluating the dedicated `kc_onboarding_token` (`tokenType: 'onboarding_restricted'`). Unauthenticated users with a valid restricted token are granted access to set their password, while visitors without a valid onboarding cookie are redirected to `/login?reason=missing_temp_token`.
 2. **Device-Family Scoped Status Caching (F04)**: Cache keys in `JwtStrategy` are scoped to the client family (`user:status:${sub}:${clientType}`), eliminating cross-family cache contamination where a `MOBILE` session previously populated an `ACTIVE` status that allowed a revoked `WEB` access token to bypass validation. In addition, `authService.validateAuthenticatedAccessToken()` now validates the persisted PostgreSQL `Session` row for the client family.
 3. **Session Identity Binding (`sid`) & Replacement-Login Isolation (F04)**: Access and refresh tokens carry a cryptographic session UUID (`sid`). Login updates the PostgreSQL `Session` record with the new `sid` and `createdAt`. Any access token issued prior to logout or replacement login is immediately rejected (`session.id !== payload.sid`), eliminating session resurrection even after `Session.revokedAt` is reset to null by a subsequent login.
 4. **Atomic TOTP Challenge Claim Lua Script (F10)**: In `authService.enableTotp()`, challenge consumption executes an atomic compare-and-delete Lua script (`if redis.call("get", KEYS[1]) == ARGV[1] then redis.call("del", KEYS[1], KEYS[2]) return 1 else return 0 end`). Concurrent confirmation requests fail-closed: exactly one request claims the challenge, while concurrent requests receive `400 Bad Request` without double-writing or factor collision.
+5. **Two-Stage Month N Settlement Workflow (F05)**: Decoupled final settlement into `prepareFinalSettlement` (`POST /disbursements/group/:chitGroupId/prepare-final-settlement`) where any staff maker initiates and computes voucher snapshots, and `approveFinalSettlement` (`POST /disbursements/group/:chitGroupId/approve-final-settlement`) where an independent partner (`isPartner: true`, `maker != checker`) signs off. Month N settlement auction and winner now safely upsert without duplicate key collisions.
+6. **Storage Guardians Branch Scoping & Strict Default-Deny (F06)**: Raw file access through `assertStorageKeyAccess` strictly enforces branch scoping on `BRANCH_MANAGER` for `minutes/`, `safety-proof/`, `receipts/`, and `vouchers/` by resolving the owning entity in PostgreSQL. All unrecognized prefixes and cross-branch requests fail-closed with HTTP 403 Forbidden. Presigned upload URLs (`kyc/`, `safety-proof/`) enforce the same branch constraints.
+7. **Customer Purview & Sensitive Field Redaction (F07)**: For `COLLECTION_AGENT`, customer lists and details are strictly scoped to customers with active tickets in the agent's assigned branch. The customer's `panNumber` is completely omitted (`undefined`) from collection agent responses, and internal fields (`refreshTokenHash`, `fcmToken`, `tokenRevokedBefore`) are stripped from all API outputs.
+8. **Subscriber Group Membership & Phone Masking (F08)**: `GET /auctions/:id` enforces that customer callers must be subscribers in the target chit group. Branch managers are restricted to their branch's groups. For all non-admin viewers, fellow subscribers' phone numbers are masked (`+91 ******0000`), protecting subscriber privacy.
+9. **Decoupled Idempotency with Same-Branch Isolation (F09)**: In `PaymentService` and `CollectionService`, cached idempotency records are strictly bound to `recordedByUserId`. An agent or cashier attempting to query or replay a payment initiated by another staff member in the same branch receives `ForbiddenException: Access denied: You can only query or replay your own payment records`. Domain accounting branch is strictly derived from `ticket.chitGroup.branchId`.
+10. **PostgreSQL 17 Engine CHECK Constraints with Ternary Logic Hardening (F12)**: Database-level CHECK constraints (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) enforce `maker != checker` at the database kernel. The ternary logic NULL trap in SQL (`FALSE OR NULL` evaluates to `NULL`, which passes a check constraint) was hardened with explicit `IS NOT NULL` conjunctions and historical migration backfills (`isHistoricalEntry Boolean @default(false)`).
 
 Severity reflects potential impact and required access, not evidence of exploitation. These are repository findings; no claim is made that the application has been attacked or that every deployment exposes every path.
 
@@ -248,11 +256,16 @@ Staff creation accepts an omitted password and then assigns the same hardcoded d
 
 | Check | Result |
 |---|---|
-| API `auth.spec.ts`, `auth-token-lifecycle.spec.ts` | 2 suites, 53 tests passed |
-| API `user.spec.ts`, `storage.spec.ts`, `adversarial-security-invariants.spec.ts` | 3 suites, 72 tests passed |
-| Complete web unit/regression command | 353 tests passed, zero failures |
-| Working tree before review | Clean |
-| Application changes | None |
+| Phase 1 Security Remediation Suite (`phase1-security-remediation.spec.ts`) | 1 suite, 39 tests passed |
+| Phase 2 Security Remediation Suite (`phase2-security-remediation.spec.ts`) | 1 suite, 36 tests passed |
+| Auth Token Lifecycle Suite (`auth-token-lifecycle.spec.ts`) | 1 suite, 25 tests passed |
+| Live PostgreSQL 17 Constraints Suite (`08-maker-checker-db-constraints.e2e-spec.ts`) | 1 suite, 15 tests passed |
+| Live PostgreSQL 17 & Redis 7 Lifecycle Suite (`07-postgres-redis-lifecycle.e2e-spec.ts`) | 1 suite, 6 tests passed |
+| Complete API unit/regression command | 59 suites, 986 tests passed, zero failures |
+| Complete Web unit/regression command | 14 suites, 358 tests passed, zero failures |
+| TypeScript strict typechecking (`tsc --noEmit`) | API & Web pass with 0 errors |
+| Working tree after Phase 1 & Phase 2 remediation | Clean (`364399a5`) |
+| Application & Database changes | Full Phase 1 & Phase 2 implementations complete & verified |
 
 API tests were invoked directly with Node/Jest. The initial pnpm PowerShell wrapper was blocked by execution policy; the web tests ran successfully with `pnpm.cmd`. An initial combined API test-pattern command did not execute successfully because the Windows command wrapper interpreted its pattern separators; the explicit five-file invocations above completed successfully.
 

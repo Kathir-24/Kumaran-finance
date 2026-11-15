@@ -19,10 +19,15 @@ The **Auth Module** provides multi-factor authentication, session management, an
    - Strict 3-attempt brute-force lockout: failed attempts increment the counter while preserving remaining TTL; exceeding 3 attempts locks verification until TTL expiry.
    - Atomic deletion upon successful verification (`DEL auth:otp:<phone>`) to eliminate replay attacks.
    - Resilient in-memory fallback if Redis is temporarily offline during testing or maintenance.
-4. **Session Management & Token Lifecycle**:
-   - Short-lived JWT Access Token (15-minute validity).
-   - Long-lived JWT Refresh Token (7-day validity) with bcrypt hash persisted in `User.refreshTokenHash`.
-   - Complete session revocation on `POST /auth/logout`.
+4. **Session Management & Token Vault Lifecycle (Phase 1 / F04)**:
+   - Dedicated PostgreSQL `Session` table providing client-family isolation (`WEB`, `MOBILE`, `DESKTOP`).
+   - Short-lived JWT Access Token (15-minute validity) bound to a cryptographic session UUID (`sid`).
+   - Long-lived JWT Refresh Token (7-day validity) with bcrypt hash persisted in the client-family's `Session` record.
+   - Authoritative `User.tokenRevokedBefore` and `Customer.tokenRevokedBefore` timestamps persisted in PostgreSQL for durable revocation across restarts and Redis loss.
+   - Complete scoped or global session revocation on `POST /auth/logout`.
+5. **Staff Onboarding & Security Factor Replacement (F10, F16)**:
+   - Mandatory first-login password onboarding (`mustChangePassword: true`) with single-use atomic token consumption.
+   - Factor replacement (`POST /auth/totp/enable` when already enrolled) requires current password verification and executes atomic Lua compare-and-delete challenge claims.
 5. **Device FCM Push Token Lifecycle**:
    - `PATCH /auth/fcm-token`: Authenticated staff register their active Firebase Cloud Messaging (FCM) device token upon mobile app startup.
    - **Cross-Device Security**: Calling `POST /auth/logout` automatically clears `fcmToken = null` on the user's database record to prevent sensitive Maker-Checker approval alerts from reaching a signed-out phone.

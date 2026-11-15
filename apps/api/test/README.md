@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Test Framework**: Jest 30 + `ts-jest` (Node.js 24 LTS VM Modules)  
-> **Test Runners**: 54 Unit & Invariant Suites (828 Tests) + 11 Multi-Role E2E Integration Suites (99 Tests)  
+> **Test Runners**: 59 Unit & Invariant Suites (986 Tests) + Real PostgreSQL 17 / Redis 7 Integration Suites  
 > **Financial Invariant**: Pure whole-rupee math (`BigInt`). Zero floating-point arithmetic.
 
 ---
@@ -54,6 +54,8 @@ apps/api/test/
 │   ├── otp-cooldown-lockout.spec.ts             # OTP failure exponential backoff
 │   ├── payment.spec.ts                          # Single discrete payments & reversals
 │   ├── pdf.spec.ts                              # Bilingual receipt & passbook PDF generation
+│   ├── phase1-security-remediation.spec.ts      # Phase 1: Account takeover, Session vault, revocation, TOTP, Edge onboarding (39 tests)
+│   ├── phase2-security-remediation.spec.ts      # Phase 2: Final settlement, storage branch checks, customer purview, phone mask, DB constraints (36 tests)
 │   ├── push.spec.ts                             # Mobile push notification dispatch
 │   ├── queue-resilience.spec.ts                 # Dead-letter queue & retry backoff
 │   ├── reconciliation-ledger.spec.ts            # Payment gateway ledger reconciliation
@@ -70,13 +72,15 @@ apps/api/test/
 │   ├── third-party-resilience.spec.ts           # Gateway fallback & retry policies
 │   ├── transaction-retry.spec.ts                # Deterministic transaction retry logic
 │   └── user.spec.ts                             # User roles & permissions matrix
-└── e2e/                           # 11 Consolidated Multi-Role E2E Suites
+└── e2e/                           # Consolidated Multi-Role E2E & Lifecycle Suites
     ├── 01-auth-security.e2e-spec.ts             # Web login, 2FA, token refresh, mobile MPIN
     ├── 02-customer-kyc.e2e-spec.ts              # Customer onboarding, KYC documents & BOLA
     ├── 03-chits-auctions.e2e-spec.ts            # Chit creation, 1/4 ceiling & tie-break draw
     ├── 04-payments-reversals.e2e-spec.ts        # Discrete payments, maker-checker reversals
     ├── 05-disbursements-jobs.e2e-spec.ts        # Prize payouts, safety checklist, BullMQ
     ├── 06-storage-documents.e2e-spec.ts         # Presigned URL streaming & path traversal guards
+    ├── 07-postgres-redis-lifecycle.e2e-spec.ts  # Real Postgres 17 & Redis 7 auth revocation, restart, session lifecycle (6 tests)
+    ├── 08-maker-checker-db-constraints.e2e-spec.ts # Real Postgres 17 CHECK constraints & ternary NULL-trap immunity (15 tests)
     ├── app.e2e-spec.ts                          # Root / and /health ping endpoints
     ├── proxy-client-ip.e2e-spec.ts              # X-Forwarded-For & trusted proxy IP parsing
     ├── response-envelope.e2e-spec.ts            # Standard envelope { success, data, timestamp }

@@ -1473,13 +1473,86 @@ Content-Type: image/jpeg
 
 ---
 
-### 8.6 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement`
-**Description**: **Month N Maturity Settlement**: Final payout to unprized subscriber without auction (deducts 4% commission; transitions chit to COMPLETED).  
-**Roles**: `SUPER_ADMIN`
+### 8.6 `POST /api/v1/disbursements/group/:chitGroupId/prepare-final-settlement` (Stage 1: Maker Preparation)
+**Description**: **Stage 1 Final Settlement (Maker)**: Computes Month N maturity voucher snapshot and records preparation details.  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
 
 #### Request Body
 ```json
 {
+  "notes": "Month N final maturity payout prepared for unprized ticket #20."
+}
+```
+
+#### Success Response
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-11-15T10:00:00.000Z",
+  "data": {
+    "status": "PREPARED",
+    "chitGroupId": "group-uuid-001",
+    "ticketId": "ticket-uuid-020",
+    "ticketNumber": 20,
+    "subscriberName": "P. Murugesan",
+    "grossChitValue": 100000,
+    "foremanCommission": 4000,
+    "finalMonthInstallment": 5000,
+    "priorArrearsDeducted": 0,
+    "netPayableAmount": 91000,
+    "preparedByUserId": "maker-staff-001",
+    "preparedAt": "2026-11-15T10:00:00.000Z"
+  }
+}
+```
+
+### 8.7 `POST /api/v1/disbursements/group/:chitGroupId/approve-final-settlement` (Stage 2: Checker Approval)
+**Description**: **Stage 2 Final Settlement (Checker)**: Independent Partner approves and commits disbursement (`isPartner: true`, `maker != checker`). Transitions chit group to `COMPLETED` and marks Month N due `PAID`.  
+**Roles**: `SUPER_ADMIN` (Partner)
+
+#### Request Body
+```json
+{
+  "disbursementMode": "BANK_TRANSFER_NEFT",
+  "paymentReference": "FINAL_SETTLEMENT_UTR_12345",
+  "disbursedAt": "2026-11-15T10:05:00.000Z",
+  "notes": "Month N final maturity payout approved and transferred via NEFT."
+}
+```
+
+#### Success Response
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "timestamp": "2026-11-15T10:05:00.000Z",
+  "data": {
+    "auctionId": "auction-uuid-final",
+    "chitGroupId": "group-uuid-001",
+    "installmentMonth": 20,
+    "winningTicketNumber": 20,
+    "subscriberName": "P. Murugesan",
+    "disbursementMode": "BANK_TRANSFER_NEFT",
+    "disbursedAmount": 91000,
+    "foremanCommission": 4000,
+    "grossChitValue": 100000,
+    "chitGroupStatus": "COMPLETED",
+    "paymentReference": "FINAL_SETTLEMENT_UTR_12345",
+    "conductedByUserId": "maker-staff-001",
+    "finalizedByUserId": "checker-partner-002"
+  }
+}
+```
+
+### 8.8 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Direct Settlement with Maker DTO)
+**Description**: **Month N Maturity Settlement (Direct)**: Combined payout execution with verified Maker DTO (`makerUserId != checkerUserId`).  
+**Roles**: `SUPER_ADMIN` (Partner)
+
+#### Request Body
+```json
+{
+  "makerUserId": "maker-staff-001",
   "disbursementMode": "BANK_TRANSFER_NEFT",
   "paymentReference": "FINAL_SETTLEMENT_UTR_12345",
   "disbursedAt": "2026-10-23T10:00:00.000Z",
@@ -1500,7 +1573,7 @@ Content-Type: image/jpeg
     "winningTicketNumber": 20,
     "subscriberName": "P. Murugesan",
     "disbursementMode": "BANK_TRANSFER_NEFT",
-    "disbursedAmount": 96000,
+    "disbursedAmount": 91000,
     "foremanCommission": 4000,
     "grossChitValue": 100000,
     "chitGroupStatus": "COMPLETED",

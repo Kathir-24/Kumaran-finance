@@ -260,6 +260,14 @@ static sanitizeKey(key: string): string {
 }
 ```
 
+### 4.3 Storage Guardians & Authorization (`assertStorageKeyAccess` — F06)
+Raw storage requests at `GET /api/v1/storage/file/*key` execute strict domain-level ownership and branch-scope verification via `DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser)`:
+- **Strict Default-Deny**: Any unrecognized key prefix (e.g. `temp/`, `backups/`, or unknown paths) triggers immediate `HTTP 403 Forbidden`.
+- **Passbooks (`passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf`)**: Customers must own the specified ticket in that chit group. Branch Managers are validated against `ticket.chitGroup.branchId`. Field Collection Agents are barred from raw passbook downloads.
+- **KYC Documents (`kyc/{customerId}/...`)**: Customers can only access their own documents (`currentUser.sub === customerId`). Branch Managers must match `customer.branchId`. Field Collection Agents are barred.
+- **Minutes, Safety Proofs, Receipts & Vouchers**: Branch Managers are strictly verified against the branch of the underlying chit group, payment, or winner record in PostgreSQL.
+- **Presigned Upload URLs (`POST /storage/presigned-url`)**: Direct-to-S3 presigned PUT generation validates branch ownership for `kyc/` and `safety-proof/` before minting upload credentials.
+
 ---
 
 ## 5. Complete REST Endpoint Catalog

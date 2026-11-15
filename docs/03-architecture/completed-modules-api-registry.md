@@ -150,7 +150,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/auctions/group/:chitGroupId` | List past auctions, winners & dividend history | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
-| `GET` | `/auctions/:id` | Get single auction record & tie-break results | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
+| `GET` | `/auctions/:id` | Get single auction record & tie-break results (Fellow subscriber phone masked as `+91 ******0000`) | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Group Only** | **Read-Only (Global)** |
 | `GET` | `/auctions/:id/eligible-bidders`| Pre-auction guard: active non-prized 0-arrears | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Audit)** |
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/tie-break` | **Option A**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
@@ -229,7 +229,9 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/disbursements/auction/:auctionId/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement**: Payout to final subscriber without auction (Less 4% commission; completes chit) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`isPartner: true`, `maker != checker`) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Direct Settlement**: Combined payout execution with verified Maker DTO | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ## 10. Module 9: Dashboards & Statutory Reports (`apps/api/src/report/`)
 

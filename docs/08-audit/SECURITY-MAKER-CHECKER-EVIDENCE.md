@@ -15,7 +15,7 @@ Kumaran Finance enforces strict dual control (Four-Eyes Principle / Maker $\ne$ 
 All checks are enforced at three distinct layers:
 1. **Network / BFF Layer**: NestJS `RolesGuard` and HttpOnly cookie / Bearer token validation.
 2. **Application / Service Layer**: Explicit assertion of `maker_user_id !== checker_user_id` throwing `ForbiddenException` (HTTP 403).
-3. **Database Layer**: Row-level locks (`SELECT FOR UPDATE`), deterministic lock sorting, and unique composite constraints (`@@unique([chitGroupId, customerId])`).
+3. **Database Layer**: Row-level locks (`SELECT FOR UPDATE`), deterministic lock sorting, unique composite constraints (`@@unique([chitGroupId, customerId])`), and **PostgreSQL 17 Engine CHECK Constraints** (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) with ternary logic NULL-trap immunity.
 
 ---
 
@@ -28,7 +28,8 @@ All checks are enforced at three distinct layers:
 | **Prize Payout Authorization** (KFC-FIN-003/004) | Staff / Maker (Safety Checklist) | `SUPER_ADMIN` strictly (Partner) | `verifiedByUserId != authorizedByUserId` | Controller + Service + DB | `disbursement.spec.ts`<br>`adversarial-security-invariants.spec.ts` |
 | **Defaulter Removal Approval** (SEC-B / KFC-SEC-002) | `SUPER_ADMIN` (Partner A) | `SUPER_ADMIN` (Partner B) | `removalRequestedByUserId != checkerPartnerUserId` | Controller + Service + DB | `installment.spec.ts` |
 | **Finalized Auction Correction** (KFC-FIN-005) | `SUPER_ADMIN` (Partner A) | `SUPER_ADMIN` (Partner B) | `requestedByUserId != checkerPartnerUserId` | Controller + Service + DB | `auction.spec.ts` |
-| **Cash Handover to Vault** | `COLLECTION_AGENT` (Field) | `ACCOUNTANT` / Cashier (Head Office) | `collectedByUserId != acknowledgedByUserId` | Controller + Service + DB | `collection.spec.ts`<br>`adversarial-security-invariants.spec.ts` |
+| **Cash Handover to Vault** | `COLLECTION_AGENT` (Field) | `ACCOUNTANT` / Cashier (Head Office) | `collectedByUserId != acknowledgedByUserId` | Controller + Service + DB | `collection.spec.ts`<br>`adversarial-security-invariants.spec.ts`<br>`08-maker-checker-db-constraints.e2e-spec.ts` |
+| **Month N Final Settlement** (F05) | Staff / Maker (`prepare-final-settlement`) | `SUPER_ADMIN` strictly (Partner) | `maker_user_id != checker_user_id` | Controller + Service + DB | `phase2-security-remediation.spec.ts`<br>`08-maker-checker-db-constraints.e2e-spec.ts` |
 | **Customer UPI Bank Claim** | Customer / Staff (Claimant) | `ACCOUNTANT` / Cashier (Bank Verifier) | `submittedByUserId != verifiedByUserId` | Controller + Service + DB | `payment.spec.ts`<br>`adversarial-security-invariants.spec.ts` |
 
 ---
@@ -129,4 +130,39 @@ PASS test/unit/adversarial-security-invariants.spec.ts
 
 Test Suites: 1 passed, 1 total
 Tests:       20 passed, 20 total
+```
+
+---
+
+## 6. Live PostgreSQL 17 Database Engine CHECK Constraint Verification
+
+Execution of `apps/api/test/e2e/08-maker-checker-db-constraints.e2e-spec.ts` directly against live container `chitflow-db` (Port 5433):
+
+```text
+PASS test/e2e/08-maker-checker-db-constraints.e2e-spec.ts
+  PostgreSQL Engine-Level Maker-Checker CHECK Constraints (Live DB)
+    chk_payment_cash_handover_maker_checker
+      √ [DB-INV-1] should REJECT inserting a Payment where recordedByUserId == cashHandoverAcknowledgedByUserId (Postgres 23514)
+      √ [DB-INV-2] should ACCEPT Payment with NULL cashHandoverAcknowledgedByUserId
+      √ [DB-INV-3] should ACCEPT Payment with distinct collector and acknowledger
+    chk_auction_maker_checker
+      √ [DB-INV-4] should REJECT COMPLETED auction where conductedByUserId == finalizedByUserId (Postgres 23514)
+      √ [DB-INV-5] should REJECT COMPLETED live auction where finalizedByUserId is NULL (Postgres 23514)
+      √ [DB-INV-6] should ACCEPT SCHEDULED auction with NULL maker and checker
+      √ [DB-INV-7] should ACCEPT COMPLETED auction with distinct maker and checker
+      √ [DB-INV-8] should ACCEPT COMPLETED historical auction (isHistoricalEntry = true) without distinct maker
+      √ [DB-INV-9] should ACCEPT Month 1 statutory company pool auction with NULL maker
+    chk_winner_maker_checker
+      √ [DB-INV-10] should REJECT DISBURSED winner where verifiedByUserId == authorizedByUserId (Postgres 23514)
+      √ [DB-INV-11] should REJECT DISBURSED live winner where verifiedByUserId is NULL (Postgres 23514)
+      √ [DB-INV-12] should ACCEPT PENDING_VERIFICATION winner with NULL maker and checker
+      √ [DB-INV-13] should ACCEPT DISBURSED winner with distinct maker and checker
+      √ [DB-INV-14] should ACCEPT DISBURSED historical winner (isHistoricalEntry = true)
+    chk_reversal_maker_checker
+      √ [DB-INV-15] should REJECT APPROVED reversal where initiatedByUserId == approvedByUserId (Postgres 23514)
+
+Test Suites: 1 passed, 1 total
+Tests:       15 passed, 15 total
+Snapshots:   0 total
+Time:        3.421 s
 ```

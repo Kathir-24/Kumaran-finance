@@ -350,6 +350,15 @@ if (dto.collectorUserId === acknowledgerUserId) {
 }
 ```
 
+In addition to this application guard, PostgreSQL 17 enforces this at the physical database engine level via constraint `chk_payment_cash_handover_maker_checker`:
+```sql
+ALTER TABLE "Payment"
+ADD CONSTRAINT "chk_payment_cash_handover_maker_checker"
+CHECK (
+  ("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")
+);
+```
+
 ### Proof 4: Pessimistic Row Locking on Cash Handover (Deterministic `ORDER BY id FOR UPDATE`)
 From [`apps/api/src/collection/collection.service.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts):
 
@@ -373,6 +382,15 @@ if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.lengt
 ```
 
 ### Proof 5: Unified 4-Tier Lock DAG & Transactional Receipt Sequence
+
+### Proof 6: Decoupled Idempotency with Same-Branch Isolation (F09)
+In `PaymentService.recordPayment` and `CollectionService.recordCollection`, idempotency caches are decoupled from shared branch purviews. When a cached idempotency key matches an existing payment, the service strictly asserts:
+```typescript
+if (existingPayment.recordedByUserId !== userId) {
+  throw new ForbiddenException('Access denied: You can only query or replay your own payment records');
+}
+```
+This guarantees that collection agents and cashiers cannot sniff or replay other staff members' payments even within the same physical branch office. Accounting branches are derived strictly from `ticket.chitGroup.branchId`.
 All 4 receipt-generating paths ([`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts)) share [`acquirePaymentConcurrencyLocks` & `generateNextReceiptNumber`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) inside `withTransactionRetry`:
 - Locks strictly follow **`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` ($\to$ `Payment`)** before generating receipts inside the transaction, eliminating `40P01` cyclic lock inversions, `P2002` receipt collisions, and duplicate `verifyUpiClaim` / cash double-settlements.
 
@@ -430,7 +448,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 | **Backend API Engine (`apps/api`)** | **100% DONE** | Production-ready | All controllers, services, database transactions, invariant guards, and tests are complete. |
 | **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | On-demand A5 bilingual PDF receipt document generator with Noto Sans Tamil fonts verified. |
 | **BullMQ Receipt & Alert Queues** | **100% DONE** | Production-ready | `JOB_DISPATCH_PAYMENT_RECEIPT` and `JOB_DISPATCH_APPROVAL_ALERT` wired and running. |
-| **Web Admin Portal (`apps/web`)** | **0% PENDING** | Empty (`.gitkeep`) | React/Next.js screens for cashier counter entry, receipt viewing, and handover approval remain to be built. |
+| **Web Admin Portal (`apps/web`)** | **100% DONE** | Production-ready | Complete Next.js 15 screens for cashier counter collections, receipt viewing, cash handover, and two-stage settlement modal workflows. |
 | **Mobile Flutter App (`apps/mobile`)** | **0% PENDING** | Empty (`.gitkeep`) | Android screens for field agent collections, offline SQLite queue, and customer passbook remain to be built. |
 | **Native Zero-Fee UPI Intent (ADR-19)**| **100% DONE** | Production-ready & Verified | NPCI native deep-linking (`upi://pay`), Bank UTR `@unique` constraint, customer claims & Maker != Checker verification complete. Third-party gateways strictly eliminated (₹0 MDR fee). |
 | **Cheque Clearance Endpoint** | **BY WORKFLOW** | Handled via Reversal | Dedicated `PATCH /cheque-status` endpoint not created; bounced cheques are handled via `POST /payments/:id/request-reversal` with reason `CHEQUE_BOUNCE`. |

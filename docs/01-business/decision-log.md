@@ -37,6 +37,8 @@
 | **ADR-21** | Partner Identity Separation (SEC-A) | `isPartner: true` on `User` and JWT separates verified business partners from administrative Super Admin. Enforced on reversals, auctions, payouts, and defaulter removals. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-22** | Defaulter Removal Dual Control (SEC-B) | Two-partner workflow: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B reviews & approves (`REMOVED_DEF_3M`) with `maker != checker`. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-23** | Indian TRAI DLT SMS Exclusivity (Q34) | Automated notifications delivered strictly via Indian TRAI DLT SMS flow (MSG91). WhatsApp simulation channels purged; mobile push disabled in production. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-24** | Session Vault, Client-Family Scoping & Durable Revocation | Dedicated PostgreSQL `Session` vault with device-family isolation (`WEB`, `MOBILE`, `DESKTOP`). Cryptographic session UUID (`sid`) binding prevents resurrection after replacement login. Invalidation on password reset, role demotion, and deactivation is durable and Redis-loss resilient. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
+| **ADR-25** | Two-Stage Final Month Settlement & Engine-Level Maker-Checker Constraints | Decoupled Month N maturity settlement into Stage 1 (`prepare-final-settlement` Maker) and Stage 2 (`approve-final-settlement` Checker Partner, `maker != checker`). PostgreSQL 17 engine-level CHECK constraints (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) enforce dual-control at database storage level. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
 
 ---
 
@@ -266,3 +268,28 @@
   1. **DLT SMS Exclusivity**: MSG91 HTTP flow API with registered 19-digit DLT template IDs is the sole automated delivery channel in production.
   2. **Purge of Fake Channels**: All WhatsApp simulation mock loggers and fake delivery channels are completely purged from `NotificationService`.
   3. **Financial Non-Blocking Guarantee**: Failure of external telecom gateway never blocks core financial database transactions. All SMS operations use non-blocking asynchronous dispatch with circuit breaker protection.
+
+### ADR-24: Session Vault, Client-Family Scoping & Durable Revocation (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-15
+- **Operational Reality**: Field collection agents operate Android smartphones while partners and desk accountants use web workstations. Scoped logout or password change on a desktop must not terminate a field agent's active collection round, while admin password resets or role changes must durably revoke access without relying solely on volatile Redis TTLs.
+- **Architectural Decision**:
+  1. **PostgreSQL Session Vault**: Dedicated `Session` table indexed by `[userId, clientType]` and `[customerId, clientType]`. Refresh tokens are hashed and validated against this durable row.
+  2. **Cryptographic Session Identity (`sid`) Binding**: Access and refresh tokens carry a cryptographic session UUID (`sid`). Invalidation assigns a new session identity, permanently rejecting previous tokens even if a subsequent login clears revocation flags.
+  3. **Device-Family Scoped Status Caching**: Redis authorization cache keys are scoped to `user:status:${sub}:${clientType}`, preventing cross-family privilege leakage.
+  4. **Next.js Edge Onboarding Journey**: Unauthenticated users with a temporary onboarding token are guided via HttpOnly cookies through `/onboarding` to set passwords, with direct Edge middleware route validation.
+
+### ADR-25: Two-Stage Final Month Settlement & Engine-Level Maker-Checker Constraints (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+- **Date**: 2026-11-15
+- **Operational Reality**: Month N maturity payout has no auction, but Guardrail 10 (Dual Control) strictly mandates that the person calculating the payout cannot be the sole approver. Furthermore, database-level constraints must reject self-approval even if application guards are bypassed.
+- **Architectural Decision**:
+  1. **Two-Stage Settlement Lifecycle**:
+     - Stage 1: `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff calculates arrears, Month N due deduction, 4% commission, and generates voucher snapshot).
+     - Stage 2: `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner approves payout, enforcing `maker != checker` and verified partner identity `isPartner: true`).
+  2. **PostgreSQL 17 Engine CHECK Constraints**:
+     - `chk_payment_cash_handover_maker_checker` on `Payment`
+     - `chk_auction_maker_checker` on `Auction`
+     - `chk_winner_maker_checker` on `AuctionWinner`
+     - `chk_reversal_maker_checker` on `PaymentReversal`
+     - All constraints are state-aware and hardened against SQL ternary logic NULL traps. Historical imported records use `isHistoricalEntry = true` to preserve legacy audit integrity without weakening live dual-control enforcement.

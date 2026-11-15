@@ -93,6 +93,11 @@ stateDiagram-v2
 - **`AUTHORIZED_BY_CHECKER` $\to$ `DISBURSED`**:
   - Funds released via selected mode: Cheque, Bank Transfer (NEFT/RTGS/IMPS), or Cash.
   - Voucher number and payment reference recorded.
+- **Month $N$ Final Maturity Settlement (Two-Stage Workflow / F05)**:
+  - Month $N$ final payout has no auction. It executes via two-stage dual control:
+    1. `prepareFinalSettlement` (Maker Staff): Computes Month $N$ deductions, prior arrears, 4% commission, and creates a pending settlement record with `disbursementStatus = 'VERIFIED_BY_MAKER'` stamping `conductedByUserId = makerUserId` and `verifiedByUserId = makerUserId`.
+    2. `approveFinalSettlement` (Checker Partner): Verifies the prepared snapshot, enforces `makerUserId != checkerUserId` and `isPartner: true`, transitions status to `DISBURSED`, marks Month $N$ due `PAID`, stamps `finalizedByUserId` and `authorizedByUserId`, and completes the chit group.
+    3. Enforced at both application and database levels via PostgreSQL engine constraint `chk_winner_maker_checker`.
 
 ---
 

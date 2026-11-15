@@ -23,7 +23,7 @@ The entire project blueprint, architecture, compliance, and operational manual s
 ```text
 docs/
 ├── 01-business/
-│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-19)
+│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-25)
 │   ├── financial-rules.md                    # Confirmed financial math (whole-rupee mandate, 4% commission, dividends)
 │   ├── permissions-matrix.md                 # RBAC + maker-checker dual controls (4 partners & field agents)
 │   ├── compliance-checklist.md               # Regulatory items, data minimization, & statutory review
@@ -160,7 +160,7 @@ Open your browser and verify the built-in administrative & observability portals
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
 | **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public in non-prod) | Interactive testing for all 115 physical paths (121 operations). |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public in non-prod) | Interactive testing for all 123 physical paths (129 operations). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | User: `admin`<br>Pass: `chitflow_secret` | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. |
 | **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | User: `admin`<br>Pass: `chitflow_secret` | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
 | **Sentry APM & Crash Monitoring**| [http://localhost:3000/health/sentry-test](http://localhost:3000/health/sentry-test) | Config in `apps/api/.env` | `@sentry/nestjs` crash reporting with Indian DPDP Act PII scrubbing and safe bypass. |
@@ -201,7 +201,7 @@ pnpm run lint
 # 2. Run monorepo TypeScript checks (SDK + Web + API build)
 pnpm run typecheck
 
-# 3. Run monorepo unit tests (8 SDK + 843 API unit + 353 Web unit tests = 1,196 passed tests)
+# 3. Run monorepo unit tests (8 SDK + 986 API unit + 358 Web unit tests = 1,352 passed tests across 73 suites)
 pnpm run test
 pnpm run test:e2e
 

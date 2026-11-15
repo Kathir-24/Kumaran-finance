@@ -342,6 +342,7 @@ model AuctionWinner {
   authorizedByUserId     String?           // Super Admin / Partner (Checker)
   disbursedAt            DateTime?
   paymentReference       String?           // Cheque number, Bank UTR, or Cash voucher receipt number
+  isHistoricalEntry      Boolean           @default(false) // True if imported during mid-cycle onboarding
 }
 
 model AuctionTieBidder {
@@ -506,3 +507,24 @@ model AuditLog {
   @@index([timestamp])
 }
 ```
+
+---
+
+## 7. PostgreSQL Engine-Level CHECK Constraints (`CONFIRMED-BY-DEVELOPER` / Invariant 10 & F12)
+
+To enforce Invariant 10 (Maker $\neq$ Checker Dual Control) at both application and physical database storage levels, PostgreSQL 17 engine-level `CHECK` constraints are deployed via migration `20261115060000_complete_maker_checker_constraints`. These constraints execute inside PostgreSQL transactions and reject self-approval or unapproved completions regardless of the calling application, script, or migration tool:
+
+### 7.1 Table Constraint Matrix
+
+| Table | Constraint Name | Enforcement Scope | Business Rule & Invariant |
+|---|---|---|---|
+| `Payment` | `chk_payment_cash_handover_maker_checker` | `("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")` | Cashier collecting payment cannot acknowledge their own handover (ADR-09). |
+| `Auction` | `chk_auction_maker_checker` | State-aware dual-control on auction entry vs partner finalization (`conductedByUserId != finalizedByUserId`). Month 1 statutory company pool allows null maker; historical entries exempt. | Invariant 10 / ADR-09. |
+| `AuctionWinner` | `chk_winner_maker_checker` | State-aware dual-control on verification vs disbursement authorization (`verifiedByUserId != authorizedByUserId`). Hardened against SQL ternary NULL trap with explicit null checks. | Invariant 10 / Invariant 9 / F12. |
+| `PaymentReversal` | `chk_reversal_maker_checker` | Dual-control on reversal request vs partner approval (`initiatedByUserId != approvedByUserId`). | Invariant 10 / SEC-A. |
+
+### 7.2 Ternary Logic NULL-Trap Protection
+In standard SQL three-valued logic (`TRUE`, `FALSE`, `UNKNOWN`/`NULL`), PostgreSQL `CHECK` constraints pass if the predicate evaluates to `TRUE` or `NULL` (it only fails if strictly `FALSE`). Expressions like `(status != 'DISBURSED' OR paymentReference = 'COMPANY_POOL_MONTH_1')` evaluate to `NULL` when `paymentReference` is null, causing unapproved `DISBURSED` rows to pass unchecked!
+To ensure zero bypass:
+- All conditional branches in `chk_winner_maker_checker` and `chk_auction_maker_checker` explicitly enforce `("paymentReference" IS NOT NULL AND ...)` and explicit conjunctions.
+- `isHistoricalEntry = true` is explicitly tracked for legacy notebook imports, eliminating synthetic fake makers on historical records while strictly enforcing dual control on all live business operations.

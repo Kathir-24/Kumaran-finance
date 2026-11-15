@@ -113,7 +113,7 @@
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
 | `GET`  | `/auctions/group/:chitGroupId` | List past auctions, winners & dividend history for group | All Authenticated |
-| `GET`  | `/auctions/:id` | Get single auction record & tie-break results | All Authenticated |
+| `GET`  | `/auctions/:id` | Get single auction record & tie-break results (Group membership enforced for customers, branch checked for managers, fellow subscriber phone masked as `+91 ******0000`) | All Authenticated (Scoped) |
 | `GET`  | `/auctions/:id/eligible-bidders` | **Pre-Auction Guard**: Active non-prized subscribers with 0 arrears | Staff, Auditor |
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
@@ -179,7 +179,9 @@
 | `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher (Prohibits manual override of authorized payout) | `ACCOUNTANT`, `SUPER_ADMIN` |
 | `POST` | `/disbursements/auction/:auctionId/release` | Release payout, auto-settle deducted arrears dues as `PAID`, record transaction reference | `SUPER_ADMIN` |
 | `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Settlement (`KFC-FIN-001`, `FIN-B`)**: Direct payout to final subscriber without auction (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears; marks Month N due `PAID`) | `SUPER_ADMIN` |
+| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears) | Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`) |
+| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`isPartner: true`, `maker != checker`; marks Month N due `PAID`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Direct Settlement**: Combined payout execution with verified Maker DTO | `SUPER_ADMIN` (Partner) |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
 | Method | Endpoint | Description | Allowed Roles |

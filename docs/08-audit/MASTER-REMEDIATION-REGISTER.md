@@ -28,6 +28,7 @@
 | **KFC-BIZ-001** | Subscriber Exit Settlement Forfeiture Policy Unapproved | **MEDIUM** | Agent G (Compliance) | Q25 | **BLOCKED — BUSINESS DECISION** |
 | **KFC-MOB-001** | Flutter Android Mobile Collection & Passbook App UI | **LOW** | Agent E (Deferred) | Q30 | **DEFERRED — OWNER-APPROVED SCOPE EXCLUSION** |
 | **KC-01 to KC-13** | Kumaran Chits Master Known Issues (Attendance, Offsets, Audit, Timezone, Concurrency, PDF) | **CRITICAL** | Core Engineering | Master Tracker | **CLOSED WITH EVIDENCE** |
+| **F01–F16** | Security & Authorization Review (Session Vault, Token Revocation, DB Maker-Checker, Two-Stage Settlement, Scoping) | **CRITICAL to MEDIUM** | Security & Platform Architecture | ADR-09, ADR-21 | **PHASE 1 & 2 CLOSED (12/12), PHASE 3 SCHEDULED (4/4)** |
 
 ---
 
@@ -225,3 +226,26 @@
 - **Business Rule Ref**: Section 1
 - **Status**: `DEFERRED — OWNER-APPROVED SCOPE EXCLUSION`
 - **Remediation Plan**: Document deferred status in `FLUTTER-ANDROID-DEFERRED-SCOPE.md`.
+
+---
+
+## 3. Security & Authorization Remediation Register (F01–F16: November 15, 2026)
+
+| Finding ID | Severity | Remediation Phase | Finding Summary | Permanent Resolution | Status | Verification Evidence |
+|---|---|---|---|---|---|---|
+| **F01** | **CRITICAL** | Phase 1 | Pending TOTP bypass on MPIN setup | `validateAuthenticatedAccessToken` verifies `tokenType: access`, durable revocation cutoffs, `mustChangePassword`, and setupToken issuance is verified against `tokenRevokedBefore` before atomic consumption | **CLOSED WITH EVIDENCE** | `phase1-security-remediation.spec.ts` (39/39) |
+| **F02** | **HIGH** | Phase 1 | Admin password reset leaves sessions usable | Transactional `resetPassword` and `updateRoles` combining user mutation and PostgreSQL `Session` revocation in single `$transaction`; write errors propagate visibly | **CLOSED WITH EVIDENCE** | `phase1-security-remediation.spec.ts`, `07-postgres-redis-lifecycle.e2e-spec.ts` |
+| **F03** | **HIGH** | Phase 1 | Removing roles keeps privileges in cache | Structured Redis cache with `tokenRevokedBeforeMs` validation, role/isPartner sync, legacy string `'ACTIVE'` treated as cache miss, reliable status cache eviction on mutations | **CLOSED WITH EVIDENCE** | `phase1-security-remediation.spec.ts` |
+| **F04** | **HIGH** | Phase 1 | Scoped logout session resurrection & family isolation | Dedicated PostgreSQL `Session` table enforcement; global fallback removed; refresh always verifies DB `Session` row before trusting cached hash; cold Redis access tokens validated against `Session.revokedAt` and cryptographic `sid` binding | **CLOSED WITH EVIDENCE** | `auth-token-lifecycle.spec.ts` (25/25), `07-postgres-redis-lifecycle.e2e-spec.ts` |
+| **F05** | **HIGH** | Phase 2 | Month N final settlement maker == checker | Decoupled two-stage endpoints: `prepareFinalSettlement` (Stage 1 Maker staff) and `approveFinalSettlement` (Stage 2 Checker partner, `maker != checker`), with upsert on settlement auction/winner | **CLOSED WITH EVIDENCE** | `phase2-security-remediation.spec.ts` (36/36) |
+| **F06** | **HIGH** | Phase 2 | Raw storage access bypasses passbook and branch scope | Passbook ticket ownership verification (`passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf`), KYC branch checks, strict default-deny for unrecognized keys | **CLOSED WITH EVIDENCE** | `phase2-security-remediation.spec.ts` |
+| **F07** | **HIGH** | Phase 2 | Customer search & detail expose unscoped records & PII | Caller context scoping: `COLLECTION_AGENT` scoped strictly to active tickets in assigned branch; `panNumber` completely omitted; sensitive hashes stripped | **CLOSED WITH EVIDENCE** | `phase2-security-remediation.spec.ts` |
+| **F08** | **HIGH** | Phase 2 | Ticket/auction endpoints expose fellow subscribers' PII | Chit group membership enforcement on `GET /auctions/:id` + fellow subscriber phone masking (`+91 ******0000`) | **CLOSED WITH EVIDENCE** | `phase2-security-remediation.spec.ts` |
+| **F09** | **HIGH** | Phase 2 | Payment & collection writes lack agent/branch checks | Decoupled same-branch idempotency protection (cannot query/replay another user's payment); domain accounting branch derived strictly from `ticket.chitGroup.branchId` | **CLOSED WITH EVIDENCE** | `phase2-security-remediation.spec.ts` |
+| **F10** | **HIGH** | Phase 1 | TOTP factor replacement without password / challenge race | Bounded retries (3 attempts) on mistyped codes without destroying setup challenge; atomic compare-and-delete Lua script on valid code verification; password required for factor replacement | **CLOSED WITH EVIDENCE** | `phase1-security-remediation.spec.ts` |
+| **F11** | **HIGH** | Phase 3 | Queue dashboard auth detached from Super Admin identity | Super Admin session auth guard on Bull Board (`/admin/queues`) | **SCHEDULED (PHASE 3)** | Scheduled for Phase 3 implementation |
+| **F12** | **HIGH** | Phase 2 | Database maker-checker constraints absent | PostgreSQL 17 engine CHECK constraints (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) with SQL ternary NULL-trap immunity | **CLOSED WITH EVIDENCE** | `08-maker-checker-db-constraints.e2e-spec.ts` (15/15) |
+| **F13** | **MEDIUM** | Phase 3 | SMS OTP verification race condition | Atomic Redis Lua OTP attempt tracking and consumption | **SCHEDULED (PHASE 3)** | Scheduled for Phase 3 implementation |
+| **F14** | **MEDIUM** | Phase 3 | Mobile app refresh loop causes cascade 401 | Single-flight refresh mutex in Flutter Dio interceptor | **SCHEDULED (PHASE 3)** | Scheduled for Phase 3 implementation |
+| **F15** | **MEDIUM** | Phase 3 | SSE approvals stream lacks mid-flight auth check | Periodic active-session heartbeat validator | **SCHEDULED (PHASE 3)** | Scheduled for Phase 3 implementation |
+| **F16** | **HIGH** | Phase 1 | Shared default staff password without forced change | Atomic single-use onboarding token consumption, `mustChangePassword` enforced on both MPIN login and `verifyOtp`, TOTP requirement preserved on onboarding completion, Next.js Edge HttpOnly cookie onboarding flow with `/onboarding` UI | **CLOSED WITH EVIDENCE** | `phase1-security-remediation.spec.ts`, Playwright E2E |

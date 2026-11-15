@@ -105,3 +105,15 @@
 - **Root Cause**: Page dimensions and Tamil Unicode rendering unverified against statutory specifications.
 - **Permanent Solution**: Inspected PDFKit document buffers at 72 pt/in: Receipt (A5 Portrait), Voucher (A5 Landscape), Minutes (A4 Portrait), Passbook (A4 Landscape). Embedded `NotoSansTamil` TrueType fonts verified.
 - **Verification**: `scripts/test-pdf-geometry.ts` execution and binary PDF header inspection.
+
+---
+
+## 3. Phased Security Findings Tracking (F01–F16)
+
+Following the comprehensive Authentication & Authorization Review on November 15, 2026, 16 findings were registered:
+
+| Phase | Findings | Scope | Current Status | Primary Evidence |
+|---|---|---|---|---|
+| **Phase 1** | **F01, F02, F03, F04, F10, F16** | Account takeover, credential lifecycle, session vault, revocation cutoffs, TOTP replacement, Edge onboarding | **CLOSED WITH EVIDENCE** (Commit `364399a5`) | `phase1-security-remediation.spec.ts` (39/39), `auth-token-lifecycle.spec.ts` (25/25), `07-postgres-redis-lifecycle.e2e-spec.ts` (6/6) |
+| **Phase 2** | **F05, F06, F07, F08, F09, F12** | Month N final settlement two-stage workflow, storage guardians branch scoping & default-deny, customer purview & PAN redaction, subscriber phone masking, payment isolation, database CHECK constraints | **CLOSED WITH EVIDENCE** (Commit `364399a5`) | `phase2-security-remediation.spec.ts` (36/36), `08-maker-checker-db-constraints.e2e-spec.ts` (15/15) |
+| **Phase 3** | **F11, F13, F14, F15** | Bull Board Super Admin session auth, atomic Redis OTP attempts Lua script, mobile Dio single-flight refresh, SSE approvals heartbeat | **SCHEDULED (PHASE 3)** | Implementation scheduled for Phase 3 |

@@ -299,27 +299,36 @@ flowchart TD
      - **Stage 1 (Maker Preparation)**: `POST /disbursements/group/:id/prepare-final-settlement` (Roles: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`). Calculates Month N arrears, base installment deduction, 4.00% commission, and net prize payable. Creates pending settlement record with `conductedByUserId = makerUserId` and winner `disbursementStatus = 'VERIFIED_BY_MAKER'`.
      - **Stage 2 (Checker Approval)**: `POST /disbursements/group/:id/approve-final-settlement` (Roles: `SUPER_ADMIN` with verified partner identity `isPartner: true`). Strictly enforces **`maker_user_id != checker_user_id`** (rejects with HTTP 403 `MAKER_CHECKER_VIOLATION` if checker is the user who prepared it). Commits the payout, marks Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`.
   2. **PostgreSQL Database-Level CHECK Constraints**:
-     - Applied via migration `20261115040000_maker_checker_check_constraints`:
-       - `chk_auction_maker_checker`: `CHECK (conductedByUserId IS NULL OR finalizedByUserId IS NULL OR conductedByUserId <> finalizedByUserId)`
-       - `chk_winner_maker_checker`: `CHECK (verifiedByUserId IS NULL OR authorizedByUserId IS NULL OR verifiedByUserId <> authorizedByUserId)`
-       - `chk_reversal_maker_checker`: `CHECK (approvedByUserId IS NULL OR initiatedByUserId <> approvedByUserId)`
+     - Applied and hardened via migration `20261115060000_complete_maker_checker_constraints`:
+       - `chk_payment_cash_handover_maker_checker`: `CHECK ("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")`
+       - `chk_auction_maker_checker`: State-aware constraint enforcing `conductedByUserId != finalizedByUserId` on completed auctions, with Month 1 statutory company pool support and `isHistoricalEntry = true` exemption.
+       - `chk_winner_maker_checker`: State-aware constraint enforcing `verifiedByUserId != authorizedByUserId` on disbursed payouts, with strict SQL ternary NULL-trap protection.
+       - `chk_reversal_maker_checker`: State-aware constraint enforcing `initiatedByUserId != approvedByUserId` on approved reversals.
      - Ensures that even if an application bug or maintenance script attempts a self-approval, PostgreSQL rejects the mutation at the database engine level with SQLSTATE `23514`.
 
 ### 7.8 Passbook Ownership, Customer Scoping & Domain Branch Derivation (F06, F07, F08, F09)
 - **F06 (Storage Guardians & Passbook Ownership)**:
-  - `DocumentAccessHelper.assertStorageKeyAccess` now explicitly parses `passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf` keys. Customers are restricted strictly to tickets they own in PostgreSQL (`where: { chitGroupId, ticketNumber, customerId: user.sub }`).
-  - Field Collection Agents are barred from raw passbook downloads (must use authorized app flows).
-  - Branch Managers accessing `passbooks/` or `kyc/` must match the branch assigned to the chit scheme or customer profile.
+  - `DocumentAccessHelper.assertStorageKeyAccess` explicitly parses `passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf` keys. Customers are restricted strictly to tickets they own in PostgreSQL (`where: { chitGroupId, ticketNumber, customerId: user.sub }`).
+  - Branch Managers accessing `passbooks/`, `kyc/`, `minutes/`, `safety-proof/`, `receipts/`, or `vouchers/` must match the branch assigned to the chit scheme or customer profile by resolving the owning record in PostgreSQL.
+  - Direct presigned upload generation (`POST /storage/presigned-url` for `kyc/` and `safety-proof/`) verifies branch ownership before issuing upload credentials.
   - Strict **Default-Deny**: Any unapproved storage key prefix (e.g. `temp/`, `exports/`, unrecognized categories) triggers immediate `HTTP 403 Forbidden`.
 - **F07 (Customer Scoping & Response Allowlists)**:
   - Customer listing (`findAll`) and detail (`findOne`) pass caller context:
-    - Branch Managers and Collection Agents are scoped strictly to `where.branchId = currentUser.branchId`.
+    - Branch Managers are scoped strictly to `where.branchId = currentUser.branchId`.
+    - Collection Agents are scoped strictly to customers holding active tickets in the agent's branch.
     - Customers are scoped strictly to `where.id = currentUser.sub`.
-  - Sensitive internal tokens (`refreshTokenHash`, `fcmToken`, `tokenRevokedBefore`) are completely stripped from all API responses. Non-admin callers receive masked PAN numbers (`ABXXXXX34F`).
+  - For Collection Agents, `panNumber` is completely omitted (`undefined`) from all customer views.
+  - Sensitive internal tokens (`refreshTokenHash`, `fcmToken`, `tokenRevokedBefore`) are stripped from all API outputs. Non-admin staff receive masked PAN numbers (`ABXXXXX34F`).
 - **F08 (Chit & Auction Group Scoping & PII Masking)**:
-  - `ChitService.getTickets()` and `AuctionService.getGroupAuctions()` enforce group membership: customers who do not own a ticket in the chit scheme are rejected with `HTTP 403 Forbidden`.
-  - For enrolled customers, fellow subscribers' phone numbers are masked as `+91 ******0000` and subscriber names as `Subscriber (Ticket #X)`. Winner phones in auction listings are masked for non-winning subscribers.
-- **F09 (Domain Branch Derivation & Cross-Branch Boundaries)**:
+  - Both group auction listing (`GET /auctions/group/:chitGroupId`) and single auction detail (`GET /auctions/:id`) enforce chit group membership: customers who do not own a ticket in the scheme are rejected with `HTTP 403 Forbidden`.
+  - Branch Managers are restricted strictly to chit groups belonging to their assigned branch.
+  - For all non-admin viewers, fellow subscribers' phone numbers are masked as `+91 ******0000` across all auction winner and tie-bidder views.
+- **F09 (Domain Branch Derivation & Same-Branch Idempotency Isolation)**:
   - Payment and collection writes (`CollectionService.recordCollection`, `PaymentService.recordPayment`) derive accounting branches strictly from the authoritative domain record (`ticket.chitGroup.branchId`), eliminating arbitrary caller branch injection.
-  - Cross-branch writes are strictly barred: callers from Branch A attempting to record collections or payments for Branch B tickets are rejected with `HTTP 403 CROSS_BRANCH_FORBIDDEN`.
-  - Idempotency replay pre-authorization validates caller branch identity before returning duplicate payment data.
+  - Decoupled same-branch idempotency protection: collection agents and cashiers cannot query or replay payments recorded by another staff member even within the same branch. An attempt to replay another user's cached idempotency record returns `HTTP 403 Forbidden: Access denied: You can only query or replay your own payment records`.
+
+### 7.9 Authentication Lifecycle & Token Vault Hardening (Phase 1)
+- **Next.js Edge `/onboarding` Route Gate (F16)**: Edge middleware evaluates dedicated `kc_onboarding_token` (`tokenType: 'onboarding_restricted'`). Unauthenticated users with a valid restricted token can set their password, while requests without valid onboarding credentials redirect to `/login?reason=missing_temp_token`.
+- **Device-Family Scoped Status Caching (F04)**: Redis cache keys in `JwtStrategy` are scoped per device family (`user:status:${sub}:${clientType}`), eliminating cross-family cache contamination. `validateAuthenticatedAccessToken` validates the persisted PostgreSQL `Session` row for the client family.
+- **Session Identity Binding (`sid`) (F04)**: Access and refresh tokens carry a cryptographic session UUID (`sid`). Login updates the PostgreSQL `Session` record with the new `sid`. Any access token issued prior to logout or replacement login is immediately rejected (`session.id !== payload.sid`), eliminating session resurrection.
+- **Atomic TOTP Challenge Claim Lua Script (F10)**: In `authService.enableTotp()`, challenge consumption executes an atomic compare-and-delete Lua script. Concurrent confirmation requests fail-closed: exactly one request claims the challenge, while concurrent requests receive `400 Bad Request` without double-writing or factor collision.
