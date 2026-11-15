@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
   ServiceUnavailableException,
@@ -78,6 +79,7 @@ export interface OtpSessionRecord {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly otpStore = new Map<string, OtpSessionRecord>();
   private readonly cooldownStore = new Map<string, number>();
   private readonly lockoutStore = new Map<string, number>();
@@ -868,63 +870,113 @@ export class AuthService {
    */
   async verifyOtp(dto: VerifyOtpDto) {
     const trimmedPhone = dto.phone.trim();
-
-    // Guard 1: Distributed Brute-Force Lockout check (HTTP 429)
-    const lockout = await this.checkOtpLockout(trimmedPhone);
-    if (lockout.locked) {
-      throw new HttpException(
-        `Too many invalid verification attempts. This mobile number is temporarily locked out. Please try again in ${lockout.remainingSeconds} seconds.`,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    const candidateHash = crypto.createHash('sha256').update(dto.otp.trim()).digest('hex');
 
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
-    let record: OtpSessionRecord | undefined;
+    let record: OtpSessionRecord;
 
-    if (useRedis && redis) {
-      const raw = await redis.get(`auth:otp:${trimmedPhone}`);
-      if (raw) {
-        try {
-          record = JSON.parse(raw);
-        } catch {
-          record = undefined;
+    // F13: Atomic Concurrency-Safe OTP Verification via Redis Lua Script
+    if (useRedis && redis && typeof (redis as any).eval === 'function') {
+      const verifyOtpLua = `
+        local lockoutTtl = redis.call("TTL", KEYS[2])
+        if lockoutTtl > 0 then
+          return cjson.encode({ status = "LOCKED", remainingSeconds = lockoutTtl })
+        end
+
+        local rawRecord = redis.call("GET", KEYS[1])
+        if not rawRecord then
+          return cjson.encode({ status = "EXPIRED" })
+        end
+
+        local record = cjson.decode(rawRecord)
+        if tonumber(record.expiresAt) < tonumber(ARGV[4]) then
+          redis.call("DEL", KEYS[1])
+          return cjson.encode({ status = "EXPIRED" })
+        end
+
+        if record.hashedOtp == ARGV[1] then
+          redis.call("DEL", KEYS[1], KEYS[3])
+          return cjson.encode({ status = "SUCCESS", record = record })
+        else
+          local attempts = tonumber(record.attempts or 0) + 1
+          record.attempts = attempts
+          if attempts >= tonumber(ARGV[2]) then
+            redis.call("SET", KEYS[2], tostring(ARGV[4]), "EX", tonumber(ARGV[3]))
+            redis.call("DEL", KEYS[1], KEYS[3])
+            return cjson.encode({ status = "MAX_ATTEMPTS_EXCEEDED", attempts = attempts })
+          else
+            local currentTtl = redis.call("TTL", KEYS[1])
+            if currentTtl > 0 then
+              redis.call("SET", KEYS[1], cjson.encode(record), "EX", currentTtl)
+            end
+            return cjson.encode({
+              status = "INVALID_CODE",
+              attempts = attempts,
+              remainingAttempts = tonumber(ARGV[2]) - attempts
+            })
+          end
+        end
+      `;
+
+      const otpKey = `auth:otp:${trimmedPhone}`;
+      const lockoutKey = `auth:otp:lockout:${trimmedPhone}`;
+      const cooldownKey = `auth:otp:cooldown:${trimmedPhone}`;
+
+      let rawResult: string;
+      try {
+        rawResult = (await (redis as any).eval(
+          verifyOtpLua,
+          3,
+          otpKey,
+          lockoutKey,
+          cooldownKey,
+          candidateHash,
+          OTP_MAX_VERIFY_ATTEMPTS,
+          OTP_LOCKOUT_SECONDS,
+          Date.now(),
+        )) as string;
+      } catch (err: any) {
+        this.logger.warn(`Redis atomic verifyOtp error, falling back to safe path: ${err.message}`);
+        rawResult = '';
+      }
+
+      if (rawResult) {
+        const result = JSON.parse(rawResult);
+
+        if (result.status === 'LOCKED') {
+          throw new HttpException(
+            `Too many invalid verification attempts. This mobile number is temporarily locked out. Please try again in ${result.remainingSeconds} seconds.`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
         }
+
+        if (result.status === 'EXPIRED') {
+          throw new BadRequestException('OTP has expired or was not requested. Please request a new OTP.');
+        }
+
+        if (result.status === 'MAX_ATTEMPTS_EXCEEDED') {
+          throw new HttpException(
+            'Too many invalid verification attempts. This mobile number is temporarily locked out for 5 minutes.',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        if (result.status === 'INVALID_CODE') {
+          throw new BadRequestException(
+            `Invalid OTP code. Please enter the correct 6-digit code. ${result.remainingAttempts} attempt(s) remaining.`,
+          );
+        }
+
+        record = result.record;
+      } else {
+        // Fallback if Redis eval failed
+        record = await this.verifyOtpFallback(trimmedPhone, candidateHash);
       }
     } else {
-      record = this.otpStore.get(trimmedPhone);
+      // Memory store fallback (when Redis is absent or in test mock)
+      record = await this.verifyOtpFallback(trimmedPhone, candidateHash);
     }
-
-    if (!record || Date.now() > record.expiresAt) {
-      throw new BadRequestException('OTP has expired or was not requested. Please request a new OTP.');
-    }
-
-    const candidateHash = crypto.createHash('sha256').update(dto.otp.trim()).digest('hex');
-    if (candidateHash !== record.hashedOtp) {
-      record.attempts += 1;
-      if (record.attempts >= OTP_MAX_VERIFY_ATTEMPTS) {
-        // Trigger 5-minute lockout penalty and destroy active OTP session
-        await this.setOtpLockout(trimmedPhone, OTP_LOCKOUT_SECONDS);
-        await this.clearOtpSession(trimmedPhone, false);
-        throw new HttpException(
-          'Too many invalid verification attempts. This mobile number is temporarily locked out for 5 minutes.',
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      if (useRedis && redis) {
-        const ttl = await redis.ttl(`auth:otp:${trimmedPhone}`);
-        if (ttl > 0) {
-          await redis.set(`auth:otp:${trimmedPhone}`, JSON.stringify(record), 'EX', ttl);
-        }
-      }
-      throw new BadRequestException(
-        `Invalid OTP code. Please enter the correct 6-digit code. ${OTP_MAX_VERIFY_ATTEMPTS - record.attempts} attempt(s) remaining.`,
-      );
-    }
-
-    // Successful verification: clear active OTP session, cooldown, and lockout atomically
-    await this.clearOtpSession(trimmedPhone, true);
 
     if (record.isCustomer) {
       const customer = await this.prisma.customer.findUnique({
@@ -994,6 +1046,70 @@ export class AuthService {
       setupToken,
       message: 'OTP verified successfully. Please configure your 6-digit MPIN.',
     };
+  }
+
+  /**
+   * Fallback OTP verification for environments where Redis Lua eval is unsupported (e.g. mock test harnesses)
+   */
+  private async verifyOtpFallback(
+    trimmedPhone: string,
+    candidateHash: string,
+  ): Promise<OtpSessionRecord> {
+    const lockout = await this.checkOtpLockout(trimmedPhone);
+    if (lockout.locked) {
+      throw new HttpException(
+        `Too many invalid verification attempts. This mobile number is temporarily locked out. Please try again in ${lockout.remainingSeconds} seconds.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const redis = this.redisProvider?.getClient();
+    const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
+    let record: OtpSessionRecord | undefined;
+
+    if (useRedis && redis) {
+      const raw = await redis.get(`auth:otp:${trimmedPhone}`);
+      if (raw) {
+        try {
+          record = JSON.parse(raw);
+        } catch {
+          record = undefined;
+        }
+      }
+    } else {
+      record = this.otpStore.get(trimmedPhone);
+    }
+
+    if (!record || Date.now() > record.expiresAt) {
+      throw new BadRequestException(
+        'OTP has expired or was not requested. Please request a new OTP.',
+      );
+    }
+
+    if (candidateHash !== record.hashedOtp) {
+      record.attempts += 1;
+      if (record.attempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+        await this.setOtpLockout(trimmedPhone, OTP_LOCKOUT_SECONDS);
+        await this.clearOtpSession(trimmedPhone, false);
+        throw new HttpException(
+          'Too many invalid verification attempts. This mobile number is temporarily locked out for 5 minutes.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      if (useRedis && redis) {
+        const ttl = await redis.ttl(`auth:otp:${trimmedPhone}`);
+        if (ttl > 0) {
+          await redis.set(`auth:otp:${trimmedPhone}`, JSON.stringify(record), 'EX', ttl);
+        }
+      }
+      throw new BadRequestException(
+        `Invalid OTP code. Please enter the correct 6-digit code. ${OTP_MAX_VERIFY_ATTEMPTS - record.attempts} attempt(s) remaining.`,
+      );
+    }
+
+    await this.clearOtpSession(trimmedPhone, true);
+    return record;
   }
 
   /**

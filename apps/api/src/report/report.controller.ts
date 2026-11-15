@@ -1,11 +1,13 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Header,
   Logger,
   MessageEvent,
   Query,
   Sse,
+  UnauthorizedException,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -120,6 +122,9 @@ export class ReportController {
     return interval(15000).pipe(
       startWith(0),
       switchMap(async () => {
+        // Mid-flight authentication & session validity assertion (F15)
+        await this.reportService.assertStreamAuthorization(currentUser);
+
         try {
           const approvals = await this.reportService.getPendingApprovals(
             currentUser,
@@ -134,6 +139,9 @@ export class ReportController {
             id: Date.now().toString(),
           } as MessageEvent;
         } catch (err: any) {
+          if (err instanceof UnauthorizedException || err instanceof ForbiddenException) {
+            throw err; // Fail-closed: terminate stream immediately on auth invalidation
+          }
           this.logger.warn(
             `Approvals SSE stream query error for user ${currentUser.sub}: ${err.message}`,
           );

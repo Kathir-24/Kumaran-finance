@@ -31,6 +31,16 @@ export class MetricsAuthGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    if (
+      nodeEnv === 'production' &&
+      (!this.metricsUser || !this.metricsPass || this.metricsPass === 'chitflow_secret')
+    ) {
+      throw new UnauthorizedException(
+        'Prometheus metrics authentication misconfigured: Production credentials required',
+      );
+    }
+
     const http = context.switchToHttp();
     const req = http.getRequest<Request>();
     const res = http.getResponse<Response>();

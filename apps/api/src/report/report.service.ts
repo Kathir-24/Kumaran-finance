@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
@@ -852,6 +852,58 @@ export class ReportService {
 
   async getSubscriberLedgerFormXxi(query: QueryFormXxiDto, requestingUser: JwtPayload) {
     return this.statutoryReportService.getSubscriberLedgerFormXxi(query, requestingUser);
+  }
+
+  /**
+   * Asserts mid-flight session validity, token expiry cutoff, and permission version for open SSE streams (F15).
+   * Throws UnauthorizedException or ForbiddenException to immediately terminate expired or revoked streams.
+   */
+  async assertStreamAuthorization(currentUser: JwtPayload): Promise<void> {
+    // 1. Check access token expiration claim (standard 15m lifetime)
+    if (currentUser.exp) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      if (nowSeconds >= currentUser.exp) {
+        throw new UnauthorizedException('Access token expired: SSE stream terminated');
+      }
+    }
+
+    // 2. Fast-path check: Redis revocation cutoff
+    const redis = this.redisProvider?.getClient();
+    if (redis && this.redisProvider?.getIsConnected() && currentUser.iat) {
+      try {
+        const revokedBeforeStr = await redis.get(`auth:revoked:${currentUser.sub}`);
+        if (revokedBeforeStr) {
+          const revokedBefore = parseInt(revokedBeforeStr, 10);
+          if (currentUser.iat * 1000 < revokedBefore) {
+            throw new UnauthorizedException('Session revoked: SSE stream terminated');
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof UnauthorizedException) throw err;
+      }
+    }
+
+    // 3. Database check: user active status & DB tokenRevokedBefore cutoff
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.sub },
+      select: { isActive: true, tokenRevokedBefore: true, roles: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User account deactivated: SSE stream terminated');
+    }
+
+    if (user.tokenRevokedBefore && currentUser.iat) {
+      if (currentUser.iat * 1000 < user.tokenRevokedBefore.getTime()) {
+        throw new UnauthorizedException('Session invalidated: SSE stream terminated');
+      }
+    }
+
+    // 4. Role verification: ensure user still holds SUPER_ADMIN or BRANCH_MANAGER role
+    const hasAllowedRole = user.roles.some((r) => r === Role.SUPER_ADMIN || r === Role.BRANCH_MANAGER);
+    if (!hasAllowedRole) {
+      throw new ForbiddenException('Permissions updated: User no longer authorized for approvals stream');
+    }
   }
 
   /**
