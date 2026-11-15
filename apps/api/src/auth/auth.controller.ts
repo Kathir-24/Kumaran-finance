@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -34,6 +35,7 @@ import {
   VerifyOtpResponseDto,
 } from './dto/auth-response.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { LoginDto } from './dto/login.dto';
 import { MpinLoginDto } from './dto/mpin-login.dto';
@@ -279,6 +281,22 @@ export class AuthController {
     return this.authService.loginMpin(dto);
   }
 
+  @Post('complete-onboarding')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Complete first-login onboarding and set permanent password',
+    description:
+      'Exchanges a temporary onboarding_restricted token and new permanent password for active access & refresh tokens.',
+  })
+  @ApiOkResponseEnvelope(AuthTokensResponseDto, {
+    description: 'Onboarding completed, permanent password saved, active tokens issued',
+  })
+  @ApiResponse({ status: 400, description: 'Weak password or validation error' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired onboarding token' })
+  async completeOnboarding(@Body() dto: CompleteOnboardingDto) {
+    return this.authService.completeOnboarding(dto);
+  }
+
   @Post('mobile/set-mpin')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -297,12 +315,13 @@ export class AuthController {
     let userId: string | undefined;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
-      try {
-        const payload = this.authService.verifyToken(token);
-        userId = payload.sub;
-      } catch {
-        // Fall back to dto.setupToken
+      const payload = this.authService.verifyToken(token);
+      if (payload.tokenType !== 'access') {
+        throw new UnauthorizedException(
+          'Invalid token purpose for MPIN change. Full access token required.',
+        );
       }
+      userId = payload.sub;
     }
     return this.authService.setMpin(userId, dto);
   }

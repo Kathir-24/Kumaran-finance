@@ -62,11 +62,36 @@ model User {
   refreshTokenHash String?   // Hashed refresh token for active session revocation
   fcmToken         String?   // Firebase Cloud Messaging device push token for mobile instant approvals
   lastLoginAt      DateTime?
+  tokenRevokedBefore DateTime?          // Durable PostgreSQL timestamp for invalidating stateless JWTs
+  mustChangePassword Boolean            @default(false) // Enforces first-login credential change for newly provisioned staff
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   collections  Payment[] @relation("AgentPayments")
   auditLogs    AuditLog[]
+  sessions     Session[]
+}
+
+// -------------------------------------------------------------
+// 1.1 Multi-Device Session Vault (RFC 6819 Device Isolation)
+// -------------------------------------------------------------
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  clientType       String    // 'WEB', 'MOBILE', 'DESKTOP'
+  refreshTokenHash String?
+  revokedAt        DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, clientType])
+  @@unique([customerId, clientType])
+  @@index([expiresAt])
 }
 
 // -------------------------------------------------------------
@@ -91,6 +116,7 @@ model Customer {
   fcmToken         String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
   refreshTokenHash String?            // Hashed refresh token for active session revocation (RFC 6819)
   lastLoginAt      DateTime?          // Timestamp of most recent customer authentication
+  tokenRevokedBefore DateTime?          // Durable PostgreSQL timestamp for invalidating subscriber sessions
   isKycVerified    Boolean            @default(false)
   version          Int                @default(1)
   createdAt     DateTime           @default(now())
@@ -99,6 +125,7 @@ model Customer {
   nominees      Nominee[]
   documents     CustomerDocument[]
   tickets       SubscriberTicket[]
+  sessions      Session[]
 
   @@index([branchId])
 }

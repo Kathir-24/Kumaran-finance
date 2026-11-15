@@ -241,20 +241,24 @@ flowchart TD
   - If a cache miss occurs, PostgreSQL is queried and the result is cached for **120 seconds** (`EX 120`).
 - **Proactive Invalidation**: When a staff user's status is toggled, roles updated, or password changed in [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), `redis.del('user:status:${userId}')` is invoked immediately, guaranteeing instant access termination across the cluster.
 
-### 7.2 Multi-Device Concurrent Session Isolation
-- **Problem Solved**: Kumaran Finance partners and field agents frequently use both the **Web Portal** (for accounting, schemes, and minutes) and the **Android Mobile App** (for collections, receipts, and OTP approvals). Storing a single `refreshTokenHash` on the database row caused logging in on mobile to overwrite web's token hash. When web attempted its 15-minute background refresh, it failed the hash check, triggering the RFC 6819 token reuse trap and locking the user out of both devices.
-- **Implementation**: Refresh token families are isolated per device type via Redis key `auth:session:${userId}:${clientType}` (where `clientType` is `'WEB'`, `'MOBILE'`, or `'DESKTOP'`) with a 7-day TTL (`604,800s`).
+### 7.2 Multi-Device Concurrent Session Isolation & Durable Revocation (F02 & F04)
+- **Problem Solved**: Kumaran Finance partners and field agents frequently use both the **Web Portal** (for accounting, schemes, and minutes) and the **Android Mobile App** (for collections, receipts, and OTP approvals). Storing a single `refreshTokenHash` on the database row caused logging in on mobile to overwrite web's token hash. When web attempted its 15-minute background refresh, it failed the hash check, triggering the RFC 6819 token reuse trap and locking the user out of both devices. Furthermore, relying solely on Redis in-memory cutoffs allowed revoked sessions to resurrect if Redis restarted or after 15 minutes.
+- **Implementation**:
+  - Refresh token families are isolated per device type via Redis key `auth:session:${userId}:${clientType}` (where `clientType` is `'WEB'`, `'MOBILE'`, or `'DESKTOP'`) with a 7-day TTL (`604,800s`).
+  - Durable PostgreSQL Session Vault: A dedicated `Session` table stores `(userId, clientType)` and `(customerId, clientType)` with unique constraints, ensuring each client device family maintains its own persistent hash.
+  - Durable Revocation Anchor: `tokenRevokedBefore DateTime?` on `User` and `Customer` tables provides an authoritative cutoff checked on every token validation, guaranteeing zero session resurrection even on cold Redis or cluster restarts.
 - **RFC 6819 Token Reuse Defense**:
-  - Rotating a token on Web updates only `auth:session:${userId}:WEB`, leaving Mobile completely unaffected.
+  - Rotating a token on Web updates only `auth:session:${userId}:WEB` and its corresponding `Session` record, leaving Mobile completely unaffected.
   - If a replayed/stolen refresh token is detected on Web, **only the Web session family is revoked**, leaving the partner's Mobile collection session active.
-  - When Redis is unavailable or on cold start, the system transparently falls back to the database `refreshTokenHash` column.
+  - Token refresh strictly binds to the signed token's embedded `clientType`, rejecting client-family mismatches.
 
-### 7.3 Architectural Immunity Against Password-Reset Abuse
+### 7.3 Architectural Immunity Against Password-Reset Abuse & Default Credential Elimination (F16)
 - **Attack Vector Inapplicable**: In generic SaaS applications, public password-reset endpoints (`/auth/forgot-password`) suffer from email enumeration, account lockout DoS, and token brute-forcing.
 - **Kumaran Chits Architecture**:
   1. **Strict Phone-Only Identity (ADR-18)**: Built exclusively for Kumaran Finance. Zero email columns exist in PostgreSQL.
   2. **No Public Password Reset Form**: Subscribers and agents authenticate strictly via MSG91 6-digit SMS OTP (`/auth/mobile/request-otp` and `/auth/mobile/verify-otp`) protected by 60s cooldowns and 5-minute brute-force lockouts.
-  3. **Super Admin Dual-Control Reset**: If an office staff member forgets their password, a Super Admin performs an emergency reset via [`UserService.resetPassword()`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), which purges all active refresh tokens in Redis and DB, requiring the staff member to configure a new password on their next login.
+  3. **Super Admin Dual-Control Reset**: If an office staff member forgets their password, a Super Admin performs an emergency reset via [`UserService.resetPassword()`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), which sets a random temporary password, marks `mustChangePassword = true`, stamps `tokenRevokedBefore`, and revokes active sessions across PostgreSQL and Redis.
+  4. **Elimination of Shared Default Credentials (F16)**: Creating a staff user without a password generates a unique cryptographically random temporary password with `mustChangePassword = true`. Authenticating with temporary credentials issues an `onboarding_restricted` token (rejected for business routes) requiring `POST /auth/complete-onboarding` to establish permanent credentials.
 
 ### 7.4 Client-Side 20-Minute Inactivity Guardian
 - **Implementation**: [`SessionInactivityGuard`](file:///u:/Kumaran-finance/apps/web/src/components/security/session-inactivity-guard.tsx) tracks user interactions (`mousemove`, `mousedown`, `keydown`, `scroll`, `touchstart`) with a 500ms throttle.

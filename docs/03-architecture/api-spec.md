@@ -51,19 +51,20 @@
 ### 2.1 Module 1: Auth & Staff Identity (`/api/v1/auth`)
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `POST` | `/auth/web/login` | Office staff credentials login (10-digit Phone + Password) | Public |
+| `POST` | `/auth/web/login` | Office staff credentials login (10-digit Phone + Password). Returns `mustChangePassword` & `onboarding_restricted` token if temporary password | Public |
+| `POST` | `/auth/complete-onboarding` | Exchange `onboarding_restricted` token and new permanent password for active access & refresh tokens (F16) | Public / Onboarding Token |
 | `POST` | `/auth/web/verify-totp` | Verify Microsoft Authenticator 6-digit TOTP code | Session Token |
 | `POST` | `/auth/mobile/request-otp` | Request 6-digit SMS OTP (DLT Template 1407169823412093847); stored in Redis (`auth:otp:<phone>`) with 300s TTL | Public (Throttled) |
-| `POST` | `/auth/mobile/verify-otp` | Verify 6-digit SMS OTP against Redis with 3-attempt lockout; returns `setupToken` for staff or full session tokens for customers | Public (Throttled) |
-| `POST` | `/auth/mobile/set-mpin` | Establish or update 6-digit MPIN bcrypt hash (Accepts `setupToken` or Bearer JWT) | Setup Token / Bearer JWT |
+| `POST` | `/auth/mobile/verify-otp` | Verify 6-digit SMS OTP against Redis with 3-attempt lockout; returns single-use `mpin_setup` token for staff or full session tokens for customers | Public (Throttled) |
+| `POST` | `/auth/mobile/set-mpin` | Establish or update 6-digit MPIN. Strictly enforces `tokenType: access` for Bearer changes or single-use `tokenType: mpin_setup` challenge token; rejects `totp_pending` and `refresh` tokens (F01) | Access Bearer JWT / Single-Use Setup Token |
 | `POST` | `/auth/mobile/login-mpin` | Mobile quick unlock with 10-digit Phone + 6-digit MPIN (Biometric unlock on mobile calls this) | Public (Throttled) |
-| `POST` | `/auth/refresh-token` | Rotate 15-minute access token & 7-day refresh token | Public |
-| `POST` | `/auth/logout` | Revoke active session, refresh token hash & FCM token | Bearer JWT |
+| `POST` | `/auth/refresh-token` | Rotate 15-minute access token & 7-day refresh token with client-family binding (`clientType`) and replay detection (F04) | Public |
+| `POST` | `/auth/logout` | Revoke active session, refresh token hash & FCM token across PostgreSQL and Redis (Supports optional `clientType` scoping) | Bearer JWT |
 | `PATCH`| `/auth/fcm-token` | Register or clear staff device Firebase FCM push token | Bearer JWT (Staff) |
 | `GET`  | `/auth/me` | Retrieve authenticated profile, roles, and branch details (Dual Staff & Customer Support) | Bearer JWT |
-| `POST` | `/auth/change-password` | Self-service password change with current password verification | Bearer JWT (Staff) |
-| `POST` | `/auth/totp/setup` | Generate RFC 6238 Base32 secret & QR URI for 2FA | Bearer JWT |
-| `POST` | `/auth/totp/enable` | Confirm 6-digit code and permanently lock 2FA | Bearer JWT |
+| `POST` | `/auth/change-password` | Self-service password change with current password verification; revokes active sessions across PostgreSQL and Redis | Bearer JWT (Staff) |
+| `POST` | `/auth/totp/setup` | Generate RFC 6238 Base32 secret & QR URI for 2FA; holds server-side expiring challenge in Redis (F10) | Bearer JWT |
+| `POST` | `/auth/totp/enable` | Confirm 6-digit code matching active setup challenge; requires current account password for factor replacement; revokes previous sessions (F10) | Bearer JWT |
 | `POST` | `/auth/totp/disable` | Disable 2FA with password confirmation | Bearer JWT |
 
 ### 2.2 Branches & Staff User Administration (`/api/v1/branches`, `/api/v1/users`)

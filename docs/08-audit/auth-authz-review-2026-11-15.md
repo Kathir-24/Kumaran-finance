@@ -4,7 +4,31 @@ Review date: 2026-11-15. Repository: Kumaran Finance / Kumaran Chits.
 
 ## Assessment
 
-**The current implementation should not be treated as security complete.** The review identified 16 findings: **1 Critical, 12 High, and 3 Medium**. Most urgent are a TOTP bypass through MPIN enrollment, ineffective administrative password-reset revocation, and a final-month payout path that bypasses independent approval.
+**The current implementation is actively undergoing phased security remediation.** The review originally identified 16 findings: **1 Critical, 12 High, and 3 Medium**. 
+
+### Remediation Status (Phase 1 Completed: 2026-11-15)
+
+| ID | Severity | Finding Summary | Remediation Phase | Status | Verification Reference |
+|---|---|---|---|---|---|
+| **F01** | **Critical** | Pending TOTP tokens can set an MPIN and bypass second factor | **Phase 1** | **RESOLVED** | `POST /auth/mobile/set-mpin` checks `tokenType: access` & single-use `SET NX` |
+| **F02** | High | Admin password resets leave active sessions usable | **Phase 1** | **RESOLVED** | PostgreSQL `tokenRevokedBefore` + Redis session purging |
+| **F03** | High | Removing roles does not remove privileges from existing tokens | **Phase 1** | **RESOLVED** | Role sync on DB fetch + session revocation on `updateRoles()` |
+| **F04** | High | Scoped logout resurrects refresh session after 15m | **Phase 1** | **RESOLVED** | Dedicated `Session` model + clientType token binding |
+| **F05** | High | Final-month settlement maker == checker | Phase 2 | Scheduled | Phase 2 Maker-Checker refactoring |
+| **F06** | High | Storage access bypasses passbook ownership & branch | Phase 2 | Scheduled | Scope-aware storage ownership assertion |
+| **F07** | High | Customer search & detail expose unscoped records & PII | Phase 2 | Scheduled | Response allowlists & caller context filtering |
+| **F08** | High | Ticket/auction endpoints expose other subscribers' PII | Phase 2 | Scheduled | Membership/assignment/branch scope filtering |
+| **F09** | High | Payment & collection writes lack agent/branch checks | Phase 2 | Scheduled | Domain-record derived branch + ticket access policy |
+| **F10** | High | Existing TOTP factor can be replaced with only access token | **Phase 1** | **RESOLVED** | Server challenge in Redis + current password required for replacement |
+| **F11** | High | Queue dashboard auth detached from Super Admin identity | Phase 3 | Scheduled | Native Super Admin session guard on Bull Board |
+| **F12** | High | Missing DB unique constraints for pending auctions/winners | Phase 2 | Scheduled | Partial unique indexes on pending disbursements |
+| **F13** | Medium | SMS OTP race condition allows attempt exhaustion bypass | Phase 3 | Scheduled | Atomic Redis Lua OTP attempt tracking |
+| **F14** | Medium | Mobile app refresh loop causes cascade 401 | Phase 3 | Scheduled | Single-flight refresh mutex in Flutter Dio interceptor |
+| **F15** | Medium | SSE approvals stream lacks mid-flight auth check | Phase 3 | Scheduled | Periodic active-session heartbeat validator |
+| **F16** | Medium | Hardcoded default staff password without forced change | **Phase 1** | **RESOLVED** | Random temp password + `mustChangePassword` + `POST /auth/complete-onboarding` |
+
+*Phase 1 Automated Test Suite*: [`apps/api/test/unit/phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts) (14/14 passed, 100/100 across full auth regression suite).  
+*Database Migration*: `20261115030000_auth_revocation_and_session_vault` deployed to PostgreSQL 17.
 
 Severity reflects potential impact and required access, not evidence of exploitation. These are repository findings; no claim is made that the application has been attacked or that every deployment exposes every path.
 

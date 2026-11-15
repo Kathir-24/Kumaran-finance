@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { REGEX_TOTP_CODE } from '../../common/constants';
 
 export class TotpEnableDto {
@@ -19,4 +19,13 @@ export class TotpEnableDto {
   @IsString()
   @Matches(REGEX_TOTP_CODE, { message: 'Code must be exactly 6 digits' })
   code: string;
+
+  @ApiProperty({
+    example: 'AdminPass#2026!',
+    description: 'Current account password. Required strictly when replacing an already-configured TOTP 2FA factor.',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

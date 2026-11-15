@@ -6,7 +6,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RedisConnectionProvider } from '../../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
-import { isTokenRevokedInRedis } from '../utils/token-revocation.util';
+import {
+  isTokenIssuedBeforeRevocation,
+  isTokenRevokedInRedis,
+} from '../utils/token-revocation.util';
 
 const USER_STATUS_CACHE_TTL_SECONDS = 120; // 2 minutes
 
@@ -72,16 +75,22 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, isActive: true, isPartner: true },
+      select: { id: true, isActive: true, isPartner: true, tokenRevokedBefore: true, roles: true },
     });
 
     if (!user || !user.isActive) {
       if (payload.roles?.includes(Role.CUSTOMER)) {
         const customer = await this.prisma.customer.findUnique({
           where: { id: payload.sub },
-          select: { id: true },
+          select: { id: true, tokenRevokedBefore: true },
         });
         if (customer) {
+          if (
+            customer.tokenRevokedBefore &&
+            isTokenIssuedBeforeRevocation(payload, customer.tokenRevokedBefore.getTime().toString())
+          ) {
+            throw new UnauthorizedException('Session terminated or token revoked. Please sign in again.');
+          }
           if (useRedis && redis) {
             await redis.set(cacheKey, 'ACTIVE', 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
           }
@@ -95,6 +104,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User account is deactivated or no longer exists');
     }
 
+    if (
+      user.tokenRevokedBefore &&
+      isTokenIssuedBeforeRevocation(payload, user.tokenRevokedBefore.getTime().toString())
+    ) {
+      throw new UnauthorizedException('Session terminated or credentials updated. Please sign in again.');
+    }
+
+    payload.roles = user.roles;
     payload.isPartner = user.isPartner;
 
     if (useRedis && redis) {

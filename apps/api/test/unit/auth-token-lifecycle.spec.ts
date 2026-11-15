@@ -205,6 +205,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         data: {
           refreshTokenHash: null,
           fcmToken: null,
+          tokenRevokedBefore: expect.any(Date),
         },
       });
     });
@@ -614,7 +615,13 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       expect(result).toBe(payload);
       expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-001' },
-        select: { id: true, isActive: true, isPartner: true },
+        select: {
+          id: true,
+          isActive: true,
+          isPartner: true,
+          tokenRevokedBefore: true,
+          roles: true,
+        },
       });
       expect(redisClientMock.set).toHaveBeenCalledWith(
         'user:status:user-001',
@@ -869,7 +876,11 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       expect(sessionMap.has(`auth:session:${mockUserId}:MOBILE`)).toBe(false);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { id: mockUserId },
-        data: { refreshTokenHash: null, fcmToken: null },
+        data: {
+          refreshTokenHash: null,
+          fcmToken: null,
+          tokenRevokedBefore: expect.any(Date),
+        },
       });
     });
 

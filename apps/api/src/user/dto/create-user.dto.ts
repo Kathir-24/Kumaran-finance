@@ -43,8 +43,8 @@ export class CreateUserDto {
   branchId?: string;
 
   @ApiProperty({
-    example: 'Admin@Kumaran2026',
-    description: 'Initial password. Defaults to "Admin@Kumaran2026" if omitted.',
+    example: 'TempPass#2026!',
+    description: 'Initial password. If omitted, a cryptographically secure random temporary password is generated requiring first-login change.',
     required: false,
   })
   @IsString()

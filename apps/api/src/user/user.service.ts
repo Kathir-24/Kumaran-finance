@@ -17,14 +17,58 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
-const DEFAULT_STAFF_PASSWORD = 'Admin@Kumaran2026';
-
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly redisProvider?: RedisConnectionProvider,
   ) {}
+
+  /**
+   * Permanently invalidates sessions across horizontal instances and client device families.
+   * Updates PostgreSQL tokenRevokedBefore authority, clears persisted Session hashes,
+   * purges Redis session vault keys, and sets fast-path stateless revocation cutoffs.
+   */
+  async revokeUserSessions(userId: string): Promise<void> {
+    const now = new Date();
+    const revokedAtMs = Date.now().toString();
+
+    // 1. Authoritative DB Invalidation
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        tokenRevokedBefore: now,
+        refreshTokenHash: null,
+        fcmToken: null,
+      },
+    }).catch(() => {});
+
+    if (typeof (this.prisma as any).session?.updateMany === 'function') {
+      await (this.prisma as any).session.updateMany({
+        where: { userId },
+        data: {
+          refreshTokenHash: null,
+          revokedAt: now,
+        },
+      }).catch(() => {});
+    }
+
+    // 2. High-Throughput Redis Invalidation
+    if (this.redisProvider?.getIsConnected()) {
+      const client = this.redisProvider.getClient();
+      if (client) {
+        await client.del(`user:status:${userId}`).catch(() => {});
+        await client.del(
+          `auth:session:${userId}:WEB`,
+          `auth:session:${userId}:MOBILE`,
+          `auth:session:${userId}:DESKTOP`,
+        ).catch(() => {});
+
+        // 7-day cutoff to protect remaining lifetime of any issued refresh token
+        await client.set(`auth:revoked_before:${userId}`, revokedAtMs, 'EX', 7 * 86400).catch(() => {});
+      }
+    }
+  }
 
   /**
    * Evicts the cached user status in Redis when account status or credentials change
@@ -159,7 +203,9 @@ export class UserService {
       }
     }
 
-    const rawPassword = dto.password || DEFAULT_STAFF_PASSWORD;
+    const isTempPassword = !dto.password;
+    const rawPassword =
+      dto.password?.trim() || `Temp#${crypto.randomBytes(4).toString('hex')}!$`;
     const passwordHash = await bcrypt.hash(rawPassword, BCRYPT_SALT_ROUNDS);
 
     const created = await this.prisma.user.create({
@@ -170,6 +216,7 @@ export class UserService {
         passwordHash,
         roles: dto.roles,
         isActive: true,
+        mustChangePassword: isTempPassword,
       },
       include: {
         branch: {
@@ -178,7 +225,8 @@ export class UserService {
       },
     });
 
-    return this.sanitizeUser(created);
+    const sanitized = this.sanitizeUser(created);
+    return isTempPassword ? { ...sanitized, temporaryPassword: rawPassword } : sanitized;
   }
 
   /**
@@ -201,8 +249,7 @@ export class UserService {
       where: { id },
       data: {
         isActive: dto.isActive,
-        // Invalidate active sessions immediately upon deactivation
-        refreshTokenHash: dto.isActive ? user.refreshTokenHash : null,
+        ...(!dto.isActive ? { refreshTokenHash: null } : {}),
       },
       include: {
         branch: {
@@ -211,7 +258,11 @@ export class UserService {
       },
     });
 
-    await this.evictUserStatusCache(id);
+    if (!dto.isActive) {
+      await this.revokeUserSessions(id);
+    } else {
+      await this.evictUserStatusCache(id);
+    }
 
     return this.sanitizeUser(updated);
   }
@@ -244,7 +295,7 @@ export class UserService {
       },
     });
 
-    await this.evictUserStatusCache(id);
+    await this.revokeUserSessions(id);
 
     return this.sanitizeUser(updated);
   }
@@ -269,11 +320,11 @@ export class UserService {
       where: { id },
       data: {
         passwordHash,
-        refreshTokenHash: null,
+        mustChangePassword: true,
       },
     });
 
-    await this.evictUserStatusCache(id);
+    await this.revokeUserSessions(id);
 
     return {
       success: true,

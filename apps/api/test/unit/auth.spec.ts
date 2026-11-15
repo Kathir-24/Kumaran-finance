@@ -87,6 +87,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -125,6 +127,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -155,6 +159,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -188,6 +194,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -223,6 +231,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -244,6 +254,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         tempToken: loginResult.tempToken,
         totpCode: validTotpCode,
       });
+
+      if (!('accessToken' in verifyResult)) throw new Error('Expected tokens');
 
       expect(verifyResult).toHaveProperty('accessToken');
       expect(verifyResult).toHaveProperty('refreshToken');
@@ -267,6 +279,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -326,6 +340,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
         refreshTokenHash: null,
         fcmToken: null,
         lastLoginAt: null,
+        tokenRevokedBefore: null,
+        mustChangePassword: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -396,7 +412,11 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       expect(result.success).toBe(true);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { id: mockUserId },
-        data: { refreshTokenHash: null, fcmToken: null },
+        data: {
+          refreshTokenHash: null,
+          fcmToken: null,
+          tokenRevokedBefore: expect.any(Date),
+        },
       });
     });
 
@@ -410,7 +430,11 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       expect(result.success).toBe(true);
       expect(prismaMock.customer.update).toHaveBeenCalledWith({
         where: { id: customerId },
-        data: { refreshTokenHash: null, fcmToken: null },
+        data: {
+          refreshTokenHash: null,
+          fcmToken: null,
+          tokenRevokedBefore: expect.any(Date),
+        },
       });
     });
   });
@@ -556,6 +580,8 @@ describe('Module 1: Auth & Staff Identity Tests', () => {
       refreshTokenHash: null,
       fcmToken: null,
       lastLoginAt: null,
+      tokenRevokedBefore: null,
+      mustChangePassword: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

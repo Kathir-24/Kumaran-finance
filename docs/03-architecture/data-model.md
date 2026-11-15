@@ -107,11 +107,14 @@ model User {
   refreshTokenHash String?   // Hashed refresh token for active session revocation
   fcmToken         String?   // Firebase Cloud Messaging device push token for mobile instant approvals
   lastLoginAt      DateTime?
+  tokenRevokedBefore DateTime? // Authoritative revocation cutoff timestamp for zero resurrection (F02)
+  mustChangePassword Boolean   @default(false) // Forced first-login password change flag (F16)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   collections      Payment[] @relation("AgentPayments")
   auditLogs        AuditLog[]
+  sessions         Session[]
 }
 
 // -------------------------------------------------------------
@@ -136,12 +139,33 @@ model Customer {
   fcmToken     String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
   isKycVerified Boolean           @default(false)
   version      Int                @default(1) // Optimistic concurrency control
+  tokenRevokedBefore DateTime?    // Authoritative revocation cutoff timestamp (F02)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
   nominees     Nominee[]
   documents    CustomerDocument[]
   tickets      SubscriberTicket[]
+  sessions     Session[]
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  clientType       String    // "WEB" | "MOBILE" | "DESKTOP" (F04 Multi-Device Isolation)
+  refreshTokenHash String?   // Device-family specific refresh token bcrypt hash
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, clientType])
+  @@unique([customerId, clientType])
+  @@index([userId])
+  @@index([customerId])
 }
 
 model Nominee {
