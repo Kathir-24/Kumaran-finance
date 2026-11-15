@@ -20,7 +20,7 @@
   - **Backend**: NestJS 12 (TypeScript, Modular Monolith) in `apps/api/`
   - **Database**: PostgreSQL 17 + Prisma ORM (Port `5433` via Docker)
   - **Web Dashboard**: React / Next.js 15 (Admin, Accountant, Partners, Auditor) in `apps/web/`
-  - **Mobile App**: Flutter + Dart (Android-first: 100% full feature parity for Partners/Super Admin + Field Agents & Customers) in `apps/mobile/`
+  - **Mobile App**: Dart Client Core (`apps/mobile/lib/core/` for typed API models, offline SQLite synchronization, and single-flight authentication interceptors). *Notice: Per authoritative business owner directive (November 13, 2026), Flutter Android mobile UI screens and APK packaging are deferred to Phase 2 (Q2 2027); see `docs/08-audit/FLUTTER-ANDROID-DEFERRED-SCOPE.md`.*
   - **Shared Client SDK**: Typed Client API SDK in `packages/api-client/` (`@kumaran/api-client`) + Dart Models in `apps/mobile/lib/core/api/`
   - **Jobs & Queue**: Redis 7 + BullMQ (Background jobs only; PostgreSQL is the sole financial truth)
   - **Object Storage**: S3-Compatible Object Storage (Cloudflare R2, MinIO, or private S3 with 15-minute presigned URLs)

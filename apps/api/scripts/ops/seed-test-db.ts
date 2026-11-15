@@ -25,11 +25,22 @@ async function truncateTestTables(targetUrl: string): Promise<void> {
     const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
       SELECT tablename
       FROM pg_tables
-      WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
+      WHERE schemaname = 'public' AND tablename NOT IN ('_prisma_migrations', 'AuditLog')
     `;
+    // In isolated test environments, disable the AuditLog truncate trigger BEFORE truncating so CASCADE doesn't trip on User FK
+    if (activeDb.toLowerCase().includes('test')) {
+      await prisma.$executeRawUnsafe(`ALTER TABLE "public"."AuditLog" DISABLE TRIGGER "trg_prevent_audit_log_truncate";`);
+    }
+
     if (tables.length > 0) {
       const tableList = tables.map((t) => `"public"."${t.tablename}"`).join(', ');
       await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE;`);
+    }
+
+    // In isolated test environments, also truncate AuditLog and re-enable its immutability trigger
+    if (activeDb.toLowerCase().includes('test')) {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "public"."AuditLog" RESTART IDENTITY;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "public"."AuditLog" ENABLE ALWAYS TRIGGER "trg_prevent_audit_log_truncate";`);
     }
   } finally {
     await prisma.$disconnect();

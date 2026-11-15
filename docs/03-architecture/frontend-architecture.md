@@ -9,6 +9,7 @@
 > **Implementation Status**: This document defines the authoritative architectural blueprint and screen catalog for the Web Portal (`apps/web/`) and Mobile Application (`apps/mobile/`).
 > - **Web Portal Implementation Ledger**: All web modules, screen catalogs, and verification proofs are documented under [`docs/web/`](../web/README.md). Foundation & Authentication are **100% Complete & Verified** with 42/42 passing unit tests.
 > - **Backend REST API tier** (`apps/api/`) is **100% complete** with 587/587 passing tests (35 suites) recorded in [`completed-modules-api-registry.md`](./completed-modules-api-registry.md).
+> - **Mobile Client Tier (`apps/mobile/`)**: The Dart client core (`lib/core/` for typed API models, offline SQLite synchronization, and single-flight authentication interceptors) is complete and verified. Per authoritative directive (November 13, 2026), Flutter Android mobile UI screens and APK packaging are deferred to Phase 2 (Q2 2027); see [`docs/08-audit/FLUTTER-ANDROID-DEFERRED-SCOPE.md`](../08-audit/FLUTTER-ANDROID-DEFERRED-SCOPE.md).
 
 ---
 
@@ -328,7 +329,7 @@ flowchart TD
 
 ### 8. Mobile Client Single-Flight Refresh Mutex & Transparent 401 Replay (F14 Remediation)
 - **Single-Flight Refresh Mutex (`AuthSessionManager`)**:
-  - In `apps/mobile/lib/core/api/auth_session_manager.dart`, concurrent 401 responses coalesce into a single in-flight `POST /auth/refresh` call via `_inFlightRefresh`.
+  - In `apps/mobile/lib/core/api/client/auth_interceptor.dart`, concurrent 401 responses coalesce into a single in-flight `POST /api/v1/auth/refresh-token` call via `_inFlightRefresh`.
   - Guarantees that parallel HTTP requests (e.g. background sync, route dues, approval queue) never trigger concurrent refresh token rotations or race against each other.
   - Passes `clientType: 'MOBILE'` to maintain strict session isolation from web browser sessions (F04).
 - **Transparent Request Replay (`KumaranMobileApiClient.request`)**:

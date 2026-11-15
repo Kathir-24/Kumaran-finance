@@ -51,7 +51,7 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 | **M10**| **Accounting, Reports & Audit Trail** | | | | | | |
 | 10.1| Day Book, Cash Book & Handover Reconciliation | Actor | Branch Scope| Global Scope| — | — | Read-only |
 | 10.2| Bilingual Receipts (Push Notification / SMS Fallback) | Trigger | Trigger | Trigger | Trigger | Receiver | View |
-| 10.3| Immutable Append-Only Audit Trail | Global | Branch Scope| Read-only | — | Own History | Global |
+| 10.3| Immutable Append-Only Audit Trail | Global (Super Admin Only) | — | — | — | — | — |
 
 ---
 
@@ -214,7 +214,7 @@ flowchart TD
 - **Acceptance Criteria**:
   - **Given** Ticket #7 has `consecutiveUnpaidMonths >= 3`,
   - **When** Partner calls `POST /tickets/:id/remove-defaulter`, ticket status updates to `REMOVED_DEF_3M`;
-  - **When** Partner calls `POST /tickets/:id/substitute` with new customer ID, a new ticket is issued under the same number, and exit settlement voucher is generated with 4% damages deduction.
+  - **When** Partner calls `POST /tickets/:id/substitute` with new customer ID, a new ticket is issued under the same number, while the financial damage settlement voucher calculation is intentionally held fail-closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal Partner Board resolution and statutory legal validation (ADR-07 / Q25).
 
 #### US-SA-6: Dual-Control Auction Finalization (Checker)
 - **As a**: Super Admin / Partner B (Checker)

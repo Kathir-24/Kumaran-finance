@@ -34,7 +34,7 @@ Future<void> main() async {
   final serverSub = server.listen((HttpRequest request) async {
     final path = request.uri.path;
 
-    if (path == '/auth/refresh' && request.method == 'POST') {
+    if ((path == '/api/v1/auth/refresh-token' || path == '/auth/refresh-token') && request.method == 'POST') {
       refreshRequestCount++;
       final bodyStr = await utf8.decodeStream(request);
       final body = jsonDecode(bodyStr);

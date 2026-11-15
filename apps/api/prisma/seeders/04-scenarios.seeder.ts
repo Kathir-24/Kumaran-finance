@@ -417,6 +417,7 @@ export async function seedScenarios(
           create: {
             ticketId: historicalWinnerTicket.id,
             wasTieBreakWinner: false,
+            isHistoricalEntry: true,
             disbursementStatus: 'DISBURSED',
             disbursedAmount: 400000n,
           },

@@ -64,7 +64,8 @@ class AuthSessionManager {
       }
 
       final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-      final uri = Uri.parse('$cleanBase/auth/refresh');
+      final refreshPath = cleanBase.endsWith('/api/v1') ? '/auth/refresh-token' : '/api/v1/auth/refresh-token';
+      final uri = Uri.parse('$cleanBase$refreshPath');
       final request = await httpClient.openUrl('POST', uri);
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');

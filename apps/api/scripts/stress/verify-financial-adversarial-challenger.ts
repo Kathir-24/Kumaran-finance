@@ -127,11 +127,11 @@ async function run() {
   console.log(`   Accountant: ${accountant.userId}`);
   console.log(`   Field Agent: ${agent.userId}\n`);
 
-  // Ensure a test chit group exists: 1 Lakh, 20 months, 20 members (KC-LIVE-20M-01)
-  let chitGroupId = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KC-LIVE-20M-01'`);
+  // Ensure a standard test chit group exists: 1 Lakh, 20 months, 20 members (KCA-1L-20M-01)
+  let chitGroupId = queryDb(`SELECT id FROM public."ChitGroup" WHERE "groupCode" = 'KCA-1L-20M-01'`);
   if (!chitGroupId || chitGroupId.startsWith('[DB ERROR]')) {
-    console.log(`Group KC-LIVE-20M-01 not found. Querying any ACTIVE chit group...`);
-    chitGroupId = queryDb(`SELECT id FROM public."ChitGroup" WHERE status = 'ACTIVE' LIMIT 1;`);
+    console.log(`Group KCA-1L-20M-01 not found. Querying standard 20-member ACTIVE chit group...`);
+    chitGroupId = queryDb(`SELECT g.id FROM public."ChitGroup" g JOIN public."SubscriberTicket" t ON t."chitGroupId" = g.id WHERE g.status = 'ACTIVE' GROUP BY g.id HAVING count(t.id) >= 20 LIMIT 1;`);
   }
   console.log(`Using Chit Group ID: ${chitGroupId}\n`);
 
@@ -495,10 +495,10 @@ async function run() {
   });
 
   // Clean up Month 3 dues and Month 3 auction and payments for clean test
-  queryDb(`DELETE FROM public."PaymentReversal" WHERE "paymentId" IN (SELECT id FROM public."Payment" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}') AND "installmentMonth" >= 3)`);
-  queryDb(`DELETE FROM public."Receipt" WHERE "paymentId" IN (SELECT id FROM public."Payment" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}') AND "installmentMonth" >= 3)`);
+  queryDb(`DELETE FROM public."PaymentReversal" WHERE "paymentId" IN (SELECT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}'))`);
+  queryDb(`DELETE FROM public."Receipt" WHERE "paymentId" IN (SELECT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}'))`);
   queryDb(`DELETE FROM public."PaymentAllocation" WHERE "installmentDueId" IN (SELECT id FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 3)`);
-  queryDb(`DELETE FROM public."Payment" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}') AND "installmentMonth" >= 3`);
+  queryDb(`DELETE FROM public."Payment" WHERE id IN (SELECT "paymentId" FROM public."PaymentAllocation" WHERE "ticketId" IN (SELECT id FROM public."SubscriberTicket" WHERE "chitGroupId" = '${chitGroupId}'))`);
   queryDb(`DELETE FROM public."InstallmentDue" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" = 3`);
   queryDb(`DELETE FROM public."AuctionMinutes" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 3)`);
   queryDb(`DELETE FROM public."AuctionTieBidder" WHERE "auctionId" IN (SELECT id FROM public."Auction" WHERE "chitGroupId" = '${chitGroupId}' AND "installmentMonth" >= 3)`);
@@ -743,17 +743,18 @@ async function run() {
   }
 
   // 5.2 Payment Reversal Dual Control
-  // Accountant requests reversal on the payment made above
+  // Partner A (Maker) requests reversal on the payment made above
   if (successfulPaymentId) {
     const revReqRes = await request('POST', `/payments/${successfulPaymentId}/request-reversal`, {
-      reason: 'Entered wrong payment mode during cash entry',
-    }, accountant.token);
+      reason: 'WRONG_RECEIPT_REFERENCE',
+      notes: 'Entered wrong payment mode during cash entry',
+    }, adminA.token);
 
     const revReqPass = revReqRes.status === 200 || revReqRes.status === 201;
     assertResult({
       testId: 'MAKER-CHECKER-03',
       category: 'Dual Control',
-      description: 'Accountant (Maker) requests payment reversal',
+      description: 'Partner A (Maker) requests payment reversal',
       endpoint: `POST /api/v1/payments/:id/request-reversal`,
       expectedStatus: 200,
       observedStatus: revReqRes.status,
@@ -761,10 +762,10 @@ async function run() {
       details: `Response: ${JSON.stringify(revReqRes.json?.data || revReqRes.json)}`,
     });
 
-    // Reversal Maker (accountant) attempts to approve own reversal
+    // Reversal Maker (adminA) attempts to approve own reversal
     const selfApproveRes = await request('POST', `/payments/${successfulPaymentId}/approve-reversal`, {
       notes: 'Maker attempting to approve own reversal',
-    }, accountant.token);
+    }, adminA.token);
 
     assertResult({
       testId: 'MAKER-CHECKER-04',

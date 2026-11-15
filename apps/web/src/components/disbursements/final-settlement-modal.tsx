@@ -94,7 +94,7 @@ export function FinalSettlementModal({
         throw new Error('No unprized subscriber ticket found for final month settlement');
       }
 
-      return unwrapApiResponse<{ message?: string; settlement?: any }>(
+      return unwrapApiResponse<{ message?: string; settlement?: Record<string, unknown> }>(
         apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/prepare-final-settlement', {
           params: { path: { chitGroupId: chitGroup.id } },
           body: {
