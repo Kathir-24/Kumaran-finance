@@ -40,8 +40,13 @@ flowchart LR
 - [ ] Endpoint is protected with JWT Auth Guard and Role Decorators (e.g., `@Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)`).
 - [ ] Branch scoping enforced: Users cannot read or mutate data outside their assigned branch unless granted global scope.
 - [ ] Sensitive operations (payment reversals, auction finalization, auction corrections, prize payouts, defaulter exit settlements) require Maker-Checker dual control with **`maker_user_id != checker_user_id`** strictly enforced by backend services and database transactions (`CONFIRMED-BY-DEVELOPER`).
+- [ ] PostgreSQL 17 engine-level `CHECK` constraints enforce physical storage dual control (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) with SQL ternary NULL-trap protection (F12).
 - [ ] Partner exclusivity enforced: Payment reversal initiation, auction finalization, auction corrections, and defaulter exit settlements are strictly restricted to `SUPER_ADMIN` (the 4 Partners).
-- [ ] Distributed SMS OTP request cooldown (60s via `auth:otp:cooldown:<phone>`) and 5-minute brute-force lockout (300s via `auth:otp:lockout:<phone>` on 3rd invalid attempt) enforced with in-memory fallback to protect SMS gateway quota and prevent cycling attacks.
+- [ ] Distributed SMS OTP request cooldown (60s via `auth:otp:cooldown:<phone>`) and 5-minute brute-force lockout (300s via `auth:otp:lockout:<phone>` on 3rd invalid attempt) enforced via atomic Redis Lua script (`verifyOtpLua`) with in-memory fallback to prevent cycling attacks and race conditions (F13).
+- [ ] Session management enforces client-family isolation (`WEB`, `MOBILE`, `DESKTOP`), cryptographic `sid` binding, and 7-day durable revocation cutoffs (`tokenRevokedBefore` / `auth:revoked:${sub}`) across restarts and Redis loss (F04).
+- [ ] Bull Board Queue Monitor (`/admin/queues`) strictly protected by Super Admin JWT session guard; development default credentials (`admin:chitflow_secret`) are permanently rejected (F11).
+- [ ] SSE streams assert token validity and session revocation on every tick (`assertStreamAuthorization`), immediately closing streams upon expiry or revocation (F15).
+- [ ] Mobile client networking incorporates single-flight refresh mutex (`_inFlightRefresh`) with `clientType: 'MOBILE'` and transparent 401 request replay (F14).
 
 ### Gate 5: Automated Testing Coverage
 - [ ] Unit tests for services and calculation logic pass with 100% success rate across all **52/52 API test suites (843/843 tests) + 14 Web test suites (353/353 tests) = 1,196 total tests, 0 failures**.

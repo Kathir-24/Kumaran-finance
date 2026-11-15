@@ -105,6 +105,12 @@ To empower Partners (Super Admin) and Branch Managers to act promptly without na
 - **Protocol**: HTTP/1.1 or HTTP/2 Server-Sent Events (`text/event-stream`)
 - **Authorized Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`
 - **Emission Cadence**: Emits an `APPROVALS_UPDATE` event immediately upon connection, and subsequently every 15 seconds.
+- **Mid-Flight Session & Token Expiry Assertion (F15)**: On each 15-second tick before emitting summary data, `ReportService.assertStreamAuthorization` executes a real-time validation:
+  - Asserts token validity (`now < exp`).
+  - Checks fast-path Redis revocation cutoff (`auth:revoked:${sub}`).
+  - Verifies database user active status (`user.isActive`).
+  - Asserts continued authorization for required staff roles.
+  - If token expires, user logs out, or permissions change mid-stream, throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the connection and close the SSE pipe.
 - **Client Handling (Next.js / Flutter)**:
   ```ts
   const eventSource = new EventSource('/api/reports/approvals-stream', {

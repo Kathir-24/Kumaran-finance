@@ -97,6 +97,7 @@ All 11 endpoints connect directly to real NestJS 12 controllers, PostgreSQL 17 t
 | **ADR-16** | **Paper Notebook Intake** | Only 3 fields mandatory (`fullName`, `phone`, `addressLine1`); Aadhaar and PAN are strictly optional to support physical onboarding. |
 | **ADR-18** | **Phone-Only Identity** | Validates 10-digit Indian numbers starting with 6–9 (`^[6-9]\d{9}$`). Zero email fields exist. |
 | **DPDP Act 2023** | **Data Minimization** | Strictly stores last 4 digits of Aadhaar (`XXXX-XXXX-1234`). Full 12-digit Aadhaar numbers are never collected or stored. |
+| **F07 Scoping & Projection Guard** | **Privacy & Secret Redaction** | Customer list/detail queries apply branch/agent scoping. Explicit Prisma select allowlist permanently strips sensitive authentication hashes (`passwordHash`, `mpinHash`, `totpSecret`, `fcmToken`) and redacts `panNumber`. |
 
 ---
 

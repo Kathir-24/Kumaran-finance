@@ -236,7 +236,7 @@ In Linux VPS and production container environments:
 Kumaran Chits provides real-time infrastructure and financial telemetry via Prometheus metrics exporter:
 
 - **Endpoint**: `http://localhost:3000/metrics` (or `http://localhost/metrics` via Nginx ingress)
-- **Authentication**: Protected via HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`, default: `admin` / `chitflow_secret`).
+- **Authentication**: Protected via HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`; fail-fast startup validator rejects the insecure default `chitflow_secret` in production).
 - **Telemetry Catalog**:
   - **Latency Histograms**: `http_request_duration_seconds` measuring p95 read ($\le 200\text{ ms}$) and financial write ($\le 500\text{ ms}$) latencies per NFR §3.
   - **PostgreSQL Database Health**: `chitflow_db_connected` (1 = healthy, 0 = down).

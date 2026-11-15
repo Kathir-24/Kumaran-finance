@@ -88,11 +88,11 @@ Mobile onboarding for both staff (Agents/Partners) and customers relies on a 6-d
 | `auth:otp:cooldown:<phone>` | `string` | 60s | SMS Gateway Flood Throttle | Unix timestamp of issuance |
 | `auth:otp:lockout:<phone>` | `string` | 300s | Brute-force penalty lock | Unix timestamp of lockout trigger |
 | `auth:session:<userId>:<clientType>` | `string` | 604,800s (7d) | Concurrent client session token isolation | Bcrypt hash of client-scoped refresh token |
-| `auth:revoked_before:<userId>` | `string` | 900s (15m) | Instant stateless JWT logout revocation | Unix epoch timestamp (seconds) |
+| `auth:revoked:${userId}` | `string` | 604,800s (7d) | Instant stateless JWT & session revocation cutoff | Unix epoch timestamp (milliseconds), persists full 7-day refresh lifetime (F04) |
 | `lock:auth:refresh:<sha256>` | `string` | 4,000ms | Concurrent refresh distributed mutex | Random UUID token released via atomic Lua script |
 | `auth:refresh_waiters:<sha256>` | `integer` | 5s | Tracks overlapping in-flight refresh callers | Active waiter counter (`INCR`/`DECR`) |
 | `auth:refresh_inflight_result:<sha256>` | `string` | 4s (deleted on consume) | Contention-only rotated token handoff | JSON `{ accessToken, refreshToken, user }` populated only when waiters > 0 |
-| `user:status:<userId>` | `string` | 120s | Fast-path JWT validation cache | `"ACTIVE"` or `"INACTIVE"` status string |
+| `user:status:<userId>:<clientType>` | `string` | 120s | Device-family scoped fast-path JWT validation cache | `"ACTIVE"` or `"INACTIVE"` status string (F04) |
 | `throttle:<name>:<key>` | `integer` | Dynamic (e.g. 60s) | Distributed HTTP rate-limiting hit counter | Total request hits in current time window |
 | `throttle:block:<name>:<key>` | `string` | Dynamic (blockDuration) | Temporary block flag for abusive clients | `"1"` (active penalty lock) |
 | `lock:report:<cacheKey>` | `string` | 4,000ms | Cache stampede mutex for Executive Dashboard / Daybook | Random UUID token (`crypto.randomUUID()`) verified by Lua script |
@@ -131,6 +131,10 @@ export interface OtpSessionRecord {
    - Upon successful verification, `redis.del('auth:otp:<phone>', 'auth:otp:cooldown:<phone>', 'auth:otp:lockout:<phone>')` is invoked immediately. A verified OTP cannot be re-used, and throttle states are reset cleanly.
 5. **Seamless In-Memory Fallback**:
    - If Redis is down or starting up, [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) falls back to internal `Map` stores (`otpStore`, `cooldownStore`, `lockoutStore`) with identical expiry and attempt rules, ensuring zero downtime and 100% deterministic test execution.
+6. **Atomic Concurrency Execution via Redis Lua Script (F13 Remediation)**:
+   - In `AuthService.verifyOtp`, OTP validation executes via an atomic Redis Lua script (`verifyOtpLua`).
+   - The script atomically inspects lockout status, session presence and expiry, matches the SHA-256 hash, increments attempts, applies the 300-second lockout penalty on the 3rd failed attempt, and deletes the session on success in 1 single atomic Redis execution.
+   - Eliminates race conditions: parallel brute-force guesses cannot bypass attempt tracking, and concurrent requests cannot double-consume the same OTP.
 
 ---
 

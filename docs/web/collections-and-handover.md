@@ -27,6 +27,9 @@ At the Perundurai branch office counter and during field rounds, subscribers pay
 3. **Sequential Bilingual Receipts**:
    - Atomically generates sequential receipt numbers in format `KC-REC-{BRANCH}-{YYYY}-{XXXXX}` with 5-digit padding.
    - Direct download of pixel-accurate printable A5 bilingual PDF via `GET /api/v1/pdf/receipt/:paymentId`.
+4. **Same-Branch Idempotency Isolation & Branch Scope Locking (F09)**:
+   - Replaying a cached idempotency key is strictly restricted to the user who recorded the payment (`existingPayment.recordedByUserId === currentUser.id`), preventing cross-agent payment sniffing within the branch.
+   - Accounting branch is strictly derived from `ticket.chitGroup.branchId`, ensuring ticket payments cannot be diverted to foreign branch ledgers.
 
 #### B. Task 8.2: Customer Self-Reported UPI Claims Verification Desk
 1. **Customer Mobile UPI Payment Claim**:

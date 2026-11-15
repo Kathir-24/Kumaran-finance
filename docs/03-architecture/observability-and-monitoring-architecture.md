@@ -83,7 +83,7 @@ flowchart LR
     end
 
     subgraph EXPOSURE["3. Secure Scrape & Dashboards"]
-        GUARD["MetricsAuthGuard\n(Basic Auth: admin / chitflow_secret)"]
+        GUARD["MetricsAuthGuard\n(Basic Auth: METRICS_USER / METRICS_PASSWORD)"]
         ENDPOINT["GET /metrics\n(72KB OpenMetrics Stream)"]
         GRAFANA["Prometheus Server & Grafana Dashboards\n(15s Scrape Interval)"]
 
@@ -142,7 +142,7 @@ scrape_configs:
     metrics_path: '/metrics'
     basic_auth:
       username: 'admin'
-      password: 'chitflow_secret'
+      password: '${PROMETHEUS_METRICS_SCRAPE_SECRET}' # Set in deployment; default rejected in prod
     static_configs:
       - targets: ['api:3000']
 ```
@@ -464,10 +464,10 @@ Time:        3.642 s
 * **Step 3 (`GET /health/sentry-test`)**: Status `500 Internal Server Error`, intentional diagnostic crash captured cleanly by `GlobalExceptionFilter` with sanitized envelope (`code: 'INTERNAL_SERVER_ERROR'`).
 * **Step 4A & 4B (`GET /metrics`)**:
   - `4A (Negative Guard)`: Request without Basic Auth blocked with `401 Unauthorized` (`WWW-Authenticate: Basic realm="Prometheus Metrics"`).
-  - `4B (Authenticated Scrape)`: With Basic Auth (`admin:chitflow_secret`) returns `200 OK` (72,039 characters). Verified gauges: `http_requests_total`, `chitflow_db_connected 1`, `bullmq_queue_jobs_count`, `chitflow_daily_collected_amount_rupees`.
+  - `4B (Authenticated Scrape)`: With configured Basic Auth returns `200 OK` (72,039 characters). Verified gauges: `http_requests_total`, `chitflow_db_connected 1`, `bullmq_queue_jobs_count`, `chitflow_daily_collected_amount_rupees`. (Insecure default password is fail-fast rejected in production per `env.validation.ts`).
 * **Step 5A & 5B (`GET /admin/queues/`)**:
-  - `5A (Negative Guard)`: Request without Basic Auth blocked with `401 Unauthorized` (`WWW-Authenticate: Basic realm="Bull Board Dashboard"`).
-  - `5B (Authenticated Dashboard)`: With Basic Auth returns `200 OK` (`text/html; charset=utf-8`) rendering Bull Board management UI.
+  - `5A (Negative Guard)`: Request without Super Admin JWT session or configured Basic Auth blocked with `401 Unauthorized` (`WWW-Authenticate: Basic realm="Kumaran Chits Queue Monitor"`).
+  - `5B (Authenticated Dashboard)`: With Super Admin JWT session (Bearer, `?token=`, or cookie) or configured Basic Auth returns `200 OK` (`text/html; charset=utf-8`) rendering Bull Board management UI. (F11 Hardened).
 * **Step 12 (`GET /api/v1/jobs/repeatable-schedules`)**: Confirmed 3 active BullMQ cron schedules in Redis (`1 0 * * *`, `0 6 * * *`, `0 9 * * *` with Asia/Kolkata timezone).
 * **Step 13 (`GET /api/v1/jobs/queue-status`)**: Confirmed health and job depth counts across all 3 queues (`daily-maintenance-queue`, `notification-queue`, `reconciliation-queue`).
 * **Step 14A (`GET /api/v1/jobs/notification-audit-logs`)**: Retrieved outbound Push (`FCM`) and DLT SMS dispatch logs.
@@ -499,7 +499,7 @@ Time:        3.642 s
 |---|---|---|---|:---:|:---:|
 | **1. Metrics** | `prom-client` | `GET /metrics` | `MetricsAuthGuard` (Basic Auth) | **₹0** | ✅ 100% Verified |
 | **2. Error Tracking** | `@sentry/nestjs` | `GET /health/sentry-test` | Safe-Bypass / DPDP Sanitizer | **₹0** | ✅ 100% Verified |
-| **3. Queue UI** | `@bull-board/express` | `GET /admin/queues/` | `BullBoardAuthMiddleware` (Basic Auth) | **₹0** | ✅ 100% Verified |
+| **3. Queue UI** | `@bull-board/express` | `GET /admin/queues/` | `BullBoardAuthMiddleware` (Super Admin JWT / Basic Auth) | **₹0** | ✅ 100% Verified |
 | **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Super Admin Only | **₹0** | ✅ 100% Verified |
 | **Liveness Probe** | Core NestJS | `GET /health` | Public / Container Probe | **₹0** | ✅ 100% Verified |
-| **Live Alert Stream**| Server-Sent Events | `GET /reports/approvals-stream` | `JwtAuthGuard` (Staff Only) | **₹0** | ✅ 100% Verified |
+| **Live Alert Stream**| Server-Sent Events | `GET /reports/pending-approvals/stream` | `JwtAuthGuard` + Active Session/Expiry Assertion (F15) | **₹0** | ✅ 100% Verified |

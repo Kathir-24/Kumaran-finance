@@ -270,6 +270,8 @@ flowchart TD
 - **Local Storage**: `drift` / `sqflite` (Encrypted SQLite database for offline caching).
 - **Network Awareness**: `connectivity_plus` (Monitors cellular/Wi-Fi transitions).
 - **Background Sync**: `workmanager` (Triggers periodic synchronization when charging/connected).
+- **Single-Flight Refresh Mutex & Transparent 401 Replay (F14)**: Mobile API requests handle token expiration automatically via `AuthSessionManager`'s single-flight mutex (`_inFlightRefresh`) with `clientType: 'MOBILE'`, safely replaying queue sync operations without session collision or user interruption.
+- **Same-Branch Idempotency Isolation (F09)**: Server verifies `existingPayment.recordedByUserId === userId` when handling cached idempotency keys, ensuring field agents cannot inspect or replay payments recorded by other agents.
 - **Signed Paper Passbook (ADR-11)**: Physical proof signed directly in subscriber's paper passbook with pen; loose receipt thermal printers are completely eliminated.
 
 ---

@@ -172,9 +172,9 @@ Registered automatically in [`BullMqQueueProvider.registerRepeatableJobs()`](fil
 Bull Board provides a graphical UI for monitoring BullMQ queue health without requiring CLI access:
 
 - **Route**: `http://localhost:3000/admin/queues`
-- **Authentication**: HTTP Basic Auth
-  - **Username**: `admin` (or `BULL_BOARD_USER`)
-  - **Password**: `chitflow_secret` (or `BULL_BOARD_PASSWORD`)
+- **Authentication (F11 Hardened)**:
+  - **Primary**: Active `SUPER_ADMIN` JWT session via `Authorization: Bearer <token>`, `?token=<token>`, or browser cookie (`access_token`). Real-time active status (`user.isActive`) and fast-path Redis revocation cutoffs (`auth:revoked:${sub}`) are asserted on every request.
+  - **Secondary Fallback**: Explicitly configured HTTP Basic Auth (`BULL_BOARD_USER` / `BULL_BOARD_PASSWORD`). Insecure default credentials (`admin:chitflow_secret`) are strictly rejected across all environments.
 - **Capabilities**:
   - Live inspection of `active`, `waiting`, `completed`, and `failed` job tabs.
   - Visual review of JSON payloads and error stack traces.
@@ -256,7 +256,13 @@ Payload: {
 
 ### Proof 4: Bull Board Authenticated Access (`GET /admin/queues`)
 ```bash
-$ curl -I -u "admin:chitflow_secret" http://127.0.0.1:3000/admin/queues
+# Super Admin JWT Session authentication (Primary)
+$ curl -I -H "Authorization: Bearer <super_admin_jwt_token>" http://127.0.0.1:3000/admin/queues
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+
+# Alternatively with non-default configured Basic Auth
+$ curl -I -u "admin:${BULL_BOARD_STRONG_PASSWORD}" http://127.0.0.1:3000/admin/queues
 HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 ```

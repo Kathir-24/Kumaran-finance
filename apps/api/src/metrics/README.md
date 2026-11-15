@@ -71,7 +71,7 @@ To prevent public leakage of financial collection volumes and internal operation
 
 - **Environment Variables**:
   - `METRICS_USER` (Default fallback: `BULL_BOARD_USER` or `admin`)
-  - `METRICS_PASSWORD` (Default fallback: `BULL_BOARD_PASSWORD` or `chitflow_secret`)
+  - `METRICS_PASSWORD` (Must be set to a strong secret in production; `env.validation.ts` and `MetricsAuthGuard` strictly reject the default `chitflow_secret`)
 - **Scrape Header**: `Authorization: Basic <base64(user:password)>`
 - Unauthenticated requests receive `401 Unauthorized` with `WWW-Authenticate: Basic realm="Prometheus Metrics"`.
 
@@ -89,7 +89,7 @@ scrape_configs:
     metrics_path: '/metrics'
     basic_auth:
       username: 'admin'
-      password: 'chitflow_secret'
+      password: '${PROMETHEUS_METRICS_SCRAPE_SECRET}' # Set in deployment; defaults rejected in prod
     static_configs:
       - targets: ['api:3000']
 ```

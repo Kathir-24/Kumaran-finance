@@ -88,7 +88,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 ### Step 4: Prometheus Telemetry Metrics (`GET /metrics`)
 - **Negative Guard Test (4A)**: Requesting `GET /metrics` without credentials returns **HTTP 401 Unauthorized** with `WWW-Authenticate: Basic realm="Prometheus Metrics"`.
 - **Authenticated Telemetry Scrape (4B)**:
-  - **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
+  - **Auth**: HTTP Basic Auth with configured credentials (fail-fast rejected in production if default `chitflow_secret` is present)
   - **Response**: **HTTP 200** (`Content-Type: text/plain; charset=utf-8; version=0.0.4`)
   - **Payload Size**: 72,039 characters
   - **Scraped Metrics Sample**:
@@ -108,7 +108,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 ### Step 5: Bull Board Dashboard UI (`GET /admin/queues/`)
 - **Negative Guard Test (5A)**: Requesting `GET /admin/queues/` without credentials returns **HTTP 401 Unauthorized** with `WWW-Authenticate: Basic realm="Bull Board Dashboard"`.
 - **Authenticated Dashboard Access (5B)**:
-  - **Auth**: HTTP Basic Auth (`admin:chitflow_secret`)
+  - **Auth**: Super Admin JWT Session (or configured non-default Basic Auth; defaults rejected per F11)
   - **Response**: **HTTP 200** (`Content-Type: text/html; charset=utf-8`)
   - **Content Verified**: Full interactive HTML queue manager rendered and operational.
 

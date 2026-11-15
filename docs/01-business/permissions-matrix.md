@@ -111,6 +111,11 @@ To prevent accounting errors, unauthorized modifications, and internal fraud, hi
 - **Hard Guard**: `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`MAKER_CHECKER_VIOLATION`). The partner who requested the removal cannot approve it.
 - **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 
+### 3.2 Month N Final Settlement Two-Stage Dual Control (F05 & ADR-25):
+- **Stage 1 (Maker Preparation)**: Accountant, Branch Manager, or Super Admin Partner A (`POST /disbursements/group/:chitGroupId/prepare-final-settlement`) computes Month N settlement voucher, verifying arrears, Month N due deduction, and 4.00% commission. Stamped with `conductedByUserId = makerUserId`.
+- **Checker (Authorize & Disburse)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`, `POST /disbursements/group/:chitGroupId/approve-final-settlement`) verifies voucher calculations and commits payout.
+- **Hard Guard**: `maker_user_id != checker_user_id` enforced in application logic and PostgreSQL engine CHECK constraint `chk_winner_maker_checker`. Single-step self-approval is rejected.
+
 ### 4. Field Cash Handover & Vault Deposit (Dual Agent/Accountant Guard):
 - **Collector (Submit Handover)**: Field Collection Agent (or staff in field collector role) collects cash from customers and submits daily handover batch.
 - **Acknowledger (Accept Handover)**: Partner (Super Admin) physically counts cash and signs off / acknowledges handover into branch vault.

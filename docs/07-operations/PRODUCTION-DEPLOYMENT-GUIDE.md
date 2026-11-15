@@ -261,7 +261,7 @@ Rules:
 | `GET /health` & `GET /health/readiness` | Public (throttling & envelope bypassed) | HTTP `200`: `status: "ok"`, `database: "connected"`, `redis: "connected"` (`503` if degraded) | [`health.controller.ts`](../../apps/api/src/health/health.controller.ts#L34-L137) |
 | `GET /health/liveness` | Public (in-process event loop check) | HTTP `200`: `status: "alive"`, `service: "chitflow-api"` | [`health.controller.ts`](../../apps/api/src/health/health.controller.ts#L143-L158) |
 | `GET /metrics` | HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`) | Prometheus text exposition (HTTP latency histograms, Node metrics, KPIs) | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L275-L284) |
-| `GET /admin/queues` | HTTP Basic Auth (`BULL_BOARD_USER` / `BULL_BOARD_PASSWORD`) | Bull Board dashboard for `daily-maintenance-queue`, `notification-queue`, `reconciliation-queue` | [`main.ts`](../../apps/api/src/main.ts#L178-L184) |
+| `GET /admin/queues` | Super Admin JWT Session (or configured Basic Auth) | Bull Board dashboard for `daily-maintenance-queue`, `notification-queue`, `reconciliation-queue` | [`main.ts`](../../apps/api/src/main.ts#L178-L184) |
 | `GET /api/docs` | Disabled automatically when `NODE_ENV=production` | Swagger explorer available only in non-production environments | [`main.ts`](../../apps/api/src/main.ts#L123) |
 | Nginx Access Log | `/var/log/nginx/access.log` inside `chitflow-nginx` | Every entry carries `rid="<request-id>"`, `rt=`, `uct=`, `uht=`, `urt=` | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L24-L30) |
 | Web Client Error Boundary | Browser UI `(dashboard)/error.tsx` | Non-chunk crashes display reference code `ERR-KUM-XXXXXX` | [`error-reporter.ts`](../../apps/web/src/lib/error-reporter.ts#L20-L36) |

@@ -13,7 +13,8 @@ Field collection agents collect subscription payments in rural areas around Peru
 The offline cache subsystem guarantees:
 1. **Zero Double Collections**: Once a collection is recorded locally, the corresponding due status in `cached_assigned_dues` transitions to `PAID` immediately.
 2. **Immutable Point-of-Collection Idempotency**: Each offline collection generates a cryptographically random UUIDv4 `idempotency_key` via `IdempotencyHelper.generateUuidV4()` at the moment of cash handover.
-3. **Safe Queue Drainage**: An item is deleted from `offline_collections_queue` only after receiving an HTTP 200/201 or 409 (already recorded) confirmation from `/api/v1/collections/counter`.
+3. **Safe Queue Drainage**: An item is deleted from `offline_collections_queue` only after receiving an HTTP 200/201 or duplicate confirmation from `POST /api/v1/collections/record` or `POST /api/v1/collections/sync-offline-queue`.
+4. **Transparent 401 Rotation & Single-Flight Mutex (F14)**: Mobile API requests handle token expiration automatically via `AuthSessionManager`'s single-flight refresh mutex (`_inFlightRefresh`) with `clientType: 'MOBILE'`, safely replaying queue sync operations without interrupting the field agent.
 
 ---
 

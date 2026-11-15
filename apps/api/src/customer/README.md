@@ -15,8 +15,10 @@ The **Customer Module** governs subscriber intake, nominee relationships, KYC ve
 2. **Lightweight Intake & Paper Notebook Parity (ADR-16)**:
    - For long-time local subscribers known to the 4 Partners, customer intake requires only: Full Name, Primary Phone, and Address.
    - **Zero Forced KYC**: Aadhaar, PAN, and document uploads are strictly optional and never block subscription.
-3. **Data Minimization (DPDP Act 2023)**:
+3. **Data Minimization & Sensitive Field Masking (DPDP Act 2023 & F07)**:
    - When Aadhaar is provided, only the **masked last 4 digits** (`aadhaarLast4`) are stored. Full 12-digit Aadhaar numbers are never persisted.
+   - **Explicit Projection Allowlist (F07)**: Customer listings and details strictly project safe fields via Prisma select projection, permanently barring sensitive auth secrets (`passwordHash`, `mpinHash`, `totpSecret`, `fcmToken`) from API output.
+   - **Branch & Agent Scoping (F07)**: `GET /customers` and `GET /customers/:id` enforce branch-level scoping; Field Collection Agents are strictly restricted to subscribers within their assigned collection route.
 4. **Subscriber Device FCM Push Token (Anti-IDOR Protection)**:
    - `PATCH /customers/:id/fcm-token`: Allows subscribers to register their smartphone FCM push token for digital passbook alerts and auction results.
    - **Anti-BOLA/IDOR Guardian**: Customers can **only** register or update their own device push token (`currentUser.sub === id`). Staff (`SUPER_ADMIN`, `COLLECTION_AGENT`) can update a subscriber's token during doorstep onboarding rounds.

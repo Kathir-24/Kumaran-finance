@@ -1,9 +1,9 @@
 # Bull Board Background Queue Monitor
 
 > **Package**: `@bull-board/api` & `@bull-board/express`  
-> **Route**: `/admin/queues` (HTTP Basic Auth)  
-> **Access Level**: `SUPER_ADMIN` (The 4 Partners)  
-> **Compliance**: [`docs/01-business/permissions-matrix.md`](../../../../../docs/01-business/permissions-matrix.md) §1 & §2, [`docs/03-architecture/completed-modules-api-registry.md`](../../../../../docs/03-architecture/completed-modules-api-registry.md) §13  
+> **Route**: `/admin/queues` (Super Admin JWT Session / HTTP Basic Auth fallback)  
+> **Access Level**: `SUPER_ADMIN` (Strictly Super Admin Identity)  
+> **Compliance**: [`docs/01-business/permissions-matrix.md`](../../../../../docs/01-business/permissions-matrix.md) §1 & §2, [`docs/03-architecture/security-and-access-guardians.md`](../../../../../docs/03-architecture/security-and-access-guardians.md) §7.10 (F11 Remediation)  
 
 ---
 
@@ -26,21 +26,27 @@ The Bull Board Queue Monitor provides a visual web interface mounted at `/admin/
 
 ## 2. Security & Authentication Architecture
 
-In strict adherence to the **Maker-Checker & Super Admin access governance** mandated in [`docs/01-business/permissions-matrix.md`](../../../../../docs/01-business/permissions-matrix.md), access to `/admin/queues` is restricted to authorized company administrators:
+In strict adherence to the **Maker-Checker & Super Admin access governance** mandated in [`docs/01-business/permissions-matrix.md`](../../../../../docs/01-business/permissions-matrix.md) and security remediation **F11**, access to `/admin/queues` is restricted strictly to verified Super Admin sessions:
 
 ```mermaid
-flowchart LR
-    Browser["Admin Browser\n(GET /admin/queues)"] --> AuthMiddleware["BullBoardAuthMiddleware\n(HTTP Basic Auth)"]
-    AuthMiddleware -->|Missing / Invalid| Denied["401 Unauthorized\n(WWW-Authenticate: Basic)"]
-    AuthMiddleware -->|Valid Super Admin| Dashboard["Bull Board Dashboard\n(ExpressAdapter Router)"]
-    Dashboard --> Redis[("Redis 7 BullMQ Queues")]
+flowchart TD
+    Req["Request: GET /admin/queues\n(Header / Query / Cookie)"] --> Middleware["BullBoardAuthMiddleware"]
+    Middleware --> HasJWT{"Super Admin JWT\nPresent & Valid?"}
+    HasJWT -->|Yes| RevokeCheck{"Session Revoked\nor Inactive?"}
+    RevokeCheck -->|No| Allow["200 OK — Render Bull Board UI"]
+    RevokeCheck -->|Yes| Deny401["401 Unauthorized\n(Session Revoked)"]
+    HasJWT -->|No / Invalid| CheckBasic{"Configured Basic Auth\nProvided & Non-Default?"}
+    CheckBasic -->|Yes| Allow
+    CheckBasic -->|No / Default| DenyBasic["401 Unauthorized\n(Active Super Admin Session Required)"]
 ```
 
-### Authentication Credentials
-- **Mechanism**: Native HTTP Basic Authentication (supported natively by all modern web browsers without requiring a custom login frontend).
-- **Environment Variables**:
-  - `BULL_BOARD_USER`: Username (defaults to `admin`).
-  - `BULL_BOARD_PASSWORD`: Secure administrative password (defaults to `chitflow_secret` in development).
+### Authentication Mechanisms
+1. **Primary Authentication (Super Admin JWT Session)**:
+   - Validates active `Role.SUPER_ADMIN` access tokens delivered via `Authorization: Bearer <token>`, query param `?token=<token>`, or browser cookies (`access_token` or `jwt`).
+   - Asserts real-time user status (`user.isActive`) and verifies fast-path Redis revocation cutoffs (`auth:revoked:${sub}`) on every dashboard navigation. Non-Super Admin roles receive `403 Forbidden`.
+2. **Secondary Fallback (HTTP Basic Auth)**:
+   - Evaluated ONLY IF explicitly configured with strong, non-default credentials via `BULL_BOARD_USER` and `BULL_BOARD_PASSWORD`.
+   - The insecure development fallback password `chitflow_secret` is permanently rejected across all environments under F11.
 
 ---
 

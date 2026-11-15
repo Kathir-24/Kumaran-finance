@@ -11,23 +11,27 @@
 The **Auth Module** provides multi-factor authentication, session management, and role-based access control (RBAC) engineered for the 6 personas operating Kumaran Chits:
 
 1. **Web Portal Dual-Factor Login**: Phone number + bcrypt password (salt 12) followed by RFC 6238 TOTP (Time-Based One-Time Password) using Microsoft Authenticator or Google Authenticator.
-2. **Mobile Quick Unlock**: 6-digit MPIN authentication for Field Collection Agents and Partners on the Android mobile app.
-3. **Distributed Redis-Backed SMS OTP Engine**:
+2. **Mobile Quick Unlock & MPIN Lifecycle (F01)**:
+   - 6-digit MPIN authentication for Field Collection Agents and Partners on the Android mobile app.
+   - Enforces TOTP validation on MPIN login (`loginMpin`) when `isTotpEnabled = true`, returning `requiresTotp: true` with a scoped challenge token.
+   - MPIN establishment (`POST /auth/mobile/set-mpin`) strictly requires `JwtAuthGuard` or a verified, single-use `setupToken` with active user checks.
+3. **Distributed Redis-Backed SMS OTP Engine (F13 Hardened)**:
    - 6-digit cryptographic OTP generation delivered strictly via Indian Telecom DLT SMS (`Msg91SmsDriver` / `MockSmsDriver`).
    - Stored in Redis under `auth:otp:<phone>` with a 300-second (5-minute) TTL (`EX 300`).
    - SHA-256 hashed comparison to prevent timing attacks.
-   - Strict 3-attempt brute-force lockout: failed attempts increment the counter while preserving remaining TTL; exceeding 3 attempts locks verification until TTL expiry.
-   - Atomic deletion upon successful verification (`DEL auth:otp:<phone>`) to eliminate replay attacks.
+   - **Atomic Verification via Redis Lua Script (F13)**: Executes lockout check, expiry check, hash comparison, attempt increment, 3-attempt lockout penalty setting (`auth:otp:lockout:<phone>`, 300s TTL), and session deletion in 1 single atomic Redis Lua execution, completely eliminating race conditions.
    - Resilient in-memory fallback if Redis is temporarily offline during testing or maintenance.
-4. **Session Management & Token Vault Lifecycle (Phase 1 / F04)**:
+4. **Session Management & Token Vault Lifecycle (Phase 1 / F02, F03, F04)**:
    - Dedicated PostgreSQL `Session` table providing client-family isolation (`WEB`, `MOBILE`, `DESKTOP`).
    - Short-lived JWT Access Token (15-minute validity) bound to a cryptographic session UUID (`sid`).
    - Long-lived JWT Refresh Token (7-day validity) with bcrypt hash persisted in the client-family's `Session` record.
-   - Authoritative `User.tokenRevokedBefore` and `Customer.tokenRevokedBefore` timestamps persisted in PostgreSQL for durable revocation across restarts and Redis loss.
-   - Complete scoped or global session revocation on `POST /auth/logout`.
+   - Password reset (`POST /auth/reset-password` / `change-password`) atomically clears all database session records, deletes Redis session caches (`auth:session:${userId}:*`), and sets an authoritative 7-day revocation cutoff (`auth:revoked:${userId}` and `User.tokenRevokedBefore`) (F02).
+   - Dynamic role changes revoke active sessions or assert cached auth version to prevent privilege desynchronization (F03).
+   - Complete scoped or global session revocation on `POST /auth/logout` with 7-day cutoff persistence (F04).
 5. **Staff Onboarding & Security Factor Replacement (F10, F16)**:
    - Mandatory first-login password onboarding (`mustChangePassword: true`) with single-use atomic token consumption.
-   - Factor replacement (`POST /auth/totp/enable` when already enrolled) requires current password verification and executes atomic Lua compare-and-delete challenge claims.
+   - Factor replacement (`POST /auth/totp/enable` when already enrolled) requires current password verification, executes atomic Lua compare-and-delete challenge claims, and revokes prior sessions (F10).
+   - User creation strictly validates branch existence and fails-closed against missing or unassigned branch IDs (F16).
 5. **Device FCM Push Token Lifecycle**:
    - `PATCH /auth/fcm-token`: Authenticated staff register their active Firebase Cloud Messaging (FCM) device token upon mobile app startup.
    - **Cross-Device Security**: Calling `POST /auth/logout` automatically clears `fcmToken = null` on the user's database record to prevent sensitive Maker-Checker approval alerts from reaching a signed-out phone.

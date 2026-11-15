@@ -325,3 +325,12 @@ flowchart TD
   - Automatically hides dashboard chrome (`nav`, `header`, `aside`, `footer`, `button:not(.print:show)`, `.print:hidden`).
   - Resets all dark backgrounds (`bg-slate-950`, `bg-slate-900`) to pure `#ffffff` and text colors to high-contrast `#0f172a` black/slate.
   - Formats tables with `page-break-inside: auto` and `thead { display: table-header-group }` for multi-page paper ledger printing without text truncation or overflow clipping.
+
+### 8. Mobile Client Single-Flight Refresh Mutex & Transparent 401 Replay (F14 Remediation)
+- **Single-Flight Refresh Mutex (`AuthSessionManager`)**:
+  - In `apps/mobile/lib/core/api/auth_session_manager.dart`, concurrent 401 responses coalesce into a single in-flight `POST /auth/refresh` call via `_inFlightRefresh`.
+  - Guarantees that parallel HTTP requests (e.g. background sync, route dues, approval queue) never trigger concurrent refresh token rotations or race against each other.
+  - Passes `clientType: 'MOBILE'` to maintain strict session isolation from web browser sessions (F04).
+- **Transparent Request Replay (`KumaranMobileApiClient.request`)**:
+  - Automatically captures HTTP 401 responses, awaits the single-flight refresh mutex, updates local session tokens, and replays the original HTTP operation seamlessly without user interruption.
+  - Enforces re-entrancy protection (`isRetry: true`) to immediately bubble up permanent 401s if the refresh token itself is invalid or revoked.

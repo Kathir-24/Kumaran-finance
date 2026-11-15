@@ -223,7 +223,7 @@
 | `GET`  | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | `SUPER_ADMIN` only |
 | `GET`  | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | `SUPER_ADMIN` only |
 | `GET`  | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | `SUPER_ADMIN` only |
-| `GET/UI`| `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection & dead letter retry | Basic Auth (`BULL_BOARD_USER`) |
+| `GET/UI`| `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection & dead letter retry | Super Admin JWT Session (or configured Basic Auth) |
 
 ### 2.14 Foundation: System Health & Observability (`/`, `/health`, `/metrics`)
 | Method | Endpoint | Description | Allowed Roles |

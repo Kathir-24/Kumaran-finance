@@ -223,7 +223,7 @@ The platform executes autonomous maintenance jobs scheduled strictly in Indian S
 | **09:00 AM** | **Pre-Auction Broadcast Reminder** | Scans chits with auctions in 3 days; broadcasts bilingual mobile Push & DLT SMS alerts with date, time, and branch venue. | `POST /api/v1/jobs/run-pre-auction-scan` |
 
 ### 6.2 Monitoring & Queue Inspection
-- **Bull Board Dashboard**: `http://localhost:3000/admin/queues` (Basic Auth: `BULL_BOARD_USER`).
+- **Bull Board Dashboard**: `http://localhost:3000/admin/queues` (Super Admin JWT session or configured `BULL_BOARD_USER` Basic Auth).
 - **Repeatable Schedules Audit**: `GET /api/v1/jobs/repeatable-schedules`.
 - **Queue Health Metrics**: `GET /api/v1/jobs/queue-status`.
 

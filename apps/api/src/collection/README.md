@@ -13,6 +13,8 @@ The **Collection & Cash Handover** module handles doorstep field collections and
 | **Zero Double Payments** | Installment cannot be paid twice | Rejects with `INSTALLMENT_ALREADY_PAID` if `due.status === PAID` |
 | **Zero Float / Whole Rupee Math** | All currency stored in integer rupees | Native TypeScript `bigint` & Prisma `BigInt` |
 | **Idempotency Deduplication** | Safe retry without duplicate receipts | Unique `idempotencyKey` UUID per transaction |
+| **Same-Branch Idempotency Isolation (F09)** | Agent payments isolated; no cross-agent sniffing | Asserts `existingPayment.recordedByUserId === userId` on cached idempotency replay |
+| **Branch Scope Locking (F09)** | Payment accounting locked to ticket's home branch | Locks accounting branch to `ticket.chitGroup.branchId`; verifies agent purview |
 | **Dual-Control Vault Handover** | Agent cannot acknowledge their own cash | Strict validation: `collectorUserId != acknowledgerUserId` |
 | **Async Receipt Notification** | Non-blocking BullMQ queue dispatch | Dispatches `JOB_DISPATCH_PAYMENT_RECEIPT` to `notification-queue` post-commit with fire-and-forget safety |
 

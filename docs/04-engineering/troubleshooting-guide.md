@@ -158,14 +158,12 @@ flowchart TD
   docker start chitflow-redis
   ```
 
-### D.2. Bull Board Queue Monitor Returns `401 Unauthorized`
-- **Symptoms**: Navigating to `http://localhost:3000/admin/queues` prompts for HTTP Basic Auth and fails.
-- **Root Cause**: Incorrect credentials or missing environment variables.
+### D.2. Bull Board Queue Monitor Returns `401 Unauthorized` or `403 Forbidden`
+- **Symptoms**: Navigating to `http://localhost:3000/admin/queues` returns `401 Unauthorized` or prompts for credentials.
+- **Root Cause**: Missing active Super Admin session or invalid Basic Auth credentials.
 - **Remedy**:
-  - Check `.env` settings:
-    - Default Username: `BULL_BOARD_USER=admin`
-    - Default Password: `BULL_BOARD_PASSWORD=chitflow_secret`
-  - Enter credentials in browser Basic Auth modal.
+  - **Primary Access (Super Admin Session)**: Log into the Web Operations Portal (`http://localhost:3001`) as Super Admin (`9876543210`). The browser session cookie (`access_token`) or passing `?token=<access_token>` in the URL grants immediate access.
+  - **Secondary Access (Basic Auth)**: If using Basic Auth, ensure non-default credentials are set in `.env` (`BULL_BOARD_USER` and `BULL_BOARD_PASSWORD`). Note that the insecure default `chitflow_secret` is strictly rejected by the server under F11.
 
 ### D.3. Inspecting Active Redis OTP Sessions & Background Queues
 - **Symptoms**: Need to debug or audit active 6-digit SMS OTP sessions or check if receipt jobs are enqueued.

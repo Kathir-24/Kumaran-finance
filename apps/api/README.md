@@ -83,8 +83,8 @@ Environment variables are validated fail-fast at server startup via [`src/config
 | `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ background queues and distributed OTP storage. |
 | `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues and distributed OTP storage. |
 | `REDIS_DB` | `number` | Optional | `0` | Redis logical database index (`0`–`15`; use `1` for isolated test runs). |
-| `BULL_BOARD_USER` | `string` | Optional | `admin` | HTTP Basic Auth user for Bull Board at `/admin/queues`. |
-| `BULL_BOARD_PASSWORD` | `string` | Optional | `chitflow_secret` | HTTP Basic Auth password for Bull Board. |
+| `BULL_BOARD_USER` | `string` | Optional | `admin` | Secondary HTTP Basic Auth username for `/admin/queues` (Primary auth uses Super Admin JWT session). |
+| `BULL_BOARD_PASSWORD` | `string` | Optional | `undefined` | Secondary HTTP Basic Auth password for `/admin/queues` (Insecure default `chitflow_secret` is strictly rejected). |
 | `SMS_DRIVER` | `string` | Optional | `mock` | SMS gateway driver (`mock` for dev/test, `msg91` for production DLT). |
 | `PUSH_DRIVER` | `string` | Optional | `mock` | Mobile Push driver (`mock` or `firebase` for FCM). |
 | `SENTRY_DSN` | `string` | Optional | `""` | Sentry DSN (safe-bypass when empty). |

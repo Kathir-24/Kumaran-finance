@@ -112,6 +112,7 @@ All 14 endpoints connect directly to real NestJS 12 controllers and PostgreSQL 1
 | **Guardrail 7** | **Ticket Limit Constraint (ADR-13)** | A customer cannot hold 2 or more tickets in the same chit scheme (`@@unique([chitGroupId, customerId])`). Substitution modal pre-checks duplicate assignment and blocks mutations. |
 | **Guardrail 8** | **Defaulter Rules & 3-Month Removal (ADR-07 & ADR-12)** | Subscribers with unpaid arrears are strictly ineligible to bid. Subscribers with $\ge 3$ consecutive missed installments grant company removal rights to Super Admin. |
 | **Guardrail 10** | **Maker $\ne$ Checker Separation** | Bids are recorded by Makers (`conductedByUserId`) and finalized by Checkers (`finalizedByUserId`). Self-finalization is blocked at UI and database levels. |
+| **F08 Privacy Guard** | **Subscriber PII Masking** | When accessed by a subscriber, fellow members' phone numbers are masked (`+91 ******0000`) and names are redacted; subscribers can only view auctions for groups in which they hold active tickets. |
 
 ---
 

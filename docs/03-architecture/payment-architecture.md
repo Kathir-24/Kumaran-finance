@@ -382,6 +382,8 @@ if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.lengt
 ```
 
 ### Proof 5: Unified 4-Tier Lock DAG & Transactional Receipt Sequence
+All 4 receipt-generating paths ([`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts)) share [`acquirePaymentConcurrencyLocks` & `generateNextReceiptNumber`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) inside `withTransactionRetry`:
+- Locks strictly follow **`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` ($\to$ `Payment`)** before generating receipts inside the transaction, eliminating `40P01` cyclic lock inversions, `P2002` receipt collisions, and duplicate `verifyUpiClaim` / cash double-settlements.
 
 ### Proof 6: Decoupled Idempotency with Same-Branch Isolation (F09)
 In `PaymentService.recordPayment` and `CollectionService.recordCollection`, idempotency caches are decoupled from shared branch purviews. When a cached idempotency key matches an existing payment, the service strictly asserts:
@@ -391,8 +393,6 @@ if (existingPayment.recordedByUserId !== userId) {
 }
 ```
 This guarantees that collection agents and cashiers cannot sniff or replay other staff members' payments even within the same physical branch office. Accounting branches are derived strictly from `ticket.chitGroup.branchId`.
-All 4 receipt-generating paths ([`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts)) share [`acquirePaymentConcurrencyLocks` & `generateNextReceiptNumber`](file:///u:/Kumaran-finance/apps/api/src/common/utils/receipt-sequence.util.ts) inside `withTransactionRetry`:
-- Locks strictly follow **`Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` ($\to$ `Payment`)** before generating receipts inside the transaction, eliminating `40P01` cyclic lock inversions, `P2002` receipt collisions, and duplicate `verifyUpiClaim` / cash double-settlements.
 
 ---
 

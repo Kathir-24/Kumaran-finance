@@ -370,7 +370,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Browser["Open Browser: http://localhost:3000/admin/queues"] --> Auth["Enter BULL_BOARD_USER and BULL_BOARD_PASSWORD"]
+    Browser["Open Browser: http://localhost:3000/admin/queues"] --> Auth["Authenticate via active Super Admin Session\n(or configured BULL_BOARD_USER Basic Auth)"]
     Auth --> Board["Bull Board Live Monitoring Dashboard"]
     Board --> Q1["1. daily-maintenance-queue\n• Daily arrears calculation at 00:01 AM IST\n• 3-month continuous defaulter tagging"]
     Board --> Q2["2. notification-queue\n• Bilingual push receipts & DLT SMS dispatches\n• Pre-auction reminders & dividend broadcasts\n• Maker-Checker push alerts"]
@@ -380,7 +380,7 @@ flowchart TD
 
 ### Step-by-Step Instructions:
 1. Navigate to `https://admin.kumaranfinance.in/admin/queues` (or `http://localhost:3000/admin/queues`).
-2. Log in using configured `BULL_BOARD_USER` and `BULL_BOARD_PASSWORD`.
+2. If already logged into the Web Admin Portal as Super Admin, the dashboard opens automatically. Alternatively, supply an active Super Admin access token via `?token=<token>` or enter configured administrative credentials.
 3. Verify live queue health:
    - **`daily-maintenance-queue`**: Runs nightly at **00:01 AM IST (`1 0 * * *`)** to recompute arrears balances and tag defaulters.
    - **`notification-queue`**: Dispatches push notifications and fallback DLT SMS messages.

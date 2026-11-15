@@ -337,7 +337,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/jobs/repeatable-schedules` | List active BullMQ repeatable cron jobs and next execution timestamps | Super Admin Only |
 | `GET` | `/jobs/queue-status` | Inspect BullMQ queue health and active/waiting/failed job counts | Super Admin Only |
 | `GET` | `/jobs/notification-audit-logs` | Retrieve audit history of dispatched Push Notifications and DLT SMS messages | Super Admin Only |
-| `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin (`BULL_BOARD_USER` Basic Auth) |
+| `GET/UI` | `/admin/queues` | **Bull Board Visual Dashboard**: Real-time queue inspection, job progress & dead letter retry | Super Admin JWT Session (or configured Basic Auth) |
 
 ---
 
