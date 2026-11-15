@@ -58,6 +58,12 @@ export interface SanitizedUser {
   lastLoginAt: Date | null;
 }
 
+interface SessionIdentity {
+  id: string;
+  createdAt: Date;
+  refreshTokenHash: string | null;
+}
+
 export interface OtpSessionRecord {
   hashedOtp: string;
   expiresAt: number;
@@ -1290,9 +1296,11 @@ export class AuthService {
       branchId: string | null;
     },
     clientType: string = 'MOBILE',
+    sessionIdentity?: SessionIdentity,
   ) {
     const issuedAtMs = Date.now();
-    const sid = crypto.randomUUID();
+    const sid = sessionIdentity?.id ?? crypto.randomUUID();
+    const sessionStartedAt = sessionIdentity?.createdAt ?? new Date(issuedAtMs);
     const accessPayload: JwtPayload = {
       sub: customer.id,
       phone: customer.phone,
@@ -1331,12 +1339,20 @@ export class AuthService {
 
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
-    if (useRedis && redis) {
-      await redis.set(`auth:session:${customer.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
-    }
-
-    if (typeof (this.prisma as any).session?.upsert === 'function') {
-      const expiresAt = new Date(Date.now() + 7 * 86400 * 1000);
+    const expiresAt = new Date(Date.now() + 7 * 86400 * 1000);
+    if (sessionIdentity) {
+      // Do not let a refresh in flight overwrite a logout or replacement login.
+      const rotated = await this.prisma.session.updateMany({
+        where: {
+          id: sessionIdentity.id, customerId: customer.id, clientType,
+          revokedAt: null, refreshTokenHash: sessionIdentity.refreshTokenHash,
+        },
+        data: { refreshTokenHash, expiresAt },
+      });
+      if (rotated.count !== 1) {
+        throw new UnauthorizedException('Session changed while refreshing. Please sign in again.');
+      }
+    } else if (typeof (this.prisma as any).session?.upsert === 'function') {
       await (this.prisma as any).session.upsert({
         where: {
           customerId_clientType: {
@@ -1351,14 +1367,14 @@ export class AuthService {
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
-          createdAt: now,
+          createdAt: sessionStartedAt,
         },
         update: {
           id: sid,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
-          createdAt: now,
+          createdAt: sessionStartedAt,
         },
       });
     }
@@ -1370,6 +1386,13 @@ export class AuthService {
         lastLoginAt: now,
       },
     });
+
+    if (useRedis && redis) {
+      if (!sessionIdentity) {
+        await redis.del(`user:status:${customer.id}`, `user:status:${customer.id}:${clientType}`);
+      }
+      await redis.set(`auth:session:${customer.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
+    }
 
     return {
       verified: true,
@@ -1570,6 +1593,7 @@ export class AuthService {
       }
 
       let storedHash: string | null = null;
+      let sessionIdentity: SessionIdentity | undefined;
       if (typeof (this.prisma as any).session?.findUnique === 'function') {
         const session = await (this.prisma as any).session.findUnique({
           where: { customerId_clientType: { customerId: customer.id, clientType } },
@@ -1584,6 +1608,7 @@ export class AuthService {
           throw new UnauthorizedException('Session has been superseded. Please sign in again.');
         }
         storedHash = session.refreshTokenHash;
+        sessionIdentity = session;
       } else {
         if (useRedis && redis) {
           storedHash = await redis.get(`auth:session:${customer.id}:${clientType}`);
@@ -1627,6 +1652,7 @@ export class AuthService {
           branchId: customer.branchId,
         },
         clientType,
+        sessionIdentity,
       );
     }
 
@@ -1646,6 +1672,7 @@ export class AuthService {
     }
 
     let storedHash: string | null = null;
+    let sessionIdentity: SessionIdentity | undefined;
     if (typeof (this.prisma as any).session?.findUnique === 'function') {
       const session = await (this.prisma as any).session.findUnique({
         where: { userId_clientType: { userId: user.id, clientType } },
@@ -1660,6 +1687,7 @@ export class AuthService {
         throw new UnauthorizedException('Session has been superseded. Please sign in again.');
       }
       storedHash = session.refreshTokenHash;
+      sessionIdentity = session;
     } else {
       if (useRedis && redis) {
         storedHash = await redis.get(`auth:session:${user.id}:${clientType}`);
@@ -1695,7 +1723,7 @@ export class AuthService {
       );
     }
 
-    return this.generateAuthTokens(user, clientType);
+    return this.generateAuthTokens(user, clientType, sessionIdentity);
   }
 
   /**
@@ -1935,9 +1963,14 @@ export class AuthService {
   /**
    * Helper to sign JWT access & refresh tokens and update DB state
    */
-  private async generateAuthTokens(user: User, clientType: string = 'WEB') {
+  private async generateAuthTokens(
+    user: User,
+    clientType: string = 'WEB',
+    sessionIdentity?: SessionIdentity,
+  ) {
     const issuedAtMs = Date.now();
-    const sid = crypto.randomUUID();
+    const sid = sessionIdentity?.id ?? crypto.randomUUID();
+    const sessionStartedAt = sessionIdentity?.createdAt ?? new Date(issuedAtMs);
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
@@ -1974,16 +2007,21 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: refreshExpiresIn });
 
     const refreshTokenHash = await this.hashRefreshToken(refreshToken);
-    const now = new Date();
-
     const redis = this.redisProvider?.getClient();
     const useRedis = Boolean(redis && this.redisProvider?.getIsConnected());
-    if (useRedis && redis) {
-      await redis.set(`auth:session:${user.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
-    }
-
-    if (typeof (this.prisma as any).session?.upsert === 'function') {
-      const expiresAt = new Date(Date.now() + 7 * 86400 * 1000);
+    const expiresAt = new Date(Date.now() + 7 * 86400 * 1000);
+    if (sessionIdentity) {
+      const rotated = await this.prisma.session.updateMany({
+        where: {
+          id: sessionIdentity.id, userId: user.id, clientType,
+          revokedAt: null, refreshTokenHash: sessionIdentity.refreshTokenHash,
+        },
+        data: { refreshTokenHash, expiresAt },
+      });
+      if (rotated.count !== 1) {
+        throw new UnauthorizedException('Session changed while refreshing. Please sign in again.');
+      }
+    } else if (typeof (this.prisma as any).session?.upsert === 'function') {
       await (this.prisma as any).session.upsert({
         where: {
           userId_clientType: {
@@ -1998,14 +2036,14 @@ export class AuthService {
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
-          createdAt: now,
+          createdAt: sessionStartedAt,
         },
         update: {
           id: sid,
           refreshTokenHash,
           expiresAt,
           revokedAt: null,
-          createdAt: now,
+          createdAt: sessionStartedAt,
         },
       });
     }
@@ -2017,6 +2055,13 @@ export class AuthService {
         lastLoginAt: new Date(),
       },
     });
+
+    if (useRedis && redis) {
+      if (!sessionIdentity) {
+        await redis.del(`user:status:${user.id}`, `user:status:${user.id}:${clientType}`);
+      }
+      await redis.set(`auth:session:${user.id}:${clientType}`, refreshTokenHash, 'EX', 7 * 86400);
+    }
 
     return {
       accessToken,

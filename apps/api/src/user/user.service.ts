@@ -63,6 +63,11 @@ export class UserService {
         const revokedAtMs = revokedAt.getTime().toString();
         await client.del(`user:status:${userId}`).catch(() => {});
         await client.del(
+          `user:status:${userId}:WEB`,
+          `user:status:${userId}:MOBILE`,
+          `user:status:${userId}:DESKTOP`,
+        ).catch(() => {});
+        await client.del(
           `auth:session:${userId}:WEB`,
           `auth:session:${userId}:MOBILE`,
           `auth:session:${userId}:DESKTOP`,
@@ -82,6 +87,11 @@ export class UserService {
       const client = this.redisProvider.getClient();
       if (client) {
         await client.del(`user:status:${userId}`).catch(() => {});
+        await client.del(
+          `user:status:${userId}:WEB`,
+          `user:status:${userId}:MOBILE`,
+          `user:status:${userId}:DESKTOP`,
+        ).catch(() => {});
       }
     }
   }

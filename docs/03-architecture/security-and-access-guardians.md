@@ -235,17 +235,17 @@ flowchart TD
 
 ### 7.1 High-Throughput JWT Validation Caching (120s TTL)
 - **Problem Solved**: On every authenticated HTTP request, NestJS `JwtStrategy` previously queried PostgreSQL (`findUnique({ id })`) to verify `isActive`. Under heavy traffic (500+ concurrent requests), this caused connection pool saturation on PostgreSQL.
-- **Implementation**: [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts) checks Redis key `user:status:${payload.sub}` first.
-  - If `'ACTIVE'`, request passes instantly with **zero DB queries**.
-  - If `'INACTIVE'`, request is immediately rejected with `401 Unauthorized`.
-  - If a cache miss occurs, PostgreSQL is queried and the result is cached for **120 seconds** (`EX 120`).
-- **Proactive Invalidation**: When a staff user's status is toggled, roles updated, or password changed in [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts), `redis.del('user:status:${userId}')` is invoked immediately, guaranteeing instant access termination across the cluster.
+- **Implementation**: `JwtStrategy` checks the family-scoped Redis key `user:status:${payload.sub}:${payload.clientType}`. Structured entries contain active status, roles, partner identity, global revocation cutoff, and session ID. Legacy plain `ACTIVE` entries are cache misses. Revocation cutoffs and session identity are checked before accepting a structured entry.
+  - On a cache miss, PostgreSQL account/session state is checked and authorization is cached for **120 seconds** (`EX 120`).
+- **Proactive Invalidation**: Administrative password resets, role changes, deactivation, and reactivation clear the legacy key and all WEB/MOBILE/DESKTOP authorization keys. A replacement login clears only its family's authorization entry plus the legacy key, preserving other families.
 
 ### 7.2 Multi-Device Concurrent Session Isolation & Durable Revocation (F02 & F04)
 - **Problem Solved**: Kumaran Finance partners and field agents frequently use both the **Web Portal** (for accounting, schemes, and minutes) and the **Android Mobile App** (for collections, receipts, and OTP approvals). Storing a single `refreshTokenHash` on the database row caused logging in on mobile to overwrite web's token hash. When web attempted its 15-minute background refresh, it failed the hash check, triggering the RFC 6819 token reuse trap and locking the user out of both devices. Furthermore, relying solely on Redis in-memory cutoffs allowed revoked sessions to resurrect if Redis restarted or after 15 minutes.
 - **Implementation**:
   - Refresh token families are isolated per device type via Redis key `auth:session:${userId}:${clientType}` (where `clientType` is `'WEB'`, `'MOBILE'`, or `'DESKTOP'`) with a 7-day TTL (`604,800s`).
   - Durable PostgreSQL Session Vault: A dedicated `Session` table stores `(userId, clientType)` and `(customerId, clientType)` with unique constraints, ensuring each client device family maintains its own persistent hash.
+  - A login issues a new session ID and uses the same millisecond timestamp for token issuance and session creation. Refresh rotates token hashes while preserving that session ID and creation timestamp, so existing unexpired access tokens remain valid within the same session.
+  - Refresh persists its new hash with a conditional update matching the existing session ID, previous hash, and non-revoked state. If logout or replacement login wins the race, refresh rejects instead of recreating or reactivating the old session. Redis token hashes are published after PostgreSQL persistence succeeds.
   - Durable Revocation Anchor: `tokenRevokedBefore DateTime?` on `User` and `Customer` tables provides an authoritative cutoff checked on every token validation, guaranteeing zero session resurrection even on cold Redis or cluster restarts.
 - **RFC 6819 Token Reuse Defense**:
   - Rotating a token on Web updates only `auth:session:${userId}:WEB` and its corresponding `Session` record, leaving Mobile completely unaffected.

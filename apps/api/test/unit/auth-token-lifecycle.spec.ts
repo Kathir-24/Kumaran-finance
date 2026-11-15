@@ -1183,7 +1183,7 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
 
     it('AUTH-COALESCE-05: follower rejects coalesced result if logout destroyed active session mid-rotation', async () => {
       const store = new Map<string, string>();
-      const { provider: sharedRedisProvider } = createAtomicRedisMock(store);
+      const { client, provider: sharedRedisProvider } = createAtomicRedisMock(store);
 
       const replicaA = new AuthService(
         prismaMock as unknown as PrismaService,
@@ -1229,8 +1229,18 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
       prismaMock.user.findUnique.mockImplementation(async () => ({ ...userRecord }));
       prismaMock.user.update.mockImplementation(async (args: any) => {
         userRecord.refreshTokenHash = args.data.refreshTokenHash;
-        store.delete(`auth:session:${mockUserId}:WEB`);
         return { ...userRecord };
+      });
+
+      // Log out after the rotated result is published, before the follower reads
+      // it. Do not couple this race to the order of DB and Redis persistence.
+      const setValue = client.set.getMockImplementation();
+      client.set.mockImplementation(async (key: string, value: string, ...args: any[]) => {
+        const result = await setValue(key, value, ...args);
+        if (key.startsWith('auth:refresh_inflight_result:')) {
+          await replicaA.logout(mockUserId, 'WEB');
+        }
+        return result;
       });
 
       const promiseA = replicaA.refreshToken({ refreshToken: staffRefresh, clientType: 'WEB' });
