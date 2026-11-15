@@ -91,8 +91,11 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionDetailResponseDto, { description: 'Auction retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
-  async findOne(@Param('id') id: string) {
-    return this.auctionService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.auctionService.findOne(id, currentUser);
   }
 
   @Get(':id/eligible-bidders')

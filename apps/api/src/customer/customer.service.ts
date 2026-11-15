@@ -248,6 +248,20 @@ export class CustomerService {
       if (!isGlobalStaff) {
         if (currentUser.roles?.includes(Role.CUSTOMER)) {
           where.id = currentUser.sub;
+        } else if (
+          currentUser.roles?.includes(Role.COLLECTION_AGENT) &&
+          !currentUser.roles.includes(Role.BRANCH_MANAGER)
+        ) {
+          // Collection agents are scoped strictly to customers with active tickets in the agent's branch
+          where.branchId = currentUser.branchId || undefined;
+          where.tickets = {
+            some: {
+              chitGroup: {
+                branchId: currentUser.branchId || undefined,
+                status: 'ACTIVE',
+              },
+            },
+          };
         } else if (currentUser.branchId) {
           where.branchId = currentUser.branchId;
         }
@@ -348,6 +362,22 @@ export class CustomerService {
           if (currentUser.sub !== id) {
             throw new ForbiddenException('Subscribers are only permitted to view their own profile');
           }
+        } else if (
+          currentUser.roles?.includes(Role.COLLECTION_AGENT) &&
+          !currentUser.roles.includes(Role.BRANCH_MANAGER)
+        ) {
+          if (currentUser.branchId && customer.branchId !== currentUser.branchId) {
+            throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');
+          }
+          const hasActiveTicketInBranch = customer.tickets?.some(
+            (t: any) =>
+              t.chitGroup?.branchId === currentUser.branchId && t.chitGroup?.status === 'ACTIVE',
+          );
+          if (!hasActiveTicketInBranch) {
+            throw new ForbiddenException(
+              'Access denied: Customer is not assigned to your active collection purview',
+            );
+          }
         } else if (currentUser.branchId && customer.branchId !== currentUser.branchId) {
           throw new ForbiddenException('Access denied: Customer does not belong to your assigned branch');
         }
@@ -374,7 +404,15 @@ export class CustomerService {
       r === Role.SUPER_ADMIN || r === Role.AUDITOR || (r === Role.CUSTOMER && currentUser.sub === customer.id),
     );
 
-    if (!isFullAccess && safeCustomer.panNumber) {
+    const isAgentOnly =
+      currentUser?.roles?.includes(Role.COLLECTION_AGENT) &&
+      !currentUser?.roles?.some(
+        (r) => r === Role.SUPER_ADMIN || r === Role.BRANCH_MANAGER || r === Role.ACCOUNTANT,
+      );
+
+    if (isAgentOnly) {
+      safeCustomer.panNumber = undefined;
+    } else if (!isFullAccess && safeCustomer.panNumber) {
       safeCustomer.panNumber = `${safeCustomer.panNumber.slice(0, 2)}XXXXX${safeCustomer.panNumber.slice(-3)}`;
     }
 

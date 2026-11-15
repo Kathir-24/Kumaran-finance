@@ -291,6 +291,7 @@ export class ChitService {
             auctionId: auction.id,
             ticketId,
             wasTieBreakWinner: false,
+            isHistoricalEntry: true,
             disbursementStatus: 'DISBURSED',
             disbursedAmount: prizeMoney,
           },

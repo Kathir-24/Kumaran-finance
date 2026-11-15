@@ -827,7 +827,7 @@ export class AuctionService {
   /**
    * Retrieves single auction with full details
    */
-  async findOne(id: string) {
+  async findOne(id: string, currentUser?: JwtPayload) {
     const auction = await this.prisma.auction.findUnique({
       where: { id },
       include: {
@@ -839,6 +839,7 @@ export class AuctionService {
             chitValue: true,
             durationMonths: true,
             maxDiscountCeiling: true,
+            branchId: true,
           },
         },
         winner: {
@@ -881,6 +882,72 @@ export class AuctionService {
 
     if (!auction) {
       throw new NotFoundException(`Auction with ID ${id} not found`);
+    }
+
+    if (currentUser) {
+      if (
+        currentUser.roles.includes(Role.CUSTOMER) &&
+        !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+      ) {
+        const ownTicket = await this.prisma.subscriberTicket.findFirst({
+          where: { chitGroupId: auction.chitGroupId, customerId: currentUser.sub },
+          select: { id: true },
+        });
+        if (!ownTicket) {
+          throw new ForbiddenException('Access denied: You do not belong to this chit scheme');
+        }
+      } else if (
+        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        !currentUser.roles.includes(Role.SUPER_ADMIN) &&
+        !currentUser.roles.includes(Role.AUDITOR) &&
+        currentUser.branchId
+      ) {
+        if (auction.chitGroup?.branchId && auction.chitGroup.branchId !== currentUser.branchId) {
+          throw new ForbiddenException('Access denied: Chit scheme belongs to another branch');
+        }
+      }
+    }
+
+    if (
+      currentUser &&
+      currentUser.roles.includes(Role.CUSTOMER) &&
+      !currentUser.roles.some((r: Role) => r !== Role.CUSTOMER)
+    ) {
+      const isOwnWinningTicket = auction.winner?.ticket?.customerId === currentUser.sub;
+      return {
+        ...auction,
+        winner: auction.winner && auction.winner.ticket
+          ? {
+              ...auction.winner,
+              ticket: {
+                ...auction.winner.ticket,
+                customer: auction.winner.ticket.customer
+                  ? {
+                      ...auction.winner.ticket.customer,
+                      phone: isOwnWinningTicket ? auction.winner.ticket.customer.phone : '+91 ******0000',
+                    }
+                  : null,
+              },
+            }
+          : auction.winner,
+        tieBidders: auction.tieBidders?.map((b) => {
+          const isOwnTieBid = b.ticket?.customerId === currentUser.sub;
+          return {
+            ...b,
+            ticket: b.ticket
+              ? {
+                  ...b.ticket,
+                  customer: b.ticket.customer
+                    ? {
+                        ...b.ticket.customer,
+                        phone: isOwnTieBid ? b.ticket.customer.phone : '+91 ******0000',
+                      }
+                    : null,
+                }
+              : b.ticket,
+          };
+        }),
+      };
     }
 
     return auction;

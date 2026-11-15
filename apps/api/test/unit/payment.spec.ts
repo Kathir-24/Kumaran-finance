@@ -289,6 +289,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         id: 'existing-payment-001',
         amount: 3750n,
         idempotencyKey: 'idemp-uuid-123',
+        recordedByUserId: mockMakerId,
       };
       prismaMock.payment.findUnique.mockResolvedValue(existingPayment);
 

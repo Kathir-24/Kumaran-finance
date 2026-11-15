@@ -339,6 +339,123 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
       expect(result.settlement.netPrizeMoney).toBe(91000);
       expect(prismaMock.auction.create).toHaveBeenCalled();
     });
+
+    it('F05-5: settleFinalMonth without makerUserId throws BadRequestException MAKER_REQUIRED', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        id: 'group-001',
+        groupCode: 'KCA-1L-20M',
+        chitValue: BigInt(100000),
+        durationMonths: 20,
+        baseInstallment: BigInt(5000),
+        monthlyContribution: BigInt(5000),
+        foremanCommissionPercent: 4.0,
+        status: 'ACTIVE',
+      });
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: 'ticket-20',
+        ticketNumber: 20,
+        chitGroupId: 'group-001',
+        isPrized: false,
+        dues: [],
+        customer: { fullName: 'M. Shanmugam' },
+      });
+
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: 'ticket-20',
+          ticketNumber: 20,
+          isPrized: false,
+          dues: [],
+          customer: { fullName: 'M. Shanmugam' },
+        },
+      ]);
+
+      await expect(
+        disbursementService.settleFinalMonth(
+          'group-001',
+          {
+            ticketId: 'ticket-20',
+            disbursementMode: 'ACCOUNT_PAYEE_CHEQUE' as any,
+            paymentReference: 'CHQ-990011',
+            // makerUserId omitted
+          } as any,
+          superAdminPartner.sub,
+          superAdminPartner.roles,
+        ),
+      ).rejects.toThrow(/MAKER_REQUIRED/i);
+    });
+
+    it('F05-6: settleFinalMonth uses upsert on auction and winner, avoiding duplicate key crash', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue({
+        id: 'group-001',
+        groupCode: 'KCA-1L-20M',
+        chitValue: BigInt(100000),
+        durationMonths: 20,
+        baseInstallment: BigInt(5000),
+        monthlyContribution: BigInt(5000),
+        foremanCommissionPercent: 4.0,
+        status: 'ACTIVE',
+      });
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: 'ticket-20',
+        ticketNumber: 20,
+        chitGroupId: 'group-001',
+        isPrized: false,
+        dues: [],
+        customer: { fullName: 'M. Shanmugam' },
+      });
+
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: 'ticket-20',
+          ticketNumber: 20,
+          isPrized: false,
+          dues: [],
+          customer: { fullName: 'M. Shanmugam' },
+        },
+      ]);
+
+      prismaMock.auction.upsert = jest.fn().mockResolvedValue({
+        id: 'auc-final-001',
+        chitGroupId: 'group-001',
+        installmentMonth: 20,
+        status: 'COMPLETED',
+      });
+
+      prismaMock.auctionWinner.upsert = jest.fn().mockResolvedValue({
+        id: 'win-final-001',
+        disbursedAmount: 91000n,
+        disbursementStatus: 'DISBURSED',
+      });
+
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        id: 'ticket-20',
+        isPrized: true,
+      });
+
+      prismaMock.chitGroup.update.mockResolvedValue({
+        id: 'group-001',
+        status: 'COMPLETED',
+      });
+
+      const result = await disbursementService.settleFinalMonth(
+        'group-001',
+        {
+          ticketId: 'ticket-20',
+          disbursementMode: 'ACCOUNT_PAYEE_CHEQUE' as any,
+          paymentReference: 'CHQ-990011',
+          makerUserId: branchManagerPrd.sub,
+        },
+        superAdminPartner.sub,
+        superAdminPartner.roles,
+      );
+
+      expect(result.message).toContain('Final Month 20 maturity settlement successfully executed');
+      expect(prismaMock.auction.upsert).toHaveBeenCalled();
+      expect(prismaMock.auctionWinner.upsert).toHaveBeenCalled();
+    });
   });
 
   // ============================================================================
@@ -358,6 +475,12 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
         chitGroup: {
           findUnique: jest.fn(),
           update: jest.fn(),
+        },
+        auction: {
+          findUnique: jest.fn(),
+        },
+        branch: {
+          findUnique: jest.fn(),
         },
       };
     });
@@ -446,6 +569,70 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
           prismaMock,
         ),
       ).rejects.toThrow(/Unknown or unauthorized storage category/i);
+    });
+
+    it('F06-7: Branch Manager accessing auction minutes of another branch throws 403 Forbidden', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroup: {
+          branchId: 'branch-prd-001', // PRD branch
+        },
+      });
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'minutes/auc-001/minutes.pdf',
+          branchManagerErd, // ERD manager
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Auction minutes or safety proofs belong to another branch/i);
+    });
+
+    it('F06-8: Branch Manager accessing safety proofs of another branch throws 403 Forbidden', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroup: {
+          branchId: 'branch-prd-001', // PRD branch
+        },
+      });
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'safety-proof/auc-001/doc-1.pdf',
+          branchManagerErd, // ERD manager
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Auction minutes or safety proofs belong to another branch/i);
+    });
+
+    it('F06-9: Branch Manager accessing receipts or vouchers of another branch throws 403 Forbidden', async () => {
+      prismaMock.branch.findUnique.mockResolvedValue({
+        id: 'branch-erd-002',
+        code: 'ERD',
+      });
+
+      await expect(
+        DocumentAccessHelper.assertStorageKeyAccess(
+          'receipts/KC-REC-PRD-2026-00001.pdf',
+          branchManagerErd, // ERD manager (code: ERD) accessing PRD receipt
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Receipt belongs to another branch/i);
+    });
+
+    it('F06-10: Branch Manager requesting presigned upload URL for another branch kyc throws 403 Forbidden', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'cust-alice-001',
+        branchId: 'branch-prd-001', // PRD customer
+      });
+
+      await expect(
+        DocumentAccessHelper.assertStorageUploadAccess(
+          'kyc/cust-alice-001/pan.pdf',
+          branchManagerErd, // ERD manager
+          prismaMock,
+        ),
+      ).rejects.toThrow(/Customer does not belong to your assigned branch/i);
     });
   });
 
@@ -549,6 +736,72 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
       expect(customer.tokenRevokedBefore).toBeUndefined();
       expect(customer.panNumber).toBe('ABXXXXX34F');
     });
+
+    it('F07-5: Collection Agent findAll scopes query to active tickets in agent branch and strips panNumber', async () => {
+      prismaMock.customer.count.mockResolvedValue(1);
+      prismaMock.customer.findMany.mockResolvedValue([
+        {
+          id: 'cust-alice-001',
+          fullName: 'Alice Walker',
+          branchId: 'branch-prd-001',
+          panNumber: 'ABCDE1234F',
+          tickets: [{ chitGroup: { branchId: 'branch-prd-001', status: 'ACTIVE' } }],
+        },
+      ]);
+
+      const result = await customerService.findAll({}, collectionAgentPrd);
+
+      expect(prismaMock.customer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tickets: {
+              some: {
+                chitGroup: {
+                  branchId: 'branch-prd-001',
+                  status: 'ACTIVE',
+                },
+              },
+            },
+          }),
+        }),
+      );
+
+      const customer = result.data[0] as any;
+      expect(customer.panNumber).toBeUndefined(); // PAN stripped for collection agent
+    });
+
+    it('F07-6: Collection Agent findOne throws 403 if customer has no active ticket in agent branch', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'cust-alice-001',
+        fullName: 'Alice Walker',
+        branchId: 'branch-prd-001',
+        panNumber: 'ABCDE1234F',
+        tickets: [], // No active ticket in branch!
+      });
+
+      await expect(
+        customerService.findOne('cust-alice-001', collectionAgentPrd),
+      ).rejects.toThrow(/Access denied: Customer is not assigned to your active collection purview/i);
+    });
+
+    it('F07-7: Collection Agent findOne returns customer with panNumber stripped if active in branch', async () => {
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'cust-alice-001',
+        fullName: 'Alice Walker',
+        branchId: 'branch-prd-001',
+        panNumber: 'ABCDE1234F',
+        tickets: [
+          {
+            status: 'ACTIVE',
+            chitGroup: { branchId: 'branch-prd-001', status: 'ACTIVE' },
+          },
+        ],
+      });
+
+      const customer = (await customerService.findOne('cust-alice-001', collectionAgentPrd)) as any;
+      expect(customer.fullName).toBe('Alice Walker');
+      expect(customer.panNumber).toBeUndefined();
+    });
   });
 
   // ============================================================================
@@ -570,6 +823,7 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
           findMany: jest.fn(),
         },
         auction: {
+          findUnique: jest.fn(),
           findMany: jest.fn(),
         },
       };
@@ -681,6 +935,65 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
 
       // Caller is Alice, winner is Bob -> Bob's phone must be masked
       expect((auctions[0] as any).winner.ticket.customer.phone).toBe('+91 ******0000');
+    });
+
+    it('F08-5: AuctionService.findOne rejects customer not enrolled in chit group with 403', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroupId: 'group-001',
+        chitGroup: { id: 'group-001', branchId: 'branch-prd-001' },
+      });
+
+      prismaMock.subscriberTicket.findFirst.mockResolvedValue(null); // Not enrolled!
+
+      await expect(
+        auctionService.findOne('auc-001', customerBob),
+      ).rejects.toThrow(/Access denied: You do not belong to this chit scheme/i);
+    });
+
+    it('F08-6: AuctionService.findOne rejects cross-branch branch manager with 403', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroupId: 'group-001',
+        chitGroup: { id: 'group-001', branchId: 'branch-prd-001' }, // PRD branch
+      });
+
+      await expect(
+        auctionService.findOne('auc-001', branchManagerErd), // ERD branch manager
+      ).rejects.toThrow(/Access denied: Chit scheme belongs to another branch/i);
+    });
+
+    it('F08-7: AuctionService.findOne masks fellow subscriber phone numbers for customer caller', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: 'auc-001',
+        chitGroupId: 'group-001',
+        chitGroup: { id: 'group-001', branchId: 'branch-prd-001' },
+        winner: {
+          id: 'win-001',
+          ticket: {
+            customerId: 'cust-bob-002', // Fellow subscriber (Bob)
+            customer: { fullName: 'Bob Builder', phone: '+919443322111' },
+          },
+        },
+        tieBidders: [
+          {
+            ticket: {
+              customerId: 'cust-charlie-003',
+              customer: { fullName: 'Charlie Davis', phone: '+919443322112' },
+            },
+          },
+        ],
+      });
+
+      prismaMock.subscriberTicket.findFirst.mockResolvedValue({
+        id: 'ticket-alice-001',
+        customerId: customerAlice.sub, // Alice is enrolled
+      });
+
+      const result = await auctionService.findOne('auc-001', customerAlice);
+
+      expect(result.winner!.ticket.customer!.phone).toBe('+91 ******0000');
+      expect(result.tieBidders![0].ticket.customer!.phone).toBe('+91 ******0000');
     });
   });
 
@@ -900,6 +1213,52 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
           collectionAgentErd.branchId, // Cross-branch caller!
         ),
       ).rejects.toThrow(/CROSS_BRANCH_FORBIDDEN/i);
+    });
+
+    it('F09-5: CollectionService rejects same-branch agent idempotency replay of another agent collection with 403', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue({
+        id: 'pay-existing-001',
+        branchId: 'branch-prd-001',
+        recordedByUserId: 'user-agent-prd-OTHER', // Different agent in same branch!
+        receipt: { receiptNumber: 'KC-REC-PRD-2026-00001' },
+      });
+
+      await expect(
+        collectionService.recordCollection(
+          {
+            ticketId: 'ticket-001',
+            installmentMonth: 1,
+            amount: 5000,
+            collectionMode: 'CASH',
+            idempotencyKey: 'idemp-other-agent',
+          } as any,
+          collectionAgentPrd.sub, // Agent Kumar attempting replay!
+          collectionAgentPrd.branchId,
+        ),
+      ).rejects.toThrow(/You can only query or replay your own collection records/i);
+    });
+
+    it('F09-6: PaymentService rejects same-branch user idempotency replay of another user payment with 403', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue({
+        id: 'pay-existing-002',
+        branchId: 'branch-prd-001',
+        recordedByUserId: 'user-cashier-002', // Different cashier in same branch!
+        receipt: { receiptNumber: 'KC-REC-PRD-2026-00002' },
+      });
+
+      await expect(
+        paymentService.recordPayment(
+          {
+            ticketId: 'ticket-001',
+            installmentMonth: 1,
+            amount: 5000,
+            paymentMode: 'CASH',
+            idempotencyKey: 'idemp-other-cashier',
+          } as any,
+          superAdminPartner.sub, // Different user attempting replay!
+          'branch-prd-001',
+        ),
+      ).rejects.toThrow(/You can only query or replay your own payment records/i);
     });
   });
 });

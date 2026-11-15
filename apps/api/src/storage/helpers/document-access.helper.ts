@@ -346,6 +346,22 @@ export class DocumentAccessHelper {
           'Access denied: Field agents cannot access internal company safety or minutes files',
         );
       }
+      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        // Format: minutes/{auctionId}/... or safety-proof/{auctionId}/...
+        const parts = key.split('/');
+        const auctionId = parts[1];
+        if (auctionId) {
+          const auction = await prisma.auction.findUnique({
+            where: { id: auctionId },
+            select: { chitGroup: { select: { branchId: true } } },
+          });
+          if (auction?.chitGroup?.branchId && auction.chitGroup.branchId !== user.branchId) {
+            throw new ForbiddenException(
+              'Access denied: Auction minutes or safety proofs belong to another branch',
+            );
+          }
+        }
+      }
       return;
     }
 
@@ -360,6 +376,23 @@ export class DocumentAccessHelper {
           'Access denied: Direct storage file access is restricted for collection agents',
         );
       }
+      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        // Format: receipts/{receiptNumber}.pdf or receipts/branchCode/year/receipt.pdf
+        const fileName = key.split('/').pop() || '';
+        const receiptMatch = fileName.match(/^KC-REC-([A-Z0-9]+)-/);
+        if (receiptMatch && receiptMatch[1]) {
+          const branchCode = receiptMatch[1];
+          const branch = await prisma.branch.findUnique({
+            where: { id: user.branchId },
+            select: { code: true },
+          });
+          if (branch && branch.code !== branchCode) {
+            throw new ForbiddenException(
+              'Access denied: Receipt belongs to another branch',
+            );
+          }
+        }
+      }
       return;
     }
 
@@ -373,12 +406,30 @@ export class DocumentAccessHelper {
    * Validates write/upload permissions to a sanitized storage key during local-driver
    * presigned PUT fallback execution.
    */
-  static assertStorageUploadAccess(key: string, user: JwtPayload): void {
+  static async assertStorageUploadAccess(
+    key: string,
+    user: JwtPayload,
+    prisma?: PrismaService,
+  ): Promise<void> {
     const isStaffUploader = user.roles.some((r) =>
       ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
     );
 
     if (key.startsWith('kyc/')) {
+      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        const customerId = key.split('/')[1];
+        if (customerId) {
+          const cust = await prisma.customer.findUnique({
+            where: { id: customerId },
+            select: { branchId: true },
+          });
+          if (cust && cust.branchId && cust.branchId !== user.branchId) {
+            throw new ForbiddenException(
+              'Access denied: Customer does not belong to your assigned branch',
+            );
+          }
+        }
+      }
       if (
         isStaffUploader ||
         user.roles.includes(Role.COLLECTION_AGENT)
@@ -404,6 +455,20 @@ export class DocumentAccessHelper {
         throw new ForbiddenException(
           'Access denied: Only Super Admin, Branch Manager, or Accountant can upload safety proofs',
         );
+      }
+      if (user.roles.includes(Role.BRANCH_MANAGER) && user.branchId && prisma) {
+        const auctionId = key.split('/')[1];
+        if (auctionId) {
+          const auction = await prisma.auction.findUnique({
+            where: { id: auctionId },
+            select: { chitGroup: { select: { branchId: true } } },
+          });
+          if (auction?.chitGroup?.branchId && auction.chitGroup.branchId !== user.branchId) {
+            throw new ForbiddenException(
+              'Access denied: Auction belongs to another branch',
+            );
+          }
+        }
       }
       return;
     }

@@ -288,6 +288,7 @@ model AuctionWinner {
   ticketId           String            @unique
   ticket             SubscriberTicket  @relation(fields: [ticketId], references: [id])
   wasTieBreakWinner  Boolean           @default(false)
+  isHistoricalEntry  Boolean           @default(false) // True if imported during mid-cycle onboarding
   
   // Company Safety Proof Checklist (Recordkeeper pattern)
   isSecurityRequired Boolean           @default(false) // Evaluated case-by-case (not mandatory)

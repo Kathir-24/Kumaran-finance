@@ -106,10 +106,15 @@ export class PaymentService {
         if (
           staffBranchId &&
           existing.branchId &&
-          staffBranchId !== existing.branchId &&
-          existing.recordedByUserId !== recordedByUserId
+          staffBranchId !== existing.branchId
         ) {
           throw new ForbiddenException('Access denied: Unauthorized idempotency replay from another branch');
+        }
+
+        if (existing.recordedByUserId !== recordedByUserId) {
+          throw new ForbiddenException(
+            'Access denied: You can only query or replay your own payment records',
+          );
         }
 
         return {

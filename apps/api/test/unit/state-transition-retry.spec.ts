@@ -381,7 +381,7 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
 
       const res = await disbursementService.settleFinalMonth(
         'chit-001',
-        { ticketId: 'tkt-20', disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT },
+        { ticketId: 'tkt-20', disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT, makerUserId: 'maker-staff-001' },
         'checker-002',
         [Role.SUPER_ADMIN],
       );
@@ -394,7 +394,7 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
       await expect(
         disbursementService.settleFinalMonth(
           'chit-001',
-          { ticketId: 'tkt-20', disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT },
+          { ticketId: 'tkt-20', disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT, makerUserId: 'maker-staff-001' },
           'checker-002',
           [Role.SUPER_ADMIN],
         ),

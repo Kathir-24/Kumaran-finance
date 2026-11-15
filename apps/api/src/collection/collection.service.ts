@@ -113,10 +113,15 @@ export class CollectionService {
         if (
           staffBranchId &&
           existingPayment.branchId &&
-          staffBranchId !== existingPayment.branchId &&
-          existingPayment.recordedByUserId !== collectorUserId
+          staffBranchId !== existingPayment.branchId
         ) {
           throw new ForbiddenException('Access denied: Unauthorized idempotency replay from another branch');
+        }
+
+        if (existingPayment.recordedByUserId !== collectorUserId) {
+          throw new ForbiddenException(
+            'Access denied: You can only query or replay your own collection records',
+          );
         }
 
         return {

@@ -430,7 +430,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Get BullMQ queue health and job counts",
+        "summary": "Get BullMQ queue health and job counts (Super Admin strictly)",
         "tags": [
           "Background Jobs & Daily Maintenance"
         ]
@@ -500,7 +500,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Get audit logs of dispatched Push Notifications and DLT SMS messages",
+        "summary": "Get audit logs of dispatched Push Notifications and DLT SMS messages (Super Admin strictly)",
         "tags": [
           "Background Jobs & Daily Maintenance"
         ]
@@ -626,7 +626,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "List active BullMQ repeatable cron jobs and next execution timestamps",
+        "summary": "List active BullMQ repeatable cron jobs and next execution timestamps (Super Admin strictly)",
         "tags": [
           "Background Jobs & Daily Maintenance"
         ]
@@ -2027,6 +2027,68 @@
           }
         },
         "summary": "Mobile quick unlock with 6-digit MPIN",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/complete-onboarding": {
+      "post": {
+        "description": "Exchanges a temporary onboarding_restricted token and new permanent password for active access & refresh tokens.",
+        "operationId": "AuthController_completeOnboarding_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOnboardingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onboarding completed, permanent password saved, active tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthTokensResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Weak password or validation error"
+          },
+          "401": {
+            "description": "Invalid or expired onboarding token"
+          }
+        },
+        "summary": "Complete first-login onboarding and set permanent password",
         "tags": [
           "Auth"
         ]
@@ -8697,6 +8759,160 @@
         ]
       }
     },
+    "/api/v1/disbursements/group/{chitGroupId}/prepare-final-settlement": {
+      "post": {
+        "description": "Stage 1: Calculates Month N arrears, base installment deduction, 4% commission, and net prize payable. Creates pending settlement record with conductedByUserId = makerUserId. Requires independent Checker approval.",
+        "operationId": "DisbursementController_prepareFinalSettlement_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleFinalMonthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Final settlement voucher prepared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FinalSettlementResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settlement request or unprized tickets > 1"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Insufficient maker permissions"
+          },
+          "404": {
+            "description": "Chit group or ticket not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Maker: Prepare Month N final settlement voucher and financial breakdown",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
+    "/api/v1/disbursements/group/{chitGroupId}/approve-final-settlement": {
+      "post": {
+        "description": "Stage 2: Independent Checker Partner verifies prepared settlement calculations and executes payout. Strictly enforces maker != checker. Transitions scheme to COMPLETED.",
+        "operationId": "DisbursementController_approveFinalSettlement_v1",
+        "parameters": [
+          {
+            "name": "chitGroupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Final month settlement approved and disbursed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2026-10-22T07:28:14.000Z"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FinalSettlementResponseDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "timestamp",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settlement request or already completed"
+          },
+          "401": {
+            "description": "Unauthorized — Invalid or missing Bearer token"
+          },
+          "403": {
+            "description": "Forbidden: Partner exclusivity or Maker == Checker violation"
+          },
+          "404": {
+            "description": "Prepared settlement not found"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Checker: Authorize and disburse prepared Month N settlement (Maker != Checker)",
+        "tags": [
+          "Prize Disbursements & Safety Proof"
+        ]
+      }
+    },
     "/api/v1/disbursements/group/{chitGroupId}/final-settlement": {
       "post": {
         "description": "Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.",
@@ -9395,7 +9611,7 @@
     },
     "/api/v1/reports/audit-logs": {
       "get": {
-        "description": "Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Customers can view their own account transaction logs only.",
+        "description": "Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Allowed strictly: Super Admin.",
         "operationId": "ReportController_getAuditLogs_v1",
         "parameters": [
           {
@@ -9517,7 +9733,7 @@
             "JWT-auth": []
           }
         ],
-        "summary": "Immutable Audit Trail Register",
+        "summary": "Immutable Audit Trail Register (Super Admin strictly)",
         "tags": [
           "Dashboards & Statutory Reports"
         ]
@@ -10334,6 +10550,11 @@
             "description": "Assigned branch ID",
             "nullable": true
           },
+          "isPartner": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the staff member is a verified business partner"
+          },
           "isTotpEnabled": {
             "type": "boolean",
             "example": false,
@@ -10598,6 +10819,11 @@
             "description": "Assigned branch ID",
             "nullable": true
           },
+          "isPartner": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the staff member is a verified business partner"
+          },
           "isTotpEnabled": {
             "type": "boolean",
             "example": false,
@@ -10741,6 +10967,11 @@
             "type": "string",
             "example": "123456",
             "description": "Current 6-digit TOTP code generated by Microsoft Authenticator"
+          },
+          "password": {
+            "type": "string",
+            "example": "AdminPass#2026!",
+            "description": "Current account password. Required strictly when replacing an already-configured TOTP 2FA factor."
           }
         },
         "required": [
@@ -10906,6 +11137,24 @@
           "mpin"
         ]
       },
+      "CompleteOnboardingDto": {
+        "type": "object",
+        "properties": {
+          "tempToken": {
+            "type": "string",
+            "description": "Temporary restricted onboarding token issued during first login with temporary password"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewSecurePassword#2026",
+            "description": "New permanent staff password (min 8 characters)"
+          }
+        },
+        "required": [
+          "tempToken",
+          "newPassword"
+        ]
+      },
       "SetMpinDto": {
         "type": "object",
         "properties": {
@@ -11060,6 +11309,11 @@
               ]
             }
           },
+          "isPartner": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the staff member is a verified business partner"
+          },
           "isActive": {
             "type": "boolean",
             "example": true,
@@ -11164,8 +11418,8 @@
           },
           "password": {
             "type": "string",
-            "example": "Admin@Kumaran2026",
-            "description": "Initial password. Defaults to \"Admin@Kumaran2026\" if omitted."
+            "example": "TempPass#2026!",
+            "description": "Initial password. If omitted, a cryptographically secure random temporary password is generated requiring first-login change."
           }
         },
         "required": [
@@ -13326,8 +13580,7 @@
           "signedByForeman": {
             "type": "boolean",
             "example": true,
-            "description": "Signed by Foreman confirmation",
-            "default": true
+            "description": "Signed by Foreman confirmation (Form XVII minutes)"
           }
         },
         "required": [
@@ -15810,6 +16063,11 @@
             "type": "string",
             "example": "2025-04-22T00:00:00.000Z",
             "description": "Settlement disbursement timestamp (defaults to current date)"
+          },
+          "makerUserId": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Distinct staff user ID who prepared the settlement voucher (Maker != Checker)"
           }
         },
         "required": [

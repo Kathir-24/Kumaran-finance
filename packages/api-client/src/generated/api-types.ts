@@ -131,7 +131,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get BullMQ queue health and job counts */
+        /** Get BullMQ queue health and job counts (Super Admin strictly) */
         get: operations["JobsController_getQueueStatus_v1"];
         put?: never;
         post?: never;
@@ -148,7 +148,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get audit logs of dispatched Push Notifications and DLT SMS messages */
+        /** Get audit logs of dispatched Push Notifications and DLT SMS messages (Super Admin strictly) */
         get: operations["JobsController_getNotificationLogs_v1"];
         put?: never;
         post?: never;
@@ -185,7 +185,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active BullMQ repeatable cron jobs and next execution timestamps */
+        /** List active BullMQ repeatable cron jobs and next execution timestamps (Super Admin strictly) */
         get: operations["JobsController_getRepeatableSchedules_v1"];
         put?: never;
         post?: never;
@@ -589,6 +589,26 @@ export interface paths {
          * @description Quick biometric/MPIN login for field collection agents on mobile.
          */
         post: operations["AuthController_loginMpin_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/complete-onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete first-login onboarding and set permanent password
+         * @description Exchanges a temporary onboarding_restricted token and new permanent password for active access & refresh tokens.
+         */
+        post: operations["AuthController_completeOnboarding_v1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2116,6 +2136,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disbursements/group/{chitGroupId}/prepare-final-settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Maker: Prepare Month N final settlement voucher and financial breakdown
+         * @description Stage 1: Calculates Month N arrears, base installment deduction, 4% commission, and net prize payable. Creates pending settlement record with conductedByUserId = makerUserId. Requires independent Checker approval.
+         */
+        post: operations["DisbursementController_prepareFinalSettlement_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disbursements/group/{chitGroupId}/approve-final-settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checker: Authorize and disburse prepared Month N settlement (Maker != Checker)
+         * @description Stage 2: Independent Checker Partner verifies prepared settlement calculations and executes payout. Strictly enforces maker != checker. Transitions scheme to COMPLETED.
+         */
+        post: operations["DisbursementController_approveFinalSettlement_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/disbursements/group/{chitGroupId}/final-settlement": {
         parameters: {
             query?: never;
@@ -2304,8 +2364,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Immutable Audit Trail Register
-         * @description Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Customers can view their own account transaction logs only.
+         * Immutable Audit Trail Register (Super Admin strictly)
+         * @description Append-only record of dual-control actions (auction finalizations, reversals, safety proofs, payouts, removals). Allowed strictly: Super Admin.
          */
         get: operations["ReportController_getAuditLogs_v1"];
         put?: never;
@@ -2814,6 +2874,11 @@ export interface components {
              */
             branchId: string | null;
             /**
+             * @description Whether the staff member is a verified business partner
+             * @example true
+             */
+            isPartner?: boolean;
+            /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
              */
@@ -2977,6 +3042,11 @@ export interface components {
              */
             branchId: string | null;
             /**
+             * @description Whether the staff member is a verified business partner
+             * @example true
+             */
+            isPartner?: boolean;
+            /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
              */
@@ -3072,6 +3142,11 @@ export interface components {
              * @example 123456
              */
             code: string;
+            /**
+             * @description Current account password. Required strictly when replacing an already-configured TOTP 2FA factor.
+             * @example AdminPass#2026!
+             */
+            password?: string;
         };
         DisableTotpDto: {
             /**
@@ -3175,6 +3250,15 @@ export interface components {
              * @enum {string}
              */
             clientType: "WEB" | "MOBILE" | "DESKTOP";
+        };
+        CompleteOnboardingDto: {
+            /** @description Temporary restricted onboarding token issued during first login with temporary password */
+            tempToken: string;
+            /**
+             * @description New permanent staff password (min 8 characters)
+             * @example NewSecurePassword#2026
+             */
+            newPassword: string;
         };
         SetMpinDto: {
             /**
@@ -3288,6 +3372,11 @@ export interface components {
              */
             roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
             /**
+             * @description Whether the staff member is a verified business partner
+             * @example true
+             */
+            isPartner?: boolean;
+            /**
              * @description Whether the staff account is active
              * @example true
              */
@@ -3352,8 +3441,8 @@ export interface components {
              */
             branchId?: string;
             /**
-             * @description Initial password. Defaults to "Admin@Kumaran2026" if omitted.
-             * @example Admin@Kumaran2026
+             * @description Initial password. If omitted, a cryptographically secure random temporary password is generated requiring first-login change.
+             * @example TempPass#2026!
              */
             password?: string;
         };
@@ -4829,11 +4918,10 @@ export interface components {
              */
             notes?: string;
             /**
-             * @description Signed by Foreman confirmation
-             * @default true
+             * @description Signed by Foreman confirmation (Form XVII minutes)
              * @example true
              */
-            signedByForeman: boolean;
+            signedByForeman?: boolean;
         };
         MarkMinutesFiledResponseDto: {
             /**
@@ -6457,6 +6545,11 @@ export interface components {
              * @example 2025-04-22T00:00:00.000Z
              */
             disbursedAt?: string;
+            /**
+             * @description Distinct staff user ID who prepared the settlement voucher (Maker != Checker)
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            makerUserId?: string;
         };
         ExecutiveDashboardKpiResponseDto: {
             /**
@@ -8148,6 +8241,52 @@ export interface operations {
             };
             /** @description Too many MPIN attempts. Account locked for 15 minutes. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_completeOnboarding_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteOnboardingDto"];
+            };
+        };
+        responses: {
+            /** @description Onboarding completed, permanent password saved, active tokens issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["AuthTokensResponseDto"];
+                    };
+                };
+            };
+            /** @description Weak password or validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or expired onboarding token */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12521,6 +12660,126 @@ export interface operations {
                 content?: never;
             };
             /** @description Auction or winner not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_prepareFinalSettlement_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chitGroupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleFinalMonthDto"];
+            };
+        };
+        responses: {
+            /** @description Final settlement voucher prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["FinalSettlementResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid settlement request or unprized tickets > 1 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Insufficient maker permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chit group or ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DisbursementController_approveFinalSettlement_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chitGroupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Final month settlement approved and disbursed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example 2026-10-22T07:28:14.000Z */
+                        timestamp: string;
+                        data: components["schemas"]["FinalSettlementResponseDto"];
+                    };
+                };
+            };
+            /** @description Invalid settlement request or already completed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized — Invalid or missing Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden: Partner exclusivity or Maker == Checker violation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Prepared settlement not found */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -209,6 +209,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
         id: 'existing-payment-uuid',
         amount: 3950n,
         idempotencyKey: 'duplicate-key-123',
+        recordedByUserId: mockCollectorId,
         allocations: [],
         receipt: { receiptNumber: 'KC-REC-PRD-2026-00010' },
       };
@@ -492,6 +493,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
         amount: 3950n,
         paymentMethod: PaymentMethod.CASH,
         cashHandoverStatus: 'PENDING_HANDOVER',
+        recordedByUserId: mockCollectorId,
         createdAt: new Date('2026-10-21T09:00:00.000Z'),
         receipt: { receiptNumber: 'KC-REC-PRD-2026-00005' },
       };

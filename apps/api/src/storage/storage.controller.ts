@@ -109,6 +109,21 @@ export class StorageController {
           'Subscribers are only permitted to upload KYC documents for their own account',
         );
       }
+      if (
+        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        currentUser.branchId &&
+        this.prisma
+      ) {
+        const cust = await this.prisma.customer.findUnique({
+          where: { id: dto.customerId },
+          select: { branchId: true },
+        });
+        if (cust && cust.branchId && cust.branchId !== currentUser.branchId) {
+          throw new ForbiddenException(
+            'Access denied: Customer does not belong to your assigned branch',
+          );
+        }
+      }
       key = StorageKeyHelper.kycDocument(dto.customerId, dto.docType, ext);
     } else if (dto.purpose === UploadPurpose.SAFETY_PROOF) {
       if (!dto.auctionId) {
@@ -120,6 +135,21 @@ export class StorageController {
         )
       ) {
         throw new ForbiddenException('Only staff can upload auction safety proofs');
+      }
+      if (
+        currentUser.roles.includes(Role.BRANCH_MANAGER) &&
+        currentUser.branchId &&
+        this.prisma
+      ) {
+        const auction = await this.prisma.auction.findUnique({
+          where: { id: dto.auctionId },
+          select: { chitGroup: { select: { branchId: true } } },
+        });
+        if (auction?.chitGroup?.branchId && auction.chitGroup.branchId !== currentUser.branchId) {
+          throw new ForbiddenException(
+            'Access denied: Auction belongs to another branch',
+          );
+        }
       }
       key = StorageKeyHelper.safetyProofDoc(dto.auctionId, dto.fileName);
     } else {
@@ -192,7 +222,7 @@ export class StorageController {
         ? rawKey
         : '';
     const sanitizedKey = StorageKeyHelper.sanitizeKey(rawKeyStr);
-    DocumentAccessHelper.assertStorageUploadAccess(sanitizedKey, currentUser);
+    await DocumentAccessHelper.assertStorageUploadAccess(sanitizedKey, currentUser, this.prisma);
 
     const rawContentType = req.headers['content-type'];
     const mimeType =

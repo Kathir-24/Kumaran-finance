@@ -71,6 +71,9 @@ export function FinalSettlementModal({
   const commission = (grossPool * 4n) / 100n; // 4.00% Foreman Commission (ADR-04)
   const netPayable = grossPool - commission; // P = V - Cf (D = 0)
 
+  const [isPrepared, setIsPrepared] = useState<boolean>(false);
+  const [preparedSummary, setPreparedSummary] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen && chitGroup) {
       setDisbursementMode('ACCOUNT_PAYEE_CHEQUE');
@@ -78,18 +81,21 @@ export function FinalSettlementModal({
       setDisbursedAt(new Date().toISOString().split('T')[0]);
       setNotes('');
       setErrorMsg(null);
+      setIsPrepared(false);
+      setPreparedSummary(null);
     }
   }, [isOpen, chitGroup]);
 
-  const settleMutation = useMutation({
+  // Stage 1: Maker prepares the final settlement voucher (F05)
+  const prepareMutation = useMutation({
     mutationFn: async () => {
       if (!chitGroup) throw new Error('No chit group selected');
       if (!unprizedTicket) {
         throw new Error('No unprized subscriber ticket found for final month settlement');
       }
 
-      return unwrapApiResponse<{ message?: string }>(
-        apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/final-settlement', {
+      return unwrapApiResponse<{ message?: string; settlement?: any }>(
+        apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/prepare-final-settlement', {
           params: { path: { chitGroupId: chitGroup.id } },
           body: {
             ticketId: unprizedTicket.id,
@@ -98,6 +104,29 @@ export function FinalSettlementModal({
             notes: notes.trim() || undefined,
             disbursedAt: disbursedAt ? new Date(disbursedAt).toISOString() : undefined,
           },
+        }),
+      );
+    },
+    onSuccess: (res) => {
+      setIsPrepared(true);
+      setPreparedSummary(
+        res.message || 'Settlement voucher prepared successfully. Requires independent Partner Checker approval.',
+      );
+      setErrorMsg(null);
+    },
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err, 'Failed to prepare settlement voucher'));
+    },
+  });
+
+  // Stage 2: Independent Partner Checker authorizes and commits payout (F05)
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      if (!chitGroup) throw new Error('No chit group selected');
+
+      return unwrapApiResponse<{ message?: string }>(
+        apiClient.POST('/api/v1/disbursements/group/{chitGroupId}/approve-final-settlement', {
+          params: { path: { chitGroupId: chitGroup.id } },
         }),
       );
     },
@@ -110,7 +139,7 @@ export function FinalSettlementModal({
       onClose();
     },
     onError: (err: unknown) => {
-      setErrorMsg(getErrorMessage(err, 'Settlement failed'));
+      setErrorMsg(getErrorMessage(err, 'Settlement approval failed'));
     },
   });
 
@@ -136,6 +165,16 @@ export function FinalSettlementModal({
             <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {isPrepared && preparedSummary && (
+            <div className="p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold">Stage 1 Prepared (Maker Complete)</div>
+                <div className="text-emerald-300/80 mt-0.5">{preparedSummary}</div>
+              </div>
             </div>
           )}
 
@@ -182,7 +221,7 @@ export function FinalSettlementModal({
             </label>
             <select
               value={disbursementMode}
-              disabled={settleMutation.isPending}
+              disabled={prepareMutation.isPending || approveMutation.isPending || isPrepared}
               onChange={(e) => setDisbursementMode(e.target.value)}
               className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
             >
@@ -201,7 +240,7 @@ export function FinalSettlementModal({
             </label>
             <Input
               value={paymentReference}
-              disabled={settleMutation.isPending}
+              disabled={prepareMutation.isPending || approveMutation.isPending || isPrepared}
               onChange={(e) => setPaymentReference(e.target.value)}
               placeholder="e.g. IOB-CHQ-FINAL-998811 or CASH-VAULT"
               className="text-xs font-mono"
@@ -215,7 +254,7 @@ export function FinalSettlementModal({
             </label>
             <Textarea
               value={notes}
-              disabled={settleMutation.isPending}
+              disabled={prepareMutation.isPending || approveMutation.isPending || isPrepared}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Section 16 maturity settlement completed in branch office counter..."
               rows={2}
@@ -229,24 +268,41 @@ export function FinalSettlementModal({
             type="button"
             variant="ghost"
             onClick={onClose}
-            disabled={settleMutation.isPending}
+            disabled={prepareMutation.isPending || approveMutation.isPending}
             className="text-slate-400 hover:text-slate-200 text-xs"
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={() => settleMutation.mutate()}
-            disabled={!unprizedTicket || settleMutation.isPending}
-            className="bg-amber-600 hover:bg-amber-500 text-white text-xs gap-1.5 shadow"
-          >
-            {settleMutation.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            )}
-            <span>{settleMutation.isPending ? t('settlingFinal') : t('confirmFinalSettlementBtn')}</span>
-          </Button>
+
+          {!isPrepared ? (
+            <Button
+              type="button"
+              onClick={() => prepareMutation.mutate()}
+              disabled={!unprizedTicket || prepareMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-500 text-white text-xs gap-1.5 shadow"
+            >
+              {prepareMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              <span>{prepareMutation.isPending ? 'Preparing Voucher...' : 'Prepare Voucher (Maker)'}</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => approveMutation.mutate()}
+              disabled={approveMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow"
+            >
+              {approveMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              <span>{approveMutation.isPending ? 'Authorizing Payout...' : 'Approve & Disburse (Checker Partner)'}</span>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1029,26 +1029,11 @@ export class DisbursementService {
     }
 
     // Invariant Guardrail 10: Strict Maker != Checker Dual Control
-    let makerUserId = dto.makerUserId;
-    if (makerUserId && makerUserId === checkerUserId) {
-      throw new ForbiddenException(
-        'MAKER_CHECKER_VIOLATION: Maker and Checker cannot be the same user for final settlement',
-      );
-    }
-
+    const makerUserId = dto.makerUserId;
     if (!makerUserId) {
-      if (typeof this.prisma.user?.findFirst === 'function') {
-        const branchStaff = await this.prisma.user.findFirst({
-          where: {
-            id: { not: checkerUserId },
-            isActive: true,
-          },
-          select: { id: true },
-        });
-        makerUserId = branchStaff?.id || 'maker-staff-user';
-      } else {
-        makerUserId = 'maker-staff-user';
-      }
+      throw new BadRequestException(
+        'MAKER_REQUIRED: Final month settlement requires prior preparation by an authorized Maker. Please prepare the settlement voucher first via prepareFinalSettlement.',
+      );
     }
 
     if (makerUserId === checkerUserId) {
@@ -1165,42 +1150,103 @@ export class DisbursementService {
         }
       }
 
-      // Create settlement auction record for Month N
-      const settlementAuction = await tx.auction.create({
-        data: {
-          chitGroupId,
-          installmentMonth: finalMonth,
-          auctionDate: releaseDate,
-          status: 'COMPLETED',
-          isHistoricalEntry: false,
-          bidDiscount: commissionAmount,
-          foremanCommissionRate: new Prisma.Decimal(4.0),
-          foremanCommissionAmount: commissionAmount,
-          totalDividend: 0n,
-          dividendPerTicket: 0n,
-          prizeMoney: grossPrize - commissionAmount,
-          conductedByUserId: makerUserId,
-          finalizedByUserId: checkerUserId,
-        },
-      });
+      // Update or upsert settlement auction record for Month N (F05)
+      const settlementAuction = typeof tx.auction.upsert === 'function'
+        ? await tx.auction.upsert({
+            where: { chitGroupId_installmentMonth: { chitGroupId, installmentMonth: finalMonth } },
+            create: {
+              chitGroupId,
+              installmentMonth: finalMonth,
+              auctionDate: releaseDate,
+              status: 'COMPLETED',
+              isHistoricalEntry: false,
+              bidDiscount: commissionAmount,
+              foremanCommissionRate: new Prisma.Decimal(4.0),
+              foremanCommissionAmount: commissionAmount,
+              totalDividend: 0n,
+              dividendPerTicket: 0n,
+              prizeMoney: grossPrize - commissionAmount,
+              conductedByUserId: makerUserId,
+              finalizedByUserId: checkerUserId,
+            },
+            update: {
+              auctionDate: releaseDate,
+              status: 'COMPLETED',
+              bidDiscount: commissionAmount,
+              foremanCommissionRate: new Prisma.Decimal(4.0),
+              foremanCommissionAmount: commissionAmount,
+              prizeMoney: grossPrize - commissionAmount,
+              conductedByUserId: makerUserId,
+              finalizedByUserId: checkerUserId,
+            },
+          })
+        : await tx.auction.create({
+            data: {
+              chitGroupId,
+              installmentMonth: finalMonth,
+              auctionDate: releaseDate,
+              status: 'COMPLETED',
+              isHistoricalEntry: false,
+              bidDiscount: commissionAmount,
+              foremanCommissionRate: new Prisma.Decimal(4.0),
+              foremanCommissionAmount: commissionAmount,
+              totalDividend: 0n,
+              dividendPerTicket: 0n,
+              prizeMoney: grossPrize - commissionAmount,
+              conductedByUserId: makerUserId,
+              finalizedByUserId: checkerUserId,
+            },
+          });
 
-      // Create AuctionWinner record with exact net disbursed amount
-      await tx.auctionWinner.create({
-        data: {
-          auctionId: settlementAuction.id,
-          ticketId: ticket.id,
-          wasTieBreakWinner: false,
-          disbursementStatus: 'DISBURSED',
-          disbursementMode: dto.disbursementMode,
-          disbursedAmount: netPayablePrize,
-          verifiedByUserId: makerUserId,
-          authorizedByUserId: checkerUserId,
-          disbursedAt: releaseDate,
-          paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
-          agreementSigned: true,
-          nomineeSigned: true,
-        },
-      });
+      // Update or upsert AuctionWinner record with exact net disbursed amount
+      if (typeof tx.auctionWinner.upsert === 'function') {
+        await tx.auctionWinner.upsert({
+          where: { auctionId: settlementAuction.id },
+          create: {
+            auctionId: settlementAuction.id,
+            ticketId: ticket.id,
+            wasTieBreakWinner: false,
+            disbursementStatus: 'DISBURSED',
+            disbursementMode: dto.disbursementMode,
+            disbursedAmount: netPayablePrize,
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: checkerUserId,
+            disbursedAt: releaseDate,
+            paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
+            agreementSigned: true,
+            nomineeSigned: true,
+          },
+          update: {
+            ticketId: ticket.id,
+            disbursementStatus: 'DISBURSED',
+            disbursementMode: dto.disbursementMode,
+            disbursedAmount: netPayablePrize,
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: checkerUserId,
+            disbursedAt: releaseDate,
+            paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
+            agreementSigned: true,
+            nomineeSigned: true,
+          },
+        });
+      } else {
+        await tx.auctionWinner.create({
+          data: {
+            auctionId: settlementAuction.id,
+            ticketId: ticket.id,
+            wasTieBreakWinner: false,
+            disbursementStatus: 'DISBURSED',
+            disbursementMode: dto.disbursementMode,
+            disbursedAmount: netPayablePrize,
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: checkerUserId,
+            disbursedAt: releaseDate,
+            paymentReference: dto.paymentReference || 'FINAL_SETTLEMENT_MONTH_N',
+            agreementSigned: true,
+            nomineeSigned: true,
+          },
+        });
+      }
 
       // Update ticket to prized and clear arrears
       await tx.subscriberTicket.update({
