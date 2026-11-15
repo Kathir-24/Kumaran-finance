@@ -21,6 +21,7 @@ class MockHttpClientSuccess extends KumaranMobileApiClient {
     Map<String, dynamic>? queryParameters,
     Map<String, dynamic>? body,
     Map<String, String>? customHeaders,
+    bool isRetry = false,
   }) async {
     dispatchedCalls.add({
       'method': method,

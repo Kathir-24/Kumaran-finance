@@ -22,13 +22,14 @@ class KumaranMobileApiClient {
     _httpClient.connectionTimeout = const Duration(seconds: 15);
   }
 
-  /// Executes an HTTP request with Bearer Auth, Idempotency-Key, and error unwrapping
+  /// Executes an HTTP request with Bearer Auth, Idempotency-Key, transparent 401 refresh, and error unwrapping
   Future<Map<String, dynamic>> request({
     required String method,
     required String path,
     Map<String, dynamic>? queryParameters,
     Map<String, dynamic>? body,
     Map<String, String>? customHeaders,
+    bool isRetry = false,
   }) async {
     final uri = _buildUri(path, queryParameters);
     final request = await _httpClient.openUrl(method, uri);
@@ -72,6 +73,22 @@ class KumaranMobileApiClient {
     }
 
     if (response.statusCode >= 400) {
+      // 401 Unauthorized handling: attempt single-flight token rotation and replay (F14)
+      if (response.statusCode == 401 && !isRetry && authManager != null) {
+        final refreshed = await authManager!.refreshToken(baseUrl, _httpClient);
+        if (refreshed) {
+          // Replay original request with refreshed access token
+          return await this.request(
+            method: method,
+            path: path,
+            queryParameters: queryParameters,
+            body: body,
+            customHeaders: customHeaders,
+            isRetry: true,
+          );
+        }
+      }
+
       if (response.statusCode == 401 && authManager?.onUnauthorized != null) {
         await authManager!.onUnauthorized!();
       }
