@@ -52,7 +52,7 @@ import { UpdateChitGroupDto } from './dto/update-chit-group.dto';
 export class ChitController {
   constructor(private readonly chitService: ChitService) {}
 
-  @Post('new')
+  @Post(['', 'new'])
   @HttpCode(HttpStatus.CREATED)
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
@@ -64,9 +64,10 @@ export class ChitController {
   @ApiResponse({ status: 409, description: 'Group code already exists' })
   async create(
     @Body() dto: CreateChitGroupDto,
+    @CurrentUser('sub') userId?: string,
     @CurrentUser('branchId') staffBranchId?: string | null,
   ) {
-    return this.chitService.create(dto, staffBranchId);
+    return this.chitService.create(dto, userId, staffBranchId);
   }
 
   @Post('onboard-ongoing')
@@ -217,6 +218,60 @@ export class ChitController {
     @Body() dto?: ActivateChitDto,
   ) {
     return this.chitService.activate(id, userId, dto);
+  }
+
+  @Post(':id/register')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Record sanction order and register chit scheme (DRAFT -> REGISTERED)',
+    description:
+      'Transitions a chit scheme from DRAFT to REGISTERED status. Allowed: Super Admin.',
+  })
+  @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit registered successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot register chit: Scheme is not in DRAFT status' })
+  @ApiResponse({ status: 404, description: 'Chit scheme not found' })
+  async register(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.chitService.register(id, userId);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Cancel an unactivated draft chit scheme (DRAFT -> CANCELLED)',
+    description:
+      'Transitions an unactivated chit scheme from DRAFT to CANCELLED status. Allowed: Super Admin.',
+  })
+  @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit cancelled successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot cancel chit: Scheme is not in DRAFT status' })
+  @ApiResponse({ status: 404, description: 'Chit scheme not found' })
+  async cancel(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.chitService.cancel(id, userId);
+  }
+
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Final account reconciliation and scheme closure (COMPLETED -> CLOSED)',
+    description:
+      'Transitions a completed chit scheme to CLOSED status upon balance reconciliation. Allowed: Super Admin.',
+  })
+  @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit closed successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot close chit: Scheme is not in COMPLETED status' })
+  @ApiResponse({ status: 404, description: 'Chit scheme not found' })
+  async close(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.chitService.close(id, userId);
   }
 }
 

@@ -19,6 +19,7 @@ import {
 
 export class HistoricalWinnerDto {
   @ApiProperty({
+    type: 'integer',
     example: 2,
     description: 'Installment month of past auction (e.g., Months 2 to onboardedAtMonth - 1)',
   })
@@ -29,6 +30,7 @@ export class HistoricalWinnerDto {
   month: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 5,
     description: 'Ticket number that won the past auction',
   })
@@ -63,6 +65,7 @@ export class HistoricalWinnerDto {
 
 export class OngoingMemberAllocationDto {
   @ApiProperty({
+    type: 'integer',
     example: 1,
     description: 'Ticket number (1 to totalTickets)',
   })
@@ -135,6 +138,7 @@ export class OnboardOngoingChitDto {
   chitValue: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 20,
     description: 'Total scheme duration in months',
   })
@@ -145,6 +149,7 @@ export class OnboardOngoingChitDto {
   durationMonths: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 20,
     description: 'Total tickets in the scheme',
   })
@@ -155,6 +160,7 @@ export class OnboardOngoingChitDto {
   totalTickets: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 7,
     description: 'Current active month where digital tracking starts (e.g. Month 7)',
   })

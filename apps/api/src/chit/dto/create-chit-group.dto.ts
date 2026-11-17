@@ -55,6 +55,7 @@ export class CreateChitGroupDto {
   chitValue: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 20,
     description: 'Duration of the chit scheme in months (e.g., 20, 25, 40)',
   })
@@ -65,6 +66,7 @@ export class CreateChitGroupDto {
   durationMonths: number;
 
   @ApiProperty({
+    type: 'integer',
     example: 20,
     description: 'Total number of subscriber tickets (must match durationMonths in standard chits)',
   })

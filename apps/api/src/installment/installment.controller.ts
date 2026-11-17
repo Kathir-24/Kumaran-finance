@@ -42,7 +42,7 @@ import { InstallmentService } from './installment.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiResponse({ status: 401, description: 'Unauthorized — Invalid or missing Bearer token' })
 @ApiResponse({ status: 403, description: 'Forbidden — Insufficient role permissions or BOLA violation' })
-@Controller('installments')
+@Controller(['installments', 'installment-dues'])
 export class InstallmentController {
   constructor(private readonly installmentService: InstallmentService) {}
 

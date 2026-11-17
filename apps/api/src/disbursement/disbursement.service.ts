@@ -1477,6 +1477,7 @@ export class DisbursementService {
         grossPrize: Number(grossPrize),
         commissionAmount: Number(commissionAmount),
         finalMonthDeduction: Number(finalMonthDeduction),
+        finalMonthInstallment: Number(finalMonthDeduction),
         priorArrears: Number(priorArrears),
         netPayablePrize: Number(netPayablePrize),
         preparedByUserId: makerUserId,

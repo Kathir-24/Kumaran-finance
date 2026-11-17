@@ -166,6 +166,7 @@ enum ChitStatus {
   ACTIVE     // In progress
   COMPLETED  // All installments finished
   CLOSED     // Accounts reconciled and closed
+  CANCELLED  // Cancelled draft scheme
 }
 
 enum InitializationMode {
@@ -196,6 +197,8 @@ model ChitGroup {
   onboardedAtMonth       Int                     @default(1) // e.g., 7 if onboarded at Month 7
   
   status                 ChitStatus              @default(DRAFT)
+  createdByUserId        String?                 // User ID who created or onboarded the scheme (Maker)
+  activatedByUserId      String?                 // Partner User ID who approved and activated scheme (Checker)
   sanctionOrderNumber    String?                 // Regulatory reference from Chit Registrar
   sanctionDate           DateTime?
   startDate              DateTime

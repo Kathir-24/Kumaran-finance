@@ -420,7 +420,10 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       return;
     }
 
-    const testMonth = 950 + Math.floor(Math.random() * 40);
+    const testMonth = 1000 + Math.floor(Math.random() * 900000);
+    await prisma.installmentDue.deleteMany({
+      where: { ticketId: activeTicketId, installmentMonth: testMonth },
+    });
 
     // Create an isolated installment due in UNPAID status
     const testDue = await prisma.installmentDue.create({

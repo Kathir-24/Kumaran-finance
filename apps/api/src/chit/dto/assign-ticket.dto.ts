@@ -8,6 +8,7 @@ import {
 
 export class AssignTicketDto {
   @ApiProperty({
+    type: 'integer',
     example: 4,
     description: 'Ticket number to assign (between 1 and totalTickets)',
   })

@@ -86,7 +86,11 @@ export class ChitService {
   /**
    * Creates a fresh chit group starting from Month 1 in DRAFT status
    */
-  async create(dto: CreateChitGroupDto, staffBranchId?: string | null) {
+  async create(
+    dto: CreateChitGroupDto,
+    creatorUserId?: string,
+    staffBranchId?: string | null,
+  ) {
     if (dto.durationMonths !== dto.totalTickets) {
       throw new BadRequestException(
         `Duration (${dto.durationMonths} months) must equal total tickets (${dto.totalTickets}) in standard chits`,
@@ -102,7 +106,19 @@ export class ChitService {
       );
     }
 
-    let branchId = dto.branchId || staffBranchId;
+    // Support legacy 2-argument signature create(dto, staffBranchId) vs new create(dto, creatorUserId, staffBranchId)
+    let branchId: string | undefined = dto.branchId || (staffBranchId ?? undefined);
+    let actualCreatorUserId: string | null = null;
+    if (staffBranchId !== undefined) {
+      actualCreatorUserId = creatorUserId || null;
+    } else if (creatorUserId) {
+      if (creatorUserId.startsWith('branch') || !branchId) {
+        branchId = creatorUserId;
+      } else {
+        actualCreatorUserId = creatorUserId;
+      }
+    }
+
     if (!branchId) {
       const defaultBranch = await this.prisma.branch.findFirst({
         where: { isActive: true },
@@ -131,6 +147,7 @@ export class ChitService {
         initMode: InitializationMode.NEW_GROUP,
         onboardedAtMonth: 1,
         status: ChitStatus.DRAFT,
+        createdByUserId: actualCreatorUserId,
         sanctionOrderNumber: dto.sanctionOrderNumber?.trim() || null,
         sanctionDate: dto.sanctionDate ? new Date(dto.sanctionDate) : null,
         startDate: new Date(dto.startDate),
@@ -140,6 +157,24 @@ export class ChitService {
         branch: { select: { id: true, code: true, name: true } },
       },
     });
+
+    if (typeof this.prisma.auditLog?.create === 'function') {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: actualCreatorUserId || 'SYSTEM',
+          action: 'CHIT_GROUP_CREATED',
+          entityType: 'ChitGroup',
+          entityId: created.id,
+          newValue: {
+            groupCode: created.groupCode,
+            chitValue: created.chitValue.toString(),
+            durationMonths: created.durationMonths,
+            status: created.status,
+            createdByUserId: actualCreatorUserId,
+          },
+        },
+      });
+    }
 
     await this.invalidateSchemesCache(created.id);
     return created;
@@ -175,6 +210,27 @@ export class ChitService {
       );
     }
 
+    // Full ticket roster validation: all N tickets must be allocated
+    if (dto.memberAllocations.length !== dto.totalTickets) {
+      throw new BadRequestException(
+        `Cannot onboard ongoing chit: All ${dto.totalTickets} tickets must be allocated in member roster (received ${dto.memberAllocations.length})`,
+      );
+    }
+
+    const ticketNumbers = dto.memberAllocations.map((m) => m.ticketNumber);
+    const uniqueTicketNumbers = new Set(ticketNumbers);
+    if (uniqueTicketNumbers.size !== ticketNumbers.length) {
+      throw new BadRequestException('Duplicate ticket numbers found in member allocations');
+    }
+
+    for (let t = 1; t <= dto.totalTickets; t++) {
+      if (!uniqueTicketNumbers.has(t)) {
+        throw new BadRequestException(
+          `Missing ticket #${t} in member allocations: all tickets from 1 to ${dto.totalTickets} must be assigned`,
+        );
+      }
+    }
+
     // ADR-13: Validate that no customer appears twice in the member allocations
     const customerIds = dto.memberAllocations.map((m) => m.customerId);
     const uniqueCustomerIds = new Set(customerIds);
@@ -197,12 +253,67 @@ export class ChitService {
     }
 
     const math = this.calculateSchemeMath(dto.chitValue, dto.durationMonths);
+    const commission =
+      (math.chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
 
-    // Validate historical auction discounts against 1/4 ceiling
+    // Validate historical winners completeness: must cover Months 2 to onboardedAtMonth - 1 without gaps or duplicates
+    const expectedHistoricalCount = dto.onboardedAtMonth - 2;
+    if (dto.historicalWinners.length !== expectedHistoricalCount) {
+      throw new BadRequestException(
+        `Historical winners count (${dto.historicalWinners.length}) must exactly match months 2 to ${dto.onboardedAtMonth - 1} (${expectedHistoricalCount} auctions expected)`,
+      );
+    }
+
+    const historicalMonths = new Set(dto.historicalWinners.map((hw) => hw.month));
+    for (let m = 2; m < dto.onboardedAtMonth; m++) {
+      if (!historicalMonths.has(m)) {
+        throw new BadRequestException(
+          `Historical winners must cover Month ${m}: all months from 2 to ${dto.onboardedAtMonth - 1} must be recorded without gaps or duplicates`,
+        );
+      }
+    }
+
+    // Validate that each winner ticket is unique and assigned
+    const winnerTicketNumbers = dto.historicalWinners.map((hw) => hw.ticketNumber);
+    const uniqueWinnerTickets = new Set(winnerTicketNumbers);
+    if (uniqueWinnerTickets.size !== winnerTicketNumbers.length) {
+      throw new BadRequestException(
+        'Duplicate winner ticket detected: A ticket cannot win more than one historical auction',
+      );
+    }
+
+    // Validate historical auction discounts: 4% floor (D >= Cf), 1/4 ceiling (D <= V/4), and whole-rupee divisibility ((D - Cf) % N == 0)
     for (const hw of dto.historicalWinners) {
-      if (BigInt(hw.bidDiscount) > math.maxDiscountCeiling) {
+      if (hw.ticketNumber === 1) {
+        throw new BadRequestException(
+          'Ticket #1 is reserved for statutory company pool and cannot be an auction winner for Month >= 2',
+        );
+      }
+
+      if (!uniqueTicketNumbers.has(hw.ticketNumber)) {
+        throw new BadRequestException(
+          `Winner ticket #${hw.ticketNumber} for Month ${hw.month} was not found in member allocations`,
+        );
+      }
+
+      const bidDiscount = toWholeRupeeBigInt(hw.bidDiscount, 'Bid discount', { min: 1n });
+
+      if (bidDiscount > math.maxDiscountCeiling) {
         throw new BadRequestException(
           `Historical bid discount ₹${hw.bidDiscount} in Month ${hw.month} exceeds maximum 1/4 ceiling of ₹${math.maxDiscountCeiling.toString()}`,
+        );
+      }
+
+      if (bidDiscount < commission) {
+        throw new BadRequestException(
+          `Historical bid discount ₹${hw.bidDiscount} in Month ${hw.month} must be at least the foreman commission of ₹${commission.toString()} (4.00% floor)`,
+        );
+      }
+
+      const totalDividend = bidDiscount - commission;
+      if (totalDividend % BigInt(dto.totalTickets) !== 0n) {
+        throw new BadRequestException(
+          `NON_DIVISIBLE_DIVIDEND: Historical total dividend ₹${totalDividend.toString()} in Month ${hw.month} must be evenly divisible by ${dto.totalTickets} tickets to guarantee whole-rupee installments`,
         );
       }
     }
@@ -224,6 +335,7 @@ export class ChitService {
           initMode: InitializationMode.ONGOING_GROUP,
           onboardedAtMonth: dto.onboardedAtMonth,
           status: ChitStatus.DRAFT,
+          createdByUserId: creatorUserId,
           sanctionOrderNumber: dto.sanctionOrderNumber?.trim() || null,
           sanctionDate: dto.sanctionDate ? new Date(dto.sanctionDate) : null,
           startDate: new Date(dto.startDate),
@@ -253,6 +365,49 @@ export class ChitService {
         createdTickets.map((t) => [t.ticketNumber, t.id]),
       );
 
+      // Auto-create Month 1 statutory company pool auction (Guardrail 5 / ADR-05)
+      const ticket1Id = ticketMap.get(1);
+      if (!ticket1Id) {
+        throw new BadRequestException('Ticket #1 must be allocated in member roster');
+      }
+
+      const month1Auction = await tx.auction.create({
+        data: {
+          chitGroupId: chit.id,
+          installmentMonth: 1,
+          auctionDate: new Date(dto.startDate),
+          status: 'COMPLETED',
+          isHistoricalEntry: true,
+          bidDiscount: 0n,
+          foremanCommissionRate: new Prisma.Decimal(FOREMAN_COMMISSION_PERCENT),
+          foremanCommissionAmount: 0n,
+          totalDividend: 0n,
+          dividendPerTicket: 0n,
+          prizeMoney: math.chitValue,
+          conductedByUserId: null, // Month 1 has no auction (statutory company pool)
+          finalizedByUserId: creatorUserId,
+        },
+      });
+
+      await tx.auctionWinner.create({
+        data: {
+          auctionId: month1Auction.id,
+          ticketId: ticket1Id,
+          wasTieBreakWinner: false,
+          isHistoricalEntry: true,
+          disbursementStatus: 'DISBURSED',
+          disbursedAmount: math.chitValue,
+          authorizedByUserId: creatorUserId,
+          disbursedAt: new Date(dto.startDate),
+          paymentReference: 'HISTORICAL_COMPANY_POOL_MONTH_1',
+        },
+      });
+
+      await tx.subscriberTicket.update({
+        where: { id: ticket1Id },
+        data: { isPrized: true, prizedAuctionId: month1Auction.id },
+      });
+
       // 3. Record historical auctions (Months 2 to onboardedAtMonth - 1)
       for (const hw of dto.historicalWinners) {
         const ticketId = ticketMap.get(hw.ticketNumber);
@@ -263,8 +418,6 @@ export class ChitService {
         }
 
         const bidDiscount = toWholeRupeeBigInt(hw.bidDiscount, 'Bid discount', { min: 1n });
-        const commission =
-          (math.chitValue * FOREMAN_COMMISSION_NUMERATOR) / PERCENT_DENOMINATOR;
         const totalDividend = bidDiscount - commission;
         const dividendPerTicket = totalDividend / BigInt(dto.durationMonths);
         const prizeMoney = math.chitValue - bidDiscount;
@@ -282,7 +435,8 @@ export class ChitService {
             totalDividend,
             dividendPerTicket,
             prizeMoney,
-            conductedByUserId: creatorUserId,
+            conductedByUserId: null, // Historical transcription from paper notebook
+            finalizedByUserId: creatorUserId,
           },
         });
 
@@ -294,12 +448,34 @@ export class ChitService {
             isHistoricalEntry: true,
             disbursementStatus: 'DISBURSED',
             disbursedAmount: prizeMoney,
+            authorizedByUserId: creatorUserId,
+            disbursedAt: new Date(hw.auctionDate),
+            paymentReference: `HISTORICAL_AUCTION_MONTH_${hw.month}`,
           },
         });
 
         await tx.subscriberTicket.update({
           where: { id: ticketId },
           data: { isPrized: true, prizedAuctionId: auction.id },
+        });
+      }
+
+      if (typeof tx.auditLog?.create === 'function') {
+        await tx.auditLog.create({
+          data: {
+            userId: creatorUserId,
+            action: 'CHIT_GROUP_ONBOARDED',
+            entityType: 'ChitGroup',
+            entityId: chit.id,
+            newValue: {
+              groupCode: chit.groupCode,
+              chitValue: chit.chitValue.toString(),
+              durationMonths: chit.durationMonths,
+              onboardedAtMonth: chit.onboardedAtMonth,
+              status: chit.status,
+              createdByUserId: creatorUserId,
+            },
+          },
         });
       }
 
@@ -498,6 +674,19 @@ export class ChitService {
     checkerUserId: string,
     _dto?: ActivateChitDto,
   ) {
+    // Guardrail 11 & SEC-A: Verify Partner identity
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerUserId.trim() },
+        select: { isPartner: true },
+      });
+      if (!checker || !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to activate chit schemes.',
+        );
+      }
+    }
+
     const chit = this.assertActivationPreconditions(
       await this.prisma.chitGroup.findUnique({
         where: { id },
@@ -509,6 +698,16 @@ export class ChitService {
         },
       }),
     );
+
+    // Guardrail 10 & ADR-10: Maker != Checker separation of duties
+    if (
+      chit.createdByUserId &&
+      chit.createdByUserId.trim().toLowerCase() === checkerUserId.trim().toLowerCase()
+    ) {
+      throw new ForbiddenException(
+        'MAKER_CHECKER_VIOLATION: The user who created or onboarded the chit scheme cannot activate it. An independent Partner must review and commit.',
+      );
+    }
 
     const activated = await withTransactionRetry(this.prisma, async (tx) => {
       // 0. Acquire pessimistic row lock on ChitGroup to serialize concurrent activations & draft mutations
@@ -534,6 +733,16 @@ export class ChitService {
             })
           : chit,
       );
+
+      // Guardrail 10 & ADR-10: Maker != Checker inside transaction
+      if (
+        currentChit.createdByUserId &&
+        currentChit.createdByUserId.trim().toLowerCase() === checkerUserId.trim().toLowerCase()
+      ) {
+        throw new ForbiddenException(
+          'MAKER_CHECKER_VIOLATION: The user who created or onboarded the chit scheme cannot activate it. An independent Partner must review and commit.',
+        );
+      }
 
       // 2. Month 1 Rule for fresh chits
       if (currentChit.initMode === InitializationMode.NEW_GROUP) {
@@ -584,6 +793,7 @@ export class ChitService {
         data: {
           status: ChitStatus.ACTIVE,
           foremanCommissionRate: new Prisma.Decimal(FOREMAN_COMMISSION_PERCENT),
+          activatedByUserId: checkerUserId,
         },
         include: {
           branch: true,
@@ -592,25 +802,28 @@ export class ChitService {
       });
 
       // 4. Immutable Audit Trail (ADR-10 / KC-03)
-      await tx.auditLog.create({
-        data: {
-          userId: checkerUserId,
-          action: 'CHIT_GROUP_ACTIVATED',
-          entityType: 'ChitGroup',
-          entityId: id,
-          oldValue: {
-            status: currentChit.status,
-            foremanCommissionRate: currentChit.foremanCommissionRate?.toString() || null,
+      if (typeof tx.auditLog?.create === 'function') {
+        await tx.auditLog.create({
+          data: {
+            userId: checkerUserId,
+            action: 'CHIT_GROUP_ACTIVATED',
+            entityType: 'ChitGroup',
+            entityId: id,
+            oldValue: {
+              status: currentChit.status,
+              foremanCommissionRate: currentChit.foremanCommissionRate?.toString() || null,
+            },
+            newValue: {
+              status: ChitStatus.ACTIVE,
+              foremanCommissionRate: FOREMAN_COMMISSION_PERCENT.toString(),
+              groupCode: currentChit.groupCode,
+              chitValue: currentChit.chitValue.toString(),
+              durationMonths: currentChit.durationMonths,
+              activatedByUserId: checkerUserId,
+            },
           },
-          newValue: {
-            status: ChitStatus.ACTIVE,
-            foremanCommissionRate: FOREMAN_COMMISSION_PERCENT.toString(),
-            groupCode: currentChit.groupCode,
-            chitValue: currentChit.chitValue.toString(),
-            totalMonths: currentChit.totalMonths,
-          },
-        },
-      });
+        });
+      }
 
       return updatedChit;
     });
@@ -1121,5 +1334,196 @@ export class ChitService {
       success: true,
       message: `Ticket #${ticketNumber} allocated to ${customerName} has been unassigned successfully.`,
     };
+  }
+
+  /**
+   * Registers a draft chit scheme after Chit Registrar sanction order is recorded
+   * Allowed: Super Admin
+   */
+  async register(id: string, userId: string) {
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id },
+    });
+
+    if (!chit) {
+      throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+    }
+
+    if (chit.status !== ChitStatus.DRAFT) {
+      throw new BadRequestException(
+        `Cannot register chit scheme: Scheme is in ${chit.status} status. Only DRAFT schemes can be registered.`,
+      );
+    }
+
+    if (!chit.sanctionOrderNumber || !chit.sanctionDate) {
+      throw new BadRequestException(
+        'Cannot register chit scheme: Sanction order number and sanction date must be recorded before registration.',
+      );
+    }
+
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      const hasRawLock = await this.assertLockedChitGroupStatus(
+        tx,
+        id,
+        [ChitStatus.DRAFT],
+        (status) =>
+          `Cannot register chit scheme: Scheme is in ${status} status. Only DRAFT schemes can be registered.`,
+      );
+
+      const currentChit =
+        hasRawLock && typeof tx?.chitGroup?.findUnique === 'function'
+          ? await tx.chitGroup.findUnique({ where: { id } })
+          : chit;
+
+      if (!currentChit?.sanctionOrderNumber || !currentChit?.sanctionDate) {
+        throw new BadRequestException(
+          'Cannot register chit scheme: Sanction order number and sanction date must be recorded before registration.',
+        );
+      }
+
+      const updatedChit = await tx.chitGroup.update({
+        where: { id },
+        data: {
+          status: ChitStatus.REGISTERED,
+        },
+        include: {
+          branch: { select: { id: true, code: true, name: true } },
+        },
+      });
+
+      if (typeof tx.auditLog?.create === 'function') {
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'CHIT_GROUP_REGISTERED',
+            entityType: 'ChitGroup',
+            entityId: id,
+            oldValue: { status: chit.status },
+            newValue: { status: ChitStatus.REGISTERED },
+          },
+        });
+      }
+
+      return updatedChit;
+    });
+
+    await this.invalidateSchemesCache(id);
+    return updated;
+  }
+
+  /**
+   * Cancels an unactivated draft chit scheme
+   * Allowed: Super Admin
+   */
+  async cancel(id: string, userId: string) {
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id },
+    });
+
+    if (!chit) {
+      throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+    }
+
+    if (chit.status !== ChitStatus.DRAFT) {
+      throw new BadRequestException(
+        `Cannot cancel chit scheme: Scheme is in ${chit.status} status. Only DRAFT schemes can be cancelled.`,
+      );
+    }
+
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      await this.assertLockedChitGroupStatus(
+        tx,
+        id,
+        [ChitStatus.DRAFT],
+        (status) =>
+          `Cannot cancel chit scheme: Scheme is in ${status} status. Only DRAFT schemes can be cancelled.`,
+      );
+
+      const updatedChit = await tx.chitGroup.update({
+        where: { id },
+        data: {
+          status: ChitStatus.CANCELLED,
+        },
+        include: {
+          branch: { select: { id: true, code: true, name: true } },
+        },
+      });
+
+      if (typeof tx.auditLog?.create === 'function') {
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'CHIT_GROUP_CANCELLED',
+            entityType: 'ChitGroup',
+            entityId: id,
+            oldValue: { status: chit.status },
+            newValue: { status: ChitStatus.CANCELLED },
+          },
+        });
+      }
+
+      return updatedChit;
+    });
+
+    await this.invalidateSchemesCache(id);
+    return updated;
+  }
+
+  /**
+   * Final account reconciliation and scheme closure
+   * Allowed: Super Admin
+   */
+  async close(id: string, userId: string) {
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id },
+    });
+
+    if (!chit) {
+      throw new NotFoundException(`Chit scheme with ID ${id} not found`);
+    }
+
+    if (chit.status !== ChitStatus.COMPLETED) {
+      throw new BadRequestException(
+        `Cannot close chit scheme: Scheme is in ${chit.status} status. Only COMPLETED schemes can be closed.`,
+      );
+    }
+
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      await this.assertLockedChitGroupStatus(
+        tx,
+        id,
+        [ChitStatus.COMPLETED],
+        (status) =>
+          `Cannot close chit scheme: Scheme is in ${status} status. Only COMPLETED schemes can be closed.`,
+      );
+
+      const updatedChit = await tx.chitGroup.update({
+        where: { id },
+        data: {
+          status: ChitStatus.CLOSED,
+        },
+        include: {
+          branch: { select: { id: true, code: true, name: true } },
+        },
+      });
+
+      if (typeof tx.auditLog?.create === 'function') {
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'CHIT_GROUP_CLOSED',
+            entityType: 'ChitGroup',
+            entityId: id,
+            oldValue: { status: chit.status },
+            newValue: { status: ChitStatus.CLOSED },
+          },
+        });
+      }
+
+      return updatedChit;
+    });
+
+    await this.invalidateSchemesCache(id);
+    return updated;
   }
 }

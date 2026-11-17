@@ -416,7 +416,8 @@ export class InstallmentService {
       };
     });
 
-    const outstandingBalance = totalNetDue - totalPaid;
+    const openingBalance = ticket.openingBalance || 0n;
+    const outstandingBalance = totalNetDue + openingBalance - totalPaid;
 
     return {
       ticket: {
@@ -426,6 +427,7 @@ export class InstallmentService {
         isPrized: ticket.isPrized,
         consecutiveUnpaidMonths: ticket.consecutiveUnpaidMonths,
         joiningDate: ticket.joiningDate,
+        openingBalance,
       },
       customer: {
         customerCode: ticket.customer.customerCode,
@@ -446,6 +448,7 @@ export class InstallmentService {
         totalDividend,
         totalNetDue,
         totalPaid,
+        openingBalance,
         outstandingBalance,
       },
       ledgerEntries,

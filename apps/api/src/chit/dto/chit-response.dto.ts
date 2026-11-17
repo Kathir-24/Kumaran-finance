@@ -16,32 +16,38 @@ export class ChitGroupResponseDto {
   @ApiProperty({ type: String, example: 'ரூ 1 லட்சம் 20 மாதங்கள் குழு A', description: 'Chit group name in Tamil', nullable: true })
   groupNameTamil?: string | null;
 
-  @ApiProperty({ example: 100000, description: 'Chit total value in whole Rupees' })
+  @ApiProperty({ type: 'integer', example: 100000, description: 'Chit total value in whole Rupees' })
   chitValue: number;
 
-  @ApiProperty({ example: 20, description: 'Duration in months' })
+  @ApiProperty({ type: 'integer', example: 20, description: 'Duration in months' })
   durationMonths: number;
 
-  @ApiProperty({ example: 20, description: 'Total number of subscriber tickets' })
+  @ApiProperty({ type: 'integer', example: 20, description: 'Total number of subscriber tickets' })
   totalTickets: number;
 
-  @ApiProperty({ example: 5000, description: 'Base installment amount per month in whole Rupees' })
+  @ApiProperty({ type: 'integer', example: 5000, description: 'Base installment amount per month in whole Rupees' })
   baseInstallment: number;
 
   @ApiProperty({ example: 4.0, description: 'Foreman commission rate permanently frozen for group' })
   foremanCommissionRate: number;
 
-  @ApiProperty({ example: 25000, description: 'Maximum allowable 1/4 (25%) auction bid discount ceiling in whole Rupees' })
+  @ApiProperty({ type: 'integer', example: 25000, description: 'Maximum allowable 1/4 (25%) auction bid discount ceiling in whole Rupees' })
   maxDiscountCeiling: number;
 
   @ApiProperty({ enum: InitializationMode, example: InitializationMode.NEW_GROUP, description: 'Initialization mode' })
   initMode: InitializationMode;
 
-  @ApiProperty({ example: 1, description: 'Month chit was onboarded at' })
+  @ApiProperty({ type: 'integer', example: 1, description: 'Month chit was onboarded at' })
   onboardedAtMonth: number;
 
   @ApiProperty({ enum: ChitStatus, example: ChitStatus.DRAFT, description: 'Chit scheme lifecycle status' })
   status: ChitStatus;
+
+  @ApiProperty({ type: String, example: 'user-uuid-maker', description: 'User ID of Maker who created or onboarded the chit', nullable: true })
+  createdByUserId?: string | null;
+
+  @ApiProperty({ type: String, example: 'user-uuid-checker', description: 'User ID of Partner Checker who activated the chit', nullable: true })
+  activatedByUserId?: string | null;
 
   @ApiProperty({ type: String, example: 'DRO/ERD/CHIT/2026/001', description: 'Registrar sanction order number', nullable: true })
   sanctionOrderNumber?: string | null;
@@ -75,7 +81,7 @@ export class TicketResponseDto {
   @ApiProperty({ example: 'cust-uuid-001', description: 'Subscriber customer ID' })
   customerId: string;
 
-  @ApiProperty({ example: 1, description: 'Ticket number 1..N' })
+  @ApiProperty({ type: 'integer', example: 1, description: 'Ticket number 1..N' })
   ticketNumber: number;
 
   @ApiProperty({ example: false, description: 'Whether ticket has won an auction' })
@@ -84,7 +90,7 @@ export class TicketResponseDto {
   @ApiProperty({ type: String, example: null, description: 'Prized auction ID if won', nullable: true })
   prizedAuctionId?: string | null;
 
-  @ApiProperty({ example: 0, description: 'Consecutive unpaid installment months count' })
+  @ApiProperty({ type: 'integer', example: 0, description: 'Consecutive unpaid installment months count' })
   consecutiveUnpaidMonths: number;
 
   @ApiProperty({ example: 'ACTIVE', description: 'Ticket enrollment status' })

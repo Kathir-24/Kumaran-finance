@@ -21,6 +21,7 @@ export class QueryChitDto {
   search?: string;
 
   @ApiPropertyOptional({
+    type: 'integer',
     example: 1,
     default: 1,
   })
@@ -31,6 +32,7 @@ export class QueryChitDto {
   page?: number = 1;
 
   @ApiPropertyOptional({
+    type: 'integer',
     example: 20,
     default: 20,
   })

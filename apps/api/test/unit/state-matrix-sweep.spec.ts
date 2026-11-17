@@ -34,14 +34,16 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
       ChitStatus.ACTIVE,
       ChitStatus.COMPLETED,
       ChitStatus.CLOSED,
+      ChitStatus.CANCELLED,
     ];
 
     const validChitTransitions: Record<ChitStatus, ChitStatus[]> = {
-      [ChitStatus.DRAFT]: [ChitStatus.REGISTERED, ChitStatus.ACTIVE],
+      [ChitStatus.DRAFT]: [ChitStatus.REGISTERED, ChitStatus.ACTIVE, ChitStatus.CANCELLED],
       [ChitStatus.REGISTERED]: [ChitStatus.ACTIVE],
       [ChitStatus.ACTIVE]: [ChitStatus.COMPLETED],
       [ChitStatus.COMPLETED]: [ChitStatus.CLOSED],
       [ChitStatus.CLOSED]: [], // Terminal state
+      [ChitStatus.CANCELLED]: [], // Terminal state
     };
 
     let chitService: ChitService;
