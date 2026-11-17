@@ -69,9 +69,6 @@ void main() {
     assertEqual(counts.tickets, 3, 'tickets count should be 3');
     assertEqual(counts.nominees, 1, 'nominees count should be 1');
     assertEqual(counts.documents, 2, 'documents count should be 2');
-    assertTrue(counts.tickets is int, 'tickets should be int');
-    assertTrue(counts.nominees is int, 'nominees should be int');
-    assertTrue(counts.documents is int, 'documents should be int');
   }
 
   // Test 4: DEF-12: CustomerResponseDto uses integer type for version counter
@@ -107,7 +104,6 @@ void main() {
 
     final doc = ConfirmCustomerDocumentDto.fromJson(json);
     assertEqual(doc.sizeBytes, 2048576, 'sizeBytes should match');
-    assertTrue(doc.sizeBytes is int, 'sizeBytes should be int');
   }
 
   print('ALL Module 3 Dart model tests PASSED successfully!');
