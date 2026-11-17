@@ -29,6 +29,7 @@ export interface UserSummary {
   name: string;
   phone: string;
   roles: string[];
+  isPartner?: boolean;
   isActive: boolean;
   branch?: { id: string; code: string; name: string } | null;
 }
@@ -55,11 +56,13 @@ export function EditRolesDialog({
   const t = useTranslations('users');
   const queryClient = useQueryClient();
   const [selectedRoles, setSelectedRoles] = React.useState<string[]>([]);
+  const [isPartner, setIsPartner] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (user) {
       setSelectedRoles(user.roles || []);
+      setIsPartner(Boolean(user.isPartner));
       setErrorMsg(null);
     }
   }, [user]);
@@ -82,7 +85,10 @@ export function EditRolesDialog({
       return unwrapApiResponse(
         apiClient.PATCH('/api/v1/users/{id}/roles', {
           params: { path: { id: user.id } },
-          body: { roles: selectedRoles as UserRoleType[] },
+          body: {
+            roles: selectedRoles as UserRoleType[],
+            isPartner: selectedRoles.includes('SUPER_ADMIN') ? isPartner : false,
+          },
         })
       );
     },
@@ -153,6 +159,32 @@ export function EditRolesDialog({
               );
             })}
           </div>
+
+          {selectedRoles.includes('SUPER_ADMIN') && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-amber-300">Verified Business Partner:</span>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Statutory partners are legally verified stakeholders holding authorization rights for auctions, disbursements, and reversals.
+                  </p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-amber-500/20">
+                <input
+                  type="checkbox"
+                  checked={isPartner}
+                  disabled={isSelf && Boolean(user?.isPartner)}
+                  onChange={(e) => setIsPartner(e.target.checked)}
+                  className="rounded border-amber-500/40 bg-slate-950 text-amber-500 focus:ring-amber-500/30 h-3.5 w-3.5"
+                />
+                <span className="font-medium text-amber-200 text-xs">
+                  Grant Verified Partner Privileges (isPartner: true)
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">

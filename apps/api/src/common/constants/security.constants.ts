@@ -98,3 +98,18 @@ export const CORS_ALLOWED_METHODS = [
 
 /** Preflight cache duration: 24 hours (86,400 seconds) */
 export const CORS_MAX_AGE_SECONDS = 86_400;
+
+/**
+ * Canonical Staff RBAC Roles:
+ * Strictly excludes Role.CUSTOMER which is reserved for chit subscribers.
+ */
+export const STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'BRANCH_MANAGER',
+  'ACCOUNTANT',
+  'COLLECTION_AGENT',
+  'AUDITOR',
+] as const;
+
+export type StaffRole = (typeof STAFF_ROLES)[number];
+

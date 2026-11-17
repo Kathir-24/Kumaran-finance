@@ -46,8 +46,8 @@ export class UserController {
   @ApiPaginatedResponseEnvelope(UserResponseDto, {
     description: 'Staff user list retrieved successfully',
   })
-  async findAll(@Query() query: QueryUserDto) {
-    return this.userService.findAll(query);
+  async findAll(@Query() query: QueryUserDto, @CurrentUser() currentUser?: any) {
+    return this.userService.findAll(query, currentUser);
   }
 
   @Get(':id')
@@ -78,8 +78,8 @@ export class UserController {
   })
   @ApiResponse({ status: 400, description: 'Invalid branch or payload' })
   @ApiResponse({ status: 409, description: 'Phone number already registered to staff' })
-  async create(@Body() dto: CreateUserDto) {
-    return this.userService.create(dto);
+  async create(@Body() dto: CreateUserDto, @CurrentUser() currentUser?: any) {
+    return this.userService.create(dto, currentUser);
   }
 
   @Patch(':id/status')
@@ -117,9 +117,9 @@ export class UserController {
   async updateRoles(
     @Param('id') id: string,
     @Body() dto: UpdateUserRolesDto,
-    @CurrentUser('sub') currentUserId: string,
+    @CurrentUser() currentUser: any,
   ) {
-    return this.userService.updateRoles(id, dto, currentUserId);
+    return this.userService.updateRoles(id, dto, currentUser);
   }
 
   @Post(':id/reset-password')

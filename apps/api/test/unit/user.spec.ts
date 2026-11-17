@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
@@ -91,6 +92,38 @@ describe('Staff User Management Tests', () => {
         NotFoundException,
       );
     });
+
+    it('should scope queries to currentUser.branchId when caller is Branch Manager', async () => {
+      prismaMock.user.findMany.mockResolvedValue([mockStaffUser]);
+      prismaMock.user.count.mockResolvedValue(1);
+
+      const bmUser = {
+        sub: 'user-bm-001',
+        roles: [Role.BRANCH_MANAGER],
+        branchId: 'branch-erd-002',
+      };
+
+      await userController.findAll({ page: 1, limit: 20 }, bmUser as any);
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            branchId: 'branch-erd-002',
+          }),
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException if Branch Manager queries a different branchId', async () => {
+      const bmUser = {
+        sub: 'user-bm-001',
+        roles: [Role.BRANCH_MANAGER],
+        branchId: 'branch-erd-002',
+      };
+
+      await expect(
+        userController.findAll({ page: 1, limit: 20, branchId: 'other-branch' }, bmUser as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe('2. Staff User Creation', () => {
@@ -136,6 +169,56 @@ describe('Staff User Management Tests', () => {
           branchId: 'invalid-branch-id',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject staff creation with Role.CUSTOMER', async () => {
+      await expect(
+        userController.create({
+          name: 'Invalid Staff',
+          phone: '9842100000',
+          roles: [Role.CUSTOMER as any],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow verified partner to create staff with isPartner: true', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.branch.findFirst.mockResolvedValue({ id: mockBranchId });
+      prismaMock.user.create.mockResolvedValue({ ...mockStaffUser, isPartner: true });
+
+      const partnerUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: true };
+      const res = await userController.create(
+        {
+          name: 'Partner User',
+          phone: '9842111111',
+          roles: [Role.SUPER_ADMIN],
+          isPartner: true,
+        },
+        partnerUser as any,
+      );
+
+      expect(res.isPartner).toBe(true);
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ isPartner: true }),
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException if non-partner attempts to create user with isPartner: true', async () => {
+      const nonPartnerAdmin = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: false };
+
+      await expect(
+        userController.create(
+          {
+            name: 'Attempted Partner',
+            phone: '9842122222',
+            roles: [Role.SUPER_ADMIN],
+            isPartner: true,
+          },
+          nonPartnerAdmin as any,
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -199,6 +282,48 @@ describe('Staff User Management Tests', () => {
           mockSuperAdminId,
           { roles: [Role.ACCOUNTANT] },
           mockSuperAdminId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject updating staff with Role.CUSTOMER', async () => {
+      await expect(
+        userController.updateRoles(
+          mockAgentId,
+          { roles: [Role.CUSTOMER as any] },
+          { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: true } as any,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ForbiddenException if non-partner modifies isPartner status', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      const nonPartnerAdmin = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: false };
+
+      await expect(
+        userController.updateRoles(
+          mockAgentId,
+          { roles: [Role.SUPER_ADMIN], isPartner: true },
+          nonPartnerAdmin as any,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should prevent partner from revoking their own partner status', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockStaffUser,
+        id: mockSuperAdminId,
+        roles: [Role.SUPER_ADMIN],
+        isPartner: true,
+      });
+
+      const partnerUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: true };
+
+      await expect(
+        userController.updateRoles(
+          mockSuperAdminId,
+          { roles: [Role.SUPER_ADMIN], isPartner: false },
+          partnerUser as any,
         ),
       ).rejects.toThrow(BadRequestException);
     });

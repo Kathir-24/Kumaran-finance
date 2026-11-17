@@ -41,6 +41,7 @@ export function UserForm() {
   const [phone, setPhone] = React.useState('');
   const [branchId, setBranchId] = React.useState('');
   const [selectedRoles, setSelectedRoles] = React.useState<string[]>(['COLLECTION_AGENT']);
+  const [isPartner, setIsPartner] = React.useState(false);
   const [password, setPassword] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -97,6 +98,7 @@ export function UserForm() {
             name: name.trim(),
             phone: cleanPhone,
             roles: selectedRoles as Array<'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR'>,
+            isPartner: selectedRoles.includes('SUPER_ADMIN') ? isPartner : false,
             branchId: branchId || undefined,
             password: password.trim() || undefined,
           },
@@ -235,14 +237,27 @@ export function UserForm() {
                 </div>
 
                 {selectedRoles.includes('SUPER_ADMIN') && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-2.5 text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2 mt-2">
-                    <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-amber-300">Administrative Super Admin (isPartner: false):</span>
-                      <span className="ml-1 text-slate-300">
-                        This account will have full IT and system administration access (user management, audit logs, background queues). Legal partner privileges (auction finalization, prize payouts, payment reversals) require statutory partnership deed verification and cannot be assigned here.
-                      </span>
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-[11px] text-amber-200/90 leading-relaxed space-y-2.5 mt-2">
+                    <div className="flex items-start gap-2">
+                      <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-amber-300">Super Admin Authority (SEC-A / ADR-21):</span>
+                        <p className="mt-0.5 text-slate-300">
+                          Administrative Super Admins manage staff users, audit registers, and background queues. Only verified statutory business partners can perform financial authorizations (auctions, payouts, reversals).
+                        </p>
+                      </div>
                     </div>
+                    <label className="flex items-center gap-2 cursor-pointer pt-1.5 border-t border-amber-500/20">
+                      <input
+                        type="checkbox"
+                        checked={isPartner}
+                        onChange={(e) => setIsPartner(e.target.checked)}
+                        className="rounded border-amber-500/40 bg-slate-950 text-amber-500 focus:ring-amber-500/30 h-3.5 w-3.5"
+                      />
+                      <span className="font-semibold text-amber-200">
+                        Designate as Verified Statutory Business Partner (isPartner: true)
+                      </span>
+                    </label>
                   </div>
                 )}
               </div>

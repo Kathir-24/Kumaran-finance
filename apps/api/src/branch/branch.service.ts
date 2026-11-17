@@ -13,6 +13,7 @@ import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
+import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @Injectable()
 export class BranchService {
@@ -151,6 +152,35 @@ export class BranchService {
 
     await this.invalidateCache(created.id);
     return created;
+  }
+
+  /**
+   * Updates an existing branch office (Super Admin only).
+   * Atomically invalidates branch caches.
+   */
+  async update(id: string, dto: UpdateBranchDto) {
+    const branch = await this.prisma.branch.findUnique({
+      where: { id },
+    });
+
+    if (!branch) {
+      throw new NotFoundException(`Branch with ID ${id} not found`);
+    }
+
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name.trim();
+    if (dto.nameTamil !== undefined) data.nameTamil = dto.nameTamil.trim() || null;
+    if (dto.address !== undefined) data.address = dto.address.trim();
+    if (dto.phone !== undefined) data.phone = dto.phone.trim();
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+
+    const updated = await this.prisma.branch.update({
+      where: { id },
+      data,
+    });
+
+    await this.invalidateCache(id);
+    return updated;
   }
 
   /**

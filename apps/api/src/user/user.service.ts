@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
@@ -117,7 +118,7 @@ export class UserService {
   /**
    * Retrieves paginated list of staff users with search & role filters
    */
-  async findAll(query: QueryUserDto) {
+  async findAll(query: QueryUserDto, currentUser?: any) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -136,7 +137,23 @@ export class UserService {
       where.roles = { has: query.role };
     }
 
-    if (query.branchId) {
+    // Tenancy isolation (Layer 2 Anti-BOLA):
+    // If Branch Manager (and not Super Admin / Auditor), scope strictly to own branchId
+    const isBranchManagerOnly =
+      currentUser?.roles?.includes(Role.BRANCH_MANAGER) &&
+      !currentUser?.roles?.includes(Role.SUPER_ADMIN) &&
+      !currentUser?.roles?.includes(Role.AUDITOR);
+
+    if (isBranchManagerOnly) {
+      if (query.branchId && currentUser.branchId && query.branchId !== currentUser.branchId) {
+        throw new ForbiddenException(
+          'Branch Managers are restricted to staff within their assigned branch',
+        );
+      }
+      if (currentUser.branchId) {
+        where.branchId = currentUser.branchId;
+      }
+    } else if (query.branchId) {
       where.branchId = query.branchId;
     }
 
@@ -191,7 +208,17 @@ export class UserService {
   /**
    * Creates a new staff user account (Super Admin only)
    */
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, currentUser?: any) {
+    if (dto.roles.includes(Role.CUSTOMER)) {
+      throw new BadRequestException('Customer role cannot be assigned to staff user accounts');
+    }
+
+    if (dto.isPartner) {
+      if (currentUser && !currentUser.isPartner) {
+        throw new ForbiddenException('Only verified business partners can grant Partner status');
+      }
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { phone: dto.phone.trim() },
     });
@@ -229,6 +256,7 @@ export class UserService {
         phone: dto.phone.trim(),
         passwordHash,
         roles: dto.roles,
+        isPartner: dto.isPartner === true,
         isActive: true,
         mustChangePassword: isTempPassword,
       },
@@ -284,7 +312,14 @@ export class UserService {
   /**
    * Updates RBAC roles assigned to a staff user
    */
-  async updateRoles(id: string, dto: UpdateUserRolesDto, currentUserId: string) {
+  async updateRoles(id: string, dto: UpdateUserRolesDto, currentUser?: any) {
+    const currentUserId = typeof currentUser === 'string' ? currentUser : currentUser?.sub;
+    const currentUserIsPartner = typeof currentUser === 'string' ? false : Boolean(currentUser?.isPartner);
+
+    if (dto.roles.includes(Role.CUSTOMER)) {
+      throw new BadRequestException('Customer role cannot be assigned to staff user accounts');
+    }
+
     if (id === currentUserId && !dto.roles.includes(Role.SUPER_ADMIN)) {
       throw new BadRequestException('Super Admins cannot revoke their own Super Admin privileges');
     }
@@ -297,12 +332,25 @@ export class UserService {
       throw new NotFoundException(`Staff user with ID ${id} not found`);
     }
 
+    // Partner status mutation security check
+    let targetIsPartner = user.isPartner;
+    if (dto.isPartner !== undefined && dto.isPartner !== user.isPartner) {
+      if (currentUser && !currentUserIsPartner) {
+        throw new ForbiddenException('Only verified business partners can modify Partner status');
+      }
+      if (id === currentUserId && !dto.isPartner && user.isPartner) {
+        throw new BadRequestException('Partners cannot revoke their own partner status');
+      }
+      targetIsPartner = dto.isPartner;
+    }
+
     const now = new Date();
     const updateFn = async (tx: any) => {
       const res = await tx.user.update({
         where: { id },
         data: {
           roles: dto.roles,
+          isPartner: targetIsPartner,
           tokenRevokedBefore: now,
           refreshTokenHash: null,
           fcmToken: null,

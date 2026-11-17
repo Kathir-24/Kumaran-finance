@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -21,6 +22,7 @@ import {
 import { BranchService } from './branch.service';
 import { BranchResponseDto } from './dto/branch-response.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
+import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @ApiTags('Branches')
 @ApiBearerAuth('JWT-auth')
@@ -84,5 +86,20 @@ export class BranchController {
   @ApiResponse({ status: 409, description: 'Branch code already in use' })
   async create(@Body() dto: CreateBranchDto) {
     return this.branchService.create(dto);
+  }
+
+  @Patch(':id')
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Update branch office details',
+    description:
+      'Updates metadata or active status for a specific branch office. Allowed: Super Admin only.',
+  })
+  @ApiOkResponseEnvelope(BranchResponseDto, {
+    description: 'Branch updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
+    return this.branchService.update(id, dto);
   }
 }

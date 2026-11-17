@@ -26,6 +26,7 @@ describe('Branch Management Tests', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -106,6 +107,39 @@ describe('Branch Management Tests', () => {
           phone: '9842143210',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('3. Branch Update', () => {
+    it('should update branch details successfully', async () => {
+      prismaMock.branch.findUnique.mockResolvedValue(mockBranch);
+      prismaMock.branch.update.mockResolvedValue({
+        ...mockBranch,
+        name: 'Updated HO Perundurai',
+        phone: '9842199999',
+      });
+
+      const res = await branchController.update('branch-prd-001', {
+        name: 'Updated HO Perundurai',
+        phone: '9842199999',
+      });
+
+      expect(res.name).toBe('Updated HO Perundurai');
+      expect(prismaMock.branch.update).toHaveBeenCalledWith({
+        where: { id: 'branch-prd-001' },
+        data: expect.objectContaining({
+          name: 'Updated HO Perundurai',
+          phone: '9842199999',
+        }),
+      });
+    });
+
+    it('should throw NotFoundException if branch to update does not exist', async () => {
+      prismaMock.branch.findUnique.mockResolvedValue(null);
+
+      await expect(
+        branchController.update('missing-branch', { name: 'New Name' }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

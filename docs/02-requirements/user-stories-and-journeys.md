@@ -19,7 +19,7 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 | 1.2 | Mobile App 6-digit MPIN Quick Unlock & Biometrics | Actor (Parity)| — | Actor (Dual) | Actor | Actor | — |
 | 1.3 | Session Management & Instant Logout | Actor | Actor | Actor | Actor | Actor | Actor |
 | **M2** | **Branch & Staff Management** | | | | | | |
-| 2.1 | Single Branch Configuration (`PRD`) | Actor | View | View | — | — | View |
+| 2.1 | Single Branch Configuration (`PRD`) | Actor | View | View | View (Receipts) | — | View |
 | 2.2 | Staff Profile & Multi-Role Assignment | Actor | View | — | — | — | View |
 | **M3** | **Customer & Nominee Intake** | | | | | | |
 | 3.1 | Customer Intake (`KC-CUST-XXXXX`) & Tamil Names | Actor | Actor | Limited | Lead Intake | Self-profile | View |

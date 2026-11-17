@@ -1,16 +1,17 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import {
   ArrayNotEmpty,
   IsArray,
-  IsEnum,
+  IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MinLength,
 } from 'class-validator';
-import { REGEX_INDIAN_PHONE } from '../../common/constants';
+import { REGEX_INDIAN_PHONE, STAFF_ROLES } from '../../common/constants';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'R. Murugan', description: 'Full staff name in English' })
@@ -24,14 +25,25 @@ export class CreateUserDto {
 
   @ApiProperty({
     isArray: true,
-    enum: Role,
+    enum: STAFF_ROLES,
     example: [Role.COLLECTION_AGENT],
-    description: 'Assigned RBAC role personas for this staff user',
+    description: 'Assigned RBAC role personas for this staff user (strictly excludes CUSTOMER)',
   })
   @IsArray()
   @ArrayNotEmpty()
-  @IsEnum(Role, { each: true })
+  @IsIn(STAFF_ROLES, {
+    each: true,
+    message: 'roles must contain only staff roles (SUPER_ADMIN, BRANCH_MANAGER, ACCOUNTANT, COLLECTION_AGENT, AUDITOR)',
+  })
   roles: Role[];
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Verified statutory partner identity (requires caller to be an active partner)',
+  })
+  @IsBoolean()
+  @IsOptional()
+  isPartner?: boolean;
 
   @ApiProperty({
     example: 'branch-prd-001',
