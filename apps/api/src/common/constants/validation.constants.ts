@@ -7,7 +7,7 @@
  * - MPIN: Exactly 6 numeric digits.
  */
 
-export const REGEX_INDIAN_PHONE = /^\d{10}$/;
+export const REGEX_INDIAN_PHONE = /^[6-9]\d{9}$/;
 
 export const REGEX_INDIAN_PINCODE = /^\d{6}$/;
 

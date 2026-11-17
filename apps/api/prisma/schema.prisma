@@ -139,6 +139,8 @@ model Nominee {
   phone        String
   aadhaarLast4 String?
   createdAt    DateTime  @default(now())
+
+  @@index([customerId])
 }
 
 model CustomerDocument {
@@ -150,6 +152,8 @@ model CustomerDocument {
   fileName     String
   verified     Boolean   @default(false)
   uploadedAt   DateTime  @default(now())
+
+  @@index([customerId])
 }
 
 // -------------------------------------------------------------

@@ -9,9 +9,12 @@ export class NomineeResponseDto {
   customerId: string;
 
   @ApiProperty({ example: 'Kavitha S', description: 'Nominee full name in English' })
-  name: string;
+  fullName: string;
 
-  @ApiProperty({ type: String, example: 'கவிதா சு', description: 'Nominee full name in Tamil', nullable: true })
+  @ApiPropertyOptional({ example: 'Kavitha S', description: 'Nominee full name alias for backward compatibility' })
+  name?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'கவிதா சு', description: 'Nominee full name in Tamil', nullable: true })
   nameTamil?: string | null;
 
   @ApiProperty({ example: 'SPOUSE', description: 'Relationship with subscriber' })

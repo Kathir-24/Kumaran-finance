@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiClient, getErrorMessage, unwrapApiResponse, KumaranApiError } from '@/lib/api-client';
 import type { Schema } from '@kumaran/api-client';
@@ -38,11 +38,31 @@ export function CustomerIntakeForm() {
   const [phone, setPhone] = React.useState('');
   const [altPhone, setAltPhone] = React.useState('');
 
-  // Section 2: Address
+  // Section 2: Address & Branch
   const [addressLine1, setAddressLine1] = React.useState('');
   const [addressLine2, setAddressLine2] = React.useState('');
   const [city, setCity] = React.useState('Perundurai');
   const [pincode, setPincode] = React.useState('638052');
+  const [branchId, setBranchId] = React.useState('');
+
+  // Fetch branches for branch assignment
+  const { data: branches = [] } = useQuery<{ id: string; code: string; name: string }[]>({
+    queryKey: queryKeys.branches.all,
+    queryFn: async () => {
+      try {
+        return await unwrapApiResponse(
+          apiClient.GET('/api/v1/branches', {
+            params: { query: { activeOnly: 'true' } },
+          })
+        );
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Track created customer for resilient partial failure recovery
+  const [createdCustomer, setCreatedCustomer] = React.useState<CreatedCustomerSummary | null>(null);
 
   // Section 3: Nominee
   const [includeNominee, setIncludeNominee] = React.useState(false);
@@ -102,6 +122,8 @@ export function CustomerIntakeForm() {
     setNomineeAadhaarLast4('');
     setPanNumber('');
     setAadhaarLast4('');
+    setBranchId('');
+    setCreatedCustomer(null);
     setErrorMsg(null);
     setSuccessData(null);
   };
@@ -113,8 +135,11 @@ export function CustomerIntakeForm() {
       if (!fullName.trim() || fullName.trim().length < 2) {
         throw new Error('Full Name must be at least 2 characters');
       }
-      if (!/^\d{10}$/.test(phone.trim())) {
-        throw new Error('Primary Mobile Phone must be exactly 10 digits');
+      if (!/^[6-9]\d{9}$/.test(phone.trim())) {
+        throw new Error('Primary Mobile Phone must be a valid 10-digit Indian mobile number (starts with 6-9)');
+      }
+      if (altPhone.trim() && !/^[6-9]\d{9}$/.test(altPhone.trim())) {
+        throw new Error('Alternate Mobile Phone must be a valid 10-digit Indian mobile number (starts with 6-9)');
       }
       if (!addressLine1.trim()) {
         throw new Error('Street Address Line 1 is required');
@@ -134,32 +159,36 @@ export function CustomerIntakeForm() {
         if (!nomineeName.trim() || nomineeName.trim().length < 2) {
           throw new Error('Nominee Name must be at least 2 characters');
         }
-        if (!/^\d{10}$/.test(nomineePhone.trim())) {
-          throw new Error('Nominee Phone must be exactly 10 digits');
+        if (!/^[6-9]\d{9}$/.test(nomineePhone.trim())) {
+          throw new Error('Nominee Phone must be a valid 10-digit Indian mobile number (starts with 6-9)');
         }
         if (nomineeAadhaarLast4.trim() && !/^\d{4}$/.test(nomineeAadhaarLast4.trim())) {
           throw new Error('Nominee Aadhaar must be strictly the last 4 digits');
         }
       }
 
-      // 3. Submit Customer payload
-      const customerPayload: Schema<'CreateCustomerDto'> = {
-        fullName: fullName.trim(),
-        fullNameTamil: fullNameTamil.trim() || undefined,
-        phone: phone.trim(),
-        altPhone: altPhone.trim() || undefined,
-        addressLine1: addressLine1.trim(),
-        addressLine2: addressLine2.trim() || undefined,
-        city: city.trim() || 'Perundurai',
-        pincode: pincode.trim() || '638052',
-        panNumber: panNumber.trim() ? panNumber.trim().toUpperCase() : undefined,
-        aadhaarLast4: aadhaarLast4.trim() || undefined,
-        branchId: activeBranchId || user?.branchId || undefined,
-      };
+      // 3. Submit Customer payload (skip if already created in a previous partial attempt)
+      let customer = createdCustomer;
+      if (!customer) {
+        const customerPayload: Schema<'CreateCustomerDto'> = {
+          fullName: fullName.trim(),
+          fullNameTamil: fullNameTamil.trim() || undefined,
+          phone: phone.trim(),
+          altPhone: altPhone.trim() || undefined,
+          addressLine1: addressLine1.trim(),
+          addressLine2: addressLine2.trim() || undefined,
+          city: city.trim() || 'Perundurai',
+          pincode: pincode.trim() || '638052',
+          panNumber: panNumber.trim() ? panNumber.trim().toUpperCase() : undefined,
+          aadhaarLast4: aadhaarLast4.trim() || undefined,
+          branchId: branchId || activeBranchId || user?.branchId || undefined,
+        };
 
-      const customer = await unwrapApiResponse<CreatedCustomerSummary>(
-        apiClient.POST('/api/v1/customers', { body: customerPayload })
-      );
+        customer = await unwrapApiResponse<CreatedCustomerSummary>(
+          apiClient.POST('/api/v1/customers', { body: customerPayload })
+        );
+        setCreatedCustomer(customer);
+      }
 
       // 4. Submit Nominee payload if entered
       if (includeNominee && nomineeName.trim() && customer?.id) {
@@ -181,6 +210,7 @@ export function CustomerIntakeForm() {
       return customer;
     },
     onSuccess: (data) => {
+      setCreatedCustomer(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       setSuccessData({
         id: data.id,
@@ -231,7 +261,7 @@ export function CustomerIntakeForm() {
             onFillSample={fillSampleSubscriber}
           />
 
-          {/* Section 2: Residential Address */}
+          {/* Section 2: Residential Address & Branch */}
           <AddressDetailsSection
             addressLine1={addressLine1}
             setAddressLine1={setAddressLine1}
@@ -241,6 +271,9 @@ export function CustomerIntakeForm() {
             setCity={setCity}
             pincode={pincode}
             setPincode={setPincode}
+            branchId={branchId}
+            setBranchId={setBranchId}
+            branches={branches}
           />
 
           {/* Section 3: Nominee Details (Optional Toggle) */}

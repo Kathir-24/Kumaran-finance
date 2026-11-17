@@ -81,9 +81,9 @@ export class CustomerController {
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
   async create(
     @Body() dto: CreateCustomerDto,
-    @CurrentUser('branchId') branchId?: string | null,
+    @CurrentUser() currentUser?: JwtPayload,
   ) {
-    return this.customerService.create(dto, branchId);
+    return this.customerService.create(dto, currentUser);
   }
 
   @Get()
@@ -247,7 +247,7 @@ export class CustomerController {
       );
     }
 
-    return this.customerService.updateFcmToken(id, dto.fcmToken);
+    return this.customerService.updateFcmToken(id, dto.fcmToken, currentUser);
   }
 
   @Post(':id/documents')

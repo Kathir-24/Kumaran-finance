@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
   IsOptional,
@@ -88,6 +89,7 @@ export class CreateCustomerDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase().trim() : value))
   @Matches(REGEX_INDIAN_PAN, {
     message: 'PAN must be valid 10-character format (e.g. ABCDE1234F)',
   })

@@ -568,6 +568,15 @@ export class DocumentAccessHelper {
       return;
     }
 
+    if (user.roles.includes(Role.COLLECTION_AGENT)) {
+      if (!user.branchId || customer.branchId !== user.branchId) {
+        throw new ForbiddenException(
+          'BOLA_VIOLATION: Access denied. Customer profile and KYC documents belong to another branch office',
+        );
+      }
+      return;
+    }
+
     throw new ForbiddenException('BOLA_VIOLATION: Access denied. Unauthorized to access this customer record');
   }
 }

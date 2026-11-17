@@ -3760,7 +3760,12 @@ export interface components {
              * @description Nominee full name in English
              * @example Kavitha S
              */
-            name: string;
+            fullName: string;
+            /**
+             * @description Nominee full name alias for backward compatibility
+             * @example Kavitha S
+             */
+            name?: string;
             /**
              * @description Nominee full name in Tamil
              * @example கவிதா சு

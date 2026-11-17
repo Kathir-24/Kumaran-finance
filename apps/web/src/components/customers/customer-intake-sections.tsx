@@ -116,6 +116,9 @@ export interface AddressSectionProps {
   setCity: (v: string) => void;
   pincode: string;
   setPincode: (v: string) => void;
+  branchId?: string;
+  setBranchId?: (v: string) => void;
+  branches?: { id: string; code?: string; name: string }[];
 }
 
 export function AddressDetailsSection(props: AddressSectionProps) {
@@ -165,6 +168,23 @@ export function AddressDetailsSection(props: AddressSectionProps) {
             className="h-9 text-xs font-mono border-slate-700 bg-slate-950 text-slate-100"
           />
         </div>
+        {props.setBranchId && (
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300">{t('branchLabel')}</label>
+            <select
+              value={props.branchId || ''}
+              onChange={(e) => props.setBranchId?.(e.target.value)}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="">{t('homeBranch')} (PRD HO)</option>
+              {props.branches?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.code ? `${b.code} - ${b.name}` : b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

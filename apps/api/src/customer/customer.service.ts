@@ -151,7 +151,7 @@ export class CustomerService {
   /**
    * Registers a new customer profile with unique phone check and auto-generated customer code
    */
-  async create(dto: CreateCustomerDto, staffBranchId?: string | null) {
+  async create(dto: CreateCustomerDto, currentUserOrBranchId?: JwtPayload | string | null) {
     // 1. Phone number uniqueness check
     const existing = await this.prisma.customer.findUnique({
       where: { phone: dto.phone },
@@ -163,8 +163,28 @@ export class CustomerService {
       );
     }
 
-    // 2. Resolve branch (provided branchId -> staff branch -> default Head Office)
-    let branchId = dto.branchId || staffBranchId;
+    // 2. Resolve branch & Anti-BOLA verification
+    let branchId: string | undefined;
+    if (typeof currentUserOrBranchId === 'object' && currentUserOrBranchId !== null) {
+      const currentUser = currentUserOrBranchId as JwtPayload;
+      const isSuperAdmin = currentUser.roles?.includes(Role.SUPER_ADMIN);
+
+      if (!isSuperAdmin) {
+        if (dto.branchId && currentUser.branchId && dto.branchId !== currentUser.branchId) {
+          throw new ForbiddenException(
+            'BOLA_VIOLATION: Staff cannot create customers in another branch office',
+          );
+        }
+        branchId = currentUser.branchId || dto.branchId || undefined;
+      } else {
+        branchId = dto.branchId || currentUser.branchId || undefined;
+      }
+    } else if (typeof currentUserOrBranchId === 'string') {
+      branchId = currentUserOrBranchId;
+    } else {
+      branchId = dto.branchId;
+    }
+
     if (!branchId) {
       const defaultBranch = await this.prisma.branch.findFirst({
         where: { isActive: true },
@@ -423,8 +443,16 @@ export class CustomerService {
 
     if (isAgentOnly) {
       safeCustomer.panNumber = undefined;
+      safeCustomer.documents = undefined;
     } else if (!isFullAccess && safeCustomer.panNumber) {
       safeCustomer.panNumber = `${safeCustomer.panNumber.slice(0, 2)}XXXXX${safeCustomer.panNumber.slice(-3)}`;
+    }
+
+    if (safeCustomer.nominees && Array.isArray(safeCustomer.nominees)) {
+      safeCustomer.nominees = safeCustomer.nominees.map((n: any) => ({
+        ...n,
+        name: n.fullName || n.name,
+      }));
     }
 
     return safeCustomer;
@@ -518,7 +546,7 @@ export class CustomerService {
       DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
-    return this.prisma.nominee.create({
+    const nominee = await this.prisma.nominee.create({
       data: {
         customerId,
         fullName: dto.fullName.trim(),
@@ -527,6 +555,29 @@ export class CustomerService {
         aadhaarLast4: dto.aadhaarLast4?.trim() || null,
       },
     });
+
+    if (currentUser?.sub && this.prisma.auditLog) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: currentUser.sub,
+          action: 'CUSTOMER_NOMINEE_ADDED',
+          entityType: 'Nominee',
+          entityId: nominee.id,
+          newValue: {
+            customerId,
+            fullName: nominee.fullName,
+            relationship: nominee.relationship,
+            phone: nominee.phone,
+            aadhaarLast4: nominee.aadhaarLast4,
+          },
+        },
+      });
+    }
+
+    return {
+      ...nominee,
+      name: nominee.fullName,
+    };
   }
 
   /**
@@ -560,6 +611,24 @@ export class CustomerService {
       where: { id: nomineeId },
     });
 
+    if (currentUser?.sub && this.prisma.auditLog) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: currentUser.sub,
+          action: 'CUSTOMER_NOMINEE_REMOVED',
+          entityType: 'Nominee',
+          entityId: nomineeId,
+          oldValue: {
+            customerId,
+            fullName: nominee.fullName,
+            relationship: nominee.relationship,
+            phone: nominee.phone,
+            aadhaarLast4: nominee.aadhaarLast4,
+          },
+        },
+      });
+    }
+
     return {
       success: true,
       message: 'Nominee removed successfully.',
@@ -587,6 +656,19 @@ export class CustomerService {
       data: { isKycVerified: dto.isKycVerified },
     });
 
+    if (currentUser?.sub && this.prisma.auditLog) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: currentUser.sub,
+          action: 'CUSTOMER_KYC_STATUS_UPDATED',
+          entityType: 'Customer',
+          entityId: id,
+          oldValue: { isKycVerified: customer.isKycVerified },
+          newValue: { isKycVerified: dto.isKycVerified },
+        },
+      });
+    }
+
     return {
       success: true,
       isKycVerified: dto.isKycVerified,
@@ -597,13 +679,17 @@ export class CustomerService {
   /**
    * Registers, updates, or clears the Firebase Cloud Messaging device push token for a customer
    */
-  async updateFcmToken(id: string, fcmToken?: string | null) {
+  async updateFcmToken(id: string, fcmToken?: string | null, currentUser?: JwtPayload) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    if (currentUser) {
+      DocumentAccessHelper.assertCustomerAccess(customer, currentUser);
     }
 
     const updatedCustomer = await this.prisma.customer.update({

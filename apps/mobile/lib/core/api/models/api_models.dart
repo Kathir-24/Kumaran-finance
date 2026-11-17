@@ -1649,7 +1649,7 @@ class CustomerResponseDto {
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Record version for optimistic concurrency control
-  final double? version;
+  final int? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -1695,7 +1695,7 @@ class CustomerResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
+      version: json['version'] != null ? (json['version'] as num).toInt() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -1800,11 +1800,11 @@ class CreateCustomerDto {
 
 class CustomerCountsDto {
   /// Number of active ticket holdings
-  final double tickets;
+  final int tickets;
   /// Number of registered nominees
-  final double nominees;
+  final int nominees;
   /// Number of uploaded KYC documents
-  final double documents;
+  final int documents;
 
   const CustomerCountsDto({
     required this.tickets,
@@ -1814,9 +1814,9 @@ class CustomerCountsDto {
 
   factory CustomerCountsDto.fromJson(Map<String, dynamic> json) {
     return CustomerCountsDto(
-      tickets: (json['tickets'] != null ? (json['tickets'] as num).toDouble() : null) ?? 0.0,
-      nominees: (json['nominees'] != null ? (json['nominees'] as num).toDouble() : null) ?? 0.0,
-      documents: (json['documents'] != null ? (json['documents'] as num).toDouble() : null) ?? 0.0,
+      tickets: (json['tickets'] != null ? (json['tickets'] as num).toInt() : null) ?? 0,
+      nominees: (json['nominees'] != null ? (json['nominees'] as num).toInt() : null) ?? 0,
+      documents: (json['documents'] != null ? (json['documents'] as num).toInt() : null) ?? 0,
     );
   }
 
@@ -1857,7 +1857,7 @@ class CustomerListItemDto {
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Record version for optimistic concurrency control
-  final double? version;
+  final int? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -1906,7 +1906,7 @@ class CustomerListItemDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
+      version: json['version'] != null ? (json['version'] as num).toInt() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -1946,6 +1946,8 @@ class NomineeResponseDto {
   /// Linked customer ID
   final String customerId;
   /// Nominee full name in English
+  final String fullName;
+  /// Nominee full name alias for backward compatibility
   final String name;
   /// Nominee full name in Tamil
   final String? nameTamil;
@@ -1961,6 +1963,7 @@ class NomineeResponseDto {
   const NomineeResponseDto({
     required this.id,
     required this.customerId,
+    required this.fullName,
     required this.name,
     this.nameTamil,
     required this.relationship,
@@ -1973,7 +1976,8 @@ class NomineeResponseDto {
     return NomineeResponseDto(
       id: json['id']?.toString() ?? '',
       customerId: json['customerId']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
+      fullName: (json['fullName'] ?? json['name'])?.toString() ?? '',
+      name: (json['name'] ?? json['fullName'])?.toString() ?? '',
       nameTamil: json['nameTamil']?.toString(),
       relationship: json['relationship']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
@@ -1986,6 +1990,7 @@ class NomineeResponseDto {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['id'] = id;
     data['customerId'] = customerId;
+    data['fullName'] = fullName;
     data['name'] = name;
     data['nameTamil'] = nameTamil;
     data['relationship'] = relationship;
@@ -2024,7 +2029,7 @@ class CustomerDetailResponseDto {
   /// Whether KYC verification is approved
   final bool isKycVerified;
   /// Record version for optimistic concurrency control
-  final double? version;
+  final int? version;
   /// Branch ID
   final String? branchId;
   /// Home branch details
@@ -2079,7 +2084,7 @@ class CustomerDetailResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
+      version: json['version'] != null ? (json['version'] as num).toInt() : null,
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -2139,7 +2144,7 @@ class UpdateCustomerDto {
   /// Updated masked last 4 digits of Aadhaar
   final String? aadhaarLast4;
   /// Current record version for optimistic concurrency control
-  final double? version;
+  final int? version;
 
   const UpdateCustomerDto({
     this.fullName,
@@ -2167,7 +2172,7 @@ class UpdateCustomerDto {
       pincode: json['pincode']?.toString(),
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
-      version: json['version'] != null ? (json['version'] as num).toDouble() : null,
+      version: json['version'] != null ? (json['version'] as num).toInt() : null,
     );
   }
 
@@ -2363,7 +2368,7 @@ class ConfirmCustomerDocumentDto {
   /// Verified MIME type uploaded directly to object storage
   final String mimeType;
   /// Uploaded file byte length (1 byte to 10 MB)
-  final double sizeBytes;
+  final int sizeBytes;
 
   const ConfirmCustomerDocumentDto({
     required this.key,
@@ -2379,7 +2384,7 @@ class ConfirmCustomerDocumentDto {
       docType: json['docType']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
       mimeType: json['mimeType']?.toString() ?? '',
-      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toInt() : null) ?? 0,
     );
   }
 

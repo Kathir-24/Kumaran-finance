@@ -31,7 +31,8 @@ import { useAuthStore, type AuthState } from '@/stores/auth-store';
 export interface CustomerNominee {
   id: string;
   customerId: string;
-  fullName: string;
+  fullName?: string;
+  name?: string;
   relationship: string;
   phone: string;
   aadhaarLast4?: string | null;
@@ -165,7 +166,7 @@ export function CustomerNomineesCard({ customerId, nominees }: CustomerNomineesC
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">{nominee.fullName}</span>
+                    <span className="text-sm font-bold text-white">{nominee.fullName || nominee.name}</span>
                     <Badge variant="outline" className="border-indigo-500/30 bg-indigo-950/40 text-indigo-300 text-[11px]">
                       {nominee.relationship}
                     </Badge>

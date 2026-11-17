@@ -6,6 +6,10 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
+import {
+  REGEX_AADHAAR_LAST_4,
+  REGEX_INDIAN_PHONE,
+} from '../../common/constants';
 
 export class CreateNomineeDto {
   @ApiProperty({
@@ -31,8 +35,8 @@ export class CreateNomineeDto {
   })
   @IsNotEmpty({ message: 'Nominee phone number is required' })
   @IsString()
-  @Matches(/^\d{10}$/, {
-    message: 'Nominee phone number must be exactly 10 digits',
+  @Matches(REGEX_INDIAN_PHONE, {
+    message: 'Nominee phone number must be a valid 10-digit Indian mobile (starts with 6-9)',
   })
   phone: string;
 
@@ -42,7 +46,7 @@ export class CreateNomineeDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{4}$/, {
+  @Matches(REGEX_AADHAAR_LAST_4, {
     message: 'Nominee Aadhaar must be strictly the last 4 digits (e.g. 8912)',
   })
   aadhaarLast4?: string;

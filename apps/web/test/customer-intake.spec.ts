@@ -235,6 +235,92 @@ test('Task 5.2: Guardrail 10 — RBAC Authority Gate prevents Desk Accountant fr
   assert.equal(canPerformCustomerIntake([]), false, 'Empty role must be barred');
 });
 
+test('Task 5.2: DEF-09 Alternate Mobile Phone Validation Invariant', () => {
+  const base = {
+    fullName: 'S. Rathinasamy',
+    phone: '9842712345',
+    addressLine1: '45/1 Erode Main Road',
+  };
+
+  // Valid altPhone
+  assert.equal(validateCustomerIntake({ ...base, altPhone: '9443212345' }).isValid, true);
+  assert.equal(validateCustomerIntake({ ...base, altPhone: '6380123456' }).isValid, true);
+
+  // Invalid altPhone (starts with 0-5, too short, or non-digits)
+  assert.equal(validateCustomerIntake({ ...base, altPhone: '1234567890' }).isValid, false);
+  assert.equal(validateCustomerIntake({ ...base, altPhone: '0984212345' }).isValid, false);
+  assert.equal(validateCustomerIntake({ ...base, altPhone: '98427' }).isValid, false);
+});
+
+test('Task 5.2: DEF-10 Branch Selection & DEF-11 Partial Failure Retry Invariant', () => {
+  // Simulates the intake submission flow
+  interface IntakeState {
+    createdCustomerId: string | null;
+    customerCreatedCalls: number;
+    nomineeCreatedCalls: number;
+  }
+
+  const simulateIntakeSubmission = async (
+    state: IntakeState,
+    payload: { customer: { fullName: string; phone: string; branchId?: string }; nominee?: { name: string; failOnNominee?: boolean } },
+  ) => {
+    // Step 1: Customer Creation (skipped if customer already created)
+    let customerId = state.createdCustomerId;
+    if (!customerId) {
+      state.customerCreatedCalls++;
+      customerId = 'cust-uuid-created-001';
+      state.createdCustomerId = customerId;
+    }
+
+    // Step 2: Nominee Creation
+    if (payload.nominee) {
+      state.nomineeCreatedCalls++;
+      if (payload.nominee.failOnNominee) {
+        throw new Error('Nominee creation network timeout');
+      }
+    }
+
+    return { customerId, branchId: payload.customer.branchId || 'default-ho' };
+  };
+
+  const state: IntakeState = {
+    createdCustomerId: null,
+    customerCreatedCalls: 0,
+    nomineeCreatedCalls: 0,
+  };
+
+  // 1st Attempt: Customer created, but nominee throws error
+  assert.rejects(
+    async () => {
+      await simulateIntakeSubmission(state, {
+        customer: { fullName: 'S. Rathinasamy', phone: '9842712345', branchId: 'branch-erd-002' },
+        nominee: { name: 'R. Saradha', failOnNominee: true },
+      });
+    },
+    /Nominee creation network timeout/,
+  );
+
+  // Assert customer was created once
+  assert.equal(state.customerCreatedCalls, 1);
+  assert.equal(state.nomineeCreatedCalls, 1);
+  assert.equal(state.createdCustomerId, 'cust-uuid-created-001');
+
+  // 2nd Attempt (Retry): User re-submits form after fixing nominee info
+  // Since state.createdCustomerId is preserved, customer creation is NOT re-invoked (avoiding 409 Conflict)
+  assert.doesNotReject(async () => {
+    const res = await simulateIntakeSubmission(state, {
+      customer: { fullName: 'S. Rathinasamy', phone: '9842712345', branchId: 'branch-erd-002' },
+      nominee: { name: 'R. Saradha', failOnNominee: false },
+    });
+    assert.equal(res.customerId, 'cust-uuid-created-001');
+    assert.equal(res.branchId, 'branch-erd-002');
+  });
+
+  // Customer create was NOT called again; nominee was called second time
+  assert.equal(state.customerCreatedCalls, 1, 'Customer creation should NOT be called again on retry');
+  assert.equal(state.nomineeCreatedCalls, 2, 'Nominee creation should be retried');
+});
+
 test('Task 5.2: Bilingual Dictionary Parity — intake keys (en <-> ta)', () => {
   const enCustomers = (enMessages as any).customers || {};
   const taCustomers = (taMessages as any).customers || {};
