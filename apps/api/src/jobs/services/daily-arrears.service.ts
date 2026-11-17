@@ -1,6 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus } from '@prisma/client';
 import { CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS } from '../../common/constants';
+import {
+  computeMaxConsecutiveUnpaidMonths,
+  deriveTicketArrearsStatus,
+} from '../../common/utils/arrears.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { DailyArrearsExecutionResult } from '../dto/job-payloads.dto';
 import { DistributedLockService } from './distributed-lock.service';
@@ -83,23 +87,23 @@ export class DailyArrearsService {
     let ticketsInDefault3M = 0;
 
     for (const ticket of tickets) {
-      let consecutiveUnpaid = 0;
-      let totalOverdue = 0n;
-
-      // Count consecutive unpaid months starting from the latest month downwards
-      for (const d of ticket.dues) {
-        if (d.status !== DueStatus.PAID) {
-          consecutiveUnpaid++;
-          totalOverdue += (d.netPayableAmount - d.paidAmount);
-        } else {
-          break; // Stop at the first paid month
-        }
-      }
+      // Compute canonical longest contiguous unpaid month streak (ADR-07)
+      const consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(ticket.dues);
+      const totalOverdue = ticket.dues.reduce(
+        (sum, d) =>
+          d.status !== DueStatus.PAID
+            ? sum + (d.netPayableAmount - d.paidAmount)
+            : sum,
+        0n,
+      );
 
       const wasInDefault = ticket.status === 'DEFAULT_3_MONTHS';
       const isNowDefault =
         consecutiveUnpaid >= CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS;
-      const targetStatus = isNowDefault ? 'DEFAULT_3_MONTHS' : 'ACTIVE';
+      const targetStatus = deriveTicketArrearsStatus(
+        consecutiveUnpaid,
+        ticket.status,
+      );
 
       if (consecutiveUnpaid > 0) {
         ticketsInArrears++;

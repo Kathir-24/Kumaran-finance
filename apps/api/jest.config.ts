@@ -24,6 +24,12 @@ const config: Config = {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  // Real-DB integration tests (chaos, concurrency, state-matrix) share a live
+  // PostgreSQL instance and acquire branch-level FOR UPDATE locks. Running them
+  // in parallel causes lock contention and flaky failures. maxWorkers: 1 runs
+  // all spec files sequentially, matching the same guarantee as test:e2e
+  // (--runInBand) and eliminating cross-test deadlock races.
+  maxWorkers: 1,
 };
 
 export default config;

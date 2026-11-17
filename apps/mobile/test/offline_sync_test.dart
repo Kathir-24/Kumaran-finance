@@ -85,11 +85,13 @@ Future<void> main() async {
   final collectionItem = await repository.recordOfflineCollection(
     dueId: 'due-001',
     ticketId: 'ticket-001',
+    installmentMonth: 3,
     amountCollected: 40000,
     agentBranchCode: 'PRD',
   );
 
   assertEqual(collectionItem.amountCollected, 40000, 'Collected amount matches');
+  assertEqual(collectionItem.installmentMonth, 3, 'Installment month is 3');
   assertEqual(collectionItem.paymentMethod, 'CASH', 'Payment method is CASH');
   assertEqual(collectionItem.idempotencyKey.isNotEmpty, true, 'UUIDv4 idempotency key must be generated');
 
@@ -110,7 +112,8 @@ Future<void> main() async {
 
   final call = mockClient.dispatchedCalls.first;
   assertEqual(call['method'], 'POST', 'HTTP method is POST');
-  assertEqual(call['path'], '/api/v1/collections/counter', 'Correct API path');
+  assertEqual(call['path'], '/api/v1/collections/record', 'Correct API path');
+  assertEqual(call['body']['installmentMonth'], 3, 'Correct installment month');
   assertEqual(call['headers']['Idempotency-Key'], collectionItem.idempotencyKey, 'Idempotency key preserved');
 
   // 5. Verify queue is drained after successful sync

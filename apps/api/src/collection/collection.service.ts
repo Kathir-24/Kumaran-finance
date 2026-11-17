@@ -10,6 +10,10 @@ import {
 import { DueStatus, PaymentMethod, PaymentStatus, Role, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  computeMaxConsecutiveUnpaidMonths,
+  deriveTicketArrearsStatus,
+} from '../common/utils/arrears.util';
+import {
   acquirePaymentConcurrencyLocks,
   generateNextReceiptNumber,
   PAYMENT_TRANSACTION_OPTIONS,
@@ -197,6 +201,23 @@ export class CollectionService {
       );
     }
 
+    // 5a. Sequential Installment Payment Guard (ADR-07): Prevent Out-of-Order Collections
+    if (typeof this.prisma.installmentDue?.findFirst === 'function') {
+      const priorUnpaidDuePre = await this.prisma.installmentDue.findFirst({
+        where: {
+          ticketId: ticket.id,
+          installmentMonth: { lt: due.installmentMonth },
+          status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+        },
+        orderBy: { installmentMonth: 'asc' },
+      });
+      if (priorUnpaidDuePre) {
+        throw new BadRequestException(
+          `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDuePre.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+        );
+      }
+    }
+
     // Accounting Branch (F09): Strictly derived from authorized domain record
     const branchId = ticket.chitGroup.branchId;
     const lockBranchId = ticket.chitGroup.branchId;
@@ -227,6 +248,23 @@ export class CollectionService {
           throw new BadRequestException(
             `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
           );
+        }
+
+        // Sequential Installment Payment Guard under transaction lock
+        if (typeof tx.installmentDue?.findFirst === 'function') {
+          const priorUnpaidDue = await tx.installmentDue.findFirst({
+            where: {
+              ticketId: ticket.id,
+              installmentMonth: { lt: due.installmentMonth },
+              status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            },
+            orderBy: { installmentMonth: 'asc' },
+          });
+          if (priorUnpaidDue) {
+            throw new BadRequestException(
+              `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDue.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+            );
+          }
         }
 
         // 1. Create Payment
@@ -277,20 +315,35 @@ export class CollectionService {
           },
         });
 
-      // 5. Recalculate Arrears & Restore Auction Eligibility
-      const remainingUnpaidDues = await tx.installmentDue.count({
-        where: {
-          ticketId: ticket.id,
-          status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
-          dueDate: { lt: new Date() },
-        },
-      });
+      // 5. Recalculate Consecutive Arrears & Restore Auction Eligibility (ADR-07 canonical streak)
+      const allDues =
+        typeof tx.installmentDue?.findMany === 'function'
+          ? await tx.installmentDue.findMany({
+              where: { ticketId: ticket.id },
+              orderBy: { installmentMonth: 'desc' },
+            })
+          : undefined;
+
+      let consecutiveUnpaid: number;
+      if (Array.isArray(allDues)) {
+        consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(allDues, {
+          treatAsPaidIds: [due.id],
+        });
+      } else {
+        consecutiveUnpaid = await tx.installmentDue.count({
+          where: {
+            ticketId: ticket.id,
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            dueDate: { lt: new Date() },
+          },
+        });
+      }
 
       await tx.subscriberTicket.update({
         where: { id: ticket.id },
         data: {
-          consecutiveUnpaidMonths: remainingUnpaidDues,
-          status: remainingUnpaidDues === 0 ? 'ACTIVE' : ticket.status,
+          consecutiveUnpaidMonths: consecutiveUnpaid,
+          status: deriveTicketArrearsStatus(consecutiveUnpaid, ticket.status),
         },
       });
 
@@ -450,11 +503,18 @@ export class CollectionService {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) with deterministic ID sorting to eliminate deadlocks (40P01)
       if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
         const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
-        const lockedPayments = await tx.$queryRaw<Array<{ id: string; cashHandoverStatus: string }>>`
-          SELECT id, "cashHandoverStatus" FROM "Payment" WHERE id = ANY(${sortedPaymentIds}::text[]) ORDER BY id FOR UPDATE
+        const lockedPayments = await tx.$queryRaw<
+          Array<{ id: string; cashHandoverStatus: string; paymentStatus?: string }>
+        >`
+          SELECT id, "cashHandoverStatus", "paymentStatus" FROM "Payment" WHERE id = ANY(${sortedPaymentIds}::text[]) ORDER BY id FOR UPDATE
         `;
         if (lockedPayments && lockedPayments.length > 0) {
           for (const lp of lockedPayments) {
+            if (lp.paymentStatus && lp.paymentStatus !== PaymentStatus.SUCCESS) {
+              throw new BadRequestException(
+                `Payment ${lp.id} is not in SUCCESS status (status: ${lp.paymentStatus}) and cannot be acknowledged for cash handover`,
+              );
+            }
             if (lp.cashHandoverStatus !== 'PENDING_HANDOVER') {
               throw new BadRequestException(
                 `Payment ${lp.id} has already been acknowledged or is not pending handover`,
@@ -474,11 +534,16 @@ export class CollectionService {
         throw new BadRequestException('One or more payment IDs in the batch could not be found');
       }
 
-      // Verify all belong to collector and are in PENDING_HANDOVER
+      // Verify all belong to collector, are SUCCESS cash collections, and are in PENDING_HANDOVER
       for (const p of payments) {
         if (p.recordedByUserId !== dto.collectorUserId) {
           throw new BadRequestException(
             `Payment ${p.id} was not recorded by collector ${dto.collectorUserId}`,
+          );
+        }
+        if (p.paymentStatus && p.paymentStatus !== PaymentStatus.SUCCESS) {
+          throw new BadRequestException(
+            `Payment ${p.id} is not in SUCCESS status (status: ${p.paymentStatus}) and cannot be acknowledged for cash handover`,
           );
         }
         if (p.paymentMethod !== PaymentMethod.CASH) {
@@ -739,7 +804,16 @@ export class CollectionService {
       (preExistingPayments || []).map((p) => [p.idempotencyKey!, p]),
     );
 
-    for (const item of dto.items) {
+    // Sort multi-month offline items chronologically per ticket (oldest month first)
+    // so sequential payment validation (PRIOR_INSTALLMENT_UNPAID) succeeds cleanly
+    const orderedItems = [...dto.items].sort((a, b) => {
+      if (a.ticketId === b.ticketId) {
+        return a.installmentMonth - b.installmentMonth;
+      }
+      return 0;
+    });
+
+    for (const item of orderedItems) {
       if (item.idempotencyKey && preExistingMap.has(item.idempotencyKey)) {
         const existing = preExistingMap.get(item.idempotencyKey)!;
         if (existing.recordedByUserId !== collectorUserId) {
@@ -816,6 +890,8 @@ export class CollectionService {
 
         if (errorMessage.includes('INSTALLMENT_ALREADY_PAID')) {
           errorCode = 'INSTALLMENT_ALREADY_PAID';
+        } else if (errorMessage.includes('PRIOR_INSTALLMENT_UNPAID')) {
+          errorCode = 'PRIOR_INSTALLMENT_UNPAID';
         } else if (errorMessage.includes('PARTIAL_PAYMENTS_NOT_ALLOWED')) {
           errorCode = 'PARTIAL_PAYMENTS_NOT_ALLOWED';
         } else if (errorMessage.includes('Subscriber ticket not found')) {

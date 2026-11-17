@@ -81,6 +81,17 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         },
         include: { chitGroup: true, customer: true },
       });
+
+      if (activeTicket) {
+        // Ensure activeTicket has no outstanding prior dues so synthetic concurrency test months can be evaluated sequentially
+        await prisma.installmentDue.updateMany({
+          where: {
+            ticketId: activeTicket.id,
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+          },
+          data: { status: DueStatus.PAID, paidAmount: 3750n },
+        });
+      }
     } catch {
       isDbConnected = false;
       console.warn(
@@ -534,14 +545,33 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       return;
     }
 
+    const branchTickets = await prisma.subscriberTicket.findMany({
+      where: {
+        status: 'ACTIVE',
+        chitGroupId: activeTicket.chitGroupId,
+      },
+      include: { chitGroup: true, customer: true },
+      take: 2,
+    });
+    const ticket1 = branchTickets[0] || activeTicket;
+    const ticket2 = branchTickets[1] || branchTickets[0];
+
+    await prisma.installmentDue.updateMany({
+      where: {
+        ticketId: { in: [ticket1.id, ticket2.id] },
+        status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+      },
+      data: { status: DueStatus.PAID, paidAmount: 3750n },
+    });
+
     const testMonth1 = 993;
     const testMonth2 = 994;
 
     const [due1, due2] = await Promise.all([
       prisma.installmentDue.create({
         data: {
-          ticketId: activeTicket.id,
-          chitGroupId: activeTicket.chitGroupId,
+          ticketId: ticket1.id,
+          chitGroupId: ticket1.chitGroupId,
           installmentMonth: testMonth1,
           grossAmount: 5000n,
           dividendDeduction: 1000n,
@@ -552,8 +582,8 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       }),
       prisma.installmentDue.create({
         data: {
-          ticketId: activeTicket.id,
-          chitGroupId: activeTicket.chitGroupId,
+          ticketId: ticket2.id,
+          chitGroupId: ticket2.chitGroupId,
           installmentMonth: testMonth2,
           grossAmount: 5000n,
           dividendDeduction: 1000n,
@@ -571,7 +601,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       const [res1, res2] = await Promise.all([
         paymentService.recordPayment(
           {
-            ticketId: activeTicket.id,
+            ticketId: ticket1.id,
             installmentMonth: testMonth1,
             amount: 4000,
             paymentMethod: PaymentMethod.CASH,
@@ -581,7 +611,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         ),
         paymentService.recordPayment(
           {
-            ticketId: activeTicket.id,
+            ticketId: ticket2.id,
             installmentMonth: testMonth2,
             amount: 4000,
             paymentMethod: PaymentMethod.CASH,
@@ -733,10 +763,19 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
     const branchTickets = await prisma.subscriberTicket.findMany({
       where: {
         status: 'ACTIVE',
-        chitGroup: { branchId: activeTicket.chitGroup.branchId, status: 'ACTIVE' },
+        chitGroupId: activeTicket.chitGroupId,
       },
       include: { chitGroup: true, customer: true },
       take: 6,
+    });
+
+    const branchTicketIds = branchTickets.map((t) => t.id);
+    await prisma.installmentDue.updateMany({
+      where: {
+        ticketId: { in: branchTicketIds },
+        status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+      },
+      data: { status: DueStatus.PAID, paidAmount: 3750n },
     });
 
     const createdDueIds: string[] = [];

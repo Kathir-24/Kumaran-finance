@@ -65,6 +65,7 @@ class InMemoryOfflineStorageProvider implements OfflineStorageProvider {
         queueId: existing.queueId,
         dueId: existing.dueId,
         ticketId: existing.ticketId,
+        installmentMonth: existing.installmentMonth,
         amountCollected: existing.amountCollected,
         paymentMethod: existing.paymentMethod,
         collectedAt: existing.collectedAt,

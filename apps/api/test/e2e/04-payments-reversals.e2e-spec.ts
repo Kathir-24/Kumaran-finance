@@ -98,6 +98,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     it('TC-HP-01 & TC-REG-03: Records discrete counter payment with cashier notes persisted to PostgreSQL', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
         where: { status: { in: ['UNPAID', 'OVERDUE'] } },
+        orderBy: { installmentMonth: 'asc' },
       });
       expect(unpaidDue).toBeDefined();
 
@@ -191,6 +192,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     it('TC-BIZ-01: ADR-07 Partial Payment Rejection - Rejects partial payment amount strictly', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
         where: { status: { in: ['UNPAID', 'OVERDUE'] } },
+        orderBy: { installmentMonth: 'asc' },
       });
       expect(unpaidDue).toBeDefined();
 
@@ -241,6 +243,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     it('TC-BIZ-03: Dual Control - Maker cannot approve own payment reversal (403 Forbidden)', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
         where: { status: { in: ['UNPAID', 'OVERDUE'] } },
+        orderBy: { installmentMonth: 'asc' },
       });
 
       if (!unpaidDue) return;
@@ -308,6 +311,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     it('TC-REL-01: Idempotency Key prevents duplicate payment creation on network retry', async () => {
       const unpaidDue = await prisma.installmentDue.findFirst({
         where: { status: { in: ['UNPAID', 'OVERDUE'] } },
+        orderBy: { installmentMonth: 'asc' },
       });
 
       if (!unpaidDue) return;
@@ -369,6 +373,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
             chitGroup: { branchId: headBranch?.id, status: 'ACTIVE' },
           },
         },
+        orderBy: { installmentMonth: 'asc' },
         include: {
           ticket: {
             include: { customer: true, chitGroup: true },
@@ -428,8 +433,16 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
         where: {
           id: { not: upiDue.id },
           status: { in: ['UNPAID', 'OVERDUE'] },
+          allocations: {
+            none: {
+              payment: {
+                paymentStatus: PaymentStatus.INITIATED,
+              },
+            },
+          },
           ticket: { chitGroup: { status: 'ACTIVE' } },
         },
+        orderBy: { installmentMonth: 'asc' },
       });
 
       if (!otherDue) return;

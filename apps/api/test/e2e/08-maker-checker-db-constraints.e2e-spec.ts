@@ -443,4 +443,63 @@ describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', ()
       expect(reversal.id).toBeDefined();
     });
   });
+
+  // ============================================================================
+  // 5. Subscriber Ticket Defaulter Removal Constraint (chk_ticket_removal_maker_checker)
+  // ============================================================================
+  describe('chk_ticket_removal_maker_checker', () => {
+    afterEach(async () => {
+      await prisma.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
+          removalRequestedByUserId: null,
+          removedByUserId: null,
+          status: 'ACTIVE',
+        },
+      });
+    });
+
+    it('rejects subscriber ticket removal where removalRequestedByUserId === removedByUserId (Postgres 23514)', async () => {
+      await expect(
+        prisma.subscriberTicket.update({
+          where: { id: ticketId },
+          data: {
+            status: 'REMOVED_DEF_3M',
+            removalRequestedByUserId: makerUserId,
+            removedByUserId: makerUserId, // VIOLATION: Same user (self-approval)!
+          },
+        }),
+      ).rejects.toThrow(/chk_ticket_removal_maker_checker/i);
+    });
+
+    it('accepts subscriber ticket removal request where removedByUserId IS NULL', async () => {
+      const updated = await prisma.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'PENDING_REMOVAL_APPROVAL',
+          removalRequestedByUserId: makerUserId,
+          removedByUserId: null,
+        },
+      });
+
+      expect(updated.id).toBe(ticketId);
+      expect(updated.removalRequestedByUserId).toBe(makerUserId);
+      expect(updated.removedByUserId).toBeNull();
+    });
+
+    it('accepts subscriber ticket removal approval where removalRequestedByUserId !== removedByUserId', async () => {
+      const updated = await prisma.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'REMOVED_DEF_3M',
+          removalRequestedByUserId: makerUserId,
+          removedByUserId: checkerUserId, // Dual control: Independent checker
+        },
+      });
+
+      expect(updated.id).toBe(ticketId);
+      expect(updated.removalRequestedByUserId).toBe(makerUserId);
+      expect(updated.removedByUserId).toBe(checkerUserId);
+    });
+  });
 });

@@ -46,12 +46,14 @@ class OfflineSyncManager {
         // Submit collection to backend using the immutable point-of-collection idempotency key
         await apiClient.request(
           method: 'POST',
-          path: '/api/v1/collections/counter',
+          path: '/api/v1/collections/record',
           body: {
-            'dueId': item.dueId,
             'ticketId': item.ticketId,
+            'installmentMonth': item.installmentMonth,
             'amount': item.amountCollected,
             'paymentMethod': item.paymentMethod,
+            'idempotencyKey': item.idempotencyKey,
+            'collectedAt': item.collectedAt,
             'notes': 'Offline field collection synced automatically (${item.receiptNumberProvisional})',
           },
           customHeaders: {

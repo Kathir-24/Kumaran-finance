@@ -33,6 +33,16 @@ const nextConfig: NextConfig = {
         destination: '/',
         permanent: true,
       },
+      {
+        source: '/installments',
+        destination: '/schemes',
+        permanent: true,
+      },
+      {
+        source: '/payments',
+        destination: '/collections',
+        permanent: true,
+      },
     ];
   },
   async headers() {

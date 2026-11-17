@@ -85,6 +85,7 @@ class OfflineCollectionItem {
   final String queueId;
   final String dueId;
   final String ticketId;
+  final int installmentMonth;
   final int amountCollected;       // Whole rupees (BigInt)
   final String paymentMethod;      // CASH
   final String collectedAt;
@@ -98,6 +99,7 @@ class OfflineCollectionItem {
     required this.queueId,
     required this.dueId,
     required this.ticketId,
+    required this.installmentMonth,
     required this.amountCollected,
     required this.paymentMethod,
     required this.collectedAt,
@@ -113,6 +115,7 @@ class OfflineCollectionItem {
       'queue_id': queueId,
       'due_id': dueId,
       'ticket_id': ticketId,
+      'installment_month': installmentMonth,
       'amount_collected': amountCollected,
       'payment_method': paymentMethod,
       'collected_at': collectedAt,
@@ -129,6 +132,7 @@ class OfflineCollectionItem {
       queueId: map['queue_id'] as String,
       dueId: map['due_id'] as String,
       ticketId: map['ticket_id'] as String,
+      installmentMonth: (map['installment_month'] as num?)?.toInt() ?? 1,
       amountCollected: (map['amount_collected'] as num).toInt(),
       paymentMethod: map['payment_method'] as String,
       collectedAt: map['collected_at'] as String,

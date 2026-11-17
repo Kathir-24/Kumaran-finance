@@ -573,6 +573,68 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('SEC-A / DEF-04: should reject substituteSubscriber if caller is not a verified partner', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, isPartner: false });
+
+      await expect(
+        installmentService.substituteSubscriber(mockTicketId1, mockAdminId, {
+          newCustomerId: 'new-cust-uuid',
+          reason: 'Substitution by non-partner admin',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('SEC-A / DEF-04: should allow verified partner to substitute subscriber on REMOVED_DEF_3M ticket', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, isPartner: true });
+      prismaMock.subscriberTicket.findUnique
+        .mockResolvedValueOnce({
+          id: mockTicketId1,
+          ticketNumber: 5,
+          isPrized: false,
+          status: 'REMOVED_DEF_3M',
+          customerId: 'old-cust-uuid',
+          chitGroupId: mockChitGroupId,
+          chitGroup: { id: mockChitGroupId, groupCode: 'KCA-1L-20M-01' },
+          customer: { id: 'old-cust-uuid', fullName: 'Old Defaulted Customer' },
+        })
+        .mockResolvedValueOnce(null); // ADR-13 unique check
+      prismaMock.customer.findUnique.mockResolvedValue({
+        id: 'new-cust-uuid',
+        fullName: 'New Validated Customer',
+        isKycVerified: true,
+      });
+      prismaMock.subscriberTicket.update.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        customerId: 'new-cust-uuid',
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { id: 'new-cust-uuid', fullName: 'New Validated Customer' },
+      });
+
+      const result = await installmentService.substituteSubscriber(
+        mockTicketId1,
+        mockAdminId,
+        {
+          newCustomerId: 'new-cust-uuid',
+          reason: 'Legitimate substitution by verified partner',
+        },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.ticket.status).toBe('ACTIVE');
+      expect(result.ticket.newCustomerId).toBe('new-cust-uuid');
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 0,
+            status: 'ACTIVE',
+            customerId: 'new-cust-uuid',
+          }),
+        }),
+      );
+    });
+
     it('FIN-F / Q25: should FAIL CLOSED on settleRemoval with UNAPPROVED_SETTLEMENT_POLICY', async () => {
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
         id: mockTicketId1,

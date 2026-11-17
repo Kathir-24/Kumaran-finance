@@ -26,6 +26,7 @@ class OfflineDuesRepository {
   Future<OfflineCollectionItem> recordOfflineCollection({
     required String dueId,
     required String ticketId,
+    required int installmentMonth,
     required int amountCollected,
     required String agentBranchCode,
   }) async {
@@ -39,6 +40,7 @@ class OfflineDuesRepository {
       queueId: queueId,
       dueId: dueId,
       ticketId: ticketId,
+      installmentMonth: installmentMonth,
       amountCollected: amountCollected,
       paymentMethod: 'CASH',
       collectedAt: now.toIso8601String(),

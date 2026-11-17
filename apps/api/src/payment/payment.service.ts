@@ -20,6 +20,10 @@ import {
 import type { ApprovalAlertJobPayload } from '../jobs/dto/job-payloads.dto';
 import { formatBilingualReceiptText, ReceiptDataInput } from './bilingual-receipt.helper';
 import {
+  computeMaxConsecutiveUnpaidMonths,
+  deriveTicketArrearsStatus,
+} from '../common/utils/arrears.util';
+import {
   acquirePaymentConcurrencyLocks,
   generateNextReceiptNumber,
   PAYMENT_TRANSACTION_OPTIONS,
@@ -186,6 +190,23 @@ export class PaymentService {
       );
     }
 
+    // 5a. Sequential Installment Payment Guard (ADR-07): Prevent Out-of-Order Payments
+    if (typeof this.prisma.installmentDue?.findFirst === 'function') {
+      const priorUnpaidDuePre = await this.prisma.installmentDue.findFirst({
+        where: {
+          ticketId: ticket.id,
+          installmentMonth: { lt: due.installmentMonth },
+          status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+        },
+        orderBy: { installmentMonth: 'asc' },
+      });
+      if (priorUnpaidDuePre) {
+        throw new BadRequestException(
+          `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDuePre.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+        );
+      }
+    }
+
     // Accounting Branch (F09): Strictly derived from authorized domain record
     const branchId = ticket.chitGroup.branchId;
     const lockBranchId = ticket.chitGroup.branchId;
@@ -216,6 +237,23 @@ export class PaymentService {
           throw new BadRequestException(
             `INSTALLMENT_ALREADY_PAID: Month ${dto.installmentMonth} installment has already been paid in full`,
           );
+        }
+
+        // Sequential Installment Payment Guard under transaction lock
+        if (typeof tx.installmentDue?.findFirst === 'function') {
+          const priorUnpaidDue = await tx.installmentDue.findFirst({
+            where: {
+              ticketId: ticket.id,
+              installmentMonth: { lt: due.installmentMonth },
+              status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            },
+            orderBy: { installmentMonth: 'asc' },
+          });
+          if (priorUnpaidDue) {
+            throw new BadRequestException(
+              `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDue.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+            );
+          }
         }
 
         // 1. Create Payment
@@ -267,32 +305,23 @@ export class PaymentService {
           },
         });
 
-      // 5. Recalculate Consecutive Arrears
+      // 5. Recalculate Consecutive Arrears (ADR-07 canonical longest contiguous unpaid streak)
       const allDues = await tx.installmentDue.findMany({
         where: {
           ticketId: ticket.id,
-          installmentMonth: { lte: dto.installmentMonth },
         },
         orderBy: { installmentMonth: 'desc' },
       });
 
-      let consecutiveUnpaid = 0;
-      for (const d of allDues) {
-        if (d.id === due.id) {
-          break;
-        }
-        if (d.status !== DueStatus.PAID) {
-          consecutiveUnpaid++;
-        } else {
-          break;
-        }
-      }
+      const consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(allDues, {
+        treatAsPaidIds: [due.id],
+      });
 
       await tx.subscriberTicket.update({
         where: { id: ticket.id },
         data: {
           consecutiveUnpaidMonths: consecutiveUnpaid,
-          status: consecutiveUnpaid >= 3 ? 'DEFAULT_3_MONTHS' : 'ACTIVE',
+          status: deriveTicketArrearsStatus(consecutiveUnpaid, ticket.status),
         },
       });
 
@@ -840,20 +869,21 @@ export class PaymentService {
           },
         });
 
-        // 4. Recalculate Consecutive Arrears for ticket
-        const unpaidDues = await tx.installmentDue.count({
-          where: {
-            ticketId: alloc.ticketId,
-            installmentMonth: { lte: alloc.due.installmentMonth },
-            status: { not: DueStatus.PAID },
-          },
+        // 4. Recalculate Consecutive Arrears for ticket (ADR-07 canonical longest contiguous unpaid streak)
+        const allDues = await tx.installmentDue.findMany({
+          where: { ticketId: alloc.ticketId },
+          orderBy: { installmentMonth: 'desc' },
+        });
+
+        const consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(allDues, {
+          treatAsUnpaidIds: [alloc.installmentDueId],
         });
 
         await tx.subscriberTicket.update({
           where: { id: alloc.ticketId },
           data: {
-            consecutiveUnpaidMonths: unpaidDues,
-            status: unpaidDues >= 3 ? 'DEFAULT_3_MONTHS' : 'ACTIVE',
+            consecutiveUnpaidMonths: consecutiveUnpaid,
+            status: deriveTicketArrearsStatus(consecutiveUnpaid, alloc.ticket?.status),
           },
         });
       }
@@ -903,6 +933,18 @@ export class PaymentService {
       throw new ForbiddenException(
         'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to reject payment reversals',
       );
+    }
+
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const checker = await this.prisma.user.findUnique({
+        where: { id: checkerUserId },
+        select: { isPartner: true },
+      });
+      if (checker && !checker.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to reject payment reversals',
+        );
+      }
     }
 
     const payment = await this.prisma.payment.findUnique({
@@ -1000,6 +1042,23 @@ export class PaymentService {
       throw new BadRequestException('Subscriber ticket has been removed from this chit scheme');
     }
 
+    // Sequential Installment Payment Guard (ADR-07): Prevent Out-of-Order UPI Claims
+    if (typeof this.prisma.installmentDue?.findFirst === 'function') {
+      const priorUnpaidDue = await this.prisma.installmentDue.findFirst({
+        where: {
+          ticketId: due.ticketId,
+          installmentMonth: { lt: due.installmentMonth },
+          status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+        },
+        orderBy: { installmentMonth: 'asc' },
+      });
+      if (priorUnpaidDue) {
+        throw new BadRequestException(
+          `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDue.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+        );
+      }
+    }
+
     // Role-based authorization & Anti-BOLA guard:
     // If requesting user is CUSTOMER, ensure it's their ticket
     if (requestingUser.roles.includes(Role.CUSTOMER)) {
@@ -1053,32 +1112,54 @@ export class PaymentService {
     const paymentAmount = due.netPayableAmount;
 
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.create({
-          data: {
-            branchId,
-            recordedByUserId: requestingUser.sub,
-            customerId: due.ticket.customerId,
-            amount: paymentAmount,
-            paymentMethod: PaymentMethod.UPI,
-            paymentStatus: PaymentStatus.INITIATED,
-            transactionRef: cleanUtr,
-            cashHandoverStatus: 'ACKNOWLEDGED',
-            notes: dto.notes ? `Customer UPI Claim: ${dto.notes.trim()}` : 'Customer UPI Claim (Self-Reported)',
-          },
-        });
+      const result = await withTransactionRetry(
+        this.prisma,
+        async (tx) => {
+          // Sequential Installment Payment Guard under transaction lock
+          if (typeof tx.installmentDue?.findFirst === 'function') {
+            const priorUnpaidDueTx = await tx.installmentDue.findFirst({
+              where: {
+                ticketId: due.ticketId,
+                installmentMonth: { lt: due.installmentMonth },
+                status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+              },
+              orderBy: { installmentMonth: 'asc' },
+            });
+            if (priorUnpaidDueTx) {
+              throw new BadRequestException(
+                `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDueTx.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+              );
+            }
+          }
 
-        const allocation = await tx.paymentAllocation.create({
-          data: {
-            paymentId: payment.id,
-            ticketId: due.ticketId,
-            installmentDueId: due.id,
-            amountAllocated: paymentAmount,
-          },
-        });
+          const payment = await tx.payment.create({
+            data: {
+              branchId,
+              recordedByUserId: requestingUser.sub,
+              customerId: due.ticket.customerId,
+              amount: paymentAmount,
+              paymentMethod: PaymentMethod.UPI,
+              paymentStatus: PaymentStatus.INITIATED,
+              transactionRef: cleanUtr,
+              cashHandoverStatus: 'ACKNOWLEDGED',
+              notes: dto.notes ? `Customer UPI Claim: ${dto.notes.trim()}` : 'Customer UPI Claim (Self-Reported)',
+            },
+          });
 
-        return { payment, allocation };
-      });
+          const allocation = await tx.paymentAllocation.create({
+            data: {
+              paymentId: payment.id,
+              ticketId: due.ticketId,
+              installmentDueId: due.id,
+              amountAllocated: paymentAmount,
+            },
+          });
+
+          return { payment, allocation };
+        },
+        undefined,
+        PAYMENT_TRANSACTION_OPTIONS,
+      );
 
       return {
         success: true,
@@ -1168,6 +1249,12 @@ export class PaymentService {
     const due = allocation.due;
     const ticket = allocation.ticket;
 
+    if (ticket.status === 'REMOVED_DEF_3M') {
+      throw new BadRequestException(
+        'Subscriber ticket has been removed from this chit scheme due to consecutive arrears',
+      );
+    }
+
     if (due.status === DueStatus.PAID) {
       throw new BadRequestException('Installment due has already been settled by another payment');
     }
@@ -1209,6 +1296,23 @@ export class PaymentService {
         );
       }
 
+      // Sequential Installment Payment Guard under transaction lock
+      if (typeof tx.installmentDue?.findFirst === 'function') {
+        const priorUnpaidDue = await tx.installmentDue.findFirst({
+          where: {
+            ticketId: ticket.id,
+            installmentMonth: { lt: due.installmentMonth },
+            status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+          },
+          orderBy: { installmentMonth: 'asc' },
+        });
+        if (priorUnpaidDue) {
+          throw new BadRequestException(
+            `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDue.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+          );
+        }
+      }
+
       // 1. Update Payment to SUCCESS
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
@@ -1240,32 +1344,23 @@ export class PaymentService {
         },
       });
 
-      // 4. Recalculate Consecutive Arrears
+      // 4. Recalculate Consecutive Arrears (ADR-07 canonical longest contiguous unpaid streak)
       const allDues = await tx.installmentDue.findMany({
         where: {
           ticketId: ticket.id,
-          installmentMonth: { lte: due.installmentMonth },
         },
         orderBy: { installmentMonth: 'desc' },
       });
 
-      let consecutiveUnpaid = 0;
-      for (const d of allDues) {
-        if (d.id === due.id) {
-          break;
-        }
-        if (d.status !== DueStatus.PAID) {
-          consecutiveUnpaid++;
-        } else {
-          break;
-        }
-      }
+      const consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(allDues, {
+        treatAsPaidIds: [due.id],
+      });
 
       await tx.subscriberTicket.update({
         where: { id: ticket.id },
         data: {
           consecutiveUnpaidMonths: consecutiveUnpaid,
-          status: consecutiveUnpaid >= 3 ? 'DEFAULT_3_MONTHS' : 'ACTIVE',
+          status: deriveTicketArrearsStatus(consecutiveUnpaid, ticket.status),
         },
       });
 

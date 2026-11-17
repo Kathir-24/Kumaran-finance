@@ -93,12 +93,16 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       },
       installmentDue: {
         findUnique: jest.fn(),
-        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         count: jest.fn(),
       },
       customer: {
         findUnique: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: mockCheckerId, isPartner: true }),
       },
       auditLog: {
         create: jest.fn(),
@@ -176,6 +180,118 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       );
       expect(result.dueStatus).toBe(DueStatus.PAID);
       expect(result.paidAmount).toBe(3750n);
+    });
+
+    it('should correctly scan consecutive unpaid dues from latest down when recording payment (DEF-01)', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.payment.create.mockResolvedValue({ id: mockPaymentId, createdAt: new Date() });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-001' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-001',
+        receiptNumber: 'KC-REC-PRD-2026-00413',
+        isBilingual: true,
+      });
+
+      // Subscriber has Month 5 (UNPAID), Month 4 (paying now), Month 3 (PAID)
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: 'due-005', installmentMonth: 5, status: DueStatus.UNPAID },
+        { id: mockDue.id, installmentMonth: 4, status: DueStatus.PAID },
+        { id: 'due-003', installmentMonth: 3, status: DueStatus.PAID },
+      ]);
+
+      await paymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      // Month 5 is unpaid (1), Month 4 is paid (stops) -> consecutiveUnpaid = 1
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 1,
+            status: 'ACTIVE',
+          }),
+        }),
+      );
+    });
+
+    it('should reject out-of-order payment with 400 PRIOR_INSTALLMENT_UNPAID when prior month is unpaid', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      // Prior month 3 is UNPAID while trying to pay month 4
+      prismaMock.installmentDue.findFirst.mockResolvedValue({
+        id: 'due-003',
+        ticketId: mockTicketId,
+        installmentMonth: 3,
+        status: DueStatus.UNPAID,
+      });
+
+      await expect(
+        paymentService.recordPayment(
+          {
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3750,
+            paymentMethod: PaymentMethod.CASH,
+          },
+          mockMakerId,
+          mockBranchId,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'PRIOR_INSTALLMENT_UNPAID: Month 3 installment must be settled before paying Month 4.',
+        ),
+      );
+    });
+
+    it('should record sequential payments and reset consecutiveUnpaidMonths to 0 when all dues are settled', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.installmentDue.findFirst.mockResolvedValue(null); // No prior unpaid dues
+      prismaMock.payment.create.mockResolvedValue({ id: mockPaymentId, createdAt: new Date() });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-001' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-001',
+        receiptNumber: 'KC-REC-PRD-2026-00414',
+        isBilingual: true,
+      });
+
+      // All dues up to Month 4 are now PAID
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: mockDue.id, installmentMonth: 4, status: DueStatus.PAID },
+        { id: 'due-003', installmentMonth: 3, status: DueStatus.PAID },
+        { id: 'due-002', installmentMonth: 2, status: DueStatus.PAID },
+        { id: 'due-001', installmentMonth: 1, status: DueStatus.PAID },
+      ]);
+
+      await paymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 0,
+            status: 'ACTIVE',
+          }),
+        }),
+      );
     });
 
     it('should persist optional cashier notes when provided in payment dto', async () => {
@@ -543,7 +659,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           initiatedByUserId: mockMakerId, // Maker is Partner A
         },
       });
-      prismaMock.installmentDue.count.mockResolvedValue(1);
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
 
       const result = await paymentService.approveReversal(
         mockPaymentId,
@@ -623,6 +739,58 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         }),
       );
       expect(result.message).toContain('Payment remains in SUCCESS status');
+    });
+
+    it('should accurately calculate consecutive unpaid arrears when approving reversal (DEF-02)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, isPartner: true });
+      prismaMock.payment.findUnique.mockResolvedValue({
+        ...mockSuccessPayment,
+        reversal: {
+          id: 'rev-01',
+          paymentId: mockPaymentId,
+          reason: 'CHEQUE_BOUNCE',
+          status: 'REQUESTED',
+          initiatedByUserId: mockMakerId,
+        },
+      });
+
+      // Dues from latest down: Month 4 (due being reversed -> counts as UNPAID), Month 3 (UNPAID), Month 2 (UNPAID)
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: mockDue.id, installmentMonth: 4, status: DueStatus.PAID },
+        { id: 'due-003', installmentMonth: 3, status: DueStatus.UNPAID },
+        { id: 'due-002', installmentMonth: 2, status: DueStatus.UNPAID },
+      ]);
+
+      await paymentService.approveReversal(
+        mockPaymentId,
+        { notes: 'Cheque bounced at bank' },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      // Consecutive unpaid: 4, 3, 2 = 3 months -> triggers DEFAULT_3_MONTHS
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 3,
+            status: 'DEFAULT_3_MONTHS',
+          }),
+        }),
+      );
+    });
+
+    it('SEC-A / DEF-03: should reject reversal rejection if checker is not a verified partner', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, isPartner: false });
+
+      await expect(
+        paymentService.rejectReversal(
+          mockPaymentId,
+          { rejectionReason: 'Non-partner rejection attempt' },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -1038,6 +1206,102 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           [Role.SUPER_ADMIN],
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject out-of-order UPI claim with 400 PRIOR_INSTALLMENT_UNPAID when prior month is unpaid', async () => {
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDueForClaim);
+      prismaMock.installmentDue.findFirst.mockResolvedValue({
+        id: 'due-claim-000',
+        ticketId: mockTicketId,
+        installmentMonth: 1,
+        status: DueStatus.UNPAID,
+      });
+
+      await expect(
+        paymentService.submitUpiClaim(
+          {
+            dueId: 'due-claim-001',
+            utrNumber: 'UTR-123456789012',
+          },
+          mockCustomerUser,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'PRIOR_INSTALLMENT_UNPAID: Month 1 installment must be settled before paying Month 4.',
+        ),
+      );
+    });
+
+    it('should reject out-of-order UPI claim verification with 400 PRIOR_INSTALLMENT_UNPAID when prior month is unpaid', async () => {
+      const pendingClaim = {
+        id: 'claim-payment-001',
+        branchId: mockBranchId,
+        recordedByUserId: mockCustomerUser.sub,
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        notes: 'Customer UPI Claim',
+        allocations: [
+          {
+            id: 'alloc-claim-001',
+            due: mockDueForClaim,
+            ticket: mockTicket,
+          },
+        ],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(pendingClaim);
+      prismaMock.installmentDue.findFirst.mockResolvedValue({
+        id: 'due-claim-000',
+        ticketId: mockTicketId,
+        installmentMonth: 1,
+        status: DueStatus.UNPAID,
+      });
+
+      await expect(
+        paymentService.verifyUpiClaim(
+          'claim-payment-001',
+          mockAccountantUser.sub,
+          mockAccountantUser.roles,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'PRIOR_INSTALLMENT_UNPAID: Month 1 installment must be settled before paying Month 4.',
+        ),
+      );
+    });
+
+    it('should reject UPI claim verification when ticket has been removed (REMOVED_DEF_3M)', async () => {
+      const removedClaim = {
+        id: 'claim-payment-removed',
+        branchId: mockBranchId,
+        recordedByUserId: mockCustomerUser.sub,
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-999888777666',
+        notes: 'Customer UPI Claim',
+        allocations: [
+          {
+            id: 'alloc-claim-removed',
+            due: mockDueForClaim,
+            ticket: { ...mockTicket, status: 'REMOVED_DEF_3M' },
+          },
+        ],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(removedClaim);
+
+      await expect(
+        paymentService.verifyUpiClaim(
+          'claim-payment-removed',
+          mockAccountantUser.sub,
+          mockAccountantUser.roles,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

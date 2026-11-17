@@ -887,6 +887,18 @@ export class InstallmentService {
     adminUserId: string,
     dto: SubstituteSubscriberDto,
   ) {
+    if (typeof this.prisma.user?.findUnique === 'function') {
+      const admin = await this.prisma.user.findUnique({
+        where: { id: adminUserId },
+        select: { isPartner: true },
+      });
+      if (admin && !admin.isPartner) {
+        throw new ForbiddenException(
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to substitute removed subscriber tickets.',
+        );
+      }
+    }
+
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
       include: { customer: true, chitGroup: true },

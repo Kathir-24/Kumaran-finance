@@ -165,7 +165,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       data: {
         chitGroupId: activeChitGroupId,
         customerId: isolatedCustomer.id,
-        ticketNumber: 9982,
+        ticketNumber: Math.floor(Math.random() * 80000) + 10000,
         status: 'ACTIVE',
       },
     });
@@ -227,6 +227,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       uploadSpy.mockRestore();
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auction.delete({ where: { id: testAuction.id } });
+      await prisma.installmentDue.deleteMany({ where: { ticketId: isolatedTicket.id } });
       await prisma.subscriberTicket.delete({ where: { id: isolatedTicket.id } });
       await prisma.customer.delete({ where: { id: isolatedCustomer.id } });
     }
@@ -236,17 +237,39 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
   // Scenario 3: Telecom 504 Gateway Timeout Financial Isolation
   // --------------------------------------------------------------------------
   it('CHAOS-SMS-1: Downstream Indian telecom 504 Gateway Timeout MUST NOT rollback or delay the financial payment transaction', async () => {
-    if (!isDbConnected || !activeTicketId || !makerUserId) {
+    if (!isDbConnected || !activeChitGroupId || !makerUserId || !branchId) {
       console.warn('Skipping CHAOS-SMS-1: DB not connected');
       return;
     }
 
-    const testMonth = 10000 + Math.floor(Math.random() * 80000);
+    const testMonth = 1;
+    const timestamp = Date.now();
+    const isolatedCustomer = await prisma.customer.create({
+      data: {
+        customerCode: `KC-CUST-CHAOS-SMS1-${timestamp}`,
+        fullName: 'Chaos SMS Customer',
+        phone: `91993${String(timestamp).slice(-5)}3`,
+        addressLine1: 'Perundurai Road',
+        city: 'Erode',
+        pincode: '638052',
+        isKycVerified: true,
+        branchId,
+      },
+    });
+
+    const isolatedTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: activeChitGroupId,
+        customerId: isolatedCustomer.id,
+        ticketNumber: Math.floor(Math.random() * 80000) + 10000,
+        status: 'ACTIVE',
+      },
+    });
 
     // Create an isolated installment due in UNPAID status
     const testDue = await prisma.installmentDue.create({
       data: {
-        ticketId: activeTicketId,
+        ticketId: isolatedTicket.id,
         chitGroupId: activeChitGroupId,
         installmentMonth: testMonth,
         grossAmount: 5000n,
@@ -275,7 +298,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       const startTime = Date.now();
       const paymentResult = await isolatedPaymentService.recordPayment(
         {
-          ticketId: activeTicketId,
+          ticketId: isolatedTicket.id,
           installmentMonth: testMonth,
           amount: 4000,
           paymentMethod: PaymentMethod.CASH,
@@ -311,7 +334,9 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
         await prisma.receipt.deleteMany({ where: { paymentId } });
         await prisma.payment.deleteMany({ where: { id: paymentId } });
       }
-      await prisma.installmentDue.deleteMany({ where: { id: testDue.id } });
+      await prisma.installmentDue.deleteMany({ where: { ticketId: isolatedTicket.id } });
+      await prisma.subscriberTicket.delete({ where: { id: isolatedTicket.id } });
+      await prisma.customer.delete({ where: { id: isolatedCustomer.id } });
     }
   });
 
@@ -415,20 +440,39 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
   // Scenario 6: Redis Crash During Payment Recording (PostgreSQL Financial Truth Non-Blocking)
   // --------------------------------------------------------------------------
   it('CHAOS-REDIS-1: Redis crash during counter payment recording MUST commit PostgreSQL financial truth, while BullMQ degrades gracefully without failing payment', async () => {
-    if (!isDbConnected || !activeTicketId || !makerUserId) {
+    if (!isDbConnected || !activeChitGroupId || !makerUserId || !branchId) {
       console.warn('Skipping CHAOS-REDIS-1: DB not connected');
       return;
     }
 
-    const testMonth = 1000 + Math.floor(Math.random() * 900000);
-    await prisma.installmentDue.deleteMany({
-      where: { ticketId: activeTicketId, installmentMonth: testMonth },
+    const testMonth = 1;
+    const timestamp = Date.now();
+    const isolatedCustomer = await prisma.customer.create({
+      data: {
+        customerCode: `KC-CUST-CHAOS-REDIS-${timestamp}`,
+        fullName: 'Chaos Redis Customer',
+        phone: `91994${String(timestamp).slice(-5)}4`,
+        addressLine1: 'Perundurai Road',
+        city: 'Erode',
+        pincode: '638052',
+        isKycVerified: true,
+        branchId,
+      },
+    });
+
+    const isolatedTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: activeChitGroupId,
+        customerId: isolatedCustomer.id,
+        ticketNumber: Math.floor(Math.random() * 80000) + 10000,
+        status: 'ACTIVE',
+      },
     });
 
     // Create an isolated installment due in UNPAID status
     const testDue = await prisma.installmentDue.create({
       data: {
-        ticketId: activeTicketId,
+        ticketId: isolatedTicket.id,
         chitGroupId: activeChitGroupId,
         installmentMonth: testMonth,
         grossAmount: 5000n,
@@ -456,7 +500,7 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
       const startTime = Date.now();
       const paymentResult = await redisChaosPaymentService.recordPayment(
         {
-          ticketId: activeTicketId,
+          ticketId: isolatedTicket.id,
           installmentMonth: testMonth,
           amount: 4000,
           paymentMethod: PaymentMethod.CASH,
@@ -495,7 +539,9 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
         await prisma.receipt.deleteMany({ where: { paymentId } });
         await prisma.payment.deleteMany({ where: { id: paymentId } });
       }
-      await prisma.installmentDue.deleteMany({ where: { id: testDue.id } });
+      await prisma.installmentDue.deleteMany({ where: { ticketId: isolatedTicket.id } });
+      await prisma.subscriberTicket.delete({ where: { id: isolatedTicket.id } });
+      await prisma.customer.delete({ where: { id: isolatedCustomer.id } });
     }
   });
 

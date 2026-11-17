@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { DueStatus, PaymentMethod, Role } from '@prisma/client';
+import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { CollectionService, getIstDayRange } from '../../src/collection/collection.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -74,6 +74,7 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       },
       installmentDue: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
@@ -202,6 +203,34 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
           mockBranchId,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject out-of-order collection with 400 PRIOR_INSTALLMENT_UNPAID when prior month is unpaid', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.installmentDue.findFirst.mockResolvedValue({
+        id: 'due-003',
+        ticketId: mockTicketId,
+        installmentMonth: 3,
+        status: DueStatus.UNPAID,
+      });
+
+      await expect(
+        collectionService.recordCollection(
+          {
+            ticketId: mockTicketId,
+            installmentMonth: 4,
+            amount: 3950,
+            paymentMethod: PaymentMethod.CASH,
+          },
+          mockCollectorId,
+          mockBranchId,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'PRIOR_INSTALLMENT_UNPAID: Month 3 installment must be settled before paying Month 4.',
+        ),
+      );
     });
 
     it('should safely deduplicate offline sync requests with identical idempotencyKey', async () => {
@@ -761,6 +790,134 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
 
     it('should throw BadRequestException when given an invalid date string', () => {
       expect(() => getIstDayRange('not-a-valid-date')).toThrow(BadRequestException);
+    });
+  });
+
+  describe('Module 5 Forensic Hardening (DEF-10, DEF-11, DEF-12)', () => {
+    it('DEF-10: should restore ticket from DEFAULT_3_MONTHS to ACTIVE when field collection drops consecutive arrears from 3 to 2', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        ...mockTicket,
+        status: 'DEFAULT_3_MONTHS',
+        consecutiveUnpaidMonths: 3,
+      });
+      prismaMock.installmentDue.findUnique.mockResolvedValue({
+        ...mockDue,
+        id: 'due-m2',
+        installmentMonth: 2,
+      });
+      prismaMock.installmentDue.findFirst.mockResolvedValue(null);
+      prismaMock.payment.create.mockResolvedValue({
+        id: 'pmt-def10',
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date(),
+      });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-def10' });
+      prismaMock.receipt.create.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00099' });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.findMany.mockResolvedValue([
+        { id: 'due-m4', installmentMonth: 4, status: DueStatus.OVERDUE },
+        { id: 'due-m3', installmentMonth: 3, status: DueStatus.OVERDUE },
+        { id: 'due-m2', installmentMonth: 2, status: DueStatus.OVERDUE },
+        { id: 'due-m1', installmentMonth: 1, status: DueStatus.PAID },
+      ]);
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      await collectionService.recordCollection(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 2,
+          amount: 3950,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: {
+            consecutiveUnpaidMonths: 2,
+            status: 'ACTIVE',
+          },
+        }),
+      );
+    });
+
+    it('DEF-11: should reject cash handover acknowledgment when a payment in the batch is REVERSED', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-reversed',
+          recordedByUserId: mockCollectorId,
+          paymentMethod: PaymentMethod.CASH,
+          paymentStatus: PaymentStatus.REVERSED,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          amount: 3950n,
+        },
+      ]);
+
+      await expect(
+        collectionService.acknowledgeHandover(
+          {
+            collectorUserId: mockCollectorId,
+            paymentIds: ['pmt-reversed'],
+            acknowledgedAmount: 3950,
+          },
+          mockPartnerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('DEF-12: should sort multi-month offline sync items chronologically per ticket and map PRIOR_INSTALLMENT_UNPAID cleanly', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      const recordSpy = jest
+        .spyOn(collectionService, 'recordCollection')
+        .mockResolvedValueOnce({
+          paymentId: 'pmt-m2',
+          receiptNumber: 'KC-REC-PRD-2026-00101',
+          amount: 3950n,
+          collectedAt: new Date(),
+        } as any)
+        .mockRejectedValueOnce(
+          new BadRequestException(
+            'PRIOR_INSTALLMENT_UNPAID: Month 3 installment must be settled before paying Month 4.',
+          ),
+        );
+
+      const res = await collectionService.syncOfflineQueue(
+        {
+          items: [
+            {
+              ticketId: mockTicketId,
+              installmentMonth: 4,
+              amount: 3950,
+              paymentMethod: PaymentMethod.CASH,
+              idempotencyKey: 'off-key-m4',
+              collectedAt: '2026-11-17T10:15:00.000Z',
+            },
+            {
+              ticketId: mockTicketId,
+              installmentMonth: 2,
+              amount: 3950,
+              paymentMethod: PaymentMethod.CASH,
+              idempotencyKey: 'off-key-m2',
+              collectedAt: '2026-11-17T10:10:00.000Z',
+            },
+          ],
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      // Month 2 was processed BEFORE Month 4 due to chronological sorting per ticket
+      expect(recordSpy.mock.calls[0][0].installmentMonth).toBe(2);
+      expect(recordSpy.mock.calls[1][0].installmentMonth).toBe(4);
+      expect(res.successCount).toBe(1);
+      expect(res.failureCount).toBe(1);
+      expect(res.failed[0].errorCode).toBe('PRIOR_INSTALLMENT_UNPAID');
+      recordSpy.mockRestore();
     });
   });
 });
