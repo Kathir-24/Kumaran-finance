@@ -1,12 +1,13 @@
-# Kumaran Chits — Architectural Decision Record (ADR) & Decision Log (DRAFT)
+# Kumaran Chits — Architectural Decision Record (ADR) & Decision Log
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance**  
-> **Status**: Working Draft  
+> **Status**: Active Architecture Decision Log (`ADR-01` through `ADR-26`)  
 > **Status Labels Used**:
-> - `CONFIRMED-BY-DEVELOPER`: Confirmed by developer based on direct knowledge/experience; needs company confirmation later.
+> - `CONFIRMED-BY-DEVELOPER`: Confirmed by developer based on direct knowledge/experience; subject to final company confirmation where noted.
 > - `PROPOSED`: Proposed working design or technical pattern.
 > - `OPEN`: Unresolved question; pending business decision or company clarification.
+> - `DEFERRED`: Postponed to Phase 2 per authoritative business owner directive.
 > - `UNVERIFIED-LEGAL`: Legal or statutory claim lacking verified primary source citation.
 
 ---
@@ -21,24 +22,26 @@
 | **ADR-04** | Foreman Commission Architecture | Configurable default of 4.00% (`CONFIRMED-BY-DEVELOPER`), copied at chit creation and frozen per chit once active. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-05** | Offline Auction Recording | Staff conduct auctions offline at branch; software records and validates entered results (`CONFIRMED-BY-DEVELOPER`). Live mobile bidding deferred. | `CONFIRMED-BY-DEVELOPER` (offline) / `PROPOSED` (Phase 2) | Developer | Developer | 2026-10-17 | **Y** |
 | **ADR-06** | Auction Discount Ceiling Engine | Fixed at strictly **1/4 (25.00%) of total chit value** ($D_{max} = \frac{V}{4}$). Non-dynamic, constant ceiling for all auction months (e.g., ₹1,00,000 scheme $\to$ max discount $\le$ ₹25,000). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-07** | Field Agent Collections & Payment Settlement | Offline entries marked `PENDING_SYNC`. Each month has strictly a single payment; **zero double payments** and **zero advance balance** (concept eliminated). End-of-day cash handover. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-08** | Receipt Language & Standards | Bilingual (English + Tamil) digital PDF receipts in v1 scope (`CONFIRMED-BY-DEVELOPER`). Build order `OPEN`. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-09** | Customer Mobile App Scope | Phase 1: Passbook, dividend tracker, online payment, auction results display (`PROPOSED`). Build order `OPEN`. | `PROPOSED` | AI-assisted draft | None | 2026-10-17 | **Y** |
-| **ADR-10** | Infrastructure, Hosting & S3 Storage | Production targets any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, etc.) + Cloudflare R2 (₹0 egress) with zero vendor lock-in. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
-| **ADR-11** | Receipt Delivery & Passbook | Signed physical paper passbook is primary physical proof. Software records digital receipt ID for Form XXII cash book. Mobile App Push notification is primary (₹0 cost); SMS fallback for keypad phones (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
-| **ADR-12** | Notification Channels & Help Desk | Smart Hierarchy: OTP via SMS only; All operational alerts (Payments, Auctions, Dividends, Defaults) via Free Mobile Push with SMS fallback for keypad phones; WhatsApp Business API parked in V1; Direct phone calls for support (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
-| **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
-| **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | 2026-10-17 | **Y** |
-| **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-19 | **Y** |
-| **ADR-17** | Dual-Platform Full Parity for Partners | 100% full feature parity on BOTH Web (`apps/web`) and Mobile (`apps/mobile`) for the 4 Partners across both Maker and Checker roles (`maker_user_id != checker_user_id` enforced regardless of device). Desk roles on Web; field/customers on Mobile. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-20 | **Y** |
-| **ADR-18** | Phone-Only Identity & Email Elimination | Single non-nullable unique `phone` across users and customers; `email` column permanently dropped. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-22 | **Y** |
-| **ADR-19** | Zero-Fee Native UPI Intent & Bank UTR Uniqueness | Zero third-party gateway fees (No Razorpay/Cashfree/2% MDR). NPCI native `upi://pay` deep-linking to KVB current account. `Payment.transactionRef @unique` prevents duplicate bank UTR claims. Customer claims verified by Desk Accountant under Maker != Checker. | `CONFIRMED-BY-DEVELOPER` | Developer / Owner | 2026-10-27 | **Y** |
+| **ADR-07** | Field Agent Collections & Payment Settlement | Offline entries marked `PENDING_SYNC`. Each month has strictly a single payment; **zero double payments**, **zero partial payments**, and **zero advance balance** (concept eliminated). End-of-day cash handover. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-08** | Receipt Language & Standards | Bilingual (English + Tamil) digital PDF receipts in V1 scope (`CONFIRMED-BY-DEVELOPER`), with red diagonal cancellation watermark (`KFC-PDF-001`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-09** | Customer Mobile App Scope | Passbook, dividend tracker, online UPI intent, auction results display. **Deferred to Phase 2 (Q2 2027)** per Nov 13, 2026 Owner Directive (see `ADR-26`); backend APIs & Dart core preserved. | `DEFERRED` (Phase 2 — Q2 2027) | Business Owner | Owner / Developer | 2026-11-13 | **N** |
+| **ADR-10** | Infrastructure, Hosting, Storage & Ownership | Production targets any Flat-Fee Linux VPS + Cloudflare R2 (₹0 egress) with zero vendor lock-in. Code/cloud/domain commercial handover terms remain `OPEN`. | `CONFIRMED-BY-DEVELOPER` (Infra) / `OPEN` (Handover) | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-11** | Receipt Delivery & Passbook | Signed physical paper passbook is primary physical proof. Software records digital receipt ID for Form XXII cash book and streams A5 PDFs via BFF. Phase 1 automated alerts use Indian TRAI DLT SMS (`ADR-23`); mobile push deferred to Phase 2 (`ADR-26`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
+| **ADR-12** | Notification Channels & Help Desk | Phase 1: OTP and all operational alerts delivered strictly via Indian TRAI DLT SMS (MSG91, see `ADR-23`). FCM Mobile Push deferred to Phase 2 with Flutter UI (`ADR-26`); WhatsApp Business API purged/parked; Direct phone calls for support. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-21 | **Y** |
+| **ADR-13** | Customer Subscriptions & Ticket Limits | A customer may join multiple different chit groups, but **cannot hold 2 or more tickets in the same chit group** (`@@unique([chitGroupId, customerId])`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-14** | Prize Payout Modes & Zero Cash Block | Flexible disbursement voucher (Cheque, NEFT/RTGS/IMPS, or Cash). Hard cash disbursements permitted for any amount with ZERO artificial software cash block (`CONFIRMED-BY-DEVELOPER`); IT Act §40A(3) advisory rendered on cash vouchers $> ₹10,000$. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-19 | **Y** |
+| **ADR-15** | Safety Proof & Collateral Checklist | Property documents eliminated. Surety is **not mandatory** across the board; provided only if demanded by company for safety. Flexible instruments: signed agreement (winner + nominee), signed blank cheques, promissory notes. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-10-17 | **Y** |
+| **ADR-16** | Lightweight Intake & No Forced KYC | Customer intake mirrors physical notebooks: Name, Phone, Address, Nominee. Aadhaar, PAN, and document uploads are completely optional, never mandatory (`CONFIRMED-BY-DEVELOPER`). | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-19 | **Y** |
+| **ADR-17** | Dual-Platform Architecture & Partner Parity | Cross-device Maker $\ne$ Checker enforced at API & DB levels. Phase 1 production UI is Web Portal (`apps/web/`); Flutter Android UI parity deferred to Phase 2 (`ADR-26`) with Dart Core (`apps/mobile/lib/core/`) preserved. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-20 | **Y** |
+| **ADR-18** | Phone-Only Identity & Email Elimination | Single non-nullable unique `phone` across users and customers; `email` column permanently dropped. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-22 | **Y** |
+| **ADR-19** | Zero-Fee Native UPI Intent & Bank UTR Uniqueness | Zero third-party gateway fees (No Razorpay/Cashfree/2% MDR). NPCI native `upi://pay` deep-linking to KVB current account. `Payment.transactionRef @unique` prevents duplicate bank UTR claims. Customer claims verified by Desk Accountant under Maker != Checker. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-27 | **Y** |
 | **ADR-20** | Backend-For-Frontend (BFF) & HttpOnly Cookie Architecture | Next.js 15 BFF proxy with HttpOnly cookies (`kc_access_token`, `kc_refresh_token`). Raw tokens eliminated from browser storage. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-11-10 | **Y** |
-| **ADR-21** | Partner Identity Separation (SEC-A) | `isPartner: true` on `User` and JWT separates verified business partners from administrative Super Admin. Enforced on reversals, auctions, payouts, and defaulter removals. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
-| **ADR-22** | Defaulter Removal Dual Control (SEC-B) | Two-partner workflow: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B reviews & approves (`REMOVED_DEF_3M`) with `maker != checker`. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
-| **ADR-23** | Indian TRAI DLT SMS Exclusivity (Q34) | Automated notifications delivered strictly via Indian TRAI DLT SMS flow (MSG91). WhatsApp simulation channels purged; mobile push disabled in production. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-21** | Partner Identity Separation (SEC-A) | `isPartner: true` on `User` and JWT separates verified business partners from administrative Super Admin. Enforced on reversals, auctions, corrections, payouts, settlements, and defaulter removals. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-22** | Defaulter Removal Dual Control (SEC-B) | Two-partner workflow: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B reviews & approves (`REMOVED_DEF_3M`) or rejects with `maker != checker`. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-23** | Indian TRAI DLT SMS Exclusivity (Q34) | Automated notifications delivered strictly via Indian TRAI DLT SMS flow (MSG91). WhatsApp simulation channels purged; mobile push disabled in production Phase 1. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-24** | Session Vault, Client-Family Scoping & Durable Revocation | Dedicated PostgreSQL `Session` vault with device-family isolation (`WEB`, `MOBILE`, `DESKTOP`). Cryptographic session UUID (`sid`) binding prevents resurrection after replacement login. Invalidation on password reset, role demotion, and deactivation is durable and Redis-loss resilient. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
-| **ADR-25** | Two-Stage Final Month Settlement & Engine-Level Maker-Checker Constraints | Decoupled Month N maturity settlement into Stage 1 (`prepare-final-settlement` Maker) and Stage 2 (`approve-final-settlement` Checker Partner, `maker != checker`). PostgreSQL 17 engine-level CHECK constraints (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) enforce dual-control at database storage level. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
+| **ADR-25** | Two-Stage Final Month Settlement & Engine-Level CHECK Constraints | Decoupled Month $N$ maturity settlement into Stage 1 (`prepare-final-settlement` Maker) and Stage 2 (`approve-final-settlement` Checker Partner, `maker != checker`). 8 PostgreSQL 17 engine-level CHECK constraints enforce dual control and financial integrity at storage level. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
+| **ADR-26** | Flutter Android UI Phase 2 Deferral & Dart Core Preservation | Authoritative Nov 13, 2026 Owner Directive: Flutter Android mobile UI screens and APK/AAB packaging deferred to Phase 2 (Q2 2027). Phase 1 ships 100% Web Operations Portal + NestJS API + preserved Dart Core (`apps/mobile/lib/core/`) and `@kumaran/api-client`. | `DEFERRED` (Phase 2 — Q2 2027) | Business Owner | Owner / Developer | 2026-11-13 | **N** |
 
 ---
 
@@ -80,16 +83,14 @@
 
 ---
 
-### ADR-10: Ownership of Code, Cloud, and Domain (`CONFIRMED-BY-DEVELOPER` / `OPEN`)
-- **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, cloud hosting accounts, and domain registration.
-- **Future Handover (`OPEN`)**: A formal handover to Kumaran Finance may occur later. Handover terms, intellectual property assignment, and ongoing maintenance responsibilities are **OPEN** and subject to future commercial agreement.
-
----
-
-### ADR-10: Infrastructure, Hosting & S3 Storage Architecture (`CONFIRMED-BY-DEVELOPER`)
-- **Hosting Model**: Single Flat-Fee Linux VPS (Ubuntu 24.04 LTS / Debian 12) from **any Linux VPS provider** (Hostinger Mumbai, DigitalOcean Bangalore, Hetzner, Linode, Vultr, Contabo, etc. at ~₹900–₹1,800/month flat) with fixed predictable billing.
-- **Zero Vendor Lock-In**: The entire production stack is containerized with standard Docker Compose v2. It has zero proprietary cloud dependencies and can be migrated to any other VPS host in under 15 minutes by transferring the database dump.
-- **Object Storage**: Universal S3-compatible object storage via **Cloudflare R2** (10 GB free tier with ₹0 egress bandwidth fees). All customer documents and bilingual PDF receipts use 15-minute presigned URLs (`HMAC-SHA256`) with zero public access.
+### ADR-10: Infrastructure, Hosting, S3 Storage & Commercial Ownership (`CONFIRMED-BY-DEVELOPER` / `OPEN`)
+- **10A. Hosting & S3 Storage (`CONFIRMED-BY-DEVELOPER`)**:
+  - **Hosting Model**: Single Flat-Fee Linux VPS (Ubuntu 24.04 LTS / Debian 12) from **any Linux VPS provider** (Hostinger Mumbai, DigitalOcean Bangalore, Hetzner, Linode, Vultr, Contabo, etc. at ~₹900–₹1,800/month flat) with fixed predictable billing.
+  - **Zero Vendor Lock-In**: The entire production stack is containerized with standard Docker Compose v2. It has zero proprietary cloud dependencies and can be migrated to any other VPS host in under 15 minutes by transferring the database dump.
+  - **Object Storage**: Universal S3-compatible object storage via **Cloudflare R2** (10 GB free tier with ₹0 egress bandwidth fees). All customer documents and bilingual PDF receipts use 15-minute presigned URLs (`HMAC-SHA256`) with zero public access.
+- **10B. Ownership of Code, Cloud, and Domain (`OPEN`)**:
+  - **Current Status (`CONFIRMED-BY-DEVELOPER`)**: The developer currently holds the source code, cloud hosting accounts, and domain registration.
+  - **Future Handover (`OPEN`)**: Formal handover terms, intellectual property assignment, and ongoing maintenance responsibilities remain **OPEN** subject to future commercial agreement with Kumaran Finance.
 
 ---
 
@@ -99,29 +100,37 @@
   $$\text{Month \#} \mid \text{Payment Date (Cycle Start)} \mid \text{Paid Date (Doorstep)} \mid \text{Amount Paid } (I_{net}) \mid \text{Dividend } (Div) \mid \text{Total } (I_{base})$$
   Invariant: $\text{Amount Paid} + \text{Dividend} = \text{Total Base Installment}$ on every row.
 - **Software Role**: Every transaction generates a sequential receipt number (`KC-REC-...`) solely for company ledger integrity (Form XXII Cash Book), evening handover reconciliation, and dispute backup.
-- **Delivery & Asynchronous Queueing**: Counter payments (`POST /payments`) and field collections (`POST /collections/record`) immediately commit financial records to PostgreSQL and asynchronously enqueue a background receipt dispatch to BullMQ (`notification-queue` / `JOB_DISPATCH_PAYMENT_RECEIPT`). Smartphone app subscribers receive an instant free Push Notification deep-linking to their digital passbook. Keypad phone users receive an SMS receipt fallback.
-- **BFF Blob PDF Delivery Architecture**: To guarantee zero popup blocker interceptions, zero cross-origin CORS barriers, and eliminate internal Docker hostname failures (`ERR_NAME_NOT_RESOLVED`), all statutory PDF downloads (Form XVII Minutes, Form XXI Passbooks, A5 Subscription Receipts, and Prize Vouchers) route directly through the Next.js BFF proxy (`/bff/api/v1/[...path]`). The web client consumes these endpoints via `@kumaran/api-client` (`parseAs: 'blob'`) and triggers instant browser downloads via transient DOM anchors (`triggerBlobDownload`) with deterministic object URL revocation.
+- **Delivery & Asynchronous Queueing**: Counter payments (`POST /payments`) and field collections (`POST /collections/record`) immediately commit financial records to PostgreSQL and asynchronously enqueue a background receipt dispatch to BullMQ (`notification-queue` / `JOB_DISPATCH_PAYMENT_RECEIPT`, passing `paymentId` for async S3 PDF pre-rendering). In **Phase 1 production**, automated delivery runs strictly via **Indian TRAI DLT SMS** (`ADR-23`); Mobile App Push Notifications (FCM) are deferred to **Phase 2** alongside Flutter mobile UI (`ADR-26`).
+- **BFF Blob PDF Delivery Architecture**: To guarantee zero popup blocker interceptions, zero cross-origin CORS barriers, and eliminate internal Docker hostname failures (`ERR_NAME_NOT_RESOLVED`), all statutory PDF downloads (Form XVII Minutes, Form XXI Passbooks, A5 Subscription Receipts, and Prize Vouchers) route directly through the Next.js BFF proxy (`/bff/api/v1/[...path]`) with unconditional `Cache-Control: private, no-store`. The web client consumes these endpoints via `@kumaran/api-client` (`parseAs: 'blob'`) and triggers instant browser downloads via transient DOM anchors (`triggerBlobDownload`) with deterministic object URL revocation.
 - **High-Contrast `@media print` Stylesheet**: Browser printing (`window.print()`) for statutory registers (Form XXII Day Book, Form XXI Subscriber Ledgers, Form XVII Minutes) cleanly strips dark-mode dashboards, sidebars, topbar navigation, and buttons, rendering crisp black-on-white tables matching official A4/A5 paper records without chrome bleed.
 
 ---
 
-### ADR-12: Smart Notification Hierarchy, OTP via SMS & Direct Phone Support (`CONFIRMED-BY-DEVELOPER`)
-- **Authentication**: All user login OTPs (Partners, Staff, Customers) strictly use **Telecom DLT SMS** (Header: `KMRCHT`, Template `1407169823412093847`). OTP sessions are stored in **Redis** (`auth:otp:<phone>`) with a strict **300-second (5-minute) TTL**, SHA-256 hash security, and a 3-attempt brute-force lockout.
-- **Operational Alerts**: Payments, upcoming auction reminders, post-auction dividend credits, and 3-month default warnings follow a unified smart hierarchy:
-  - **Smartphone Users**: Free Mobile App Push Notifications (FCM, ₹0 cost).
-  - **Keypad Phone Users**: Telecom DLT SMS fallback.
-- **WhatsApp Business API**: Officially **Parked / Shelved in V1** to avoid third-party SaaS fees and Meta per-conversation charges.
+### ADR-12: Notification Channels, OTP via SMS & Direct Phone Support (`CONFIRMED-BY-DEVELOPER`)
+- **Authentication**: All user login OTPs (Partners, Staff, Customers) strictly use **Telecom DLT SMS** (Header: `KMRCHT`, Template `1407169823412093847`). OTP sessions are stored in **Redis** (`auth:otp:<phone>`) with a strict **300-second (5-minute) TTL**, SHA-256 hash security, and atomic Lua 3-attempt brute-force lockout (`F13`).
+- **Operational Alerts (Aligned with `ADR-23` & `ADR-26`)**:
+  - **Phase 1 Production**: Payments, upcoming auction reminders, post-auction dividend credits, and 3-month default warnings are delivered strictly via **Indian TRAI DLT SMS (MSG91)**.
+  - **Phase 2 Target**: Free Mobile App Push Notifications (FCM) remain architecturally preserved and activate when Flutter Android mobile UI launches (`ADR-26`).
+- **WhatsApp Business API**: Officially **Purged / Parked in V1** (`ADR-23`) to avoid third-party SaaS fees and Meta per-conversation charges.
 - **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobile numbers).
 
 ---
 
 ### ADR-13: Customer Subscriptions & Ticket Limits (`CONFIRMED-BY-DEVELOPER`)
 - **Cross-Chit Enrollment**: A single customer may join multiple different chit groups (`CONFIRMED-BY-DEVELOPER`).
-- **Same-Chit Limit**: A single customer **CANNOT hold 2 or more tickets in the SAME chit group** (Max 1 ticket per customer per scheme) (`CONFIRMED-BY-DEVELOPER`).
+- **Same-Chit Limit**: A single customer **CANNOT hold 2 or more tickets in the SAME chit group** (Max 1 ticket per customer per scheme, DB-enforced `@@unique([chitGroupId, customerId])`) (`CONFIRMED-BY-DEVELOPER`).
 - **Data Model Terminology**:
   - **Customer**: The individual person / entity.
   - **Membership**: The subscription relationship connecting the customer to a specific Chit Group.
   - **Ticket**: The unique participation unit (1 to $N$) within that Chit Group.
+
+---
+
+### ADR-14: Prize Payout Modes & Zero Cash Block (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: Kumaran Finance predominantly disburses prize money in physical hard cash at the branch office, in line with long-standing local business practices in Perundurai and Erode district.
+- **Architectural Decision**: The software must faithfully record operational truth. It **strictly enforces ZERO artificial cash blocks or limits**.
+- **Payout Modes**: Supports `CASH`, `ACCOUNT_PAYEE_CHEQUE`, `BANK_TRANSFER_NEFT`, `BANK_TRANSFER_RTGS`, and `BANK_TRANSFER_IMPS`.
+- **Zero Software Block & Tax Advisory**: Staff can disburse any authorized prize money amount (₹1,00,000, ₹2,00,000, ₹5,00,000, ₹10,00,000) in `CASH` without artificial blocking errors; vouchers exceeding ₹10,000 render statutory IT Act Section 40A(3) / 269ST advisories (`KFC-TAX-001`).
 
 ---
 
@@ -133,15 +142,7 @@
   2. Signed Blank Cheque(s) with signatures from customer / guarantor.
   3. Promissory Note / Personal Guarantee.
   4. Other security proof accepted by branch management.
-- **System Role**: Operational checklist and digital attachment repository (`isSecurityRequired: boolean`, `securityType: string?`, `blankChequeDetails: string?`, `isWinnerSigned: boolean`, `isNomineeSigned: boolean`, `documentUrls: string[]`).
-
----
-
-### ADR-14: Prize Payout Modes & Zero Cash Block (`CONFIRMED-BY-DEVELOPER`)
-- **Operational Reality**: Kumaran Finance predominantly disburses prize money in physical hard cash at the branch office, in line with long-standing local business practices in Perundurai and Erode district.
-- **Architectural Decision**: The software must faithfully record operational truth. It **strictly enforces ZERO artificial cash blocks or limits**.
-- **Payout Modes**: Supports `CASH`, `ACCOUNT_PAYEE_CHEQUE`, `BANK_TRANSFER_NEFT`, `BANK_TRANSFER_RTGS`, and `BANK_TRANSFER_IMPS`.
-- **Zero Software Block**: Staff can disburse any authorized prize money amount (₹1,00,000, ₹2,00,000, ₹5,00,000, ₹10,00,000) in `CASH`. The system records the transaction without throwing artificial blocking errors.
+- **System Role**: Operational checklist and digital attachment repository on `AuctionWinner` (`isSecurityRequired: Boolean`, `securityType: String?`, `blankChequeDetails: String?`, `agreementSigned: Boolean`, `nomineeSigned: Boolean`, `securityDocS3Key: String?`).
 
 ---
 
@@ -150,30 +151,20 @@
   1. Full Name (English and optional Tamil)
   2. Mobile Phone Number (10 digits)
   3. Address / Town
-  4. Nominee Name & Relationship
+  4. Nominee Name & Relationship (mandatory guardian if minor)
 - **No Forced Aadhaar / Document Uploads**:
-  - Aadhaar number, PAN card number, and identity document uploads are **strictly OPTIONAL** and never mandatory.
+  - Aadhaar number (stored strictly as `aadhaarLast4`), PAN card number, and identity document uploads are **strictly OPTIONAL** and never mandatory.
   - Known local subscribers are onboarded immediately upon entering their notebook details.
   - Zero forced document scans, photocopies, or third-party digital KYC barriers are required to create a customer, assign a ticket, or participate in auctions.
 
 ---
 
-### ADR-17: Dual-Platform Full Parity for Partners (Web & Mobile Parity for Maker & Checker) (`CONFIRMED-BY-DEVELOPER`)
-- **Operational Reality**: The 4 equal partners (Super Admin / Owners) run Kumaran Finance on the move, at home, at the branch counter, and in customer meetings. They cannot be restricted exclusively to desktop computers, nor can they be forced to perform high-volume ledger entry on smartphones.
-- **Architectural Decision**:
-  1. **100% Feature Parity for Partners**: The 4 Partners have 100% full feature parity on **BOTH** the Web Portal (`apps/web/`) and the Android Mobile App (`apps/mobile/`).
-  2. **Cross-Device Maker-Checker**: The strict invariant `maker_user_id != checker_user_id` is enforced at the API and database levels, completely agnostic of client devices:
-     - Partner A on Mobile (Maker) $\to$ Partner B on Web (Checker)
-     - Partner A on Web (Maker) $\to$ Partner B on Mobile (Checker)
-     - Partner A on Mobile (Maker) $\to$ Partner B on Mobile (Checker)
-     - Partner A on Web (Maker) $\to$ Partner B on Web (Checker)
-  3. **Role-Tailored Platform Distribution**:
-     - **Partners (`SUPER_ADMIN`)**: 100% Full Parity on Web & Mobile (Auctions, Approvals, Payouts, Cash Handover, Reports).
-     - **Desk Accountant (`ACCOUNTANT`)**: Primarily Web Portal (transcribing 20-month physical notebooks, day books, voucher preparation).
-     - **CA Auditor (`AUDITOR`)**: Primarily Web Portal (read-only 12-column Form XXII Cash Book, Form XXI Ledgers, forensic audit trails).
-     - **Field Collection Agents (`COLLECTION_AGENT`)**: Primarily Mobile App (1-second fingerprint unlock, doorstep collections, offline SQLite auto-sync, push/SMS receipts).
-     - **Customers (`CUSTOMER`)**: Primarily Mobile App (bilingual passbook, 1-tap UPI payment via GPay/PhonePe/Paytm, auction results).
-     - **Dual-Role Staff (`[COLLECTION_AGENT, ACCOUNTANT]`)**: Mobile App on collection rounds; Web Portal or Mobile App at office desk.
+### ADR-17: Dual-Platform Architecture & Cross-Device Partner Parity (`CONFIRMED-BY-DEVELOPER`)
+- **Operational Reality**: The 4 equal partners (Super Admin / Owners) run Kumaran Finance at the branch counter and on the move.
+- **Phase 1 vs. Phase 2 Delivery (`ADR-26`)**:
+  - **Phase 1 Active Production**: The **Next.js 15 Web Operations Portal (`apps/web/`)** is the active production interface for Partners, Desk Accountants, and CA Auditors.
+  - **Phase 2 Deferred**: Flutter Android UI screens and APK packaging (`apps/mobile/`) are deferred to Phase 2 (Q2 2027) per the Nov 13, 2026 Owner Directive (`ADR-26`), while Dart Core (`apps/mobile/lib/core/`), `@kumaran/api-client`, and all mobile backend endpoints remain 100% preserved and tested.
+- **Cross-Device Maker-Checker Enforcement**: The strict invariant `maker_user_id != checker_user_id` is enforced at the API and PostgreSQL levels completely agnostic of client devices (Web-to-Web, Mobile-to-Web, Web-to-Mobile, Mobile-to-Mobile).
 
 
 ---
@@ -238,12 +229,13 @@
 - **Architectural Decision**:
   1. **Schema Column**: `User.isPartner Boolean @default(false)` added to Prisma schema and PostgreSQL database.
   2. **JWT Payload**: `isPartner` added to `JwtPayload` and propagated via `SanitizedUser` and `JwtStrategy`.
-  3. **High-Impact Endpoints Guarded**:
-     - `approveReversal` (`POST /payments/:id/reversal/approve`) requires `isPartner: true`.
-     - `finalizeAuction` (`POST /auctions/:id/finalize`) requires `isPartner: true`.
-     - `authorizePayout` (`POST /auctions/:id/authorize-payout`) requires `isPartner: true`.
-     - `settleFinalMonth` (`POST /chits/:id/settle-final-month`) requires `isPartner: true`.
-     - `approveDefaulterRemoval` (`POST /tickets/:id/remove-defaulter/approve`) requires `isPartner: true`.
+  3. **High-Impact Endpoints Guarded (`assertVerifiedPartner` — fail-closed `isPartner: true && isActive !== false`)**:
+     - `POST /payments/:id/request-reversal`, `POST /payments/:id/approve-reversal`, `POST /payments/:id/reject-reversal`
+     - `POST /auctions/:id/finalize`, `POST /auctions/:id/correction/request`, `POST /auctions/:id/correction/approve`, `POST /auctions/:id/correction/reject`
+     - `PATCH /auctions/:auctionId/mark-filed-with-registrar` (enforced for `SUPER_ADMIN` callers)
+     - `POST /disbursements/auction/:auctionId/authorize-payout`
+     - `POST /disbursements/group/:chitGroupId/approve-final-settlement` and `POST /disbursements/group/:chitGroupId/final-settlement`
+     - `POST /tickets/:id/remove-defaulter/request`, `POST /tickets/:id/remove-defaulter/approve`, `POST /tickets/:id/remove-defaulter/reject`, and `POST /tickets/:id/substitute`
 
 ---
 
@@ -281,15 +273,47 @@
 
 ### ADR-25: Two-Stage Final Month Settlement & Engine-Level Maker-Checker Constraints (`CONFIRMED-BY-DEVELOPER`)
 - **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
-- **Date**: 2026-11-15
-- **Operational Reality**: Month N maturity payout has no auction, but Guardrail 10 (Dual Control) strictly mandates that the person calculating the payout cannot be the sole approver. Furthermore, database-level constraints must reject self-approval even if application guards are bypassed.
+- **Date**: 2026-11-15 (Hardened 2026-11-17/18)
+- **Operational Reality**: Month $N$ maturity payout has no auction, but Guardrail 10 (Dual Control) strictly mandates that the person calculating the payout cannot be the sole approver. Furthermore, database-level constraints must reject self-approval and negative financial values even if application guards are bypassed.
 - **Architectural Decision**:
-  1. **Two-Stage Settlement Lifecycle**:
-     - Stage 1: `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff calculates arrears, Month N due deduction, 4% commission, and generates voucher snapshot).
-     - Stage 2: `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner approves payout, enforcing `maker != checker` and verified partner identity `isPartner: true`).
-  2. **PostgreSQL 17 Engine CHECK Constraints**:
+  1. **Two-Stage Settlement Lifecycle (`CR-DISB-02`)**:
+     - Stage 1: `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff calculates arrears, Month $N$ due deduction, 4% commission, and generates voucher snapshot).
+     - Stage 2: `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner approves payout, enforcing `maker != checker` and verified partner identity `isPartner: true`). The legacy route `POST /disbursements/group/:chitGroupId/final-settlement` also enforces `{ requirePreparedSettlement: true }`, guaranteeing zero single-stage bypass.
+  2. **8 PostgreSQL 17 Engine CHECK Constraints**:
      - `chk_payment_cash_handover_maker_checker` on `Payment`
-     - `chk_auction_maker_checker` on `Auction`
-     - `chk_winner_maker_checker` on `AuctionWinner`
+     - `chk_auction_maker_checker` on `Auction` (covers both `COMPLETED` and `MINUTES_FILED`)
+     - `chk_auction_non_negative_amounts` on `Auction`
+     - `chk_auction_minutes_attendees` on `AuctionMinutes`
+     - `chk_winner_maker_checker` on `AuctionWinner` (covers `VERIFIED_BY_MAKER`, `AUTHORIZED_BY_CHECKER`, and `DISBURSED`)
+     - `chk_winner_positive_disbursed_amount` on `AuctionWinner`
      - `chk_reversal_maker_checker` on `PaymentReversal`
-     - All constraints are state-aware and hardened against SQL ternary logic NULL traps. Historical imported records use `isHistoricalEntry = true` to preserve legacy audit integrity without weakening live dual-control enforcement.
+     - `chk_ticket_removal_maker_checker` on `SubscriberTicket`
+     - All dual-control constraints are state-aware and hardened against SQL ternary logic NULL traps. Historical imported records use `isHistoricalEntry = true` to preserve legacy audit integrity without weakening live dual-control enforcement.
+
+---
+
+### ADR-26: Flutter Android UI Phase 2 Deferral & Dart Core Preservation (`DEFERRED` — Owner Directive)
+- **Status**: **AUTHORITATIVE BUSINESS OWNER SCOPE EXCLUSION** (Phase 2 — Q2 2027)
+- **Date**: 2026-11-13
+- **Owner Directive**:
+  > *"The entire Flutter mobile UI and Android application implementation is postponed. Do not build Flutter UI or Android APKs. Focus 100% on backend API integrity, web dashboard, PDF generation, security, and financial rules."*
+- **Deferred Scope Inventory (`apps/mobile/`)**:
+  | Component / Feature | Technology | Status | Target Phase |
+  |---|---|:---:|:---:|
+  | Android Field Agent Collection UI | Flutter / Dart | Preserved (No UI build) | Phase 2 (Q2 2027) |
+  | Android Member Passbook App UI | Flutter / Dart | Preserved (No UI build) | Phase 2 (Q2 2027) |
+  | Offline SQLite Sync UI | Drift / SQLite | Core & backend endpoints verified | Phase 2 |
+  | Bluetooth Thermal Printer (ESC/POS) | Flutter | Architecture ready | Phase 2 |
+  | Biometric Screen Lock / Android Keystore | Flutter | Deferred | Phase 2 |
+  | Google Play Store Packaging (APK/AAB) | Android Gradle | Deferred | Phase 2 |
+- **Preserved Backend & Dart Core Contracts**:
+  1. `apps/mobile/lib/core/`: Typed 64-bit integer Rupee Dart models (`api_models.dart`), single-flight 401 refresh mutex (`AuthSessionManager`), and offline sync queue core remain 100% maintained and tested (`dart analyze` clean; 6/6 Dart test suites passing).
+  2. `packages/api-client/`: Synchronized `@kumaran/api-client` TypeScript SDK.
+  3. Preserved backend endpoints: Mobile Bearer auth (`/auth/mobile/*`, `/auth/refresh`), offline sync (`POST /collections/sync-offline-queue`), UPI intent (`GET /installments/:dueId/upi-intent`), and passbook (`GET /tickets/:ticketId/passbook`).
+- **Phase 2 Reactivation Checklist**:
+  - [ ] Upgrade Flutter SDK to latest stable release (`flutter upgrade`).
+  - [ ] Regenerate Dart API models from `@kumaran/api-client` OpenAPI spec (`scripts/generate-dart-api.ts`).
+  - [ ] Connect Drift offline database to SQLite storage.
+  - [ ] Pair field agent handheld Android devices with Bluetooth thermal printers.
+  - [ ] Configure production Firebase Cloud Messaging (FCM) credentials for Push alerts.
+  - [ ] Conduct field agent training at Perundurai Head Office.

@@ -53,17 +53,17 @@ Every subscriber's physical paper passbook at Kumaran Finance maintains strictly
 3. **Auction Date & Dividend Linkage**:
    - The in-branch auction is conducted on the cycle date (e.g., `22/12/2022`).
    - Its winning discount directly populates the universal dividend for that **immediate upcoming collection cycle** (`22/12/2022` to `22/01/2023`), so members pay the discounted net amount ($I_{base} - Div$) starting right in Month 2.
-4. **Dynamic Discount Ceiling**:
-   - In every auction month, the discount is **competitive and dynamic**:
-     $$4\% \text{ Foreman Commission} \le \text{Bid Discount } (D) \le \frac{1}{4} \text{ Ceiling } \left(\frac{V}{4}\right)$$
-   - Discount does not have to be static. In quiet months it may be lower (e.g. ₹30,000 or ₹40,000); when competition hits the 25% ceiling (₹75,000), physical paper token lot draws are conducted in front of members.
-5. **Final Month (Month $N$) Settlement (FIN-B & `CONFIRMED-BY-DEVELOPER`)**:
+4. **Competitive Bid Range Within Fixed 1/4 Ceiling**:
+   - In every auction month, the winning discount is **competitive** within the strictly **fixed** floor-to-ceiling band (there is no dynamic ceiling — see §6.2):
+     $$4\% \text{ Foreman Commission } (C_f) \le \text{Bid Discount } (D) \le \text{Fixed } \frac{1}{4} \text{ Ceiling } \left(\frac{V}{4}\right)$$
+   - Discount does not have to hit the ceiling in every month. In quiet months it may be lower (e.g. ₹30,000 or ₹40,000); when competition hits the fixed 25% ceiling (₹75,000 on a ₹3L scheme), physical paper token lot draws are conducted in front of members.
+5. **Final Month (Month $N$) Two-Stage Settlement (FIN-B, ADR-25 & `CONFIRMED-BY-DEVELOPER`)**:
    - No auction in Month $N$. The single remaining unprized subscriber receives the full gross chit pool minus 4.00% Foreman Commission ($C_f$), minus the final month's payable base installment ($I_{\text{base}}$) **if unpaid**, minus any prior unpaid arrears:
      $$\text{Final Net Settlement Payout} = V - C_f - (\text{finalMonthDeduction}) - \text{priorArrears}$$
    - **Double Collection Prohibition (FIN-B)**:
      - Case 1 (Month $N$ Unpaid): $\text{finalMonthDeduction} = I_{base}$. Payout is $100,000 - 4,000 - 5,000 = \mathbf{₹91,000}$. Month $N$ due is marked `PAID`.
      - Case 2 (Month $N$ Already Paid at branch desk): $\text{finalMonthDeduction} = 0n$. Payout is $100,000 - 4,000 - 0 = \mathbf{₹96,000}$. Zero double collection.
-   - Executed via `POST /chits/:id/settle-final-month` exclusively by verified Partners (`isPartner: true`). Scheme status transitions to `COMPLETED`.
+   - Executed strictly via **2-stage Maker-Checker settlement**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `isPartner: true`, `maker != checker`). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -171,17 +171,19 @@ The dividend settlement policy is confirmed as follows:
   - Branch staff simply enters the winning ticket number drawn into the software.
   - The software records the result without running an autonomous digital RNG draw.
 
-### 6.4 Finalized Auction Correction Workflow (`KFC-FIN-005` / `CONFIRMED-BY-DEVELOPER`)
+### 6.4 Finalized Auction Correction Workflow (`KFC-FIN-005` / `M9-DUAL-DEF-01..05` / `CONFIRMED-BY-DEVELOPER`)
 In the event of a human clerical error during physical auction data entry (e.g. inverted digit on winning ticket or mistyped discount):
 1. **Maker Request (`POST /api/v1/auctions/:id/correction/request`)**:
-   - Initiated strictly by **Super Admin (Partner A)** with a mandatory justification.
-   - Enforces the 25% discount ceiling and whole-rupee divisibility rules on the corrected values.
-   - **Immutable Disbursed Prize Guard**: If the prize money has already been disbursed (`disbursementStatus === 'DISBURSED'`), correction is strictly blocked.
+   - Initiated strictly by **Super Admin (Partner A, `isPartner: true`)** with a mandatory justification inside a row-locked transaction (`withTransactionRetry`, monotonic DAG locks).
+   - Enforces the 25% discount ceiling, whole-rupee divisibility (`KFC-FIN-002`), and rejects no-op corrections.
+   - **Immutable Disbursed Prize Guard**: If prize money is already disbursed (`disbursementStatus === 'DISBURSED'`), correction is strictly blocked (`DISBURSED_PRIZE_IMMUTABLE`).
+   - **Settled History Guard (`FIN-E`)**: If ANY subscriber has already paid their Month $N+1$ installment due, correction fails closed with `ALREADY_PAID_DUES_EXIST`.
+   - **Disbursement Lockout (`M9-DUAL-DEF-02`)**: While a correction request is pending, all 3 prize disbursement stages (`verifySafetyProof`, `authorizePayout`, `releasePayout`) fail closed (`PENDING_CORRECTION_LOCKOUT`) so disputed winners cannot be paid out.
 2. **Checker Approval (`POST /api/v1/auctions/:id/correction/approve`)**:
-   - Approved strictly by **Super Admin (Partner B)** with hard dual control: `maker_user_id != checker_user_id`.
-   - Atomically updates auction fields (`winningTicketId`, `bidDiscount`, `prizeMoney`, `dividendPerTicket`).
-   - If the winning ticket changes, swaps `isPrized` flags (unmarks old winner, marks new winner).
-   - Reconciles downstream month installment dues (`netPayableAmount = baseInstallment - correctedDividend`) for unpaid records. Paid records remain preserved to protect financial auditability.
+   - Approved strictly by **Super Admin (Partner B, `isPartner: true`)** with hard dual control: `maker_user_id != checker_user_id`.
+   - Atomically updates auction fields (`winningTicketId`, `bidDiscount`, `prizeMoney`, `dividendPerTicket`), swaps `isPrized` flags if the winner changed, reconciles all unpaid Month $N+1$ installment dues (`netPayableAmount = baseInstallment - correctedDividend`), and if corrected below ceiling ($D < V/4$), purges stale `AuctionTieBidder` rows and resets `wasTieBreakWinner = false` (`M9-DUAL-DEF-04`).
+3. **Checker Rejection (`POST /api/v1/auctions/:id/correction/reject`)**:
+   - Independent **Super Admin (Partner B, `isPartner: true`, `maker != checker`)** can dismiss an erroneous correction request, logging `AUCTION_CORRECTION_REJECTED` and lifting the disbursement lockout (`M9-DUAL-DEF-01`).
 
 ---
 
@@ -206,20 +208,23 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 - **Receipts & Notifications (`CONFIRMED-BY-DEVELOPER`)**:
   - The customer's physical paper passbook signed with pen by the agent/cashier is the primary physical proof.
   - Generation of bilingual (English + Tamil) digital PDF receipts (for company ledger and dispute backup) is in V1 scope (`CONFIRMED-BY-DEVELOPER`).
-  - Notifications follow a Smart Hierarchy: Free In-App Push Notifications for smartphone app users, and DLT SMS fallback for keypad phone users. WhatsApp Business API is parked in V1 (`CONFIRMED-BY-DEVELOPER`).
+  - Phase 1 automated notifications run exclusively via **Indian TRAI DLT SMS (MSG91)** (`ADR-23`); WhatsApp Business API is purged/parked in V1, and FCM mobile push notifications are deferred to Phase 2 alongside Flutter UI (`ADR-26`).
   - Payout vouchers support Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`).
 
 ---
 
-## 8. Defaulter Rules & Auction Bidding Ineligibility (`CONFIRMED-BY-DEVELOPER`)
+## 8. Defaulter Rules, Zero Late Fees, Full Roster & Auction Ineligibility (`CONFIRMED-BY-DEVELOPER`)
 
-1. **Auction Bidding Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**:
-   - Any subscriber who has not paid their installment due for a specific month is **strictly ineligible to participate or bid in that month's auction**.
-   - The software enforces this condition automatically: staff cannot select an unpaid subscriber as an active bidder or auction winner for that installment month.
-
-2. **3-Month Consecutive Arrears & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
-   - If a subscriber fails to pay their monthly installment for **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
-   - The software tracks consecutive missed installments, flags the ticket with status `DEFAULT_3_MONTHS`, and provides an authorized workflow for company management / partners to formally remove the customer and reassign or settle the ticket according to company policy.
+1. **Full Roster Precondition (Q05)**:
+   - A chit group cannot be activated with vacant tickets; all $M = N$ tickets must be assigned to subscribers before activation.
+2. **Zero Late Fees & Zero Penalty Interest (Q23)**:
+   - Kumaran Finance charges strictly **₹0 late fee** and **₹0 penalty interest** on overdue installments.
+3. **Auction Bidding Ineligibility for Unpaid Dues & Pending Removal (ADR-07 / ADR-12 / `DEF-M9-ENG-01`)**:
+   - Any subscriber who has not paid their installment due for a specific month, or whose ticket has a pending defaulter removal request (`removalRequestedByUserId != null`), is **strictly ineligible to participate or bid in that month's auction**.
+   - Row-locked ticket validation authoritatively enforces `consecutiveUnpaidMonths === 0` and `removalRequestedByUserId === null` before accepting any bid or tie-break entry.
+4. **3-Month Consecutive Arrears & Two-Partner Removal Rights (ADR-22 / `KFC-SEC-002` / `KFC-SEC-004`)**:
+   - Missing **3 continuous (consecutive) monthly installments** flags the ticket `DEFAULT_3_MONTHS` and grants removal rights under two-partner dual control (`POST /tickets/:id/remove-defaulter/request` $\to$ `PENDING_REMOVAL_APPROVAL` $\to$ `POST /tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`, `maker != checker`).
+   - **Prized Ticket Immutability (`KFC-SEC-004` / Q26)**: Prized subscriber tickets can **never** be removed, substituted, or surrendered (`PRIZED_TICKET_IMMUTABLE`).
 
 ---
 
@@ -247,12 +252,12 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 ## 10. Prize Disbursement Arrears Offset & TOCTOU Guard (FIN-A, FIN-D, `KFC-FIN-003`, `KFC-FIN-004`)
 
 1. **Automatic Arrears Offsetting (FIN-A & `KFC-FIN-003`)**:
-   - When authorizing a prize payout (`POST /auctions/:id/authorize-payout`), the system queries all unpaid installment dues for the winning subscriber up to the auction month.
+   - When authorizing a prize payout (`POST /disbursements/auction/:auctionId/authorize-payout`), the system queries all unpaid installment dues for the winning subscriber up to the auction month.
    - Total outstanding arrears are automatically deducted from the gross prize money:
      $$\text{Authorized Net Payout} = \text{Prize Money } (P) - \text{Total Arrears}$$
    - **Insolvency Guard**: If total unpaid arrears are greater than or equal to the prize money ($\text{Arrears} \ge P$), authorization is rejected fail-closed.
 2. **Time-Of-Check-To-Time-Of-Use (TOCTOU) Arrears Verification (FIN-D)**:
-   - Upon release (`POST /auctions/:id/release-payout`), inside the row-locked database transaction:
+   - Upon release (`POST /disbursements/auction/:auctionId/disburse`), inside the row-locked database transaction:
      - The system re-queries all unpaid dues $\le$ auction month.
      - Validates `currentArrears === expectedArrears`.
      - If arrears changed (e.g. subscriber made an intervening payment between authorization and release), the transaction fails closed immediately:
@@ -266,10 +271,10 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 
 ---
 
-## 11. Finalized Auction Correction Downstream Integrity Guard (FIN-E & KFC-FIN-005)
+## 11. Finalized Auction Correction Downstream Integrity Guard (FIN-E, `KFC-FIN-005` & `M9-DUAL-DEF-01..02`)
 
-1. **Dual Control Requirement**: Partner A requests (`POST /auctions/:id/request-correction`); independent Partner B approves (`POST /auctions/:id/approve-correction`).
-2. **Disbursed Prize Immutability**: If prize money has already been disbursed to the winner, correction is strictly rejected: `DISBURSED_PRIZE_IMMUTABLE`.
+1. **Dual Control Requirement**: Partner A requests (`POST /auctions/:id/correction/request`); independent Partner B approves (`POST /auctions/:id/correction/approve`) or rejects (`POST /auctions/:id/correction/reject`) under `maker != checker` and `isPartner: true`.
+2. **Disbursed Prize Immutability & Pending Lockout**: If prize money has already been disbursed to the winner, correction is strictly rejected (`DISBURSED_PRIZE_IMMUTABLE`). While a correction request is pending, all 3 prize disbursement stages fail closed (`PENDING_CORRECTION_LOCKOUT`).
 3. **Settled Financial History Preservation (FIN-E)**:
    - If ANY subscriber has already paid their installment due for downstream Month $N+1$, correction fails closed:
      `HTTP 400 Bad Request: ALREADY_PAID_DUES_EXIST: Cannot request/approve correction because downstream dues have already been paid. Correction would invalidate settled financial history.`
@@ -278,8 +283,22 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 
 ## 12. Defaulter & Early Exit Settlement Policy Guard (FIN-F & Q25)
 
-1. **Statutory Status**: Policy regarding damage deduction percentages (4% commission vs 5% damages under Section 30 Chit Funds Act) remains **UNCONFIRMED** by Kumaran Finance partners and legal counsel.
+1. **Statutory Status**: Policy regarding damage deduction percentages (4% commission vs 5% damages under Section 30 / Sections 39–40 Chit Funds Act) remains **UNCONFIRMED** by Kumaran Finance partners and legal counsel.
 2. **Fail-Closed Execution Guard**:
    - Calling `POST /tickets/:id/settle-removal` strictly fails closed with:
-     `HTTP 400 Bad Request: UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement policy (Q25) has not been confirmed by business owner and legal counsel. Automatic settlement execution is blocked.`
+     `HTTP 400 Bad Request: UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed.`
    - Prevents illegal or unauthorized forfeiture of subscriber capital.
+
+---
+
+## 13. Statutory Ledger Math Invariants (`DEF-M10-STAT-01..04`)
+
+1. **Form XXII Cash Book Physical Vault Partition**:
+   - Strictly isolates physical cash movements (`paymentMethod === 'CASH'` and `disbursementMode === 'CASH'`). Digital UPI, NEFT/RTGS/IMPS, and Cheques are 100% excluded.
+   - Historical cash inflows that are later reversed remain recorded on their original vault-entry date (`paymentStatus IN ('SUCCESS', 'REVERSED')`), while approved physical cash payment reversals (`paymentReversal.status === 'APPROVED'`) are accounted as explicit cash outflows (`REV-` voucher) on `reversedAt`.
+   - Field agent cash handovers enter vault accounting strictly at physical acknowledgement time (`cashHandoverAcknowledgedAt ?? createdAt`), guaranteeing the exact daily invariant across exact `Asia/Kolkata` (IST) day bounds:
+     $$\text{Opening Safe Cash}(T) \equiv \text{Closing Safe Cash}(T - 1)$$
+     $$\text{Closing Safe Cash}(T) = \text{Opening Safe Cash}(T) + \text{Cash Inflows}(T) - \text{Cash Disbursements}(T) - \text{Cash Reversals}(T)$$
+2. **Form XXI Subscriber Passbook Running Cumulative Totals**:
+   - Every monthly row computes exact 64-bit `BigInt` running totals (`cumulativeGrossDue`, `cumulativeDividendCredit`, `cumulativeNetPayable`, `cumulativePaid`, `runningBalance = cumulativeNetPayable - cumulativePaid`) and emits a contiguous `1..N` schedule (`contiguousSchedule`) for booklet print reconciliation.
+   - Unallocated paid dues retain KC-09 anti-hallucination provenance (`PRIZE_ARREARS_OFFSET` via verified audit log, or `DIRECT_ADJUSTMENT` with `null` date/receipt when no allocation exists).
