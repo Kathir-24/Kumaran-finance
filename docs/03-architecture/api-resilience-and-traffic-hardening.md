@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
 > **Target Audience**: Backend Engineers, DevOps Architects, Security Auditors  
-> **Compliance**: ADR-01 through ADR-19, `AGENTS.md`, OWASP API Security Top 10
+> **Compliance**: ADR-01 through ADR-26, 11 Invariant Architectural Guardrails (`AGENTS.md`), OWASP API Security Top 10
 
 ---
 
@@ -18,7 +18,7 @@ This specification details the resilience patterns, threadpool sizing, process b
 
 ```mermaid
 flowchart TD
-    Client["Client Devices\n(Flutter Mobile & Next.js Web)"] -->|HTTPS TLS 1.3\nKeepalive 65s| Ingress["Nginx Edge Ingress\n(Limit 30r/s, Scoped 25MB Body)"]
+    Client["Client Devices\n(Next.js 15 Web & Phase 1 Dart Core / Phase 2 Flutter Android)"] -->|HTTPS TLS 1.3\nKeepalive 65s| Ingress["Nginx Edge Ingress\n(Limit 30r/s, Scoped 25MB Envelope)"]
     Ingress -->|Keepalive 70s\nNodeHttpHandler| API["NestJS Modular Monolith\n(libuv UV_THREADPOOL_SIZE=16)"]
     
     subgraph "API Core Guardians"
@@ -46,11 +46,11 @@ flowchart TD
 | 3 | **Response Latency & Optimization** | Uncached multi-query database aggregations on dashboard | Branch-scoped 30-second Redis caching for executive KPI queries with automated invalidation upon payments or handovers | `ReportService.getExecutiveDashboard` |
 | 4 | **API Timeouts** | Unbounded external S3 SDK requests or slow queries | `TimeoutInterceptor` (15s default deadline) and explicit S3 SDK socket/connection timeouts (`NodeHttpHandler`) | `TimeoutInterceptor`, `S3StorageDriver` |
 | 5 | **Request Queue & Backpressure** | Concurrent requests overwhelming threadpool | Ingress queue bursts capped in Nginx; keepalive timeouts aligned (Node 70s > Nginx 65s) to eliminate `ECONNRESET` | `main.ts`, `chitflow.conf` |
-| 6 | **Thread Pool & Async I/O** | `bcrypt` (cost 12) starving 4-thread default libuv pool | Scaled container environment to `UV_THREADPOOL_SIZE=16` ensuring 12 threads remain open for non-blocking disk & DNS I/O | `apps/api/Dockerfile`, `docker-compose.fullstack.yml` |
+| 6 | **Thread Pool & Async I/O** | `bcrypt` (cost 12) starving 4-thread default libuv pool | Scaled container environment to `UV_THREADPOOL_SIZE=16` ensuring 12 threads remain open for non-blocking disk & DNS I/O | `apps/api/Dockerfile`, `infra/docker/docker-compose.fullstack.yml` |
 | 7 | **Synchronous Heavy Tasks** | CPU-intensive PDF rendering on repeated receipt views | S3 pre-generation check in `PdfService` to stream existing buffers directly instead of rerunning PDFKit synthesis | `PdfService.generateReceiptPdf` |
 | 8 | **Memory Leaks** | Unbounded in-memory arrays growing with each dispatch | Capped `NotificationService.sentLog` with a fixed-size ring buffer (max 200 entries) preventing V8 heap exhaustion | `NotificationService.pushLog` |
 | 9 | **CPU Spikes** | Deep object cloning and map allocation for BigInt serialization | Optimized in-place tree mutation using `WeakSet` circular checking, reducing heap allocations by >90% | `BigIntInterceptor` |
-| 10 | **Payload Limits & Pagination** | Unbounded payloads causing memory exhaustion & DoS | Strict 1MB JSON body limit globally; 25MB scoped strictly to KYC/safety-proof uploads; pagination added to defaulters and UPI claims | `nginx.conf`, `InstallmentService`, `PaymentService` |
+| 10 | **Payload Limits & Pagination** | Unbounded payloads causing memory exhaustion & DoS | Strict 1MB JSON body limit globally; 25MB Nginx multipart envelope (`chitflow.conf`) with 10MB per-file app cap (`StorageService` / Multer); pagination added to defaulters and UPI claims | `nginx.conf`, `chitflow.conf`, `InstallmentService`, `PaymentService` |
 | 11 | **Retry Storms & Backoff** | Synchronized retries overwhelming telecom SMS gateway | Jittered exponential backoff: $Delay = \min(Delay_{max}, Base \times 2^{attempt}) + \text{RandomJitter}$ | `Msg91SmsDriver.postWithRetry` |
 | 12 | **Cascading Failures** | Downstream SMS gateway outage crashing notification queues | Three-state `CircuitBreaker` (`CLOSED`, `OPEN`, `HALF_OPEN`) with fast-fail fallback and automatic recovery | `CircuitBreaker`, `Msg91SmsDriver` |
 | 13 | **Double Submits & Idempotency** | Network dropped ACK causing duplicate payment entries | Global `IdempotencyHeaderInterceptor` binding `Idempotency-Key` HTTP header directly to mutation request DTOs | `IdempotencyHeaderInterceptor` |
@@ -62,9 +62,9 @@ flowchart TD
 ### 3.1 Edge Tier (Nginx Ingress)
 All incoming ingress traffic is throttled at the network perimeter before consuming Node.js event-loop resources:
 ```nginx
-# Authentication Endpoints (Brute force & SMS OTP protection)
+# Authentication Endpoints (Brute force & SMS OTP protection; burst=10 on /auth/, burst=5 on strict login/OTP sub-routes in chitflow.conf)
 location /api/v1/auth/ {
-    limit_req zone=api_auth_limit burst=5 nodelay;
+    limit_req zone=api_auth_limit burst=10 nodelay;
     ...
 }
 
@@ -87,8 +87,8 @@ location @rate_limited {
 If a request passes ingress (e.g., during internal proxy communications), the NestJS `@Throttle()` guard enforces strict user-level limits. Upon throwing `ThrottlerException`, the `GlobalExceptionFilter` attaches the required standard header:
 ```typescript
 if (exception instanceof ThrottlerException) {
-  const retryAfterSeconds = 60;
-  response.header('Retry-After', String(retryAfterSeconds));
+  const retryAfter = 60;
+  response.setHeader('Retry-After', String(retryAfter));
 }
 ```
 
@@ -143,7 +143,7 @@ Previously, every connected user triggered 4 database queries every 15 seconds (
 **Optimized Implementation**:
 1. Approvals query result is cached in Redis (`report:approvals:<branchId|ALL>`) with a 15-second TTL.
 2. Regardless of how many clients connect, at most 1 SQL query executes per 15 seconds.
-3. Financial mutation events (`POST /payments`, `POST /collections/record`, `POST /disbursements/release`) immediately evict `report:approvals:*` and `report:dashboard:*`, delivering instant real-time synchronization without polling penalty.
+3. Financial mutation events (`POST /api/v1/payments`, `POST /api/v1/collections/record`, `POST /api/v1/disbursements/auction/:auctionId/disburse`) immediately evict `report:approvals:*` and `report:dashboard:*`, delivering instant real-time synchronization without polling penalty.
 
 ---
 
@@ -175,7 +175,8 @@ Response format adheres strictly to `ApiPaginatedResponseEnvelope`:
 ## 8. Verification & Performance Benchmarking
 
 All resilience mechanisms are continuously verified through automated test suites:
-- **Circuit Breaker Tests**: `apps/api/test/unit/circuit-breaker.spec.ts` (100% pass)
-- **Network Chaos & Timeout Recovery**: `apps/api/test/unit/chaos-network-disconnect.spec.ts` (100% pass)
-- **High Concurrency & Stress Drills**: `apps/api/test/unit/concurrency-postgres.spec.ts` & `test/unit/distributed-lock.spec.ts` (100% pass)
-- **Full Test Suite Status**: 609 passing tests across 40 suites.
+- **Circuit Breaker Tests**: [`apps/api/test/unit/circuit-breaker.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/circuit-breaker.spec.ts) (**5/5 pass**)
+- **API Resilience & Interceptors**: [`apps/api/test/unit/api-resilience.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/api-resilience.spec.ts) (**8/8 pass**)
+- **Network Chaos & Timeout Recovery**: [`apps/api/test/unit/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/chaos-network-disconnect.spec.ts) (**7/7 pass**)
+- **High Concurrency & Stress Drills**: [`apps/api/test/unit/concurrency-postgres.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/concurrency-postgres.spec.ts) (**26/26 real PostgreSQL 17 pass**) & [`distributed-lock.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/distributed-lock.spec.ts) (100% pass)
+- **Full Monorepo Test Suite Status**: **1,226 passing API unit tests across 63 suites**, **376 passing Web tests across 14 suites**, **10 `@kumaran/api-client` tests**, and **15/15 DB `CHECK` constraint E2E tests**.

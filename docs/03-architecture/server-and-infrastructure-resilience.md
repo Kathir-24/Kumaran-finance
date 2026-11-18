@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Audience**: Core Engineering, DevOps Engineers, Cloud Architects, AI Coding Agents  
-> **Compliance & Guardrails**: Strictly enforces the 10 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), pure whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, and PostgreSQL 17 as the sole source of financial truth.
+> **Compliance & Guardrails**: Strictly enforces the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), pure whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`isPartner: true`, `ADR-21`), and PostgreSQL 17 as the sole source of financial truth.
 
 ---
 
@@ -73,7 +73,7 @@ flowchart TD
     This $256\text{MB}$ headroom safely accommodates Prisma engine binaries, OpenSSL buffers, and libuv thread stacks, preventing OOM kills.
   - **Next.js Web**: `NODE_OPTIONS="--max-old-space-size=512"`. Container memory ceiling is set to `mem_limit: 512m`.
 - **Bounded In-Memory Caches**:
-  - In `ReportService`, the in-memory dashboard snapshot buffer enforces a strict FIFO/LRU ceiling of **20 entries** (`MAX_SNAPSHOT_CACHE_ENTRIES = 20`), preventing unbounded memory leaks during prolonged server uptime.
+  - In `ReportService` ([`report.service.ts:71`](file:///u:/Kumaran-finance/apps/api/src/report/report.service.ts#L71)), the in-memory dashboard snapshot buffer enforces a strict FIFO/LRU ceiling of **20 entries** (`MAX_SNAPSHOT_ENTRIES = 20`), preventing unbounded memory leaks during prolonged server uptime.
 - **Container Memory Allocation Matrix**:
 
 | Service | Container Name | V8 Heap (`max-old-space-size`) | Container `mem_limit` | Headroom / Buffer |
@@ -105,7 +105,7 @@ flowchart TD
   - Triggers a **Critical Alert** whenever storage usage reaches or exceeds **80% capacity** (`THRESHOLD_PERCENT=80`).
 
 ### 2.4 Pillar 5: Bandwidth Saturation & Edge CDN Architecture
-- **Origin Compression**: Nginx enables `gzip on;` with `gzip_comp_level 5;` and `gzip_types text/plain text/css application/json application/javascript application/xml;`.
+- **Origin Compression**: Nginx ([`infra/docker/nginx/nginx.conf:46`](file:///u:/Kumaran-finance/infra/docker/nginx/nginx.conf#L46)) enables `gzip on;` with `gzip_comp_level 6;` and `gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;`.
 - **Edge CDN Distribution (Cloudflare / Reverse Proxy CDN)**:
   - Deployed in front of Nginx Ingress or application entrypoint.
   - **Static Asset Behaviors** (`/_next/static/*`, `/static/*`, images, fonts): Cached at edge locations across India with `Cache-Control: public, max-age=31536000, immutable`.
@@ -150,20 +150,19 @@ flowchart TD
   - Container memory allocations are pinned to prevent memory contention or OOM issues during auction rush hours.
 - **Resource Monitoring & Proactive Alarms**:
   - Node Exporter / Prometheus alerts configured at **80% of disk storage**, **80% of RAM**, and **85% sustained CPU load**.
-- **SMS DLT Gateway Balance Guardian**:
-  - SMS gateway (Indian DLT) credit balance is monitored via automated threshold alerts.
-  - When SMS credits fall below 500 units, the system automatically falls back to free **Firebase Cloud Messaging (FCM) Push Notifications** and Web Push, ensuring customers continue receiving payment confirmations without interruption.
+- **SMS DLT Gateway Failover & Balance Guardian (`ADR-23` / `ADR-26`)**:
+  - SMS gateway (Indian TRAI DLT via MSG91) credit balance and circuit breaker state (`kumaran_sms_circuit_breaker_state`) are monitored via Prometheus alerts.
+  - When primary SMS dispatch fails or trips the circuit breaker, [`SmsService`](file:///u:/Kumaran-finance/apps/api/src/notification/services/sms.service.ts) fails over to the secondary backup driver (`SMS_BACKUP_DRIVER_TOKEN`), while subscribers with a registered Phase 2 `fcmToken` receive ₹0-cost **Firebase Cloud Messaging (FCM) Push Notifications** (no Web Push is deployed).
 
 ### 2.8 Pillar 9: Off-Site Redundancy & Disaster Recovery (DRP)
 - **High Availability & Redundancy**:
-  - Application instances run in Docker containers managed with auto-restart policies (`restart: unless-stopped`) and health probes.
-  - Database operates with continuous WAL archiving and automated midnight encrypted dumps (`backup-cron`).
+  - Application instances run in Docker containers managed with auto-restart policies (`restart: unless-stopped`) and deep health probes (`/health/readiness`).
+  - Database backups run via automated nightly encrypted binary dumps (`pg_dump -F c`) at **02:00 AM IST** (`30 20 * * *` UTC) via `chitflow-backup-cron` ([`infra/docker/docker-compose.fullstack.yml:248-286`](file:///u:/Kumaran-finance/infra/docker/docker-compose.fullstack.yml#L248-L286)).
 - **Off-Site Disaster Recovery (DRP)**:
-  - S3-compatible cloud storage (Cloudflare R2, MinIO, or S3) replicates all KYC scans and bilingual PDF receipts off-server with zero egress fees.
-  - Nightly encrypted database snapshots (02:00 AM IST) are transferred to off-site object storage (`S3_BUCKET`).
-- **Recovery Invariants**:
-  - **Recovery Point Objective (RPO)**: $\le 15\text{ minutes}$ (via continuous PostgreSQL WAL archiving).
-  - **Recovery Time Objective (RTO)**: $\le 2\text{ hours}$ (verified via quarterly automated drill `pnpm run db:drp:drill`).
+  - S3-compatible cloud storage (Cloudflare R2, MinIO, or S3) replicates all KYC scans, bilingual PDF receipts, and encrypted nightly database archives (`S3_BUCKET`, 30-day cloud retention, 7-day local retention) with zero egress fees.
+- **Verified Recovery Objectives (Honest Production Baseline)**:
+  - **Current Verified RPO**: **$\le 24\text{ hours}$** (driven by automated nightly 02:00 AM IST `pg_dump -F c` snapshots to off-site S3/R2). *Note: Continuous WAL archiving / Point-In-Time Recovery (PITR) is **not currently deployed** in the baseline compose stack; enabling optional WAL-G / `archive_mode=on` streaming in production upgrades RPO to $\le 15\text{ minutes}$.*
+  - **Current Verified RTO**: **$\le 60\text{ minutes}$** (verified via live automated DRP drill [`apps/api/scripts/ops/drp-drill.ts`](file:///u:/Kumaran-finance/apps/api/scripts/ops/drp-drill.ts), which restored a 186 KB binary archive into disposable database `chitflow_drp_drill` in **1.04 seconds** with 100% entity and whole-rupee financial parity).
 
 ---
 
@@ -219,3 +218,31 @@ bash infra/scripts/rollback.sh
 # Windows Server / Admin Terminal
 .\infra\scripts\rollback.ps1
 ```
+
+---
+
+## 4. Host Loopback Port Exposure, Secrets Hygiene & Infrastructure Audit Ledger
+
+Verified directly against [`infra/docker/docker-compose.fullstack.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.fullstack.yml) and [`apps/api/src/config/env.validation.ts`](file:///u:/Kumaran-finance/apps/api/src/config/env.validation.ts):
+
+### 4.1 Verified Container Network & Port Exposure Matrix (9 Containers)
+| Service | Container Name | Container Port | Host Binding | Public Internet? | Security Verdict |
+|---|---|:---:|---|:---:|---|
+| **Nginx Ingress** | `chitflow-nginx` | 80, 443 | `0.0.0.0:80`, `0.0.0.0:443` | **YES (Intended)** | TLS 1.2/1.3 termination, HSTS, edge rate zones (`3r/s` auth, `30r/s` API) |
+| **NestJS API** | `chitflow-api` | 3000 | `127.0.0.1:3000` | **NO** | Loopback only; non-root `node` user; `ENABLE_BULLMQ_WORKERS=false` |
+| **BullMQ Worker** | `chitflow-worker` | 3002 | None (internal bridge) | **NO** | Zero host port exposure; `ENABLE_BULLMQ_WORKERS=true` |
+| **Next.js Web** | `chitflow-web` | 3001 | `127.0.0.1:3001` | **NO** | Loopback only; non-root `nextjs` UID 1001; standalone build |
+| **PostgreSQL 17** | `chitflow-db` | 5432 | `127.0.0.1:5433` | **NO** | Loopback only; zero public DB exposure |
+| **Redis 7** | `chitflow-redis` | 6379 | `127.0.0.1:6379` | **NO** | Loopback only; `--maxmemory 512mb --maxmemory-policy noeviction` (`KFC-INF-001`) |
+| **MinIO S3 (Dev/Local)** | `chitflow-minio` | 9000, 9001 | `127.0.0.1:9000`, `127.0.0.1:9001` | **NO** | Loopback only (production targets Cloudflare R2, ₹0 egress) |
+| **Certbot Renewal** | `chitflow-certbot` | None | None | **NO** | Internal challenge volume mount; 12h Let's Encrypt renew loop |
+| **Backup Cron** | `chitflow-backup-cron` | None | None | **NO** | Internal bridge; 02:00 AM IST `pg_dump -F c` + S3/R2 upload |
+
+### 4.2 Secrets Hygiene & Fail-Fast Production Startup Gates
+- **Zero Secrets in Git**: `.gitignore` excludes all `.env`, `.env.production`, `.env.local`, `*.pem`, `*.key`, `*.pfx`, and dump files; production VPS `.env` MUST be locked to `chmod 600` (owner-readable only).
+- **Mandatory Boot Checks (`NODE_ENV === 'production'`, `env.validation.ts`)**:
+  1. `JWT_SECRET` must be $\ge 32$ characters and cannot contain dev placeholder strings.
+  2. `STORAGE_DRIVER` must be explicitly `'s3'` (rejects `'local'` disk storage in production).
+  3. `BULL_BOARD_PASSWORD` and `METRICS_PASSWORD` fail fast if set to default `'chitflow_secret'`.
+- **Flat-Fee Linux VPS Target Sizing**: 4 vCPU, 8–16 GB RAM, 100 GB NVMe SSD (~₹900–₹1,800/month flat across Hostinger, DigitalOcean, Hetzner, Linode, Vultr, or Contabo) + Cloudflare R2 (₹0 egress).
+

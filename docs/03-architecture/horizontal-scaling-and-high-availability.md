@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Compliance & Invariants**: Strictly conforms to the 10 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, and zero hallucination policy.
+> **Compliance & Invariants**: Strictly conforms to the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`isPartner: true`, `ADR-21`), and zero hallucination policy.
 
 ---
 
@@ -16,7 +16,7 @@ The platform guarantees stateful integrity across horizontal instances while mai
 flowchart TD
     subgraph Clients["Field Operations & Administrative Clients"]
         WebPortal["Web Operations Dashboard\n(Next.js 15 — Admin, Desk Accountant, Auditor)"]
-        MobileApp["Mobile Field App\n(Flutter / SQLite — Field Agents & Customers)"]
+        MobileApp["Mobile Client Core\n(Phase 1 Dart Core SDK / Phase 2 Flutter UI — ADR-26)"]
     end
 
     subgraph IngressTier["Edge Ingress & Reverse Proxy"]
@@ -57,10 +57,10 @@ To completely eliminate sticky session dependencies and session loss across inst
 1. **Stateless JWT Tokens**:
    - Access tokens have a 15-minute lifespan and are cryptographically verified using `JWT_SECRET` (HMAC SHA-256) on every incoming request without querying the database or local memory.
    - Any API replica holding the identical `JWT_SECRET` validates requests interchangeably.
-2. **Distributed Refresh Token Rotation & Coalescing (RFC 6819)**:
-   - Refresh tokens are pre-hashed via SHA-256 and hashed via `bcrypt` before storage in Redis (`auth:session:<userId>:<clientType>`) and PostgreSQL (`User.refreshTokenHash` / `Customer.refreshTokenHash`).
+2. **Distributed Refresh Token Rotation, Multi-Device Session Vault & Coalescing (RFC 6819 / F04)**:
+   - Refresh tokens are pre-hashed via SHA-256 and hashed via `bcrypt` before persistence in the dedicated PostgreSQL **`Session` table** (client-scoped Web vs Mobile session families, migration `20261115030000_auth_revocation_and_session_vault`) mirrored into fast-path Redis caches (`auth:session:<sessionId>` and `user:status:<userId>` with 120s TTL).
    - Concurrent bursts landing across horizontal replicas synchronize via transient Redis lock `lock:auth:refresh:<sha256>` and contention-only handoff keys, preventing false RFC 6819 session revocations without exposing sequential replays.
-   - Logout immediately deletes client session keys, sets `auth:revoked_before:<userId>`, and clears PostgreSQL `refreshTokenHash`, revoking access across all replicas simultaneously.
+   - Logout ([`auth.service.ts:1947`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts#L1947)) revokes the scoped PostgreSQL `Session` row(s), stamps `auth:revoked_before:<userId>`, evicts `user:status:*` & `auth:session:*`, and clears `fcmToken`, revoking access across all replicas simultaneously without cross-device logout collisions.
 3. **Distributed OTP Authentication**:
    - OTP state during customer and field agent logins is stored exclusively in Redis (`auth:otp:<phone>` and `auth:otp:cooldown:<phone>`) with atomic Lua operations and strict TTL expiration. Zero OTP state exists on local server disks.
 
@@ -119,8 +119,8 @@ upstream api_upstream {
 To guarantee 100% consistency when scaling horizontally, in-memory state is synchronized via Redis:
 
 1. **Distributed Notification Audit Log**:
-   - Dispatched SMS and Push alerts are recorded to Redis capped list `audit:notifications` via atomic `LPUSH` + `LTRIM 0 199` with a 7-day TTL (WhatsApp simulation purged per Q34).
-   - Any replica or auditor querying `getDistributedNotificationLog()` accesses the unified audit trail regardless of which container processed the dispatch.
+   - Dispatched SMS and Push alerts are dual-written to a bounded 200-entry in-memory ring buffer and Redis capped list `audit:notifications` via atomic `LPUSH` + `LTRIM 0 199` with a 7-day TTL (`604800s`, [`notification.service.ts:37-54`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L37-L54); WhatsApp simulation permanently purged per `Q34` / `KFC-NOT-001`).
+   - Any replica querying `getDistributedNotificationLog()` via `GET /api/v1/jobs/notification-audit-logs` (**strictly `SUPER_ADMIN` only** per Guardrail 11, [`jobs.controller.ts:213`](file:///u:/Kumaran-finance/apps/api/src/jobs/jobs.controller.ts#L213)) accesses the unified audit trail regardless of which container processed the dispatch.
 2. **Distributed Circuit Breaker Coordination**:
    - Third-party downstream gateways (MSG91 SMS Gateway, FCM Push) employ a distributed circuit breaker.
    - When 5 consecutive failures trip the breaker on Replica A, it broadcasts the trip timestamp to Redis key `circuit:MSG91_SMS_GATEWAY:open_until`.

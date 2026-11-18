@@ -23,8 +23,8 @@ flowchart TD
     end
 
     subgraph P1["Pillar 1: Prometheus Metrics (/metrics)"]
-        PM["MetricsService & Registry (prom-client)\nLatency Histograms: p95 <= 200ms (reads), <= 500ms (writes)\nDomain KPIs: Active chits, defaulters, BigInt daily volume"]
-        AUTH1["MetricsAuthGuard\n(HTTP Basic Auth Protected)"]
+        PM["MetricsService & Registry (prom-client)\nLatency Histograms: p95 <= 200ms (reads), <= 500ms (writes)\nDomain KPIs: Active chits, defaulters, BigInt volume & SMS APM"]
+        AUTH1["MetricsAuthGuard\n(Constant-Time Bearer Token / HTTP Basic Auth)"]
     end
 
     subgraph P2["Pillar 2: Sentry Error Monitoring"]
@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph P3["Pillar 3: Visual Queue Dashboard"]
         BB["Bull Board UI (/admin/queues)\n3 Monitored Queues: maintenance, notification, recon\nVisual job status, stack traces, and 1-click retry"]
-        AUTH2["BullBoardAuthMiddleware\n(HTTP Basic Auth Protected)"]
+        AUTH2["BullBoardAuthMiddleware (F11)\n(Super Admin JWT Session + Constant-Time Basic Fallback)"]
     end
 
     subgraph P4["Pillar 4: Regulatory Audit Logging"]
@@ -83,7 +83,7 @@ flowchart LR
     end
 
     subgraph EXPOSURE["3. Secure Scrape & Dashboards"]
-        GUARD["MetricsAuthGuard\n(Basic Auth: METRICS_USER / METRICS_PASSWORD)"]
+        GUARD["MetricsAuthGuard\n(Constant-Time Bearer Token / HTTP Basic Auth)"]
         ENDPOINT["GET /metrics\n(72KB OpenMetrics Stream)"]
         GRAFANA["Prometheus Server & Grafana Dashboards\n(15s Scrape Interval)"]
 
@@ -100,7 +100,7 @@ flowchart LR
   - `HttpMetricsInterceptor` prefers Express matched route templates (`req.route.path`), collapses unmatched `404` scanner paths to `__unmatched__`, normalizes UUIDs, numeric IDs, long hex/opaque tokens, domain codes (`KC-REC-*`, `KC-VOU-*`, `KC-CUST-*`, `KCA-*`), and storage wildcards (`/storage/file/:key`), enforces a hard `200`-route fallback cardinality cap (`__other__`), captures true controller exception status codes via `tap({ error })`, and isolates telemetry inside `try/catch`.
   - Self-metrics exclusion: Requests to `/metrics`, `/health`, `/api/docs`, and `/admin/queues` are ignored to prevent telemetry feedback loops.
 
-### 2.2 Complete Exported Metrics Catalog
+### 2.2 Complete Exported Metrics Catalog (12 Custom Metrics + Process Defaults)
 
 ```mermaid
 classDiagram
@@ -115,6 +115,8 @@ classDiagram
         +Gauge defaulterTicketsCount
         +Gauge makerCheckerPendingCount
         +Gauge dailyCollectedAmountRupees
+        +Counter smsDispatchesTotal
+        +Gauge smsCircuitBreakerState
         +getMetrics() Promise~string~
     }
 ```
@@ -131,6 +133,8 @@ classDiagram
 | `chitflow_defaulter_tickets_count` | Gauge | `bucket` | Count of overdue subscribers in `1_MONTH` or `3_MONTH_REMOVAL` buckets. |
 | `chitflow_maker_checker_pending_count` | Gauge | `type` | Pending dual-control tasks (`PAYMENT_REVERSAL`, `PRIZE_DISBURSEMENT`). |
 | `chitflow_daily_collected_amount_rupees`| Gauge | — | Cumulative collections recorded today in **whole integer Rupees (`BigInt`)**. |
+| `kumaran_sms_dispatches_total` | Counter | `provider`, `template`, `status` | External TRAI DLT SMS dispatch counts (`success`, `fallback_success`, `circuit_open`, `failure`, `bypassed`, [`metrics.service.ts:126`](file:///u:/Kumaran-finance/apps/api/src/metrics/services/metrics.service.ts#L126)). |
+| `kumaran_sms_circuit_breaker_state` | Gauge | `provider` | SMS gateway circuit breaker state (`0 = CLOSED`, `1 = HALF_OPEN`, `2 = OPEN`, [`metrics.service.ts:133`](file:///u:/Kumaran-finance/apps/api/src/metrics/services/metrics.service.ts#L133)). |
 | `nodejs_*` | Process | — | Standard V8 heap size, memory RSS, and event-loop lag metrics. |
 
 ### 2.3 Prometheus Scrape Configuration (`prometheus.yml`)
@@ -293,12 +297,12 @@ flowchart TD
 
     subgraph WORKERS["3. Asynchronous Worker Execution Pool"]
         W1["Maintenance Worker\n(Attempts: 3, Backoff: 1s Exp)"]
-        W2["Notification Worker\n(Attempts: 3, FCM Push + DLT SMS Fallback)"]
-        W3["Reconciliation Worker\n(Attempts: 3, Gateway Reconciliation)"]
+        W2["Notification Worker\n(Attempts: 3, TRAI DLT SMS Phase 1 Primary / FCM Push Phase 2)"]
+        W3["Reconciliation Worker\n(Attempts: 3, Direct KVB Bank Settlement — ADR-19)"]
     end
 
     subgraph UI["4. Pillar 3: Visual Observability & Management"]
-        AUTH["BullBoardAuthMiddleware\n(HTTP Basic Auth Protected)"]
+        AUTH["BullBoardAuthMiddleware (F11)\n(Super Admin JWT Session + Constant-Time Basic Fallback)"]
         BOARD["Bull Board UI (/admin/queues)\n• Live Job Counts (Waiting/Active/Completed/Failed)\n• Stack Trace Viewer\n• 1-Click Retry / Clean"]
     end
 
@@ -316,7 +320,7 @@ flowchart TD
 
 ### 4.1 Dashboard Capabilities
 * **Route**: `http://localhost:3000/admin/queues/`
-* **Access Control**: Protected by [`BullBoardAuthMiddleware`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/bull-board-auth.middleware.ts) requiring HTTP Basic Auth.
+* **Access Control (`F11` Hardened)**: Protected by [`BullBoardAuthMiddleware`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/bull-board-auth.middleware.ts) enforcing active **`SUPER_ADMIN` JWT sessions** (via `Authorization: Bearer`, `?token=`, or `access_token` / `jwt` cookie with Redis revocation checks) plus constant-time SHA-256 HTTP Basic Auth fallback (rejecting insecure default `chitflow_secret`).
 * **Monitored Queues**:
   1. `daily-maintenance-queue`: Midnight arrears calculation and 3-month default tagging.
   2. `notification-queue`: DLT SMS and FCM push dispatch for receipts and auction reminders.
@@ -364,42 +368,40 @@ flowchart TD
     AUTH -->|All Other Roles| DENY
 ```
 
-### 5.1 Database Schema (`public."AuditLog"`)
+### 5.1 Database Schema (`public."AuditLog"`, [`schema.prisma:471-485`](file:///u:/Kumaran-finance/apps/api/prisma/schema.prisma#L471-L485))
 ```prisma
 model AuditLog {
   id         String   @id @default(uuid())
-  timestamp  DateTime @default(now())
   userId     String?
-  action     String   // e.g., 'PAYMENT_REVERSED', 'SAFETY_PROOF_VERIFIED'
-  entityType String   // e.g., 'Payment', 'AuctionWinner', 'CustomerDocument'
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // e.g., "AUCTION_FINALIZED", "TIE_BREAK_DRAWN", "PAYMENT_REVERSED"
+  entityType String   // "Payment", "Auction", "ChitGroup"
   entityId   String
+  ipAddress  String?
   oldValue   Json?
   newValue   Json?
-  ipAddress  String?
+  timestamp  DateTime @default(now())
 
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([entityId])
-  @@index([userId])
-  @@index([action])
+  @@index([entityType, entityId])
   @@index([timestamp])
 }
 ```
 
-### 5.2 Audited Financial & Dual-Control Actions
-Every critical mutation in the codebase automatically writes an append-only entry to `AuditLog`. [`RequestContextMiddleware`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.middleware.ts) (`AsyncLocalStorage`) captures the Express `TRUST_PROXY`-resolved and normalized client IP address (`::ffff:` stripped) along with `X-Request-ID` before Guards/Controllers run, and [`PrismaService`](file:///u:/Kumaran-finance/apps/api/src/prisma/prisma.service.ts) uses a Prisma `$extends` query hook on `auditLog.create` / `createMany` so both direct and interactive `$transaction` audit records automatically persist `ipAddress` (safely leaving `null` for non-HTTP background jobs) without duplicating IP plumbing across services. (`X-Request-ID` is likewise propagated on Nginx `/api/v1/reports/approvals-stream` SSE ingress and Web BFF headers.)
+### 5.2 Audited Financial & Dual-Control Actions (Sections 67 & 38, Chit Funds Act 1982)
+Every critical mutation in the codebase automatically writes an append-only entry to `AuditLog` with structured JSON before/after diffs (`oldValue` / `newValue`). [`RequestContextMiddleware`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.middleware.ts) (`AsyncLocalStorage`) captures the Express `TRUST_PROXY`-resolved and normalized client IP address (`::ffff:` stripped) along with `X-Request-ID` before Guards/Controllers run, and [`PrismaService`](file:///u:/Kumaran-finance/apps/api/src/prisma/prisma.service.ts) uses a Prisma `$extends` query hook on `auditLog.create` / `createMany` so both direct and interactive `$transaction` audit records automatically persist `ipAddress` (safely leaving `null` for non-HTTP background jobs) without duplicating IP plumbing across services. (`X-Request-ID` is likewise propagated on Nginx `/api/v1/reports/approvals-stream` SSE ingress and Web BFF headers.)
 
-| Action Code | Triggering Workflow | Maker-Checker Actor Recorded |
+| Action Code | Triggering Workflow | Maker-Checker Actor & Captured Diff |
 |---|---|---|
-| `USER_LOGIN` | Staff or Customer authentication | Caller user ID + IP address |
-| `PAYMENT_RECORDED` | Cash or UPI payment entry | Desk Accountant / Field Agent ID |
+| `USER_LOGIN` | Staff or Customer authentication | Caller user ID + resolved IP address |
+| `PAYMENT_RECORDED` | Cash or UPI payment entry | Desk Accountant / Field Agent ID, amount, receipt no., due ID |
 | `PAYMENT_REVERSAL_REQUESTED` | Maker initiates reversal request | Maker user ID + reason code |
-| `PAYMENT_REVERSAL_REJECTED` | Checker rejects reversal | Checker user ID + rejection notes |
-| `PAYMENT_REVERSED` | Checker authorizes reversal & due rollback | Checker user ID + restored due ID |
-| `SAFETY_PROOF_DOCUMENT_UPLOADED` | Photo of cheques/agreement uploaded | Maker user ID + S3 key |
-| `SAFETY_PROOF_VERIFIED` | Maker completes safety checklist | Maker user ID + cheque numbers |
-| `DISBURSEMENT_AUTHORIZED` | Checker authorizes prize payout | Checker user ID (`maker != checker`) |
-| `DISBURSEMENT_COMMITTED` | Cash/NEFT disbursement released | Disbursing officer user ID |
+| `PAYMENT_REVERSAL_REJECTED` | Partner Checker rejects reversal | Partner Checker user ID + rejection notes |
+| `PAYMENT_REVERSED` / `PAYMENT_REVERSAL_APPROVED` | Partner Checker authorizes reversal & due rollback | Partner Checker user ID + restored due ID + receipt cancellation watermark |
+| `AUCTION_FINALIZED` / `AUCTION_CORRECTION_REQUESTED` / `AUCTION_CORRECTION_APPROVED` | Monthly auction finalization & dual-control correction (`KFC-FIN-005`) | Partner Maker & Partner Checker IDs, winning ticket, discount, universal dividends |
+| `SAFETY_PROOF_DOCUMENT_UPLOADED` / `SAFETY_PROOF_VERIFIED` | Safety checklist & blank cheques/agreement verified | Maker user ID, cheque numbers, nominee, S3 key |
+| `DISBURSEMENT_AUTHORIZED` / `DISBURSEMENT_COMMITTED` | Partner authorizes & cashier releases prize payout (incl. TOCTOU arrears offset) | Partner Checker (`maker != checker`) & disbursing officer IDs, payout ref |
+| `DEFAULTER_REMOVAL_REQUESTED` / `DEFAULTER_REMOVAL_APPROVED` | Statutory 3-consecutive-month default ticket removal (ADR-07) | Partner Maker & Partner Checker IDs, ticket/customer IDs |
+| `CASH_HANDOVER_SUBMITTED` / `CASH_HANDOVER_ACKNOWLEDGED` | Field agent daily route cash handover & desk acknowledgment | Agent Maker & Accountant/Manager Checker IDs, cash total |
 | `CUSTOMER_DOCUMENT_DELETED` | KYC scan purged from storage | Authorizing admin user ID |
 
 ### 5.3 Audit Query Endpoints & Access Boundaries
@@ -408,25 +410,27 @@ Every critical mutation in the codebase automatically writes an append-only entr
   - **Super Admin Exclusive Access (Guardrail 11)**: Restricted strictly to `Role.SUPER_ADMIN` across controller and service layers. Non-Super-Admin roles (Auditors, Customers, Accountants, Branch Managers, Collection Agents) receive `403 Forbidden`.
   - **Secret & PII Redaction**: `oldValue` / `newValue` JSON snapshots are recursively sanitized via `sanitizeAuditPayload()` (redacting passwords, hashes, TOTP secrets/URIs, MPINs, refresh/access/FCM tokens, OTPs, JWTs, auth keys, bank account numbers, and cheque numbers, and masking all PAN & Aadhaar variants while preserving `aadhaarLast4`) before returning.
 * **`GET /api/v1/jobs/notification-audit-logs`**:
-  - Detailed audit trail of all outbound FCM Push Notifications and DLT SMS messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`). Restricted strictly to `Role.SUPER_ADMIN`.
+  - Detailed audit trail of all outbound TRAI DLT SMS and FCM Push messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`). Restricted strictly to `Role.SUPER_ADMIN`.
 
-### 5.4 Storage Lifecycle & Retention Guarantees
+### 5.4 Storage Lifecycle, Database Triggers & Retention Guarantees
 * **Financial & Regulatory Audit Trail (`AuditLog`)**:
   - **Storage Engine**: PostgreSQL 17 ACID Table (`chitflow_dev`, Port 5433).
-  - **Permanence**: 100% immutable and append-only. Zero `DELETE` or `UPDATE` operations exist in the codebase.
-  - **Survivability**: Survives all server restarts, deployments, and Docker restarts. Meets the 5-year statutory recordkeeping mandate under the Tamil Nadu Chit Funds Act.
-* **Outbound Notification Dispatch Logs (`sentLog`)**:
-  - **Storage Engine**: In-memory ring buffer inside [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts).
-  - **Purpose**: Real-time delivery verification, E2E test assertions, and diagnostic queue inspection.
-  - **Statutory Dispute Path**: Can be linked to an append-only `NotificationLog` table in PostgreSQL if long-term multi-year SMS delivery proofs are required by legal counsel.
+  - **Database-Engine Append-Only Immutability**: Beyond having zero `PUT`/`PATCH`/`DELETE` endpoints or Prisma mutations, migration [`20261114010000_audit_log_complete_immutability/migration.sql`](file:///u:/Kumaran-finance/apps/api/prisma/migrations/20261114010000_audit_log_complete_immutability/migration.sql) enforces PostgreSQL `ENABLE ALWAYS` triggers **`trg_prevent_audit_log_mutation`** (`BEFORE UPDATE OR DELETE`, raising `'AuditLog records are strictly append-only...'`) and **`trg_prevent_audit_log_truncate`** (`BEFORE TRUNCATE`), plus `REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog" FROM PUBLIC`. Verified live against PostgreSQL 17 in **`CONCURR-INV-26`** ([`concurrency-postgres.spec.ts:2335`](file:///u:/Kumaran-finance/apps/api/test/unit/concurrency-postgres.spec.ts#L2335)).
+  - **Survivability**: Survives all server restarts, deployments, and Docker restarts. Meets the 5-year statutory recordkeeping mandate under Sections 67 & 38 of the Chit Funds Act, 1982.
+* **Outbound Notification Dispatch Logs (`audit:notifications` + `sentLog`)**:
+  - **Storage Engine**: Dual-written in [`NotificationService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L37-L54) to a bounded 200-entry local ring buffer (`MAX_LOG_SIZE = 200`) **and** shared Redis capped list **`audit:notifications`** (`LPUSH` + `LTRIM 0 199`, 7-day TTL `604800s`) for multi-replica visibility across horizontal containers.
+  - **Purpose**: Real-time delivery verification, E2E test assertions, and diagnostic queue inspection (`GET /api/v1/jobs/notification-audit-logs`).
+  - **Statutory Dispute Path**: Can be linked to an append-only `NotificationLog` table in PostgreSQL if multi-year SMS delivery proofs are required by legal counsel.
 
 ---
 
 ## 6. System Probes & Real-Time SSE Streams
 
-* **Liveness & Health Probe (`GET /health`)**:
-  - Unauthenticated endpoint for container orchestrators (Kubernetes / ECS / Docker).
-  - Returns: `{ "status": "ok", "service": "chitflow-api", "sentryActive": false, "time": "2026-10-25T13:30:00Z" }`.
+* **Deep Readiness Probes (`GET /health` & `GET /health/readiness`)** ([`health.controller.ts:31-141`](file:///u:/Kumaran-finance/apps/api/src/health/health.controller.ts#L31-L141)):
+  - Unauthenticated, `@SkipThrottle()` endpoints probing PostgreSQL (`SELECT 1`, 2000ms timeout) and Redis (`PING`, 1500ms timeout).
+  - Returns HTTP `200 OK` `{ "status": "ok", "service": "chitflow-api", "database": "connected", "redis": "connected", "sentryActive": false, "time": "..." }` or HTTP `503 Service Unavailable` if any backing dependency fails.
+* **Shallow Liveness Probe (`GET /health/liveness`)** ([`health.controller.ts:143-157`](file:///u:/Kumaran-finance/apps/api/src/health/health.controller.ts#L143-L157)):
+  - Returns HTTP `200 OK` `{ "status": "alive", "service": "chitflow-api", "time": "..." }` without touching PostgreSQL or Redis to avoid false restart loops during transient DB spikes.
 * **Real-Time Maker-Checker SSE Stream (`GET /api/v1/reports/approvals-stream`)**:
   - Long-lived Server-Sent Events (SSE) connection pushing pending approvals in real-time to connected web dashboards.
   - Configured with Nginx reverse proxy headers `proxy_buffering off; chunked_transfer_encoding on; proxy_read_timeout 24h;` to eliminate gateway dropouts.
@@ -435,19 +439,19 @@ Every critical mutation in the codebase automatically writes an append-only entr
 
 ## 7. Concrete Verification Proofs & Results
 
-All components are verified via automated unit test suites and live server E2E executions:
+All components are verified via automated unit test suites, real PostgreSQL 17 trigger proofs, Web audit register tests, and live server E2E executions:
 
-### 7.1 Automated Jest Unit Tests (**42 / 42 Tests Passing**)
+### 7.1 Automated Jest Unit & Trigger Proofs (**83 / 83 Observability Suite Tests Passing** + Trigger & Web Proofs)
 
 ```text
-PASS test/unit/metrics.spec.ts     (13 tests)
-PASS test/unit/sentry.spec.ts      (10 tests)
-PASS test/unit/bull-board.spec.ts  (6 tests)
-PASS test/unit/report.spec.ts      (13 tests, including Section 7 AuditLog)
+PASS test/unit/metrics.spec.ts           (13 tests)
+PASS test/unit/sentry.spec.ts            (16 tests)
+PASS test/unit/bull-board.spec.ts        (7 tests)
+PASS test/unit/report.spec.ts            (47 tests, including AuditLog RBAC & redaction)
+PASS test/unit/concurrency-postgres.spec.ts (CONCURR-INV-26: PostgreSQL AuditLog triggers)
+PASS apps/web/test/audit-register.spec.ts   (Read-only audit UI, persona isolation, diff rendering)
 
-Test Suites: 4 passed, 4 total
-Tests:       42 passed, 42 total
-Time:        3.642 s
+Observability Core Suites: 4 passed (83 / 83 tests passing)
 ```
 
 #### Key Test Assertions:
@@ -502,5 +506,5 @@ Time:        3.642 s
 | **2. Error Tracking** | `@sentry/nestjs` | `GET /health/sentry-test` | Safe-Bypass / DPDP Sanitizer | **₹0** | ✅ 100% Verified |
 | **3. Queue UI** | `@bull-board/express` | `GET /admin/queues/` | `BullBoardAuthMiddleware` (Super Admin JWT / Basic Auth) | **₹0** | ✅ 100% Verified |
 | **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Super Admin Only + Payload Redaction | **₹0** | ✅ 100% Verified |
-| **Liveness Probe** | Core NestJS | `GET /health` | Public / Container Probe | **₹0** | ✅ 100% Verified |
+| **Readiness / Liveness** | Core NestJS | `GET /health`, `/health/readiness`, `/health/liveness` | Public (`@SkipThrottle()`) Deep DB+Redis / Shallow Probes | **₹0** | ✅ 100% Verified |
 | **Live Alert Stream**| Server-Sent Events | `GET /reports/approvals-stream` | `JwtAuthGuard` + Active Session/Expiry/Branch-Scope Assertion (F15) | **₹0** | ✅ 100% Verified |
