@@ -4,7 +4,7 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Production Target**: Ubuntu 24.04 LTS / Debian 12 on any Flat-Fee Linux VPS (Hostinger, DigitalOcean, Hetzner, Linode, Vultr, Contabo, etc.) + Cloudflare R2 (or MinIO S3)  
 > **Runtime**: Node.js 24 LTS (`node:24-alpine`), pnpm `12.14.0`, PostgreSQL 17, Redis 7, Nginx 1.27  
-> **Compliance**: ADR-01 through ADR-19, [`docs/06-devops/infrastructure-and-drp.md`](../06-devops/infrastructure-and-drp.md), and Zero-Downtime Operational Standards
+> **Compliance**: ADR-01 through ADR-26, 11 Invariant Architectural Guardrails (`AGENTS.md`), [`docs/06-devops/infrastructure-and-drp.md`](../06-devops/infrastructure-and-drp.md), and Zero-Downtime Operational Standards
 
 ---
 
@@ -14,7 +14,7 @@ Kumaran Chits runs as a single-tenant modular monolith orchestrated via [`infra/
 
 ```mermaid
 flowchart TD
-    Client["Clients\n(Web Portal & Mobile App)"] -->|HTTPS :443 / HTTP :80 Redirect| Nginx["Nginx 1.27 Ingress\n(chitflow-nginx :80, :443)\nTLS 1.2/1.3 + Rate Limits + X-Request-ID"]
+    Client["Clients\n(Next.js 15 Web Portal & Phase 1 Dart Core / Phase 2 Flutter — ADR-26)"] -->|HTTPS :443 / HTTP :80 Redirect| Nginx["Nginx 1.27 Ingress\n(chitflow-nginx :80, :443)\nTLS 1.2/1.3 + Rate Limits + X-Request-ID"]
     Certbot["Certbot Sidecar\n(chitflow-certbot)\n12h Webroot Renewal"] -.->|ACME / Certs| Nginx
 
     subgraph Internal Docker Network
@@ -24,7 +24,7 @@ flowchart TD
         Worker["Dedicated BullMQ Worker\n(chitflow-worker :3002)\nENABLE_BULLMQ_WORKERS=true (1280m)"]
         API --> DB[("PostgreSQL 17\n(chitflow-db :5432 / host 127.0.0.1:5433)\nBigInt Whole-Rupee Truth")]
         Worker --> DB
-        API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)\n512mb volatile-lru")]
+        API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)\n512mb noeviction (KFC-INF-001)")]
         Worker --> Redis
         API --> S3[("MinIO / Cloudflare R2\n(chitflow-minio :9000, :9001)\nkumaran-chits-private")]
         BackupCron["Backup Cron\n(chitflow-backup-cron)\n02:00 AM IST Nightly"] --> DB
@@ -42,7 +42,7 @@ flowchart TD
 | `api` | `chitflow-api` | [`apps/api/Dockerfile`](../../apps/api/Dockerfile) (`node:24-alpine`) | `127.0.0.1:3000:3000` | `1280m` | `NODE_OPTIONS="--max-old-space-size=1024"`, `UV_THREADPOOL_SIZE=16`, `ENABLE_BULLMQ_WORKERS=${ENABLE_BULLMQ_WORKERS:-false}`, `connection_limit=25`, `ulimits.nofile=65535` |
 | `worker` | `chitflow-worker` | [`apps/api/Dockerfile`](../../apps/api/Dockerfile) (`node:24-alpine`) | Internal `PORT=3002` | `1280m` | `NODE_OPTIONS="--max-old-space-size=1024"`, `UV_THREADPOOL_SIZE=16`, `ENABLE_BULLMQ_WORKERS=true`, `connection_limit=15`, `ulimits.nofile=65535` |
 | `db` | `chitflow-db` | `postgres:17` | `127.0.0.1:5433:5432` | `1024m` | `max_connections=150`, `shared_buffers=512MB`, `statement_timeout=15000`, `lock_timeout=5000` |
-| `redis` | `chitflow-redis` | `redis:7-alpine` | `127.0.0.1:6379:6379` | `640m` | `--maxmemory 512mb --maxmemory-policy volatile-lru --save 900 1 --save 300 10` |
+| `redis` | `chitflow-redis` | `redis:7-alpine` | `127.0.0.1:6379:6379` | `640m` | `--maxmemory 512mb --maxmemory-policy noeviction --save 900 1 --save 300 10` (`KFC-INF-001`) |
 | `minio` | `chitflow-minio` | `cgr.dev/chainguard/minio:latest` | `127.0.0.1:9000:9000`, `127.0.0.1:9001:9001` | `512m` | Private S3-compatible object storage console (`:9001`) and API (`:9000`) |
 | `backup-cron` | `chitflow-backup-cron` | `postgres:17-alpine` + `aws-cli` | — | `256m` | Runs [`infra/scripts/backup-cron-job.sh`](../../infra/scripts/backup-cron-job.sh) at `30 20 * * *` UTC (`02:00 AM IST`) |
 
@@ -53,7 +53,7 @@ flowchart TD
   - Dedicated BullMQ worker (`connection_limit=15`, `pool_timeout=10`) → 15 connections.
   - Remaining **85+ connections** reserved for Prisma migrations, `pg_dump`, and DRP drills.
 - **Database Safety Timeouts**: PostgreSQL boots with `statement_timeout=15000` (15s) and `lock_timeout=5000` (5s).
-- **Redis Memory & Queue Safety**: `--maxmemory 512mb` with `--maxmemory-policy volatile-lru` evicts only keys with explicit `EX` TTLs; persistent BullMQ keys (without TTL) remain immune from eviction, backed by RDB snapshots (`900 1`, `300 10`).
+- **Redis Memory & Queue Safety (`KFC-INF-001`)**: `--maxmemory 512mb` with **`--maxmemory-policy noeviction`** guarantees BullMQ job metadata, delayed queues, and distributed locks are never silently evicted under memory pressure, backed by RDB snapshots (`900 1`, `300 10`) and bounded DLQ retention (`DEF-DB-06`: max 500 failed jobs / 7 days).
 - **Process Bulkheading & V8 Heaps**: `api` runs producer-only (`ENABLE_BULLMQ_WORKERS=false`) while `worker` runs background queues (`ENABLE_BULLMQ_WORKERS=true`). Setting `--max-old-space-size=1024` inside a `1280m` container (and `512` inside `512m` for `web`) forces V8 GC before Linux OOM killer (`Exit Code 137`).
 - **Libuv Thread Pool**: `UV_THREADPOOL_SIZE=16` prevents `bcrypt` password/MPIN hashing from starving DNS, file, or network I/O.
 - **Reverse-Proxy Trust (`TRUST_PROXY`)**: [`parseTrustProxySetting()`](../../apps/api/src/common/context/proxy-ip.util.ts) defaults to `['loopback', 'linklocal', 'uniquelocal']` when `TRUST_PROXY` is unset so both 1-hop (`Mobile -> Nginx -> API`) and 2-hop (`Browser -> Nginx -> Web BFF -> API`) flows resolve real client IPs without trusting spoofed external `X-Forwarded-For` headers. Operators behind Cloudflare/CDN can set explicit CIDRs in `TRUST_PROXY`.
@@ -167,7 +167,7 @@ bash infra/scripts/disk-monitor.sh /
 | **HTTP Keep-Alive Alignment** | Nginx `keepalive_timeout 65;` < NestJS `server.keepAliveTimeout = 70000` (70s) & `headersTimeout = 71000` (71s) | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L36), [`main.ts`](../../apps/api/src/main.ts#L194-L195) |
 | **Web BFF vs. Mobile Isolation** | `/api/auth/` (`burst=10`) & `/bff/` (`burst=30`) proxy to `web_upstream` (`:3001`); `/api/v1/auth/` (`burst=5`) & `/api/` (`burst=30`) proxy to `api_upstream` (`:3000`) | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L95-L237) |
 | **Rate Limits & `429` JSON** | `api_auth_limit` = `3r/s`; `api_general_limit` = `30r/s`; Nginx `@rate_limited` returns HTTP `429` JSON with `Retry-After: 60` | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L57-L59), [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L83-L89) |
-| **Payload Limits** | Global Nginx `client_max_body_size 1M`; scoped `25M` upload proxy for `/api/v1/` and `/bff/api/v1/` KYC documents & safety proofs (app upload constant: `5 MB`) | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L40), [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L110-L176), [`storage.constants.ts`](../../apps/api/src/common/constants/storage.constants.ts#L4) |
+| **Payload Limits** | Global Nginx `client_max_body_size 1M`; scoped `25M` upload proxy for `/api/v1/` and `/bff/api/v1/` KYC documents & safety proofs (app upload limits: `5 MB` legacy multipart `MAX_DOCUMENT_FILE_SIZE_BYTES`, `10 MB` direct presigned S3/R2 `MAX_DIRECT_UPLOAD_SIZE_BYTES`) | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L40), [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L110-L176), [`storage.constants.ts`](../../apps/api/src/common/constants/storage.constants.ts#L11-L12) |
 | **Unbuffered SSE Streaming** | `/bff/api/v1/reports/approvals-stream` & `/api/v1/reports/approvals-stream`: `proxy_buffering off`, `proxy_cache off`, `chunked_transfer_encoding on`, `24h` timeouts | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L126-L197) |
 | **Static vs. HTML Caching** | `/_next/static/` → `public, max-age=31536000, immutable`; `/` → `no-cache, no-store, must-revalidate, max-age=0` | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L287-L315) |
 | **Chunk-Skew Self-Healing** | Dashboard [`error.tsx`](../../apps/web/src/app/%28dashboard%29/error.tsx#L25-L49) detects `ChunkLoadError` and reloads once every 10s (`10000` ms `sessionStorage` guard) | [`error.tsx`](../../apps/web/src/app/%28dashboard%29/error.tsx#L35-L45) |
@@ -260,7 +260,7 @@ Rules:
 |---|---|---|---|
 | `GET /health` & `GET /health/readiness` | Public (throttling & envelope bypassed) | HTTP `200`: `status: "ok"`, `database: "connected"`, `redis: "connected"` (`503` if degraded) | [`health.controller.ts`](../../apps/api/src/health/health.controller.ts#L34-L137) |
 | `GET /health/liveness` | Public (in-process event loop check) | HTTP `200`: `status: "alive"`, `service: "chitflow-api"` | [`health.controller.ts`](../../apps/api/src/health/health.controller.ts#L143-L158) |
-| `GET /metrics` | HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`) | Prometheus text exposition (HTTP latency histograms, Node metrics, KPIs) | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L275-L284) |
+| `GET /metrics` | Constant-Time Bearer Token (`METRICS_BEARER_TOKEN`) or HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`) | Prometheus text exposition (HTTP latency histograms, Node metrics, SMS APM & KPIs) | [`chitflow.conf`](../../infra/docker/nginx/conf.d/chitflow.conf#L275-L284) |
 | `GET /admin/queues` | Super Admin JWT Session (or configured Basic Auth) | Bull Board dashboard for `daily-maintenance-queue`, `notification-queue`, `reconciliation-queue` | [`main.ts`](../../apps/api/src/main.ts#L178-L184) |
 | `GET /api/docs` | Disabled automatically when `NODE_ENV=production` | Swagger explorer available only in non-production environments | [`main.ts`](../../apps/api/src/main.ts#L123) |
 | Nginx Access Log | `/var/log/nginx/access.log` inside `chitflow-nginx` | Every entry carries `rid="<request-id>"`, `rt=`, `uct=`, `uht=`, `urt=` | [`nginx.conf`](../../infra/docker/nginx/nginx.conf#L24-L30) |
@@ -314,9 +314,32 @@ Configure this CORS policy on your `kumaran-chits-private` bucket in Cloudflare 
   ```
 - **Host CLI Backup, Restore & Quarterly DRP Drill** (from repo root):
   ```bash
-  pnpm run db:backup:s3     # Upload encrypted pg_dump snapshot & prune >30d S3 retention
-  pnpm run db:backups:list  # List S3 snapshots
-  pnpm run db:restore:s3    # Restore latest S3 snapshot
-  pnpm run db:drp:drill     # Execute automated RPO/RTO verification drill
+  pnpm run db:backup:s3     # Upload unified pg_dump + document recovery set & prune >30d dev retention
+  pnpm run db:backup:health # Verify backup freshness (<= 26h) & manifest integrity
+  pnpm run db:backups:list  # List S3 recovery sets & snapshots
+  pnpm run db:restore:s3    # Restore latest S3 recovery set
+  pnpm run db:drp:drill     # Execute automated RPO/RTO verification drill (1.04s DB / ~3.6s unified)
   ```
-  See [`docs/06-devops/infrastructure-and-drp.md`](../06-devops/infrastructure-and-drp.md) for full RPO/RTO recovery procedures.
+  See [`docs/06-devops/infrastructure-and-drp.md`](../06-devops/infrastructure-and-drp.md) for full RPO/RTO recovery procedures (verified current **RPO $\le 24$ hours**, **RTO $\le 60$ minutes**).
+
+---
+
+## 9. Production Readiness Release Gate & Operational Boundaries (`v1.0.0-rc1`)
+
+Formal readiness certification for **Head Office In-Office Web Operations (Perundurai, Erode District, Tamil Nadu)** across all 6 audit stages (`Prompts 01–06`) and all 11 remediated `KFC-*` work packages:
+
+### 9.1 Historical P0/P1 Audit Blocker Resolution Status
+All software blockers raised during the 6-stage audit have been permanently closed in live code:
+- **`OPS-01` / `KFC-INF-001` (Redis Eviction Policy)**: **REMEDIATED** (`--maxmemory-policy noeviction` in `docker-compose.fullstack.yml`).
+- **`FIN-01` / `DB-001` / `KFC-FIN-003..004` (Prize Override & Arrears Offset)**: **REMEDIATED** (`PAYOUT_OVERRIDE_NOT_PERMITTED` + TOCTOU `ARREARS_STATE_CHANGED` + 8 DB `CHECK` constraints).
+- **`FIN-03` / `DB-002` / `KFC-PDF-001` (Reversed Receipt PDF Watermark)**: **REMEDIATED** (`ரத்து செய்யப்பட்டது / CANCELLED` diagonal watermark + S3 cache bypass).
+- **`KFC-FIN-001` / `002` / `005` & `KFC-SEC-001..004` & `KFC-NOT-001`**: **REMEDIATED & VERIFIED** across **1,226 API unit tests (63 suites)**, **187 API E2E tests (14 suites, incl. 25 DB `CHECK` tests)**, **376 Web Node `--test` tests (14 suites)**, **10 `@kumaran/api-client` tests**, and **26/26 real PostgreSQL 17 concurrency tests (`CONCURR-INV-1..26`)**.
+
+### 9.2 Explicit Go-Live Operational Boundaries
+| Classification | Scope & Pre-Launch Action Required |
+|---|---|
+| **A. IMPLEMENTED & CERTIFIED (Production-Ready)** | Single-company whole-rupee `BigInt` ledger, 4% frozen commission, 1/4 ceiling & Option A physical tie-break, universal equal dividends (`NON_DIVISIBLE_DIVIDEND`), discrete single payments, Month $N$ maturity without double collection (`FIN-B`), prize arrears auto-offset (`FIN-A`/`FIN-D`), two-partner dual control (`isPartner: true`, Guardrails 10–11), immutable `AuditLog` DB triggers (`CONCURR-INV-26`), 100% EN/TA web parity, and dynamic cancelled PDF watermarking. |
+| **B. EXTERNAL PROVISIONING PENDING (Pre-Cutover)** | (1) Live Indian TRAI DLT credentials (`MSG91_AUTH_KEY`, sender `KMRCHT`, template IDs) in production `.env`; (2) Physical USB/Bluetooth pairing of 80mm thermal receipt printer at Perundurai branch desk; (3) Live flat-fee Linux VPS & Cloudflare R2 offsite bucket provisioning (`chmod 600 .env`); (4) Pre-release Chromium Playwright sweep (`pnpm test:web:e2e`, Suites `00`–`11`) and 4-partner branch rehearsal. |
+| **C. BLOCKED ON STATUTORY POLICY (`Q25`)** | Defaulter early-exit damages formula (4% vs 5% under Chit Funds Act §30) remains unconfirmed by Partners/legal counsel; software **fails closed** with HTTP 400 `UNAPPROVED_SETTLEMENT_POLICY`. |
+| **D. DEFERRED TO PHASE 2 (Q2 2027 — `ADR-26`)** | Native Flutter Android UI screens & signed APK packaging (`apps/mobile/`). Phase 1 field agents and customers operate via the responsive Next.js Web Portal (`apps/web`) while `apps/mobile/lib/core/` preserves typed Dart models & offline SQLite sync core for Phase 2. |
+

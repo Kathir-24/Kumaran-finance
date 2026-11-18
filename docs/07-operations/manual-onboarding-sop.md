@@ -96,13 +96,13 @@ $$\sum \text{Total Historical Collections (System)} \quad \text{vs.} \quad \sum 
 
 ---
 
-### Step 6: Dual Sign-Off & Forward Activation (`CONFIRMED-BY-DEVELOPER`)
-1. **Maker (Desk Accountant / Partner A)**: Enters the digitized historical data from the physical notebooks and submits for review.
-2. **Checker (Partner B / Super Admin)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"**.
-   - Strict constraint enforced: `maker_user_id != checker_user_id`. The user who transcribed the data cannot self-activate the chit group; another partner must independently review and sign off.
+### Step 6: Dual Sign-Off & Forward Activation (`CONFIRMED-BY-DEVELOPER` / Guardrails 10–11)
+1. **Maker (Desk Accountant, Branch Manager, or Partner A)**: Enters the digitized historical data from the physical notebooks via `POST /api/v1/chits/onboard-ongoing` ([`chit.controller.ts:73-87`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.controller.ts#L73-L87)) and submits for review.
+2. **Checker (Independent Verified Partner B — `SUPER_ADMIN` with `isPartner: true`)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"** (`POST /api/v1/chits/:id/activate`, [`chit.controller.ts:205-220`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.controller.ts#L205-L220)).
+   - Strict constraint enforced: `maker_user_id != checker_user_id` and verified Partner identity (`isPartner: true`, Guardrail 11 / `ADR-21`). The user who transcribed the data cannot self-activate the chit group.
 3. **Forward Engine Activated**:
    - The chit is now officially `ACTIVE`.
    - Installments for Month 7 to Month 20 will be managed digitally.
-   - Field collection agents can collect Month 7 dues on the mobile app.
+   - Field collection agents record Month 7 dues via the responsive Web Portal in Phase 1 (and via the Android mobile app in Phase 2 Q2 2027, `ADR-26`).
    - All past subscriber payment histories, receipts, and safety proof documents remain fully searchable.
-   - In Month 20 (Final Month $N$), there will be **no auction**; the company will take 4% commission and the last month's payable installment, and settle the remaining prize money to the final subscriber with a receipt (`CONFIRMED-BY-DEVELOPER`).
+   - In Month 20 (Final Month $N$), there will be **no auction**; the company takes 4% commission and deducts the Month $N$ installment **only if unpaid** ($₹91,000$ net payout on a ₹1,00,000 scheme, marking Month $N$ `PAID`; or $₹96,000$ if the subscriber already paid Month $N$ at the branch desk — zero double collection per `KFC-FIN-001` / `FIN-B`).

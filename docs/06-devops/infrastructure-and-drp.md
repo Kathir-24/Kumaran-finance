@@ -13,7 +13,7 @@ Kumaran Chits is packaged as a high-reliability, cloud-agnostic Docker Compose m
 
 ```mermaid
 flowchart TD
-    Clients["Client Tier\n• Mobile Field App (Flutter Android)\n• Web Operations Dashboard (Next.js 15)"]
+    Clients["Client Tier\n• Web Operations Dashboard (Next.js 15 — Phase 1 Primary)\n• Mobile Core SDK (Phase 1 Dart Core / Phase 2 Flutter Android — ADR-26)"]
     
     Cloudflare["Edge Ingress & CDN Tier\n• Cloudflare DNS & Free TLS Termination\n• DDoS Protection & Edge Rate Limiting"]
     
@@ -114,24 +114,25 @@ S3_FORCE_PATH_STYLE=false
 - **Storage Alarm Threshold**: Host root disk and database volume storage are monitored continuously. If disk usage reaches or exceeds **80% capacity**, an automated critical alert is triggered.
 - **Storage Monitoring Automation**: Executed via [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (Linux) or [`infra/scripts/disk-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.ps1) (Windows), verifying free space and logging alerts before storage exhaustion.
 - **SSL/TLS Expiration Probe**: Automated certificate monitoring probe via [`infra/scripts/cert-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.sh) (Linux) and [`infra/scripts/cert-monitor.ps1`](file:///u:/Kumaran-finance/infra/scripts/cert-monitor.ps1) (Windows) triggers a critical alert whenever certificate validity drops to **$\le 30$ days** (`SSL_EXPIRY_THRESHOLD_SECONDS=2592000`).
-- **SMS DLT Provider Credit Guardian**: SMS gateway balance is monitored with automated alerts at 500 remaining credits, with seamless fallback to free Firebase Cloud Messaging (FCM) mobile push alerts and Web Push notifications.
+- **SMS DLT Provider Failover & Credit Guardian (`ADR-23` / `ADR-26`)**: SMS gateway balance and circuit breaker state (`kumaran_sms_circuit_breaker_state`) are monitored via Prometheus alerts; primary MSG91 failures automatically fail over to `SMS_BACKUP_DRIVER_TOKEN` in `SmsService` (with FCM Push active for Phase 2 subscribers who register an `fcmToken`; no Web Push is deployed).
 
 ---
 
-## 3. Disaster Recovery Plan (DRP)
+## 4. Disaster Recovery Plan (DRP)
 
-### 3.1 Recovery Metrics
+### 4.1 Recovery Metrics & Honest Operational Baseline
 | Metric | Target | How It Is Achieved |
 |---|---|---|
-| **Recovery Point Objective (RPO)** | **$\le 24$ hours** | Automated nightly unified recovery set snapshot (`pg_dump -F c` + MinIO document snapshot + atomic manifest) via `chitflow-backup-cron` at 02:00 AM IST. Note: Continuous WAL archiving (PITR) is a planned production enhancement. |
-| **Recovery Time Objective (RTO)** | **$\le 2$ hours** | Automated database & document snapshot restore via `pnpm db:restore:s3` and Docker container rebuild (benchmarked at ~3.6s in automated drill). |
+| **Recovery Point Objective (RPO)** | **$\le 24$ hours** | Automated nightly unified recovery set snapshot (`pg_dump -F c` + document snapshot + atomic `manifest.json` under `backups/sets/set_YYYYMMDD_HHMMSS_<id>/`) via `chitflow-backup-cron` at 02:00 AM IST. *Note: Continuous WAL archiving (PITR) is **NOT currently deployed**; optional future WAL-G / `archive_mode=on` streaming upgrades RPO to $\le 15$ min.* |
+| **Recovery Time Objective (RTO)** | **$\le 2$ hours** *(verified $\le 60$m)* | Automated database & document snapshot restore via `pnpm db:restore:s3` and Docker container rebuild (benchmarked at **1.04s** DB restore / **~3.6s** full unified drill). |
+| **Statutory Retention & Encryption** | **8 Years** *(Chit Funds Act §45)* | Transport TLS + S3 Server-Side Encryption (`AES256` SSE-S3 on R2/S3; note: GPG `--passphrase-file` is **NOT implemented**). Offsite Cloudflare R2 / S3 lifecycle policy retains statutory archives; DEV retains 30 days in MinIO and 7 days locally. |
 
-### 3.2 Backup Lifecycle & Retention Schedule
-1. **Automated Nightly Snapshot**: Full unified recovery set taken every night at 02:00 AM IST by `chitflow-backup-cron`, verified with SHA-256 checksums, and uploaded to S3-compatible storage.
-2. **Local Retention Buffer**: Last 7 daily backup dumps retained on host SSD for sub-minute disaster recovery.
-3. **Offsite S3 Replication**: Recovery sets retained for **30 days** in S3-compatible object storage with pruner protection ensuring the latest valid set is never deleted.
+### 4.2 Backup Lifecycle, Health Checks & Retention Schedule
+1. **Automated Nightly Unified Recovery Set**: Full snapshot (`database.dump` + `documents/*` + `manifest.json` with SHA-256 checksums) taken every night at 02:00 AM IST by `chitflow-backup-cron` and uploaded to S3-compatible storage (`backups/sets/<setId>/`).
+2. **Freshness Monitoring**: `pnpm db:backup:health` verifies backup freshness ($\le 26$h), manifest integrity, and dump availability.
+3. **Local & Offsite Retention**: Last 7 daily dumps retained on host SSD; 30 days in DEV MinIO; Cloudflare R2 production bucket configured with Versioning + Object Lock (WORM) for 8-year statutory retention.
 
-### 3.3 Quarterly Disaster Recovery Drill Procedure
+### 4.3 Quarterly Disaster Recovery Drill Procedure
 Once every 90 days (or on demand during audits), the developer and Kumaran Finance administrator execute this automated drill:
 
 ```powershell
@@ -146,7 +147,7 @@ powershell -ExecutionPolicy Bypass -File infra/scripts/drp-drill.ps1
 1. Captures baseline entity counts from the source database (`chitflow_dev`).
 2. Triggers an automated S3/MinIO binary backup set with timestamp and SHA-256 checksums (`RPO Phase`).
 3. Provisions a completely isolated target database (`chitflow_drp_drill`) and isolated bucket (`kumaran-chits-drill`), preserving active developer data.
-4. Downloads the S3 dump and restores via `pg_restore`, benchmarking recovery time against the 2-hour RTO standard (`RTO Phase`).
+4. Downloads the S3 dump and restores via `pg_restore`, benchmarking recovery time against the 2-hour RTO standard (`RTO Phase`; empirically measured **1.04s** on 186 KB dump / **~3.6s** unified drill with 100% parity across Users, Customers, ChitGroups, Tickets, Dues, Payments, and AuditLogs).
 5. Restores all application documents into `kumaran-chits-drill` and validates checksums.
 6. Executes strict mathematical, statutory, and security invariant assertions on the restored database:
    - **Assertion 1**: Entity Row Parity (Users, Customers, Groups, Tickets, Dues, Payments, AuditLogs).
@@ -160,7 +161,7 @@ powershell -ExecutionPolicy Bypass -File infra/scripts/drp-drill.ps1
    - **Assertion 9**: Worker & Queue sandboxing isolation (zero job replay or active queue access).
 7. Drops `chitflow_drp_drill` and `kumaran-chits-drill` cleanly and outputs an audit compliance report.
 
-### 3.4 Local & Branch Database Backup / Restore Runbook
+### 4.4 Local & Branch Database Backup / Restore Runbook
 For on-premise branch operations and local developer testing, automated scripts in `infra/scripts/` provide immediate snapshot capabilities:
 
 1. **Creating a Local Compressed Backup**:
@@ -177,22 +178,22 @@ For on-premise branch operations and local developer testing, automated scripts 
    powershell -ExecutionPolicy Bypass -File infra\scripts\backup-to-s3.ps1
 
    # Or via pnpm shortcut:
-   pnpm --filter api db:backup:s3
+   pnpm run db:backup:s3
+   pnpm run db:backup:health
 
    # Or trigger on-demand snapshot via Docker cron container:
    docker exec chitflow-backup-cron /scripts/backup-cron-job.sh
    ```
    - Autonomous `chitflow-backup-cron` container executes nightly at 02:00 AM IST (`30 20 * * *` UTC).
-   - Dumps PostgreSQL 17 database in custom compressed binary format (`-F c`).
-   - Uploads to S3 storage under `backups/db/YYYY/MM/kumaran_chits_backup_YYYYMMDD_HHMMSS.dump` with `AES256` server-side encryption.
-   - Automatically scans `backups/db/` and prunes backups older than **30 days** per §3.2. Local dumps are pruned after 7 days.
+   - Dumps PostgreSQL 17 database in custom compressed binary format (`-F c`) plus documents snapshot & manifest.
+   - Uploads to S3/R2 storage with `AES256` SSE and prunes old snapshots per §4.2 (never pruning the latest valid recovery set).
 
 3. **Listing and Restoring from S3**:
    ```powershell
-   # List all available backups in S3
+   # List all available recovery sets & legacy dumps in S3
    pnpm db:backups:list
 
-   # Restore the latest backup from S3
+   # Restore the latest verified recovery set from S3
    pnpm db:restore:s3
 
    # Or restore a specific backup key
@@ -205,9 +206,25 @@ For on-premise branch operations and local developer testing, automated scripts 
    ```
    - Performs a clean, transactional restore using `pg_restore --clean`.
 
+### 4.5 The 10 Disaster Recovery Scenarios (`DR-01` – `DR-10`) & Non-Database Asset Protection
+| ID | Disaster Scenario | Recovery Procedure | Technical RTO | Key Safeguard |
+|:---:|---|---|---:|---|
+| **DR-01** | Complete VPS / Host Failure | Provision fresh Linux VPS, clone repo, restore encrypted `.env` from partner vault, pull GHCR images, run `pnpm db:restore:s3`. | ~25 min | Offsite R2 bucket + offline encrypted `.env` vault. |
+| **DR-02** | PostgreSQL DB Corruption | Stop `api`/`worker`, restore latest verified recovery set into clean volume (`pg_restore --clean`), run invariants, restart. | ~1–5 min | Verified in live DRP drill (1.04s restore). |
+| **DR-03** | Accidental Record Deletion | Restore latest snapshot into disposable `chitflow_drp_drill`, extract missing row via `INSERT INTO ... SELECT`, re-insert. | ~15 min | `ON DELETE RESTRICT` prevents financial cascade deletes. |
+| **DR-04** | Failed Schema Migration | Roll back via `prisma migrate resolve` or restore pre-migration S3 snapshot. | ~10 min | Expand-and-Contract pattern + mandatory pre-migrate backup. |
+| **DR-05** | Ransomware / Host Compromise | Wipe VPS, re-deploy clean code from GitHub `main`, restore from immutable Cloudflare R2 bucket (Object Lock / WORM). | ~45 min | Least-privilege write-only S3 backup credentials. |
+| **DR-06** | Cloudflare R2 / S3 Outage | Local 7-day DB dumps retained on VPS; KYC uploads gracefully reject/retry without corrupting DB (`CHAOS-S3-1`). | Immediate | Zero orphan DB rows guaranteed. |
+| **DR-07** | Redis Cache / Queue Wipe | Restart Redis cleanly; API re-registers repeatable crons on boot; PostgreSQL remains sole financial truth. | < 5 sec | Non-blocking financial commits (`CHAOS-REDIS-1`). |
+| **DR-08** | Partial Deployment Failure | `zero-downtime-deploy.sh` automated rollback trap restores `chitflow-api:previous` & reloads Nginx if readiness fails in 60s. | < 60 sec | Verified rollback script (`rollback.sh`). |
+| **DR-09** | Lost JWT Signing Secret | Rotate 64+ char `JWT_SECRET` across `api`, `worker`, `web` in `.env`, restart; staff re-authenticate cleanly. | < 5 min | Zero financial data impact. |
+| **DR-10** | Regional VPS Provider Outage | Provision standby VPS on alternate provider, re-point Cloudflare DNS, restore from Cloudflare R2. | ~30 min | Zero cloud vendor lock-in. |
+
+**Non-Database Assets Requiring Independent Protection**: (1) Subscriber KYC & Safety Proof S3 objects (`kumaran-chits-private/` — enable Bucket Versioning + Object Lock WORM on R2/S3); (2) Nginx TLS certs (`infra/docker/nginx/ssl/` — re-issuable via Certbot); (3) Production `.env` files (`infra/docker/.env`, `apps/api/.env` — store in encrypted partner KeePass/Bitwarden vault, never in git).
+
 ---
 
-## 4. Production Go-Live Deployment Checklist (VPS & Cloud Production)
+## 5. Production Go-Live Deployment Checklist (VPS & Cloud Production)
 
 Before launching the platform into live customer and partner operations in Perundurai, the DevOps engineer must verify all 5 infrastructure transitions from local development defaults to hardened production configurations:
 
@@ -215,11 +232,11 @@ Before launching the platform into live customer and partner operations in Perun
 |---|---|---|---|
 | **HTTPS / TLS** | Local HTTP (`http://localhost:3000`) | Enforce HTTPS-only via **Nginx Ingress with Let's Encrypt / Certbot** or **Cloudflare Edge SSL**. | Port 80 traffic automatically redirects (HTTP 301) to HTTPS port 443. Plaintext HTTP is rejected at ingress. |
 | **Secrets Storage** | Plain text `.env` file on local disk | Store sensitive credentials (`DATABASE_URL`, `JWT_SECRET`) in root-owned `chmod 600 .env` file or cloud secrets manager. | Zero production passwords or JWT keys committed to git, Docker images, or unencrypted storage. |
-| **Database Subnet Isolation** | Docker container port `5433` exposed on `127.0.0.1` | Deploy **PostgreSQL 17** within an isolated Docker bridge network (`chitflow-internal`) with **zero public host port mapping**. | Database port 5432 is accessible exclusively by internal services (`chitflow-api`, `chitflow-worker`, `backup-cron`). Zero external internet exposure. |
-| **S3 Bucket Encryption & Access** | Local filesystem (`./storage/uploads`) | Enable **Server-Side Encryption** and enforce **Block All Public Access** on private S3 bucket (Cloudflare R2, MinIO, or S3). | Bucket blocks all public access. Documents are strictly accessible via 15-minute temporary presigned URLs. |
-| **Automated Database Backups** | Local PowerShell scripts (`infra/scripts/backup-db.ps1`) | Enable **Automated Midnight pg_dump cron (`backup-cron`)** streamed off-site to S3 object storage with daily retention. | Nightly automated snapshot scheduled at 02:00 AM IST. RPO $\le 15$ min, RTO $\le 2$ hours verified via quarterly recovery drill. |
+| **Database Subnet Isolation** | Docker container port `5433` exposed on `127.0.0.1` | Deploy **PostgreSQL 17** within an isolated Docker bridge network with **loopback-only or zero host port mapping**. | Database port 5432 is accessible exclusively by internal services (`chitflow-api`, `chitflow-worker`, `backup-cron`). Zero external internet exposure. |
+| **S3 Bucket Encryption & Access** | Local MinIO (`127.0.0.1:9000`) | Enable **Server-Side Encryption (`AES256`)**, **Bucket Versioning / WORM**, and **Block All Public Access** on private Cloudflare R2 / S3 bucket. | Bucket blocks all public access. Documents are strictly accessible via 15-minute temporary presigned URLs. |
+| **Automated Database Backups** | Local PowerShell scripts (`infra/scripts/backup-db.ps1`) | Enable **Automated Nightly 02:00 AM IST `backup-cron`** streamed off-site to Cloudflare R2 / S3 with 8-year statutory archival. | Verified current **RPO $\le 24$ hours** (optional future WAL-G PITR for $\le 15$ min), **RTO $\le 2$ hours** verified via quarterly recovery drill. |
 
-### 4.1 Production Secrets Management & Injection
+### 5.1 Production Secrets Management & Injection
 In Linux VPS and production container environments:
 - The production environment file (`.env`) is placed outside public web directories and protected with strict Linux permissions:
   ```bash
@@ -231,22 +248,22 @@ In Linux VPS and production container environments:
 
 ---
 
-## 5. APM Observability & Prometheus Telemetry (`/metrics`)
+## 6. APM Observability & Prometheus Telemetry (`/metrics`)
 
 Kumaran Chits provides real-time infrastructure and financial telemetry via Prometheus metrics exporter:
 
 - **Endpoint**: `http://localhost:3000/metrics` (or `http://localhost/metrics` via Nginx ingress)
-- **Authentication**: Protected via HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`; fail-fast startup validator rejects the insecure default `chitflow_secret` in production).
+- **Authentication**: Protected via constant-time **Bearer Token (`METRICS_BEARER_TOKEN`) OR RFC 7617 HTTP Basic Auth** (`METRICS_USER` / `METRICS_PASSWORD`; fail-fast startup validator rejects the insecure default `chitflow_secret` in production).
 - **Telemetry Catalog**:
   - **Latency Histograms**: `http_request_duration_seconds` measuring p95 read ($\le 200\text{ ms}$) and financial write ($\le 500\text{ ms}$) latencies per NFR §3.
   - **PostgreSQL Database Health**: `chitflow_db_connected` (1 = healthy, 0 = down).
   - **BullMQ Background Queues**: `bullmq_queue_jobs_count` tracking active, delayed, waiting, and failed jobs across all 3 queues.
-  - **Chit Fund Invariants & KPIs**: Active chit groups, active subscribers, overdue tickets in 1-month and 3-month default buckets, pending Maker-Checker approvals, and today's total collection volume in whole Rupees (`BigInt`).
+  - **Chit Fund Invariants & SMS APM**: Active chit groups, active subscribers, overdue tickets in 1-month and 3-month default buckets, pending Maker-Checker approvals, today's total collection volume in whole Rupees (`BigInt`), plus `kumaran_sms_dispatches_total` and `kumaran_sms_circuit_breaker_state`.
 - **Detailed Documentation & PromQL Recipes**: Consult [`apps/api/src/metrics/README.md`](../../apps/api/src/metrics/README.md).
 
 ---
 
-## 6. Sentry Error Monitoring & Crash Tracking (`@sentry/nestjs`)
+## 7. Sentry Error Monitoring & Crash Tracking (`@sentry/nestjs`)
 
 Kumaran Chits utilizes Sentry for real-time application crash detection and server-side failure alerting:
 
@@ -263,7 +280,7 @@ Kumaran Chits utilizes Sentry for real-time application crash detection and serv
 
 ---
 
-## 7. Production Nginx TLS 1.3 & Server-Sent Events (SSE) Reverse Proxy
+## 8. Production Nginx TLS 1.3 & Server-Sent Events (SSE) Reverse Proxy
 
 Kumaran Chits deploys Nginx 1.27 as the production edge ingress:
 
