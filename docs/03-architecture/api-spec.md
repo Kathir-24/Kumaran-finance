@@ -4,7 +4,7 @@
 > **Base URL**: `/api/v1` (Global prefix `/api`, URI versioning `v1`)  
 > **Documentation Tool**: OpenAPI 3.0 / Swagger (`/api/docs`)  
 > **Contract Source of Truth**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) & [`docs/03-architecture/completed-modules-api-registry.md`](completed-modules-api-registry.md)  
-> **Total Verified Scope**: **118 operations across 112 paths** (100% automated test coverage, 712 passing tests across 50 test suites).
+> **Total Verified Scope**: **134 HTTP controller operations across 18 NestJS controllers** (`+1` Bull Board UI `/admin/queues`; exported `openapi-spec.json`: **123 paths / 129 operations**; verified test baseline: **1,226 API** + **376 Web** + **10 SDK** + **6 Dart** suites passing).
 
 ---
 
@@ -15,7 +15,7 @@
 |---|---|---|
 | `Authorization` | String | `Bearer <JWT_ACCESS_TOKEN>` for all authenticated endpoints |
 | `Content-Type` | String | `application/json` (max 1 MB) or `multipart/form-data` (max 25 MB for KYC and safety-proof uploads) |
-| `Idempotency-Key` | String | Unique UUID required on financial mutation endpoints (`POST /payments`, `POST /collections/record`, `POST /collections/sync-offline-queue`, `POST /payments/:id/request-reversal`, `POST /disbursements/auction/:auctionId/release`). Intercepted by `IdempotencyHeaderInterceptor` to bridge headers directly to request bodies and guarantee idempotency across network retries. |
+| `Idempotency-Key` | String | Unique UUID required on financial mutation endpoints (`POST /payments`, `POST /collections/record`, `POST /collections/sync-offline-queue`, `POST /payments/:id/request-reversal`, `POST /disbursements/auction/:auctionId/disburse`). Intercepted by `IdempotencyHeaderInterceptor` to bridge headers directly to request bodies and guarantee idempotency across network retries. |
 | `Retry-After` (Response) | Integer / Seconds | Attached to all HTTP 429 (`TOO_MANY_REQUESTS`) responses by both NestJS `GlobalExceptionFilter` and Nginx edge rate limiter, indicating the backoff period before retrying. |
 
 ### 1.2 Standard Response Envelopes
@@ -73,8 +73,9 @@
 | `GET`  | `/branches` | List active company branch offices | Staff, Auditor |
 | `GET`  | `/branches/:id` | Get branch metadata by ID | Staff, Auditor |
 | `POST` | `/branches` | Create new physical branch office | `SUPER_ADMIN` |
-| `GET`  | `/users` | Search & list staff users with pagination and role/branch filters | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `GET`  | `/users/:id` | Get staff user profile by ID (Sanitized, no hashes) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `PATCH`| `/branches/:id` | Update branch metadata (name, bilingual Tamil name, address, phone, active flag) | `SUPER_ADMIN` |
+| `GET`  | `/users` | Search & list staff users with pagination and role/branch filters | `SUPER_ADMIN`, `BRANCH_MANAGER`, `AUDITOR` |
+| `GET`  | `/users/:id` | Get staff user profile by ID (Sanitized, no hashes) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `AUDITOR` |
 | `POST` | `/users` | Create new staff account with assigned RBAC roles and default credentials | `SUPER_ADMIN` |
 | `PATCH`| `/users/:id/status` | Activate or deactivate staff user account (Immediately revokes active sessions) | `SUPER_ADMIN` |
 | `PATCH`| `/users/:id/roles` | Update assigned RBAC roles for staff account (Self-revocation guard) | `SUPER_ADMIN` |
@@ -99,15 +100,18 @@
 ### 2.4 Module 3: Chit Schemes & Mid-Cycle Intake (`/api/v1/chits`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `POST` | `/chits/new` | Create fresh chit group in DRAFT status | `SUPER_ADMIN` |
+| `POST` | `/chits` (alias `/chits/new`) | Create fresh chit group in DRAFT status | `SUPER_ADMIN` |
 | `PATCH`| `/chits/:id` | Update draft chit scheme parameters (groupName, dates, sanction details) | `SUPER_ADMIN` |
-| `POST` | `/chits/onboard-ongoing` | **Mid-Cycle Intake**: Onboard ongoing chit from physical notebook | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/chits/onboard-ongoing` | **Mid-Cycle Intake**: Onboard ongoing chit from physical notebook | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `GET`  | `/chits` | List chit schemes with status & keyword filter | All Authenticated |
 | `GET`  | `/chits/:id` | View chit scheme details, duration, base dues, and rules | All Authenticated |
 | `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 unique constraint) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `DELETE`| `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/chits/:id/tickets` | View all assigned tickets and status in scheme | Staff, Member, Auditor |
-| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 pool | `SUPER_ADMIN` |
+| `POST` | `/chits/:id/register` | Record Chit Registrar sanction order (`DRAFT` $\to$ `REGISTERED`) | `SUPER_ADMIN` |
+| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 pool (`DRAFT`/`REGISTERED` $\to$ `ACTIVE`) | `SUPER_ADMIN` |
+| `POST` | `/chits/:id/cancel` | Cancel an unactivated draft chit scheme (`DRAFT` $\to$ `CANCELLED`) | `SUPER_ADMIN` |
+| `POST` | `/chits/:id/close` | Reconcile and permanently close a completed scheme (`COMPLETED` $\to$ `CLOSED`) | `SUPER_ADMIN` |
 
 ### 2.5 Module 4: In-Office Offline Auctions & Tie-Breakers (`/api/v1/auctions`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -118,12 +122,13 @@
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`); enqueues background auction result broadcast to BullMQ `notification-queue` (`JOB_DISPATCH_AUCTION_RESULT`; Push primary, Keypad SMS fallback) | `SUPER_ADMIN` |
-| `POST` | `/auctions/:id/correction/request` | **Maker**: Request correction of winning ticket or bid discount with reason (`KFC-FIN-005`) | `SUPER_ADMIN` |
-| `POST` | `/auctions/:id/correction/approve` | **Checker**: Authorize and apply auction correction, swap prized ticket, reconcile downstream unpaid dues (`maker != checker`) | `SUPER_ADMIN` |
+| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`, `isPartner: true`); enqueues background auction result broadcast to BullMQ `notification-queue` | `SUPER_ADMIN` (Partner) |
+| `POST` | `/auctions/:id/correction/request` | **Maker**: Request correction of winning ticket or bid discount with reason (`KFC-FIN-005`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/auctions/:id/correction/approve` | **Checker**: Authorize and apply auction correction, swap prized ticket, reconcile downstream unpaid dues (`maker != checker`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/auctions/:id/correction/reject` | **Checker**: Reject pending finalized auction correction request, leaving auction unchanged (`maker != checker`) | `SUPER_ADMIN` (Partner) |
 | `GET`  | `/auctions/:id/minutes` | View Form XVII statutory auction minutes summary | Staff, Auditor |
 | `GET`  | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for print/PDF | Staff, Auditor |
-| `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar of Chits | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar (`COMPLETED` $\to$ `MINUTES_FILED`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 
 ### 2.6 Module 5: Installments, Digital Passbook & Defaulters (`/api/v1/tickets`, `/api/v1/installments`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -132,11 +137,12 @@
 | `GET`  | `/tickets/:ticketId/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
 | `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
 | `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
+| `POST` | `/tickets/:id/remove-defaulter` | Legacy defaulter removal route (enforces two-partner SEC-B policy; use `/request` $\to$ `/approve`) | `SUPER_ADMIN` (Partner) |
 | `POST` | `/tickets/:id/remove-defaulter/request` | **Defaulter Removal Request (Maker)**: Partner A requests removal with justification (`PENDING_REMOVAL_APPROVAL`) | `SUPER_ADMIN` (Partner) |
 | `POST` | `/tickets/:id/remove-defaulter/approve` | **Defaulter Removal Approval (Checker)**: Partner B approves removal (`REMOVED_DEF_3M`; `maker != checker`) | `SUPER_ADMIN` (Partner) |
 | `POST` | `/tickets/:id/remove-defaulter/reject` | **Defaulter Removal Rejection (Checker)**: Partner B rejects removal (reverts to `DEFAULT_3_MONTHS`) | `SUPER_ADMIN` (Partner) |
 | `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
-| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement (BLOCKED / Q25)**: Fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement (BLOCKED / Q25)**: Fails closed with `400 UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation | `SUPER_ADMIN` |
 | `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` |
@@ -144,7 +150,7 @@
 ### 2.7 Module 6: Field Collections & Cash Handover (`/api/v1/collections`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/collections/agent-dues` | View dues assigned for field collection rounds | `COLLECTION_AGENT`, `ACCOUNTANT`, `SUPER_ADMIN` |
+| `GET`  | `/collections/agent-dues` | View dues assigned for field collection rounds | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `AUDITOR` |
 | `POST` | `/collections/record` | Record doorstep cash collection (Exact $I_{net}$; throws 400 on partial); enqueues background receipt dispatch to BullMQ `notification-queue` (Push primary, Keypad SMS fallback) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
 | `POST` | `/collections/sync-offline-queue` | Batch sync offline field collection queue (1 to 100 items with item-level failure isolation, idempotency & asynchronous BullMQ receipt dispatch) | `COLLECTION_AGENT`, `ACCOUNTANT`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
 | `GET`  | `/collections/daily-summary` | View today's collection register & vault cash | Staff, Auditor |
@@ -164,24 +170,24 @@
 | `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
 | `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `SUPER_ADMIN` |
-| `GET`  | `/payments/:id/receipt/cancelled` | Generate cancelled bilingual PDF receipt with bold red diagonal `ரத்து செய்யப்பட்டது / CANCELLED` watermark | Staff, Customer, Auditor |
+
+*(Note: Reversed payments do not use a separate `/receipt/cancelled` route; `GET /pdf/receipt/:paymentId` dynamically detects `paymentStatus === 'REVERSED'` and renders the red bilingual `ரத்து செய்யப்பட்டது / CANCELLED` watermark per `KFC-PDF-001`.)*
 
 ### 2.9 Module 8: Prize Disbursements & Safety Proof Checklist (`/api/v1/disbursements`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `GET`  | `/disbursements` | List prize disbursement records across schemes with pagination | Staff, Auditor |
-| `GET`  | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff, Member, Auditor |
-| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (legacy multipart fallback) to S3 | Staff |
-| `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof scan upload (`safety-proof/:auctionId/...`, fail-closed `fileExists`) | Staff |
-| `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | Staff, Auditor |
-| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
-| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher with automatic prior arrears offset; fails closed if arrears $\ge$ prize (`maker != checker`) | `SUPER_ADMIN` |
-| `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release reference & generate bilingual voucher (Prohibits manual override of authorized payout) | `ACCOUNTANT`, `SUPER_ADMIN` |
-| `POST` | `/disbursements/auction/:auctionId/release` | Release payout, auto-settle deducted arrears dues as `PAID`, record transaction reference | `SUPER_ADMIN` |
-| `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher (English + தமிழ்) | Staff, Member, Auditor |
-| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears) | Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`) |
+| `GET`  | `/disbursements` | List prize disbursement records across schemes with pagination | Staff (Excl. Agents), Auditor |
+| `GET`  | `/disbursements/auction/:auctionId` | View auction winner details & disbursement status | Staff (Excl. Agents), Winner (Customer), Auditor |
+| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (legacy multipart fallback) to S3 | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof scan upload (`safety-proof/:auctionId/...`, fail-closed `fileExists`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` |
+| `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner alert | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher with automatic prior arrears offset; fails closed if arrears $\ge$ prize (`maker != checker`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Release payout, auto-settle deducted arrears dues as `PAID`, enforce `ARREARS_STATE_CHANGED` TOCTOU & UTR uniqueness, and record payout reference | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher JSON (English + தமிழ்) | Staff (Excl. Agents), Winner (Customer), Auditor |
+| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`isPartner: true`, `maker != checker`; marks Month N due `PAID`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Direct Settlement**: Combined payout execution with verified Maker DTO | `SUPER_ADMIN` (Partner) |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Final Settlement Alias**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`), reading authoritative Maker from Stage 1 prepared settlement | `SUPER_ADMIN` (Partner) |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -201,7 +207,7 @@
 |---|---|---|---|
 | `POST` | `/storage/presigned-upload-url` | Request 300s direct-to-S3/R2 presigned `PUT` upload URL + required headers (ABAC-guarded by purpose) | Staff, Customer (Self KYC) |
 | `PUT`  | `/storage/upload/*key` | Local-driver fallback binary `PUT` upload target (`STORAGE_DRIVER=local` only; max 10 MB stream cap; rejected in S3 mode) | Staff, Customer (Self KYC) |
-| `GET`  | `/storage/file/:key` | Authenticated file download (`302` presigned S3/CDN redirect under S3 mode or `?redirect=true`; raw binary stream via `?stream=true` or local driver) | Staff, Customer, Auditor |
+| `GET`  | `/storage/file/*key` | Authenticated file download (`302` presigned S3/CDN redirect under S3 mode or `?redirect=true`; raw binary stream via `?stream=true` or local driver; strict default-deny prefixes) | Staff, Customer (Scoped), Auditor |
 
 ### 2.12 Component 2: Bilingual PDF Canvas Engine (`/api/v1/pdf`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -230,6 +236,8 @@
 |---|---|---|---|
 | `GET`  | `/` | System identification and welcome root endpoint | Public |
 | `GET`  | `/health` | Terminus health check (Database connectivity & memory threshold) | Public |
+| `GET`  | `/health/readiness` | Kubernetes/Docker readiness probe (PostgreSQL & Redis connectivity) | Public |
+| `GET`  | `/health/liveness` | Lightweight process liveness probe | Public |
 | `GET`  | `/health/sentry-test` | Sentry exception verification endpoint | Public |
 | `GET`  | `/metrics` | Prometheus metrics scrape endpoint (HTTP latencies, BullMQ queues & chit fund KPIs) | Basic Auth (`METRICS_USER`) |
 
@@ -405,45 +413,27 @@ This section provides granular contract specifications (request bodies, response
 
 ---
 
-### 3.7 `POST /api/v1/tickets/:id/settle-removal` (Defaulter Exit Account Settlement)
+### 3.7 `POST /api/v1/tickets/:id/settle-removal` (Defaulter Exit Account Settlement — FAIL-CLOSED / Q25)
 - **HTTP Method**: `POST`
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
-- **Authorized Personas**: `SUPER_ADMIN` exclusively (`KFC-SEC-002`)
+- **Authorized Personas**: `SUPER_ADMIN` exclusively (`ticket.controller.ts:272`, `KFC-SEC-002`)
 - **Path Parameter**: `id` — Subscriber Ticket UUID
-- **Description**: Calculates cumulative installments paid by a subscriber removed under 3-month consecutive default (`REMOVED_DEF_3M`), deducts 4.00% Foreman Commission damages ($V \times 0.04$), issues an exit settlement refund voucher, and records an immutable audit log.
-- **Maker-Checker Hard Guard (`KFC-SEC-002`)**: Enforces `ticket.removedByUserId !== adminUserId`. The partner who removed the subscriber cannot authorize the exit payout; a second distinct Partner must verify and sign off (`HTTP 403 Forbidden: MAKER_CHECKER_VIOLATION`).
-- **Prized Ticket Immutability Guard (`KFC-SEC-004`)**: Prized subscriber tickets are permanently immutable and cannot be removed or settled (`HTTP 400 Bad Request: PRIZED_TICKET_IMMUTABLE`).
-- **Formula**:
-  $$\text{Refund Amount} = \max(0, \text{Total Paid} - (V \times 0.04))$$
-- **Request Body (`SettleRemovalDto`)**:
-  ```json
-  {
-    "paymentMethod": "CASH",
-    "notes": "Settled remaining refund after 4% contractual damages deduction per Foreman approval."
-  }
-  ```
-- **Success Response (`HTTP 200 OK`)**:
-  ```json
-  {
-    "success": true,
-    "statusCode": 200,
-    "timestamp": "2026-10-23T19:45:53.336Z",
-    "data": {
-      "success": true,
-      "message": "Defaulter account for R. Velumani (Ticket #19) successfully settled.",
-      "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
-      "ticketNumber": 19,
-      "customerName": "R. Velumani",
-      "groupCode": "KC-LIVE-20M-01",
-      "totalPaid": 0,
-      "damagesDeducted": 4000,
-      "refundAmount": 0,
-      "voucherNumber": "KC-VOU-DEF-753336",
-      "settledAt": "2026-10-23T19:45:53.336Z"
+- **Current Runtime Behavior (`UNAPPROVED_SETTLEMENT_POLICY` — Fail-Closed Lock)**:
+  - Per Open Legal Decision **Q25** ([`open-questions.md`](../01-business/open-questions.md)), automated exit settlement calculation and payout execution are **strictly locked fail-closed** in [`InstallmentService.settleRemoval`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts#L1089-L1125) pending formal Partner Board resolution and statutory legal validation under the Chit Funds Act, 1982.
+  - Every invocation rejects immediately with **`HTTP 400 Bad Request`**:
+    ```json
+    {
+      "success": false,
+      "statusCode": 400,
+      "error": {
+        "code": "BAD_REQUEST",
+        "message": "UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed."
+      }
     }
-  }
-  ```
-- **Error Codes**: `400 Bad Request` (Ticket status is not `REMOVED_DEF_3M` or ticket is prized), `403 Forbidden` (`MAKER_CHECKER_VIOLATION`), `404 Not Found` (Subscriber ticket not found).
+    ```
+- **Additional Invariants Enforced**:
+  - **Prized Ticket Immutability (`KFC-SEC-004`)**: Prized tickets (`isPrized: true`) can never be removed or settled (`PRIZED_TICKET_IMMUTABLE`).
+  - **Maker-Checker (`KFC-SEC-002`)**: Once Q25 is legally ratified and unlocked, `ticket.removedByUserId !== adminUserId` will remain enforced.
 
 ---
 
@@ -554,9 +544,9 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 
 ---
 
-### 3.12 `POST /api/v1/auctions/:id/correction/request` & `approve` (Auction Correction Workflow - `KFC-FIN-005`)
+### 3.12 `POST /api/v1/auctions/:id/correction/{request, approve, reject}` (Auction Correction Workflow — `KFC-FIN-005`)
 - **HTTP Methods**: `POST`
-- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` only)
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with `isPartner: true` strictly)
 - **Path Parameter**: `id` — Auction UUID
 - **Request Body (`RequestAuctionCorrectionDto`)**:
   ```json
@@ -567,17 +557,18 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
   }
   ```
 - **Validation Guards**:
-  - Enforces 25% ceiling: $D \le \frac{V}{4}$.
-  - Enforces whole-rupee divisibility: $(D - C_f) \pmod M == 0$.
-  - Enforces prize immutability: fails closed with HTTP 400 if `disbursementStatus === 'DISBURSED'`.
-- **Approval Body (`ApproveAuctionCorrectionDto`)**:
+  - Enforces 25% ceiling ($D \le \frac{V}{4}$) and frozen commission floor ($D \ge C_f$).
+  - Enforces whole-rupee divisibility: $(D - C_f) \bmod N = 0$ (`NON_DIVISIBLE_DIVIDEND`).
+  - Enforces prize immutability (`disbursementStatus !== 'DISBURSED'`) and next-month paid dues guard (`ALREADY_PAID_DUES_EXIST`).
+  - While pending, all downstream disbursement mutations on the auction fail closed with `PENDING_CORRECTION_LOCKOUT`.
+- **Approval / Rejection Bodies (`ApproveAuctionCorrectionDto` / `RejectAuctionCorrectionDto`)**:
   ```json
   {
     "approvalNotes": "Verified against physical branch auction minutes and token sheet."
   }
   ```
-- **Maker-Checker Hard Guard**: Enforces `auction.correctionRequestedByUserId !== adminUserId` (`HTTP 403 MAKER_CHECKER_VIOLATION`).
-- **Ledger Impact**: Atomically swaps `isPrized` flags if winner ticket changed, recalculates universal dividend, and updates downstream unpaid installment dues.
+- **Maker-Checker Hard Guard**: Enforces `correctionRequestedByUserId !== checkerPartnerId` (`HTTP 403 MAKER_CHECKER_VIOLATION`) on both `approve` and `reject`.
+- **Ledger Impact on Approval**: Atomically swaps `isPrized` flags if winner ticket changed, purges sub-ceiling tie-bidders, resets `AuctionMinutes.filedAtRegistrar = false` (`XR-AUC-03`) if previously filed, recalculates universal dividend, and updates downstream unpaid installment dues.
 
 ---
 
@@ -653,19 +644,19 @@ To strictly enforce **Guardrail 10 (Maker-Checker Separation of Duties)** and **
   }
   ```
 
-#### 3.13.3 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Direct Settlement with Maker DTO)
+#### 3.13.3 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Final Settlement Execution Alias — `CR-DISB-02`)
 - **HTTP Method**: `POST`
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with `isPartner: true`)
-- **Description**: Supports direct atomic final settlement when a distinct `makerUserId` (e.g. Branch Manager or Accountant) is supplied in `SettleFinalMonthDto`. Strictly enforces `makerUserId !== checkerUserId`.
+- **Description**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`) on all HTTP settlement invocations — reading the authoritative Maker identity from the Stage 1 prepared settlement record (`prepare-final-settlement`), re-verifying live arrears (`ARREARS_STATE_CHANGED` on drift), and enforcing `makerUserId !== checkerUserId` at both service and database levels.
 
 ---
 
-### 3.14 Cancelled Receipt Watermark Endpoint (`KFC-PDF-001`)
-- **HTTP Method**: `GET /api/v1/payments/:id/receipt`
+### 3.14 Cancelled Receipt Watermark Behavior (`KFC-PDF-001`)
+- **PDF Endpoint**: `GET /api/v1/pdf/receipt/:paymentId` (bilingual JSON metadata at `GET /api/v1/payments/:id/receipt`)
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
 - **Behavior on Reversed Payments**:
-  - When `payment.status === 'REVERSED'`, the service automatically bypasses any cached pre-reversal PDF.
-  - Dynamically renders a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35° rotation, 28pt bold, color `#DC2626`) across the page body.
+  - When `payment.paymentStatus === 'REVERSED'`, `PdfService.generateReceiptPdf` automatically bypasses any cached pre-reversal PDF.
+  - Dynamically renders a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (`-35°` rotation, `0.28` opacity, `#DC2626`, bundled `NotoSansTamil-Bold.ttf`) across the A5 page body.
   - Adds header banner: `*** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***` with reversal timestamp and audit ID.
   - Persists and streams the document as `KC-REC-PRD-2026-XXXXX-cancelled.pdf`.
 
@@ -673,7 +664,7 @@ To strictly enforce **Guardrail 10 (Maker-Checker Separation of Duties)** and **
 
 ## 4. Related Architecture & Contract Documents
 
-- **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) (`115` paths, `121` operations exported via [`apps/api/scripts/codegen/export-openapi.ts`](../../apps/api/scripts/codegen/export-openapi.ts))
+- **OpenAPI 3.0 Contract (JSON)**: [`docs/03-architecture/openapi-spec.json`](openapi-spec.json) (**123** paths, **129** operations exported via [`apps/api/scripts/codegen/export-openapi.ts`](../../apps/api/scripts/codegen/export-openapi.ts); **134** total live NestJS controller operations including `/health/*`, `/metrics`, and aliases)
 - **TypeScript Client SDK Types**: [`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts) (regenerated via `pnpm run codegen:ts`)
 - **Flutter / Dart Client Models**: [`apps/mobile/lib/core/api/models/api_models.dart`](../../apps/mobile/lib/core/api/models/api_models.dart) (regenerated via `pnpm run codegen:dart` / [`scripts/generate-dart-api.ts`](../../scripts/generate-dart-api.ts))
 - **Monorepo Contract Sync Command**: Run `pnpm run codegen:all` after any NestJS DTO or controller route change; verified by [`apps/api/test/unit/client-contract.spec.ts`](../../apps/api/test/unit/client-contract.spec.ts) (`0` bare object schemas, `0` untyped/double arrays)

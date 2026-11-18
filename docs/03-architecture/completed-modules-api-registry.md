@@ -3,63 +3,48 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Current Status**: **All 10 Modules, 3 System Components, Branches, Users & Infrastructure Complete**  
 > **Target Audience**: Developers, Auditors, Mobile App Developers, Web Frontend Developers  
-> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**455 / 455 passing tests: 367 Unit + 88 E2E**).
+> **Quality Standard**: Zero assumptions, zero hallucinations, pure whole-rupee math (`BigInt`), and 100% automated test coverage (**1,226 API unit tests across 63 suites + 376 Web tests + 10 SDK tests + 6 Dart suites + PostgreSQL 17 / Redis 7 E2E suites**).
 
 ---
 
 ## 1. Executive Summary & Verification Metrics
 
-| Module # & Name | HTTP Prefix | Endpoints Count | Key Invariants Enforced | Test Suite & Tests |
-|---|---|:---:|---|:---:|
-| **Foundation, Health & Metrics** | `/health`, `/`, `/metrics` | 4 | PostgreSQL 17, Port 5433, Redis 7, MinIO S3, Prometheus APM Telemetry | 4 unit passing |
-| **Module 1: Auth & Staff Identity** | `/auth` | 14 | bcrypt (salt 10-12), RFC 6238 TOTP, Redis SMS-OTP (300s TTL, 3 attempts), 6-digit MPIN, token revocation (`/logout`), FCM push | 25 passing |
-| **Branches: Company Offices** | `/branches` | 3 | Single company tenancy (ADR-01), bilingual Tamil names, branch-scoping | 4 passing |
-| **Users: Staff Administration** | `/users` | 6 | RBAC role management, bcrypt passwords, branch assignments, atomic deactivation, forced password reset | 9 passing |
-| **Module 2: Customer & KYC Intake** | `/customers` | 11 | Auto `KC-CUST-XXXXX`, bilingual names, masked Aadhaar (last 4), S3 KYC uploads, 15-min presigned URLs, scan deletion | 24 passing |
-| **Module 3: Chit Groups & Intake** | `/chits` | 9 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update & ticket unassign | 20 passing |
-| **Module 4: In-Office Auctions** | `/auctions` | 10 | Pre-auction defaulter block, Option A paper token draw, Maker $\ne$ Checker, statutory minutes layout | 16 passing |
-| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 10 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 3M defaulter removal, substitution & exit settlement, NPCI UPI Intent URI helper | 16 passing |
-| **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger`), BullMQ receipt queue | 16 passing |
-| **Module 7: Payments & Reversals** | `/payments` | 10 | Office payments, bilingual receipt (EN+தமிழ்), Maker $\ne$ Checker reversal, Bank UTR unique constraint, Customer UPI claims & Desk verification | 23 passing |
-| **Module 8: Prize Disbursements** | `/disbursements` | 9 | Safety proof checklist (ADR-15), S3 proof uploads & presigned inspection URLs, bilingual voucher, Maker $\ne$ Checker payout | 17 passing |
-| **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII Cash Book, Form XVII, Form XXI, Maker-Checker Pending Approvals & SSE Stream | 13 passing |
-| **Component 1: Encrypted Storage** | `/storage` | 1 | Presigned S3/local storage driver, path traversal sanitization, horizontal IDOR protection | 10 passing |
-| **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | A5 digital receipts, vouchers, Form XVII, Form XXI passbooks, embedded Noto Sans Tamil fonts | 24 passing |
-| **Component 3: BullMQ Background Jobs**| `/jobs`, `/admin/queues`| 10 | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM auto-recon, Bull Board visual UI | 25 passing |
-| **Financial Invariants (CI Suite)** | N/A | N/A | Math conservation: $\text{Collections} + \text{Dividends} = V$, $\text{Commission} + \text{Dividends} = D$ | 19 passing |
-| **Full E2E Integration Test Suites** | All prefixes | — | End-to-end multi-role HTTP verification across all 10 suites | 88 E2E passing |
-| **TOTAL VERIFIED SCOPE** | — | **112 (118 ops + UI)**| **All Invariants 100% Satisfied** | **712 / 712 PASSING (50 Test Suites)** |
+| Module # & Name | HTTP Prefix | Live Ops Count | Key Invariants Enforced |
+|---|---|:---:|---|
+| **Foundation, Health & Metrics** | `/`, `/health`, `/metrics` | 6 | Root liveness, Terminus `/health`, `/readiness`, `/liveness`, `/sentry-test`, Prometheus APM (`MetricsAuthGuard`) |
+| **Module 1: Auth & Staff Identity** | `/auth` | 15 | bcrypt (salt 10-12), RFC 6238 TOTP (Lua claim), Redis Lua SMS-OTP (300s TTL, 3 attempts), MPIN (`F01`), forced onboarding (`F16`), PostgreSQL `Session` Vault (`F04`) |
+| **Branches: Company Offices** | `/branches` | 4 | Single company tenancy (ADR-01), bilingual Tamil names, branch metadata `PATCH`, branch-scoping |
+| **Users: Staff Administration** | `/users` | 6 | RBAC role management, `isPartner` verified partner flag, atomic session revocation on deactivation/reset (`F02`) |
+| **Module 2: Customer & KYC Intake** | `/customers` | 12 | Auto `KC-CUST-XXXXX`, bilingual names, masked `aadhaarLast4`, S3 KYC upload + direct presigned `/confirm`, 15-min presigned URLs, scan deletion |
+| **Module 3: Chit Groups & Intake** | `/chits` | 12 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update/register/activate/cancel/close, ticket unassign |
+| **Module 4: In-Office Auctions** | `/auctions` | 13 | Pre-auction defaulter & pending-removal block, Option A paper token draw, Partner-only Maker $\ne$ Checker finalize (`KFC-SEC-003`), finalized correction (`request`/`approve`/`reject`), Registrar filing (`COMPLETED` $\to$ `MINUTES_FILED`) |
+| **Module 5: Installments & Passbook** | `/tickets`, `/installments` | 13 | Universal dividend ($I_{net} = I_{base} - Div$), single discrete due, 2-partner 3M defaulter removal (`request`/`approve`/`reject`), substitution, Q25 fail-closed `settle-removal`, NPCI UPI Intent |
+| **Module 6: Collections & Handover** | `/collections` | 6 | Exact $I_{net}$ matching, offline queue sync, sequential bilingual receipt, dual control (`collector != acknowledger` + `chk_payment_cash_handover_maker_checker`), BullMQ receipt queue |
+| **Module 7: Payments & Reversals** | `/payments` | 10 | Counter payments, bilingual receipt JSON, Partner-only Maker $\ne$ Checker reversal (`KFC-SEC-001`, `chk_reversal_maker_checker`), Bank UTR unique constraint, Customer UPI claims & Desk verification |
+| **Module 8: Prize Disbursements** | `/disbursements` | 12 | Safety proof checklist (ADR-15), S3 proof upload & `/confirm-safety-proof`, Partner payout authorization (`KFC-FIN-004`, `PENDING_CORRECTION_LOCKOUT`), TOCTOU arrears guard (`ARREARS_STATE_CHANGED`), 2-stage Month $N$ (`CR-DISB-02`) |
+| **Module 9: Reports & Dashboards** | `/reports` | 9 | Executive KPI dashboard, Form XXII physical Cash Book, Form XVII, Form XXI, 8-queue Pending Approvals, SSE stream (`@BypassEnvelope`, `F15`), `SUPER_ADMIN`-only Audit Logs |
+| **Component 1: Encrypted Storage** | `/storage` | 3 | Direct presigned PUT (`POST /presigned-upload-url`), local fallback PUT (`PUT /upload/*key`), authenticated file streaming (`GET /file/*key`), default-deny prefixes (`F06`) |
+| **Component 2: Bilingual PDF Canvas**| `/pdf` | 4 | A5 digital receipts (with `0.28` red cancelled watermark), A5 vouchers, A4 Form XVII, A4 Landscape Form XXI passbooks, bundled Noto Sans Tamil fonts |
+| **Component 3: BullMQ Background Jobs**| `/jobs` (+ `/admin/queues` UI) | 9 (+1 UI) | 00:01 AM arrears scan, 3M default tagging, DLT SMS/Push router, 06:00 AM bank recon, 09:00 AM pre-auction scan, `SUPER_ADMIN`-only queue telemetry & Bull Board |
+| **TOTAL VERIFIED LIVE SCOPE** | **18 Controllers** | **134 HTTP Ops (+1 UI)** | **All 11 Guardrails & 8 DB `CHECK` Constraints 100% Enforced (`openapi-spec.json`: 123 paths / 129 ops)** |
 
 ---
 
 ### 1.1 Automated TypeScript AST Persona Enforcement Verification
 
-An automated AST inspection utility (`apps/api/scripts/audit/audit-persona-enforcement.ts`) parses all 18 NestJS controllers across `apps/api/src/` using the TypeScript Compiler API (`ts.createSourceFile`, `ts.canHaveDecorators`, `ts.getDecorators`). It maps every class-level and method-level decorator (`@Roles`, `@UseGuards`, `@Get`, `@Post`, `@Patch`, `@Delete`, `@Sse`) to evaluate RBAC and ABAC compliance against this registry.
+An automated AST inspection utility (`apps/api/scripts/audit/audit-persona-enforcement.ts`) parses all **18 NestJS controllers** across `apps/api/src/` using the TypeScript Compiler API (`ts.createSourceFile`, `ts.canHaveDecorators`, `ts.getDecorators`). It maps every class-level and method-level decorator (`@Roles`, `@UseGuards`, `@Get`, `@Post`, `@Patch`, `@Put`, `@Delete`, `@Sse`) to evaluate RBAC and ABAC compliance across all **134 live HTTP operations** (**14 public/non-RBAC** + **120 JWT-guarded operations**):
 
-```
-================================================================
-AUTOMATED AST AUDIT METRICS (18 CONTROLLERS & 112 PATHS):
-Total Operations (Endpoints)     : 118
-  • Public Endpoints (No JWT)    : 13
-  • Guarded Endpoints (JWT/Basic): 105
-      - Enforced with Specific Roles : 97 (Strict RolesGuard RBAC)
-      - Guarded with JwtAuthGuard    : 8  (Contextual ABAC / Caller Identity)
-================================================================
-```
+#### Canonical 6-Persona Scope & Enforcement Boundaries
 
-#### The 624 Granular Persona Access Decisions Matrix (104 Guarded Operations × 6 Personas)
-
-Across all 104 non-public operations, each of the 6 system roles was evaluated against business authorization rules:
-
-| Persona Role | Allowed Operations | Blocked Operations | Total Evaluated | Scope & Enforcement Boundary |
-|---|:---:|:---:|:---:|---|
-| **`SUPER_ADMIN`** | **104** | **0** | **104** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at database/service level. |
-| **`BRANCH_MANAGER`** | **82** | **22** | **104** | Branch-scoped intake, auction facilitation, staff management. Blocked from company branch creation, scheme activation, user resets, reversal approvals, and payout releases. |
-| **`ACCOUNTANT`** | **68** | **36** | **104** | Company-wide financial ledger entries, notebook transcription (Maker), voucher preparation, day books, cash books, collections, UPI claims verification. Blocked from user admin, scheme admin, auction bidding, reversal approvals, and payout releases. |
-| **`COLLECTION_AGENT`** | **36** | **68** | **104** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues, generating customer UPI intent. Blocked from administrative auctions, prize vouchers, minutes, passbooks, and scheme configs. |
-| **`CUSTOMER`** | **33** | **71** | **104** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers, 1-tap UPI deep-linking, self-reported UPI claims. Blocked from all staff endpoints. |
-| **`AUDITOR`** | **53** | **51** | **104** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. Strictly blocked from ALL 51 mutation/write operations. |
-| **TOTALS** | **376** | **248** | **624** | **100% Verified Match between Controller Decorators and Registry Specification** |
+| Persona Role | Scope & Enforcement Boundary |
+|---|---|
+| **`SUPER_ADMIN` (`isPartner: true`)** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at service and PostgreSQL engine levels (8 `CHECK` constraints). Only verified Partners can authorize reversals, auction finalizations/corrections, prize payouts, and defaulter removals. |
+| **`SUPER_ADMIN` (`isPartner: false`)** | Administrative IT access (branches, staff onboarding/resets, `GET /reports/audit-logs`, `GET /jobs/*`, Bull Board `/admin/queues`), strictly barred from financial mutations under Guardrail 11 (`ADR-21`). |
+| **`BRANCH_MANAGER`** | Branch-scoped customer intake, auction facilitation (`record-bid`, `tie-break`), safety proof verification, vault cash acknowledgment, and reports. Strictly blocked from scheme creation/activation, user resets, auction finalization (`KFC-SEC-003`), payment reversal initiation/approval (`KFC-SEC-001`), prize payout authorization, defaulter removal (`KFC-SEC-002`), audit logs, and BullMQ telemetry. |
+| **`ACCOUNTANT`** | Company-wide financial ledger entries, mid-cycle notebook transcription (Maker), safety proof verification, payout release (`disburse`), cash handover acknowledgment, UPI claim verification, and statutory registers. Strictly blocked from user admin, scheme activation, auction bidding/finalization, payment reversals (`KFC-SEC-001`), payout authorization, audit logs, and BullMQ telemetry. |
+| **`COLLECTION_AGENT`** | Scoped strictly to active-ticket customers in assigned branch. Doorstep collections, offline sync, handover submission, viewing assigned dues, generating customer UPI intent. Strictly blocked from customer KYC viewing (`403`), prize disbursements/vouchers, Form XVII minutes, passbooks, payment reversals, audit logs, and BullMQ telemetry. |
+| **`CUSTOMER`** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers (via `/pdf/*`), 1-tap UPI deep-linking, self-reported UPI claims. Strictly blocked from all staff endpoints and raw `/storage/file/receipts/*` or `vouchers/*`. |
+| **`AUDITOR`** | Global read-only forensic access to Day Book, Form XXII Cash Book, Form XXI Ledgers, Form XVII Minutes, Defaulters Aging, and staff/branch directories. Strictly blocked (`403`) from **100% of write operations**, internal system audit logs (`GET /reports/audit-logs`), and BullMQ queue telemetry (`GET /jobs/*`, `/admin/queues`) per Guardrail 11. |
 
 ---
 
@@ -74,7 +59,8 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/auth/mobile/request-otp` | Request SMS OTP for mobile onboarding/login | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/mobile/verify-otp` | Verify SMS OTP; returns setupToken or session | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/mobile/login-mpin` | Mobile quick unlock with 6-digit MPIN | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
-| `POST` | `/auth/mobile/set-mpin` | Establish 6-digit MPIN (via setupToken or active session) | **Auth / Setup** | **Auth / Setup** | **Auth / Setup** | **Auth / Setup** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auth/complete-onboarding` | Exchange `onboarding_restricted` token & set permanent password (`F16`) | **Onboarding Token** | **Onboarding Token** | **Onboarding Token** | **Onboarding Token** | 🚫 **Blocked** | **Onboarding Token** |
+| `POST` | `/auth/mobile/set-mpin` | Establish 6-digit MPIN (via single-use `mpin_setup` or `access` token, `F01`) | **Auth / Setup** | **Auth / Setup** | **Auth / Setup** | **Auth / Setup** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auth/refresh-token` | Rotate 15-min access & 7-day refresh tokens | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `POST` | `/auth/logout` | Revoke active session and refresh token hash | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** | **Auth** |
 | `PATCH`| `/auth/fcm-token` | Register or clear staff device FCM token | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | **Auth (Staff)** | 🚫 **Blocked** | **Auth (Staff)** |
@@ -91,6 +77,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/branches` | List all company branches (`?activeOnly=true`) | **Allowed** | **Allowed** | **Allowed** | **Allowed** | 🚫 **Blocked** | **Allowed** |
 | `GET` | `/branches/:id` | View detailed branch profile and address | **Allowed** | **Allowed** | **Allowed** | **Allowed** | 🚫 **Blocked** | **Allowed** |
 | `POST` | `/branches` | Create new branch office with Tamil name | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `PATCH` | `/branches/:id` | Update branch metadata & active flag | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ### 2.3 Staff User Administration (`/users`)
 
@@ -119,7 +106,8 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `DELETE`| `/customers/:id/nominees/:nomineeId`| Remove linked nominee record | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/customers/:id/kyc-status` | Approve or revoke KYC verification flag | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/customers/:id/fcm-token` | Register or clear subscriber device FCM token | **Allowed** | **Branch Scope** | 🚫 **Blocked** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
-| `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo) to private S3 | **Allowed** | **Branch Scope** | **Allowed** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
+| `POST` | `/customers/:id/documents` | Upload KYC scan (Aadhaar, PAN, Photo; legacy multipart) to private S3 | **Allowed** | **Branch Scope** | **Allowed** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
+| `POST` | `/customers/:id/documents/confirm` | Confirm direct presigned PUT KYC scan upload (`fileExists` verified) | **Allowed** | **Branch Scope** | **Allowed** | **Allowed (Onboarding)** | **Self Only (Anti-IDOR)** | 🚫 **Blocked** |
 | `GET` | `/customers/:id/documents/:docId/url` | Generate 15-minute S3 presigned viewing URL | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked (Exempt)** | **Self Only (Anti-IDOR)** | **Read-Only** |
 | `DELETE` | `/customers/:id/documents/:docId` | Delete KYC scan from S3 & database | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | **Self Only (Unverified)** | 🚫 **Blocked** |
 
@@ -131,7 +119,7 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `POST` | `/chits/new` | Create fresh chit group in DRAFT status | **Allowed (Exclusive)** | 🚫 **Review Only** | 🚫 **Review Only** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits` (alias `/chits/new`) | Create fresh chit group in DRAFT status | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `PATCH` | `/chits/:id` | Update draft chit scheme parameters (names, dates, sanctions) | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/chits/onboard-ongoing` | Mid-Cycle Intake from physical paper notebook | **Allowed** | **Branch Scope** | **Allowed (Maker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/chits` | List chit schemes with status & keyword filter | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Active Chits** | **Read-Only (Global)** |
@@ -139,7 +127,10 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 limit) | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `DELETE` | `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/chits/:id/tickets` | View all ticket assignments in scheme | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Ticket Info**| **Read-Only (Global)** |
-| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits/:id/register` | Record Registrar sanction order (`DRAFT` $\to$ `REGISTERED`) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 (`ACTIVE`) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits/:id/cancel` | Cancel unactivated draft scheme (`DRAFT` $\to$ `CANCELLED`) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/chits/:id/close` | Permanently close completed scheme (`COMPLETED` $\to$ `CLOSED`) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -155,10 +146,13 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/tie-break` | **Option A**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/auctions/:id/tie-break-record` | **Option A (Alias)**: Record paper token lot draw winner | **Maker** | **Maker (Branch)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/auctions/:id/finalize` | **Checker**: Commit results & mark `isPrized` | **Checker** (`maker != checker`) | **Checker per §6** (`maker != checker`) | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auctions/:id/finalize` | **Checker**: Commit results & mark `isPrized` (`KFC-SEC-003`) | **Checker (Partner)** (`maker != checker`) | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auctions/:id/correction/request` | **Maker (Partner A)**: Request finalized auction correction (`KFC-FIN-005`) | **Maker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auctions/:id/correction/approve` | **Checker (Partner B)**: Approve & apply correction (`maker != checker`) | **Checker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/auctions/:id/correction/reject` | **Checker (Partner B)**: Reject pending correction (`maker != checker`) | **Checker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/auctions/:id/minutes` | Form XVII statutory auction minutes summary | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for PDF | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `PATCH` | `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `PATCH` | `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar (`COMPLETED` $\to$ `MINUTES_FILED`) | **Allowed (Partner)** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -172,9 +166,12 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `GET` | `/tickets/:ticketId/passbook` | Detailed digital passbook statement | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | **Read-Only (Global)** |
 | `GET` | `/tickets/defaulters` | List subscribers with continuous arrears | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `GET` | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `POST` | `/tickets/:id/remove-defaulter`| Execute 3M arrears removal (`REMOVED_DEF_3M`)| **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/remove-defaulter`| Legacy removal route (enforces SEC-B two-partner policy) | **Partner Only** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/remove-defaulter/request` | **Maker (Partner A)**: Request 3M defaulter removal (`PENDING_REMOVAL_APPROVAL`) | **Maker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/remove-defaulter/approve` | **Checker (Partner B)**: Approve removal (`REMOVED_DEF_3M`, `maker != checker`) | **Checker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/remove-defaulter/reject` | **Checker (Partner B)**: Reject removal (reverts to `DEFAULT_3_MONTHS`) | **Checker (Partner)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/tickets/:id/substitute` | Substitute subscriber for `REMOVED_DEF_3M` ticket (ADR-13) | **Allowed (Exclusive)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/tickets/:id/settle-removal` | Settle defaulter account with 4% damages deduction voucher | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/tickets/:id/settle-removal` | **BLOCKED / Q25**: Fails closed with `400 UNAPPROVED_SETTLEMENT_POLICY` | **Allowed (Fail-Closed Q25)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/installments/group/:chitGroupId/month/:month`| View member dues list for month | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate`| Generate dues from auction dividend | **Allowed** | **Branch Scope** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact $I_{net}$ | **All** | **Branch Scope** | **Company-wide** | **Assigned Tickets** | **Own Ticket Only** | 🚫 **Blocked (Exempt)** |
@@ -209,9 +206,9 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 | `POST` | `/payments/upi-claim` | Customer self-submits bank UTR claim (`INITIATED`) | **Allowed** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Ticket Only** | 🚫 **Blocked** |
 | `GET` | `/payments/pending-upi-claims` | List paginated pending UPI claims (`?page=1&limit=20`, max `100`) for Accounting Desk verification | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked (Desk Workbench)** |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify UTR credit & issue receipt (`maker != checker`) | **Allowed (Checker)** | **Allowed (Branch)** | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/payments/:id/approve-reversal` | **Checker**: Commit reversal (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/payments/:id/request-reversal` | **Maker (Partner A)**: Request payment reversal (`KFC-SEC-001`) | **Allowed (Partner Maker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/payments/:id/approve-reversal` | **Checker (Partner B)**: Commit reversal (`maker != checker`) | **Allowed (Partner Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/payments/:id/reject-reversal` | **Checker (Partner B)**: Dismiss reversal request | **Allowed (Partner Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ---
 
@@ -221,9 +218,10 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 
 | Method | Endpoint | Description | Super Admin | Branch Manager | Desk Accountant | Collection Agent | Customer | Auditor |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `GET` | `/disbursements` | List disbursements across chit schemes | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | 🚫 **Blocked** | **Read-Only (Global)** |
-| `GET` | `/disbursements/auction/:auctionId` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | **Assigned Scope** | **Own Winner Only** | **Read-Only (Global)** |
-| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques to S3 | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `GET` | `/disbursements` | List disbursements across chit schemes | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
+| `GET` | `/disbursements/auction/:auctionId` | View winner disbursement details | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Winner Only** | **Read-Only (Global)** |
+| `POST` | `/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photos of signed agreement & blank cheques (legacy multipart) to S3 | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof upload (`fileExists` verified) | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-min presigned URL to view safety proof photos | **Allowed** | **Branch Scope** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | **Read-Only (Global)** |
 | `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety checklist & scans | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout (`maker != checker`) | **Allowed (Checker)** | 🚫 **STRICTLY BLOCKED** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
@@ -270,7 +268,9 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 ### 11.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|:---:|
-| `GET` | `/storage/file/:key` | Authenticated file retrieval: `302` presigned S3/CDN redirect when `STORAGE_DRIVER=s3` (or `?redirect=true`), or raw binary stream (`200` / `404`) when `?stream=true` or local driver | Staff, Customer, Auditor |
+| `POST` | `/storage/presigned-upload-url` | Request 300s direct-to-S3/R2 presigned `PUT` upload URL (`kyc/` or `safety-proof/`, ABAC-guarded) | Staff, Customer (Self KYC) |
+| `PUT` | `/storage/upload/*key` | Local-driver fallback binary `PUT` upload target (`STORAGE_DRIVER=local` only, 10 MB ceiling, 120s timeout) | Staff, Customer (Self KYC) |
+| `GET` | `/storage/file/*key` | Authenticated file retrieval (`302` presigned redirect under S3 mode or `?redirect=true`, raw stream via `?stream=true` or local; strict default-deny prefixes) | Staff, Customer (Scoped), Auditor |
 
 ---
 
@@ -311,19 +311,17 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
   - Recalculates consecutive unpaid months for each subscriber ticket.
   - Automatically tags tickets with 3+ consecutive unpaid months as `DEFAULT_3_MONTHS` per ADR-07 and emits statutory warning notices.
   - Automatically restores tickets from `DEFAULT_3_MONTHS` back to `ACTIVE` when delinquent dues are cleared.
-- **Smart Notification Router (`NotificationService` & `PushService`)**:
-  - **In-App Mobile Push Notifications (FCM HTTP v1)**: Primary, free channel delivering instant payment receipts, upcoming auction reminders, post-auction dividend credits, and default notices to smartphone users. Powered by `PushService` and pluggable `FirebasePushDriver` (`firebase-admin`) + `MockPushDriver`.
-  - **Automated Stale Token Pruning**: Automatically clears invalid/expired FCM tokens (`fcmToken = null`) in PostgreSQL when FCM returns `registration-token-not-registered`.
-  - **Indian Telecom DLT SMS Fallback**: Header `KMRCHT` / Templates for OTP authentication and fallback for keypad phone users via `SmsService` (`Msg91SmsDriver` + `MockSmsDriver`). WhatsApp Business API parked in V1.
-  - **In-Memory Audit Registry**: Preserves full notification payloads for review and automated test assertions.
+- **Smart Notification Router (`NotificationService` & `PushService`, `ADR-23` / `ADR-26`)**:
+  - **Indian Telecom DLT SMS (Primary Phase 1 Channel — `ADR-23`)**: Header `KMRCHT` / DLT templates via `SmsService` (`Msg91SmsDriver` + `MockSmsDriver` wrapped in `CircuitBreaker`) for OTP authentication, payment receipts, auction results, and 3-month default notices. WhatsApp Business API parked in V1.
+  - **In-App Mobile Push Notifications (FCM HTTP v1 — Phase 2 Ready, `ADR-26`)**: Powered by `PushService` (`FirebasePushDriver` + `MockPushDriver`) with automatic stale token pruning (`fcmToken = null` on `registration-token-not-registered`). Ready for Phase 2 Flutter mobile client activation.
+  - **In-Memory Audit Registry**: Preserves full notification payloads for `SUPER_ADMIN` review and automated test assertions.
 - **Automated Repeatable Cron Schedulers (`Asia/Kolkata` Timezone)**:
   - **00:01 AM IST (`1 0 * * *`)**: `DailyArrearsService` runs daily arrears recalculation, marks past-due items `OVERDUE`, tags 3-month defaults (`DEFAULT_3_MONTHS`), and emits warnings.
-  - **06:00 AM IST (`0 6 * * *`)**: `ReconciliationService` runs daily settlement reconciliation against gateway logs, auto-resolving ghost drops.
-  - **09:00 AM IST (`0 9 * * *`)**: `AuctionReminderSchedulerService` scans upcoming auctions 3 days ahead and broadcasts bilingual Push & SMS reminders.
+  - **06:00 AM IST (`0 6 * * *`)**: `ReconciliationService` runs daily direct KVB bank settlement reconciliation (`ADR-19`, zero third-party gateways), auto-resolving confirmed drops and flagging exceptions.
+  - **09:00 AM IST (`0 9 * * *`)**: `AuctionReminderSchedulerService` scans upcoming auctions 3 days ahead and broadcasts bilingual DLT SMS / Push reminders.
 - **Payment Settlement Reconciliation (`ReconciliationService`)**:
-  - Runs daily at 06:00 AM IST to compare payment gateway settlement records against internal database entries.
-  - Auto-resolves ghost drops (updates internal `INITIATED` payment to `SUCCESS` and issues receipts).
-  - Flags amount and status discrepancies as exceptions for Accountant review.
+  - Runs daily at 06:00 AM IST to compare Karur Vysya Bank settlement records against internal database entries.
+  - Auto-resolves confirmed settlements (updates internal `INITIATED` payment to `SUCCESS` and issues receipts) and flags amount/status discrepancies for Accountant review.
 
 ### 13.2 Endpoint Catalog
 | Method | Endpoint | Description | Allowed Roles |
@@ -349,28 +347,33 @@ Across all 104 non-public operations, each of the 6 system roles was evaluated a
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `GET` | `/` | System root ping and version string | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `GET` | `/health` | Terminus system health check (Postgres, Redis, Storage) | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
+| `GET` | `/health/readiness` | Kubernetes/Docker readiness probe (DB & Redis) | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
+| `GET` | `/health/liveness` | Lightweight process liveness probe | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `GET` | `/health/sentry-test` | Sentry exception diagnostic verification | **Public** | **Public** | **Public** | **Public** | **Public** | **Public** |
 | `GET` | `/metrics` | Prometheus metrics scrape endpoint | **Basic Auth (`METRICS_USER`)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | **Basic Auth (`METRICS_USER`)** |
 
 ---
 
-### 14.2 Complete Audit & Proof of All 11 Public / Non-RBAC Operations
+### 14.2 Complete Audit & Proof of All 14 Public / Non-RBAC Operations
 
-The system exposes exactly **11 public operations** that intentionally do not require JWT Bearer authentication. These endpoints represent the "Front Entrance" (where credentials are created or validated) and "Infrastructure Probes" (where external systems check health). Each is hardened with specialized, non-RBAC defense layers:
+The system exposes **14 public / non-JWT-RBAC operations** representing the authentication front-entrance and infrastructure probes. Each is hardened with specialized defense layers:
 
 | # | Endpoint & Method | Purpose & Target | Security & Hardening Mechanism | Automated Test Proof |
 |:---:|---|---|---|---|
 | **1** | `GET /` | Root server liveness check | Zero sensitive data returned (`"Kumaran Chits API is running"`). | [`apps/api/test/e2e/app.e2e-spec.ts`](../test/e2e/app.e2e-spec.ts) |
-| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and MinIO connectivity. `@SkipThrottle()` enabled for Docker/load balancer probes to prevent false positives. | [`apps/api/test/e2e/app.e2e-spec.ts`](../test/e2e/app.e2e-spec.ts) |
-| **3** | `GET /health/sentry-test` | Crash diagnostic validation | Triggers an intentional 500 exception to verify Sentry APM error logging without leaking stack traces. | [`apps/api/test/unit/client-contract.spec.ts`](../test/unit/client-contract.spec.ts) |
-| **4** | `POST /auth/web/login` | Staff office web portal login | Rate-limited via `@Throttle(5, 60)` (max 5 requests/min); verifies password with `bcrypt.compare` (salt 10-12); challenges for TOTP if 2FA active. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts), [`apps/api/test/e2e/01-auth-security.e2e-spec.ts`](../test/e2e/01-auth-security.e2e-spec.ts) |
-| **5** | `POST /auth/web/verify-totp` | Staff 2FA authentication | Validates cryptographic `tempToken` issued during Step 1 login + RFC 6238 6-digit authenticator code. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
-| **6** | `POST /auth/refresh-token` | Session token pair rotation | Rotates 15-minute access JWT; validates 7-day refresh token against SHA-256 salted hash stored in DB; revokes old tokens. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts), [`apps/api/test/e2e/01-auth-security.e2e-spec.ts`](../test/e2e/01-auth-security.e2e-spec.ts) |
-| **7** | `POST /auth/mobile/request-otp` | Mobile SMS OTP onboarding | Rate-limited; generates cryptographically random 6-digit OTP; stores in Redis with strict **300-second (5 min) TTL**; dispatches via Indian DLT SMS gateway. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
-| **8** | `POST /auth/mobile/verify-otp` | Mobile SMS OTP validation | Verifies code against Redis; decrements attempts on mismatch and **locks out after 3 failed attempts**; deletes OTP key on success; returns `setupToken` or full session. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
-| **9** | `POST /auth/mobile/login-mpin` | Mobile quick unlock | Validates 6-digit MPIN against bcrypt hash; **auto-locks account after 5 consecutive failures** with exponential backoff. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts), [`apps/api/test/e2e/01-auth-security.e2e-spec.ts`](../test/e2e/01-auth-security.e2e-spec.ts) |
-| **10**| `POST /auth/mobile/set-mpin` | Initial MPIN configuration | Enforces either the cryptographic `setupToken` issued by `verify-otp` during onboarding or an active Bearer JWT in settings; hashes MPIN via bcrypt. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
-| **11**| `GET /metrics` | Prometheus telemetry scraper | Protected by `MetricsAuthGuard` using **HTTP Basic Authentication** (`METRICS_USER` / `METRICS_PASSWORD`). Blocks unauthorized public access. | [`apps/api/test/unit/metrics.spec.ts`](../test/unit/metrics.spec.ts) |
+| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and Storage connectivity (`@SkipThrottle()`). | [`apps/api/test/e2e/app.e2e-spec.ts`](../test/e2e/app.e2e-spec.ts) |
+| **3** | `GET /health/readiness` | Readiness probe | Validates live PostgreSQL & Redis readiness before routing traffic. | [`apps/api/test/unit/health.spec.ts`](../test/unit/health.spec.ts) |
+| **4** | `GET /health/liveness` | Liveness probe | Lightweight process heartbeat check. | [`apps/api/test/unit/health.spec.ts`](../test/unit/health.spec.ts) |
+| **5** | `GET /health/sentry-test` | Crash diagnostic validation | Verifies Sentry APM reporting without leaking stack traces. | [`apps/api/test/unit/client-contract.spec.ts`](../test/unit/client-contract.spec.ts) |
+| **6** | `POST /auth/web/login` | Staff office web portal login | Rate-limited (`5 req/60s`); `bcrypt.compare`; challenges for TOTP or `onboarding_restricted` (`F16`). | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
+| **7** | `POST /auth/web/verify-totp` | Staff 2FA authentication | Validates `totp_pending` JWT (5m TTL) + RFC 6238 6-digit code. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
+| **8** | `POST /auth/complete-onboarding` | Forced first-login password setup (`F16`) | Validates single-use `onboarding_restricted` token (15m TTL) & enforces permanent password change. | [`apps/api/test/unit/phase1-security-remediation.spec.ts`](../test/unit/phase1-security-remediation.spec.ts) |
+| **9** | `POST /auth/refresh-token` | Session token pair rotation (`F04`) | Rotates 15-min access JWT; validates 7-day refresh token against PostgreSQL `Session` Vault (`sid`, `clientType`); RFC 6819 replay revocation. | [`apps/api/test/unit/auth-token-lifecycle.spec.ts`](../test/unit/auth-token-lifecycle.spec.ts) |
+| **10**| `POST /auth/mobile/request-otp` | Mobile SMS OTP onboarding | Rate-limited; cryptographic 6-digit OTP in Redis (300s TTL); Indian DLT SMS (`ADR-23`). | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
+| **11**| `POST /auth/mobile/verify-otp` | Mobile SMS OTP validation (`F13`) | Atomic Redis Lua `verifyOtpLua` script; 3-attempt 5-minute lockout; single-use consumption. | [`apps/api/test/unit/phase4-concurrency-queues-sse.spec.ts`](../test/unit/phase4-concurrency-queues-sse.spec.ts) |
+| **12**| `POST /auth/mobile/login-mpin` | Mobile quick unlock | Validates 6-digit MPIN against bcrypt hash; 5-failure lockout + `mustChangePassword` check. | [`apps/api/test/unit/auth.spec.ts`](../test/unit/auth.spec.ts) |
+| **13**| `POST /auth/mobile/set-mpin` | MPIN configuration (`F01`) | Strictly requires `tokenType: 'access'` Bearer or single-use `mpin_setup` token; rejects `totp_pending`/`refresh`. | [`apps/api/test/unit/phase1-security-remediation.spec.ts`](../test/unit/phase1-security-remediation.spec.ts) |
+| **14**| `GET /metrics` | Prometheus telemetry scraper | Protected by `MetricsAuthGuard` using explicit non-default HTTP Basic Auth (`METRICS_USER` / `METRICS_PASSWORD`). | [`apps/api/test/unit/metrics.spec.ts`](../test/unit/metrics.spec.ts) |
 
 ---
 
@@ -393,9 +396,9 @@ The system exposes exactly **11 public operations** that intentionally do not re
 - **Bilingual PDF Canvas Engine**: A5 digital receipts, payout vouchers, Form XVII minutes, and Form XXI passbooks with bundled Noto Sans Tamil fonts.
 - **OWASP BOLA/IDOR Ownership Guardians**: `DocumentAccessHelper` strictly enforces horizontal isolation across all 6 personas and branch boundaries.
 - **BullMQ Background Queue & Daily Cron Worker**: Daily midnight arrears recalculation, 3-month default tagging (ADR-07), Smart Push and Indian DLT SMS dispatchers, 06:00 AM settlement reconciliation, and **Bull Board visual queue monitor at `/admin/queues`**.
-- **Total Production Endpoints**: **112 physical paths / 118 operations fully implemented, documented, and tested** (83 domain module routes + 9 branch & user routes + 2 storage routes + 4 PDF routes + 10 background jobs & queue monitor routes + Prometheus metrics + 4 health routes + root route + Bull Board visual monitor at `/admin/queues`).
-- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of all 118 HTTP operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
-- **Automated Test Coverage**: **712 tests passing across 50 test suites (712 / 712 total tests, 100% pass rate)**.
+- **Total Production Endpoints**: **134 live HTTP controller operations across 18 NestJS controllers (+1 Bull Board visual monitor at `/admin/queues`)** (`docs/03-architecture/openapi-spec.json`: **123 paths / 129 operations**).
+- **Strongly-Typed OpenAPI Response Schemas (MIS-01 Resolution)**: **100% of exported OpenAPI operations** declare typed response content schemas matching the standard `{ success, statusCode, timestamp, data }` JSON envelope, enabling automated TypeScript and Dart client SDK generation with zero untyped gaps.
+- **Automated Test Coverage**: **1,226 API unit tests across 63 suites + 376 Web unit tests (14 suites) + 10 `@kumaran/api-client` tests + 6 Dart test suites (100% pass rate)**.
 
 
 

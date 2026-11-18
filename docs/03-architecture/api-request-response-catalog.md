@@ -738,9 +738,9 @@ Content-Type: image/jpeg
 
 ---
 
-### 4.2 `POST /api/v1/chits/onboard-ongoing`
+### 6.4 `POST /api/v1/chits/onboard-ongoing`
 **Description**: Mid-Cycle Onboarding from physical notebooks with historical ledger replay.  
-**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
 
 #### Request Body
 ```json
@@ -787,17 +787,18 @@ Content-Type: image/jpeg
 
 ---
 
-## 5. Module 4: In-Office Auctions & Tie-Breakers (`/auctions`)
+## 7. Module 4: In-Office Auctions & Tie-Breakers (`/auctions`)
 
-### 5.1 `POST /api/v1/auctions/:chitGroupId/:month/record-bid`
-**Description**: **Maker**: Enter in-office winning auction bid discount ($D \le V/4$).  
+### 7.1 `POST /api/v1/auctions/:id/record-bid`
+**Description**: **Maker**: Enter in-office winning auction bid discount ($C_f \le D \le V/4$, exact whole-rupee divisibility per `KFC-FIN-002`). `:id` is the Auction UUID.  
 **Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`
 
-#### Request Body
+#### Request Body (`RecordBidDto`)
 ```json
 {
   "ticketId": "ticket-uuid-004",
-  "bidDiscount": 25000
+  "bidDiscount": 25000,
+  "auctionDate": "2026-10-19T00:00:00.000Z"
 }
 ```
 
@@ -816,28 +817,29 @@ Content-Type: image/jpeg
     "totalDividend": 21000,
     "dividendPerTicket": 1050,
     "prizeMoney": 75000,
-    "status": "BID_RECORDED",
-    "makerUserId": "user-uuid-001"
+    "status": "SCHEDULED",
+    "conductedByUserId": "user-uuid-001"
   }
 }
 ```
 
 ---
 
-### 5.2 `POST /api/v1/auctions/:chitGroupId/:month/tie-break-record`
-**Description**: **Option A (Physical Draw)**: Record winning token physically drawn from brass lot pot in branch.  
+### 7.2 `POST /api/v1/auctions/:id/tie-break-record` (alias `/tie-break`)
+**Description**: **Option A (Physical Draw)**: Record winning token physically drawn from brass lot pot in branch. `:id` is the Auction UUID.  
 **Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`
 
-#### Request Body
+#### Request Body (`RecordTieBreakDto`)
 ```json
 {
-  "winningTicketId": "ticket-uuid-007",
   "tiedTickets": [
-    { "ticketId": "ticket-uuid-004", "bidDiscount": 25000 },
-    { "ticketId": "ticket-uuid-007", "bidDiscount": 25000 }
+    { "ticketId": "ticket-uuid-004", "tokenNumber": 1 },
+    { "ticketId": "ticket-uuid-007", "tokenNumber": 2 }
   ],
-  "tieBreakMethod": "PHYSICAL_TOKEN_DRAW_OPTION_A",
-  "notes": "Foreman drew ticket #7 token physically in front of subscribers at Perundurai office."
+  "winningTicketId": "ticket-uuid-007",
+  "bidDiscount": 25000,
+  "auctionDate": "2026-10-19T00:00:00.000Z",
+  "witnessNames": ["S. Sundaram", "K. Murugesan", "M. Ramesh"]
 }
 ```
 
@@ -852,24 +854,24 @@ Content-Type: image/jpeg
     "winningTicketNumber": 7,
     "bidDiscount": 25000,
     "tiedCount": 2,
-    "status": "TIE_RECORDED",
-    "notes": "Foreman drew ticket #7 token physically in front of subscribers at Perundurai office."
+    "status": "SCHEDULED",
+    "wasTieBreakWinner": true
   }
 }
 ```
 
 ---
 
-### 5.3 `POST /api/v1/auctions/:chitGroupId/:month/finalize`
-**Description**: **Checker**: Finalize auction and schedule next month's Universal Dividends (`maker != checker`).  
-**Roles**: `SUPER_ADMIN`
+### 7.3 `POST /api/v1/auctions/:id/finalize`
+**Description**: **Checker**: Finalize auction (`SCHEDULED` $\to$ `COMPLETED`) and schedule next month's Universal Dividends (`isPartner: true`, `maker != checker`). `:id` is the Auction UUID.  
+**Roles**: `SUPER_ADMIN` (Partner strictly; `KFC-SEC-003`)
 
-#### Request Body
+#### Request Body (`FinalizeAuctionDto`)
 ```json
 {
-  "winningTicketId": "ticket-uuid-007",
-  "bidDiscount": 25000,
-  "remarks": "Audited in-office token draw. Verified zero arrears on winning subscriber."
+  "subscribersPresent": 14,
+  "notes": "Audited in-office token draw. Verified zero arrears on winning subscriber.",
+  "signedByForeman": true
 }
 ```
 
@@ -881,11 +883,11 @@ Content-Type: image/jpeg
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
     "auctionId": "auction-uuid-001",
-    "status": "FINALIZED",
+    "status": "COMPLETED",
     "winningTicketNumber": 7,
     "prizeMoney": 75000,
     "dividendPerTicket": 1050,
-    "checkerUserId": "partner-uuid-002",
+    "finalizedByUserId": "partner-uuid-002",
     "finalizedAt": "2026-10-19T14:30:00.000Z"
   }
 }
@@ -893,11 +895,11 @@ Content-Type: image/jpeg
 
 ---
 
-### 5.4 `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`
-**Description**: Mark Form XVII auction minutes as physically filed with District Registrar of Chits with official challan/seal reference.  
+### 7.4 `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`
+**Description**: Mark Form XVII auction minutes as physically filed with District Registrar of Chits (`COMPLETED` $\to$ `MINUTES_FILED`) with required official challan/seal reference (`MarkMinutesFiledDto.filingReference` is `@IsNotEmpty()`).  
 **Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
 
-#### Request Body
+#### Request Body (`MarkMinutesFiledDto`)
 ```json
 {
   "filingReference": "CHALLAN-TN-ERD-2026-90412",
@@ -913,20 +915,24 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
-    "id": "minutes-uuid-001",
-    "auctionId": "auction-uuid-001",
-    "installmentMonth": 4,
-    "filedAtRegistrar": true,
-    "filedDate": "2026-10-19T00:00:00.000Z",
-    "filingReference": "CHALLAN-TN-ERD-2026-90412",
-    "filingNotes": "Filed in person at Perundurai Sub-Registrar Office; fee paid ₹100 via treasury challan."
+    "message": "Auction minutes marked as filed with Registrar successfully.",
+    "minutes": {
+      "id": "minutes-uuid-001",
+      "auctionId": "auction-uuid-001",
+      "subscribersPresent": 14,
+      "signedByForeman": true,
+      "filedAtRegistrar": true,
+      "filedDate": "2026-10-19T00:00:00.000Z",
+      "filingReference": "CHALLAN-TN-ERD-2026-90412",
+      "filingNotes": "Filed in person at Perundurai Sub-Registrar Office; fee paid ₹100 via treasury challan."
+    }
   }
 }
 ```
 
 ---
 
-## 6. Module 5: Installments & Passbook (`/installments`, `/tickets`)
+## 8. Module 5: Installments & Passbook (`/installments`, `/tickets`)
 
 ### 6.1 `GET /api/v1/tickets/:ticketId/passbook`
 **Description**: Complete digital passbook ledger statement.  
@@ -982,36 +988,27 @@ Content-Type: image/jpeg
 
 ---
 
-### 6.2 `POST /api/v1/tickets/:id/settle-removal`
-**Description**: Defaulter account settlement & exit refund voucher calculation. Deducts 4.00% Foreman Commission contractual damages from total paid installments.  
-**Roles**: `SUPER_ADMIN`, `ACCOUNTANT`
+### 6.2 `POST /api/v1/tickets/:id/settle-removal` (FAIL-CLOSED / Q25)
+**Description**: Defaulter exit settlement endpoint — **strictly locked fail-closed** under Q25 (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal Partner Board resolution and statutory legal validation ([`installment.service.ts:1119`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts#L1119)).  
+**Roles**: `SUPER_ADMIN` strictly (`ticket.controller.ts:272`)
 
 #### Request Body
 ```json
 {
   "paymentMethod": "CASH",
-  "notes": "Settled remaining refund after 4% contractual damages deduction per Foreman approval."
+  "notes": "Requested exit settlement."
 }
 ```
 
-#### Success Response (HTTP 200)
+#### Fail-Closed Response (HTTP 400 Bad Request)
 ```json
 {
-  "success": true,
-  "statusCode": 200,
-  "timestamp": "2026-10-23T19:45:53.336Z",
-  "data": {
-    "success": true,
-    "message": "Defaulter account for R. Velumani (Ticket #19) successfully settled.",
-    "ticketId": "5f44d078-d402-4cb2-96e5-cf91396e8c7d",
-    "ticketNumber": 19,
-    "customerName": "R. Velumani",
-    "groupCode": "KC-LIVE-20M-01",
-    "totalPaid": 0,
-    "damagesDeducted": 4000,
-    "refundAmount": 0,
-    "voucherNumber": "KC-VOU-DEF-753336",
-    "settledAt": "2026-10-23T19:45:53.336Z"
+  "success": false,
+  "statusCode": 400,
+  "timestamp": "2026-11-18T12:00:00.000Z",
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "UNAPPROVED_SETTLEMENT_POLICY: Early exit and defaulter settlement formula (Q25) is pending formal Partner Board resolution and statutory legal validation. Automated settlement payout execution is strictly locked fail-closed."
   }
 }
 ```
@@ -1120,8 +1117,8 @@ Content-Type: image/jpeg
 ---
 
 ### 7.2 `POST /api/v1/payments/:id/request-reversal`
-**Description**: **Maker**: Request payment reversal with audit reason.  
-**Roles**: `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`
+**Description**: **Maker (Partner A)**: Request payment reversal with audit reason (`KFC-SEC-001` — `ACCOUNTANT` & `BRANCH_MANAGER` strictly blocked `403`).  
+**Roles**: `SUPER_ADMIN` (`isPartner: true` strictly)
 
 #### Request Body
 ```json
@@ -1138,8 +1135,8 @@ Content-Type: image/jpeg
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
     "paymentId": "pay-uuid-001",
-    "reversalStatus": "PENDING_CHECKER",
-    "requestedByUserId": "user-uuid-001",
+    "status": "REQUESTED",
+    "initiatedByUserId": "partner-uuid-001",
     "reason": "Counter clerk entered wrong cash amount for ticket #4 instead of #14."
   }
 }
@@ -1179,7 +1176,7 @@ Content-Type: image/jpeg
 
 ### 7.4 `POST /api/v1/payments/upi-claim`
 **Description**: Customer registers their self-reported UPI transaction after 1-tap app payment, recording bank UTR reference. Creates `Payment` record in `INITIATED` status. Enforces PostgreSQL 17 `@unique` index on `transactionRef` to prevent duplicate claims.  
-**Roles**: `CUSTOMER` (Anti-BOLA ticket ownership verified), Staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`)
+**Roles**: `CUSTOMER` (Anti-BOLA ticket ownership verified), `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` (`COLLECTION_AGENT` excluded per `payment.controller.ts:306`)
 
 #### Request Body
 ```json
@@ -1376,19 +1373,19 @@ Content-Type: image/jpeg
 ---
 
 ### 8.3 `POST /api/v1/disbursements/auction/:auctionId/verify-safety-proof`
-**Description**: **Maker**: Check off safety proof items (agreement, cheques, promissory notes).  
+**Description**: **Maker**: Record ADR-15 Company Safety Proof checklist (non-mandatory collateral evaluated case-by-case; property documents strictly prohibited). Transitions `disbursementStatus` to `VERIFIED_BY_MAKER`.  
 **Roles**: `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`
 
-#### Request Body
+#### Request Body (`VerifySafetyProofDto`)
 ```json
 {
-  "hasSignedAgreement": true,
-  "hasNomineeConsent": true,
-  "hasBlankCheques": true,
-  "chequeCount": 3,
-  "hasPromissoryNotes": true,
-  "scannedDocuments": ["s3://kyc/proof-agreement.pdf", "s3://kyc/cheques.jpg"],
-  "notes": "Verified all 3 blank cheques signed by subscriber and nominee."
+  "isSecurityRequired": true,
+  "securityType": "BLANK_CHEQUE",
+  "blankChequeDetails": "Canara Bank Perundurai, Cheque #004512 & #004513, A/C: S. Sundaram",
+  "agreementSigned": true,
+  "nomineeSigned": true,
+  "securityDocS3Key": "safety-proof/auction-uuid-001/a1b2c3d4-winner-ticket-07-cheques.pdf",
+  "notes": "Verified signed blank cheques and agreement at office counter."
 }
 ```
 
@@ -1399,11 +1396,10 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
-    "disbursementId": "disb-uuid-001",
+    "id": "winner-uuid-001",
     "auctionId": "auction-uuid-001",
-    "safetyProofVerified": true,
-    "status": "PROOF_VERIFIED",
-    "makerUserId": "user-uuid-001"
+    "disbursementStatus": "VERIFIED_BY_MAKER",
+    "verifiedByUserId": "user-uuid-001"
   }
 }
 ```
@@ -1411,15 +1407,14 @@ Content-Type: image/jpeg
 ---
 
 ### 8.4 `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`
-**Description**: **Checker**: Authorize net payout voucher (`maker != checker`).  
-**Roles**: `SUPER_ADMIN`
+**Description**: **Checker**: Authorize net payout voucher after automatic prior arrears offset (`isPartner: true`, `maker != checker`, `KFC-FIN-004` prohibits arbitrary manual overrides). Transitions `disbursementStatus` to `AUTHORIZED_BY_CHECKER`.  
+**Roles**: `SUPER_ADMIN` (Partner strictly)
 
-#### Request Body
+#### Request Body (`AuthorizePayoutDto`)
 ```json
 {
-  "payoutMode": "NEFT",
-  "bankAccountNumber": "123456789012",
-  "bankIfsc": "SBIN0001234",
+  "disbursementMode": "BANK_TRANSFER_NEFT",
+  "disbursedAmount": 75000,
   "notes": "Verified safety proof checklist and authorized NEFT bank transfer."
 }
 ```
@@ -1431,12 +1426,11 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
-    "disbursementId": "disb-uuid-001",
-    "status": "PAYOUT_AUTHORIZED",
-    "prizeMoney": 75000,
-    "payoutMode": "NEFT",
-    "checkerUserId": "partner-uuid-002",
-    "authorizedAt": "2026-10-19T14:30:00.000Z"
+    "id": "winner-uuid-001",
+    "disbursementStatus": "AUTHORIZED_BY_CHECKER",
+    "disbursedAmount": 75000,
+    "disbursementMode": "BANK_TRANSFER_NEFT",
+    "authorizedByUserId": "partner-uuid-002"
   }
 }
 ```
@@ -1545,14 +1539,13 @@ Content-Type: image/jpeg
 }
 ```
 
-### 8.8 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Direct Settlement with Maker DTO)
-**Description**: **Month N Maturity Settlement (Direct)**: Combined payout execution with verified Maker DTO (`makerUserId != checkerUserId`).  
+### 8.8 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Final Settlement Alias — `CR-DISB-02`)
+**Description**: **Month N Maturity Settlement**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`) on all HTTP calls — reads authoritative Maker identity from Stage 1 (`prepare-final-settlement`), re-verifies live arrears (`ARREARS_STATE_CHANGED` on drift), and enforces `makerUserId != checkerUserId`.  
 **Roles**: `SUPER_ADMIN` (Partner)
 
 #### Request Body
 ```json
 {
-  "makerUserId": "maker-staff-001",
   "disbursementMode": "BANK_TRANSFER_NEFT",
   "paymentReference": "FINAL_SETTLEMENT_UTR_12345",
   "disbursedAt": "2026-10-23T10:00:00.000Z",
@@ -1587,8 +1580,12 @@ Content-Type: image/jpeg
 ## 9. Module 9: Statutory Reports (`/reports`)
 
 ### 9.1 `GET /api/v1/reports/form-xxii`
-**Description**: Form XXII Cash Book / Day Book Register for Registrar.  
-**Roles**: `AUDITOR`, `SUPER_ADMIN`
+**Description**: Form XXII Daily Cash Book Register (**Physical Cash Only**, exact IST calendar day boundaries; `Closing Cash = Opening Cash + Cash Inflows - Cash Outflows`).  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` (`report.controller.ts:181`)
+
+#### Query Parameters
+- `date` *(optional, `YYYY-MM-DD`, defaults to today IST)*
+- `branchId` *(optional UUID; auto-scoped for `BRANCH_MANAGER`)*
 
 #### Success Response
 ```json
@@ -1597,17 +1594,15 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
-    "formName": "Form XXII - Day Book Register",
-    "branchCode": "PRD",
-    "dateRange": {
-      "from": "2026-10-01T00:00:00.000Z",
-      "to": "2026-10-19T23:59:59.000Z"
-    },
-    "openingBalance": 125000,
-    "totalReceipts": 482500,
-    "totalDisbursements": 225000,
-    "closingBalance": 382500,
-    "entriesCount": 42
+    "statutoryForm": "FORM_XXII",
+    "statutoryStatus": "UNVERIFIED-LEGAL",
+    "date": "2026-10-19",
+    "openingCash": 125000,
+    "todayInflowsTotal": 99800,
+    "todayOutflowsTotal": 75000,
+    "closingCash": 149800,
+    "inflows": [],
+    "outflows": []
   }
 }
 ```
@@ -1618,7 +1613,7 @@ Content-Type: image/jpeg
 
 ### 10.1 `GET /api/v1/pdf/receipt/:paymentId?download=true`
 **Description**: Bilingual A5 digital receipt PDF with 15-minute presigned URL.  
-**Roles**: Authenticated Staff, Member (Self)
+**Roles**: Authenticated Staff, Member (Self), Auditor
 
 #### Success Response
 ```json
@@ -1627,8 +1622,8 @@ Content-Type: image/jpeg
   "statusCode": 200,
   "timestamp": "2026-10-19T14:30:00.000Z",
   "data": {
-    "key": "receipts/2026/KC-REC-PRD-2026-00412.pdf",
-    "presignedUrl": "https://storage.kumaranfinance.in/receipts/2026/KC-REC-PRD-2026-00412.pdf?X-Amz-Algorithm=...",
+    "key": "receipts/PRD/2026/KC-REC-PRD-2026-00412.pdf",
+    "presignedUrl": "https://storage.kumaranfinance.in/receipts/PRD/2026/KC-REC-PRD-2026-00412.pdf?X-Amz-Algorithm=...",
     "expiresInSeconds": 900
   }
 }
@@ -1636,9 +1631,9 @@ Content-Type: image/jpeg
 
 ---
 
-### 10.2 `POST /api/v1/jobs/cron/daily-maintenance`
-**Description**: Manually trigger daily midnight arrears recalculation and defaulter tagging.  
-**Roles**: `SUPER_ADMIN`
+### 10.2 `POST /api/v1/jobs/run-daily-arrears`
+**Description**: Manually trigger daily midnight arrears recalculation and 3-month defaulter tagging (async BullMQ enqueue at `POST /api/v1/jobs/enqueue-daily-arrears` — `SUPER_ADMIN` only).  
+**Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER` (`jobs.controller.ts:75-76`)
 
 #### Success Response
 ```json

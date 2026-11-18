@@ -9,9 +9,9 @@
 > - Bilingual PDF Canvas: [`apps/api/src/pdf/`](file:///u:/Kumaran-finance/apps/api/src/pdf/)  
 > - Background Queues: [`apps/api/src/jobs/`](file:///u:/Kumaran-finance/apps/api/src/jobs/)  
 > **Verified Automated Tests**:  
-> - [`apps/api/test/unit/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/payment.spec.ts) (20/20 PASS)  
-> - [`apps/api/test/unit/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/collection.spec.ts) (16/16 PASS)  
-> - [`apps/api/test/unit/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/pdf.spec.ts) (28/28 PASS)  
+> - [`apps/api/test/unit/payment.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/payment.spec.ts) (**45/45 PASS**)  
+> - [`apps/api/test/unit/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/collection.spec.ts) (**34/34 PASS**)  
+> - [`apps/api/test/unit/pdf.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/pdf.spec.ts) (**56/56 PASS**)  
 > **Live E2E Verification Scripts**:  
 > - [`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts) (Lifecycle 6: Collections & Vault Handover)  
 > - [`apps/api/scripts/lifecycle/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts) (Lifecycle 7: Counter Payments & Dual-Control Reversals)
@@ -56,11 +56,11 @@ flowchart LR
 4. **Dual-Control Cash Handover Invariant (PRD Module 7)**:
    - Cash collected in the field remains in `PENDING_HANDOVER` until physically counted and deposited into the branch vault.
    - The application strictly enforces `collector_user_id != acknowledger_user_id`. An agent who collected cash cannot acknowledge their own cash.
-5. **Maker-Checker Dual Control on Reversals (ADR-08 & Operations SOP §2)**:
+5. **Maker-Checker Dual Control on Reversals (ADR-08, `KFC-SEC-001` & Operations SOP §2)**:
    - Posted payments are immutable and never deleted.
-   - If an error occurs (cheque bounce, wrong ticket, duplicate bank entry), a Maker initiates a reversal request (`POST /payments/:id/request-reversal`).
-   - A separate Partner (Super Admin) acts as Checker (`POST /payments/:id/approve-reversal`).
-   - The application strictly enforces `maker_user_id != checker_user_id`. The user who requested the reversal cannot approve or reject it.
+   - If an error occurs (cheque bounce, wrong ticket, duplicate bank entry), **Partner A (`SUPER_ADMIN` with `isPartner: true` strictly)** initiates a reversal request (`POST /payments/:id/request-reversal`; `ACCOUNTANT` & `BRANCH_MANAGER` are blocked `403`).
+   - A separate **Partner B (`SUPER_ADMIN` with `isPartner: true`)** acts as Checker (`POST /payments/:id/approve-reversal` or `reject-reversal`).
+   - Both service logic and PostgreSQL `CHECK` constraint `chk_reversal_maker_checker` strictly enforce `maker_user_id != checker_user_id`. The partner who requested the reversal cannot approve or reject it.
 6. **Bank UTR Anti-Duplication Invariant (ADR-19)**:
    - Every non-null bank UTR or cheque reference string (`transactionRef`) is strictly unique across the entire database (`Payment_transactionRef_key`).
    - Reusing a bank UTR throws `ConflictException` (HTTP 409 `DUPLICATE_TRANSACTION_REF`).
@@ -77,11 +77,12 @@ flowchart LR
 sequenceDiagram
     autonumber
     actor Customer as Subscriber (Walk-in)
-    actor Cashier as Desk Staff / Accountant (Maker)
+    actor Cashier as Desk Staff / Accountant
     participant API as PaymentService (NestJS)
     participant DB as PostgreSQL 17 (chitflow_dev)
     participant Queue as BullMQ (notification-queue)
-    participant Partner as Super Admin / Partner (Checker)
+    actor PartnerA as Partner A (SUPER_ADMIN Maker)
+    actor PartnerB as Partner B (SUPER_ADMIN Checker)
 
     Customer->>Cashier: Pays exact net installment (Cash / UPI / Cheque)
     Cashier->>API: POST /payments (ticketId, installmentMonth, amount, method)
@@ -89,20 +90,20 @@ sequenceDiagram
     DB-->>API: Validation Passed
     API->>DB: Transaction: Create Payment, Create Allocation, Create Receipt, Mark Due PAID
     DB-->>API: Commit Successful
-    API->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (Push/SMS)
+    API->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (DLT SMS / Push)
     API-->>Cashier: HTTP 201 Created (Bilingual Receipt: KC-REC-PRD-YYYY-XXXXX)
     Cashier->>Customer: Hands over stamped physical receipt / signs passbook
 
-    opt Reversal Required (Cheque Bounce or Entry Error)
-        Cashier->>API: POST /payments/:id/request-reversal (reason, notes)
+    opt Reversal Required (Two-Partner Dual Control — KFC-SEC-001)
+        PartnerA->>API: POST /payments/:id/request-reversal (reason, notes)
         API->>DB: Create PaymentReversal (status = REQUESTED)
-        API->>Queue: Enqueue JOB_DISPATCH_APPROVAL_ALERT (Alerts Partners)
-        API-->>Cashier: HTTP 200 OK (Pending Checker)
-        Partner->>API: POST /payments/:id/approve-reversal (notes)
-        API->>API: Verify maker_user_id != checker_user_id & Role == SUPER_ADMIN
+        API->>Queue: Enqueue JOB_DISPATCH_APPROVAL_ALERT (Alerts Independent Partners)
+        API-->>PartnerA: HTTP 200 OK (Pending Checker Partner)
+        PartnerB->>API: POST /payments/:id/approve-reversal (notes)
+        API->>API: Verify maker_user_id != checker_user_id & isPartner == true
         API->>DB: Transaction: Payment -> REVERSED, Due -> UNPAID, Recalculate Arrears
         DB-->>API: Commit Successful
-        API-->>Partner: HTTP 200 OK (Payment Reversed, Due Restored)
+        API-->>PartnerB: HTTP 200 OK (Payment Reversed, Due Restored)
     end
 ```
 
@@ -205,6 +206,11 @@ model Payment {
   allocations                      PaymentAllocation[]
   receipt                          Receipt?
   reversal                         PaymentReversal?
+
+  @@index([createdAt])
+  @@index([recordedByUserId, cashHandoverStatus])
+  @@index([branchId, createdAt])
+  @@index([paymentStatus])
 }
 
 model PaymentAllocation {
@@ -232,6 +238,9 @@ model Receipt {
   issuedAt      DateTime @default(now())
   isBilingual   Boolean  @default(true) // Formatted in English + தமிழ்
   pdfS3Key      String?  // Storage key in private S3 storage (Cloudflare R2 / MinIO)
+
+  @@index([issuedAt])
+  @@index([branchId, issuedAt])
 }
 
 model PaymentReversal {
@@ -241,8 +250,8 @@ model PaymentReversal {
   reason            String    // Reason code (e.g. CHEQUE_BOUNCE, WRONG_TICKET)
   status            String    @default("REQUESTED") // REQUESTED, APPROVED, REJECTED
   notes             String?
-  initiatedByUserId String    // Maker (Accountant / Staff)
-  approvedByUserId  String?   // Checker (Super Admin / Partner) - maker != checker
+  initiatedByUserId String    // Maker (Partner A — SUPER_ADMIN with isPartner: true)
+  approvedByUserId  String?   // Checker (Partner B — SUPER_ADMIN with isPartner: true) - maker != checker
   reversedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -259,7 +268,7 @@ All endpoints are protected by [`JwtAuthGuard`](file:///u:/Kumaran-finance/apps/
 
 | HTTP Method & Path | Primary Role | Description & Invariant Guards |
 |---|---|---|
-| `POST /payments` | Accountant, Branch Manager, Super Admin | Records counter payment. Enforces exact $I_{net}$ matching and sequential bilingual receipt issuance. |
+| `POST /payments` | Super Admin, Branch Manager, Accountant, Collection Agent | Records discrete payment. Enforces exact $I_{net}$ matching and sequential bilingual receipt issuance (`payment.controller.ts:66`). |
 | `GET /payments` | All Staff, Auditor, Customer | Lists payments. Customers are strictly scoped to self (`customerId == ownId`). |
 | `GET /payments/:id` | All Staff, Auditor, Customer | Retrieves detailed payment with allocations, receipt, and reversal metadata. |
 | `GET /payments/:id/receipt` | All Staff, Auditor, Customer | Generates formatted bilingual receipt text layout (English + தமிழ்). |
@@ -288,8 +297,8 @@ Kumaran Chits provides two distinct endpoints for receipts, each serving a speci
 
 | Endpoint | Content-Type | Response Body | Intended Usage & Device Experience |
 |---|---|---|---|
-| [`GET /payments/:id/receipt`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L134) | `application/json` | Structured JSON with calculation metadata + pre-formatted monospace bilingual text string | **Primary Digital Display**: Consumed by the Flutter Mobile App and Web Admin to render the receipt card instantly inside the customer's digital passbook view without PDF rendering overhead. |
-| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | `application/pdf` or JSON presigned URL | Binary A5 PDF document compiled via `pdfkit` (419.53 x 595.28 pt) or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography and uploaded to private S3 storage (Cloudflare R2 / MinIO). |
+| [`GET /payments/:id/receipt`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L191) | `application/json` | Structured JSON with calculation metadata + pre-formatted monospace bilingual text string | **Primary Digital Display**: Consumed by the Web Admin and Dart Core SDK to render the receipt card instantly inside the customer's digital passbook view without PDF rendering overhead. |
+| [`GET /pdf/receipt/:paymentId`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L81) | `application/pdf` or JSON presigned URL | Binary A5 PDF document compiled via `pdfkit` (419.53 x 595.28 pt) or 15-minute S3 download URL (`?download=true`) | **On-Demand PDF Export**: Used when a customer or auditor explicitly requests a standalone downloadable PDF receipt file. Embedded with Noto Sans Tamil typography (and dynamic `0.28` red `ரத்து செய்யப்பட்டது / CANCELLED` watermark on reversed payments) and uploaded to private S3 storage (Cloudflare R2 / MinIO). |
 
 > [!IMPORTANT]
 > **Zero Thermal Printers Rule (ADR-11)**:  
@@ -299,8 +308,8 @@ Kumaran Chits provides two distinct endpoints for receipts, each serving a speci
 
 ## 6. Implementation Code Proofs
 
-### Proof 1: Exact $I_{net}$ Invariant Guard (Rejecting Partials & Doubles)
-From [`apps/api/src/payment/payment.service.ts#L119-L132`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts#L119-L132):
+### Proof 1: Exact $I_{net}$ Invariant Guard (Rejecting Partials, Doubles & Non-Integers)
+From [`apps/api/src/payment/payment.service.ts#L183-L197`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts#L183-L197):
 
 ```typescript
 // 4. ADR-07 Invariant Guard: Zero Double Payments
@@ -310,8 +319,8 @@ if (due.status === DueStatus.PAID) {
   );
 }
 
-// 5. ADR-07 Invariant Guard: Zero Partial Payments (Exact Inet Matching)
-const paymentAmount = BigInt(Math.floor(dto.amount));
+// 5. ADR-07 Invariant Guard: Zero Partial Payments (Fail-Closed Whole-Rupee BigInt — zero Math.floor)
+const paymentAmount = toWholeRupeeBigInt(dto.amount, 'Payment amount', { min: 1n });
 if (paymentAmount !== due.netPayableAmount) {
   throw new BadRequestException(
     `PARTIAL_PAYMENTS_NOT_ALLOWED: Payment must exactly match the net installment due of ₹${due.netPayableAmount.toString()} (received: ₹${paymentAmount.toString()})`,
@@ -320,10 +329,10 @@ if (paymentAmount !== due.netPayableAmount) {
 ```
 
 ### Proof 2: Dual Control Maker != Checker on Payment Reversal
-From [`apps/api/src/payment/payment.service.ts#L615-L646`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts#L615-L646):
+From [`apps/api/src/payment/payment.service.ts#L820-L855`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts#L820-L855) (backed at DB engine level by `chk_reversal_maker_checker`):
 
 ```typescript
-// 1. Enforce Super Admin Exclusivity
+// 1. Enforce Super Admin Exclusivity (plus verified Partner isPartner: true check)
 if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
   throw new ForbiddenException(
     'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve payment reversals',
@@ -339,7 +348,7 @@ if (payment.reversal.initiatedByUserId === checkerUserId) {
 ```
 
 ### Proof 3: Dual Control Collector != Acknowledger on Cash Handover
-From [`apps/api/src/collection/collection.service.ts#L363-L373`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L363-L373):
+From [`apps/api/src/collection/collection.service.ts#L497-L505`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L497-L505):
 
 ```typescript
 // Hard Guard: Dual Control Separation of Duties (collector != acknowledger)
@@ -398,16 +407,15 @@ This guarantees that collection agents and cashiers cannot sniff or replay other
 
 ## 7. Automated Test Verification & Live Server Proof Matrix
 
-### 7.1 Automated Jest Unit Tests (64 / 64 Tests Passing)
+### 7.1 Automated Jest Unit Tests (135 / 135 Tests Passing Across Core Payment Suites)
 
 ```text
-PASS test/unit/collection.spec.ts
-PASS test/unit/payment.spec.ts
-PASS test/unit/pdf.spec.ts
+PASS test/unit/collection.spec.ts (34 tests)
+PASS test/unit/payment.spec.ts    (45 tests)
+PASS test/unit/pdf.spec.ts        (56 tests)
 
 Test Suites: 3 passed, 3 total
-Tests:       64 passed, 64 total
-Time:        4.512 s
+Tests:       135 passed, 135 total (within 1,226-test API unit baseline)
 ```
 
 ### 7.2 Live Server End-to-End Verification (PostgreSQL 17 & Redis 7)
@@ -425,7 +433,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
    - `[6/6] Partner Vault Deposit`: Super Admin acknowledged physical cash $\to$ **Committed into branch vault** (`HTTP 200 OK`).
 
 2. **Lifecycle 7 Verification Output (Full 8-Step Verification)**:
-   - `[1/8] POST /payments (CASH)`: Recorded counter cash payment with full fields (`idempotencyKey`, `notes`, `collectedAt`) $\to$ **`cashHandoverStatus: PENDING_HANDOVER`**, sequential receipt `KC-REC-PRD-2026-00014`, InstallmentDue updated to `PAID`, BullMQ receipt notification enqueued (`HTTP 201 Created`).
+   - `[1/8] POST /payments (CASH)`: Recorded counter cash payment (`idempotencyKey`, `notes`) $\to$ direct branch vault entry (`cashHandoverStatus: null` on counter payments, whereas field `POST /collections/record` sets `PENDING_HANDOVER` until acknowledged), sequential receipt `KC-REC-PRD-2026-00014`, `InstallmentDue` updated to `PAID`, BullMQ receipt notification enqueued (`HTTP 201 Created`).
    - `[2/8] POST /payments (UPI)`: Recorded electronic UPI payment with `transactionRef: UPI-REF-998877661122` $\to$ **`cashHandoverStatus: ACKNOWLEDGED`** (direct bank credit bypasses drawer handover), InstallmentDue updated to `PAID` (`HTTP 201 Created`).
    - `[3/8] GET /payments (Paginated & Filtered)`: Filtered collections by `ticketId` and `paymentMethod=CASH` (`HTTP 200 OK`). Verified automatic customer scoping for mobile subscribers.
    - `[4/8] GET /payments/:id (Deep Relations & OWASP BOLA)`: Verified full relation graph (`customer`, `branch`, `recordedBy`, `allocations`, `receipt`). OWASP BOLA attack simulation (Customer 5 querying Customer 6 payment) **strictly blocked with HTTP 403 Forbidden**.
@@ -449,7 +457,7 @@ Executed against local Docker cluster (`chitflow-db:5433`, `chitflow-redis:6379`
 | **Bilingual PDF Generator (`apps/api/src/pdf`)** | **100% DONE** | Production-ready | On-demand A5 bilingual PDF receipt document generator with Noto Sans Tamil fonts verified. |
 | **BullMQ Receipt & Alert Queues** | **100% DONE** | Production-ready | `JOB_DISPATCH_PAYMENT_RECEIPT` and `JOB_DISPATCH_APPROVAL_ALERT` wired and running. |
 | **Web Admin Portal (`apps/web`)** | **100% DONE** | Production-ready | Complete Next.js 15 screens for cashier counter collections, receipt viewing, cash handover, and two-stage settlement modal workflows. |
-| **Mobile Flutter App (`apps/mobile`)** | **0% PENDING** | Empty (`.gitkeep`) | Android screens for field agent collections, offline SQLite queue, and customer passbook remain to be built. |
+| **Mobile Client (`apps/mobile`)** | **CORE SDK DONE / UI PHASE 2 (`ADR-26`)** | Dart Core SDK ready (6/6 test suites passing) | `apps/mobile/lib/core/` (typed 64-bit `int` models, single-flight refresh mutex `F14`, offline SQLite sync engine) is production-verified; Flutter Android UI screens & APK packaging are deferred to Phase 2 (Q2 2027, `ADR-26`) while responsive Web covers mobile browsers in Phase 1. |
 | **Native Zero-Fee UPI Intent (ADR-19)**| **100% DONE** | Production-ready & Verified | NPCI native deep-linking (`upi://pay`), Bank UTR `@unique` constraint, customer claims & Maker != Checker verification complete. Third-party gateways strictly eliminated (₹0 MDR fee). |
 | **Cheque Clearance Endpoint** | **BY WORKFLOW** | Handled via Reversal | Dedicated `PATCH /cheque-status` endpoint not created; bounced cheques are handled via `POST /payments/:id/request-reversal` with reason `CHEQUE_BOUNCE`. |
 
