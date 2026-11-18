@@ -135,7 +135,7 @@ Generated dynamically in-memory using PDFKit and cached in private S3 storage.
 * **Prize Payout Voucher**:
   - Format: **ISO A5 Landscape** ($210 \times 148\text{ mm}$ / $595.28 \times 419.53\text{ pt}$).
   - Key Elements: Chit value, winning discount, foreman commission (4%), net prize amount, safety checklist stamps, and physical signature lines for Subscriber, Nominee, Cashier, and Partner.
-  - Storage Key: `vouchers/PRD/2026/KC-VOU-PRD-2026-00004.pdf`
+  - Storage Key: `vouchers/PRD/2026/KC-VOU-PRD-2026-KCA-1L-20M-01-00004.pdf`
 
 ---
 
@@ -149,7 +149,7 @@ Generated dynamically in-memory using PDFKit and cached in private S3 storage.
 * **Form XXI (Continuous Passbook Statement)**:
   - Format: **A4 Landscape** ($297 \times 210\text{ mm}$).
   - Content: 20-month continuous schedule with 6 statutory columns: Month, Due Date, Base Installment, Dividend Credit, Paid Amount, and Arrears Balance.
-  - Storage Key: `passbooks/{ticketId}.pdf`
+  - Storage Key: `passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf` (`pdf.service.ts:767`)
 
 ---
 
@@ -265,8 +265,8 @@ Raw storage requests at `GET /api/v1/storage/file/*key` execute strict domain-le
 - **Strict Default-Deny**: Any unrecognized key prefix (e.g. `temp/`, `backups/`, or unknown paths) triggers immediate `HTTP 403 Forbidden`.
 - **Passbooks (`passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf`)**: Customers must own the specified ticket in that chit group. Branch Managers are validated against `ticket.chitGroup.branchId`. Field Collection Agents are barred from raw passbook downloads.
 - **KYC Documents (`kyc/{customerId}/...`)**: Customers can only access their own documents (`currentUser.sub === customerId`). Branch Managers must match `customer.branchId`. Field Collection Agents are barred.
-- **Minutes, Safety Proofs, Receipts & Vouchers**: Branch Managers are strictly verified against the branch of the underlying chit group, payment, or winner record in PostgreSQL.
-- **Presigned Upload URLs (`POST /storage/presigned-url`)**: Direct-to-S3 presigned PUT generation validates branch ownership for `kyc/` and `safety-proof/` before minting upload credentials.
+- **Minutes, Safety Proofs, Receipts & Vouchers**: Branch Managers are strictly verified against the branch of the underlying chit group, payment, or winner record in PostgreSQL. On raw `/storage/file/receipts/*` and `/storage/file/vouchers/*` paths, both `CUSTOMER` and `COLLECTION_AGENT` are **strictly blocked (`HTTP 403 Forbidden`)** and must retrieve documents via the authorized `/api/v1/pdf/receipt/:paymentId` and `/api/v1/pdf/voucher/:auctionId` endpoints ([`document-access.helper.ts:392-402`](file:///u:/Kumaran-finance/apps/api/src/storage/helpers/document-access.helper.ts#L392-L402)).
+- **Presigned Upload URLs (`POST /api/v1/storage/presigned-upload-url`)**: Direct-to-S3 presigned PUT generation validates branch ownership and customer self-scoping for `kyc/` and `safety-proof/` before minting 300s upload credentials (`storage.controller.ts:72`).
 
 ---
 
@@ -274,16 +274,20 @@ Raw storage requests at `GET /api/v1/storage/file/*key` execute strict domain-le
 
 | HTTP Method | Route | Description | Roles Allowed | Content-Type |
 |---|---|---|---|---|
-| `POST` | `/api/v1/customers/:id/documents` | Upload and link customer KYC scan | Staff, Customer (Self) | `multipart/form-data` |
+| `POST` | `/api/v1/storage/presigned-upload-url` | Mint 300s direct-to-S3/R2 presigned PUT URL + headers (`kyc/` or `safety-proof/`) | Staff, Customer (Self KYC) | `application/json` |
+| `PUT` | `/api/v1/storage/upload/*key` | Local-driver fallback binary PUT target (`STORAGE_DRIVER=local`, 10 MB cap, 120s timeout) | Staff, Customer (Self KYC) | `image/*`, `application/pdf` |
+| `POST` | `/api/v1/customers/:id/documents` | Upload and link customer KYC scan (legacy multipart fallback) | Staff, Customer (Self) | `multipart/form-data` |
+| `POST` | `/api/v1/customers/:id/documents/confirm` | Fail-closed confirm direct S3 PUT KYC upload (`fileExists` + `kyc/:id/` prefix check) | Staff, Customer (Self) | `application/json` |
 | `GET` | `/api/v1/customers/:id/documents/:docId/url` | Get 15-minute presigned URL for KYC document | Staff (excl. Agents), Customer (Self), Auditor | `application/json` |
-| `DELETE` | `/api/v1/customers/:id/documents/:docId` | Delete customer KYC scan from S3 and DB | Super Admin, Branch Manager | `application/json` |
-| `POST` | `/api/v1/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photo of signed cheques/agreement | Super Admin, Branch Manager, Accountant | `multipart/form-data` |
-| `GET` | `/api/v1/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Get 15-min presigned URL to inspect cheques | Super Admin, Branch Manager, Auditor | `application/json` |
-| `GET` | `/api/v1/pdf/receipt/:paymentId` | Stream binary A5 PDF or get 15-min S3 URL (`?download=true`) | Staff, Customer (Self), Auditor | `application/pdf` or `JSON` |
+| `DELETE` | `/api/v1/customers/:id/documents/:docId` | Delete customer KYC scan from S3 and DB (verified docs require `SUPER_ADMIN`) | Super Admin, Branch Manager, Accountant, Customer (Self unverified) | `application/json` |
+| `POST` | `/api/v1/disbursements/auction/:auctionId/upload-safety-proof` | **Maker**: Upload photo of signed cheques/agreement (legacy multipart fallback) | Super Admin, Branch Manager, Accountant | `multipart/form-data` |
+| `POST` | `/api/v1/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Fail-closed confirm direct S3 PUT safety proof (`HeadObject`/`fileExists`, prefix check, `DISBURSED_PRIZE_IMMUTABLE` guard) | Super Admin, Branch Manager, Accountant | `application/json` |
+| `GET` | `/api/v1/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Get 15-min presigned URL to inspect cheques | Super Admin, Branch Manager, Accountant, Auditor | `application/json` |
+| `GET` | `/api/v1/pdf/receipt/:paymentId` | Stream binary A5 PDF (`Cache-Control: private, no-store`, `nosniff`, dynamic `0.28` red cancelled watermark) or 15-min S3 URL (`?download=true`) | Staff, Customer (Self), Auditor | `application/pdf` or `JSON` |
 | `GET` | `/api/v1/pdf/voucher/:auctionId` | Stream binary A5 voucher or get 15-min S3 URL (`?download=true`) | Staff (excl. Agents), Customer (Winner), Auditor | `application/pdf` or `JSON` |
-| `GET` | `/api/v1/pdf/minutes/:auctionId` | Stream binary A4 Form XVII or get S3 URL (`?download=true`) | Staff (Branch-scoped), Auditor | `application/pdf` or `JSON` |
-| `GET` | `/api/v1/pdf/passbook/:ticketId` | Stream binary A4 Form XXI or get S3 URL (`?download=true`) | Staff, Customer (Self), Auditor | `application/pdf` or `JSON` |
-| `GET` | `/api/v1/storage/file/*key` | Authenticated file download (`302` presigned S3/CDN redirect under `STORAGE_DRIVER=s3` or `?redirect=true`; raw binary stream via `?stream=true` or `local` driver) | Staff, Customer, Auditor | `302` Redirect or `application/octet-stream` |
+| `GET` | `/api/v1/pdf/minutes/:auctionId` | Stream binary A4 Form XVII or get S3 URL (`?download=true`) | Staff (excl. Agents, Branch-scoped), Auditor | `application/pdf` or `JSON` |
+| `GET` | `/api/v1/pdf/passbook/:ticketId` | Stream binary A4 Landscape Form XXI or get S3 URL (`?download=true`) | Staff (excl. Agents), Customer (Self), Auditor | `application/pdf` or `JSON` |
+| `GET` | `/api/v1/storage/file/*key` | Authenticated file download (`302` presigned S3/CDN redirect under `STORAGE_DRIVER=s3` or `?redirect=true`; raw binary stream via `?stream=true` or `local` driver; default-deny prefixes) | Staff, Customer (Scoped), Auditor | `302` Redirect or `application/octet-stream` |
 
 ---
 
@@ -291,17 +295,16 @@ Raw storage requests at `GET /api/v1/storage/file/*key` execute strict domain-le
 
 All document and storage features have been executed and verified across automated test suites and live server lifecycles:
 
-### 6.1 Automated Jest Unit Tests (**94 / 94 Tests Passing**)
+### 6.1 Automated Jest Unit Tests (**189 / 189 Tests Passing Across Storage, KYC, Disbursement & PDF Suites**)
 
 ```text
-PASS test/unit/storage.spec.ts (15 tests)
-PASS test/unit/customer.spec.ts (28 tests)
-PASS test/unit/disbursement.spec.ts (26 tests)
-PASS test/unit/pdf.spec.ts (25 tests)
+PASS test/unit/storage.spec.ts      (39 tests)
+PASS test/unit/customer.spec.ts     (48 tests)
+PASS test/unit/disbursement.spec.ts (46 tests)
+PASS test/unit/pdf.spec.ts          (56 tests)
 
 Test Suites: 4 passed, 4 total
-Tests:       94 passed, 94 total
-Time:        5.441 s
+Tests:       189 passed, 189 total (within 1,226-test API unit baseline)
 ```
 
 #### Key Test Assertions Verified:
@@ -419,7 +422,8 @@ flowchart TD
 - **Endpoints**:
   1. `POST /api/v1/storage/presigned-upload-url` — Issues a 300s presigned PUT URL + required headers (`Content-Type`, and `x-amz-server-side-encryption: AES256` on AWS S3) after ABAC checks.
   2. Direct browser `PUT` via `apps/web/src/lib/direct-upload.ts` (targeting Cloudflare R2 / S3 / MinIO directly with `credentials: 'omit'`, or `/bff/api/v1/storage/upload/*key` handled by NestJS `@Put('upload/*key')` exclusively when `STORAGE_DRIVER=local`).
-  3. Fail-closed DB confirmation: `POST /api/v1/customers/:id/documents/confirm` (KYC) and `POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof` (Safety Proof) sanitize the key, enforce entity-scoped prefix ownership, and verify `storageService.fileExists(key)` before writing PostgreSQL.
+  3. Fail-closed DB confirmation (`DEF-FE-07`): `POST /api/v1/customers/:id/documents/confirm` (KYC) and `POST /api/v1/disbursements/auction/:auctionId/confirm-safety-proof` (Safety Proof) sanitize the key, enforce strict entity-scoped prefix ownership (`kyc/{customerId}/`, `safety-proof/{auctionId}/`), reject post-disbursement mutations (`DISBURSED_PRIZE_IMMUTABLE`), and execute an S3 `HeadObject` (`storageService.fileExists(key)`) check before writing PostgreSQL — zero orphan DB rows if the object does not exist.
+  4. All `/api/v1/pdf/*` responses enforce `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff` ([`pdf.controller.ts:54,73`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L54)), preventing proxy/browser caching of sensitive financial PDFs or reversed receipts.
 - **Fallback**: The standard multipart upload endpoints remain available as backward-compatible fallbacks for mobile offline sync and automated harnesses.
 
 ### 9.2 Cellular Upload Timeout Resilience & Client-Side Image Downscaling

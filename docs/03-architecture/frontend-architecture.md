@@ -2,14 +2,14 @@
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Status**: Authoritative Architectural Specification (`CONFIRMED-BY-DEVELOPER`)  
-> **Key Architecture Decisions**: [ADR-01 through ADR-19](../01-business/decision-log.md), [permissions-matrix.md](../01-business/permissions-matrix.md), [financial-rules.md](../01-business/financial-rules.md)  
-> **Core Mandate**: The 4 Partners (Super Admin) have **100% full operational parity on BOTH Web and Mobile frontends for BOTH Maker and Checker roles**. The backend is completely device-agnostic (`maker_user_id != checker_user_id`).
+> **Key Architecture Decisions**: [ADR-01 through ADR-26](../01-business/decision-log.md), [permissions-matrix.md](../01-business/permissions-matrix.md), [financial-rules.md](../01-business/financial-rules.md)  
+> **Core Mandate**: The 4 Partners (Super Admin, `isPartner: true`) have **100% full operational parity on BOTH Web and Mobile frontends for BOTH Maker and Checker roles**. The backend is completely device-agnostic (`maker_user_id != checker_user_id`).
 >
 > [!NOTE]
 > **Implementation Status**: This document defines the authoritative architectural blueprint and screen catalog for the Web Portal (`apps/web/`) and Mobile Application (`apps/mobile/`).
-> - **Web Portal Implementation Ledger**: All web modules, screen catalogs, and verification proofs are documented under [`docs/web/`](../web/README.md). Foundation & Authentication are **100% Complete & Verified** with 42/42 passing unit tests.
-> - **Backend REST API tier** (`apps/api/`) is **100% complete** with 587/587 passing tests (35 suites) recorded in [`completed-modules-api-registry.md`](./completed-modules-api-registry.md).
-> - **Mobile Client Tier (`apps/mobile/`)**: The Dart client core (`lib/core/` for typed API models, offline SQLite synchronization, and single-flight authentication interceptors) is complete and verified. Per authoritative directive (November 13, 2026), Flutter Android mobile UI screens and APK packaging are deferred to Phase 2 (Q2 2027); see [`docs/08-audit/FLUTTER-ANDROID-DEFERRED-SCOPE.md`](../08-audit/FLUTTER-ANDROID-DEFERRED-SCOPE.md).
+> - **Web Portal Implementation Ledger**: All 35 Next.js 15 routes, screen catalogs, and verification proofs are documented under [`docs/web/`](../web/README.md) with **376 / 376 passing unit tests across 14 suites** (+ Playwright E2E Suites 00–11).
+> - **Backend REST API tier** (`apps/api/`) is **100% complete** (**134 live HTTP operations across 18 NestJS controllers**; `openapi-spec.json`: **123 paths / 129 operations**) with **1,226 / 1,226 passing API unit tests (63 suites)** + **10 / 10 `@kumaran/api-client` tests** recorded in [`completed-modules-api-registry.md`](./completed-modules-api-registry.md).
+> - **Mobile Client Tier (`apps/mobile/`)**: The Dart client core (`lib/core/` for typed 64-bit `int` API models, offline SQLite synchronization, and single-flight authentication interceptors `F14`) is complete and verified (**6 / 6 Dart test suites**, `dart analyze` 0 issues). Per authoritative directive (November 13, 2026 — **ADR-26** in [`decision-log.md`](../01-business/decision-log.md)), Flutter Android mobile UI screens and APK packaging are deferred to **Phase 2 (Q2 2027)** while responsive Web covers mobile browsers in Phase 1.
 
 ---
 
@@ -20,18 +20,18 @@ The Kumaran Chits frontend tier comprises two specialized client applications op
 ```mermaid
 flowchart TD
     subgraph Clients["Frontend Client Applications"]
-        Web["Web Portal (apps/web)\nNext.js 15 (App Router) + React 19 + Tailwind CSS\n• Desktop PC / Laptop (Full-screen)\n• Responsive down to Tablet / Mobile (PWA)"]
-        Mobile["Mobile App (apps/mobile)\nFlutter 3.x + Dart (Android-first)\n• Android Smartphones (Play Store / APK)\n• Offline SQLite Auto-Sync & Biometrics"]
+        Web["Web Portal (apps/web) — Phase 1 Primary for ALL Personas\nNext.js 15 (App Router) + React 19 + Tailwind CSS v4 + BFF (ADR-20)\n• Desktop PC / Laptop (Full-screen)\n• Responsive down to Tablet / Mobile Browser"]
+        Mobile["Mobile Client (apps/mobile)\n• Phase 1 Ready: Dart Core SDK (apps/mobile/lib/core/)\n• Phase 2 Deferred (Q2 2027, ADR-26): Flutter Android UI & APK"]
     end
 
     subgraph API["Backend Modular Monolith (apps/api)"]
-        Nest["112 Physical Paths (118 Operations) | BigInt Math | RBAC Guards\nSingle Source of Financial Truth"]
+        Nest["134 Live HTTP Operations (18 Controllers) | BigInt Math | RBAC & 8 DB CHECK Guards\nSingle Source of Financial Truth"]
     end
 
     subgraph Personas["Persona Delivery Mapping"]
-        P_Partner["The 4 Partners (Super Admin)\n100% Full Parity on BOTH Web & Mobile (Maker + Checker)"]
-        P_Desk["Desk Accountant & CA Auditor\nPrimarily Web Portal (Spreadsheets, Vouchers, Audits)"]
-        P_Field["Field Collection Agents & Customers\nPrimarily Mobile App (Doorstep, Offline, UPI, Passbook)"]
+        P_Partner["The 4 Partners (Super Admin)\n100% Full Parity on Web (Phase 1) & Mobile (Phase 2) (Maker + Checker)"]
+        P_Desk["Desk Accountant & CA Auditor\nWeb Portal (Spreadsheets, Vouchers, Statutory Audits)"]
+        P_Field["Field Collection Agents & Customers\nPhase 1: Responsive Web Browser | Phase 2 (ADR-26): Native Android App"]
     end
 
     Web -->|HTTPS / REST API| Nest
@@ -54,9 +54,9 @@ The choice of platform is governed by **physical working environment, informatio
 | **Super Admin / Owner (The 4 Partners)** | **Web Portal** (`apps/web`) | **Mobile App** (`apps/mobile`) | **100% Feature Parity on BOTH Platforms**. Full authority to act as Maker or Checker on any device. Mobile provides instant push-notification approvals and camera cheque uploads; Web provides full-screen cashbooks and spreadsheet onboarding. |
 | **Branch Manager** *(Latent)* | **Web Portal** (`apps/web`) | — | Branch-scoped scheme review, customer intake, and auction facilitation. |
 | **Desk Accountant** | **Web Portal** (`apps/web`) | Mobile App (Dual Role) | High-volume transcription of 20-month physical paper notebooks into digital grids, Form XXII daily cashbook, bank reconciliation, voucher preparation. |
-| **Field Collection Agent** | **Mobile App** (`apps/mobile`) | Web Portal (Dual Role) | Android smartphone on motorbike rounds. 1-second fingerprint unlock, doorstep collections under 30 seconds, offline SQLite sync in rural 4G dead zones, evening cash handover. |
-| **Customer / Chit Subscriber** | **Mobile App** (`apps/mobile`) | Web Passbook (Optional) | Android smartphone. Bilingual (Tamil + English) passbook, 1-tap UPI installment payments (GPay/PhonePe), dividend savings tracker, auction schedule & results. |
-| **Auditor (Chartered Accountant)** | **Web Portal** (`apps/web`) | — | Read-only forensic general ledgers, 12-column Form XXII Cash Book, Form XXI Ledgers, immutable audit logs. Large-screen spreadsheet review and A4 PDF/CSV exports. |
+| **Field Collection Agent** | **Web Portal (Phase 1 Mobile Browser)** | **Mobile App (Phase 2, ADR-26)** | Responsive Web on Android Chrome in Phase 1 (with pre-numbered paper book SOP in 0-bar dead zones); Phase 2 native Android app adds offline SQLite auto-sync & biometric unlock. |
+| **Customer / Chit Subscriber** | **Web Portal (Phase 1 Mobile Browser)** | **Mobile App (Phase 2, ADR-26)** | Bilingual (Tamil + English) passbook, 1-tap direct NPCI UPI intent to KVB (`ADR-19`), dividend tracker, auction results. |
+| **Auditor (Chartered Accountant)** | **Web Portal** (`apps/web`) | — | Read-only forensic general ledgers, Form XXII physical Cash Book, Form XXI Ledgers, Form XVII Minutes, Day Book, and printable A4/A5 PDFs (internal system audit logs `GET /reports/audit-logs` & BullMQ queues are `SUPER_ADMIN` only per Guardrail 11). |
 
 ---
 
@@ -94,9 +94,9 @@ flowchart LR
 3. **Evening Field Cash Handover**:
    - **Collector**: Field agent submits daily collection tally on **Mobile** (`apps/mobile`).
    - **Acknowledger**: Partner physically counts cash at branch counter and taps **"Acknowledge Cash Received"** on **Mobile** or **Web** (`collector_user_id != acknowledger_user_id`).
-4. **Payment Reversals**:
-   - **Maker**: Partner A or Accountant requests reversal with mandatory justification on **Web** or **Mobile**.
-   - **Checker**: Partner B reviews ledger impact and approves on **Web** or **Mobile**.
+4. **Payment Reversals (`KFC-SEC-001` Two-Partner Dual Control)**:
+   - **Maker**: **Partner A (`SUPER_ADMIN` with `isPartner: true` strictly)** requests reversal with mandatory justification (`ACCOUNTANT` and `BRANCH_MANAGER` are blocked `403`).
+   - **Checker**: Independent **Partner B (`isPartner: true`, `maker != checker`)** reviews ledger impact and approves or rejects.
 
 ---
 
@@ -111,52 +111,69 @@ The Web Portal is the high-density workstation for office administration, accoun
 - **Data Fetching & Server Cache**: **TanStack React Query v5** (optimistic updates, automatic cache invalidation).
 - **Client State**: **Zustand** (sidebar state, active branch filter, modal states).
 - **Form Handling & Validation**: **React Hook Form** + **Zod** (schemas mirroring backend NestJS DTOs).
-- **Data Visualization**: **Recharts** (daily cash collection trends, arrear aging distribution).
-- **PDF Generation & Printing**: Native HTML5 print stylesheet (`@media print`) + `@react-pdf/renderer` for bilingual client-side receipts.
+- **Internationalization (`next-intl`)**: Full English (`en.json`) & Tamil (`ta.json`) localization with **100% key parity across 14 namespaces** (`auth`, `navigation`, `dashboard`, `chits`, `auctions`, `installments`, `collections`, `disbursements`, `reversals`, `reports`, `users`, `customers`, `settings`, `common`) and Google Noto Sans Tamil typography.
+- **Data Visualization**: **Recharts** (dynamically code-split via `next/dynamic` with `ssr: false`).
+- **PDF Generation & Printing**: Native HTML5 print stylesheet (`@media print` + dedicated `/print/receipt/[id]` and `/print/voucher/[id]` routes) + server-side `PDFKit` binary blob streaming via [`lib/pdf-download.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/pdf-download.ts) (`/bff/api/v1/pdf/*`). Zero client-side `@react-pdf/renderer` dependency.
 
-### 4.2 Web Portal Route & Screen Catalog
+### 4.2 Web Portal Route & Screen Catalog (35 Live `page.tsx` Routes)
 
 ```text
 apps/web/src/app/
 ├── (auth)/
 │   ├── login/page.tsx                     # 10-digit Phone/Password login
-│   └── 2fa/page.tsx                       # RFC 6238 Microsoft Authenticator TOTP verification
+│   ├── 2fa/page.tsx                       # RFC 6238 Microsoft Authenticator TOTP verification
+│   └── onboarding/page.tsx                # Forced first-login password setup (F16 / kc_onboarding_token)
 ├── (dashboard)/
-│   ├── layout.tsx                         # Sidebar, Topbar with branch badge, Profile, Inactivity timer
-│   ├── page.tsx                           # Executive Dashboard (Cash pulse, arrear alerts, Form XVII countdown)
+│   ├── layout.tsx                         # Sidebar, Topbar with branch badge, Profile, SessionInactivityGuard
+│   ├── page.tsx                           # Executive Dashboard (Cash pulse, arrear alerts, 8-queue approvals)
+│   ├── admin/
+│   │   └── jobs/page.tsx                  # BullMQ Queue Monitor & cron controls (SUPER_ADMIN strictly)
+│   ├── instructions/page.tsx              # Bilingual operational SOP & persona guidance
 │   ├── schemes/
-│   │   ├── page.tsx                       # Active & Draft Chit Scheme list
+│   │   ├── page.tsx                       # Active, Draft & Cancelled Chit Scheme list
 │   │   ├── new/page.tsx                   # Fresh scheme creation wizard (4% commission, sanction order)
 │   │   ├── [id]/page.tsx                  # Scheme details, ticket roster, auction schedule
-│   │   └── onboard/page.tsx               # Mid-Cycle Physical Notebook Onboarding Grid (400-cell spreadsheet)
+│   │   ├── [id]/defaulters/page.tsx       # Scheme-specific defaulter removal & substitution desk
+│   │   └── onboard/page.tsx               # Mid-Cycle Physical Notebook Onboarding Grid
 │   ├── customers/
 │   │   ├── page.tsx                       # Customer directory with Tamil name search
 │   │   ├── new/page.tsx                   # Lightweight intake (Name, Phone, Address, Nominee)
-│   │   └── [id]/page.tsx                  # Customer 360 profile, subscribed tickets, digital passbook
+│   │   └── [id]/page.tsx                  # Customer 360 profile, subscribed tickets, KYC & passbook
 │   ├── auctions/
 │   │   ├── page.tsx                       # Scheduled & completed auction list
+│   │   ├── live/page.tsx                  # Live auction room landing / selector
+│   │   ├── [id]/page.tsx                  # Auction detail, minutes & correction workflow
 │   │   └── [id]/live/page.tsx             # In-Office Auction Console (1/4 ceiling validator, Option A tie-break)
 │   ├── disbursements/
 │   │   ├── page.tsx                       # Prize payouts pending verification & authorization
 │   │   └── [id]/voucher/page.tsx          # Safety Proof Checklist (Agreements/Cheques) + Voucher Auth
 │   ├── collections/
-│   │   ├── page.tsx                       # Daily agent collection logs & route tracking
+│   │   ├── page.tsx                       # Daily agent collection logs & UPI claims verification desk
 │   │   └── handover/page.tsx              # Evening Cash Handover verification & vault sign-off
 │   ├── reversals/
-│   │   └── page.tsx                       # Payment reversal requests & Maker-Checker approval table
+│   │   └── page.tsx                       # Payment reversal requests & Two-Partner Maker-Checker table
 │   ├── branches/
 │   │   ├── page.tsx                       # Company branch directory (PRD, ERD) with active status
 │   │   └── new/page.tsx                   # Branch creation console with bilingual Tamil name
 │   ├── users/
-│   │   ├── page.tsx                       # Staff user administration, RBAC role assignment & status toggle
-│   │   └── new/page.tsx                   # Staff onboarding console with branch link & temporary password
+│   │   ├── page.tsx                       # Staff user administration, RBAC roles, isPartner & status toggle
+│   │   └── new/page.tsx                   # Staff onboarding console with random temp password (F16)
 │   └── reports/
 │       ├── page.tsx                       # Statutory reports index
-│       ├── cash-book/page.tsx             # Form XXII Chit Cash Book (12-column daily ledger)
+│       ├── cash-book/page.tsx             # Form XXII Physical Cash Book
 │       ├── minutes/page.tsx               # Form XVII Auction Minutes with Registrar filing status
 │       ├── ledger/page.tsx                # Form XXI Subscriber Ledger
-│       └── audit-logs/page.tsx            # Immutable append-only audit trail viewer
+│       ├── defaulters/page.tsx            # Company-wide Defaulters & Arrears Aging Register
+│       └── audit-logs/page.tsx            # Immutable append-only audit trail viewer (SUPER_ADMIN only)
+└── print/
+    ├── receipt/[id]/page.tsx              # Print-optimized bilingual subscription receipt view
+    └── voucher/[id]/page.tsx              # Print-optimized bilingual prize payout voucher view
 ```
+
+### 4.3 Localization, Accessibility (WCAG 2.1 AA) & Automated Web Test Coverage
+- **Bilingual Parity**: `en.json` and `ta.json` maintain 100% key parity across all 14 namespaces verified by `apps/web/test/bilingual-i18n.spec.ts`, with persistent top-bar language toggle.
+- **WCAG 2.1 AA Compliance**: Minimum `4.5:1` contrast ratios on status pills/buttons/inputs, complete keyboard tab order & focus rings across modals and auction bid controls, and semantic ARIA attributes (`aria-expanded`, `aria-haspopup`, `aria-live`, `role="alert"`).
+- **Verified Web Test Suites**: **376 / 376 passing unit/integration tests across 14 Node test suites** (`apps/web/test/*.spec.ts` covering BFF API client, RBAC navigation, 8-queue approvals store, i18n parity, auction room & finalization, audit register, schemes wizard, 18m/20m inactivity guard, TOTP MFA, UPI claims desk, and Module 7/10 reports security) plus Playwright E2E Suites 00–11 in `apps/web/e2e/`.
 
 ---
 
@@ -175,11 +192,13 @@ apps/web/src/app/
 
 ---
 
-## 5. Mobile Application Architecture (`apps/mobile/`)
+## 5. Mobile Application Architecture (`apps/mobile/` — Core SDK Phase 1 / UI Phase 2, ADR-26)
 
-The Mobile Application is the portable, offline-resilient operational tool for Field Agents, Customers, and the 4 Partners.
+> **Phase Split (`ADR-26`)**:
+> - **Phase 1 Implemented & Verified (`apps/mobile/lib/core/`)**: Typed 64-bit `int` OpenAPI Dart models (`core/api/models/api_models.dart`), single-flight 401 refresh mutex client (`core/api/client/auth_interceptor.dart`, `api_client.dart` — `F14`), and offline SQLite synchronization engine (`core/offline/offline_database.dart`, `offline_dues_repository.dart`, `offline_sync_manager.dart`, `offline_models.dart`) — verified with `dart analyze` (0 issues) and **6 / 6 Dart test suites passing**.
+> - **Phase 2 Deferred Blueprint (Q2 2027, `ADR-26`)**: Flutter Android UI screens (`lib/features/*`), Android Keystore biometric bindings, and APK packaging.
 
-### 5.1 Tech Stack
+### 5.1 Planned Phase 2 UI Tech Stack & Phase 1 Core SDK
 - **Framework**: **Flutter 3.x** with **Dart** (Android-first).
 - **Architecture**: Feature-First Clean Architecture (Presentation $\to$ Domain $\to$ Data).
 - **State Management**: **Riverpod** (compile-safe dependency injection & reactive state).
@@ -225,7 +244,7 @@ apps/mobile/lib/
 To eliminate duplicate business logic between the Web Portal (TypeScript) and Mobile App (Dart), the monorepo adheres to **3 sharing principles**:
 
 1. **Backend as the Authoritative Spec**:
-   - [`apps/api/`](../03-architecture/api-spec.md) publishes live OpenAPI 3.0 specifications ([`openapi-spec.json`](../03-architecture/openapi-spec.json), `115` paths / `121` operations) directly from NestJS DTOs via `pnpm run codegen:spec` ([`apps/api/scripts/codegen/export-openapi.ts`](../../apps/api/scripts/codegen/export-openapi.ts)). All union, nullable, dynamic object, and array DTO properties declare explicit `@ApiProperty` / `@ApiPropertyOptional` metadata (`type: String`/`Number`/`Boolean`, nested DTO refs, `{ type: 'object', additionalProperties: true }`, or typed `{ type: 'array', items: ... }`) so generated schemas contain zero bare `Record<string, never>` objects or `unknown[][]` double arrays.
+   - [`apps/api/`](../03-architecture/api-spec.md) publishes live OpenAPI 3.0 specifications ([`openapi-spec.json`](../03-architecture/openapi-spec.json), **123** paths / **129** operations; **134** total live NestJS controller operations) directly from NestJS DTOs via `pnpm run codegen:spec` ([`apps/api/scripts/codegen/export-openapi.ts`](../../apps/api/scripts/codegen/export-openapi.ts)). All union, nullable, dynamic object, and array DTO properties declare explicit `@ApiProperty` / `@ApiPropertyOptional` metadata (`type: String`/`Number`/`Boolean`, nested DTO refs, `{ type: 'object', additionalProperties: true }`, or typed `{ type: 'array', items: ... }`) so generated schemas contain zero bare `Record<string, never>` objects or `unknown[][]` double arrays.
    - TypeScript frontend types for `@kumaran/api-client` and `apps/web/` are generated directly from `openapi-spec.json` using `openapi-typescript` via `pnpm run codegen:ts` ([`packages/api-client/src/generated/api-types.ts`](../../packages/api-client/src/generated/api-types.ts)).
    - All Web UI pages and components route `/api/v1/*` JSON requests and PDF binary downloads through [`apiClient`](../../apps/web/src/lib/api-client.ts) + [`unwrapApiResponse`](../../apps/web/src/lib/api-client.ts) (with shared blob helper [`pdf-download.ts`](../../apps/web/src/lib/pdf-download.ts) using `parseAs: 'blob'`), restricting native `fetch()` strictly to Next.js BFF server handlers, `/api/auth/*` cookie routes, presigned S3 PUT uploads (`direct-upload.ts`), and SSE streams (`use-approvals-stream.ts`).
    - Dart models for `apps/mobile/` are generated directly from `openapi-spec.json` using `pnpm run codegen:dart` ([`scripts/generate-dart-api.ts`](../../scripts/generate-dart-api.ts) -> [`apps/mobile/lib/core/api/models/api_models.dart`](../../apps/mobile/lib/core/api/models/api_models.dart)), kept in sync with concrete payloads in [`api-request-response-catalog.md`](../03-architecture/api-request-response-catalog.md), and verified via [`apps/api/test/unit/client-contract.spec.ts`](../../apps/api/test/unit/client-contract.spec.ts).
@@ -247,10 +266,10 @@ To eliminate duplicate business logic between the Web Portal (TypeScript) and Mo
 
 | Guardian | Web Portal (`apps/web`) | Mobile App (`apps/mobile`) |
 |---|---|---|
-| **Authentication Token** | **BFF + HttpOnly Cookie Architecture (ADR-20)**: Stored in secure `HttpOnly`, `SameSite=Lax`, `Secure` cookies (`kc_access_token`, `kc_refresh_token`). **Zero secret tokens in client-accessible JavaScript or localStorage**, completely eliminating XSS token theft. | Stored in encrypted Android Keystore via `flutter_secure_storage`. |
-| **Server-Side Edge Guard** | **Next.js 15 Edge Middleware** (`src/middleware.ts`): Intercepts requests before HTML generation. Unauthenticated visitors to `/(dashboard)/*` are redirected via HTTP 307 with 0ms latency and **zero Flash of Unauthenticated Content (FOUC)**. | Native Android splash check & biometric prompt before rendering dashboard activity. |
-| **Two-Factor Authentication** | Mandatory RFC 6238 TOTP via **Microsoft Authenticator** for office staff. | 6-digit cryptographic MPIN + Android BiometricPrompt (Fingerprint). |
-| **Session Inactivity** | 20-minute client-side inactivity timer with automatic session termination. | App backgrounding locks screen; requires biometric touch to resume. |
+| **Authentication Token** | **BFF + HttpOnly Cookie Architecture (ADR-20)**: Stored in `HttpOnly; SameSite=Lax; Path=/` protocol-aware `Secure` cookies (`kc_access_token` 15m, `kc_refresh_token` 7d, `kc_totp_pending_token` 5m, `kc_onboarding_token` 15m). **Zero secret tokens in client-accessible JavaScript or localStorage**, completely eliminating XSS token theft. | Phase 1 Dart Core SDK (`AuthSessionManager` `F14`); Phase 2 encrypted Android Keystore via `flutter_secure_storage`. |
+| **Server-Side Edge Guard** | **Next.js 15 Edge Middleware** (`src/middleware.ts`): Intercepts requests before HTML generation (`jose` HS256). Unauthenticated visitors to `/(dashboard)/*` or `/print/*` redirect via HTTP 307 with 0ms latency and **zero Flash of Unauthenticated Content (FOUC)**. | Phase 2 native Android splash check & biometric prompt. |
+| **Two-Factor Authentication** | Mandatory RFC 6238 TOTP via **Microsoft Authenticator** (`kc_totp_pending_token` 5m) + forced first-login password setup (`kc_onboarding_token` 15m, `F16`). | 6-digit cryptographic MPIN + Phase 2 Android BiometricPrompt (Fingerprint). |
+| **Session Inactivity** | [`SessionInactivityGuard`](file:///u:/Kumaran-finance/apps/web/src/components/security/session-inactivity-guard.tsx): **18-minute warning modal (120s countdown)** and **20-minute automatic hard logout**, multi-tab synchronized. | Phase 2 background screen lock with biometric resume. |
 | **Maker-Checker UI Guard** | Buttons for "Finalize Auction", "Authorize Payout", and "Approve Reversal" are disabled if `current_user_id == maker_user_id`. | Approval cards display *"You initiated this action (Maker) — awaiting another partner's authorization"*. |
 | **Network Security** | Enforced TLS 1.3 / HTTPS; Content Security Policy (CSP) blocking unauthorized scripts. | SSL Pinning against backend API public key certificate. |
 
@@ -296,7 +315,7 @@ flowchart TD
 ### 3. Request Flooding Prevention & Query Cancellation
 - **Debounced Inputs**: Search bars across Schemes, Customers, and Collections use `useDebounce(input, 300)`.
 - **AbortSignal Query Cancellation**: All TanStack `queryFn` implementations accept `{ signal }` and forward it to `apiClient` and native `fetch`. Rapid keystrokes cancel pending in-flight HTTP requests automatically.
-- **SSE-Aware Approvals Polling**: `useApprovalsStream` conditions background HTTP polling on SSE health: `refetchInterval: isConnected ? false : 30_000`, eliminating redundant server load when the real-time event stream is healthy.
+- **SSE-Aware & Role-Gated Approvals Polling (`DEF-M10-WEB-01..02`)**: `useApprovalsStream` gates both HTTP polling and SSE connections behind `canQueryDashboardReports` (eliminating 403 polling loops for `COLLECTION_AGENT`), conditions fallback HTTP polling on SSE health (`refetchInterval: isConnected ? false : 30_000`), tracks all **8** approval queues inside `approvals-store`, invalidates React Query caches on SSE updates, and binds dashboard UI selectors via `useShallow`.
 
 ### 4. Main-Thread UI Freezing Prevention
 - **Asynchronous Chunked CSV Export**: High-volume ledger exports (1,000+ rows) use `downloadCsvAsync` with 500-row batching. Each batch yields to the browser macro-task queue via `await new Promise((resolve) => setTimeout(resolve, 0))`, keeping the UI responsive without frame drops.

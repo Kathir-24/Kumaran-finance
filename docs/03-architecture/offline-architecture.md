@@ -15,7 +15,7 @@ If you need to quickly recall how the offline feature works in Kumaran Chits:
 | **Rural Doorstep Collections** | `POST /api/v1/collections/sync-offline-queue` (Batch of 1 to 100 items) | PostgreSQL 17 (`Payment`, `InstallmentDue`, `Receipt`) | Client-generated UUID `idempotencyKey` prevents duplicate payments on network retries. | ✅ **100% Implemented & Tested**<br>([`apps/mobile/lib/core/offline/`](file:///u:/Kumaran-finance/apps/mobile/lib/core/offline/)) |
 | **Partial Failure Isolation** | Split response envelope `{ synced: [...], failed: [...] }` | Application Service ([`collection.service.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts)) | An invalid item (e.g. already paid at office) does not fail the rest of the batch. | ✅ **100% Implemented & Tested** |
 | **Exact Rupee Match** | Enforced before database commit | PostgreSQL 17 (`InstallmentDue.netPayableAmount`) | ADR-07: Exact $I_{net}$ matching; partial payments strictly rejected (`PARTIAL_PAYMENTS_NOT_ALLOWED`). | ✅ **100% Implemented & Tested** |
-| **Evening Vault Deposit** | `POST /collections/cash-handover/submit`<br>`POST /collections/cash-handover/acknowledge` | PostgreSQL 17 (`Payment.cashHandoverStatus`, `CashHandover`) | Non-Negotiable Hard Guard: `collector_user_id != acknowledger_user_id` (Partner signs into safe). | ✅ **100% Implemented & Tested** |
+| **Evening Vault Deposit** | `POST /collections/cash-handover/submit`<br>`POST /collections/cash-handover/acknowledge` | PostgreSQL 17 (`Payment.cashHandoverStatus`, `cashHandoverAcknowledgedByUserId`, `cashHandoverAcknowledgedAt`) | Non-Negotiable Hard Guard (`chk_payment_cash_handover_maker_checker`): `collector_user_id != acknowledger_user_id` (`SUPER_ADMIN`, `BRANCH_MANAGER`, or `ACCOUNTANT` signs cash into safe). | ✅ **100% Implemented & Tested** |
 | **In-Office Physical Auctions** | Paper token draw (Option A) + Post-connectivity entry | PostgreSQL 17 (`Auction`, `AuctionMinutes`) | ADR-05 & ADR-06: Broadband failure does not stop the auction; Foreman draws physical brass tokens. | ✅ **100% Implemented & Tested** |
 | **Redis Offline Fallback** | In-Memory `Map<string, OtpSessionRecord>` in [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Node.js Process Memory | Identical 300s TTL and 3-attempt brute-force lockout if Redis container is offline. | ✅ **100% Implemented & Tested** |
 
@@ -65,11 +65,11 @@ sequenceDiagram
     Mobile->>Mobile: Remove synced items from SQLite; flag failed items for review
 
     Note over FieldAgent,Partner: EVENING (05:00 PM): Physical Cash Handover into Safe
-    FieldAgent->>API: POST /collections/cash-handover/submit ({ paymentIds, totalAmount })
+    FieldAgent->>API: POST /collections/cash-handover/submit ({ paymentIds, notes })
     Partner->>Partner: Physically counts currency notes and coins
-    Partner->>API: POST /collections/cash-handover/acknowledge ({ handoverId })
-    Note over API: STRICT GUARD: collector_user_id != acknowledger_user_id
-    API->>DB: UPDATE Payment cashHandoverStatus = 'ACKNOWLEDGED'
+    Partner->>API: POST /collections/cash-handover/acknowledge ({ collectorUserId, acknowledgedAmount, paymentIds })
+    Note over API: STRICT GUARD (SUPER_ADMIN / BM / ACCOUNTANT): collector_user_id != acknowledger_user_id
+    API->>DB: UPDATE Payment cashHandoverStatus = 'ACKNOWLEDGED', cashHandoverAcknowledgedAt = NOW()
 ```
 
 ---
@@ -140,11 +140,11 @@ When an individual item fails, the batch is not terminated. The failed item is i
 | `INSTALLMENT_ALREADY_PAID` | Subscriber already settled this month's due (e.g. paid at office counter or online while agent was in field). | The payment is rejected; the agent returns physical cash to the subscriber. |
 | `PARTIAL_PAYMENTS_NOT_ALLOWED` | Amount collected does not match `due.netPayableAmount` ($I_{net} = I_{base} - Div$). | ADR-07 invariant violation; agent must collect the exact whole-rupee net due. |
 | `TICKET_NOT_FOUND` | Ticket UUID is invalid or corrupted. | Agent refreshes assigned list. |
-| `CHIT_NOT_ACTIVE` | Chit group is in `DRAFT`, `TERMINATED`, or `COMPLETED` status. | Collections cannot be recorded on inactive schemes. |
+| `CHIT_NOT_ACTIVE` | Chit group is in `DRAFT`, `REGISTERED`, `COMPLETED`, `CLOSED`, or `CANCELLED` status. | Collections cannot be recorded on inactive schemes. |
 | `TICKET_REMOVED` | Subscriber was removed under ADR-07 (3 consecutive months of arrears). | Defaulter settlement SOP must be initiated at Head Office. |
 | `DUE_NOT_FOUND` | Installment due has not been generated for the target month. | Scheme administrator generates monthly dues. |
 
-### 3.3 Core Batch Service Logic ([`collection.service.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L544-L625))
+### 3.3 Core Batch Service Logic ([`collection.service.ts`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L801-L940))
 
 ```typescript
 async syncOfflineQueue(
@@ -227,26 +227,31 @@ Every offline cash collection commits to PostgreSQL with:
 
 At 05:00 PM, the physical cash must be transferred to the Head Office vault safe:
 1. **Agent Submits Handover** (`POST /api/v1/collections/cash-handover/submit`):
-   - Tallies all cash collected during the day.
-   - Generates a pending `CashHandover` batch.
-2. **Partner Acknowledges Cash into Safe** (`POST /api/v1/collections/cash-handover/acknowledge`):
-   - Partner physically counts physical currency notes and coins.
-   - Signs off in the software.
-   - **Hard Invariant Enforced**:
+   - Tallies all unacknowledged `PENDING_HANDOVER` cash payments collected by the agent during the day (tracked directly on `Payment.cashHandoverStatus`; zero separate `CashHandover` table).
+2. **Independent Vault Checker Acknowledges Cash into Safe** (`POST /api/v1/collections/cash-handover/acknowledge`, `@Roles(SUPER_ADMIN, BRANCH_MANAGER, ACCOUNTANT)`):
+   - Partner, Branch Manager, or Desk Accountant physically counts currency notes and coins and submits `{ collectorUserId, acknowledgedAmount, paymentIds }`.
+   - **Hard Invariant Enforced ([`collection.service.ts:498`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts#L498) & PostgreSQL `chk_payment_cash_handover_maker_checker`)**:
      ```typescript
      if (dto.collectorUserId === acknowledgerUserId) {
        throw new ForbiddenException(
-         'Dual-Control Separation of Duties Violated: The field agent who collected the cash cannot acknowledge or sign off on their own cash handover into the branch vault (collector_user_id != acknowledger_user_id)'
+         'DUAL_CONTROL_VIOLATION: The field agent who collected the cash cannot acknowledge their own handover batch. An independent Cashier or Partner must count and verify currency notes.',
        );
      }
      ```
-   - All included payments transition to `cashHandoverStatus = 'ACKNOWLEDGED'` and the branch vault balance in Form XXII increases.
+   - All included payments transition to `cashHandoverStatus = 'ACKNOWLEDGED'` with `cashHandoverAcknowledgedAt` stamped, entering the branch safe balance in Form XXII (`DEF-M10-STAT-01`).
 
 ---
 
-## 5. Mobile Client Architecture (Upcoming Flutter Implementation in `apps/mobile/`)
+## 5. Mobile Client Core & Phase 1 Field Fallback Protocol (`ADR-26`)
 
-While the backend sync engine is 100% complete and verified, the mobile client application will implement the following on-device components during the frontend phase:
+- **Phase 1 Implemented & Verified — Dart Core Offline Engine (`apps/mobile/lib/core/offline/`)**:
+  - [`offline_database.dart`](file:///u:/Kumaran-finance/apps/mobile/lib/core/offline/offline_database.dart), [`offline_dues_repository.dart`](file:///u:/Kumaran-finance/apps/mobile/lib/core/offline/offline_dues_repository.dart), [`offline_sync_manager.dart`](file:///u:/Kumaran-finance/apps/mobile/lib/core/offline/offline_sync_manager.dart), and [`offline_models.dart`](file:///u:/Kumaran-finance/apps/mobile/lib/core/offline/models/offline_models.dart) implement the full local SQLite queue, UUIDv4 idempotency persistence, batch `POST /api/v1/collections/sync-offline-queue` + single-item `/collections/record` fallback, and `AuthSessionManager` single-flight refresh (`F14`), verified by **6 / 6 Dart test suites**.
+- **Phase 2 Deferred — Native Flutter Android UI & APK (`ADR-26`, Q2 2027)**: Native Android UI screens, `connectivity_plus`, and `workmanager` UI bindings are deferred to Phase 2 per business owner directive.
+
+### 5.1 Phase 1 Field Operational Fallback Protocol (Rural Erode Dead Zones)
+Across rural hamlets around **Perundurai, Chennimalai, Bhavani, and Uthukuli**, while the native Android UI is deferred to Phase 2, field collection agents operate using two approved Phase 1 methods:
+1. **Mobile Web Browser Mode**: Agents access the responsive Next.js Web Portal (`apps/web`) via Chrome on Android smartphones wherever 4G data is available.
+2. **Pre-Numbered Physical Receipt Book SOP (0-Bar Dead Zones)**: In cellular dead zones, agents record cash in their physical pre-numbered carbon-copy receipt book and sign the customer's physical paper passbook (`ADR-11`). Upon returning to network coverage or Head Office, the agent or desk accountant enters those receipts into the Web Portal before evening vault handover.
 
 ```mermaid
 flowchart TD
@@ -280,7 +285,7 @@ flowchart TD
 
 ### 6.1 Unit Test Proof ([`apps/api/test/unit/collection.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/collection.spec.ts))
 
-Ran 16 tests covering the entire collection module with **100% pass rate**:
+Verified **34 / 34 tests passing** covering the entire collection, offline sync, concurrency lock, same-branch idempotency isolation (`F09`), and dual-control cash handover module (within the 1,226-test API unit baseline):
 ```bash
 $ pnpm --filter api test test/unit/collection.spec.ts
 
@@ -289,21 +294,21 @@ PASS apps/api/test/unit/collection.spec.ts
     ✓ 1. Doorstep Cash Collection Recording (POST /collections/record)
     ✓ 2. Invariant Guard: Exact Net Installment Matching (ADR-07)
     ✓ 3. Invariant Guard: Zero Double Payments (ADR-07)
-    ✓ 4. Idempotency & Deduplication Guard
+    ✓ 4. Idempotency & Same-Branch Isolation Guard (F09)
     5. Offline Queue Batch Synchronization (POST /collections/sync-offline-queue)
-      ✓ should successfully sync batch of offline collections and return receipts (28 ms)
-      ✓ should handle idempotent re-submission cleanly by returning existing receipt (isDuplicate = true) (14 ms)
-      ✓ should provide partial success isolation when one item succeeds and others fail (31 ms)
+      ✓ should successfully sync batch of offline collections and return receipts
+      ✓ should handle idempotent re-submission cleanly by returning existing receipt (isDuplicate = true)
+      ✓ should provide partial success isolation when one item succeeds and others fail
     6. BullMQ Notification Queue Hookup
-      ✓ should enqueue collection receipt job to notification-queue upon successful doorstep collection (19 ms)
+      ✓ should enqueue collection receipt job to notification-queue upon successful doorstep collection
     7. Daily Summary & Evening Cash Handover
-      ✓ should fetch daily collection summary for field agent (16 ms)
-      ✓ should submit cash handover batch and transition status to PENDING_HANDOVER (22 ms)
-      ✓ should acknowledge cash handover and deposit cash into branch vault (25 ms)
-      ✓ should reject cash handover acknowledgment if collector attempts self-signoff (Maker-Checker violation) (12 ms)
+      ✓ should fetch daily collection summary for field agent
+      ✓ should submit cash handover batch and transition status to PENDING_HANDOVER
+      ✓ should acknowledge cash handover and deposit cash into branch vault
+      ✓ should reject cash handover acknowledgment if collector attempts self-signoff (DUAL_CONTROL_VIOLATION)
 
 Test Suites: 1 passed, 1 total
-Tests:       16 passed, 16 total
+Tests:       34 passed, 34 total
 ```
 
 ### 6.2 Live Server Lifecycle 6 Proof ([`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts))

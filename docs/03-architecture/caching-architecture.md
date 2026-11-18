@@ -38,10 +38,10 @@ flowchart TD
         W5["Deterministic queryKeys invalidation graph"]
     end
 
-    subgraph TIER5 ["Tier 5: Mobile Field Agent Offline Cache (SQLite / Drift)"]
+    subgraph TIER5 ["Tier 5: Mobile Offline Cache (Dart Core SQLite Phase 1 / Flutter UI Phase 2, ADR-26)"]
         M1["cached_assigned_dues\n(Pre-cached morning route dues)"]
         M2["offline_collections_queue\n(UUIDv4 Idempotency Key + Offline Cash Collections)"]
-        M3["Background Reconnection Auto-Sync Engine"]
+        M3["offline_sync_manager.dart Auto-Sync Engine"]
     end
 
     TIER1 --> TIER2
@@ -60,15 +60,15 @@ flowchart TD
 | **Tier 1: Edge** | TLS Session Handshakes | Nginx Shared Memory | `86,400s` (1 day) | LRU memory eviction | Full TLS handshake |
 | **Tier 1: Edge** | Financial APIs (`/api/v1/*`) | `Cache-Control` | `0s` (`no-store`) | Always bypassed | Direct upstream |
 | **Tier 1: Edge** | Live SSE Approval Stream | Nginx Buffering | `0s` (`off`) | Instant delivery | Live TCP stream |
-| **Tier 2: Redis** | Master Branch Directory (`cache:master:branches:*`) | Redis `String` (JSON) | `3,600s` (1 hour) | `POST /branches` or update | Fail-open to Postgres |
-| **Tier 2: Redis** | Master Scheme Catalog (`cache:master:schemes:*`) | Redis `String` (JSON) | `1,800s` (30 mins) | Scheme create/update/activate | Fail-open to Postgres |
+| **Tier 2: Redis** | Master Branch Directory (`cache:master:branches:*`) | Redis `String` (JSON) | `3,600s` (1 hour) | `POST /branches` or `PATCH /branches/:id` | Fail-open to Postgres |
+| **Tier 2: Redis** | Master Scheme Catalog (`cache:master:schemes:*`) | Redis `String` (JSON) | `1,800s` (30 mins) | Scheme create/onboard/update/register/activate/cancel/close | Fail-open to Postgres |
 | **Tier 2: Redis** | Presigned S3 URLs (`url:presigned:<key>`) | Redis `String` | `600s` (10 mins) | `StorageService.deleteFile` | Generate fresh S3 URL |
 | **Tier 2: Redis** | Distributed SMS OTP (`auth:otp:<phone>`) | Redis `String` (JSON) | `300s` (5 mins) | Verified or 3 failed attempts | Lockout penalty |
 | **Tier 2: Redis** | SMS Request Cooldown (`auth:otp:cooldown:<phone>`) | Redis `String` | `60s` (1 min) | Natural expiration | Fallback in-memory map |
 | **Tier 2: Redis** | Rate Limiting Windows (`throttle:*`) | Redis Lua | Dynamic (60s–900s) | Natural window sliding | Memory fallback |
 | **Tier 2: Redis** | Executive Dashboard KPIs (`report:dashboard:<branchId|ALL>`) | Redis `String` (BigInt Safe) | `30s` | Payment / Reversal / Handover commit | Fail-open to Postgres |
 | **Tier 2: Redis** | Live Approvals Stream Summary (`report:approvals:<branchId|ALL>`) | Redis `String` | `15s` | Payment / Reversal / Handover commit | Fail-open to Postgres |
-| **Tier 2: Redis** | Daybook Hot-Read Reports (`cache:reports:daybook:<branchId>:<date>`) | Redis `String` (BigInt Safe) | `60s` (1 min) | Payment / Reversal approval commit | Fail-open to Postgres |
+| **Tier 2: Redis** | Daybook Hot-Read Reports (`report:daybook:<branchId|ALL>:<date>`) | Redis `String` (BigInt Safe) | `60s` (1 min) | `ReportService.invalidateReportCaches()` on payment / reversal | Fail-open to Postgres |
 | **Tier 2: HTTP** | Closed Historical Reports (`Day Book`, `Form XXII`) | HTTP `ETag` + `304` | Conditional | Content SHA-256 change | Full JSON serialization |
 | **Tier 4: Web** | Workstation Server State (TanStack Query) | Browser Memory | `staleTime: 60s` | `queryClient.invalidateQueries` | Fresh background fetch |
 | **Tier 5: Mobile** | Assigned Field Dues (`cached_assigned_dues`) | SQLite (Local) | Daily Field Round | Synchronized morning download | Offline inspection |
@@ -95,9 +95,9 @@ flowchart TD
 
 ### 3.3 Daybook & Report Hot-Read Hybrid Caching
 To protect PostgreSQL 17 from query storms during peak morning and closing reconciliation hours when multiple partners, accountants, and branch managers query real-time registers:
-- **Key Pattern**: `cache:reports:daybook:${branchId}:${date}`
+- **Key Pattern**: `report:daybook:${branchId || 'ALL'}:${dateStr}` (with `report:daybook:ALL_BRANCHES:${dateStr}` also evicted on mutation, [`report.service.ts:469,631-645`](file:///u:/Kumaran-finance/apps/api/src/report/report.service.ts#L469)).
 - **TTL**: 60 seconds (prevents cache staleness).
-- **Instant Event Invalidation**: Whenever a payment is collected at the counter, recorded via doorstep sync, or reversed under dual-control checker approval, `PaymentService.invalidateDaybookCache()` executes `DEL` across affected branch keys, ensuring instant sub-10ms response times without serving stale financial balances.
+- **Instant Event Invalidation**: Whenever a payment is collected at the counter, recorded via doorstep sync, or reversed under dual-control checker approval, `ReportService.invalidateReportCaches()` executes `DEL` across affected `report:dashboard:*`, `report:approvals:*`, and `report:daybook:*` keys, ensuring instant sub-10ms response times without serving stale financial balances.
 - **BigInt Serialization**: Financial aggregates containing 64-bit integer BigInts are converted with a designated replacer/reviver schema to maintain whole-rupee precision.
 
 ---
@@ -133,9 +133,9 @@ sequenceDiagram
 
 ---
 
-## 5. Tier 5: Mobile Offline SQLite & Idempotent Collection Queue
+## 5. Tier 5: Mobile Offline SQLite & Idempotent Collection Queue (`apps/mobile/lib/core/offline/` — Dart Core Phase 1 / UI Phase 2, `ADR-26`)
 
-Field collection agents collect subscription payments in rural areas with intermittent cellular reception around Perundurai and Erode.
+Field collection agents collect subscription payments in rural areas with intermittent cellular reception around Perundurai and Erode. The Dart Core SQLite engine (`apps/mobile/lib/core/offline/`) is implemented and verified in Phase 1 while native Flutter Android UI screens are deferred to Phase 2 (`ADR-26`).
 
 ### 5.1 SQLite Local Database Schema
 
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS offline_collections_queue (
 
 ### 5.2 Idempotency & Conflict Resolution Invariants
 1. **UUIDv4 Idempotency Key**: Generated on the agent's Android device at the exact millisecond the customer hands over cash. It is never regenerated on retry.
-2. **Server Deduplication**: When connectivity restores and the sync engine posts the queued items to `/api/v1/collections`, the backend validates the `Idempotency-Key` header. If the transaction was already processed, the backend returns HTTP 200/409 with the existing receipt number, preventing duplicate collections.
+2. **Server Deduplication**: When connectivity restores and `OfflineSyncManager` (`offline_sync_manager.dart:48,122`) posts queued items to **`POST /api/v1/collections/sync-offline-queue`** (1–100 items, or single-item fallback **`POST /api/v1/collections/record`**), the backend validates `idempotencyKey` (scoped strictly to `recordedByUserId` per `F09`). If the transaction was already processed, the backend returns `isDuplicate: true` with the existing receipt number, preventing duplicate collections.
 3. **Safe Queue Drainage**: An item is deleted from `offline_collections_queue` **only after** the server returns a successful HTTP confirmation.
 
 ---
@@ -251,7 +251,7 @@ When `BranchService.findById` or `ChitService.findOne` encounters a missing ID:
 ## 9. Redis Memory Bounds, `noeviction` Policy & Concurrency Bulkheads (`KFC-INF-001`)
 
 ### 9.1 Redis Memory Ceiling & Queue Preservation
-In production, Redis is shared between master caches, rate limiters, distributed locks, and BullMQ background workers (`notification-queue`, `daily-arrears-queue`).
+In production (`infra/docker/docker-compose.fullstack.yml:44-54`), Redis is shared between master caches, rate limiters, distributed locks, and the 3 BullMQ background queues (**`daily-maintenance-queue`**, **`notification-queue`**, **`reconciliation-queue`** — `queue-names.constant.ts:3-5`, with failed-job retention capped at `500` jobs / `7 days` per `DEF-DB-06`).
 - **Memory Ceiling**: `--maxmemory 512mb` enforces an absolute RAM boundary.
 - **Eviction Policy (`KFC-INF-001`)**: `--maxmemory-policy noeviction` ensures that Redis returns an error rather than evicting keys when the memory limit is reached.
 - **BullMQ Queue Safety**: Per official BullMQ architectural requirements, `noeviction` guarantees that persistent job queues, wait lists, streams, and delayed sets are never evicted under memory pressure, preventing silent job loss or queue state corruption.

@@ -14,7 +14,7 @@ If you need to quickly recall what Redis does in Kumaran Chits:
 | Feature / Domain | Redis Key / Data Structure | Expiry / TTL | Service Responsible | Purpose & Behavior |
 |---|---|---|---|---|
 | **SMS OTP Verification** | `auth:otp:<phone>` (`String` - JSON) | `300s` (5 min) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Stores SHA-256 hashed 6-digit OTP code, 3-attempt lockout counter, user/customer metadata. Purged atomically on verify or lockout. |
-| **High-Throughput JWT Status** | `user:status:<userId>` (`String`) | `120s` (2 min) | [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts), [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts) | Caches user/customer active status (`ACTIVE` / `INACTIVE`) to prevent DB query storm on every authenticated API request. Evicted immediately on status, role, or password mutation. |
+| **High-Throughput JWT Status** | `user:status:<userId>:<clientType>` (`String` - Structured JSON) | `120s` (2 min) | [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts), [`UserService`](file:///u:/Kumaran-finance/apps/api/src/user/user.service.ts) | Device-family scoped JSON cache storing `{ isActive, roles, isPartner, tokenRevokedBeforeMs, sid }` (F03/F04). Legacy plain `'ACTIVE'` strings are treated as cache miss. Evicted across all families on status, role, or password mutation. |
 | **Multi-Device Session Vault** | `auth:session:<userId>:<clientType>` (`String`) | `604,800s` (7 days) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Isolates client-specific refresh token bcrypt hashes across `WEB`, `MOBILE`, and `DESKTOP`. Prevents cross-device refresh token revocation traps while maintaining strict RFC 6819 per-client reuse detection paired with durable PostgreSQL `Session` table. |
 | **Durable Revocation Cutoffs** | `auth:revoked_before:<userId>`<br>`auth:revoked_before:<userId>:<clientType>` (`String`) | `604,800s` (7 days) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts), [`JwtStrategy`](file:///u:/Kumaran-finance/apps/api/src/auth/strategies/jwt.strategy.ts) | Fast-path epoch cutoff rejecting previously issued stateless access JWTs after logout/password reset (`iat <= revokedBefore`), covering the full 7-day refresh lifetime and backed by PostgreSQL `tokenRevokedBefore`. |
 | **MPIN Single-Use Setup Lock** | `auth:consumed_setup_token:<jti>` (`String`) | `600s` (10 min) | [`AuthService`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts) | Atomic `SET NX` key preventing replayed onboarding setup tokens from being consumed multiple times (F01). |
@@ -36,8 +36,8 @@ If you need to quickly recall what Redis does in Kumaran Chits:
 ```mermaid
 flowchart TD
     subgraph CLIENTS ["Clients Tier"]
-        Mobile["Flutter Mobile App\n(Partners, Agents, Customers)"]
-        Web["Next.js Web Portal\n(Accountants, Auditors, Admin)"]
+        Mobile["Mobile Client (Dart Core SDK Phase 1 / Flutter UI Phase 2, ADR-26)"]
+        Web["Next.js 15 Responsive Web Portal (Phase 1 Primary for All Personas)"]
     end
 
     subgraph API ["NestJS 12 API Monolith (Port 3000)"]
@@ -87,12 +87,13 @@ Mobile onboarding for both staff (Agents/Partners) and customers relies on a 6-d
 | `auth:otp:<phone>` | `string` | 300s | Active OTP session with SHA-256 hashed code | JSON `OtpSessionRecord` (attempts counter, entityId, roles) |
 | `auth:otp:cooldown:<phone>` | `string` | 60s | SMS Gateway Flood Throttle | Unix timestamp of issuance |
 | `auth:otp:lockout:<phone>` | `string` | 300s | Brute-force penalty lock | Unix timestamp of lockout trigger |
+| `auth:otp:daily:<phone>` | `integer` | 86,400s (24h) | Daily per-phone SMS OTP quota ceiling | Daily OTP send counter (`auth.service.ts:601`) |
 | `auth:session:<userId>:<clientType>` | `string` | 604,800s (7d) | Concurrent client session token isolation | Bcrypt hash of client-scoped refresh token |
-| `auth:revoked:${userId}` | `string` | 604,800s (7d) | Instant stateless JWT & session revocation cutoff | Unix epoch timestamp (milliseconds), persists full 7-day refresh lifetime (F04) |
+| `auth:revoked_before:<userId>`<br>`auth:revoked_before:<userId>:<clientType>` | `string` | 604,800s (7d) | Instant stateless JWT & session revocation cutoff (`auth.service.ts:1878,1939`; Bull Board also checks `auth:revoked:<userId>`) | Unix epoch timestamp (milliseconds), persists full 7-day refresh lifetime (F04) |
 | `lock:auth:refresh:<sha256>` | `string` | 4,000ms | Concurrent refresh distributed mutex | Random UUID token released via atomic Lua script |
 | `auth:refresh_waiters:<sha256>` | `integer` | 5s | Tracks overlapping in-flight refresh callers | Active waiter counter (`INCR`/`DECR`) |
 | `auth:refresh_inflight_result:<sha256>` | `string` | 4s (deleted on consume) | Contention-only rotated token handoff | JSON `{ accessToken, refreshToken, user }` populated only when waiters > 0 |
-| `user:status:<userId>:<clientType>` | `string` | 120s | Device-family scoped fast-path JWT validation cache | `"ACTIVE"` or `"INACTIVE"` status string (F04) |
+| `user:status:<userId>:<clientType>` | `string` (JSON) | 120s | Device-family scoped fast-path JWT validation cache (`jwt.strategy.ts:43`) | Structured JSON `{ isActive, roles, isPartner, tokenRevokedBeforeMs, sid }` (F03/F04; legacy plain `'ACTIVE'` treated as cache miss) |
 | `throttle:<name>:<key>` | `integer` | Dynamic (e.g. 60s) | Distributed HTTP rate-limiting hit counter | Total request hits in current time window |
 | `throttle:block:<name>:<key>` | `string` | Dynamic (blockDuration) | Temporary block flag for abusive clients | `"1"` (active penalty lock) |
 | `lock:report:<cacheKey>` | `string` | 4,000ms | Cache stampede mutex for Executive Dashboard / Daybook | Random UUID token (`crypto.randomUUID()`) verified by Lua script |
@@ -164,23 +165,23 @@ To prevent architectural degradation and ensure financial integrity, the followi
 
 ## 6. Infrastructure & Connection Details
 
-### 6.1 Docker Configuration ([`docker-compose.yml`](file:///u:/Kumaran-finance/docker-compose.yml))
+### 6.1 Docker Configuration ([`infra/docker/docker-compose.fullstack.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.fullstack.yml#L44-L54) & [`infra/docker/docker-compose.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.yml))
 ```yaml
 chitflow-redis:
   image: redis:7-alpine
   container_name: chitflow-redis
   restart: unless-stopped
-  ports:
-    - '6379:6379'
-  volumes:
-    - redis_data:/data
-  command: redis-server --appendonly yes
-  healthcheck:
-    test: ['CMD', 'redis-cli', 'ping']
-    interval: 10s
-    timeout: 5s
-    retries: 5
+  mem_limit: 640m
+  command:
+    - "redis-server"
+    - "--maxmemory"
+    - "512mb"
+    - "--maxmemory-policy"
+    - "noeviction"      # KFC-INF-001: Mandatory for BullMQ queue integrity (zero silent job eviction)
+    - "--appendonly"
+    - "yes"
 ```
+*(In local dev [`infra/docker/docker-compose.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.yml#L37), port `127.0.0.1:${REDIS_PORT:-6379}:6379` is bound to localhost.)*
 
 ### 6.2 NestJS Connection Provider ([`redis-connection.provider.ts`](file:///u:/Kumaran-finance/apps/api/src/jobs/providers/redis-connection.provider.ts))
 - **Client**: `ioredis`
@@ -220,11 +221,16 @@ $ docker exec chitflow-redis redis-cli TTL "auth:otp:9876543210"
 
 ### Step 3: Brute-Force Lockout & Atomic Deletion Proof
 ```bash
-# After 3 invalid attempts, 4th attempt rejected:
-HTTP/1.1 400 Bad Request
-{"statusCode": 400, "message": "Too many invalid verification attempts. Please request a new OTP."}
+# After 3 invalid attempts, auth:otp:lockout:<phone> is set (EX 300) and subsequent attempt is rejected:
+HTTP/1.1 429 Too Many Requests
+{"statusCode": 429, "message": "Too many failed OTP attempts. Please try again after 5 minutes."}
 
-# Redis key confirmed wiped atomically:
+# Active OTP key confirmed wiped atomically by verifyOtpLua:
 $ docker exec chitflow-redis redis-cli EXISTS "auth:otp:9876543210"
 (integer) 0
 ```
+
+### Step 4: Non-Blocking Chaos Isolation Proofs ([`chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/chaos-network-disconnect.spec.ts))
+- **`CHAOS-REDIS-1` (Redis Crash During Counter Payment)**: Even if Redis drops mid-request, PostgreSQL commits the payment & issues the sequential receipt cleanly while BullMQ degrades silently without failing the cashier transaction (`PASS`).
+- **`CHAOS-SMS-1` (MSG91 Telecom 504 Gateway Timeout)**: Downstream SMS 504 timeouts never roll back or delay PostgreSQL payment commits; jobs retry asynchronously (`PASS`).
+- **`KFC-INF-001` (`noeviction` Verified)**: `redis-cli config get maxmemory-policy` $\to$ `noeviction` (`--maxmemory 512mb`).
