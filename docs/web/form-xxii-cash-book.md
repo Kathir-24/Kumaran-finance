@@ -3,16 +3,16 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Route Path**: `/reports/cash-book` (Form XXII & Day Book), `/reports` (Reports Landing Hub)  
 > **Target Personas**: `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`, `AUDITOR`  
-> **Statutory Law**: Section 23 of Chit Funds Act, 1982 & Tamil Nadu Chit Funds Rules (Form XXII Daily Cash Book)  
-> **Status**: **Verified & Complete** (232/232 passing unit tests, 0 TypeScript errors, clean Next.js 15 build)
+> **Statutory Law**: Section 23 of Chit Funds Act, 1982 & Tamil Nadu Chit Funds Rules (Form XXII Daily Cash Book — `[UNVERIFIED-LEGAL]` pending formal Registrar legal counsel sign-off)  
+> **Status**: **Verified & Complete** (**376/376** passing Web unit tests across 52 spec files / 14 suites; 0 TypeScript errors; clean Next.js 15 build across 35 App Router routes)
 
 ---
 
 ## 1. Overview & Statutory Background
 
-Under **Section 23 of the Chit Funds Act, 1982** and the **Tamil Nadu Chit Funds Rules**, every chit fund foreman must maintain **Form XXII: Daily Cash Book**.
+Under **Section 23 of the Chit Funds Act, 1982** and the **Tamil Nadu Chit Funds Rules**, every chit fund foreman must maintain **Form XXII: Daily Cash Book** *(marked `[UNVERIFIED-LEGAL]` in `ReportController` pending formal Registrar column sign-off)*.
 
-Form XXII tracks the physical currency notes and coins held in the branch safe. It operates alongside the **Multi-Mode Financial Day Book**, which captures all payment modes (`CASH`, `UPI`, `BANK_TRANSFER`, `CHEQUE`) across daily transactions.
+Form XXII tracks the physical currency notes and coins held in the branch safe (`GET /api/v1/reports/form-xxii`). It operates alongside the **Multi-Mode Financial Day Book** (`GET /api/v1/reports/day-book`), which captures all payment modes (`CASH`, `UPI`, `BANK_TRANSFER`, `CHEQUE`) across daily transactions. Both endpoints use `ReportEtagInterceptor` for conditional ETag caching.
 
 ```mermaid
 flowchart TD
@@ -21,7 +21,7 @@ flowchart TD
         AllOutflows["All Outflows (Cash + Bank Payouts)"]
     end
     subgraph FormXXII["Form XXII Physical Cash Safe Isolation"]
-        SafeOpen["Opening Safe Cash (Verified Yesteryear/Prior Close)"]
+        SafeOpen["Opening Safe Cash (Verified Prior Close)"]
         SafeCounter["Counter Cash Inflows (Instant Receipt)"]
         SafeHandover["Doorstep Field Cash (ONLY when Handover ACKNOWLEDGED)"]
         SafeOutflows["Cash Prize Disbursements & Petty Outflows"]
@@ -45,7 +45,7 @@ flowchart TD
   The UI renders a green badge when balanced, or an amber warning if a discrepancy occurs.
 
 ### 2.2 Whole Rupee Standard (Guardrail 2)
-All monetary values are whole-rupee 64-bit integers (`bigint`). Paise and decimals are strictly omitted. Formatting uses `formatRupee(val)` from `@kumaran/api-client` (`₹50,000`, never `₹50,000.00`).
+All monetary values are whole-rupee 64-bit integers (`bigint`). Paise and decimals are strictly omitted. Formatting uses `formatRupee(val)` from `apps/web/src/lib/currency.ts` and `toSafeBigInt` from `apps/web/src/components/reports/report-bigint.ts` (`₹50,000`, never `₹50,000.00`).
 
 ### 2.3 Single-Company Tenancy (Guardrail 1 / ADR-01)
 Zero `company_id` columns or headers. Branch context switching is supported for Head Office Perundurai and regional branches.
@@ -54,15 +54,15 @@ Zero `company_id` columns or headers. Branch context switching is supported for 
 
 ## 3. UI Component Architecture
 
-| Component | File Path | Line Count | Purpose & Features |
-|---|---|:---:|---|
-| **Reports Landing Hub** | `apps/web/src/app/(dashboard)/reports/page.tsx` | 163 | Statutory cards grid: Form XXII, Form XVII, CA Portal, Inactive Dues, Handover. |
-| **Cash Book Orchestrator** | `apps/web/src/app/(dashboard)/reports/cash-book/page.tsx` | 314 | Date/branch navigation, tab switching (Form XXII vs Day Book), CSV export, print trigger. |
-| **Reconciliation Pulse Bar** | `apps/web/src/components/reports/cash-book-kpi-bar.tsx` | 136 | 4 KPI cards (Opening Safe, Inflows, Outflows, Closing Safe) with live mathematical balance check. |
-| **Date & Branch Navigator** | `apps/web/src/components/reports/report-date-navigator.tsx` | 128 | Native date picker, quick presets (Today, Yesterday, Prev/Next Day), branch selector for Super Admin. |
-| **Form XXII 12-Column Table** | `apps/web/src/components/reports/form-xxii-table.tsx` | 270 | Statutory 12-column double-entry split: 6 Receipts columns vs 6 Disbursements columns. |
-| **Multi-Mode Day Book Table** | `apps/web/src/components/reports/day-book-table.tsx` | 311 | Method breakdown bar (Cash/UPI/Bank/Cheque) and unified journal with UTR / Cheque references. |
-| **RFC 4180 CSV Export Utility** | `apps/web/src/lib/csv-export.ts` | 49 | Universal CSV serializer with UTF-8 BOM (`\uFEFF`) and RFC 4180 compliant escaping. |
+| Component | File Path | Purpose & Features |
+|---|---|---|
+| **Reports Landing Hub** | `apps/web/src/app/(dashboard)/reports/page.tsx` | 5 statutory cards grid: Form XXII Cash Book, Form XVII Minutes, Form XXI Subscriber Ledger, Defaulters Register, and Audit Logs (`SUPER_ADMIN` only). |
+| **Cash Book Orchestrator** | `apps/web/src/app/(dashboard)/reports/cash-book/page.tsx` | Date/branch navigation, tab switching (Form XXII vs Day Book), CSV export, print trigger. |
+| **Reconciliation Pulse Bar** | `apps/web/src/components/reports/cash-book-kpi-bar.tsx` | 4 KPI cards (Opening Safe, Inflows, Outflows, Closing Safe) with live mathematical balance check. |
+| **Date & Branch Navigator** | `apps/web/src/components/reports/report-date-navigator.tsx` | Native date picker, quick presets (Today, Yesterday, Prev/Next Day), branch selector for Super Admin. |
+| **Form XXII 12-Column Table** | `apps/web/src/components/reports/form-xxii-table.tsx` | Statutory 12-column double-entry split: 6 Receipts columns vs 6 Disbursements columns. |
+| **Multi-Mode Day Book Table** | `apps/web/src/components/reports/day-book-table.tsx` | Method breakdown bar (Cash/UPI/Bank/Cheque) and unified journal with UTR / Cheque references. |
+| **RFC 4180 CSV Export Utility** | `apps/web/src/lib/csv-export.ts` | Universal CSV serializer with UTF-8 BOM (`\uFEFF`) and RFC 4180 compliant escaping. |
 
 ---
 
@@ -75,7 +75,7 @@ Zero `company_id` columns or headers. Branch context switching is supported for 
 
 ## 5. Automated Test Assertions (`form-xxii-cash-book.spec.ts`)
 
-The automated test suite (`apps/web/test/form-xxii-cash-book.spec.ts`) validates 8 invariants:
+The automated test suite (`apps/web/test/form-xxii-cash-book.spec.ts`) validates 8 invariants within the full verified Web suite (**376/376 passing across 52 spec files / 14 suites**):
 1. **Physical Safe Cash Inflow**: Strictly counts cash receipts and acknowledged doorstep handovers; ignores pending handovers.
 2. **Safe Cash Isolation**: Completely excludes UPI and Bank Transfer payments from Form XXII safe cash.
 3. **Closing Safe Balance Invariant**: Verifies $\text{Closing} \equiv \text{Opening} + \text{Inflows} - \text{Outflows}$ across complex multi-branch entries.
@@ -83,4 +83,4 @@ The automated test suite (`apps/web/test/form-xxii-cash-book.spec.ts`) validates
 5. **RFC 4180 CSV Export**: Escapes commas, quotes, newlines, and prepends UTF-8 BOM (`\uFEFF`).
 6. **Date Navigation**: Correctly traverses Today, Yesterday, and single-day stepping.
 7. **RBAC Authority Gate**: Grants read access to `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER`, `AUDITOR`; denies `COLLECTION_AGENT`.
-8. **100% Bilingual Parity**: Validates 73 translation keys between `messages/en.json` and `messages/ta.json`.
+8. **100% Bilingual Parity**: Validates all **284** leaf keys in the `'reports'` namespace (`1,921` total keys) between `apps/web/messages/en.json` and `ta.json`.
