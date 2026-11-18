@@ -4,7 +4,13 @@
 > **Environment**: Live NestJS 12 Backend (`http://127.0.0.1:3000`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-9.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-9.ts)  
-> **Execution Status**: **100% Passed (9 / 9 Endpoints Verified Live)**
+> **Execution Status**: **100% Passed — HISTORICAL EXECUTION SNAPSHOT (9 / 9 Live Oct 2026 Endpoints Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 2026 live-server run verbatim. Subsequent Module 7 & Module 10 hardening upgraded `ReportController` as follows:
+> 1. **8-Queue Pending Approvals & SSE Hardening (`DEF-RPT-05`, `DEF-M10-SSE-01/02`)**: Pending approvals expanded from 4 to **8 dual-control queues** with post-cache per-caller Guardrail 10/11 flags (`?actionableOnly=true`), `@BypassEnvelope()` on `@Sse('approvals-stream')`, transient `HEARTBEAT` recovery, and `F04`/`F15` mid-stream `Session.sid` & `BRANCH_SCOPE_CHANGED` assertions.
+> 2. **Form XXII, XXI & XVII Statutory Hardening (`DEF-M10-STAT-01..04`, `DEF-RPT-06`)**: Form XXII records approved physical cash reversals as `CASH_PAYMENT_REVERSAL` outflows and aligns `ACKNOWLEDGED` handovers to `cashHandoverAcknowledgedAt` preserving $\text{Opening}(T) \equiv \text{Closing}(T-1)$; Form XXI emits pure-`BigInt` running cumulative totals + `1..N` contiguous grid; Form XVII uses dynamic frozen commission rates, strictly Months $2..N-1$, and IST 21-day Registrar countdowns.
+> 3. **Audit Logs Exclusivity, Redaction & Caching (`Guardrail 11`, `DEF-RPT-04/09`, `DEF-M10-DEF-01`)**: `GET /api/v1/reports/audit-logs` is strictly `SUPER_ADMIN`-only with recursive OWASP API3 payload redaction; Defaulters exclude both `REMOVED_DEF_3M` and `SURRENDERED`; `ReportEtagInterceptor` scopes weak ETags by canonical caller + sorted query params returning RxJS `EMPTY` on `304`.
 
 ---
 

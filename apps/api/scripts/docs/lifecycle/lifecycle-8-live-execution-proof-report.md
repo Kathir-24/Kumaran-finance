@@ -5,7 +5,13 @@
 > **Environment**: Live NestJS 12 Backend (`http://127.0.0.1:3000`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-8.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-8.ts)  
-> **Execution Status**: **100% Passed (8 / 8 Endpoints Verified Live)**
+> **Execution Status**: **100% Passed — HISTORICAL EXECUTION SNAPSHOT (8 / 8 Live Oct 2026 Endpoints Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 6 & Module 9 hardening added:
+> 1. **Two-Stage Month $N$ Settlement (`FIN-B`)**: Added Maker–Checker `POST /api/v1/disbursements/group/:chitGroupId/prepare-final-settlement` and `approve-final-settlement` (preventing unilateral maturity payouts and zero double-collection of settled Month $N$ installments).
+> 2. **Automatic Arrears Offset & TOCTOU Protection (`FIN-A`, `FIN-D`, `KFC-FIN-003`, `KFC-FIN-004`)**: Unpaid subscriber arrears are automatically offset from prize money under acyclic `SELECT FOR UPDATE` locks, `disbursedAmount` overrides fail closed (`PAYOUT_OVERRIDE_NOT_PERMITTED`), and release re-checks `currentArrears === expectedArrears` with `PRIZE_ARREARS_OFFSET_ALLOCATED` audit provenance.
+> 3. **Safety Proof & Dispute Locks (`ADR-15`, `DISB-07/09`, `M9-DUAL-DEF-02`, `ADR-25`)**: `ALLOWED_SAFETY_PROOF_TYPES` strictly rejects `PROPERTY_DEED`, S3 keys are prefix-sandboxed (`safety-proof[s]/{auctionId}/`), `assertNoPendingAuctionCorrection` blocks disbursements during active correction disputes, and `chk_winner_maker_checker` + case-insensitive payout reference uniqueness are enforced at PostgreSQL engine level.
 
 ---
 
@@ -206,58 +212,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
-### Step 7: Checker Authorizes Prize Payout (`POST /api/v1/disbursements/auction/:auctionId/authorize-payout`)
-- **Caller**: Super Admin (Checker: `ebf67759-bf05-4fa6-b653-577b3f144900`)
-- **Request Payload**:
-  ```json
-  {
-    "disbursementMode": "ACCOUNT_PAYEE_CHEQUE",
-    "disbursedAmount": 75000,
-    "notes": "Authorized net prize payout of ₹75,000 via Account Payee Cheque after verifying blank cheques and agreement."
-  }
-  ```
-- **Response**: HTTP 200 OK
-  ```json
-  {
-    "success": true,
-    "statusCode": 200,
-    "data": {
-      "message": "Prize payout voucher authorized successfully. Ready for release and disbursement.",
-      "winner": {
-        "id": "f8ad6728-8281-404a-8cbe-014c2a5e7f8d",
-        "disbursementStatus": "AUTHORIZED_BY_CHECKER",
-        "authorizedByUserId": "ebf67759-bf05-4fa6-b653-577b3f144900"
-      }
-    }
-  }
-  ```
-- **Live PostgreSQL Verification (`AuctionWinner`)**:
-  ```text
-  AUTHORIZED_BY_CHECKER|ACCOUNT_PAYEE_CHEQUE|75000|ebf67759-bf05-4fa6-b653-577b3f144900
-  ```
-
----
-
-### Step 8: Release Payout (`POST /disburse`) & Generate Form XXI Bilingual Voucher
-- **Caller**: Desk Accountant (Maker)
-- **Request Payload**:
-  ```json
-  {
-    "paymentReference": "IOB-CHQ-009182",
-    "disbursedAt": "2026-10-22T17:30:00.000Z",
-    "notes": "Handed over Account Payee Cheque #009182 to prized subscriber in person at Perundurai office counter."
-  }
-  ```
-- **Response**: HTTP 200 OK
-- **Live PostgreSQL Verification (`AuctionWinner`)**:
-  ```text
-  DISBURSED|IOB-CHQ-009182|2026-10-22 17:30:00
-  ```
-- **Voucher Verification (`GET /disbursements/auction/:auctionId/voucher`)**:
-  - `isBilingual: true`
-  - English & Tamil Form XXI prize disbursement receipt voucher generated with ₹75,000 net payout.
-
-### Step 5: Checker Authorizes Prize Payout Voucher (`POST /api/v1/disbursements/auction/:auctionId/authorize-payout`)
+### Step 7: Checker Authorizes Prize Payout Voucher (`POST /api/v1/disbursements/auction/:auctionId/authorize-payout`)
 - **Caller**: Super Admin / Managing Partner (Checker: `ebf67759-bf05-4fa6-b653-577b3f144900`)
 - **Request Payload**:
   ```json
@@ -295,7 +250,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
-### Step 6: Release Prize Payout (`POST /api/v1/disbursements/auction/:auctionId/disburse`)
+### Step 8: Release Prize Payout (`POST /api/v1/disbursements/auction/:auctionId/disburse`)
 - **Caller**: Desk Accountant / Cashier
 - **Request Payload**:
   ```json
@@ -331,7 +286,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
-### Step 7: Bilingual Payout Voucher (`GET /api/v1/disbursements/auction/:auctionId/voucher`)
+### Step 9: Bilingual Payout Voucher (`GET /api/v1/disbursements/auction/:auctionId/voucher`)
 - **Request**: `GET /api/v1/disbursements/auction/a6452114-52d1-4893-a04c-9736a1bee74e/voucher`
 - **Response**: HTTP 200
   ```json
@@ -358,7 +313,7 @@ Lifecycle 8 executes the prize money disbursement and safety proof verification 
 
 ---
 
-### Step 8: Month $N$ Final Maturity Settlement (`POST /api/v1/disbursements/group/:chitGroupId/final-settlement`)
+### Step 10: Month $N$ Final Maturity Settlement (`POST /api/v1/disbursements/group/:chitGroupId/final-settlement`)
 
 - **Regulatory Basis**: Section 16 Chit Funds Act & Architectural Invariant 5.
 - **Rules Verified**:

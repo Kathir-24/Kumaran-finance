@@ -6,7 +6,13 @@
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Observability**: Prometheus Metrics (`/metrics`), Bull Board (`/admin/queues/`), Sentry Diagnostic Probe (`/health/sentry-test`)  
 > **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-11.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-11.ts)  
-> **Execution Status**: **100% Passed (15 / 15 Endpoints Verified Live)**
+> **Execution Status**: **100% Passed — HISTORICAL EXECUTION SNAPSHOT (15 / 15 Live Oct 2026 Endpoints Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP proofs below preserve the authentic October 2026 live-server run verbatim (111/111 baseline endpoints). Subsequent architectural hardening evolved the live surface to **18 controllers / 134 live HTTP & SSE operations (`+1` Bull Board UI `/admin/queues`)**:
+> 1. **Zero Payment Gateway & Notification Scope (`ADR-19`, `ADR-23`, `ADR-26`)**: Settlement reconciliation audits direct KVB UPI claims (zero third-party payment gateway); Phase 1 dispatches **bilingual MSG91 TRAI DLT SMS (`KMRCHT`, zero WhatsApp per `Q34`)** while Android FCM Push activates in Phase 2 (Q2 2027).
+> 2. **Redis Broker & Process Bulkheading (`KFC-INF-001`)**: `chitflow-redis` is pinned to `--maxmemory 512mb --maxmemory-policy noeviction`; `chitflow-api` runs producer-only (`ENABLE_BULLMQ_WORKERS="false"`) and `chitflow-worker` executes consumers (`"true"`).
+> 3. **Metrics & Audit Exclusivity (`XR-M7-MET-01`, Guardrail 11 / `ADR-21`)**: `/metrics` supports constant-time SHA-256 **Bearer (`METRICS_BEARER_TOKEN`) OR RFC 7617 Basic Auth** (strict-by-default fail-closed outside `development`/`test`); `GET /api/v1/jobs/{queue-status,repeatable-schedules,notification-audit-logs}` and `GET /api/v1/reports/audit-logs` are restricted strictly to **`SUPER_ADMIN` only** (`AUDITOR` receives `HTTP 403`).
 
 ---
 
@@ -264,7 +270,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
 ### Step 14: Audit Trails & Registers (Notification & Financial)
 
 #### Step 14A: Outbound Notification Audit Trail (`GET /jobs/notification-audit-logs`)
-- **Caller**: Super Admin / Auditor
+- **Caller**: Super Admin Only *(Guardrail 11 / `ADR-21`; `AUDITOR` receives `HTTP 403`)*
 - **Response**: **HTTP 200**
 - **Dispatched Notification Log Sample**:
   - `channel`: `PUSH_NOTIFICATION`
@@ -273,7 +279,7 @@ Lifecycle 11 represents the final operational layer of the Kumaran Chits enterpr
   - `title`: `Auction Reminder: KC-LIVE-20M-01`
 
 #### Step 14B: Financial Mutation Audit Trail (`GET /reports/audit-logs`)
-- **Caller**: Super Admin / Auditor
+- **Caller**: Super Admin Only *(Guardrail 11 / `ADR-21`; `AUDITOR` receives `HTTP 403`)*
 - **Response**: **HTTP 200**
 - **PostgreSQL Database Verification**:
   - Live query: `SELECT count(*) FROM public."AuditLog"` $\to$ **90 rows verified**.

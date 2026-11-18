@@ -5,7 +5,14 @@
 > **Execution Date**: October 25, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433) $\longleftrightarrow$ Redis 7 $\longleftrightarrow$ MinIO Private S3 (`:9000`)  
 > **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-7.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-7.ts)  
-> **Result**: **8 / 8 Live Steps Passed (100% Request $\to$ Server $\to$ Database $\to$ S3 $\to$ Queue $\to$ Response Verified)**
+> **Result**: **8 / 8 Live Steps Passed — HISTORICAL EXECUTION SNAPSHOT (100% Live Oct 2026 Request $\to$ Server $\to$ Database $\to$ S3 $\to$ Queue $\to$ Response Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 25, 2026 live-server run verbatim. Subsequent Module 5 & Module 8 hardening evolved the live `PaymentController` contract as follows:
+> 1. **Verified Partner Reversal Exclusivity (`KFC-SEC-001` / Guardrail 11 / `ADR-21`)**: `POST /api/v1/payments/:id/request-reversal`, `approve-reversal`, and `reject-reversal` now strictly require **`@Roles(Role.SUPER_ADMIN)` with Verified Partner identity (`isPartner: true`, `assertVerifiedPartner`)** and distinct `maker != checker` (backed by PostgreSQL `CHECK` constraint `chk_reversal_maker_checker`) — Desk Accountants can no longer initiate reversals via API.
+> 2. **Direct KVB UPI Intent & Dual-Control Claims (`ADR-19`)**: Added `GET /api/v1/installments/:dueId/upi-intent`, `POST /api/v1/payments/upi-claim`, and `POST /api/v1/payments/:id/verify-upi-claim` (`submitter != verifier`, branch-scoped, exact $I_{net}$ re-check under row lock).
+> 3. **Sequential Payment, UUID & Arrears Hardening (`DEF-08`, `XR-M8-PAY-08`, `DEF-M8-REV-04`)**: Enforces `PRIOR_INSTALLMENT_UNPAID`, `ParseUUIDPipe` across 6 routes, IST (`Asia/Kolkata`) receipt/daybook keys, and `OVERDUE`-aware due restoration upon reversal.
+> 4. **Receipt PDF Watermark & S3 Pre-Render (`KFC-PDF-001`, `XR-M8-PAY-01`)**: Reversed receipts render the statutory bilingual cancellation banner and diagonal watermark (`ரத்து செய்யப்பட்டது / CANCELLED` at `-35deg`, `#DC2626`), and `JOB_DISPATCH_PAYMENT_RECEIPT` passes `paymentId` for async S3 receipt PDF pre-rendering.
 
 ---
 

@@ -5,7 +5,12 @@
 > **Storage Engine**: MinIO S3 Container (`chitflow-minio`, Port 9000, Bucket: `kumaran-chits-private`)  
 > **Database**: PostgreSQL 17 (`chitflow-db` container, Port 5433, Database `chitflow_dev`)  
 > **Verification Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-10.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-10.ts)  
-> **Execution Status**: **100% Passed (5 / 5 Endpoints Verified Live)**
+> **Execution Status**: **100% Passed — HISTORICAL EXECUTION SNAPSHOT (5 / 5 Live Oct 2026 Endpoints Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP proofs below preserve the authentic October 2026 live-server run verbatim. Subsequent Module 7 hardening upgraded `PdfController`, `PdfService`, and `StorageController` as follows:
+> 1. **Security, Headers & OWASP API3 (`DEF-M7-PDF-05/07`, `R2-PDF-04`, `XR-M7-PDF-01/04`)**: Added `ParseUUIDPipe` across all 4 PDF routes, explicit `SAFE_PDF_CUSTOMER_SELECT` Prisma allowlists, pre-lookup fail-closed Anti-BOLA authorization eliminating 404-vs-403 oracles, sanitized `Content-Disposition`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`, and `COLLECTION_AGENT` no-view storage restrictions.
+> 2. **Statutory PDF Accuracy (`DEF-M7-PDF-01/03/04/06`, `XR-M7-PDF-02/03/05`)**: Pure-`BigInt` EN/TA Rupee-to-Words (lossless beyond $2^{53}-1$), arbitrary-precision frozen `foremanCommissionRate` formatting, canonical `KC-VOU-{BRANCH}-{YEAR}-{GROUP}-{MMMMM}` payout vouchers (replacing legacy UTR-based voucher keys shown in Step 2B), `PRIZE_ARREARS_OFFSET_ALLOCATED` passbook provenance, `KFC-PDF-001` cancelled-receipt banners/watermarks, and strict IST (`Asia/Kolkata`) dates.
 
 ---
 
