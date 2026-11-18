@@ -1,15 +1,15 @@
 # Kumaran Chits — Bilingual Notification & Receipt Templates
 
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Supported Channels**: Customer Physical Paper Passbook (Hand-written & Signed with Pen), Mobile App Push Notifications (Primary ₹0 Cost), Indian DLT SMS (Reserved for OTPs & Keypad Phone Fallback), Bilingual PDF Receipts (Internal Accounting & Dispute Backup), and Digital Passbook.  
-> **Unified Rule (`CONFIRMED-BY-DEVELOPER`)**:
-> 1. **Authentication (Device Login OTP)**: **SMS only** (DLT Template `1407169823412093847`).
-> 2. **All Financial & Operational Events**: Follow a single, elegant **Smart Channel Hierarchy**:
->    - **Smartphone Users (App installed / `fcmToken` present)**: Receive **Free In-App Push Notifications (FCM, ₹0 cost)** deep-linking to the passbook or auction screen.
->    - **Keypad Phone Users (Non-app / No `fcmToken`)**: Fall back to **Telecom DLT SMS**.
-> 3. **WhatsApp Business API**: **Parked / Shelved in V1 (`KFC-NOT-001`, Rule 34)** to eliminate third-party SaaS and per-conversation fees. All code simulation stubs have been completely purged from the codebase; active production delivery channel is Indian DLT SMS (MSG91), with Mobile Push (FCM) deferred with the mobile app.
+> **Supported Channels**: Customer Physical Paper Passbook (Hand-written & Signed with Pen), **Indian TRAI DLT SMS via MSG91 (Sole Active Phase 1 Automated Channel per `ADR-23`)**, Bilingual PDF Receipts (Internal Accounting & Dispute Backup), and Digital Passbook. Mobile App Push Notifications (FCM) remain architected in backend code (`apps/api/src/jobs/services/notification.service.ts`) and are **deferred to Phase 2** alongside Flutter mobile UI (`ADR-26`).  
+> **Unified Rule (`CONFIRMED-BY-DEVELOPER` / `ADR-23` / `ADR-26`)**:
+> 1. **Authentication (Device Login OTP)**: **SMS only** (Header `KMRCHT`, DLT Template `1407169823412093847`).
+> 2. **All Financial & Operational Events**:
+>    - **Phase 1 Production (`ADR-23`)**: Delivered strictly via **Indian TRAI DLT SMS (MSG91)**.
+>    - **Preserved Phase 2 Smart Channel Hierarchy (`notification.service.ts:97-140`)**: Once Flutter Android UI launches (`ADR-26`), smartphone users with `fcmToken` route via **Free In-App Push Notifications (FCM, ₹0 cost)** with automatic **DLT SMS fallback** for keypad phones or pruned tokens.
+> 3. **WhatsApp Business API**: **Purged / Shelved in V1 (`KFC-NOT-001`, Rule 34)** to eliminate third-party SaaS and per-conversation fees. All code simulation stubs have been completely purged from `NotificationService`.
 > 4. **Help Desk & Support**: Handled via **Direct Phone Calls** to Perundurai Head Office (`0424-2223333` / Partner mobiles).
-> 5. **Report Sharing**: Manual on-demand utility (A4 PDF download & Excel/CSV export) for Form XXII, Form XXI, and Handover tallies.
+> 5. **Report Sharing**: Manual on-demand utility (A4/A5 PDF download & Excel/CSV export) for Form XXII, Form XXI, Form XVII, and Handover tallies.
 > **Languages**: English & தமிழ் (Tamil)  
 > **Currency Standard**: All monetary values are strictly in **whole integer Rupees (₹)** (`CONFIRMED-BY-DEVELOPER`).
 
@@ -61,14 +61,24 @@ However, the software generates and archives a computer-generated digital receip
 ### 1.2 Cancelled / Reversed Payment Receipt (`KFC-PDF-001` / `CONFIRMED-BY-DEVELOPER`)
 When a payment is reversed by dual-partner approval (`PaymentStatus === 'REVERSED'`), the PDFKit engine bypasses any pre-reversal cached S3 document and generates a marked invalid receipt:
 - **Header Alert**: Prominent banner `*** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***`
-- **Watermark Specification**:
+- **Watermark Specification (`subscription-receipt.template.ts:219-223`)**:
   - Text: `ரத்து செய்யப்பட்டது / CANCELLED`
-  - Font: 28pt Bold Helvetica
+  - Font: 28pt Bold Unicode (`NotoSansTamil-Bold.ttf`, Helvetica fallback)
   - Color: Crimson Red (`#DC2626`)
-  - Angle: -35° diagonal
-  - Opacity: 0.22 centered across the page
+  - Angle: -35° diagonal (`origin: [209.76, 297.64]`)
+  - Opacity: `0.28` (`fillOpacity(0.28)`) centered across the page
 - **Audit Footer**: Displays reversal timestamp, approving partner ID, and reversal reason.
-- **Cache File**: Stored and retrieved under key `${receiptNumber}-cancelled.pdf` to guarantee that invalid receipts can never be misrepresented as active.
+- **Cache File & Headers**: Stored and retrieved under key `${receiptNumber}-cancelled.pdf` (`pdf.service.ts:283,341`) with unconditional `Cache-Control: private, no-store` so invalid receipts can never be misrepresented as active.
+
+### 1.3 Server PDF Canvas Inventory & Localization (`PDFKit` + Embedded Tamil Fonts)
+All server-rendered PDFs embed `NotoSansTamil-Regular.ttf` and `NotoSansTamil-Bold.ttf` with pure 64-bit `BigInt` English/Tamil rupee words (`rupee-words.helper.ts`):
+
+| Template Name | Code File | Dimensions & Orientation | Key Security & Branding Features |
+|---|---|---:|---|
+| **Subscription Receipt** | `subscription-receipt.template.ts:50-51` | **A5 Portrait** | Bilingual letterhead, whole-rupee breakdown & words, **`KFC-PDF-001` red cancelled watermark** |
+| **Prize Payout Voucher** | `payout-voucher.template.ts:80-81` | **A5 Landscape** | `KC-VOU-` numbering, dual-partner sign-off, safety proof summary, IT Act §40A(3) cash $> ₹10,000$ advisory |
+| **Form XVII Minutes** | `form-xvii-minutes.template.ts:61` | **A4 Portrait** | Registrar proceedings, dynamic frozen commission, Option A tie-break tokens, subscriber attendance, Foreman signature flag |
+| **Form XXI Passbook** | `form-xxi-passbook.template.ts:79-80` | **A4 Landscape** | 6-column physical passbook mirror, cumulative paid totals, KC-09 arrears offset provenance, Foreman signature block |
 
 ```text
 ================================================================================
@@ -162,11 +172,14 @@ Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at
 Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}
 ```
 
-### 3.5 Pluggable SMS Architecture & Compliance
-- **Implementation**: [`apps/api/src/notification/`](../../apps/api/src/notification/)
-- **Pluggable Drivers**: `MockSmsDriver` (local dev & testing) and `Msg91SmsDriver` (production Indian DLT gateway).
-- **Non-Blocking Invariant**: Telecom SMS timeouts or failures never block financial ledger updates or database transactions.
-- **DPDP Act 2023 Compliance**: Recipient phone numbers are masked as `+91******XXXX` in all application logs and telemetry.
+### 3.5 Pluggable SMS Architecture, Circuit Breaker & TRAI DLT Compliance
+- **Implementation**: [`apps/api/src/notification/`](../../apps/api/src/notification/) & [`apps/api/src/jobs/services/notification.service.ts`](../../apps/api/src/jobs/services/notification.service.ts)
+- **Pluggable Drivers**: `MockSmsDriver` (local dev, CI & testing) and `Msg91SmsDriver` (production Indian TRAI DLT gateway, default sender ID `KMRCHT`).
+- **TRAI TCCCPR 2018 Template Guard (`msg91-sms.driver.ts:69`)**: Every dispatch enforces a registered 19-digit DLT Template ID (`dlt-templates.constants.ts:8-27`: `KUMARAN_AUTH_OTP` `...847`, `KUMARAN_PAYMENT_RECEIPT` `...848`, `KUMARAN_AUCTION_REMINDER` `...849`, `KUMARAN_DEFAULT_WARNING` `...850`); missing Template IDs fail immediately.
+- **Circuit Breaker & Resilience (`msg91-sms.driver.ts:43-52`)**: `CircuitBreaker` trips `OPEN` after **5 consecutive failures**, holds `OPEN` for **30 seconds** before `HALF_OPEN` probe, and exports live state to Prometheus gauge `smsCircuitBreakerState` (`sms.service.ts:211`).
+- **Async PDF Pre-Rendering (`XR-M8-PAY-01`)**: `NotificationService.dispatchPaymentReceipt` receives `paymentId` and asynchronously pre-renders the bilingual receipt PDF to S3/R2 before notification dispatch (`notification.service.ts:81-83`).
+- **Non-Blocking Invariant**: Telecom SMS timeouts or failures never block financial ledger commits.
+- **DPDP Act 2023 Compliance**: `PhoneHelper` normalizes inputs to 12-digit Indian MSISDN (`91XXXXXXXXXX`) and masks phone numbers as `+91******XXXX` in all application logs and telemetry.
 
 ---
 
@@ -185,7 +198,7 @@ To maintain the leanest possible operational expenditure and eliminate third-par
 
 ### 5.1 The 4 Core Operational Reports
 1. **Form XXII — Daily Chit Cash Book (தினசரி ரொக்க ஏடு)**:
-   - 12-column daily cash register recording all collections, prize money disbursements, bank transactions, and the closing physical cash in the office safe vault.
+   - Physical cash-only vault register (`paymentMethod === 'CASH'` and `disbursementMode === 'CASH'`, strictly excluding UPI/NEFT/RTGS/IMPS/Cheque) recording physical cash collections, acknowledged field cash handovers (`cashHandoverAcknowledgedAt ?? createdAt`), cash prize disbursements, approved cash payment reversals (`REV-` outflows on `reversedAt`), and closing safe vault cash (`statutory-report.service.ts:28-216`). Digital bank/UPI transactions are tracked separately in the **Day Book** (`/reports/day-book`).
    - **Primary Users**: Desk Accountant, Partners, and CA Auditor.
 2. **Form XXI — Subscriber Ledger / Passbook Statement (சந்தாதாரர் கணக்கு ஏடு)**:
    - Complete 20-month historical account statement for a subscriber ticket showing monthly installments, dividends credited, net amounts paid, and receipt numbers.
@@ -202,12 +215,12 @@ To maintain the leanest possible operational expenditure and eliminate third-par
   - **"Download PDF" (Authenticated Binary Blobs)**: Generates official PDF formatted with Kumaran Finance letterhead for office filing or printing. Downloads are executed via typed `@kumaran/api-client` (`parseAs: 'blob'`) routing through the Next.js BFF proxy (`/bff/api/v1/pdf/...`) directly to the browser. Avoids pop-up blockers, CORS restrictions, and internal Docker/MinIO DNS resolution issues.
   - **"Print Sheet / Passbook" (Clean `@media print` Layout)**: Triggers native `window.print()` using dedicated print stylesheets. Automatically strips sidebars, topbar navigation, buttons, and dark-mode styling into crisp, high-contrast black-on-white tables matching physical ledger paper.
   - **"Export Excel / CSV"**: Structured tabular export for the CA Auditor to import into Tally or spreadsheet tools.
-- **Mobile App (For Partners on the Move)**:
+- **Mobile App (Phase 2 Deferred Target — `ADR-26`)**:
   - **"Share Statement / Summary"**: Uses the native Android share sheet to transfer the generated PDF via WhatsApp, Bluetooth, or messaging without recurring API costs.
 
 ---
 
-## 6. Digital Passbook Data Structure (Mobile App View) (`CONFIRMED-BY-DEVELOPER`)
+## 6. Digital Passbook Data Structure (Form XXI / Passbook View) (`CONFIRMED-BY-DEVELOPER`)
 
 In the mobile app, the subscriber's **Digital Passbook (டிஜிட்டல் சந்தா புத்தகம்)** renders each month in chronological order with strictly whole integer Rupees:
 
@@ -221,9 +234,9 @@ In the mobile app, the subscriber's **Digital Passbook (டிஜிட்டல
 
 ---
 
-## 7. Mobile App Push Notification Hierarchy & FCM Payloads (`CONFIRMED-BY-DEVELOPER`)
+## 7. Mobile App Push Notification Hierarchy & FCM Payloads (`PHASE 2 DEFERRED TARGET` — Backend Code Preserved per `ADR-23` / `ADR-26`)
 
-Push notifications provide **₹0-cost real-time delivery** over Android FCM and Apple APNs networks.
+> **Phase 1 Production Note**: Per `ADR-23` and `ADR-26`, FCM push notifications are **inactive in Phase 1 production** (Indian TRAI DLT SMS via MSG91 is the sole active automated channel). All backend `PushService` routing, payload formatting, and automatic stale-token pruning (`apps/api/src/notification/services/push.service.ts:30-44`) remain implemented and tested for Phase 2 mobile activation.
 
 ### 7.1 Delivery Priority Hierarchy
 ```

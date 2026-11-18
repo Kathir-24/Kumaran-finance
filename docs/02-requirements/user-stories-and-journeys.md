@@ -4,7 +4,8 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Scope**: 100% complete coverage across all 10 functional modules, 28 features, and all 6 standardized personas (63 exhaustive user stories & 6 multi-actor journey maps).  
 > **Status**: Authoritative Product Specification (`CONFIRMED-BY-DEVELOPER`)  
-> **Zero Hallucination Guarantee**: Derived strictly from confirmed business decisions (ADR-01 through ADR-19), [`financial-rules.md`](../01-business/financial-rules.md), [`permissions-matrix.md`](../01-business/permissions-matrix.md), [`completed-modules-api-registry.md`](../03-architecture/completed-modules-api-registry.md), and verified NestJS controller implementations.
+> **Zero Hallucination Guarantee**: Derived strictly from confirmed business decisions (`ADR-01` through `ADR-26`), [`financial-rules.md`](../01-business/financial-rules.md), [`permissions-matrix.md`](../01-business/permissions-matrix.md), [`completed-modules-api-registry.md`](../03-architecture/completed-modules-api-registry.md), and verified NestJS controller implementations.  
+> **Phase 1 vs. Phase 2 Delivery Scope (`ADR-26`)**: Web Portal (`apps/web/`) and NestJS API (`apps/api/`) represent the active Phase 1 production release; Flutter Android UI screens (`apps/mobile/`) are deferred to Phase 2 (Q2 2027) while Dart Core and all mobile backend APIs remain 100% preserved and verified.
 
 ---
 
@@ -22,17 +23,17 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 | 2.1 | Single Branch Configuration (`PRD`) | Actor | View | View | View (Receipts) | — | View |
 | 2.2 | Staff Profile & Multi-Role Assignment | Actor | View | — | — | — | View |
 | **M3** | **Customer & Nominee Intake** | | | | | | |
-| 3.1 | Customer Intake (`KC-CUST-XXXXX`) & Tamil Names | Actor | Actor | Limited | Lead Intake | Self-profile | View |
+| 3.1 | Customer Intake (`KC-CUST-XXXXX`) & Tamil Names | Actor | Actor | View Only | Lead Intake (`POST`) | Self-profile | View |
 | 3.2 | Masked Aadhaar (Last 4) & PAN Verification | Checker | Maker | Maker | — | Upload | View |
 | 3.3 | Nominee Relationship & Signature Linking | Actor | Actor | Actor | Lead Intake | View/Edit | View |
 | **M4** | **Chit Scheme Management** | | | | | | |
 | 4.1 | Fresh Chit Group Creation (4% Commission Lock) | Actor | Review | Review | — | View | View |
 | 4.2 | Mid-Cycle Intake from Physical Notebooks | Checker | Maker | Maker | — | — | View |
 | 4.3 | Fixed 1/4 (25%) Discount Ceiling Enforcement | System | System | System | System | System | System |
-| 4.4 | Month 1 & Month $N$ Special Rule Execution | Actor | Actor | View | — | View | View |
+| 4.4 | Month 1 & Month $N$ Special Rule Execution | Actor (Partner) | Maker (Prep) | Maker (Prep) | — | View | View |
 | **M5** | **Ticket Allocation & Membership** | | | | | | |
 | 5.1 | Ticket Assignment (Strictly 1 Ticket per Customer) | Actor | Actor | — | — | Request | View |
-| 5.2 | 3-Month Arrears Tracking & Company Removal Rights | Checker | Maker | Review | Field Notice | View Warning | View |
+| 5.2 | 3-Month Arrears Tracking & Company Removal Rights | Maker (Partner A) / Checker (Partner B) | Blocked (`403`) | Review | Field Notice | View Warning | View |
 | **M6** | **Installment Schedules & Dividends** | | | | | | |
 | 6.1 | Due Schedule Generation with Universal Dividends | Actor | Actor | Review | View Dues | View Dues | View |
 | 6.2 | Single Discrete Payment Validation (No Partial/Adv) | System | System | System | System | System | System |
@@ -67,7 +68,7 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 - **Profile**: Operational head of the Perundurai branch office. In current business, the **4 partners fulfill all branch manager duties directly**; the software treats it as a scoped role for future expansion.
 - **Client Platform**: Web Portal (`apps/web/`).
 - **Core Mindset**: Customer intake accuracy, ticket allocation, auction facilitation, and staff coordination.
-- **Governing Boundary**: Operational authority only. **Strictly blocked from releasing funds or altering ledgers** (`permissions-matrix.md` §6).
+- **Governing Boundary**: Operational authority only. **Strictly blocked from releasing funds or altering ledgers** (`permissions-matrix.md` §3.7).
 
 ### Persona 3: Desk Accountant
 - **Profile**: Office financial recordkeeper and cashier. Can also be a field collection agent wearing the accountant hat during office hours (`roles: [COLLECTION_AGENT, ACCOUNTANT]`).
@@ -126,8 +127,8 @@ flowchart TD
         ACC_KYC --> ACC_Count["Count & Acknowledge Field Agent Cash into Vault as Checker (/cash-handover/acknowledge)"]
         ACC_Count --> ACC_Vouch["Verify Safety Proof Checklist & Prep Voucher as Maker (/verify-safety-proof)"]
         ACC_Vouch --> ACC_Rel["Release Authorized Prize Disbursement with Cheque/UTR (/disburse)"]
-        ACC_Rel --> ACC_Rev["Initiate Payment Reversal Request with Mandatory Justification (/request-reversal)"]
-        ACC_Rev --> ACC_Close["Balance Day Book & Reconcile Form XXII Cash Book at 6:00 PM"]
+        ACC_Rel --> ACC_UPI["Verify Customer Bank UTR Claims & Issue Receipt (/verify-upi-claim)"]
+        ACC_UPI --> ACC_Close["Balance Day Book & Reconcile Form XXII Cash Book at 6:00 PM"]
     end
 
     subgraph J4["Journey 4: Customer / Subscriber Lifecycle"]
@@ -153,12 +154,11 @@ flowchart TD
     end
 
     subgraph J6["Journey 6: Independent Auditor Forensic Audit"]
-        AUD_Start["2FA Login & Global Read-Only Forensic Console (47 Mutation Routes Blocked)"] --> AUD_Logs["Inspect Immutable AuditLog Table & Full Before-and-After JSON Diffs"]
-        AUD_Logs --> AUD_XXII["Audit Form XXII Cash Book Equation vs Physical Vault Balance"]
-        AUD_Logs --> AUD_XVII["Audit Form XVII Minutes & Pre-Auction 0-Arrears Bidder Eligibility"]
+        AUD_Start["2FA Login & Global Read-Only Forensic Console (79 Mutation Routes Blocked)"] --> AUD_XXII["Audit Form XXII Physical Cash Book Equation vs Safe Vault Balance"]
+        AUD_XXII --> AUD_XVII["Audit Form XVII Minutes & Pre-Auction 0-Arrears Bidder Eligibility"]
         AUD_XVII --> AUD_XXI["Audit Form XXI 20-Month Continuous Member Ledgers (Math Conservation Laws)"]
-        AUD_XXI --> AUD_Jobs["Inspect BullMQ Repeatable Cron Schedules & Notification Audit Logs (/jobs)"]
-        AUD_Jobs --> AUD_Docs["Inspect Presigned S3 Scans of Blank Cheques, Notes & KYC Documents"]
+        AUD_XXI --> AUD_Day["Verify Day Book, Defaulters Aging & Cron Ledger Effects (Audit Logs/Jobs 403)"]
+        AUD_Day --> AUD_Docs["Inspect Presigned S3 Scans of Blank Cheques, Notes & KYC Documents"]
         AUD_Docs --> AUD_Sign["Statutory Audit Verification Sign-off for Registrar Filing"]
     end
 ```
@@ -175,7 +175,7 @@ flowchart TD
 - **So that**: Company financial health, active chit groups, safe cash balance, and pending approvals are visible in real time.
 - **Acceptance Criteria**:
   - **Given** valid credentials on `/auth/web/login`,
-  - **When** 2FA is active, system returns `requireTotp: true` with a 5-minute `tempToken`;
+  - **When** 2FA is active, system returns `requireTotp: true` with a 15-minute `tempToken` (`auth.service.ts:147,224`);
   - **When** valid 6-digit TOTP is submitted to `/auth/web/verify-totp`, system issues 15-min access JWT and 7-day refresh token;
   - **Then** `/reports/dashboard` returns total active chits, total subscribers, collected today, and pending approval counters.
 
@@ -212,9 +212,10 @@ flowchart TD
 - **I want to**: Remove a subscriber who has defaulted for 3 consecutive months and allocate the seat to a substitute subscriber
 - **So that**: The chit group collection pool is safeguarded against chronic default (ADR-07 & ADR-12).
 - **Acceptance Criteria**:
-  - **Given** Ticket #7 has `consecutiveUnpaidMonths >= 3`,
-  - **When** Partner calls `POST /tickets/:id/remove-defaulter`, ticket status updates to `REMOVED_DEF_3M`;
-  - **When** Partner calls `POST /tickets/:id/substitute` with new customer ID, a new ticket is issued under the same number, while the financial damage settlement voucher calculation is intentionally held fail-closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal Partner Board resolution and statutory legal validation (ADR-07 / Q25).
+  - **Given** Ticket #7 has `consecutiveUnpaidMonths >= 3` and `isPrized === false`,
+  - **When** Partner A (`isPartner: true`) calls `POST /tickets/:id/remove-defaulter/request` (or legacy alias `/remove-defaulter`), ticket transitions to `PENDING_REMOVAL_APPROVAL`;
+  - **When** independent Partner B (`isPartner: true`, `maker != checker`) calls `POST /tickets/:id/remove-defaulter/approve`, ticket transitions to `REMOVED_DEF_3M` (or `/reject` restores `DEFAULT_3_MONTHS`);
+  - **When** Partner calls `POST /tickets/:id/substitute` with new customer ID, a replacement ticket is issued under the same number, while financial exit damage settlement (`POST /tickets/:id/settle-removal`) remains strictly locked fail-closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal Partner Board resolution and statutory legal validation (Q25).
 
 #### US-SA-6: Dual-Control Auction Finalization (Checker)
 - **As a**: Super Admin / Partner B (Checker)
@@ -235,33 +236,33 @@ flowchart TD
   - **Then** system marks status `AUTHORIZED_BY_CHECKER` and asserts `verifiedByUserId != checkerUserId`;
   - **Error Case**: System throws `403 Forbidden` if a Branch Manager attempts to authorize payout.
 
-#### US-SA-8: Dual-Control Payment Reversal Approval (Checker)
-- **As a**: Super Admin / Partner B (Checker)
-- **I want to**: Approve a payment reversal request initiated by Accountant or Partner A (Maker)
-- **So that**: Accounting ledger corrections are strictly verified by an independent partner.
+#### US-SA-8: Dual-Control Payment Reversal Approval / Rejection (Checker)
+- **As a**: Super Admin / Partner B (Checker, `isPartner: true`)
+- **I want to**: Approve or reject a payment reversal request initiated exclusively by Partner A (Maker, `isPartner: true`)
+- **So that**: Accounting ledger corrections are strictly verified by an independent partner (`KFC-SEC-001`).
 - **Acceptance Criteria**:
-  - **Given** reversal was requested with reason code on `POST /payments/:id/request-reversal` by Maker,
-  - **When** Partner B calls `POST /payments/:id/approve-reversal`,
-  - **Then** system sets payment status to `REVERSED`, reverts installment due back to `UNPAID`, recalculates arrears, and asserts `initiatedByUserId != checkerUserId`.
+  - **Given** reversal was requested with reason code on `POST /payments/:id/request-reversal` by Partner A (`ACCOUNTANT` and `BRANCH_MANAGER` are strictly blocked with `403 Forbidden`),
+  - **When** Partner B calls `POST /payments/:id/approve-reversal` (or `POST /payments/:id/reject-reversal`),
+  - **Then** system sets payment status to `REVERSED`, reverts installment due back to `UNPAID`, recalculates arrears via `computeMaxConsecutiveUnpaidMonths`, watermarks the cancelled receipt PDF (`KFC-PDF-001`), and asserts `initiatedByUserId != checkerUserId` (`chk_reversal_maker_checker`).
 
-#### US-SA-9: Month 1 Company Pool & Month $N$ Final Member Settlement
+#### US-SA-9: Month 1 Company Pool & Month $N$ Two-Stage Final Member Settlement (`ADR-25`, `FIN-B`)
 - **As a**: Super Admin (Partner)
-- **I want to**: Execute the Month 1 company pool intake and Month $N$ final subscriber settlement without auctions
-- **So that**: Standard chit-fund legal rules (foreman ticket in Month 1 and last subscriber settlement in Month $N$) are executed flawlessly.
+- **I want to**: Execute the Month 1 company pool intake and Month $N$ final subscriber settlement without auctions under strict 2-stage Maker-Checker dual control
+- **So that**: Standard chit-fund legal rules (foreman ticket in Month 1 and last subscriber settlement in Month $N$) are executed without double collection or self-approval.
 - **Acceptance Criteria**:
   - **Given** scheme is activated, Month 1 pool of ₹1,00,000 is assigned to company customer ticket with ₹0 dividend;
   - **Given** chit reaches Month $N$ (e.g. Month 20 of 20),
-  - **When** Partner calls `POST /disbursements/group/:chitGroupId/final-settlement`,
-  - **Then** system verifies all prior auctions 1 to $N-1$ are settled, retains 4% commission (₹4,000) and final installment, disburses remaining prize money to the final non-prized subscriber with voucher, and transitions chit group status to `COMPLETED`.
+  - **When** Maker staff prepares the voucher via `POST /disbursements/group/:chitGroupId/prepare-final-settlement` and independent Partner B (`isPartner: true`, `maker != checker`) approves via `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`),
+  - **Then** system verifies all prior auctions 1 to $N-1$ are settled, retains frozen 4% commission (₹4,000), deducts Month $N$ installment **only if unpaid** (`FIN-B`: ₹0 if already paid at desk), deducts prior arrears, disburses net payout with voucher, and transitions chit group status to `COMPLETED`.
 
 #### US-SA-10: Prize Disbursement Fund Release Execution
 - **As a**: Super Admin / Partner (or Desk Accountant)
 - **I want to**: Record the financial release reference (Cheque number, Bank UTR, or Cash voucher) once payout is authorized
 - **So that**: The payout voucher status transitions to `DISBURSED` with permanent transaction references.
 - **Acceptance Criteria**:
-  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status,
-  - **When** calling `POST /disbursements/auction/:auctionId/disburse` with `disbursementMode: 'CHEQUE'`, `referenceNumber: 'CHQ-904121'`, and `notes: 'Drawn on Canara Bank'`,
-  - **Then** status updates to `DISBURSED`, records `disbursedAt` timestamp and `disbursedByUserId`, and dispatches bilingual SMS/Push receipt.
+  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status (with `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` locked at authorization),
+  - **When** calling `POST /disbursements/auction/:auctionId/disburse` with `paymentReference: 'CHQ-904121'` and `notes: 'Drawn on Canara Bank'` (`ReleasePayoutDto`),
+  - **Then** system re-verifies TOCTOU arrears (`FIN-D`), updates status to `DISBURSED`, records `disbursedAt` timestamp and `disbursedByUserId`, and enqueues bilingual receipt dispatch.
 
 #### US-SA-11: Evening Safe Vault Cash Reconciliation & Form XXII Sign-off
 - **As a**: Super Admin (Partner)
@@ -394,8 +395,8 @@ flowchart TD
 - **So that**: Company statutory compliance status transitions from `COMPLETED` to `MINUTES_FILED`.
 - **Acceptance Criteria**:
   - **Given** auction is finalized and signed physical minutes are submitted to the Registrar of Chits (Erode),
-  - **When** calling `PATCH /auctions/:auctionId/mark-filed-with-registrar` with `filingDate` and `filingReferenceNumber`,
-  - **Then** auction status updates to `MINUTES_FILED` and logs the filing timestamp.
+  - **When** calling `PATCH /auctions/:auctionId/mark-filed-with-registrar` with `filedDate` (bounded `auctionDate <= filedDate <= now` in IST) and mandatory `filingReference` (plus optional `filingNotes`),
+  - **Then** auction status updates to `MINUTES_FILED`, records 21-day compliance status, and logs the filing timestamp.
 
 #### US-BM-11: Branch-Scoped Form XXII Cash Book & Day Book Inspection
 - **As a**: Branch Manager
@@ -426,7 +427,7 @@ flowchart TD
 - **Acceptance Criteria**:
   - **Given** subscriber owes Month 4 net installment ₹3,950,
   - **When** I submit `POST /payments` with `paymentMethod: CASH` and `amount: 3950`,
-  - **Then** payment status is `SUCCESS`, due is marked `PAID`, sequential receipt `KC-REC-PRD-2026-XXXXX` is generated, and cash handover status is set to `ACKNOWLEDGED` (directly in office safe).
+  - **Then** payment status is `SUCCESS`, due is marked `PAID`, sequential receipt `KC-REC-PRD-2026-XXXXX` is generated, and cash handover status is set to `PENDING_HANDOVER` for `CASH` (`payment.service.ts:231-234`, requiring independent vault acknowledgement; non-cash modes default to `ACKNOWLEDGED`).
 
 #### US-ACC-3: Mid-Cycle Notebook Historical Winner & Dues Transcription (Maker)
 - **As a**: Desk Accountant (Maker)
@@ -464,42 +465,43 @@ flowchart TD
   - **When** I verify checklist on `POST /disbursements/auction/:auctionId/verify-safety-proof` and upload scanned agreement to S3,
   - **Then** status updates to `VERIFIED_BY_MAKER`, tags `verifiedByUserId`, and enqueues push notification alert to Super Admins for Checker authorization.
 
-#### US-ACC-7: Payment Reversal Request Initiation (Maker)
-- **As a**: Desk Accountant (Reversal Maker)
-- **I want to**: Request a payment reversal when a counter entry was made in error (e.g. wrong ticket number)
-- **So that**: Reversal requests are documented with justification notes before ledger changes take effect.
+#### US-ACC-7: Customer Bank UTR Claim Verification (Checker) & Reversal Escalation Boundary (`KFC-SEC-001`)
+- **As a**: Desk Accountant
+- **I want to**: Verify customer-submitted UPI bank UTR claims against our KVB bank statement while respecting the strict Partner-only boundary on payment reversals
+- **So that**: Bank credits are reconciled promptly and unauthorized ledger reversals are prevented.
 - **Acceptance Criteria**:
-  - **Given** Payment `pay-123` recorded in error,
-  - **When** I call `POST /payments/:id/request-reversal` with reason `WRONG_TICKET_NUMBER` and explanation notes,
-  - **Then** reversal record is created in `REQUESTED` status, payment remains `SUCCESS` until approved, and system enqueues alert to Super Admins for Checker authorization.
+  - **Given** a customer submitted a 12-digit UTR claim (`POST /payments/upi-claim`, `paymentStatus: INITIATED`),
+  - **When** I verify the credit on `POST /payments/:id/verify-upi-claim` (`maker != checker`, same branch),
+  - **Then** payment transitions to `SUCCESS`, due becomes `PAID`, Day Book cache invalidates, and receipt `KC-REC-PRD-2026-XXXXX` is minted;
+  - **Reversal Guard (`KFC-SEC-001`)**: Attempting `POST /payments/:id/request-reversal` as `ACCOUNTANT` is strictly rejected with `403 Forbidden` (reversal initiation is reserved exclusively for verified Partner A, and approval/rejection for independent Partner B).
 
 #### US-ACC-8: Evening Day Book & Form XXII Cash Book Balancing
 - **As a**: Desk Accountant
 - **I want to**: Generate the Day Book and Form XXII Cash Book at 5:45 PM to verify that safe cash matches the mathematical equation
 - **So that**: Daily branch operations close with zero cashier shortage or excess.
 - **Acceptance Criteria**:
-  - **Given** opening cash ₹1,00,000, counter collections ₹15,000, field handover ₹45,000, petty expenses ₹2,000,
+  - **Given** opening cash ₹1,00,000, acknowledged cash collections ₹60,000, and physical cash outflows (cash prize disbursements + approved cash payment reversals) ₹2,000,
   - **When** I view `GET /reports/form-xxii`,
-  - **Then** Closing Cash = $\text{₹}1,00,000 + \text{₹}60,000 - \text{₹}2,00,000 = \text{₹}1,58,000$, matching physical currency in the branch safe to the exact Rupee.
+  - **Then** Closing Cash = $\text{₹}1,00,000 + \text{₹}60,000 - \text{₹}2,000 = \text{₹}1,58,000$, matching physical currency in the branch safe to the exact Rupee (`Opening Cash(T) === Closing Cash(T-1)`).
 
 #### US-ACC-9: Prize Disbursement Fund Release Execution (Voucher Clearance)
 - **As a**: Desk Accountant
 - **I want to**: Release the authorized prize money to the subscriber by entering the cheque or bank transfer reference number
 - **So that**: The payout voucher status updates to `DISBURSED` and company cash/bank books reflect the outflow.
 - **Acceptance Criteria**:
-  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status,
-  - **When** I call `POST /disbursements/auction/:auctionId/disburse` with payment mode `CHEQUE`, cheque number `904122`, and issuing bank,
-  - **Then** system commits voucher to `DISBURSED`, logs `disbursedByUserId = accountantId`, and issues bilingual receipt.
+  - **Given** payout voucher is in `AUTHORIZED_BY_CHECKER` status (with `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` locked at authorization),
+  - **When** I call `POST /disbursements/auction/:auctionId/disburse` with `paymentReference: 'CHQ-904122'` and `notes: 'Issued from Canara Bank'`,
+  - **Then** system re-verifies TOCTOU arrears (`FIN-D`), commits voucher to `DISBURSED`, logs `disbursedByUserId = accountantId`, and issues bilingual receipt.
 
-#### US-ACC-10: Staff Session Logout & Automated Inactivity Lock
+#### US-ACC-10: Staff Session Logout & Automated Inactivity Lock (`SessionInactivityGuard`)
 - **As a**: Desk Accountant
-- **I want to**: Log out securely or have the portal lock automatically after 15 minutes of inactivity
+- **I want to**: Log out securely or have the portal lock automatically after 20 minutes of inactivity (with an 18-minute warning dialog)
 - **So that**: Walk-in subscribers cannot see company books or trigger entries if I step away from the counter.
 - **Acceptance Criteria**:
   - **Given** active staff session,
   - **When** I click logout calling `POST /auth/logout`,
-  - **Then** server wipes refresh token hash, invalidates access token, and redirects to login;
-  - **When** browser is idle for 15 minutes, local session locks automatically, requiring password or TOTP re-entry.
+  - **Then** server revokes the client-family PostgreSQL `Session` row, clears HttpOnly BFF cookies, and redirects to login;
+  - **When** browser is idle for 18 minutes, `SessionInactivityGuard` opens a warning modal, and at 20 minutes triggers automatic logout (`session-inactivity-guard.tsx:31-32`).
 
 ---
 
@@ -665,7 +667,7 @@ flowchart TD
 - **So that**: My prize money is released promptly without demanding property documents (ADR-15).
 - **Acceptance Criteria**:
   - **Given** I won Month 3 auction with prize pool ₹75,000,
-  - **When** I view `GET /disbursements/auction/:id`, status displays `PENDING_SAFETY_PROOF`;
+  - **When** I view `GET /disbursements/auction/:id`, status displays `PENDING_VERIFICATION` (`schema.prisma:309`);
   - **When** I sign agreement and submit cheques at branch, staff verifies checklist;
   - **When** Partner B authorizes payout, status updates to `AUTHORIZED_BY_CHECKER` and payment is released via bank transfer.
 
@@ -757,13 +759,13 @@ flowchart TD
   - **Then** system returns staff user profile, branch assignment, and active roles (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`);
   - **Zero-Write**: Auditor is blocked from creating, editing, or resetting users (`403 Forbidden`).
 
-#### US-AUD-6: Zero Mutation Immunity (Asserting Read-Only Privileges across All 47 Write Endpoints)
+#### US-AUD-6: Zero Mutation Immunity (Asserting Read-Only Privileges across All 79 Write Endpoints)
 - **As a**: Independent Auditor / System Guardian
-- **I want to**: Ensure the `AUDITOR` role is strictly blocked from all 47 mutation routes (`@Post`, `@Patch`, `@Delete`)
+- **I want to**: Ensure the `AUDITOR` role is strictly blocked from all 79 mutation routes (`@Post`, `@Patch`, `@Put`, `@Delete`)
 - **So that**: An auditor can never alter financial records, approve transactions, or execute state changes.
 - **Acceptance Criteria**:
   - **Given** an authenticated user with `AUDITOR` role,
-  - **When** attempting any `@Post`, `@Patch`, or `@Delete` endpoint across all 18 controllers,
+  - **When** attempting any `@Post`, `@Patch`, `@Put`, or `@Delete` endpoint across all 18 controllers,
   - **Then** `RolesGuard` immediately rejects the request with `403 Forbidden: Insufficient role permissions`.
 
 #### US-AUD-7: Infrastructure Boundary & Background Cron Financial Verification

@@ -35,15 +35,15 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - The software supports an arbitrary, dynamic number ($N$) of users assigned to any persona.
   - Headcounts are **never static or hardcoded**. The system accommodates any number of partners, managers, accountants, collection agents, customers, and auditors at present and in the future.
 - **The Standardized Personas & Operating Reality**:
-  1. `SUPER_ADMIN`: Company partners / proprietors with full administrative, configuration, and final approval (Checker) authority. The **4 partners directly run branch operations**; no external Branch Manager is hired.
+  1. `SUPER_ADMIN` (`isPartner: true` vs. `isPartner: false`, `ADR-21`): Verified business partners (`isPartner: true`) hold full financial Maker/Checker authority (auction finalization, corrections, payout authorization, reversals, defaulter removals). Administrative IT Super Admins (`isPartner: false`) manage users, settings, immutable audit logs, and BullMQ queues, but are strictly blocked from financial authorizations (`assertVerifiedPartner`). The **4 partners directly run branch operations**; no external Branch Manager is hired.
   2. `BRANCH_MANAGER`: Operational branch head persona (optional/future expansion). Currently fulfilled directly by the 4 partners.
   3. `ACCOUNTANT`: Manages collections verification, bank reconciliation, day books, cash handovers, and voucher prep. **Can be assigned to field collection agents performing dual office accounting roles**.
-  4. `COLLECTION_AGENT`: Field staff using mobile app for doorstep collections, offline recording, and cash handover submission.
-  5. `CUSTOMER`: Subscribers viewing digital passbooks, dividend savings, upcoming dues, and making online payments.
-  6. `AUDITOR`: Independent auditor with read-only access to ledgers, auction records, and reports.
-- **Enforced Maker-Checker Dual Controls**:
-  - High-risk operations (payment reversals, auction finalization, prize disbursements) strictly enforce `maker_user_id != checker_user_id` at application and database levels (`CONFIRMED-BY-DEVELOPER`).
-  - Partner-to-Partner workflow: One partner initiates an entry (Maker) $\to$ Another partner reviews and finalizes (Checker).
+  4. `COLLECTION_AGENT`: Field staff for doorstep collections, offline recording, and cash handover submission (Web Portal in Phase 1; Flutter Android UI deferred to Phase 2 per `ADR-26`).
+  5. `CUSTOMER`: Subscribers viewing digital passbooks, dividend savings, upcoming dues, and making online UPI payments (backend APIs preserved; Flutter Mobile UI deferred to Phase 2 per `ADR-26`).
+  6. `AUDITOR`: Independent auditor with read-only access to ledgers, auction records, and statutory reports (excluding Super-Admin-only audit logs and BullMQ queues).
+- **Enforced Maker-Checker Dual Controls (`ADR-21`, `ADR-22`, `ADR-25`)**:
+  - High-risk operations (payment reversals, auction finalization/correction, prize disbursements, Month $N$ settlements, defaulter removals, cash handovers, UPI claim verification) strictly enforce `maker_user_id != checker_user_id` at application and PostgreSQL 17 `CHECK` constraint levels (`CONFIRMED-BY-DEVELOPER`).
+  - Partner-to-Partner workflow: One verified partner initiates an entry (Maker) $\to$ Another verified partner reviews and finalizes (Checker).
 
 ### Module 3: Customer Management & KYC (`CONFIRMED-BY-DEVELOPER`)
 - **Unique Customer Code**: System-generated identifier (e.g., `KC-CUST-00101`).
@@ -71,7 +71,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
     $$\text{Final Net Settlement Payout} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$$
   - If Month $N$ installment is unpaid, $\text{finalMonthDeduction} = I_{\text{base}}$ (₹5,000 on a ₹1,00,000 chit), net payout is strictly **₹91,000** ($100,000 - 4,000 - 5,000$), and Month $N$ `InstallmentDue` is atomically marked `PAID`.
   - If Month $N$ installment was already paid in advance or at branch desk (`monthNDue.status === 'PAID'`), $\text{finalMonthDeduction} = 0$, preventing double collection and resulting in strictly **₹96,000** net payout (`FIN-B`).
-  - Payout is released to the final unprized subscriber with a formal settlement voucher.
+  - Executed strictly via **2-stage Maker-Checker settlement (`ADR-25` / `CR-DISB-02`)**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `isPartner: true`, `maker != checker`), releasing funds with a formal settlement voucher.
 - **Initialization Lifecycle**:
   - `NEW_GROUP`: Standard lifecycle starting from Month 1.
   - `ONGOING_GROUP`: Mid-cycle onboarding from physical paper notebooks (e.g., entering at Month 7) with historical winner discounts and opening balances.
@@ -84,8 +84,8 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
 - **3-Month Consecutive Arrears & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
   - The software tracks consecutive missed monthly installments per ticket.
   - If a subscriber fails to pay for **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
-  - **Two-Partner Dual Control (`SEC-B`)**: Partner A requests removal (`POST /tickets/:id/remove-defaulter/request`), placing the ticket into `PENDING_REMOVAL_APPROVAL`. Partner B reviews and approves (`POST /tickets/:id/remove-defaulter/approve`) with strict `maker != checker` enforcement. Only upon approval does the ticket transition to `REMOVED_DEF_3M`.
-  - **Fail-Closed Exit Settlement Policy (`Q25`)**: Exit settlement calculations fail closed with HTTP 400 `UNAPPROVED_SETTLEMENT_POLICY` until the exact statutory damages formula is confirmed in writing by the business owner.
+  - **Two-Partner Dual Control (`SEC-B` / `ADR-22`)**: Partner A requests removal (`POST /tickets/:id/remove-defaulter/request`), placing the ticket into `PENDING_REMOVAL_APPROVAL`. Independent Partner B approves (`POST /tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`) or rejects (`POST /tickets/:id/remove-defaulter/reject` $\to$ `DEFAULT_3_MONTHS`) with strict `maker != checker` enforcement backed by PostgreSQL constraint `chk_ticket_removal_maker_checker`.
+  - **Fail-Closed Exit Settlement Policy (`Q25`)**: Exit settlement calculations (`POST /tickets/:id/settle-removal`) fail closed with HTTP 400 `UNAPPROVED_SETTLEMENT_POLICY` until the exact statutory damages formula is confirmed in writing by the business owner.
   - Prized tickets are strictly immutable and reject defaulter removal with HTTP 400 `PRIZED_TICKET_IMMUTABLE`.
 - Real-time tracking of Prized vs. Non-Prized status per ticket.
 
@@ -94,103 +94,101 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - For All Subscribers (Including Auction Winners & Past Prized Winners):
     $$I_{net} = I_{base} - Div_{ticket}$$
     (e.g., if base is ₹10,000 and dividend is ₹2,100, every subscriber including the auction winner pays ₹7,900 next month; applies uniformly across all schemes; `CONFIRMED-BY-DEVELOPER`).
-- **Statuses**: `UNPAID`, `PAID`, `OVERDUE`. Partial payments are strictly prohibited under the single discrete payment rule (`CONFIRMED-BY-DEVELOPER`).
+- **Statuses**: `UNPAID`, `PAID`, `OVERDUE`. Partial payments are strictly prohibited under the single discrete payment rule (`CONFIRMED-BY-DEVELOPER`). Zero late fees or penalty interest (`Q23`).
 - All installment and dividend values calculated in clean **whole integer Rupees**.
 
 ### Module 7: Field Collections & Cash Handover (`CONFIRMED-BY-DEVELOPER`)
-- Mobile-first interface for field collection agents (supporting dynamic $N$ agents) showing assigned customer dues.
-- Offline-resilient collection recording with timestamp and receipt generation.
+- Offline-resilient collection APIs and Dart sync core (`POST /collections/record`, `POST /collections/sync-offline-queue`) supporting dynamic $N$ field agents; Phase 1 operates via the Web Portal while Flutter Android UI screens are deferred to Phase 2 (`ADR-26`).
 - **Single Discrete Payment Rule (`CONFIRMED-BY-DEVELOPER`)**:
   - Each installment month accepts strictly one payment matching the net installment due.
   - Double payments for the same month will never happen in business operations.
   - The concept of "Advance Balance" is completely eliminated from the product.
 - **End-of-Day Cash Handover & Dual Agent/Accountant Guard (`CONFIRMED-BY-DEVELOPER`)**:
-  - Agent records physical cash collected during field rounds and submits handover batch.
-  - Branch Cashier / Partner verifies physical cash and acknowledges handover in the software before transactions are closed.
-  - **Hard Guard**: `collector_user_id != acknowledger_user_id`. An agent who also performs accounting tasks can never acknowledge their own collected cash.
+  - Agent records physical cash collected during field rounds and submits handover batch (`POST /collections/cash-handover/submit`).
+  - Desk Accountant, Branch Manager, or Partner verifies physical cash and acknowledges handover (`POST /collections/cash-handover/acknowledge`) before transactions close.
+  - **Hard Guard**: `collector_user_id != acknowledger_user_id` (`chk_payment_cash_handover_maker_checker`) + cross-branch Anti-BOLA. An agent who also performs accounting tasks can never acknowledge their own collected cash.
 
 ### Module 8: Payments, Reversals, & Bilingual Receipts (`CONFIRMED-BY-DEVELOPER`)
 - **Payment Modes**: Cash, UPI, Bank Transfer (NEFT/RTGS/IMPS), and Cheque.
 - **Zero-Fee Native 1-Tap UPI Intent & UTR Verification Protocol (ADR-19)**:
   - **Direct Bank Settlement**: Settle directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **strictly ₹0 third-party gateway fees** (No Razorpay/Cashfree/2% MDR fee).
-  - **1-Tap Deep-Linking**: Mobile app launches native UPI apps (GPay, PhonePe, Paytm, BHIM, Cred) via standard `upi://pay?pa=...` intent containing exact BigInt installment amount, customer name, and unique chit scheme note.
+  - **1-Tap Deep-Linking**: Server helper `GET /installments/:dueId/upi-intent` generates standard `upi://pay?pa=...` intent containing exact BigInt installment amount, customer name, and unique chit scheme note (with sequential due enforcement `PRIOR_INSTALLMENT_UNPAID`).
   - **Customer Bank UTR Claim Submission**: Customer enters their 12-digit bank UTR reference (`POST /payments/upi-claim`), creating a `Payment` record in `INITIATED` status.
   - **Bank UTR Anti-Duplication Constraint**: PostgreSQL 17 `@unique` index on `transactionRef` strictly blocks duplicate claims or reuse of the same bank UTR.
-  - **Maker-Checker Dual Control Claim Verification**: Desk Accountant or Partner reviews the pending UPI claim (`GET /payments/pending-upi-claims`), cross-checks the physical KVB bank statement, and approves (`POST /payments/:id/verify-upi-claim`), transitioning status to `SUCCESS` and marking the installment `PAID`. Strictly enforces `maker_user_id != checker_user_id`.
-- **Bilingual Receipts & Unified Notification Hierarchy (V1 Scope)**:
+  - **Maker-Checker Dual Control Claim Verification**: Desk Accountant, Branch Manager, or Partner reviews the pending UPI claim (`GET /payments/pending-upi-claims`), cross-checks the physical KVB bank statement, and approves (`POST /payments/:id/verify-upi-claim`), transitioning status to `SUCCESS`, invalidating Day Book cache, and marking the installment `PAID`. Strictly enforces `maker_user_id != checker_user_id` and branch isolation.
+- **Bilingual Receipts & Notification Architecture (V1 Scope — `ADR-23`, `ADR-26`)**:
   - Formatted in both English and Tamil with sequential branch-scoped numbering (e.g., `KC-REC-PRD-2026-00045`).
-  - Hand-written and signed directly in customer's physical paper passbook booklet; confirmed digitally via free mobile app push notification; downloadable digital PDFs available on-demand.
-  - **Smart Channel Hierarchy**: Payments and field collections asynchronously enqueue background receipt delivery to BullMQ (`notification-queue` / `JOB_DISPATCH_PAYMENT_RECEIPT`). Free In-App Push Notifications (FCM, ₹0) for smartphone app users; Telecom DLT SMS fallback for keypad phone users across Payments, Upcoming Auctions, Post-Auction Dividends (`JOB_DISPATCH_AUCTION_RESULT`), and 3-Month Default warnings. High-priority Partner push alerts (`JOB_DISPATCH_APPROVAL_ALERT`) are dispatched for Maker-Checker dual control (payment reversals, prize disbursements), strictly excluding the maker user.
-  - **Authentication**: OTP delivered strictly via Telecom DLT SMS and managed securely in Redis (`auth:otp:<phone>`) with a 300-second (5-minute) TTL and 3-attempt brute-force lockout.
+  - Hand-written and signed directly in customer's physical paper passbook booklet; downloadable digital A5 PDFs available on-demand (pre-rendered asynchronously via `JOB_DISPATCH_PAYMENT_RECEIPT` with `paymentId`).
+  - **Phase 1 Production Channel (`ADR-23`)**: Automated operational notifications (Payments, Upcoming Auctions, Post-Auction Dividends, 3-Month Default warnings) and OTPs run strictly via **Indian TRAI DLT SMS (MSG91)**. WhatsApp simulation channels are purged (`KFC-NOT-001`), and FCM Mobile Push code (`notification.service.ts`) is preserved for Phase 2 Flutter activation (`ADR-26`).
+  - **Authentication**: OTP delivered strictly via Telecom DLT SMS and managed securely in Redis (`auth:otp:<phone>`) with a 300-second (5-minute) TTL and atomic Lua 3-attempt brute-force lockout (`F13`).
   - **Help Desk**: Direct phone calls to Perundurai Head Office (`0424-2223333`); WhatsApp Business API parked in V1.
 - **Prize Payout Vouchers (V1 Scope)**:
-  - Supports Cheque, NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount to match local business reality.
-  - Requires company safety proof checklist verification (signed agreement [Yes/No], nominee signed [Yes/No], signed blank cheques [Yes/No], scanned uploads; `CONFIRMED-BY-DEVELOPER`).
+  - Supports Cheque (`ACCOUNT_PAYEE_CHEQUE`), NEFT/RTGS/IMPS, and Cash (`CONFIRMED-BY-DEVELOPER`). Enforces zero artificial cash blocks or limits; full hard cash disbursements permitted for any amount with statutory IT Act §40A(3) advisories for cash $> ₹10,000$.
+  - Requires company safety proof checklist verification (`agreementSigned`, `nomineeSigned`, `blankChequeDetails`, `securityDocS3Key`; `CONFIRMED-BY-DEVELOPER`).
   - Property documents are completely eliminated; security proof is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
 - **Payment Reversals (`KFC-SEC-001`, `KFC-PDF-001`)**:
   - Never delete a posted payment from the ledger.
-  - Reversal initiation is strictly restricted to **Super Admin (Partner A exclusively)**; Branch Manager and Accountant roles are blocked.
-  - Reversal approval is strictly restricted to **Super Admin (Partner B)** with hard dual control (`maker_user_id != checker_user_id`).
-  - Reversed receipts dynamically render a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35°, 28pt bold, `#DC2626`).
+  - Reversal initiation (`POST /payments/:id/request-reversal`) is strictly restricted to **Super Admin (`Partner A, isPartner: true`)**; Branch Manager and Accountant roles are blocked.
+  - Reversal approval (`POST /payments/:id/approve-reversal`) and rejection (`POST /payments/:id/reject-reversal`) are strictly restricted to independent **Super Admin (`Partner B, isPartner: true`)** with hard dual control (`maker_user_id != checker_user_id`, `chk_reversal_maker_checker`).
+  - Reversed receipts dynamically render a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35°, 28pt bold, `#DC2626`, opacity `0.28`).
 
 ### Module 9: In-Office Staff-Recorded Auction Engine (`CONFIRMED-BY-DEVELOPER`)
 - **Offline Auction Recording & Finalization**:
   - Auctions are conducted offline at the branch by staff/foreman in the presence of members.
-  - Software validates and records results entered by staff; finalization is strictly reserved for **Super Admin (Partners)** under `maker_user_id != checker_user_id`.
+  - Software validates and records results entered by staff; finalization is strictly reserved for verified **Super Admin Partners (`isPartner: true`)** under `maker_user_id != checker_user_id`.
 - **Validation Rules & Pre-Conditions**:
   1. Bid discount $\ge$ Foreman commission (4.00%).
   2. Bid discount $\le$ Fixed 1/4 (25.00%) ceiling of the total chit value ($D \le \frac{V}{4}$).
   3. **Whole-Rupee Dividend Divisibility (`KFC-FIN-002`)**: Total dividend $(D - C_f)$ must be cleanly divisible by total tickets $M$ without remainder ($(D - C_f) \pmod M == 0$). Bids failing this are rejected fail-closed with HTTP 400 `NON_DIVISIBLE_DIVIDEND`.
-  4. **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: Any subscriber who has not paid their installment due for that specific month is **strictly ineligible to participate or bid** in that month's auction. The system verifies payment status and blocks entering an unpaid subscriber as an active bidder or winner.
-- **Finalized Auction Correction Workflow (`KFC-FIN-005`)**:
-  - Allows correcting clerical errors (winning ticket, bid discount) via 2-partner workflow (`POST /auctions/:id/correction/request` $\to$ `approve`). Blocked if prize money has already been disbursed. Swaps `isPrized` and reconciles downstream unpaid dues.
+  4. **Auction Ineligibility for Unpaid Dues & Pending Removal (`CONFIRMED-BY-DEVELOPER`, `DEF-M9-ENG-01`)**: Any subscriber who has not paid their installment due for that month (`consecutiveUnpaidMonths > 0`) or has a pending defaulter removal request (`removalRequestedByUserId != null`) is **strictly ineligible to participate or bid**.
+- **Finalized Auction Correction Workflow (`KFC-FIN-005`, `M9-DUAL-DEF-01..05`)**:
+  - Allows correcting clerical errors (winning ticket, bid discount) via full 2-partner workflow (`POST /auctions/:id/correction/request` $\to$ `approve` or `reject`). Blocked if prize money is already disbursed (`DISBURSED_PRIZE_IMMUTABLE`) or if any Month $N+1$ due is already paid (`ALREADY_PAID_DUES_EXIST`). Active pending corrections lock all 3 prize disbursement stages (`PENDING_CORRECTION_LOCKOUT`), and sub-ceiling corrections ($D < V/4$) purge stale tie-bidders.
 - **Tie-Breaker Protocol (`CONFIRMED-BY-DEVELOPER`)**:
   - **Option A (Physical Paper Token Draw)**: When multiple members bid the maximum 1/4 ceiling discount, the Foreman draws paper tokens physically at the branch in front of members.
-  - Staff enters the winning ticket number into the software. (No autonomous digital lottery draws).
+  - Staff enters unique paper token numbers and the drawn winning ticket into the software. (No autonomous digital lottery draws).
 - **Financial Commitment**:
   - Automatically calculates Prize Money ($P = V - D$), Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members.
   - Month 1 and Month $N$ have **NO auctions** (`CONFIRMED-BY-DEVELOPER`).
 
-### Module 10: Dashboards & Reports (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)
-- **Super Admin Dashboard**: Active chits, daily/monthly collections, overdue balances, branch summaries.
-- **Branch Dashboard**: Branch collection targets, pending customer dues, upcoming auction dates.
-- **Accountant Reports**: Day book, cash handover register, bank reconciliation journal, dividend schedules.
-- **Subscriber Passbook**: Personal digital passbook, dividend savings ledger, downloadable bilingual receipts.
-- **Statutory Registers (`UNVERIFIED-LEGAL`)**: Form XVII (Minutes), Form XXI (Subscriber Ledger), and Form XXII (Cash Book) layout labels retained as `UNVERIFIED-LEGAL` until physical specimen copies from the Registrar are verified.
+### Module 10: Dashboards, Statutory Registers & Real-Time Approvals (`CONFIRMED-BY-DEVELOPER` / `UNVERIFIED-LEGAL`)
+- **Executive & Branch Dashboards (`/reports/dashboard`)**: Active chits, daily/monthly collections, vault safe cash, arrears aging buckets (excluding `REMOVED_DEF_3M` and `SURRENDERED` tickets), and branch summaries.
+- **8-Queue Pending Approvals Hub & Real-Time SSE Stream (`/reports/pending-approvals`, `/reports/approvals-stream`)**: Aggregates all 8 Maker-Checker queues with live SSE push (`@BypassEnvelope()`, mid-flight session/role verification, graceful DB-error heartbeat fallback).
+- **Accountant & Auditor Reports**: Day book (`/reports/day-book`), Form XXII physical cash book (strictly `CASH`-only, approved cash reversals as outflows on `reversedAt`, field handover vault entry at `cashHandoverAcknowledgedAt ?? createdAt`), defaulters aging (`/reports/defaulters`), and immutable audit logs (`/reports/audit-logs`, strictly `SUPER_ADMIN` only).
+- **Subscriber Passbook (`/reports/form-xxi`)**: Continuous $1..N$ digital passbook with exact 64-bit `BigInt` cumulative running totals, KC-09 arrears offset provenance, and downloadable bilingual PDFs.
+- **Statutory Registers (`UNVERIFIED-LEGAL`)**: Form XVII (Minutes with 21-day IST countdown & Option A tie-break tokens), Form XXI (Subscriber Ledger), and Form XXII (Cash Book) layout labels retained as `UNVERIFIED-LEGAL` until physical specimen copies from the Registrar are verified.
 
 ---
 
-## 3. Client Applications & Device Delivery Architecture (`CONFIRMED-BY-DEVELOPER`)
+## 3. Client Applications & Device Delivery Architecture (`CONFIRMED-BY-DEVELOPER` / `ADR-26`)
 
-The platform delivers its 10 functional modules through two purpose-built client frontends sharing a 100% unified backend API:
+The platform is architected for two client frontends sharing a 100% unified NestJS backend API, with **Phase 1 focused exclusively on the Web Operations Portal** and **Flutter Android UI deferred to Phase 2 (Q2 2027)** per `ADR-26`:
 
 ```mermaid
 flowchart TD
     subgraph Clients["Client Applications"]
-        Web["Web Portal (apps/web)\nNext.js 15 + Tailwind CSS\n• Desktop PC / Laptop\n• Responsive down to tablet/mobile"]
-        Mobile["Mobile App (apps/mobile)\nFlutter + Dart\n• Android-first (Play Store / APK)\n• Offline SQLite Auto-Sync"]
+        Web["Web Portal (apps/web) — PHASE 1 ACTIVE\nNext.js 15 + Tailwind CSS + BFF Cookies\n• Desktop PC / Laptop & Tablet\n• All Phase 1 Operations"]
+        Mobile["Mobile App (apps/mobile) — PHASE 2 DEFERRED (ADR-26)\nFlutter + Dart Core Preserved\n• Typed 64-bit int Models & Offline Sync Core Ready\n• Android UI / APK Postponed to Q2 2027"]
     end
 
     subgraph Personas["Persona Distribution"]
-        P_Partner["The 4 Partners (Super Admin)\n100% Feature Parity on BOTH Web & Mobile"]
-        P_Desk["Desk Accountant & CA Auditor\nPrimarily Web Portal"]
-        P_Field["Field Collection Agents & Customers\nPrimarily Mobile App"]
+        P_Partner["The 4 Partners (Super Admin)\nWeb Portal (Phase 1) + Mobile Parity (Phase 2)"]
+        P_Desk["Desk Accountant & CA Auditor\nWeb Portal"]
+        P_Field["Field Collection Agents & Customers\nWeb Portal / Passbook PDF (Phase 1) + Mobile App (Phase 2)"]
     end
 
     Web --> P_Partner
     Web --> P_Desk
-    Mobile --> P_Partner
-    Mobile --> P_Field
+    Web --> P_Field
+    Mobile -.->|"Phase 2 Activation"| P_Partner
+    Mobile -.->|"Phase 2 Activation"| P_Field
 ```
 
-1. **Web Dashboard (`apps/web/`)**:
-   - **Target Users**: The 4 Partners (Super Admin), Desk Accountant, and CA Auditor.
-   - **Tech Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, TanStack React Query.
-   - **Key Capabilities**: 20-month physical notebook onboarding grid, Form XXII 12-column daily cashbook, dual-control document comparison, PDF/Excel statutory exports.
-2. **Mobile Application (`apps/mobile/`)**:
-   - **Target Users**: The 4 Partners (Super Admin - 100% Full Parity), Field Collection Agents, and Chit Customers.
-   - **Tech Stack**: Flutter 3.x, Dart (Android-first).
-   - **Key Capabilities**: 1-second biometric fingerprint unlock, doorstep collections under 30 seconds, offline SQLite sync in rural 4G dead zones, native UPI app switching (GPay/PhonePe), 1-tap push notification Maker-Checker approvals.
-3. **100% Partner Feature Parity Mandate**:
-   - The 4 Partners have complete access to all administrative actions (auctions, prize disbursements, cash handover sign-off, reversals, business pulse) on **BOTH** Web and Mobile.
-   - Cross-device Maker-Checker (`maker_user_id != checker_user_id`) is supported across any permutation of mobile and desktop devices.
+1. **Web Operations Portal (`apps/web/` — Phase 1 Production)**:
+   - **Target Users**: The 4 Partners (Super Admin), Desk Accountant, Field Staff (counter/desk), and CA Auditor.
+   - **Tech Stack**: Next.js 15 (App Router + BFF HttpOnly Cookies), React 19, TypeScript, Tailwind CSS, TanStack React Query, Zustand.
+   - **Key Capabilities**: 20-month physical notebook onboarding grid, Form XXII 12-column daily cashbook, 8-queue real-time SSE approval banner, dual-control document comparison, authenticated BFF PDF/CSV statutory exports.
+2. **Mobile Application (`apps/mobile/` — Dart Core Preserved; Flutter UI Deferred to Phase 2 per `ADR-26`)**:
+   - **Preserved Phase 1 Assets**: Typed whole-rupee 64-bit `int` Dart models (`api_models.dart`), single-flight 401 refresh mutex (`AuthSessionManager`), offline SQLite sync core, and all mobile backend endpoints (`/auth/mobile/*`, `/collections/sync-offline-queue`, `/installments/:dueId/upi-intent`, `/tickets/:ticketId/passbook`).
+   - **Deferred Phase 2 UI Scope**: Flutter Android screens, biometric unlock UI, Bluetooth thermal printing, FCM push activation, and Play Store APK/AAB packaging.
+3. **Cross-Device Maker-Checker Enforcement**:
+   - The backend API and PostgreSQL 17 engine constraints enforce `maker_user_id != checker_user_id` completely agnostic of client devices.
