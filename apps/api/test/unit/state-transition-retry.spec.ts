@@ -102,10 +102,31 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
             status: 'ACTIVE',
             customer: { fullName: 'M. Palanisamy' },
           }),
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'tkt-001',
+              chitGroupId: 'chit-001',
+              ticketNumber: 5,
+              isPrized: false,
+              consecutiveUnpaidMonths: 0,
+              status: 'ACTIVE',
+              customer: { fullName: 'M. Palanisamy' },
+            },
+            {
+              id: 'tkt-002',
+              chitGroupId: 'chit-001',
+              ticketNumber: 6,
+              isPrized: false,
+              consecutiveUnpaidMonths: 0,
+              status: 'ACTIVE',
+              customer: { fullName: 'S. Ramasamy' },
+            },
+          ]),
           update: jest.fn().mockResolvedValue({ id: 'tkt-001', isPrized: true }),
         },
         installmentDue: {
           findUnique: jest.fn().mockResolvedValue({ status: 'PAID' }),
+          findFirst: jest.fn().mockResolvedValue(null),
         },
         auctionWinner: {
           upsert: jest.fn().mockResolvedValue({ id: 'win-001' }),
@@ -121,7 +142,22 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
         auditLog: {
           create: jest.fn().mockResolvedValue({ id: 'audit-001' }),
         },
-        $queryRaw: jest.fn().mockResolvedValue([{ id: 'auc-001', status: AuctionStatus.SCHEDULED }]),
+        $queryRaw: jest.fn().mockImplementation(async (q: any) => {
+          const sql = Array.isArray(q) ? q.join('') : String(q);
+          if (sql.includes('"ChitGroup"')) {
+            return [{ id: 'chit-001', status: ChitStatus.ACTIVE }];
+          }
+          if (sql.includes('"SubscriberTicket"')) {
+            return [{ id: 'tkt-001', status: 'ACTIVE', isPrized: false }];
+          }
+          if (sql.includes('"AuctionMinutes"')) {
+            return [{ id: 'min-001', filedAtRegistrar: false }];
+          }
+          if (sql.includes('"Auction"')) {
+            return [{ id: 'auc-001', status: AuctionStatus.SCHEDULED }];
+          }
+          return [];
+        }),
         $transaction: jest.fn(),
       };
       prismaMockRef.current = prismaMock;
@@ -210,6 +246,16 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
         chitGroup: { groupCode: 'KCA-1L-20M-01' },
         minutes: { id: 'min-001', filedAtRegistrar: false },
       });
+      prismaMock.$queryRaw.mockImplementation(async (q: any) => {
+        const sql = Array.isArray(q) ? q.join('') : String(q);
+        if (sql.includes('"AuctionMinutes"')) {
+          return [{ id: 'min-001', filedAtRegistrar: false }];
+        }
+        if (sql.includes('"Auction"')) {
+          return [{ id: 'auc-001', status: AuctionStatus.COMPLETED }];
+        }
+        return [];
+      });
       prismaMock.$transaction = createTransientThenSucceedTx('P2034');
       await auctionService.markMinutesFiled('auc-001', { filingReference: 'ROC-01' }, 'maker-001');
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
@@ -223,7 +269,16 @@ describe('DEF-DB-02: State Transition Transient Deadlock Retries & Concurrency G
         chitGroup: { groupCode: 'KCA-1L-20M-01' },
         minutes: { id: 'min-001', filedAtRegistrar: false },
       });
-      prismaMock.$queryRaw.mockResolvedValue([{ id: 'min-001', filedAtRegistrar: true }]);
+      prismaMock.$queryRaw.mockImplementation(async (q: any) => {
+        const sql = Array.isArray(q) ? q.join('') : String(q);
+        if (sql.includes('"AuctionMinutes"')) {
+          return [{ id: 'min-001', filedAtRegistrar: true }];
+        }
+        if (sql.includes('"Auction"')) {
+          return [{ id: 'auc-001', status: AuctionStatus.COMPLETED }];
+        }
+        return [];
+      });
       prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
 
       await expect(

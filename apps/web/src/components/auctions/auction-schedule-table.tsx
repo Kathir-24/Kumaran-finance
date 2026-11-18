@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
+  Award,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,12 +26,18 @@ import {
 import { formatRupee } from '@/lib/currency';
 import type { ChitGroupSummary } from './auction-scheme-selector';
 import type { AuctionScheduleItem } from './auction-metrics-cards';
+import {
+  computeCeilingDiscountBigInt,
+  toSafeWholeRupeeBigInt,
+} from './auction-math.util';
 
 export interface AuctionScheduleTableProps {
   scheme: ChitGroupSummary;
   auctions: AuctionScheduleItem[];
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  onOpenFinalSettlement?: () => void;
+  canSettleFinalMonth?: boolean;
   isLoading?: boolean;
 }
 
@@ -39,13 +46,15 @@ export function AuctionScheduleTable({
   auctions,
   statusFilter,
   onStatusFilterChange,
+  onOpenFinalSettlement,
+  canSettleFinalMonth = false,
   isLoading,
 }: AuctionScheduleTableProps) {
   const t = useTranslations('auctions');
 
-  const chitValueNum = Number(scheme.chitValue);
-  const duration = scheme.durationMonths || 20;
-  const ceilingDiscount = Math.floor(chitValueNum / 4);
+  const chitValueBig = toSafeWholeRupeeBigInt(scheme.chitValue, 0n);
+  const duration = Math.max(2, scheme.durationMonths || 20);
+  const ceilingDiscount = computeCeilingDiscountBigInt(chitValueBig, scheme.maxDiscountCeiling);
 
   // Map existing auctions by installment month
   const auctionMap = React.useMemo(() => {
@@ -75,11 +84,15 @@ export function AuctionScheduleTable({
         });
       } else {
         const existing = auctionMap.get(m);
+        const derivedStatus =
+          existing?.status === 'MINUTES_FILED' || existing?.minutes?.filedAtRegistrar
+            ? 'MINUTES_FILED'
+            : existing?.status || 'SCHEDULED';
         rows.push({
           month: m,
           type: 'AUCTION' as const,
           auction: existing || null,
-          status: existing?.status || 'SCHEDULED',
+          status: derivedStatus,
         });
       }
     }
@@ -192,6 +205,12 @@ export function AuctionScheduleTable({
 
                 // 2. Month N Final Settlement Row
                 if (row.type === 'MONTH_N_FINAL_SETTLEMENT') {
+                  const monthNAuction = auctionMap.get(row.month);
+                  const isSchemeCompleted =
+                    scheme.status === 'COMPLETED' ||
+                    scheme.status === 'CLOSED' ||
+                    monthNAuction?.status === 'COMPLETED' ||
+                    monthNAuction?.status === 'MINUTES_FILED';
                   return (
                     <TableRow key={row.month} className="border-slate-800/80 bg-slate-950/40 hover:bg-slate-950/60 text-xs">
                       <TableCell className="font-mono font-bold text-amber-400 whitespace-nowrap">M{row.month}</TableCell>
@@ -205,16 +224,42 @@ export function AuctionScheduleTable({
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-mono text-xs text-slate-400 whitespace-nowrap">{t('finalSettlement')}</TableCell>
-                      <TableCell className="text-right text-slate-500 text-[11px] whitespace-nowrap">—</TableCell>
+                      <TableCell className="text-center font-mono text-xs text-slate-400 whitespace-nowrap">
+                        {isSchemeCompleted ? (
+                          <Badge variant="outline" className="border-emerald-500/30 bg-emerald-950/40 text-emerald-300 text-[10px] py-0 px-1.5">
+                            <CheckCircle2 className="h-3 w-3 mr-1 inline" /> {t('statusCompleted')}
+                          </Badge>
+                        ) : (
+                          t('finalSettlement')
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-500 text-[11px] whitespace-nowrap">
+                        {!isSchemeCompleted &&
+                        scheme.status === 'ACTIVE' &&
+                        canSettleFinalMonth &&
+                        onOpenFinalSettlement ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onOpenFinalSettlement}
+                            className="h-7 px-2.5 text-[11px] border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 font-medium shrink-0 whitespace-nowrap"
+                          >
+                            <Award className="mr-1 h-3 w-3 shrink-0" />
+                            <span>{t('openFinalSettlement')}</span>
+                          </Button>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 }
 
                 // 3. Regular Auction Month (M = 2 .. N-1)
                 const auc = row.auction;
-                const isCompleted = auc?.status === 'COMPLETED';
-                const isMinutesFiled = auc?.status === 'MINUTES_FILED';
+                const isMinutesFiled =
+                  auc?.status === 'MINUTES_FILED' || auc?.minutes?.filedAtRegistrar === true;
+                const isCompleted = auc?.status === 'COMPLETED' && !isMinutesFiled;
                 const isScheduled = !auc || auc.status === 'SCHEDULED';
 
                 const formattedDate = auc?.auctionDate
@@ -226,7 +271,7 @@ export function AuctionScheduleTable({
                   : `Month ${row.month} Schedule`;
 
                 const wasTieBreak = auc?.winner?.wasTieBreakWinner;
-                const tieBidder = auc?.tieBidders?.find((tb) => tb.isWinner);
+                const tieBidder = auc?.tieBidders?.find((tb) => tb.isWinner || tb.isLotWinner);
                 const drawnToken = tieBidder?.tokenNumber;
 
                 return (

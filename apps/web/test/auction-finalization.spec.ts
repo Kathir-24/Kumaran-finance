@@ -40,18 +40,67 @@ describe('Task 6.3: Dual-Control Maker-Checker Auction Finalization & Minutes Un
     assert.equal(canAuthorize(checkerUserId, makerUserId), true);
   });
 
-  // 3. RBAC Role Authority Gate
-  it('RBAC Authority: Restricts finalization strictly to SUPER_ADMIN and BRANCH_MANAGER', () => {
-    const allowedRoles = new Set(['SUPER_ADMIN', 'BRANCH_MANAGER']);
+  // 3. RBAC & Guardrail 11 (SEC-A / KFC-SEC-003): Strictly SUPER_ADMIN with isPartner: true
+  it('RBAC Authority & Guardrail 11: Restricts finalization strictly to verified Partners (SUPER_ADMIN + isPartner: true)', () => {
+    const canFinalize = (roles: string[], isPartner: boolean) =>
+      roles.includes('SUPER_ADMIN') && isPartner === true;
 
-    const canFinalizeRole = (role: string) => allowedRoles.has(role);
+    assert.equal(canFinalize(['SUPER_ADMIN'], true), true);
+    assert.equal(canFinalize(['SUPER_ADMIN'], false), false); // Non-partner IT admin strictly blocked
+    assert.equal(canFinalize(['BRANCH_MANAGER'], true), false); // Branch Manager strictly blocked per KFC-SEC-003
+    assert.equal(canFinalize(['ACCOUNTANT'], false), false);
+    assert.equal(canFinalize(['COLLECTION_AGENT'], false), false);
+    assert.equal(canFinalize(['CUSTOMER'], false), false);
+    assert.equal(canFinalize(['AUDITOR'], false), false);
+  });
 
-    assert.equal(canFinalizeRole('SUPER_ADMIN'), true);
-    assert.equal(canFinalizeRole('BRANCH_MANAGER'), true);
-    assert.equal(canFinalizeRole('ACCOUNTANT'), false);
-    assert.equal(canFinalizeRole('COLLECTION_AGENT'), false);
-    assert.equal(canFinalizeRole('CUSTOMER'), false);
-    assert.equal(canFinalizeRole('AUDITOR'), false);
+  // 3b. Source regression: AuctionFinalizeCard strictly excludes BRANCH_MANAGER & enforces isPartner
+  it('DEF-WM-02 Regression: AuctionFinalizeCard restricts finalization to SUPER_ADMIN + isPartner and checks recorded bid', () => {
+    const cardPath = path.resolve(
+      process.cwd(),
+      'src/components/auctions/auction-finalize-card.tsx',
+    );
+    const source = fs.readFileSync(cardPath, 'utf-8');
+    assert.match(source, /hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)/);
+    assert.doesNotMatch(
+      source,
+      /hasAnyRole\(user,\s*\['SUPER_ADMIN',\s*'BRANCH_MANAGER'\]\)/,
+      'BRANCH_MANAGER must NOT be allowed to finalize auctions (KFC-SEC-003)',
+    );
+    assert.match(source, /Boolean\(user\?\.isPartner\)/);
+    assert.match(source, /hasRecordedBid/);
+  });
+
+  // 3c. KFC-FIN-005: Finalized Auction Correction dual-control & disbursed-prize immutability
+  it('DEF-WM-02 (KFC-FIN-005): AuctionDetailPage wires correction request/approve endpoints with Partner & Maker != Checker guards', () => {
+    const detailPath = path.resolve(
+      process.cwd(),
+      'src/app/(dashboard)/auctions/[id]/page.tsx',
+    );
+    const correctionPath = path.resolve(
+      process.cwd(),
+      'src/components/auctions/auction-correction-card.tsx',
+    );
+    const detailSource = fs.readFileSync(detailPath, 'utf-8');
+    const correctionSource = fs.readFileSync(correctionPath, 'utf-8');
+
+    assert.match(detailSource, /\/api\/v1\/auctions\/\{id\}\/correction\/request/);
+    assert.match(detailSource, /\/api\/v1\/auctions\/\{id\}\/correction\/approve/);
+    // Guardrail 5: AuctionCorrectionCard gated strictly to Months 2..N-1 (excludes Month 1 & Month N)
+    assert.match(
+      detailSource,
+      /isFinalized\s*&&\s*auction\.installmentMonth\s*>=\s*2\s*&&\s*auction\.installmentMonth\s*<\s*durationMonths/,
+    );
+    assert.match(correctionSource, /disbursementStatus === 'DISBURSED'/);
+    assert.match(correctionSource, /isSelfApproval/);
+    assert.match(correctionSource, /Boolean\(user\?\.isPartner\)/);
+
+    // XR-WM-02: Server pendingCorrection hydration across reloads + correctedWinningTicketId swap selector
+    assert.match(detailSource, /pendingCorrection=\{auction\.pendingCorrection\}/);
+    assert.match(detailSource, /candidateTickets=\{schemeTickets\}/);
+    assert.match(correctionSource, /pendingCorrection\?\.requestedByUserId/);
+    assert.match(correctionSource, /correctedWinningTicketId:\s*ticketSwapId/);
+    assert.match(correctionSource, /parseWholeRupeesBigInt/);
   });
 
   // 4. Form XVII Proceedings Generation & Invariants

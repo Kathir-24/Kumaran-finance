@@ -7,6 +7,27 @@
 
 // ignore_for_file: unused_import, non_constant_identifier_names, unnecessary_null_comparison, unnecessary_non_null_assertion
 
+/// Guardrail 2: Parses whole-Rupee 64-bit integers safely from JSON int, num,
+/// or BigInt-serialized decimal string without IEEE-754 double precision loss.
+int? _parseWholeRupeeIntOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final direct = int.tryParse(trimmed);
+    if (direct != null) return direct;
+    final intPart = trimmed.split('.').first.replaceAll(RegExp(r'[^0-9-]'), '');
+    return int.tryParse(intPart);
+  }
+  return null;
+}
+
+int _parseWholeRupeeInt(dynamic value, [int fallback = 0]) {
+  return _parseWholeRupeeIntOrNull(value) ?? fallback;
+}
+
 class DailyArrearsExecutionResultDto {
   /// Total installment dues checked
   final double totalDuesChecked;
@@ -3107,23 +3128,29 @@ class AuctionTieBidderDto {
   /// Tied subscriber ticket ID
   final String ticketId;
   /// Bid ceiling discount amount in whole Rupees
-  final double bidDiscount;
+  final int bidDiscount;
+  /// Physical paper token number drawn at branch (Option A)
+  final int? tokenNumber;
   /// Whether this ticket won the physical token draw
-  final bool isLotWinner;
+  final bool isWinner;
+  /// Legacy OpenAPI alias for isWinner
+  bool get isLotWinner => isWinner;
 
   const AuctionTieBidderDto({
     required this.id,
     required this.ticketId,
     required this.bidDiscount,
-    required this.isLotWinner,
+    this.tokenNumber,
+    required this.isWinner,
   });
 
   factory AuctionTieBidderDto.fromJson(Map<String, dynamic> json) {
     return AuctionTieBidderDto(
       id: json['id']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null) ?? 0.0,
-      isLotWinner: json['isLotWinner'] as bool? ?? false,
+      bidDiscount: _parseWholeRupeeInt(json['bidDiscount']),
+      tokenNumber: _parseWholeRupeeIntOrNull(json['tokenNumber']),
+      isWinner: (json['isWinner'] as bool?) ?? (json['isLotWinner'] as bool?) ?? false,
     );
   }
 
@@ -3132,7 +3159,9 @@ class AuctionTieBidderDto {
     data['id'] = id;
     data['ticketId'] = ticketId;
     data['bidDiscount'] = bidDiscount;
-    data['isLotWinner'] = isLotWinner;
+    data['tokenNumber'] = tokenNumber;
+    data['isWinner'] = isWinner;
+    data['isLotWinner'] = isWinner;
     return data;
   }
 }
@@ -3143,23 +3172,23 @@ class AuctionResponseDto {
   /// Chit group ID
   final String chitGroupId;
   /// Installment month 1..N
-  final double installmentMonth;
+  final int installmentMonth;
   /// Scheduled/Conducted auction timestamp
   final String auctionDate;
   /// Auction lifecycle status
   final String status;
   /// Winning bid discount in whole Rupees
-  final double? bidDiscount;
+  final int? bidDiscount;
   /// Foreman commission rate frozen at 4.00%
   final double? foremanCommissionRate;
   /// Foreman commission in whole Rupees
-  final double? foremanCommissionAmount;
+  final int? foremanCommissionAmount;
   /// Total universal dividend pool in whole Rupees
-  final double? totalDividend;
+  final int? totalDividend;
   /// Dividend allocated per ticket in whole Rupees
-  final double? dividendPerTicket;
+  final int? dividendPerTicket;
   /// Prize money payable to winner in whole Rupees
-  final double? prizeMoney;
+  final int? prizeMoney;
   /// Maker user ID who entered bid
   final String? conductedByUserId;
   /// Checker user ID who finalized auction
@@ -3191,15 +3220,17 @@ class AuctionResponseDto {
     return AuctionResponseDto(
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       auctionDate: json['auctionDate']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      bidDiscount: json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null,
-      foremanCommissionRate: json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null,
-      foremanCommissionAmount: json['foremanCommissionAmount'] != null ? (json['foremanCommissionAmount'] as num).toDouble() : null,
-      totalDividend: json['totalDividend'] != null ? (json['totalDividend'] as num).toDouble() : null,
-      dividendPerTicket: json['dividendPerTicket'] != null ? (json['dividendPerTicket'] as num).toDouble() : null,
-      prizeMoney: json['prizeMoney'] != null ? (json['prizeMoney'] as num).toDouble() : null,
+      bidDiscount: _parseWholeRupeeIntOrNull(json['bidDiscount']),
+      foremanCommissionRate: json['foremanCommissionRate'] != null
+          ? double.tryParse(json['foremanCommissionRate'].toString())
+          : null,
+      foremanCommissionAmount: _parseWholeRupeeIntOrNull(json['foremanCommissionAmount']),
+      totalDividend: _parseWholeRupeeIntOrNull(json['totalDividend']),
+      dividendPerTicket: _parseWholeRupeeIntOrNull(json['dividendPerTicket']),
+      prizeMoney: _parseWholeRupeeIntOrNull(json['prizeMoney']),
       conductedByUserId: json['conductedByUserId']?.toString(),
       finalizedByUserId: json['finalizedByUserId']?.toString(),
       winner: json['winner'],
@@ -3232,7 +3263,7 @@ class AuctionMinutesDto {
   /// Auction minutes ID
   final String id;
   /// Number of subscribers physically present at branch
-  final double subscribersPresent;
+  final int subscribersPresent;
   /// Full Form XVII statutory minutes text
   final String minutesText;
   /// Foreman signature recorded
@@ -3257,7 +3288,7 @@ class AuctionMinutesDto {
   factory AuctionMinutesDto.fromJson(Map<String, dynamic> json) {
     return AuctionMinutesDto(
       id: json['id']?.toString() ?? '',
-      subscribersPresent: (json['subscribersPresent'] != null ? (json['subscribersPresent'] as num).toDouble() : null) ?? 0.0,
+      subscribersPresent: _parseWholeRupeeInt(json['subscribersPresent']),
       minutesText: json['minutesText']?.toString() ?? '',
       signedByForeman: json['signedByForeman'] as bool? ?? false,
       filedAtRegistrar: json['filedAtRegistrar'] as bool? ?? false,
@@ -3285,23 +3316,23 @@ class AuctionDetailResponseDto {
   /// Chit group ID
   final String chitGroupId;
   /// Installment month 1..N
-  final double installmentMonth;
+  final int installmentMonth;
   /// Scheduled/Conducted auction timestamp
   final String auctionDate;
   /// Auction lifecycle status
   final String status;
   /// Winning bid discount in whole Rupees
-  final double? bidDiscount;
+  final int? bidDiscount;
   /// Foreman commission rate frozen at 4.00%
   final double? foremanCommissionRate;
   /// Foreman commission in whole Rupees
-  final double? foremanCommissionAmount;
+  final int? foremanCommissionAmount;
   /// Total universal dividend pool in whole Rupees
-  final double? totalDividend;
+  final int? totalDividend;
   /// Dividend allocated per ticket in whole Rupees
-  final double? dividendPerTicket;
+  final int? dividendPerTicket;
   /// Prize money payable to winner in whole Rupees
-  final double? prizeMoney;
+  final int? prizeMoney;
   /// Maker user ID who entered bid
   final String? conductedByUserId;
   /// Checker user ID who finalized auction
@@ -3339,15 +3370,17 @@ class AuctionDetailResponseDto {
     return AuctionDetailResponseDto(
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       auctionDate: json['auctionDate']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      bidDiscount: json['bidDiscount'] != null ? (json['bidDiscount'] as num).toDouble() : null,
-      foremanCommissionRate: json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null,
-      foremanCommissionAmount: json['foremanCommissionAmount'] != null ? (json['foremanCommissionAmount'] as num).toDouble() : null,
-      totalDividend: json['totalDividend'] != null ? (json['totalDividend'] as num).toDouble() : null,
-      dividendPerTicket: json['dividendPerTicket'] != null ? (json['dividendPerTicket'] as num).toDouble() : null,
-      prizeMoney: json['prizeMoney'] != null ? (json['prizeMoney'] as num).toDouble() : null,
+      bidDiscount: _parseWholeRupeeIntOrNull(json['bidDiscount']),
+      foremanCommissionRate: json['foremanCommissionRate'] != null
+          ? double.tryParse(json['foremanCommissionRate'].toString())
+          : null,
+      foremanCommissionAmount: _parseWholeRupeeIntOrNull(json['foremanCommissionAmount']),
+      totalDividend: _parseWholeRupeeIntOrNull(json['totalDividend']),
+      dividendPerTicket: _parseWholeRupeeIntOrNull(json['dividendPerTicket']),
+      prizeMoney: _parseWholeRupeeIntOrNull(json['prizeMoney']),
       conductedByUserId: json['conductedByUserId']?.toString(),
       finalizedByUserId: json['finalizedByUserId']?.toString(),
       winner: json['winner'],
@@ -3384,7 +3417,7 @@ class EligibleBidderResponseDto {
   /// Subscriber ticket unique ID
   final String ticketId;
   /// Ticket number 1..N
-  final double ticketNumber;
+  final int ticketNumber;
   /// Customer ID
   final String customerId;
   /// Customer full name
@@ -3404,13 +3437,18 @@ class EligibleBidderResponseDto {
   });
 
   factory EligibleBidderResponseDto.fromJson(Map<String, dynamic> json) {
+    final nestedCustomer = json['customer'] is Map<String, dynamic>
+        ? json['customer'] as Map<String, dynamic>
+        : null;
     return EligibleBidderResponseDto(
-      ticketId: json['ticketId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
-      customerId: json['customerId']?.toString() ?? '',
-      customerName: json['customerName']?.toString() ?? '',
-      customerCode: json['customerCode']?.toString() ?? '',
-      phone: json['phone']?.toString() ?? '',
+      ticketId: (json['ticketId'] ?? json['id'])?.toString() ?? '',
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
+      customerId: (json['customerId'] ?? nestedCustomer?['id'])?.toString() ?? '',
+      customerName:
+          (json['customerName'] ?? nestedCustomer?['fullName'])?.toString() ?? '',
+      customerCode:
+          (json['customerCode'] ?? nestedCustomer?['customerCode'])?.toString() ?? '',
+      phone: (json['phone'] ?? nestedCustomer?['phone'])?.toString() ?? '',
     );
   }
 
@@ -3443,7 +3481,7 @@ class RecordBidDto {
   factory RecordBidDto.fromJson(Map<String, dynamic> json) {
     return RecordBidDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
+      bidDiscount: _parseWholeRupeeInt(json['bidDiscount']),
       auctionDate: json['auctionDate']?.toString() ?? '',
     );
   }
@@ -3461,7 +3499,7 @@ class TiedTicketDto {
   /// Ticket UUID that bid the maximum ceiling discount
   final String ticketId;
   /// Physical paper token number drawn at the branch lot draw
-  final double? tokenNumber;
+  final int? tokenNumber;
 
   const TiedTicketDto({
     required this.ticketId,
@@ -3471,7 +3509,7 @@ class TiedTicketDto {
   factory TiedTicketDto.fromJson(Map<String, dynamic> json) {
     return TiedTicketDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      tokenNumber: json['tokenNumber'] != null ? (json['tokenNumber'] as num).toDouble() : null,
+      tokenNumber: _parseWholeRupeeIntOrNull(json['tokenNumber']),
     );
   }
 
@@ -3507,7 +3545,7 @@ class RecordTieBreakDto {
     return RecordTieBreakDto(
       tiedTickets: ((json['tiedTickets'] as List<dynamic>?)?.map((e) => TiedTicketDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       winningTicketId: json['winningTicketId']?.toString() ?? '',
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
+      bidDiscount: _parseWholeRupeeInt(json['bidDiscount']),
       auctionDate: json['auctionDate']?.toString() ?? '',
       witnessNames: (json['witnessNames'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
     );
@@ -3562,7 +3600,7 @@ class FinalizeAuctionResponseDto {
 
 class FinalizeAuctionDto {
   /// Number of attending subscribers physically present at the auction
-  final double subscribersPresent;
+  final int subscribersPresent;
   /// Statutory notes or observations recorded in the auction proceedings
   final String? notes;
   /// Signed by Foreman confirmation (Form XVII minutes)
@@ -3576,7 +3614,7 @@ class FinalizeAuctionDto {
 
   factory FinalizeAuctionDto.fromJson(Map<String, dynamic> json) {
     return FinalizeAuctionDto(
-      subscribersPresent: (json['subscribersPresent'] != null ? (json['subscribersPresent'] as num).toDouble() : null) ?? 0.0,
+      subscribersPresent: _parseWholeRupeeInt(json['subscribersPresent']),
       notes: json['notes']?.toString(),
       signedByForeman: json['signedByForeman'] as bool?,
     );
@@ -3667,7 +3705,7 @@ class RequestAuctionCorrectionDto {
 
   factory RequestAuctionCorrectionDto.fromJson(Map<String, dynamic> json) {
     return RequestAuctionCorrectionDto(
-      correctedBidDiscount: (json['correctedBidDiscount'] != null ? (json['correctedBidDiscount'] as num).toInt() : null) ?? 0,
+      correctedBidDiscount: _parseWholeRupeeInt(json['correctedBidDiscount']),
       correctedWinningTicketId: json['correctedWinningTicketId']?.toString(),
       reason: json['reason']?.toString() ?? '',
       notes: json['notes']?.toString(),
@@ -5610,9 +5648,15 @@ class WinnerDisbursementItemDto {
   /// Authorized payment mode
   final String? disbursementMode;
   /// Prize money amount in whole Rupees
-  final double? disbursedAmount;
-  /// Bank UTR or Cheque number
-  final String? disbursementReference;
+  final int? disbursedAmount;
+  /// Bank UTR or Cheque number (canonical Prisma column: paymentReference)
+  final String? paymentReference;
+  /// Legacy OpenAPI alias for paymentReference
+  String? get disbursementReference => paymentReference;
+  /// Maker user ID who verified safety proof
+  final String? verifiedByUserId;
+  /// Checker user ID who authorized payout
+  final String? authorizedByUserId;
   /// Payout release timestamp
   final String? disbursedAt;
   /// Auction and scheme details
@@ -5627,7 +5671,9 @@ class WinnerDisbursementItemDto {
     required this.disbursementStatus,
     this.disbursementMode,
     this.disbursedAmount,
-    this.disbursementReference,
+    this.paymentReference,
+    this.verifiedByUserId,
+    this.authorizedByUserId,
     this.disbursedAt,
     this.auction,
     this.ticket,
@@ -5640,8 +5686,11 @@ class WinnerDisbursementItemDto {
       ticketId: json['ticketId']?.toString() ?? '',
       disbursementStatus: json['disbursementStatus']?.toString() ?? '',
       disbursementMode: json['disbursementMode']?.toString(),
-      disbursedAmount: json['disbursedAmount'] != null ? (json['disbursedAmount'] as num).toDouble() : null,
-      disbursementReference: json['disbursementReference']?.toString(),
+      disbursedAmount: _parseWholeRupeeIntOrNull(json['disbursedAmount']),
+      paymentReference:
+          (json['paymentReference'] ?? json['disbursementReference'])?.toString(),
+      verifiedByUserId: json['verifiedByUserId']?.toString(),
+      authorizedByUserId: json['authorizedByUserId']?.toString(),
       disbursedAt: json['disbursedAt']?.toString(),
       auction: json['auction'],
       ticket: json['ticket'],
@@ -5656,7 +5705,10 @@ class WinnerDisbursementItemDto {
     data['disbursementStatus'] = disbursementStatus;
     data['disbursementMode'] = disbursementMode;
     data['disbursedAmount'] = disbursedAmount;
-    data['disbursementReference'] = disbursementReference;
+    data['paymentReference'] = paymentReference;
+    data['disbursementReference'] = paymentReference;
+    data['verifiedByUserId'] = verifiedByUserId;
+    data['authorizedByUserId'] = authorizedByUserId;
     data['disbursedAt'] = disbursedAt;
     data['auction'] = auction;
     data['ticket'] = ticket;
@@ -5718,7 +5770,7 @@ class ConfirmSafetyProofDto {
   /// Verified MIME type uploaded directly to object storage
   final String mimeType;
   /// Uploaded file byte length (1 byte to 10 MB)
-  final double sizeBytes;
+  final int sizeBytes;
 
   const ConfirmSafetyProofDto({
     required this.key,
@@ -5732,7 +5784,7 @@ class ConfirmSafetyProofDto {
       key: json['key']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
       mimeType: json['mimeType']?.toString() ?? '',
-      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+      sizeBytes: _parseWholeRupeeInt(json['sizeBytes']),
     );
   }
 
@@ -5750,7 +5802,7 @@ class SafetyProofUrlResponseDto {
   /// Time-limited S3 presigned URL for viewing the safety proof collateral scan
   final String url;
   /// URL expiration duration in seconds (15 minutes)
-  final double expiresInSeconds;
+  final int expiresInSeconds;
   /// Underlying private S3 storage object key
   final String securityDocS3Key;
 
@@ -5763,7 +5815,7 @@ class SafetyProofUrlResponseDto {
   factory SafetyProofUrlResponseDto.fromJson(Map<String, dynamic> json) {
     return SafetyProofUrlResponseDto(
       url: json['url']?.toString() ?? '',
-      expiresInSeconds: (json['expiresInSeconds'] != null ? (json['expiresInSeconds'] as num).toDouble() : null) ?? 0.0,
+      expiresInSeconds: _parseWholeRupeeInt(json['expiresInSeconds']),
       securityDocS3Key: json['securityDocS3Key']?.toString() ?? '',
     );
   }
@@ -5897,7 +5949,7 @@ class AuthorizePayoutDto {
   factory AuthorizePayoutDto.fromJson(Map<String, dynamic> json) {
     return AuthorizePayoutDto(
       disbursementMode: json['disbursementMode']?.toString() ?? '',
-      disbursedAmount: json['disbursedAmount'] != null ? (json['disbursedAmount'] as num).toInt() : null,
+      disbursedAmount: _parseWholeRupeeIntOrNull(json['disbursedAmount']),
       notes: json['notes']?.toString(),
     );
   }
@@ -6004,28 +6056,28 @@ class BilingualVoucherResponseDto {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['voucherNumber'] = voucherNumber;
-    data['isBilingual'] = isBilingual;
-    data['issuedAt'] = issuedAt;
-    data['data'] = data;
-    data['formattedText'] = formattedText;
-    return data;
+    final Map<String, dynamic> result = <String, dynamic>{};
+    result['voucherNumber'] = voucherNumber;
+    result['isBilingual'] = isBilingual;
+    result['issuedAt'] = issuedAt;
+    result['data'] = data;
+    result['formattedText'] = formattedText;
+    return result;
   }
 }
 
 class FinalSettlementDataDto {
   final String chitGroupId;
-  final double installmentMonth;
-  final double ticketNumber;
+  final int installmentMonth;
+  final int ticketNumber;
   final String customerName;
-  final double grossPrize;
-  final double foremanCommission;
+  final int grossPrize;
+  final int foremanCommission;
   /// Final month base installment deducted from payout
-  final double? finalMonthInstallment;
+  final int? finalMonthInstallment;
   /// Prior arrears deducted from payout
-  final double? priorArrearsDeducted;
-  final double netPrizeMoney;
+  final int? priorArrearsDeducted;
+  final int netPrizeMoney;
   final String disbursementMode;
   final String? paymentReference;
   final String disbursedAt;
@@ -6050,14 +6102,14 @@ class FinalSettlementDataDto {
   factory FinalSettlementDataDto.fromJson(Map<String, dynamic> json) {
     return FinalSettlementDataDto(
       chitGroupId: json['chitGroupId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       customerName: json['customerName']?.toString() ?? '',
-      grossPrize: (json['grossPrize'] != null ? (json['grossPrize'] as num).toDouble() : null) ?? 0.0,
-      foremanCommission: (json['foremanCommission'] != null ? (json['foremanCommission'] as num).toDouble() : null) ?? 0.0,
-      finalMonthInstallment: json['finalMonthInstallment'] != null ? (json['finalMonthInstallment'] as num).toDouble() : null,
-      priorArrearsDeducted: json['priorArrearsDeducted'] != null ? (json['priorArrearsDeducted'] as num).toDouble() : null,
-      netPrizeMoney: (json['netPrizeMoney'] != null ? (json['netPrizeMoney'] as num).toDouble() : null) ?? 0.0,
+      grossPrize: _parseWholeRupeeInt(json['grossPrize']),
+      foremanCommission: _parseWholeRupeeInt(json['foremanCommission']),
+      finalMonthInstallment: _parseWholeRupeeIntOrNull(json['finalMonthInstallment']),
+      priorArrearsDeducted: _parseWholeRupeeIntOrNull(json['priorArrearsDeducted']),
+      netPrizeMoney: _parseWholeRupeeInt(json['netPrizeMoney']),
       disbursementMode: json['disbursementMode']?.toString() ?? '',
       paymentReference: json['paymentReference']?.toString(),
       disbursedAt: json['disbursedAt']?.toString() ?? '',

@@ -20,8 +20,8 @@ export class WinnerDisbursementItemDto {
   @ApiProperty({ type: Number, example: 75000, description: 'Prize money amount in whole Rupees', nullable: true })
   disbursedAmount?: number | null;
 
-  @ApiProperty({ type: String, example: 'UTR-NEFT-12345678', description: 'Bank UTR or Cheque number', nullable: true })
-  disbursementReference?: string | null;
+  @ApiProperty({ type: String, example: 'UTR-NEFT-12345678', description: 'Bank UTR, Cheque number, or Cash voucher reference', nullable: true })
+  paymentReference?: string | null;
 
   @ApiProperty({ type: String, format: 'date-time', example: '2026-10-22T07:28:14.000Z', description: 'Payout release timestamp', nullable: true })
   disbursedAt?: Date | string | null;

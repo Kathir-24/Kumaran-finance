@@ -31,7 +31,8 @@ export interface WinnerDisbursementRow {
   ticketId: string;
   disbursementStatus: 'PENDING_VERIFICATION' | 'VERIFIED_BY_MAKER' | 'AUTHORIZED_BY_CHECKER' | 'DISBURSED' | string;
   disbursementMode?: string | null;
-  disbursedAmount?: number | bigint | null;
+  disbursedAmount?: number | bigint | string | null;
+  paymentReference?: string | null;
   disbursementReference?: string | null;
   disbursedAt?: string | null;
   auction?: {

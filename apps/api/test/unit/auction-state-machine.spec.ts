@@ -2,7 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { AuctionStatus } from '@prisma/client';
+import { AuctionStatus, ChitStatus } from '@prisma/client';
 import { AuctionService } from '../../src/auction/auction.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -19,6 +19,7 @@ describe('Auction State Machine & Lifecycle Exhaustion Tests', () => {
 
   const mockChitScheme = {
     id: mockChitGroupId,
+    branchId: 'branch-prd-01',
     groupCode: 'KCA-1L-20M-01',
     groupName: '₹1 Lakh 20 Months Group A',
     chitValue: 100000n,
@@ -27,6 +28,7 @@ describe('Auction State Machine & Lifecycle Exhaustion Tests', () => {
     baseInstallment: 5000n,
     maxDiscountCeiling: 25000n,
     foremanCommissionRate: 4.0,
+    status: ChitStatus.ACTIVE,
   };
 
   const mockActiveTicket = {
@@ -90,13 +92,29 @@ describe('Auction State Machine & Lifecycle Exhaustion Tests', () => {
         update: jest.fn().mockResolvedValue({ id: 'min-001', filedAtRegistrar: true }),
       },
       installmentDue: {
+        findFirst: jest.fn().mockResolvedValue(null),
         createMany: jest.fn().mockResolvedValue({ count: 20 }),
       },
       auditLog: {
         create: jest.fn().mockResolvedValue({ id: 'audit-001' }),
       },
       $transaction: jest.fn(async (callback) => callback(prismaMock)),
-      $queryRaw: jest.fn().mockResolvedValue([{ id: mockAuctionId, status: AuctionStatus.SCHEDULED }]),
+      $queryRaw: jest.fn().mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"ChitGroup"')) {
+          return [{ id: mockChitGroupId, status: ChitStatus.ACTIVE }];
+        }
+        if (sql.includes('"SubscriberTicket"')) {
+          return [{ id: mockTicketId1, status: 'ACTIVE', isPrized: false }];
+        }
+        if (sql.includes('"AuctionMinutes"')) {
+          return [{ id: 'min-1', filedAtRegistrar: false }];
+        }
+        if (sql.includes('"Auction"')) {
+          return [{ id: mockAuctionId, status: AuctionStatus.SCHEDULED }];
+        }
+        return [];
+      }),
     };
 
     auctionService = new AuctionService(prismaMock as unknown as PrismaService, null as any);
@@ -328,12 +346,22 @@ describe('Auction State Machine & Lifecycle Exhaustion Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('STATE-INV-14: should ALLOW marking minutes filed when status is COMPLETED and minutes exist', async () => {
+    it('STATE-INV-14: should ALLOW marking minutes filed when status is COMPLETED and minutes exist, transitioning Auction.status to MINUTES_FILED', async () => {
       prismaMock.auction.findUnique.mockResolvedValue({
         id: mockAuctionId,
         status: AuctionStatus.COMPLETED,
         minutes: { id: 'min-1', filedAtRegistrar: false },
         chitGroup: mockChitScheme,
+      });
+      prismaMock.$queryRaw.mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"AuctionMinutes"')) {
+          return [{ id: 'min-1', filedAtRegistrar: false }];
+        }
+        if (sql.includes('"Auction"')) {
+          return [{ id: mockAuctionId, status: AuctionStatus.COMPLETED }];
+        }
+        return [];
       });
 
       const res = await auctionService.markMinutesFiled(
@@ -343,6 +371,10 @@ describe('Auction State Machine & Lifecycle Exhaustion Tests', () => {
       );
 
       expect(res).toBeDefined();
+      expect(prismaMock.auction.update).toHaveBeenCalledWith({
+        where: { id: mockAuctionId },
+        data: { status: AuctionStatus.MINUTES_FILED },
+      });
       expect(prismaMock.auctionMinutes.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

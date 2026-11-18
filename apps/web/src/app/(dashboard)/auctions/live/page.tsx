@@ -16,7 +16,8 @@ function AuctionsLiveFallbackContent() {
   const groupId = searchParams.get('group');
   const monthStr = searchParams.get('month');
   const parsedMonth = monthStr ? Number.parseInt(monthStr, 10) : Number.NaN;
-  const monthNum = Number.isFinite(parsedMonth) && parsedMonth >= 1 ? parsedMonth : 2;
+  const isExplicitlyInvalidMonth = Number.isFinite(parsedMonth) && parsedMonth < 2;
+  const monthNum = Number.isFinite(parsedMonth) && parsedMonth >= 2 ? parsedMonth : 2;
 
   const { data: auctions = [], isLoading } = useQuery<AuctionItem[]>({
     queryKey: queryKeys.auctions.list(groupId || undefined),
@@ -28,12 +29,18 @@ function AuctionsLiveFallbackContent() {
         }),
       );
     },
-    enabled: Boolean(groupId),
+    enabled: Boolean(groupId) && !isExplicitlyInvalidMonth,
   });
 
   React.useEffect(() => {
     if (!groupId) {
       router.replace('/auctions');
+      return;
+    }
+
+    // Guardrail 5: Month 1 has NO auction (company pool)
+    if (isExplicitlyInvalidMonth) {
+      router.replace(`/auctions?group=${groupId}`);
       return;
     }
 
@@ -46,7 +53,7 @@ function AuctionsLiveFallbackContent() {
         router.replace(`/auctions/${groupId}/live?month=${monthNum}`);
       }
     }
-  }, [groupId, monthNum, auctions, isLoading, router]);
+  }, [groupId, monthNum, isExplicitlyInvalidMonth, auctions, isLoading, router]);
 
   return <RouteSuspenseFallback label="Loading auction room..." />;
 }

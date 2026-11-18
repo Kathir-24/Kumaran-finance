@@ -729,7 +729,22 @@
     "downloadPdfMinutes": "Download Form XVII PDF",
     "downloadingPdf": "Generating PDF...",
     "reenterLiveRoom": "Re-enter Live Bidding Room",
-    "statutoryDeclaration": "Foreman Declaration: Certified that the auction proceedings were conducted in the presence of subscribers in accordance with the Chit Funds Act."
+    "statutoryDeclaration": "Foreman Declaration: Certified that the auction proceedings were conducted in the presence of subscribers in accordance with the Chit Funds Act.",
+    "nonDivisibleError": "Total dividend ({totalDividend}) must be cleanly divisible by {tickets} tickets with zero remainder (remainder: {remainder}).",
+    "month1NoAuctionLiveDesc": "Guardrail 5: Month 1 full pool is taken by the company ticket with ₹0 dividend. Auctions take place exclusively in Months 2 through {lastAuctionMonth}.",
+    "monthNNoAuctionLiveDesc": "Guardrail 5: Month {duration} has no bidding auction. Settle directly with the final unprized subscriber via Month N Final Maturity Settlement.",
+    "openFinalSettlement": "Month N Settlement",
+    "correctionCardTitle": "Finalized Auction Correction (KFC-FIN-005)",
+    "correctionCardDesc": "Audited two-partner dual-control workflow for correcting clerical errors before prize disbursement or next-month collections",
+    "correctionDiscountLabel": "Corrected Winning Bid Discount (Whole ₹)",
+    "correctionTicketLabel": "Corrected Winning Subscriber Ticket (Optional)",
+    "correctionReasonLabel": "Mandatory Audit Justification Reason",
+    "correctionReasonPlaceholder": "e.g. Inverted bid discount digit verified against physical branch register",
+    "correctionRequestBtn": "Request Correction (Partner A - Maker)",
+    "correctionApproveBtn": "Approve & Reconcile Correction (Partner B - Checker)",
+    "correctionDisbursedBlocked": "Prize money has already been DISBURSED. Finalized auction records are mathematically and legally immutable (DISBURSED_PRIZE_IMMUTABLE).",
+    "correctionPartnerOnly": "Only verified legal business partners (Super Admin with isPartner: true) may request or approve finalized auction corrections.",
+    "correctionPendingApproval": "Correction request submitted by Maker Partner. An independent Checker Partner must review and approve."
   },
   "disbursements": {
     "title": "Prize Money Disbursements",
@@ -849,7 +864,10 @@
     "finalNetPayableLabel": "Final Net Payout Payable (V - 4% Cf)",
     "confirmFinalSettlementBtn": "Execute Final Maturity Settlement",
     "settlingFinal": "Executing Final Settlement...",
-    "finalSettlementSuccess": "Final Month maturity settlement successfully executed and chit scheme marked COMPLETED."
+    "finalSettlementSuccess": "Final Month maturity settlement successfully executed and chit scheme marked COMPLETED.",
+    "arrearsOffsetNotice": "KFC-FIN-003 / KFC-FIN-004: Any unpaid subscriber arrears up to this auction month are automatically deducted by the server upon authorization. Manual payout overrides are strictly prohibited.",
+    "partnerOnlyAuthAlert": "Only verified legal business partners (Super Admin with isPartner: true) possess financial authority to authorize prize payouts.",
+    "releaseRoleGuardAlert": "Only an authorized Accountant or verified Partner (Super Admin with isPartner: true) can release prize payouts."
   },
   "collections": {
     "title": "Counter Collections Desk",

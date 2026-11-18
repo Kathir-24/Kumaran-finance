@@ -31,10 +31,15 @@ interface VoucherPreviewResponse {
   issuedAt?: string | Date;
   formattedText?: string;
   data?: {
-    grossPrize?: number;
-    bidDiscount?: number;
-    foremanCommission?: number;
-    netPrizeMoney?: number;
+    chitGroupCode?: string;
+    installmentMonth?: number;
+    chitValue?: number | bigint | string;
+    grossPrize?: number | bigint | string;
+    bidDiscount?: number | bigint | string;
+    foremanCommission?: number | bigint | string;
+    prizeMoney?: number | bigint | string;
+    netPrizeMoney?: number | bigint | string;
+    disbursedAt?: string | Date;
   };
 }
 
@@ -51,6 +56,7 @@ export function BilingualVoucherDialog({
 }: BilingualVoucherDialogProps) {
   const t = useTranslations('disbursements');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.disbursements.voucher(auctionId),
@@ -67,14 +73,24 @@ export function BilingualVoucherDialog({
 
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
+    setDownloadError(null);
     try {
       await downloadVoucherPdf(auctionId, `prize-voucher-${auctionId.slice(0, 8)}.pdf`);
     } catch (err: unknown) {
-      alert(getErrorMessage(err, 'Error downloading PDF voucher'));
+      setDownloadError(getErrorMessage(err, 'Error downloading PDF voucher'));
     } finally {
       setDownloadingPdf(false);
     }
   };
+
+  const issuedTimestamp = data?.issuedAt ?? data?.data?.disbursedAt;
+  const grossPoolDisplay = data?.data?.chitValue ?? data?.data?.grossPrize ?? 0;
+  const netPrizeDisplay = data?.data?.prizeMoney ?? data?.data?.netPrizeMoney ?? 0;
+  const fallbackYear = issuedTimestamp ? new Date(issuedTimestamp).getFullYear() : new Date().getFullYear();
+  const fallbackVoucherNumber =
+    data?.data?.chitGroupCode && data?.data?.installmentMonth
+      ? `KC-VOU-${fallbackYear}-${data.data.chitGroupCode}-${String(data.data.installmentMonth).padStart(5, '0')}`
+      : `KC-VOU-${fallbackYear}-${auctionId.slice(0, 8).toUpperCase()}`;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -104,18 +120,25 @@ export function BilingualVoucherDialog({
             </div>
           ) : (
             <div className="space-y-4">
+              {downloadError && (
+                <div className="p-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{downloadError}</span>
+                </div>
+              )}
+
               {/* Voucher Header Meta */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 flex items-center justify-between">
                 <div>
                   <div className="text-[11px] font-mono text-slate-400">VOUCHER NUMBER</div>
                   <div className="text-sm font-mono font-bold text-slate-100">
-                    {data.voucherNumber || `KC-VCHR-${auctionId.slice(0, 8).toUpperCase()}`}
+                    {data.voucherNumber || fallbackVoucherNumber}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-[11px] font-mono text-slate-400">DATE ISSUED</div>
                   <div className="text-xs font-mono text-slate-200">
-                    {data.issuedAt ? formatDate(data.issuedAt) : '—'}
+                    {issuedTimestamp ? formatDate(issuedTimestamp) : '—'}
                   </div>
                 </div>
               </div>
@@ -129,7 +152,7 @@ export function BilingualVoucherDialog({
                 <div className="p-4 rounded-lg border border-slate-800 bg-slate-950/40 space-y-2 text-xs">
                   <div className="flex justify-between py-1 border-b border-slate-800/80">
                     <span className="text-slate-400">Gross Chit Pool (V):</span>
-                    <span className="font-mono text-slate-200">{formatRupee(data.data?.grossPrize ?? 0)}</span>
+                    <span className="font-mono text-slate-200">{formatRupee(grossPoolDisplay)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-800/80">
                     <span className="text-slate-400">Auction Bid Discount (D):</span>
@@ -141,7 +164,7 @@ export function BilingualVoucherDialog({
                   </div>
                   <div className="flex justify-between py-1 font-bold text-emerald-400">
                     <span>Net Prize Money Payable (P):</span>
-                    <span className="font-mono text-sm">{formatRupee(data.data?.netPrizeMoney ?? 0)}</span>
+                    <span className="font-mono text-sm">{formatRupee(netPrizeDisplay)}</span>
                   </div>
                 </div>
               )}

@@ -605,13 +605,14 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
       const ticket20 = unprizedTickets[0];
 
       // Step 3: Stage 1 - Maker (Branch Manager) prepares Month N final settlement voucher
+      const unpaidSettlementRef = `SBI-CHQ-MONTH20-${Date.now()}`;
       const prepareRes = await request(app.getHttpServer())
         .post(`/api/v1/disbursements/group/${schemeId}/prepare-final-settlement`)
         .set('Authorization', `Bearer ${branchManagerToken}`)
         .send({
           ticketId: ticket20.id,
           disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
-          paymentReference: 'SBI-CHQ-MONTH20-001',
+          paymentReference: unpaidSettlementRef,
           notes: 'Month 20 maturity settlement prepared at counter',
         });
 
@@ -645,7 +646,7 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
       expect(approveRes.body.success).toBe(true);
       expect(approveRes.body.data.settlement.netPrizeMoney).toBe(91000);
       expect(approveRes.body.data.settlement.disbursementMode).toBe('ACCOUNT_PAYEE_CHEQUE');
-      expect(approveRes.body.data.settlement.paymentReference).toBe('SBI-CHQ-MONTH20-001');
+      expect(approveRes.body.data.settlement.paymentReference).toBe(unpaidSettlementRef);
 
       // Step 7: Verify database state transitions
       // Scheme status transitioned to COMPLETED
@@ -739,13 +740,14 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
       });
 
       // Maker prepares settlement
+      const prepaidSettlementRef = `NEFT-AXIS-2026-FINAL-${Date.now()}`;
       const prepareRes = await request(app.getHttpServer())
         .post(`/api/v1/disbursements/group/${schemeId}/prepare-final-settlement`)
         .set('Authorization', `Bearer ${managingPartnerToken}`)
         .send({
           ticketId: ticket20!.id,
           disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT,
-          paymentReference: 'NEFT-AXIS-2026-FINAL',
+          paymentReference: prepaidSettlementRef,
         });
 
       expect(prepareRes.status).toBe(200);
@@ -815,8 +817,22 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
         where: { chitGroupId: schemeId, ticketNumber: 20 },
       });
 
+      // CR-DISB-02: Unilateral direct POST /final-settlement BEFORE Stage-1 prepare-final-settlement MUST be rejected even with valid makerUserId
+      const branchMgr = await prisma.user.findUnique({ where: { phone: '9876543212' }, select: { id: true } });
+      const unilateralRes = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/group/${schemeId}/final-settlement`)
+        .set('Authorization', `Bearer ${checkerPartnerToken}`)
+        .send({
+          ticketId: ticket20!.id,
+          disbursementMode: DisbursementMode.CASH,
+          paymentReference: 'CASH-UNILATERAL-BYPASS',
+          makerUserId: branchMgr!.id,
+        });
+      expect(unilateralRes.status).toBe(400);
+      expect(unilateralRes.body.error.message).toContain('PREPARED_SETTLEMENT_REQUIRED');
+
       // Managing Partner prepares settlement (Maker)
-      await request(app.getHttpServer())
+      const prepDualRes = await request(app.getHttpServer())
         .post(`/api/v1/disbursements/group/${schemeId}/prepare-final-settlement`)
         .set('Authorization', `Bearer ${managingPartnerToken}`)
         .send({
@@ -824,6 +840,18 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
           disbursementMode: DisbursementMode.CASH,
           paymentReference: 'CASH-SETTLE-MONTH20',
         });
+      expect(prepDualRes.status).toBe(200);
+
+      // CR-DISB-01: Prepared Month N record CANNOT be hijacked via auction authorize-payout
+      const preparedAuctionId = prepDualRes.body.data.settlement.auctionId;
+      const hijackRes = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/auction/${preparedAuctionId}/authorize-payout`)
+        .set('Authorization', `Bearer ${checkerPartnerToken}`)
+        .send({
+          disbursementMode: DisbursementMode.CASH,
+        });
+      expect(hijackRes.status).toBe(400);
+      expect(hijackRes.body.error.message).toContain('AUCTION_NOT_FINALIZED');
 
       // Self-approval by Managing Partner fails with 403 MAKER_CHECKER_VIOLATION
       const selfApproveRes = await request(app.getHttpServer())

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -16,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
+  ApiHeader,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -64,13 +66,12 @@ export class DisbursementController {
     Role.SUPER_ADMIN,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
-    Role.COLLECTION_AGENT,
     Role.AUDITOR,
   )
   @ApiOperation({
     summary: 'List prize disbursements across chit schemes with filters and pagination',
     description:
-      'Returns prize winners, disbursement statuses, payout modes, and release references. Allowed: Staff and Auditor.',
+      'Returns prize winners, disbursement statuses, payout modes, and release references. Allowed: Staff (excluding pure Collection Agent) and Auditor.',
   })
   @ApiPaginatedResponseEnvelope(WinnerDisbursementItemDto, { description: 'Disbursements list returned' })
   async queryDisbursements(
@@ -85,7 +86,6 @@ export class DisbursementController {
     Role.SUPER_ADMIN,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
-    Role.COLLECTION_AGENT,
     Role.CUSTOMER,
     Role.AUDITOR,
   )
@@ -140,9 +140,14 @@ export class DisbursementController {
   async uploadSafetyProof(
     @Param('auctionId') auctionId: string,
     @UploadedFile() file: any,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.disbursementService.uploadSafetyProof(auctionId, file, makerUserId);
+    return this.disbursementService.uploadSafetyProof(
+      auctionId,
+      file,
+      currentUser.sub,
+      currentUser,
+    );
   }
 
   @Post('auction/:auctionId/confirm-safety-proof')
@@ -161,9 +166,14 @@ export class DisbursementController {
   async confirmSafetyProof(
     @Param('auctionId') auctionId: string,
     @Body() dto: ConfirmSafetyProofDto,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.disbursementService.confirmSafetyProof(auctionId, dto, makerUserId);
+    return this.disbursementService.confirmSafetyProof(
+      auctionId,
+      dto,
+      currentUser.sub,
+      currentUser,
+    );
   }
 
   @Get('auction/:auctionId/safety-proof-url')
@@ -177,8 +187,11 @@ export class DisbursementController {
     description: 'Presigned viewing URL generated successfully',
   })
   @ApiResponse({ status: 404, description: 'Auction, winner, or uploaded document not found' })
-  async getSafetyProofUrl(@Param('auctionId') auctionId: string) {
-    return this.disbursementService.getSafetyProofPresignedUrl(auctionId);
+  async getSafetyProofUrl(
+    @Param('auctionId') auctionId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.disbursementService.getSafetyProofPresignedUrl(auctionId, currentUser);
   }
 
   @Post('auction/:auctionId/verify-safety-proof')
@@ -195,12 +208,13 @@ export class DisbursementController {
   async verifySafetyProof(
     @Param('auctionId') auctionId: string,
     @Body() dto: VerifySafetyProofDto,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.disbursementService.verifySafetyProof(
       auctionId,
       dto,
-      makerUserId,
+      currentUser.sub,
+      currentUser,
     );
   }
 
@@ -235,7 +249,12 @@ export class DisbursementController {
   @ApiOperation({
     summary: 'Release prize money disbursement and record official reference',
     description:
-      'Records transaction reference (Cheque number, Bank UTR, or Cash voucher) and release timestamp. Transitions status to DISBURSED.',
+      'Records transaction reference (Cheque number, Bank UTR, or Cash voucher) and release timestamp. Transitions status to DISBURSED. Supports safe network retry via dto.idempotencyKey or Idempotency-Key HTTP header.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Optional idempotency key for safe payout release retries',
   })
   @ApiOkResponseEnvelope(DisbursementReleaseResponseDto, { description: 'Prize payout released successfully' })
   @ApiResponse({ status: 400, description: 'Payout not authorized yet' })
@@ -243,12 +262,18 @@ export class DisbursementController {
   async releasePayout(
     @Param('auctionId') auctionId: string,
     @Body() dto: ReleasePayoutDto,
-    @CurrentUser('sub') releaseUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Headers('idempotency-key') idempotencyKeyHeader?: string,
   ) {
+    const resolvedIdempotencyKey =
+      dto.idempotencyKey?.trim() || idempotencyKeyHeader?.trim() || undefined;
     return this.disbursementService.releasePayout(
       auctionId,
-      dto,
-      releaseUserId,
+      resolvedIdempotencyKey
+        ? { ...dto, idempotencyKey: resolvedIdempotencyKey }
+        : dto,
+      currentUser.sub,
+      currentUser,
     );
   }
 
@@ -297,6 +322,7 @@ export class DisbursementController {
       dto,
       currentUser.sub,
       currentUser.roles,
+      currentUser,
     );
   }
 
@@ -327,13 +353,13 @@ export class DisbursementController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Super Admin: Settle final remaining subscriber for Month N (Maturity Settlement)',
+    summary: 'Super Admin: Execute prepared final Month N settlement (Strict 2-Stage Dual Control)',
     description:
-      'Settles Month N without auction. Disburses gross chit pool minus 4.00% Foreman Commission directly to the final unprized subscriber. Marks ticket isPrized = true and marks chit scheme as COMPLETED. Allowed: Super Admin.',
+      'Settles Month N without auction strictly from an existing Stage-1 prepared settlement voucher (prepare-final-settlement). Enforces independent Maker != Checker from persisted DB Stage-1 maker identity (never trusting client makerUserId). Marks ticket isPrized = true and transitions chit scheme to COMPLETED. Allowed: Super Admin (Partner).',
   })
   @ApiOkResponseEnvelope(FinalSettlementResponseDto, { description: 'Final month settlement successfully executed' })
-  @ApiResponse({ status: 400, description: 'Invalid settlement request or more than 1 unprized ticket exists' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Super Admin exclusivity' })
+  @ApiResponse({ status: 400, description: 'Prepared settlement missing, invalid settlement request, or more than 1 unprized ticket exists' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Partner exclusivity or Maker == Checker violation' })
   @ApiResponse({ status: 404, description: 'Chit group or ticket not found' })
   async settleFinalMonth(
     @Param('chitGroupId') chitGroupId: string,
@@ -345,6 +371,7 @@ export class DisbursementController {
       dto,
       currentUser.sub,
       currentUser.roles,
+      { requirePreparedSettlement: true },
     );
   }
 }

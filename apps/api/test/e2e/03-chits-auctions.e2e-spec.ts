@@ -15,6 +15,7 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
   let prisma: PrismaService;
 
   let superAdminToken: string;
+  let partner2Token: string;
   let group1L: any;
   let tickets1L: any[];
 
@@ -59,7 +60,7 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
     await app.init();
     prisma = app.get(PrismaService);
 
-    // Login Super Admin
+    // Login Partner 1 (Super Admin Maker) & Partner 2 (Super Admin Checker)
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({
@@ -67,6 +68,14 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
         password: 'Admin@Kumaran2026',
       });
     superAdminToken = loginRes.body.data.accessToken;
+
+    const partner2Login = await request(app.getHttpServer())
+      .post('/api/v1/auth/web/login')
+      .send({
+        phone: '9876543211',
+        password: 'Admin@Kumaran2026',
+      });
+    partner2Token = partner2Login.body.data.accessToken;
 
     // Fetch seeded Chit Group KCA-1L-20M-01
     group1L = await prisma.chitGroup.findFirst({
@@ -305,6 +314,269 @@ describe('Evidence Suite 3: Chits, 1/4 Ceiling, Option A Ties & Invariants (e2e)
       expect(res.body.data.bidDiscount).toBe(25000); // Maximum 1/4 ceiling locked
       expect(res.body.data.prizeMoney).toBe(75000);
       expect(res.body.data.winner.ticketId).toBe(tickets1L[4].id);
+    });
+
+    it('TC-BIZ-04: DEF-AUC-03 Guardrail 8 - Excludes and rejects subscribers with UNPAID dues even when consecutiveUnpaidMonths === 0', async () => {
+      const unpaidTicket = tickets1L[12]; // Ticket #13
+      const existingM2Due = await prisma.installmentDue.findUnique({
+        where: {
+          ticketId_installmentMonth: {
+            ticketId: unpaidTicket.id,
+            installmentMonth: 2,
+          },
+        },
+      });
+
+      // Ensure Ticket #13 has consecutiveUnpaidMonths === 0 AND a deterministic Month 2 UNPAID due
+      const prevConsecutive = unpaidTicket.consecutiveUnpaidMonths;
+      await prisma.subscriberTicket.update({
+        where: { id: unpaidTicket.id },
+        data: { consecutiveUnpaidMonths: 0, status: 'ACTIVE', isPrized: false },
+      });
+      await prisma.installmentDue.upsert({
+        where: {
+          ticketId_installmentMonth: {
+            ticketId: unpaidTicket.id,
+            installmentMonth: 2,
+          },
+        },
+        update: { status: 'UNPAID', paidAmount: 0n },
+        create: {
+          chitGroupId: group1L.id,
+          ticketId: unpaidTicket.id,
+          installmentMonth: 2,
+          dueDate: new Date(Date.now() + 86400000 * 15),
+          grossAmount: 5000n,
+          dividendDeduction: 0n,
+          netPayableAmount: 5000n,
+          paidAmount: 0n,
+          status: 'UNPAID',
+        },
+      });
+
+      try {
+        const eligibleRes = await request(app.getHttpServer())
+          .get(`/api/v1/auctions/${group1L.id}/eligible-bidders?month=2`)
+          .set('Authorization', `Bearer ${superAdminToken}`);
+
+        expect(eligibleRes.status).toBe(200);
+        const eligibleIds = eligibleRes.body.data.map((t: any) => t.id);
+        expect(eligibleIds).not.toContain(unpaidTicket.id);
+
+        const bidRes = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${group1L.id}/record-bid?month=2`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({
+            ticketId: unpaidTicket.id,
+            bidDiscount: 20000,
+            auctionDate: new Date().toISOString(),
+          });
+
+        expect(bidRes.status).toBe(400);
+        expect(bidRes.body.error.message).toContain('ADR-07 Violation');
+
+        const tieRes = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${group1L.id}/tie-break?month=3`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({
+            bidDiscount: 25000,
+            tiedTickets: [
+              { ticketId: tickets1L[3].id, tokenNumber: 1 },
+              { ticketId: unpaidTicket.id, tokenNumber: 2 },
+            ],
+            winningTicketId: tickets1L[3].id,
+            auctionDate: new Date().toISOString(),
+          });
+
+        expect(tieRes.status).toBe(400);
+        expect(tieRes.body.error.message).toContain('ADR-07 Violation');
+      } finally {
+        if (!existingM2Due) {
+          await prisma.installmentDue.deleteMany({
+            where: { ticketId: unpaidTicket.id, installmentMonth: 2 },
+          });
+        } else {
+          await prisma.installmentDue.update({
+            where: { id: existingM2Due.id },
+            data: { status: existingM2Due.status, paidAmount: existingM2Due.paidAmount },
+          });
+        }
+        await prisma.subscriberTicket.update({
+          where: { id: unpaidTicket.id },
+          data: { consecutiveUnpaidMonths: prevConsecutive },
+        });
+      }
+    });
+
+    it('TC-BIZ-05: DEF-AUC-02 & DEF-AUC-09 - Rejects Month 1/N tie-break and malformed month query params', async () => {
+      const m1Res = await request(app.getHttpServer())
+        .post(`/api/v1/auctions/${group1L.id}/tie-break?month=1`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          bidDiscount: 25000,
+          tiedTickets: [
+            { ticketId: tickets1L[3].id, tokenNumber: 1 },
+            { ticketId: tickets1L[4].id, tokenNumber: 2 },
+          ],
+          winningTicketId: tickets1L[4].id,
+          auctionDate: new Date().toISOString(),
+        });
+      expect(m1Res.status).toBe(400);
+
+      const mNRes = await request(app.getHttpServer())
+        .post(`/api/v1/auctions/${group1L.id}/tie-break?month=20`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          bidDiscount: 25000,
+          tiedTickets: [
+            { ticketId: tickets1L[3].id, tokenNumber: 1 },
+            { ticketId: tickets1L[4].id, tokenNumber: 2 },
+          ],
+          winningTicketId: tickets1L[4].id,
+          auctionDate: new Date().toISOString(),
+        });
+      expect(mNRes.status).toBe(400);
+
+      const badMonthRes = await request(app.getHttpServer())
+        .get(`/api/v1/auctions/${group1L.id}/eligible-bidders?month=2.5`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+      expect(badMonthRes.status).toBe(400);
+
+      // XR-AUC-07: Missing ?month= on ChitGroup UUID must fail closed with 400
+      const missingMonthRes = await request(app.getHttpServer())
+        .get(`/api/v1/auctions/${group1L.id}/eligible-bidders`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+      expect(missingMonthRes.status).toBe(400);
+
+      // XR-AUC-04: Duplicate physical paper token numbers rejected 400
+      const dupTokenRes = await request(app.getHttpServer())
+        .post(`/api/v1/auctions/${group1L.id}/tie-break?month=3`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          bidDiscount: 25000,
+          tiedTickets: [
+            { ticketId: tickets1L[3].id, tokenNumber: 7 },
+            { ticketId: tickets1L[4].id, tokenNumber: 7 },
+          ],
+          winningTicketId: tickets1L[4].id,
+          auctionDate: new Date().toISOString(),
+        });
+      expect(dupTokenRes.status).toBe(400);
+      expect(dupTokenRes.body.error.message).toContain('DUPLICATE_TOKEN_NUMBER');
+    });
+
+    it('TC-BIZ-06: DEF-AUC-04 & DEF-AUC-06 - Dual-control finalize, MINUTES_FILED transition, correction ceiling/floor/replay guards', async () => {
+      const candidateTicket = tickets1L[5]; // Ticket #6 (Month 1 PAID, unprized)
+      let createdAuctionId: string | null = null;
+
+      try {
+        // 1. Partner 1 records Month 4 bid
+        const recordRes = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${group1L.id}/record-bid?month=4`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({
+            ticketId: candidateTicket.id,
+            bidDiscount: 20000,
+            auctionDate: new Date().toISOString(),
+          });
+        expect(recordRes.status).toBe(200);
+        createdAuctionId = recordRes.body.data.id;
+
+        // 2. Partner 1 self-finalization MUST fail 403 (Maker != Checker)
+        const selfFinalizeRes = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/finalize`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({ subscribersPresent: 15, signedByForeman: true });
+        expect(selfFinalizeRes.status).toBe(403);
+
+        // 3. Partner 2 finalizes cleanly
+        const finalizeRes = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/finalize`)
+          .set('Authorization', `Bearer ${partner2Token}`)
+          .send({ subscribersPresent: 15, signedByForeman: true });
+        expect(finalizeRes.status).toBe(200);
+        expect(finalizeRes.body.data.status).toBe('COMPLETED');
+
+        // 4. Mark minutes filed -> MUST transition Auction.status to MINUTES_FILED
+        const filedRes = await request(app.getHttpServer())
+          .patch(`/api/v1/auctions/${createdAuctionId}/mark-filed-with-registrar`)
+          .set('Authorization', `Bearer ${partner2Token}`)
+          .send({ filingReference: `ROC-E2E-${Date.now()}` });
+        expect(filedRes.status).toBe(200);
+
+        const afterFiled = await prisma.auction.findUnique({ where: { id: createdAuctionId! } });
+        expect(afterFiled?.status).toBe('MINUTES_FILED');
+
+        // 5. Correction request >25% ceiling & <4% floor rejected
+        const overCeilingCorr = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/correction/request`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({ correctedBidDiscount: 30000, reason: 'Over ceiling attempt' });
+        expect(overCeilingCorr.status).toBe(400);
+
+        const belowFloorCorr = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/correction/request`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({ correctedBidDiscount: 2000, reason: 'Negative dividend attempt' });
+        expect(belowFloorCorr.status).toBe(400);
+
+        // 6. Valid correction request by Partner 1 -> GET /auctions/:id exposes pendingCorrection (XR-WM-02)
+        const validCorrReq = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/correction/request`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({ correctedBidDiscount: 24000, reason: 'Corrected per branch token sheet' });
+        expect(validCorrReq.status).toBe(200);
+
+        const detailWithPending = await request(app.getHttpServer())
+          .get(`/api/v1/auctions/${createdAuctionId}`)
+          .set('Authorization', `Bearer ${partner2Token}`);
+        expect(detailWithPending.status).toBe(200);
+        expect(detailWithPending.body.data.pendingCorrection).toMatchObject({
+          correctedBidDiscount: 24000,
+          reason: 'Corrected per branch token sheet',
+        });
+
+        const validCorrApprove = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/correction/approve`)
+          .set('Authorization', `Bearer ${partner2Token}`)
+          .send({ notes: 'Verified against physical ledger' });
+        expect(validCorrApprove.status).toBe(200);
+        expect(validCorrApprove.body.data.auction.bidDiscount).toBe(24000);
+        expect(validCorrApprove.body.data.auction.dividendPerTicket).toBe(1000);
+
+        // XR-AUC-03: Amending a MINUTES_FILED auction resets status -> COMPLETED and filedAtRegistrar -> false
+        const afterCorrection = await prisma.auction.findUnique({
+          where: { id: createdAuctionId! },
+          include: { minutes: true },
+        });
+        expect(afterCorrection?.status).toBe('COMPLETED');
+        expect(afterCorrection?.minutes?.filedAtRegistrar).toBe(false);
+
+        const detailAfterApproval = await request(app.getHttpServer())
+          .get(`/api/v1/auctions/${createdAuctionId}`)
+          .set('Authorization', `Bearer ${partner2Token}`);
+        expect(detailAfterApproval.status).toBe(200);
+        expect(detailAfterApproval.body.data.pendingCorrection).toBeNull();
+
+        // 7. Replay approval of the same correction MUST fail 400 (NO_PENDING_CORRECTION)
+        const replayCorrApprove = await request(app.getHttpServer())
+          .post(`/api/v1/auctions/${createdAuctionId}/correction/approve`)
+          .set('Authorization', `Bearer ${partner2Token}`)
+          .send({ notes: 'Duplicate replay attempt' });
+        expect(replayCorrApprove.status).toBe(400);
+        expect(replayCorrApprove.body.error.message).toContain('NO_PENDING_CORRECTION');
+      } finally {
+        if (createdAuctionId) {
+          await prisma.auctionMinutes.deleteMany({ where: { auctionId: createdAuctionId } });
+          await prisma.auctionTieBidder.deleteMany({ where: { auctionId: createdAuctionId } });
+          await prisma.auctionWinner.deleteMany({ where: { auctionId: createdAuctionId } });
+          await prisma.auction.deleteMany({ where: { id: createdAuctionId } });
+          await prisma.subscriberTicket.update({
+            where: { id: candidateTicket.id },
+            data: { isPrized: false, prizedAuctionId: null },
+          });
+        }
+      }
     });
   });
 });

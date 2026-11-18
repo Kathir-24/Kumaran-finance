@@ -1,5 +1,5 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { PaymentMethod, PaymentStatus, AuctionStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, AuctionStatus, DisbursementMode } from '@prisma/client';
 
 describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', () => {
   let prisma: PrismaService;
@@ -270,6 +270,75 @@ describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', ()
       expect(auction.id).toBeDefined();
       await prisma.auction.delete({ where: { id: auction.id } });
     });
+
+    it('rejects MINUTES_FILED operational auction missing conductedByUserId or finalizedByUserId (Postgres 23514)', async () => {
+      await expect(
+        prisma.auction.create({
+          data: {
+            chitGroupId,
+            installmentMonth: 5,
+            auctionDate: new Date(),
+            status: AuctionStatus.MINUTES_FILED,
+            conductedByUserId: null, // VIOLATION: Maker missing on MINUTES_FILED!
+            finalizedByUserId: checkerUserId,
+          },
+        }),
+      ).rejects.toThrow(/chk_auction_maker_checker/i);
+
+      await expect(
+        prisma.auction.create({
+          data: {
+            chitGroupId,
+            installmentMonth: 5,
+            auctionDate: new Date(),
+            status: AuctionStatus.MINUTES_FILED,
+            conductedByUserId: makerUserId,
+            finalizedByUserId: null, // VIOLATION: Checker missing on MINUTES_FILED!
+          },
+        }),
+      ).rejects.toThrow(/chk_auction_maker_checker/i);
+    });
+
+    it('rejects negative financial snapshots on Auction (chk_auction_non_negative_amounts, Postgres 23514)', async () => {
+      await expect(
+        prisma.auction.create({
+          data: {
+            chitGroupId,
+            installmentMonth: 6,
+            auctionDate: new Date(),
+            status: AuctionStatus.SCHEDULED,
+            bidDiscount: -1000n,
+          },
+        }),
+      ).rejects.toThrow(/chk_auction_non_negative_amounts/i);
+    });
+
+    it('rejects AuctionMinutes with subscribersPresent < 1 (chk_auction_minutes_attendees, Postgres 23514)', async () => {
+      const auc = await prisma.auction.create({
+        data: {
+          chitGroupId,
+          installmentMonth: 7,
+          auctionDate: new Date(),
+          status: AuctionStatus.COMPLETED,
+          conductedByUserId: makerUserId,
+          finalizedByUserId: checkerUserId,
+        },
+      });
+
+      try {
+        await expect(
+          prisma.auctionMinutes.create({
+            data: {
+              auctionId: auc.id,
+              subscribersPresent: 0, // VIOLATION!
+              minutesText: 'Invalid zero-attendee minutes',
+            },
+          }),
+        ).rejects.toThrow(/chk_auction_minutes_attendees/i);
+      } finally {
+        await prisma.auction.delete({ where: { id: auc.id } });
+      }
+    });
   });
 
   // ============================================================================
@@ -371,6 +440,149 @@ describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', ()
       });
 
       expect(winner.id).toBeDefined();
+    });
+
+    it('rejects VERIFIED_BY_MAKER operational winner without verifiedByUserId (Postgres 23514)', async () => {
+      await expect(
+        prisma.auctionWinner.create({
+          data: {
+            auctionId: testAuctionId,
+            ticketId,
+            disbursementStatus: 'VERIFIED_BY_MAKER',
+            verifiedByUserId: null, // VIOLATION!
+          },
+        }),
+      ).rejects.toThrow(/chk_winner_maker_checker/i);
+    });
+
+    it('rejects AUTHORIZED_BY_CHECKER operational winner missing verifiedByUserId or authorizedByUserId (Postgres 23514)', async () => {
+      await expect(
+        prisma.auctionWinner.create({
+          data: {
+            auctionId: testAuctionId,
+            ticketId,
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+            disbursedAmount: 75000n,
+            verifiedByUserId: null,
+            authorizedByUserId: checkerUserId,
+          },
+        }),
+      ).rejects.toThrow(/chk_winner_maker_checker/i);
+
+      await expect(
+        prisma.auctionWinner.create({
+          data: {
+            auctionId: testAuctionId,
+            ticketId,
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+            disbursedAmount: 75000n,
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: null,
+          },
+        }),
+      ).rejects.toThrow(/chk_winner_maker_checker/i);
+    });
+
+    it('rejects non-positive disbursedAmount on AuctionWinner (chk_winner_positive_disbursed_amount, Postgres 23514)', async () => {
+      await expect(
+        prisma.auctionWinner.create({
+          data: {
+            auctionId: testAuctionId,
+            ticketId,
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+            disbursedAmount: 0n, // VIOLATION!
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: checkerUserId,
+          },
+        }),
+      ).rejects.toThrow(/chk_winner_positive_disbursed_amount/i);
+    });
+
+    it('rejects duplicate non-cash Bank UTR / Cheque paymentReference across DISBURSED winners (uq_auction_winner_non_cash_payment_ref, Postgres 23505)', async () => {
+      const sharedRef = `NEFT-DB-UNIQUE-${Date.now()}`;
+      const secondCustomer = await prisma.customer.upsert({
+        where: { phone: '9842100094' },
+        update: { branchId },
+        create: {
+          customerCode: 'CUST-TST-094',
+          fullName: 'Second Test Subscriber',
+          phone: '9842100094',
+          branchId,
+          addressLine1: '124 Main Road',
+          city: 'Perundurai',
+          pincode: '638052',
+        },
+      });
+      const secondTicket = await prisma.subscriberTicket.upsert({
+        where: { chitGroupId_ticketNumber: { chitGroupId, ticketNumber: 3 } },
+        update: {},
+        create: {
+          chitGroupId,
+          ticketNumber: 3,
+          customerId: secondCustomer.id,
+        },
+      });
+      const secondAuction = await prisma.auction.create({
+        data: {
+          chitGroupId,
+          installmentMonth: 8,
+          auctionDate: new Date(),
+          status: AuctionStatus.COMPLETED,
+          conductedByUserId: makerUserId,
+          finalizedByUserId: checkerUserId,
+        },
+      });
+
+      try {
+        await prisma.auctionWinner.create({
+          data: {
+            auctionId: testAuctionId,
+            ticketId,
+            disbursementStatus: 'DISBURSED',
+            disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT,
+            disbursedAmount: 75000n,
+            paymentReference: sharedRef,
+            verifiedByUserId: makerUserId,
+            authorizedByUserId: checkerUserId,
+          },
+        });
+
+        await expect(
+          prisma.auctionWinner.create({
+            data: {
+              auctionId: secondAuction.id,
+              ticketId: secondTicket.id,
+              disbursementStatus: 'DISBURSED',
+              disbursementMode: DisbursementMode.BANK_TRANSFER_NEFT,
+              disbursedAmount: 75000n,
+              paymentReference: sharedRef, // VIOLATION: Exact duplicate bank UTR!
+              verifiedByUserId: makerUserId,
+              authorizedByUserId: checkerUserId,
+            },
+          }),
+        ).rejects.toThrow(/uq_auction_winner_non_cash_payment_ref|Unique constraint/i);
+
+        // CR-DISB-05: Case-insensitive & whitespace-padded duplicate MUST also fail at Postgres engine level!
+        await expect(
+          prisma.auctionWinner.create({
+            data: {
+              auctionId: secondAuction.id,
+              ticketId: secondTicket.id,
+              disbursementStatus: 'DISBURSED',
+              disbursementMode: DisbursementMode.BANK_TRANSFER_RTGS,
+              disbursedAmount: 75000n,
+              paymentReference: `  ${sharedRef.toLowerCase()}  `,
+              verifiedByUserId: makerUserId,
+              authorizedByUserId: checkerUserId,
+            },
+          }),
+        ).rejects.toThrow(/uq_auction_winner_non_cash_payment_ref|Unique constraint/i);
+      } finally {
+        await prisma.auctionWinner.deleteMany({ where: { auctionId: secondAuction.id } });
+        await prisma.auction.deleteMany({ where: { id: secondAuction.id } });
+        await prisma.subscriberTicket.deleteMany({ where: { id: secondTicket.id } });
+        await prisma.customer.deleteMany({ where: { id: secondCustomer.id } });
+      }
     });
   });
 

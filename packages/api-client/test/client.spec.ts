@@ -277,3 +277,47 @@ test('Contract Schema Types (DEF-FE-04): generated DTO schemas resolve concrete 
   assert.equal(samplePaginationTotal, 42);
   assert.equal(sampleDefaultersList.length, 1);
 });
+
+test('DEF-WM-01: BigInt-exact currency formatting, Module 6 Maker-Checker fields, and auction idempotency', async () => {
+  // 1. Exact 64-bit BigInt & string formatting beyond Number.MAX_SAFE_INTEGER (zero float truncation)
+  assert.equal(formatRupee(9007199254740993n), '₹9,00,71,99,25,47,40,993');
+  assert.equal(formatRupee('9007199254740993'), '₹9,00,71,99,25,47,40,993');
+  assert.equal(formatRupeeAmount('9007199254740993'), '9,00,71,99,25,47,40,993');
+  assert.equal(formatRupee('1,00,000'), '₹1,00,000');
+  assert.equal(formatRupee(75000.99), '₹75,000');
+  assert.equal(formatRupee(Number.NaN), '₹0');
+  assert.equal(formatRupee(Number.POSITIVE_INFINITY), '₹0');
+
+  // 2. Module 6 Auction & Disbursement maker columns + case-insensitive UUID check
+  const partnerA = 'user-partner-a-001';
+  const partnerB = 'user-partner-b-002';
+  assert.equal(isSelfApproval('USER-PARTNER-A-001', { conductedByUserId: partnerA }), true);
+  assert.equal(isSelfApproval(partnerA, { verifiedByUserId: partnerA }), true);
+  assert.equal(canAuthorizeAction(partnerB, { verifiedByUserId: partnerA }), true);
+  assert.equal(canAuthorizeAction(partnerA, { conductedByUserId: partnerA }), false);
+
+  // 3. Auto-inject Idempotency-Key on /auctions mutations
+  let capturedRequest: Request | null = null;
+  const client = createKumaranClient({
+    baseUrl: 'http://127.0.0.1:3000',
+    getAccessToken: () => 'mock-jwt-token',
+    fetch: async (req: Request) => {
+      capturedRequest = req;
+      return new Response(JSON.stringify({ success: true, data: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+
+  await client.POST('/api/v1/auctions/{id}/finalize' as any, {
+    params: { path: { id: 'auc-001' } } as any,
+    body: { subscribersPresent: 14, signedByForeman: true } as any,
+  });
+  assert.ok(capturedRequest);
+  assert.match(
+    (capturedRequest as Request).headers.get('Idempotency-Key') || '',
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    'Idempotency-Key must be auto-injected on auction mutations',
+  );
+});

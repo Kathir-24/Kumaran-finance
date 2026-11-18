@@ -11,6 +11,11 @@ import {
 } from 'lucide-react';
 import { formatRupee } from '@/lib/currency';
 import type { ChitGroupSummary } from './auction-scheme-selector';
+import {
+  computeCeilingDiscountBigInt,
+  computeForemanCommissionBigInt,
+  toSafeWholeRupeeBigInt,
+} from './auction-math.util';
 
 export interface AuctionScheduleItem {
   id: string;
@@ -22,8 +27,19 @@ export interface AuctionScheduleItem {
   totalDividend?: bigint | number | string | null;
   dividendPerTicket?: bigint | number | string | null;
   prizeMoney?: bigint | number | string | null;
+  conductedByUserId?: string | null;
+  finalizedByUserId?: string | null;
+  minutes?: {
+    filedAtRegistrar?: boolean;
+  } | null;
   winner?: {
     wasTieBreakWinner?: boolean;
+    verifiedByUserId?: string | null;
+    disbursementStatus?: string | null;
+    disbursementMode?: string | null;
+    disbursedAmount?: bigint | number | string | null;
+    paymentReference?: string | null;
+    disbursementReference?: string | null;
     ticket?: {
       ticketNumber: number;
       customer?: {
@@ -36,7 +52,8 @@ export interface AuctionScheduleItem {
   tieBidders?: Array<{
     id: string;
     tokenNumber?: number | null;
-    isWinner: boolean;
+    isWinner?: boolean;
+    isLotWinner?: boolean;
     ticket?: {
       ticketNumber: number;
       customer?: { fullName: string; phone: string } | null;
@@ -52,26 +69,36 @@ export interface AuctionMetricsCardsProps {
 export function AuctionMetricsCards({ scheme, auctions }: AuctionMetricsCardsProps) {
   const t = useTranslations('auctions');
 
-  const chitValueNum = Number(scheme.chitValue);
-  const duration = scheme.durationMonths || 1;
-  const baseInstallment = Math.floor(chitValueNum / duration);
+  // Guardrail 2 & 3 & 6: Pure BigInt whole-rupee calculations using frozen scheme parameters
+  const chitValueBig = toSafeWholeRupeeBigInt(scheme.chitValue, 0n);
+  const duration = Math.max(1, scheme.durationMonths || 1);
+  const baseInstallment =
+    scheme.baseInstallment !== undefined && scheme.baseInstallment !== null
+      ? toSafeWholeRupeeBigInt(scheme.baseInstallment, chitValueBig / BigInt(duration))
+      : chitValueBig / BigInt(duration);
 
   // Ceiling: 1/4 of total chit value (Guardrail 6)
-  const ceilingDiscount = Math.floor(chitValueNum / 4);
+  const ceilingDiscount = computeCeilingDiscountBigInt(chitValueBig, scheme.maxDiscountCeiling);
 
-  // Floor: 4.00% Foreman Commission (Guardrail 3)
-  const commissionFloor = Math.floor(chitValueNum * 0.04);
+  // Floor: Frozen Foreman Commission (defaults to 4.00%, Guardrail 3)
+  const commissionFloor = computeForemanCommissionBigInt(
+    chitValueBig,
+    scheme.foremanCommissionRate,
+  );
 
   // Auctions count: Total auctionable months is N - 2 (Months 2 through N-1)
   const totalAuctionMonths = Math.max(0, duration - 2);
   const completedAuctionsCount = auctions.filter(
-    (a) => a.status === 'COMPLETED' || a.status === 'MINUTES_FILED',
+    (a) =>
+      a.installmentMonth >= 2 &&
+      a.installmentMonth < duration &&
+      (a.status === 'COMPLETED' || a.status === 'MINUTES_FILED'),
   ).length;
 
-  // Cumulative dividends distributed so far
-  const totalDividends = auctions.reduce((sum, a) => {
-    return sum + (a.totalDividend ? Number(a.totalDividend) : 0);
-  }, 0);
+  // Cumulative dividends distributed so far (pure BigInt sum)
+  const totalDividends = auctions.reduce<bigint>((sum, a) => {
+    return sum + toSafeWholeRupeeBigInt(a.totalDividend, 0n);
+  }, 0n);
 
   const progressPercentage =
     totalAuctionMonths > 0

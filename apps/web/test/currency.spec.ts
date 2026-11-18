@@ -25,6 +25,9 @@ test('Guardrail 2: formatRupee correctly formats whole rupees without decimals',
   assert.equal(formatRupee('25000'), '₹25,000');
   assert.equal(formatRupee(null), '₹0');
   assert.equal(formatRupee(undefined), '₹0');
+  assert.equal(formatRupee(9007199254740993n), '₹9,00,71,99,25,47,40,993');
+  assert.equal(formatRupee('9007199254740993'), '₹9,00,71,99,25,47,40,993');
+  assert.equal(formatRupee('1,00,000'), '₹1,00,000');
 
   // Verify that decimal fractions are never included
   const formatted = formatRupee(50000);

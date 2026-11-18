@@ -3,8 +3,9 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AuctionStatus, Role } from '@prisma/client';
+import { AuctionStatus, ChitStatus, DueStatus, Role } from '@prisma/client';
 import { AuctionService } from '../../src/auction/auction.service';
+import { parseOptionalPositiveIntQuery } from '../../src/auction/helpers/auction-access.helper';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
@@ -20,6 +21,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
 
   const mockChitScheme = {
     id: mockChitGroupId,
+    branchId: 'branch-prd-01',
     groupCode: 'KCA-1L-20M-01',
     groupName: '₹1 Lakh 20 Months Group A',
     chitValue: 100000n,
@@ -28,6 +30,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
     baseInstallment: 5000n,
     maxDiscountCeiling: 25000n, // Exactly V / 4 (25%)
     foremanCommissionRate: 4.0,
+    status: ChitStatus.ACTIVE,
   };
 
   beforeEach(() => {
@@ -38,6 +41,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       },
       subscriberTicket: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
       },
@@ -57,6 +61,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       auctionTieBidder: {
         create: jest.fn(),
         deleteMany: jest.fn(),
+        updateMany: jest.fn(),
       },
       auctionMinutes: {
         findUnique: jest.fn(),
@@ -64,6 +69,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         update: jest.fn(),
       },
       installmentDue: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
       },
@@ -102,6 +108,12 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          dues: {
+            none: {
+              installmentMonth: { lte: 2 },
+              status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+            },
+          },
         },
         include: {
           customer: {
@@ -319,6 +331,26 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
   describe('3. Option A: Physical Paper Token Tie-Break Protocol', () => {
     it('should record physical paper token lot draw when multiple members bid ceiling', async () => {
       prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: mockTicketId1,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 3,
+          isPrized: false,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+          customer: { fullName: 'M. Palanisamy' },
+        },
+        {
+          id: mockTicketId2,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 4,
+          isPrized: false,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+          customer: { fullName: 'S. Ramasamy' },
+        },
+      ]);
 
       const tiedAuction = {
         id: mockAuctionId,
@@ -1024,6 +1056,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
     });
 
     it('KFC-FIN-005: should ENFORCE Maker != Checker: reject approval if requesting Partner attempts to approve own correction', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
       prismaMock.auditLog.findFirst.mockResolvedValue({
         id: 'audit-corr-req-1',
         userId: mockMakerId, // Requested by Partner A
@@ -1097,6 +1130,1004 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('8. Module 6 Forensic Audit Remediation Proofs (DEF-AUC-01 .. DEF-AUC-09)', () => {
+    const mockFinalizedAuction = {
+      id: mockAuctionId,
+      chitGroupId: mockChitGroupId,
+      chitGroup: mockChitScheme,
+      installmentMonth: 3,
+      auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+      status: AuctionStatus.COMPLETED,
+      bidDiscount: 20000n,
+      foremanCommissionRate: 4.0,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 16000n,
+      dividendPerTicket: 800n,
+      prizeMoney: 80000n,
+      winner: {
+        id: 'winner-001',
+        ticketId: mockTicketId1,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+        ticket: {
+          id: mockTicketId1,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 3,
+          status: 'ACTIVE',
+          isPrized: true,
+          consecutiveUnpaidMonths: 0,
+          customer: { fullName: 'M. Palanisamy' },
+        },
+      },
+      minutes: {
+        id: 'min-001',
+        auctionId: mockAuctionId,
+        subscribersPresent: 16,
+        minutesText: 'Old proceedings...',
+      },
+    };
+
+    it('DEF-AUC-01: uses frozen per-group foremanCommissionRate (e.g. 5.00%) instead of hardcoded 4.00%', async () => {
+      const customRateScheme = {
+        ...mockChitScheme,
+        foremanCommissionRate: 5.0, // Frozen at 5.00% -> ₹5,000 commission on ₹1,00,000
+      };
+      prismaMock.chitGroup.findUnique.mockResolvedValue(customRateScheme);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 3,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'Palanisamy V' },
+      });
+
+      // Bid ₹4,500 is >= 4% (₹4,000) but BELOW frozen 5% (₹5,000) -> MUST be rejected!
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          { ticketId: mockTicketId1, bidDiscount: 4500, auctionDate: '2026-12-15T00:00:00.000Z' },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/5\.00% Foreman Commission/);
+
+      // Bid ₹25,000 -> 5% commission = ₹5,000, totalDiv = ₹20,000, divPerTicket = ₹1,000
+      prismaMock.auction.upsert.mockResolvedValue({ id: mockAuctionId });
+      prismaMock.auctionWinner.upsert.mockResolvedValue({});
+      prismaMock.auction.findUnique.mockResolvedValue({ id: mockAuctionId });
+
+      await auctionService.recordBid(
+        mockChitGroupId,
+        2,
+        { ticketId: mockTicketId1, bidDiscount: 25000, auctionDate: '2026-12-15T00:00:00.000Z' },
+        mockMakerId,
+      );
+
+      expect(prismaMock.auction.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            foremanCommissionAmount: 5000n,
+            totalDividend: 20000n,
+            dividendPerTicket: 1000n,
+            prizeMoney: 75000n,
+          }),
+        }),
+      );
+    });
+
+    it('DEF-AUC-02: recordTieBreak strictly rejects Month 1, Month N, non-ACTIVE scheme, prized tickets, and unpaid dues', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      const validDto = {
+        tiedTickets: [
+          { ticketId: mockTicketId1, tokenNumber: 1 },
+          { ticketId: mockTicketId2, tokenNumber: 2 },
+        ],
+        winningTicketId: mockTicketId2,
+        bidDiscount: 25000,
+        auctionDate: '2026-12-15T00:00:00.000Z',
+        witnessNames: ['K. Murugan'],
+      };
+
+      // Guardrail 5: Month 1 & Month N rejected
+      await expect(
+        auctionService.recordTieBreak(mockChitGroupId, 1, validDto, mockMakerId),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        auctionService.recordTieBreak(mockChitGroupId, 20, validDto, mockMakerId),
+      ).rejects.toThrow(BadRequestException);
+
+      // Non-ACTIVE chit scheme rejected
+      prismaMock.chitGroup.findUnique.mockResolvedValueOnce({
+        ...mockChitScheme,
+        status: ChitStatus.DRAFT,
+      });
+      await expect(
+        auctionService.recordTieBreak(mockChitGroupId, 2, validDto, mockMakerId),
+      ).rejects.toThrow(/must be ACTIVE/);
+
+      // Already prized tied ticket rejected
+      prismaMock.subscriberTicket.findMany.mockResolvedValueOnce([
+        {
+          id: mockTicketId1,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 3,
+          isPrized: true,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+        },
+        {
+          id: mockTicketId2,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 4,
+          isPrized: false,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+        },
+      ]);
+      await expect(
+        auctionService.recordTieBreak(mockChitGroupId, 2, validDto, mockMakerId),
+      ).rejects.toThrow(/TICKET_ALREADY_PRIZED/);
+
+      // Tied ticket with UNPAID current/prior month due (even when consecutiveUnpaidMonths === 0) rejected
+      prismaMock.subscriberTicket.findMany.mockResolvedValueOnce([
+        {
+          id: mockTicketId1,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 3,
+          isPrized: false,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+          customer: { fullName: 'Unpaid Member' },
+        },
+        {
+          id: mockTicketId2,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 4,
+          isPrized: false,
+          status: 'ACTIVE',
+          consecutiveUnpaidMonths: 0,
+          customer: { fullName: 'Paid Member' },
+        },
+      ]);
+      prismaMock.installmentDue.findFirst.mockResolvedValueOnce({
+        id: 'due-m1-unpaid',
+        installmentMonth: 1,
+        status: DueStatus.UNPAID,
+      });
+      await expect(
+        auctionService.recordTieBreak(mockChitGroupId, 2, validDto, mockMakerId),
+      ).rejects.toThrow(/ADR-07 Violation/);
+    });
+
+    it('DEF-AUC-03: recordBid & finalizeAuction block subscriber with UNPAID InstallmentDue (<= month) even when consecutiveUnpaidMonths === 0', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 13,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'Unpaid Month 1 Subscriber' },
+      });
+      prismaMock.installmentDue.findFirst.mockResolvedValueOnce({
+        id: 'due-m1-13',
+        installmentMonth: 1,
+        status: DueStatus.UNPAID,
+      });
+
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          { ticketId: mockTicketId1, bidDiscount: 20000, auctionDate: '2026-12-15T00:00:00.000Z' },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/ADR-07 Violation/);
+
+      // TOCTOU in finalizeAuction: payment reversed after recordBid -> due now OVERDUE
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        chitGroup: mockChitScheme,
+        winner: {
+          ticketId: mockTicketId1,
+          ticket: {
+            id: mockTicketId1,
+            chitGroupId: mockChitGroupId,
+            ticketNumber: 13,
+            isPrized: false,
+            status: 'ACTIVE',
+            consecutiveUnpaidMonths: 0,
+            customer: { fullName: 'Unpaid Subscriber' },
+          },
+        },
+      });
+      prismaMock.installmentDue.findFirst.mockResolvedValueOnce({
+        id: 'due-m2-13',
+        installmentMonth: 2,
+        status: DueStatus.OVERDUE,
+      });
+
+      await expect(
+        auctionService.finalizeAuction(mockAuctionId, mockCheckerId, { subscribersPresent: 14 }),
+      ).rejects.toThrow(/ADR-07 Violation/);
+    });
+
+    it('DEF-AUC-04: markMinutesFiled atomically transitions Auction.status to MINUTES_FILED', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        status: AuctionStatus.COMPLETED,
+        chitGroup: mockChitScheme,
+        minutes: { id: 'min-1', filedAtRegistrar: false },
+      });
+      prismaMock.auctionMinutes.update.mockResolvedValue({
+        id: 'min-1',
+        filedAtRegistrar: true,
+        filingReference: 'ROC-2026-001',
+      });
+
+      await auctionService.markMinutesFiled(
+        mockAuctionId,
+        { filingReference: 'ROC-2026-001' },
+        mockCheckerId,
+      );
+
+      expect(prismaMock.auction.update).toHaveBeenCalledWith({
+        where: { id: mockAuctionId },
+        data: { status: AuctionStatus.MINUTES_FILED },
+      });
+    });
+
+    it('DEF-AUC-05: fail-closed isPartner blocks missing/null user record AND non-partner IT Super Admin as Maker', async () => {
+      // Null user on finalizeAuction MUST fail closed (not fall through!)
+      prismaMock.user.findUnique.mockResolvedValueOnce(null);
+      await expect(
+        auctionService.finalizeAuction(
+          mockAuctionId,
+          'deleted-user-id',
+          { subscribersPresent: 12 },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
+
+      // Deactivated partner (isPartner: true, isActive: false) MUST fail closed
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        id: 'deactivated-partner',
+        isPartner: true,
+        isActive: false,
+      });
+      await expect(
+        auctionService.finalizeAuction(
+          mockAuctionId,
+          'deactivated-partner',
+          { subscribersPresent: 12 },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
+
+      // Non-partner IT SUPER_ADMIN (without BRANCH_MANAGER) attempting recordBid MUST fail closed
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'it-admin', isPartner: false });
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          { ticketId: mockTicketId1, bidDiscount: 20000, auctionDate: '2026-12-15T00:00:00.000Z' },
+          'it-admin',
+          { sub: 'it-admin', phone: '9999999999', roles: [Role.SUPER_ADMIN], branchId: 'branch-prd-01' } as any,
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
+    });
+
+    it('DEF-AUC-06: correction workflow rejects >25% ceiling, <4% floor (negative dividend), Month 1/N, defaulter ticket, and replay double-approval, and resets AUTHORIZED_BY_CHECKER on discount change', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockFinalizedAuction);
+
+      // 1. Over 1/4 ceiling (₹30,000 > ₹25,000) rejected
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { correctedBidDiscount: 30000, reason: 'Over ceiling test' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/exceeds maximum allowable 1\/4 ceiling/);
+
+      // 2. Below 4% commission floor (₹2,000 < ₹4,000 -> negative dividend!) rejected
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { correctedBidDiscount: 2000, reason: 'Negative dividend test' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/Foreman Commission/);
+
+      // 3. Month 1 correction rejected (Guardrail 5)
+      prismaMock.auction.findUnique.mockResolvedValueOnce({
+        ...mockFinalizedAuction,
+        installmentMonth: 1,
+      });
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { correctedBidDiscount: 24000, reason: 'Month 1 attempt' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/Guardrail 5 Violation/);
+
+      // 4. Replay / double-approval blocked inside approveAuctionCorrection
+      const reqTimestamp = new Date('2026-11-18T10:00:00.000Z');
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce({
+          id: 'corr-req-1',
+          userId: mockMakerId,
+          timestamp: reqTimestamp,
+          newValue: { correctedBidDiscount: '24000', correctedWinningTicketId: mockTicketId1 },
+        })
+        .mockResolvedValueOnce({
+          id: 'corr-app-1',
+          action: 'AUCTION_CORRECTION_APPROVED',
+          timestamp: new Date('2026-11-18T10:05:00.000Z'),
+          newValue: { correctionRequestId: 'corr-req-1' },
+        });
+      await expect(
+        auctionService.approveAuctionCorrection(
+          mockAuctionId,
+          mockCheckerId,
+          { notes: 'Replay attempt' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/NO_PENDING_CORRECTION/);
+
+      // 5. Same-winner discount change resets AUTHORIZED_BY_CHECKER -> VERIFIED_BY_MAKER & updates minutesText
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce({
+          id: 'corr-req-2',
+          userId: mockMakerId,
+          timestamp: new Date('2026-11-18T11:00:00.000Z'),
+          newValue: {
+            correctedBidDiscount: '24000',
+            correctedWinningTicketId: mockTicketId1,
+            reason: 'Ledger typo',
+          },
+        })
+        .mockResolvedValueOnce(null); // No prior approval
+      prismaMock.auction.update.mockResolvedValue({ ...mockFinalizedAuction, bidDiscount: 24000n });
+      prismaMock.installmentDue.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      prismaMock.auctionMinutes.update.mockResolvedValue({});
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'corr-app-2' });
+
+      await auctionService.approveAuctionCorrection(
+        mockAuctionId,
+        mockCheckerId,
+        { notes: 'Verified' },
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith({
+        where: { id: 'winner-001' },
+        data: {
+          disbursedAmount: null,
+          disbursementMode: null,
+          authorizedByUserId: null,
+          disbursementStatus: 'VERIFIED_BY_MAKER',
+        },
+      });
+      expect(prismaMock.auctionMinutes.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { auctionId: mockAuctionId },
+          data: expect.objectContaining({
+            minutesText: expect.stringContaining('Winning Bid Discount: ₹24000'),
+          }),
+        }),
+      );
+    });
+
+    it('DEF-AUC-06B: approveAuctionCorrection acquires SELECT FOR UPDATE locks in strict DAG order including Month N+1 InstallmentDue before FIN-E check', async () => {
+      const lockOrder: string[] = [];
+      prismaMock.$queryRaw = jest.fn().mockImplementation(async (q: any) => {
+        const sql = Array.isArray(q) ? q.join('') : String(q);
+        if (sql.includes('"ChitGroup"')) {
+          lockOrder.push('ChitGroup');
+          return [{ id: mockChitGroupId, status: ChitStatus.ACTIVE }];
+        }
+        if (sql.includes('"AuctionWinner"')) {
+          lockOrder.push('AuctionWinner');
+          return [{ id: 'winner-001', disbursementStatus: 'VERIFIED_BY_MAKER' }];
+        }
+        if (sql.includes('"Auction"')) {
+          lockOrder.push('Auction');
+          return [{ id: mockAuctionId, status: AuctionStatus.COMPLETED }];
+        }
+        if (sql.includes('"SubscriberTicket"')) {
+          lockOrder.push('SubscriberTicket');
+          return [{ id: mockTicketId1, status: 'ACTIVE', isPrized: true }];
+        }
+        if (sql.includes('"InstallmentDue"')) {
+          lockOrder.push('InstallmentDue');
+          return [{ id: 'due-m4-t1' }];
+        }
+        return [];
+      });
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockFinalizedAuction,
+        winner: {
+          ...mockFinalizedAuction.winner,
+          disbursementStatus: 'VERIFIED_BY_MAKER',
+        },
+      });
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce({
+          id: 'corr-req-lock-1',
+          userId: mockMakerId,
+          timestamp: new Date('2026-11-18T11:00:00.000Z'),
+          newValue: {
+            correctedBidDiscount: '24000',
+            correctedWinningTicketId: mockTicketId1,
+            reason: 'TOCTOU lock order check',
+          },
+        })
+        .mockResolvedValueOnce(null);
+      prismaMock.auction.update.mockResolvedValue({ ...mockFinalizedAuction, bidDiscount: 24000n });
+      prismaMock.installmentDue.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 'due-m4-t1', grossAmount: 5000n, dividendDeduction: 800n, netPayableAmount: 4200n },
+      ]);
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.auctionMinutes.update.mockResolvedValue({});
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'corr-app-lock-1' });
+
+      await auctionService.approveAuctionCorrection(
+        mockAuctionId,
+        mockCheckerId,
+        { notes: 'Lock order verified' },
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(lockOrder).toEqual([
+        'ChitGroup',
+        'Auction',
+        'AuctionWinner',
+        'SubscriberTicket',
+        'InstallmentDue',
+      ]);
+    });
+
+    it('DEF-AUC-07: enforces Anti-BOLA cross-branch isolation for BRANCH_MANAGER across auction endpoints', async () => {
+      const otherBranchManager = {
+        sub: 'bm-branch-2',
+        phone: '9876540002',
+        roles: [Role.BRANCH_MANAGER],
+        branchId: 'branch-erode-02',
+      } as any;
+
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme); // branch-prd-01
+
+      await expect(
+        auctionService.getEligibleBidders(mockChitGroupId, 2, otherBranchManager),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          { ticketId: mockTicketId1, bidDiscount: 20000, auctionDate: '2026-12-15T00:00:00.000Z' },
+          otherBranchManager.sub,
+          otherBranchManager,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        auctionService.recordTieBreak(
+          mockChitGroupId,
+          2,
+          {
+            tiedTickets: [
+              { ticketId: mockTicketId1, tokenNumber: 1 },
+              { ticketId: mockTicketId2, tokenNumber: 2 },
+            ],
+            winningTicketId: mockTicketId2,
+            bidDiscount: 25000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          otherBranchManager.sub,
+          otherBranchManager,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      prismaMock.auctionMinutes.findUnique.mockResolvedValue({
+        id: 'min-1',
+        auction: { chitGroup: mockChitScheme },
+      });
+      await expect(
+        auctionService.getAuctionMinutes(mockAuctionId, otherBranchManager),
+      ).rejects.toThrow(ForbiddenException);
+
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        status: AuctionStatus.COMPLETED,
+        chitGroup: mockChitScheme,
+        minutes: { id: 'min-1', filedAtRegistrar: false },
+      });
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          { filingReference: 'ROC-X' },
+          otherBranchManager.sub,
+          otherBranchManager,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('DEF-AUC-09: parseOptionalPositiveIntQuery rejects malformed month query strings fail-closed', () => {
+      expect(parseOptionalPositiveIntQuery(undefined)).toBeUndefined();
+      expect(parseOptionalPositiveIntQuery('2')).toBe(2);
+      expect(() => parseOptionalPositiveIntQuery('2.5')).toThrow(BadRequestException);
+      expect(() => parseOptionalPositiveIntQuery('abc')).toThrow(BadRequestException);
+      expect(() => parseOptionalPositiveIntQuery('2abc')).toThrow(BadRequestException);
+      expect(() => parseOptionalPositiveIntQuery('-1')).toThrow(BadRequestException);
+      expect(() => parseOptionalPositiveIntQuery('0')).toThrow(BadRequestException);
+    });
+  });
+
+  describe('9. Round-3 Forensic Cross-Review Remediation Proofs (XR-AUC-01 .. XR-AUC-08 & XR-WM-02)', () => {
+    const baseFinalizedAuction = {
+      id: mockAuctionId,
+      chitGroupId: mockChitGroupId,
+      chitGroup: mockChitScheme,
+      installmentMonth: 3,
+      auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+      status: AuctionStatus.MINUTES_FILED,
+      bidDiscount: 20000n,
+      foremanCommissionRate: 4.0,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 16000n,
+      dividendPerTicket: 800n,
+      prizeMoney: 80000n,
+      winner: {
+        id: 'winner-001',
+        auctionId: mockAuctionId,
+        ticketId: mockTicketId1,
+        wasTieBreakWinner: true,
+        isSecurityRequired: true,
+        securityType: 'BLANK_CHEQUE',
+        blankChequeDetails: 'KVB #998811 A/C Old Winner',
+        agreementSigned: true,
+        nomineeSigned: true,
+        securityDocS3Key: 'safety-proof/auction-uuid-001/old-winner-cheque.pdf',
+        paymentReference: 'PRE-REF-01',
+        verifiedByUserId: mockMakerId,
+        authorizedByUserId: mockCheckerId,
+        disbursedAmount: 80000n,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+        ticket: {
+          id: mockTicketId1,
+          chitGroupId: mockChitGroupId,
+          ticketNumber: 3,
+          customerId: 'cust-001',
+          status: 'ACTIVE',
+          isPrized: true,
+          consecutiveUnpaidMonths: 0,
+          customer: { id: 'cust-001', fullName: 'Old Winner', phone: '9842100001' },
+        },
+      },
+      tieBidders: [
+        { id: 'tb-1', ticketId: mockTicketId1, isWinner: true, tokenNumber: 1 },
+        { id: 'tb-2', ticketId: mockTicketId2, isWinner: false, tokenNumber: 2 },
+      ],
+      minutes: {
+        id: 'min-001',
+        auctionId: mockAuctionId,
+        subscribersPresent: 16,
+        minutesText: 'Old proceedings...',
+        filedAtRegistrar: true,
+        filedDate: new Date('2026-12-20T00:00:00.000Z'),
+        filingReference: 'ROC-OLD-001',
+        filingNotes: 'Previously filed',
+      },
+    };
+
+    it('XR-AUC-01: recordBid & recordTieBreak wipe stale safety proof/collateral fields when replacing an existing SCHEDULED winner with a different ticket', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId2,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 4,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+      });
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        status: AuctionStatus.SCHEDULED,
+        winner: { id: 'winner-001', ticketId: mockTicketId1 },
+      });
+      prismaMock.auction.upsert.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        status: AuctionStatus.SCHEDULED,
+      });
+
+      await auctionService.recordBid(
+        mockChitGroupId,
+        2,
+        { ticketId: mockTicketId2, bidDiscount: 20000, auctionDate: '2026-12-15T00:00:00.000Z' },
+        mockMakerId,
+      );
+
+      expect(prismaMock.auctionWinner.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            ticketId: mockTicketId2,
+            wasTieBreakWinner: false,
+            isSecurityRequired: false,
+            securityType: null,
+            blankChequeDetails: null,
+            agreementSigned: false,
+            nomineeSigned: false,
+            securityDocS3Key: null,
+            paymentReference: null,
+            disbursedAt: null,
+            disbursedAmount: null,
+            disbursementMode: null,
+            verifiedByUserId: null,
+            authorizedByUserId: null,
+            disbursementStatus: 'PENDING_VERIFICATION',
+          }),
+        }),
+      );
+
+      prismaMock.auctionWinner.upsert.mockClear();
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        { id: mockTicketId1, chitGroupId: mockChitGroupId, ticketNumber: 3, isPrized: false, status: 'ACTIVE', consecutiveUnpaidMonths: 0 },
+        { id: mockTicketId2, chitGroupId: mockChitGroupId, ticketNumber: 4, isPrized: false, status: 'ACTIVE', consecutiveUnpaidMonths: 0 },
+      ]);
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        status: AuctionStatus.SCHEDULED,
+        winner: { id: 'winner-001', ticketId: mockTicketId1 },
+      });
+
+      await auctionService.recordTieBreak(
+        mockChitGroupId,
+        2,
+        {
+          tiedTickets: [
+            { ticketId: mockTicketId1, tokenNumber: 1 },
+            { ticketId: mockTicketId2, tokenNumber: 2 },
+          ],
+          winningTicketId: mockTicketId2,
+          bidDiscount: 25000,
+          auctionDate: '2026-12-15T00:00:00.000Z',
+        },
+        mockMakerId,
+      );
+
+      expect(prismaMock.auctionWinner.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            ticketId: mockTicketId2,
+            wasTieBreakWinner: true,
+            isSecurityRequired: false,
+            securityType: null,
+            blankChequeDetails: null,
+            agreementSigned: false,
+            nomineeSigned: false,
+            securityDocS3Key: null,
+            paymentReference: null,
+            disbursedAt: null,
+            disbursedAmount: null,
+            disbursementMode: null,
+            verifiedByUserId: null,
+            authorizedByUserId: null,
+            disbursementStatus: 'PENDING_VERIFICATION',
+          }),
+        }),
+      );
+    });
+
+    it('XR-AUC-01 & XR-AUC-03: approveAuctionCorrection clears ALL safety proof/collateral fields on winner swap, resyncs tieBidders, and resets MINUTES_FILED -> COMPLETED + filedAtRegistrar=false', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(baseFinalizedAuction);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId2,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 4,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'New Winner' },
+      });
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce({
+          id: 'corr-req-swap-1',
+          userId: mockMakerId,
+          timestamp: new Date('2026-12-21T10:00:00.000Z'),
+          oldValue: { ticketId: mockTicketId1 },
+          newValue: {
+            correctedBidDiscount: '24000',
+            correctedWinningTicketId: mockTicketId2,
+            correctedTicketNumber: 4,
+            reason: 'Wrong token number transcribed',
+          },
+        })
+        .mockResolvedValueOnce(null);
+      prismaMock.auction.update.mockResolvedValue({
+        ...baseFinalizedAuction,
+        status: AuctionStatus.COMPLETED,
+        bidDiscount: 24000n,
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      prismaMock.auctionMinutes.update.mockResolvedValue({});
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'corr-app-swap-1' });
+
+      await auctionService.approveAuctionCorrection(
+        mockAuctionId,
+        mockCheckerId,
+        { notes: 'Swapped cleanly' },
+        [Role.SUPER_ADMIN],
+      );
+
+      // XR-AUC-01: ALL safety proof & collateral fields MUST be wiped on winner swap
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith({
+        where: { id: 'winner-001' },
+        data: expect.objectContaining({
+          ticketId: mockTicketId2,
+          wasTieBreakWinner: true,
+          isSecurityRequired: false,
+          securityType: null,
+          blankChequeDetails: null,
+          agreementSigned: false,
+          nomineeSigned: false,
+          securityDocS3Key: null,
+          paymentReference: null,
+          disbursedAt: null,
+          disbursedAmount: null,
+          disbursementMode: null,
+          verifiedByUserId: null,
+          authorizedByUserId: null,
+          disbursementStatus: 'PENDING_VERIFICATION',
+        }),
+      });
+      expect(prismaMock.auctionTieBidder.updateMany).toHaveBeenCalledWith({
+        where: { auctionId: mockAuctionId },
+        data: { isWinner: false },
+      });
+      expect(prismaMock.auctionTieBidder.updateMany).toHaveBeenCalledWith({
+        where: { auctionId: mockAuctionId, ticketId: mockTicketId2 },
+        data: { isWinner: true },
+      });
+
+      // XR-AUC-03: MINUTES_FILED reset to COMPLETED & filedAtRegistrar reset to false
+      expect(prismaMock.auction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: AuctionStatus.COMPLETED }),
+        }),
+      );
+      expect(prismaMock.auctionMinutes.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            filedAtRegistrar: false,
+            filedDate: null,
+            filingReference: null,
+            filingNotes: null,
+          }),
+        }),
+      );
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'AUCTION_CORRECTION_APPROVED',
+            oldValue: expect.objectContaining({
+              previousAuctionStatus: AuctionStatus.MINUTES_FILED,
+              previousFilingReference: 'ROC-OLD-001',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('XR-AUC-03: requestAuctionCorrection & approveAuctionCorrection reject COMPLETED/CLOSED chit schemes', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...baseFinalizedAuction,
+        chitGroup: { ...mockChitScheme, status: ChitStatus.CLOSED },
+      });
+
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { correctedBidDiscount: 24000, reason: 'Attempt on closed scheme' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/must be ACTIVE/);
+
+      await expect(
+        auctionService.approveAuctionCorrection(
+          mockAuctionId,
+          mockCheckerId,
+          { notes: 'Attempt on closed scheme' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/must be ACTIVE/);
+    });
+
+    it('XR-AUC-02 & XR-WM-02: pure Role.CUSTOMER gets minutes=null, pendingCorrection=null, and zero fellow-winner collateral/PII; staff receives pendingCorrection', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(baseFinalizedAuction);
+      prismaMock.subscriberTicket.findFirst.mockResolvedValue({ id: mockTicketId2 });
+
+      const otherCustomer = {
+        sub: 'cust-002',
+        phone: '9842100002',
+        roles: [Role.CUSTOMER],
+      } as any;
+
+      const customerView: any = await auctionService.findOne(mockAuctionId, otherCustomer);
+      expect(customerView.minutes).toBeNull();
+      expect(customerView.pendingCorrection).toBeNull();
+      expect(customerView.winner.ticket.customer.phone).toBe('+91 ******0000');
+      expect(customerView.winner.blankChequeDetails).toBeUndefined();
+      expect(customerView.winner.securityDocS3Key).toBeUndefined();
+      expect(customerView.winner.paymentReference).toBeUndefined();
+      expect(customerView.winner.disbursedAmount).toBeUndefined();
+      expect(customerView.winner.verifiedByUserId).toBeUndefined();
+      expect(customerView.winner.authorizedByUserId).toBeUndefined();
+
+      // getGroupAuctions also strips minutes and fellow-winner collateral for Customer
+      prismaMock.auction.findMany.mockResolvedValue([baseFinalizedAuction]);
+      const groupList: any = await auctionService.getGroupAuctions(mockChitGroupId, otherCustomer);
+      expect(groupList[0].minutes).toBeNull();
+      expect(groupList[0].winner.blankChequeDetails).toBeUndefined();
+      expect(groupList[0].winner.securityDocS3Key).toBeUndefined();
+
+      // Staff receives pendingCorrection metadata for Maker != Checker UI hydration (XR-WM-02)
+      const reqTs = new Date('2026-12-22T09:00:00.000Z');
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce({
+          id: 'corr-req-ui-1',
+          userId: mockMakerId,
+          timestamp: reqTs,
+          newValue: {
+            correctedBidDiscount: '24000',
+            correctedWinningTicketId: mockTicketId2,
+            correctedTicketNumber: 4,
+            reason: 'Token correction',
+            notes: 'Per register',
+          },
+        })
+        .mockResolvedValueOnce(null);
+
+      const staffView: any = await auctionService.findOne(mockAuctionId, {
+        sub: mockCheckerId,
+        phone: '9876543211',
+        roles: [Role.SUPER_ADMIN],
+      } as any);
+      expect(staffView.pendingCorrection).toEqual({
+        requestId: 'corr-req-ui-1',
+        requestedByUserId: mockMakerId,
+        correctedBidDiscount: 24000,
+        correctedWinningTicketId: mockTicketId2,
+        correctedTicketNumber: 4,
+        reason: 'Token correction',
+        notes: 'Per register',
+        requestedAt: reqTs.toISOString(),
+      });
+    });
+
+    it('XR-AUC-04: recordTieBreak strictly rejects duplicate physical paper token numbers', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      await expect(
+        auctionService.recordTieBreak(
+          mockChitGroupId,
+          2,
+          {
+            tiedTickets: [
+              { ticketId: mockTicketId1, tokenNumber: 2 },
+              { ticketId: mockTicketId2, tokenNumber: 2 },
+            ],
+            winningTicketId: mockTicketId1,
+            bidDiscount: 25000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/DUPLICATE_TOKEN_NUMBER/);
+    });
+
+    it('XR-AUC-05: markMinutesFiled rejects non-partner IT Super Admin (isPartner: false) fail-closed', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        id: 'it-admin',
+        isPartner: false,
+        isActive: true,
+      });
+
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          { filingReference: 'ROC-IT-001' },
+          'it-admin',
+          { sub: 'it-admin', phone: '9999999999', roles: [Role.SUPER_ADMIN] } as any,
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
+    });
+
+    it('XR-AUC-06: finalizeAuction rejects installmentMonth > durationMonths AND null/zero prizeMoney or bidDiscount', async () => {
+      // Month > durationMonths (e.g. Month 25 on 20-month chit)
+      prismaMock.auction.findUnique.mockResolvedValueOnce({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 25,
+        status: AuctionStatus.SCHEDULED,
+        conductedByUserId: mockMakerId,
+        chitGroup: mockChitScheme,
+        winner: { ticketId: mockTicketId1 },
+      });
+      await expect(
+        auctionService.finalizeAuction(mockAuctionId, mockCheckerId, { subscribersPresent: 10 }),
+      ).rejects.toThrow(/Guardrail 5 Violation/);
+
+      // Null bidDiscount / prizeMoney inside TX
+      prismaMock.auction.findUnique.mockResolvedValueOnce({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 3,
+        auctionDate: new Date('2026-12-15T00:00:00.000Z'),
+        status: AuctionStatus.SCHEDULED,
+        bidDiscount: null,
+        prizeMoney: null,
+        conductedByUserId: mockMakerId,
+        chitGroup: mockChitScheme,
+        winner: {
+          ticketId: mockTicketId1,
+          ticket: {
+            id: mockTicketId1,
+            chitGroupId: mockChitGroupId,
+            ticketNumber: 3,
+            status: 'ACTIVE',
+            isPrized: false,
+            consecutiveUnpaidMonths: 0,
+            customer: { fullName: 'Subscriber' },
+          },
+        },
+      });
+      await expect(
+        auctionService.finalizeAuction(mockAuctionId, mockCheckerId, { subscribersPresent: 10 }),
+      ).rejects.toThrow(/INVALID_AUCTION_FINANCIALS/);
+    });
+
+    it('XR-AUC-07: getEligibleBiddersForIdentifier fails closed when ChitGroup UUID omits ?month=', async () => {
+      prismaMock.auction.findUnique.mockResolvedValueOnce(null);
+      prismaMock.chitGroup.findUnique.mockResolvedValueOnce(mockChitScheme);
+
+      await expect(
+        auctionService.getEligibleBiddersForIdentifier(mockChitGroupId, undefined),
+      ).rejects.toThrow(/Installment month is required/);
+    });
+
+    it('XR-AUC-08: requestAuctionCorrection rejects whitespace-only reason', async () => {
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          mockMakerId,
+          { correctedBidDiscount: 24000, reason: '   \t\n  ' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/CORRECTION_REASON_REQUIRED/);
     });
   });
 });

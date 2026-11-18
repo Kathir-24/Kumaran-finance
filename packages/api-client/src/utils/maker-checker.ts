@@ -5,6 +5,8 @@
 
 export interface MakerCheckerEntity {
   makerUserId?: string | null;
+  conductedByUserId?: string | null;
+  verifiedByUserId?: string | null;
   createdByUserId?: string | null;
   requestedByUserId?: string | null;
   collectorUserId?: string | null;
@@ -25,11 +27,15 @@ export function isSelfApproval(
 
   const makerId =
     entity.makerUserId ||
+    entity.conductedByUserId ||
+    entity.verifiedByUserId ||
     entity.createdByUserId ||
     entity.requestedByUserId ||
     entity.collectorUserId;
 
-  return Boolean(makerId && currentUserId === makerId);
+  return Boolean(
+    makerId && currentUserId.trim().toLowerCase() === makerId.trim().toLowerCase(),
+  );
 }
 
 /**

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import {
   DefaulterEligibilityRoster,
+  resolveEligibleBidderTicketId,
   type SubscriberTicketItem,
   type EligibleBidderItem,
 } from '@/components/auctions/defaulter-eligibility-roster';
@@ -30,9 +31,25 @@ import {
   AuctionSummaryCard,
   type AuctionSummaryData,
 } from '@/components/auctions/auction-summary-card';
+import {
+  computeCeilingDiscountBigInt,
+  toSafeWholeRupeeBigInt,
+} from '@/components/auctions/auction-math.util';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
+
+interface SchemeDetailFallback {
+  id: string;
+  groupCode: string;
+  groupName?: string;
+  chitValue: number | bigint | string;
+  durationMonths: number;
+  baseInstallment?: number | bigint | string;
+  foremanCommissionRate?: number | string | null;
+  maxDiscountCeiling?: number | bigint | string | null;
+}
 
 interface LiveAuctionRecord extends AuctionSummaryData {
   chitGroup?: {
@@ -41,6 +58,9 @@ interface LiveAuctionRecord extends AuctionSummaryData {
     groupName?: string;
     chitValue?: number | bigint | string;
     durationMonths?: number;
+    baseInstallment?: number | bigint | string;
+    foremanCommissionRate?: number | string | null;
+    maxDiscountCeiling?: number | bigint | string | null;
   };
 }
 
@@ -49,6 +69,11 @@ function LiveAuctionRoomContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial auction recording
+  const canConductAuction =
+    hasAnyRole(user, ['BRANCH_MANAGER']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
   const auctionId = String(params.id);
   const monthParam = searchParams.get('month');
@@ -79,7 +104,7 @@ function LiveAuctionRoomContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // 1. Fetch auction details
+  // 1. Fetch auction details (may 404 when opening an uncreated month via ChitGroup UUID + ?month=M)
   const {
     data: auction,
     isLoading: isAuctionLoading,
@@ -94,16 +119,38 @@ function LiveAuctionRoomContent() {
         }),
       );
     },
+    retry: false,
     enabled: Boolean(auctionId),
   });
 
-  const chitGroupId = auction?.chitGroupId || auction?.chitGroup?.id;
+  // 1b. Fallback: If auctionId is a ChitGroup UUID for a brand-new Month M auction, fetch scheme directly
+  const {
+    data: fallbackScheme,
+    isLoading: isFallbackSchemeLoading,
+  } = useQuery<SchemeDetailFallback>({
+    queryKey: queryKeys.schemes.detail(auctionId),
+    queryFn: async () => {
+      return unwrapApiResponse<SchemeDetailFallback>(
+        apiClient.GET('/api/v1/chits/{id}', {
+          params: { path: { id: auctionId } },
+        }),
+      );
+    },
+    retry: false,
+    enabled: Boolean(auctionId) && isAuctionError && Boolean(monthNum),
+  });
+
+  const resolvedScheme = auction?.chitGroup || fallbackScheme;
+  const chitGroupId = auction?.chitGroupId || resolvedScheme?.id;
   const currentMonth = auction?.installmentMonth ?? monthNum ?? 2;
+  const durationMonths = Math.max(2, Number(resolvedScheme?.durationMonths || 20));
+  const isMonth1OrMonthN = currentMonth <= 1 || currentMonth >= durationMonths;
 
   // 2. Fetch eligible bidders (ADR-07 pre-auction defaulter guard)
   const {
     data: eligibleBidders = [],
     isLoading: isEligibleLoading,
+    isSuccess: isEligibleLoaded,
   } = useQuery<EligibleBidderItem[]>({
     queryKey: queryKeys.auctions.eligibleBidders(auctionId, currentMonth),
     queryFn: async () => {
@@ -116,15 +163,15 @@ function LiveAuctionRoomContent() {
         }),
       );
     },
-    enabled: Boolean(auctionId),
+    enabled: Boolean(auctionId) && !isMonth1OrMonthN,
   });
 
-  // 3. Fetch all assigned subscriber tickets for chit scheme roster
+  // 3. Fetch all assigned subscriber tickets for chit scheme roster (using schemes.roster key — zero cache collision!)
   const {
     data: allTickets = [],
     isLoading: isTicketsLoading,
   } = useQuery<SubscriberTicketItem[]>({
-    queryKey: queryKeys.schemes.detail(chitGroupId || ''),
+    queryKey: queryKeys.schemes.roster(chitGroupId || ''),
     queryFn: async () => {
       if (!chitGroupId) return [];
       return unwrapApiResponse<SubscriberTicketItem[]>(
@@ -133,21 +180,49 @@ function LiveAuctionRoomContent() {
         }),
       );
     },
-    enabled: Boolean(chitGroupId),
+    enabled: Boolean(chitGroupId) && !isMonth1OrMonthN,
   });
 
-  // Scheme parameters with safe fallbacks
-  const chitValue = Number(auction?.chitGroup?.chitValue || 100000);
-  const durationMonths = Number(auction?.chitGroup?.durationMonths || 20);
-  const baseInstallment = Math.floor(chitValue / durationMonths);
-  const maxCeiling = Math.floor(chitValue / 4);
+  // Authoritative eligible tickets derived from backend pre-auction defaulter guard (Guardrail 8)
+  const authoritativeEligibleTickets = React.useMemo(() => {
+    const serverEligibleIds = new Set(
+      eligibleBidders.map((e) => resolveEligibleBidderTicketId(e)).filter(Boolean),
+    );
+    if (isEligibleLoaded) {
+      const matchedFromAll = allTickets.filter(
+        (ticket) =>
+          serverEligibleIds.has(ticket.id) &&
+          ticket.status === 'ACTIVE' &&
+          !ticket.isPrized &&
+          ticket.consecutiveUnpaidMonths === 0,
+      );
+      return matchedFromAll.length > 0 ? matchedFromAll : eligibleBidders;
+    }
+    return allTickets.filter(
+      (ticket) => ticket.status === 'ACTIVE' && !ticket.isPrized && ticket.consecutiveUnpaidMonths === 0,
+    );
+  }, [allTickets, eligibleBidders, isEligibleLoaded]);
 
-  // Record Bid Mutation
+  // Scheme parameters with exact BigInt whole-rupee math (Guardrail 2, 3, 6)
+  const chitValueBig = toSafeWholeRupeeBigInt(resolvedScheme?.chitValue, 0n);
+  const baseInstallmentBig =
+    resolvedScheme?.baseInstallment !== undefined && resolvedScheme?.baseInstallment !== null
+      ? toSafeWholeRupeeBigInt(resolvedScheme.baseInstallment, chitValueBig / BigInt(durationMonths))
+      : chitValueBig / BigInt(durationMonths);
+  const maxCeilingBig = computeCeilingDiscountBigInt(
+    chitValueBig,
+    resolvedScheme?.maxDiscountCeiling,
+  );
+
+  // Record Bid Mutation (passes ?month=currentMonth for both Auction UUID and ChitGroup UUID)
   const recordBidMutation = useMutation({
     mutationFn: async (payload: RecordBidPayload) => {
       return unwrapApiResponse(
         apiClient.POST('/api/v1/auctions/{id}/record-bid', {
-          params: { path: { id: auctionId } },
+          params: {
+            path: { id: auctionId },
+            query: { month: currentMonth },
+          },
           body: payload,
         }),
       );
@@ -160,12 +235,15 @@ function LiveAuctionRoomContent() {
     },
   });
 
-  // Record Tie-Break Mutation
+  // Record Tie-Break Mutation (passes ?month=currentMonth for both Auction UUID and ChitGroup UUID)
   const recordTieBreakMutation = useMutation({
     mutationFn: async (payload: RecordTieBreakPayload) => {
       return unwrapApiResponse(
         apiClient.POST('/api/v1/auctions/{id}/tie-break', {
-          params: { path: { id: auctionId } },
+          params: {
+            path: { id: auctionId },
+            query: { month: currentMonth },
+          },
           body: payload,
         }),
       );
@@ -179,14 +257,17 @@ function LiveAuctionRoomContent() {
     },
   });
 
+  const isAuctionFinalized =
+    auction?.status === 'COMPLETED' || auction?.status === 'MINUTES_FILED';
+
   const hasRecordedResult = Boolean(
     auction &&
       auction.bidDiscount &&
       auction.winner &&
-      !isModifying,
+      (!isModifying || isAuctionFinalized),
   );
 
-  if (isAuctionLoading) {
+  if (isAuctionLoading || (isAuctionError && Boolean(monthNum) && isFallbackSchemeLoading)) {
     return (
       <div className="flex h-96 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40">
         <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
@@ -194,7 +275,7 @@ function LiveAuctionRoomContent() {
     );
   }
 
-  if (isAuctionError || !auction) {
+  if (!auction && !fallbackScheme) {
     return (
       <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-8 text-center space-y-3">
         <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
@@ -206,6 +287,29 @@ function LiveAuctionRoomContent() {
           <Link href="/auctions">
             <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
             <span>Return to Auctions</span>
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Guardrail 5: Month 1 (Company Pool) & Month N (Maturity Settlement) have NO bidding auctions
+  if (isMonth1OrMonthN) {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-8 text-center space-y-3">
+        <AlertCircle className="mx-auto h-8 w-8 text-amber-400" />
+        <h3 className="text-base font-semibold text-white">
+          {currentMonth <= 1 ? t('month1NoAuction') : t('monthNNoAuction')}
+        </h3>
+        <p className="text-xs text-amber-200 max-w-md mx-auto leading-relaxed">
+          {currentMonth <= 1
+            ? t('month1NoAuctionLiveDesc', { lastAuctionMonth: Math.max(2, durationMonths - 1) })
+            : t('monthNNoAuctionLiveDesc', { duration: durationMonths })}
+        </p>
+        <Button size="sm" variant="outline" asChild className="border-slate-700 bg-slate-800 text-xs text-slate-200">
+          <Link href={chitGroupId ? `/auctions?group=${chitGroupId}` : '/auctions'}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            <span>Return to Auctions Schedule</span>
           </Link>
         </Button>
       </div>
@@ -225,14 +329,14 @@ function LiveAuctionRoomContent() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded">
-                {auction.chitGroup?.groupCode || 'SCHEME'}
+                {resolvedScheme?.groupCode || 'SCHEME'}
               </span>
               <h1 className="text-lg font-bold text-white">
-                Month {auction.installmentMonth} — {t('liveRoomTitle')}
+                Month {currentMonth} — {t('liveRoomTitle')}
               </h1>
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              {auction.chitGroup?.groupName || t('liveRoomSubtitle')}
+              {resolvedScheme?.groupName || t('liveRoomSubtitle')}
             </p>
           </div>
         </div>
@@ -271,7 +375,8 @@ function LiveAuctionRoomContent() {
           <DefaulterEligibilityRoster
             allTickets={allTickets}
             eligibleTickets={eligibleBidders}
-            selectedTicketId={selectedTicket?.id || auction.winner?.ticketId}
+            hasAuthoritativeEligibility={isEligibleLoaded}
+            selectedTicketId={selectedTicket?.id || auction?.winner?.ticketId}
             onSelectBidder={(ticket) => setSelectedTicket(ticket)}
             isLoading={isTicketsLoading || isEligibleLoading}
           />
@@ -279,21 +384,25 @@ function LiveAuctionRoomContent() {
 
         {/* Right Column (7 cols): Bidding Console OR Auction Summary Card */}
         <div className="lg:col-span-7 space-y-4">
-          {hasRecordedResult ? (
+          {hasRecordedResult && auction ? (
             <AuctionSummaryCard
               auction={auction}
-              chitValue={chitValue}
-              baseInstallment={baseInstallment}
+              chitValue={chitValueBig}
+              baseInstallment={baseInstallmentBig}
               totalTickets={durationMonths}
+              isFinalized={isAuctionFinalized}
+              canModifyBid={canConductAuction}
               onModifyBid={() => setIsModifying(true)}
             />
           ) : (
             <BiddingConsole
-              chitValue={chitValue}
+              chitValue={chitValueBig}
               durationMonths={durationMonths}
-              baseInstallment={baseInstallment}
+              baseInstallment={baseInstallmentBig}
+              foremanCommissionRate={resolvedScheme?.foremanCommissionRate}
+              maxDiscountCeiling={resolvedScheme?.maxDiscountCeiling}
               selectedTicket={selectedTicket}
-              eligibleTickets={allTickets.filter((t) => t.status === 'ACTIVE' && !t.isPrized && t.consecutiveUnpaidMonths === 0)}
+              eligibleTickets={authoritativeEligibleTickets}
               onSelectTicket={(ticket) => setSelectedTicket(ticket)}
               onRecordBid={async (payload) => {
                 await recordBidMutation.mutateAsync(payload);
@@ -309,8 +418,8 @@ function LiveAuctionRoomContent() {
       <TieBreakModal
         isOpen={isTieBreakOpen}
         onClose={() => setIsTieBreakOpen(false)}
-        ceilingDiscount={maxCeiling}
-        eligibleTickets={allTickets.filter((t) => t.status === 'ACTIVE' && !t.isPrized && t.consecutiveUnpaidMonths === 0)}
+        ceilingDiscount={maxCeilingBig}
+        eligibleTickets={authoritativeEligibleTickets}
         onRecordTieBreak={async (payload) => {
           await recordTieBreakMutation.mutateAsync(payload);
         }}

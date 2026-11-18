@@ -10,9 +10,16 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatRupee, parseWholeRupees, sanitizeWholeRupeeInput } from '@/lib/currency';
+import { formatRupee, sanitizeWholeRupeeInput } from '@/lib/currency';
 import { getErrorMessage } from '@/lib/api-client';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import type { SubscriberTicketItem, EligibleBidderItem } from './defaulter-eligibility-roster';
+import {
+  computeAuctionBidPreview,
+  MAX_SAFE_WHOLE_RUPEE_BIGINT,
+  parseWholeRupeesBigInt,
+  toSafeWholeRupeeBigInt,
+} from './auction-math.util';
 
 export interface RecordBidPayload {
   ticketId: string;
@@ -21,9 +28,11 @@ export interface RecordBidPayload {
 }
 
 interface BiddingConsoleProps {
-  chitValue: number;
+  chitValue: bigint | number | string;
   durationMonths: number;
-  baseInstallment: number;
+  baseInstallment: bigint | number | string;
+  foremanCommissionRate?: number | string | null;
+  maxDiscountCeiling?: bigint | number | string | null;
   selectedTicket?: SubscriberTicketItem | null;
   eligibleTickets: (SubscriberTicketItem | EligibleBidderItem)[];
   onSelectTicket: (ticket: SubscriberTicketItem) => void;
@@ -36,6 +45,8 @@ export function BiddingConsole({
   chitValue,
   durationMonths,
   baseInstallment,
+  foremanCommissionRate,
+  maxDiscountCeiling,
   selectedTicket,
   eligibleTickets,
   onSelectTicket,
@@ -44,15 +55,38 @@ export function BiddingConsole({
   isSubmitting = false,
 }: BiddingConsoleProps) {
   const t = useTranslations('auctions');
+  const user = useAuthStore((s) => s.user);
+  // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial bid recording
+  const canRecordBid =
+    hasAnyRole(user, ['BRANCH_MANAGER']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
-  // Math boundaries
-  const minFloor = Math.floor(chitValue * 0.04); // 4.00% Commission
-  const maxCeiling = Math.floor(chitValue / 4);  // 25% Fixed 1/4 Ceiling
+  // Pure BigInt whole-rupee math boundaries (Guardrail 2, 3, 6)
+  const chitValueBig = toSafeWholeRupeeBigInt(chitValue, 0n);
+  const baseInstallmentBig = toSafeWholeRupeeBigInt(baseInstallment, 0n);
+  const initialPreview = computeAuctionBidPreview({
+    chitValue: chitValueBig,
+    totalTickets: durationMonths,
+    bidDiscount: 0n,
+    frozenCommissionRate: foremanCommissionRate,
+    maxDiscountCeiling,
+    explicitBaseInstallment: baseInstallmentBig,
+  });
+  const minFloor = initialPreview.foremanCommission;
+  const maxCeiling = initialPreview.ceilingDiscount;
 
-  const [bidDiscountStr, setBidDiscountStr] = React.useState<string>(String(minFloor));
+  const [bidDiscountStr, setBidDiscountStr] = React.useState<string>(minFloor.toString());
+  const [hasUserEditedDiscount, setHasUserEditedDiscount] = React.useState(false);
   const [auctionDate, setAuctionDate] = React.useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTicketId, setSelectedTicketId] = React.useState<string>(selectedTicket?.id || '');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  // Sync default floor if scheme loads asynchronously before user edits
+  React.useEffect(() => {
+    if (!hasUserEditedDiscount && minFloor > 0n) {
+      setBidDiscountStr(minFloor.toString());
+    }
+  }, [minFloor, hasUserEditedDiscount]);
 
   // Sync selectedTicket prop
   React.useEffect(() => {
@@ -61,35 +95,54 @@ export function BiddingConsole({
     }
   }, [selectedTicket]);
 
-  // Current numeric discount
-  const currentDiscount = parseWholeRupees(bidDiscountStr) || 0;
+  // Current whole-rupee BigInt discount (pure string -> BigInt, zero Infinity RangeError on 310+ digit paste)
+  const currentDiscountBig = parseWholeRupeesBigInt(bidDiscountStr);
+  const preview = computeAuctionBidPreview({
+    chitValue: chitValueBig,
+    totalTickets: durationMonths,
+    bidDiscount: currentDiscountBig,
+    frozenCommissionRate: foremanCommissionRate,
+    maxDiscountCeiling,
+    explicitBaseInstallment: baseInstallmentBig,
+  });
 
-  // Real-time validations
-  const isFloorViolated = currentDiscount < minFloor;
-  const isCeilingViolated = currentDiscount > maxCeiling;
-  const isCeilingReached = currentDiscount === maxCeiling;
+  // Real-time validations (Guardrails 2, 3, 4, 6 + KFC-FIN-002 exact divisibility)
+  const {
+    isFloorViolated,
+    isCeilingViolated,
+    isCeilingReached,
+    isDivisible,
+    dividendRemainder,
+    foremanCommission,
+    totalDividend,
+    dividendPerTicket,
+    nextMonthNetInstallment,
+    netPrizeMoney,
+  } = preview;
 
-  // Real-time dynamic math
-  const foremanCommission = minFloor;
-  const totalDividend = Math.max(0, currentDiscount - foremanCommission);
-  const dividendPerTicket = Math.floor(totalDividend / durationMonths);
-  const nextMonthNetInstallment = Math.max(0, baseInstallment - dividendPerTicket);
-  const netPrizeMoney = Math.max(0, chitValue - currentDiscount);
+  const isDivisibilityViolated = !isFloorViolated && !isCeilingViolated && !isDivisible;
 
   const handleDiscountChange = (val: string) => {
     setErrorMsg(null);
+    setHasUserEditedDiscount(true);
     const sanitized = sanitizeWholeRupeeInput(val);
     setBidDiscountStr(sanitized);
   };
 
   const handleFillCeiling = () => {
     setErrorMsg(null);
-    setBidDiscountStr(String(maxCeiling));
+    setHasUserEditedDiscount(true);
+    setBidDiscountStr(maxCeiling.toString());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!canRecordBid) {
+      setErrorMsg('Only a verified Partner (Super Admin with isPartner: true) or Branch Manager can record in-office auction bids.');
+      return;
+    }
 
     if (!selectedTicketId) {
       setErrorMsg('Please select a winning subscriber ticket from the eligibility roster.');
@@ -97,19 +150,35 @@ export function BiddingConsole({
     }
 
     if (isFloorViolated) {
-      setErrorMsg(t('floorError', { minFloor: formatRupee(BigInt(minFloor)) }));
+      setErrorMsg(t('floorError', { minFloor: formatRupee(minFloor) }));
       return;
     }
 
     if (isCeilingViolated) {
-      setErrorMsg(t('ceilingError', { maxCeiling: formatRupee(BigInt(maxCeiling)) }));
+      setErrorMsg(t('ceilingError', { maxCeiling: formatRupee(maxCeiling) }));
+      return;
+    }
+
+    if (isDivisibilityViolated) {
+      setErrorMsg(
+        t('nonDivisibleError', {
+          totalDividend: formatRupee(totalDividend),
+          tickets: durationMonths,
+          remainder: formatRupee(dividendRemainder),
+        }),
+      );
+      return;
+    }
+
+    if (currentDiscountBig > MAX_SAFE_WHOLE_RUPEE_BIGINT) {
+      setErrorMsg('Bid discount exceeds maximum safe whole-Rupee integer limit.');
       return;
     }
 
     try {
       await onRecordBid({
         ticketId: selectedTicketId,
-        bidDiscount: currentDiscount,
+        bidDiscount: Number(currentDiscountBig),
         auctionDate: new Date(auctionDate).toISOString(),
       });
     } catch (err: unknown) {
@@ -150,24 +219,32 @@ export function BiddingConsole({
           </label>
           <select
             value={selectedTicketId}
+            disabled={!canRecordBid || isSubmitting}
             onChange={(e) => {
               const ticketId = e.target.value;
               setSelectedTicketId(ticketId);
-              const found = eligibleTickets.find(
-                (item) => ('id' in item ? item.id : item.ticketId) === ticketId,
-              );
-              if (found && 'customer' in found) {
+              const found = eligibleTickets.find((item) => {
+                const id = ('ticketId' in item && item.ticketId) ? item.ticketId : item.id;
+                return id === ticketId;
+              });
+              if (found && 'customer' in found && found.customer) {
                 onSelectTicket(found as SubscriberTicketItem);
               }
             }}
-            className="w-full rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-emerald-500/60 focus:outline-none"
+            className="w-full rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-emerald-500/60 focus:outline-none disabled:opacity-50"
           >
             <option value="">— Select Winning Subscriber Ticket —</option>
             {eligibleTickets.map((item) => {
-              const id = 'id' in item ? item.id : item.ticketId;
+              const id = (('ticketId' in item && item.ticketId) ? item.ticketId : item.id) || '';
               const num = item.ticketNumber;
-              const name = 'customer' in item ? item.customer.fullName : item.customerName;
-              const code = 'customer' in item ? item.customer.customerCode : item.customerCode;
+              const name =
+                ('customer' in item && item.customer?.fullName)
+                  ? item.customer.fullName
+                  : (('customerName' in item && item.customerName) || 'Subscriber');
+              const code =
+                ('customer' in item && item.customer?.customerCode)
+                  ? item.customer.customerCode
+                  : (('customerCode' in item && item.customerCode) || '');
               return (
                 <option key={id} value={id}>
                   #{num} - {name} ({code})
@@ -184,19 +261,22 @@ export function BiddingConsole({
             <button
               type="button"
               onClick={handleFillCeiling}
-              className="text-[11px] text-amber-400 hover:text-amber-300 font-medium transition-colors"
+              disabled={!canRecordBid || isSubmitting}
+              className="text-[11px] text-amber-400 hover:text-amber-300 font-medium transition-colors disabled:opacity-50"
             >
-              {t('fillCeilingAction', { amount: formatRupee(BigInt(maxCeiling)) })}
+              {t('fillCeilingAction', { amount: formatRupee(maxCeiling) })}
             </button>
           </div>
           <div className="relative">
             <span className="absolute left-3 top-2 text-xs font-mono text-slate-400 font-bold">₹</span>
             <input
               type="text"
+              inputMode="numeric"
               value={bidDiscountStr}
+              disabled={!canRecordBid || isSubmitting}
               onChange={(e) => handleDiscountChange(e.target.value)}
-              className={`w-full rounded-md border bg-slate-950 py-1.5 pl-7 pr-3 text-sm font-mono font-bold text-white focus:outline-none ${
-                isFloorViolated || isCeilingViolated
+              className={`w-full rounded-md border bg-slate-950 py-1.5 pl-7 pr-3 text-sm font-mono font-bold text-white focus:outline-none disabled:opacity-50 ${
+                isFloorViolated || isCeilingViolated || isDivisibilityViolated
                   ? 'border-red-500/60 text-red-300'
                   : isCeilingReached
                   ? 'border-amber-500/60 text-amber-300'
@@ -209,13 +289,25 @@ export function BiddingConsole({
           {isFloorViolated && (
             <p className="text-[11px] text-red-400 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
-              <span>{t('floorError', { minFloor: formatRupee(BigInt(minFloor)) })}</span>
+              <span>{t('floorError', { minFloor: formatRupee(minFloor) })}</span>
             </p>
           )}
           {isCeilingViolated && (
             <p className="text-[11px] text-red-400 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
-              <span>{t('ceilingError', { maxCeiling: formatRupee(BigInt(maxCeiling)) })}</span>
+              <span>{t('ceilingError', { maxCeiling: formatRupee(maxCeiling) })}</span>
+            </p>
+          )}
+          {isDivisibilityViolated && (
+            <p className="text-[11px] text-red-400 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span>
+                {t('nonDivisibleError', {
+                  totalDividend: formatRupee(totalDividend),
+                  tickets: durationMonths,
+                  remainder: formatRupee(dividendRemainder),
+                })}
+              </span>
             </p>
           )}
 
@@ -230,6 +322,7 @@ export function BiddingConsole({
                 type="button"
                 size="sm"
                 onClick={onOpenTieBreak}
+                disabled={!canRecordBid || isSubmitting}
                 className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs h-8"
               >
                 <Gavel className="mr-1.5 h-3.5 w-3.5" />
@@ -249,26 +342,26 @@ export function BiddingConsole({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="space-y-0.5">
               <span className="text-[10px] text-slate-400 leading-tight block">{t('foremanCommissionCalculated')}</span>
-              <div className="font-mono font-bold text-slate-300">{formatRupee(BigInt(foremanCommission))}</div>
+              <div className="font-mono font-bold text-slate-300">{formatRupee(foremanCommission)}</div>
             </div>
             <div className="space-y-0.5">
               <span className="text-[10px] text-slate-400 leading-tight block">{t('universalDividendPool')}</span>
-              <div className="font-mono font-bold text-slate-300">{formatRupee(BigInt(totalDividend))}</div>
+              <div className="font-mono font-bold text-slate-300">{formatRupee(totalDividend)}</div>
             </div>
             <div className="space-y-0.5">
               <span className="text-[10px] text-emerald-400 font-medium leading-tight block">{t('universalDividendPerMember')}</span>
-              <div className="font-mono font-bold text-emerald-300">{formatRupee(BigInt(dividendPerTicket))}</div>
+              <div className="font-mono font-bold text-emerald-300">{formatRupee(dividendPerTicket)}</div>
             </div>
             <div className="space-y-0.5">
               <span className="text-[10px] text-cyan-400 font-medium leading-tight block">{t('nextMonthNetInstallment')}</span>
-              <div className="font-mono font-bold text-cyan-300">{formatRupee(BigInt(nextMonthNetInstallment))}</div>
+              <div className="font-mono font-bold text-cyan-300">{formatRupee(nextMonthNetInstallment)}</div>
             </div>
           </div>
 
           <div className="border-t border-slate-800/80 pt-2 flex items-center justify-between text-xs">
             <span className="text-slate-300 font-medium">{t('netPrizeMoneyPayable')}</span>
             <span className="font-mono font-bold text-emerald-400 text-sm">
-              {formatRupee(BigInt(netPrizeMoney))}
+              {formatRupee(netPrizeMoney)}
             </span>
           </div>
         </div>
@@ -279,8 +372,9 @@ export function BiddingConsole({
           <input
             type="date"
             value={auctionDate}
+            disabled={!canRecordBid || isSubmitting}
             onChange={(e) => setAuctionDate(e.target.value)}
-            className="w-full rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+            className="w-full rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none disabled:opacity-50"
           />
         </div>
 
@@ -288,7 +382,14 @@ export function BiddingConsole({
         <Button
           type="submit"
           size="sm"
-          disabled={isSubmitting || !selectedTicketId || isFloorViolated || isCeilingViolated}
+          disabled={
+            !canRecordBid ||
+            isSubmitting ||
+            !selectedTicketId ||
+            isFloorViolated ||
+            isCeilingViolated ||
+            isDivisibilityViolated
+          }
           className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs h-9"
         >
           {isSubmitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}

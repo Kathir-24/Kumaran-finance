@@ -33,15 +33,16 @@ interface AuctionMinutesCardProps {
   groupName: string;
   installmentMonth: number;
   auctionDate: string;
-  chitValue: number;
-  bidDiscount: number;
-  foremanCommissionAmount: number;
-  totalDividend: number;
-  dividendPerTicket: number;
-  prizeMoney: number;
+  chitValue: bigint | number | string;
+  bidDiscount: bigint | number | string;
+  foremanCommissionAmount: bigint | number | string;
+  totalDividend: bigint | number | string;
+  dividendPerTicket: bigint | number | string;
+  prizeMoney: bigint | number | string;
   winnerTicketNumber: number;
   winnerCustomerName: string;
   minutes: AuctionMinutesData;
+  canRecordFiling?: boolean;
   onOpenFilingDialog: () => void;
 }
 
@@ -60,6 +61,7 @@ export function AuctionMinutesCard({
   winnerTicketNumber: _winnerTicketNumber,
   winnerCustomerName: _winnerCustomerName,
   minutes,
+  canRecordFiling = false,
   onOpenFilingDialog,
 }: AuctionMinutesCardProps) {
   const t = useTranslations('auctions');
@@ -165,7 +167,7 @@ export function AuctionMinutesCard({
           )}
         </div>
 
-        {!isFiled && (
+        {!isFiled && canRecordFiling && (
           <Button
             size="sm"
             onClick={onOpenFilingDialog}
@@ -181,9 +183,15 @@ export function AuctionMinutesCard({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span className="font-semibold text-slate-300">Statutory Form XVII Text</span>
-          <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+          <span
+            className={`flex items-center gap-1 text-[11px] ${
+              minutes.signedByForeman ? 'text-emerald-400' : 'text-amber-400'
+            }`}
+          >
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Signed by Foreman</span>
+            <span>
+              {minutes.signedByForeman ? 'Signed by Foreman' : 'Foreman Signature Pending'}
+            </span>
           </span>
         </div>
         <pre className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-[11px] text-slate-300 font-mono whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">

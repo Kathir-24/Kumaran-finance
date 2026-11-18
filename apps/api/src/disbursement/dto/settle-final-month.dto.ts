@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DisbursementMode } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class SettleFinalMonthDto {
   @ApiProperty({
@@ -41,7 +41,7 @@ export class SettleFinalMonthDto {
     description: 'Settlement disbursement timestamp (defaults to current date)',
   })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   disbursedAt?: string;
 
   @ApiPropertyOptional({

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import { SafetyProofUploadBox } from './safety-proof-upload-box';
 import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+
+type SafetyProofSecurityType =
+  | 'BLANK_CHEQUE'
+  | 'SIGNED_AGREEMENT'
+  | 'PROMISSORY_NOTE'
+  | 'PERSONAL_GUARANTEE'
+  | 'OTHER';
 
 export interface WinnerSafetyData {
   id: string;
@@ -48,9 +56,15 @@ export function SafetyProofChecklist({
 }: SafetyProofChecklistProps) {
   const t = useTranslations('disbursements');
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial safety-proof verification
+  const canVerifySafetyProof =
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
   const isAlreadyVerified =
     winner.disbursementStatus !== 'PENDING_VERIFICATION';
+  const isReadOnly = isAlreadyVerified || !canVerifySafetyProof;
 
   const [agreementSigned, setAgreementSigned] = useState(
     Boolean(winner.agreementSigned ?? isAlreadyVerified),
@@ -61,8 +75,8 @@ export function SafetyProofChecklist({
   const [isSecurityRequired, setIsSecurityRequired] = useState(
     Boolean(winner.isSecurityRequired),
   );
-  const [securityType, setSecurityType] = useState(
-    winner.securityType || 'BLANK_CHEQUE',
+  const [securityType, setSecurityType] = useState<SafetyProofSecurityType>(
+    (winner.securityType as SafetyProofSecurityType) || 'BLANK_CHEQUE',
   );
   const [blankChequeDetails, setBlankChequeDetails] = useState(
     winner.blankChequeDetails || '',
@@ -76,17 +90,40 @@ export function SafetyProofChecklist({
     text: string;
   } | null>(null);
 
+  // Sync local form state whenever winner record reloads from server
+  useEffect(() => {
+    setAgreementSigned(Boolean(winner.agreementSigned ?? isAlreadyVerified));
+    setNomineeSigned(Boolean(winner.nomineeSigned ?? isAlreadyVerified));
+    setIsSecurityRequired(Boolean(winner.isSecurityRequired));
+    setSecurityType((winner.securityType as SafetyProofSecurityType) || 'BLANK_CHEQUE');
+    setBlankChequeDetails(winner.blankChequeDetails || '');
+    setSecurityDocS3Key(winner.securityDocS3Key || null);
+    setNotes(winner.notes || '');
+  }, [
+    winner.id,
+    winner.disbursementStatus,
+    winner.agreementSigned,
+    winner.nomineeSigned,
+    winner.isSecurityRequired,
+    winner.securityType,
+    winner.blankChequeDetails,
+    winner.securityDocS3Key,
+    winner.notes,
+    isAlreadyVerified,
+  ]);
+
   // Verify Safety Proof Mutation (Maker Transition)
   const verifyMutation = useMutation({
     mutationFn: async () => {
+      if (!canVerifySafetyProof) {
+        throw new Error('Only Super Admin, Branch Manager, or Accountant can verify safety proof.');
+      }
       return unwrapApiResponse(
         apiClient.POST('/api/v1/disbursements/auction/{auctionId}/verify-safety-proof', {
           params: { path: { auctionId } },
           body: {
             isSecurityRequired,
-            securityType: isSecurityRequired
-              ? (securityType as 'BLANK_CHEQUE' | 'PROMISSORY_NOTE' | 'AGREEMENT_ONLY' | 'NONE')
-              : undefined,
+            securityType: isSecurityRequired ? securityType : undefined,
             blankChequeDetails: isSecurityRequired ? blankChequeDetails : undefined,
             agreementSigned,
             nomineeSigned,
@@ -158,7 +195,7 @@ export function SafetyProofChecklist({
           <input
             type="checkbox"
             checked={agreementSigned}
-            disabled={isAlreadyVerified}
+            disabled={isReadOnly}
             onChange={(e) => setAgreementSigned(e.target.checked)}
             className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-400"
           />
@@ -177,7 +214,7 @@ export function SafetyProofChecklist({
           <input
             type="checkbox"
             checked={nomineeSigned}
-            disabled={isAlreadyVerified}
+            disabled={isReadOnly}
             onChange={(e) => setNomineeSigned(e.target.checked)}
             className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-400"
           />
@@ -196,7 +233,7 @@ export function SafetyProofChecklist({
           <input
             type="checkbox"
             checked={isSecurityRequired}
-            disabled={isAlreadyVerified}
+            disabled={isReadOnly}
             onChange={(e) => setIsSecurityRequired(e.target.checked)}
             className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-400"
           />
@@ -219,13 +256,14 @@ export function SafetyProofChecklist({
               </label>
               <select
                 value={securityType}
-                disabled={isAlreadyVerified}
-                onChange={(e) => setSecurityType(e.target.value)}
-                className="w-full h-9 rounded-md border border-slate-800 bg-slate-900 px-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
+                disabled={isReadOnly}
+                onChange={(e) => setSecurityType(e.target.value as SafetyProofSecurityType)}
+                className="w-full h-9 rounded-md border border-slate-800 bg-slate-900 px-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
               >
                 <option value="BLANK_CHEQUE">Signed Blank Cheques (வங்கி காசோலை)</option>
                 <option value="SIGNED_AGREEMENT">Special Signed Undertaking (ஒப்பந்த பத்திரம்)</option>
                 <option value="PROMISSORY_NOTE">Promissory Note (கடன் உறுதிமொழி பத்திரம்)</option>
+                <option value="PERSONAL_GUARANTEE">Personal Guarantee / Surety (தனிநபர் ஜாமீன்)</option>
                 <option value="OTHER">Other Security Instrument (பிற ஆவணம்)</option>
               </select>
             </div>
@@ -236,7 +274,7 @@ export function SafetyProofChecklist({
               </label>
               <Input
                 value={blankChequeDetails}
-                disabled={isAlreadyVerified}
+                disabled={isReadOnly}
                 onChange={(e) => setBlankChequeDetails(e.target.value)}
                 placeholder={t('blankChequeDetailsPlaceholder')}
                 className="text-xs"
@@ -249,7 +287,7 @@ export function SafetyProofChecklist({
         <SafetyProofUploadBox
           auctionId={auctionId}
           securityDocS3Key={securityDocS3Key}
-          isAlreadyVerified={isAlreadyVerified}
+          isAlreadyVerified={isReadOnly}
           onUploaded={(key, name) => {
             setSecurityDocS3Key(key);
             setStatusMessage({
@@ -269,7 +307,7 @@ export function SafetyProofChecklist({
           </label>
           <Textarea
             value={notes}
-            disabled={isAlreadyVerified}
+            disabled={isReadOnly}
             onChange={(e) => setNotes(e.target.value)}
             placeholder={t('notesPlaceholder')}
             rows={2}
@@ -287,7 +325,7 @@ export function SafetyProofChecklist({
               </span>
             )}
           </div>
-        ) : (
+        ) : canVerifySafetyProof ? (
           <Button
             type="button"
             onClick={() => verifyMutation.mutate()}
@@ -301,6 +339,10 @@ export function SafetyProofChecklist({
             )}
             <span>{verifyMutation.isPending ? t('submitting') : t('submitVerify')}</span>
           </Button>
+        ) : (
+          <div className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 text-xs text-slate-400">
+            Read-only view: Safety proof verification requires a verified Partner (Super Admin with isPartner: true), Branch Manager, or Accountant role.
+          </div>
         )}
       </CardContent>
     </Card>

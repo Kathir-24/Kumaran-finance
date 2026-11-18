@@ -18,6 +18,7 @@ describe('Evidence Suite 5: Prize Disbursements, Safety Proof & Jobs DTOs (e2e)'
   let checkerToken: string;
   let branchManagerToken: string;
   let targetAuction: any;
+  const runChequeRef = `SBI-CHQ-${Date.now()}`;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -161,31 +162,161 @@ describe('Evidence Suite 5: Prize Disbursements, Safety Proof & Jobs DTOs (e2e)'
       expect(checkerRes.body.data.winner.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
     });
 
-    it('TC-HP-04: Releases prize payout and tags official payment reference', async () => {
+    const runIdempotencyKey = `idem-disb-e2e-${Date.now()}`;
+
+    it('TC-HP-04: Releases prize payout, tags official payment reference, and replays idempotently on retry (CR-DISB-08)', async () => {
       const releaseRes = await request(app.getHttpServer())
         .post(`/api/v1/disbursements/auction/${targetAuction.id}/disburse`)
         .set('Authorization', `Bearer ${superAdminToken}`)
         .send({
-          paymentReference: 'SBI-CHQ-004512',
+          paymentReference: runChequeRef,
+          idempotencyKey: runIdempotencyKey,
           notes: 'Cheque handed over in person',
         });
 
       expect(releaseRes.status).toBe(200);
       expect(releaseRes.body.success).toBe(true);
       expect(releaseRes.body.data.winner.disbursementStatus).toBe('DISBURSED');
-      expect(releaseRes.body.data.winner.paymentReference).toBe('SBI-CHQ-004512');
+      expect(releaseRes.body.data.winner.paymentReference).toBe(runChequeRef);
+
+      // Network retry with same idempotencyKey in DTO body replays cleanly with 200 OK
+      const retryRes = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/auction/${targetAuction.id}/disburse`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          paymentReference: runChequeRef,
+          idempotencyKey: runIdempotencyKey,
+        });
+
+      expect(retryRes.status).toBe(200);
+      expect(retryRes.body.data.idempotentReplay).toBe(true);
+      expect(retryRes.body.data.winner.paymentReference).toBe(runChequeRef);
+
+      // Network retry with same key via Idempotency-Key HTTP header (without body key) also replays cleanly with 200 OK
+      const headerRetryRes = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/auction/${targetAuction.id}/disburse`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('Idempotency-Key', runIdempotencyKey)
+        .send({
+          paymentReference: runChequeRef,
+        });
+
+      expect(headerRetryRes.status).toBe(200);
+      expect(headerRetryRes.body.data.idempotentReplay).toBe(true);
+      expect(headerRetryRes.body.data.winner.paymentReference).toBe(runChequeRef);
     });
 
-    it('TC-HP-05: Generates bilingual payout voucher (PDF Stream or JSON URL)', async () => {
+    it('TC-HP-05: Generates bilingual payout voucher with groupCode, issuedAt and exact whole-rupee breakdown (CR-DISB-08)', async () => {
       const res = await request(app.getHttpServer())
         .get(`/api/v1/disbursements/auction/${targetAuction.id}/voucher`)
         .set('Authorization', `Bearer ${superAdminToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.voucherNumber).toBeDefined();
+      expect(res.body.data.voucherNumber).toMatch(/^KC-VOU-[A-Z0-9_-]+-\d{4}-[A-Z0-9_-]+-\d{5}$/);
       expect(res.body.data.isBilingual).toBe(true);
+      expect(res.body.data.issuedAt).toBeDefined();
       expect(res.body.data.formattedText).toBeDefined();
+    });
+
+    it('TC-PII-01: GET /disbursements/auction/:id never exposes Customer auth/sensitive secrets (CR-DISB-04)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/disbursements/auction/${targetAuction.id}`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      const customer = res.body.data.winner.ticket.customer;
+      expect(customer).toBeDefined();
+      expect(customer.fullName).toBeDefined();
+      expect(customer.refreshTokenHash).toBeUndefined();
+      expect(customer.fcmToken).toBeUndefined();
+      expect(customer.tokenRevokedBefore).toBeUndefined();
+      expect(customer.panNumber).toBeUndefined();
+    });
+
+    it('TC-ADR15-01: Rejects prohibited property document securityType at DTO boundary (400 Bad Request)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/auction/${targetAuction.id}/verify-safety-proof`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          isSecurityRequired: true,
+          securityType: 'PROPERTY_DEED',
+          agreementSigned: true,
+          nomineeSigned: true,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('TC-UTR-01: Rejects reserved placeholder and case-insensitive duplicate non-cash cheque/UTR paymentReference (CR-DISB-05)', async () => {
+      // Reserved placeholder rejected fail-closed
+      const placeholderRes = await request(app.getHttpServer())
+        .post(`/api/v1/disbursements/auction/${targetAuction.id}/disburse`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          paymentReference: 'COMPANY_POOL_MONTH_1',
+        });
+      expect(placeholderRes.status).toBe(400);
+      expect(placeholderRes.body.error.message).toContain('INVALID_PAYMENT_REFERENCE');
+
+      const secondAuction = await prisma.auction.findFirst({
+        where: {
+          id: { not: targetAuction.id },
+          installmentMonth: { gte: 2 },
+          status: { in: ['COMPLETED', 'MINUTES_FILED'] },
+          winner: { isNot: null },
+        },
+        include: { winner: true, chitGroup: true },
+      });
+
+      if (!secondAuction?.winner || secondAuction.installmentMonth >= secondAuction.chitGroup.durationMonths) return;
+
+      const originalState = {
+        disbursementStatus: secondAuction.winner.disbursementStatus,
+        disbursementMode: secondAuction.winner.disbursementMode,
+        paymentReference: secondAuction.winner.paymentReference,
+        verifiedByUserId: secondAuction.winner.verifiedByUserId,
+        authorizedByUserId: secondAuction.winner.authorizedByUserId,
+        disbursedAmount: secondAuction.winner.disbursedAmount,
+        disbursedAt: secondAuction.winner.disbursedAt,
+      };
+
+      try {
+        const users = await prisma.user.findMany({
+          where: { phone: { in: ['9876543210', '9876543211'] } },
+        });
+        const maker = users.find((u) => u.phone === '9876543210')!;
+        const checker = users.find((u) => u.phone === '9876543211')!;
+
+        await prisma.auctionWinner.update({
+          where: { id: secondAuction.winner.id },
+          data: {
+            disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+            verifiedByUserId: maker.id,
+            authorizedByUserId: checker.id,
+            disbursedAmount: secondAuction.prizeMoney ?? 75000n,
+            paymentReference: null,
+          },
+        });
+
+        // Case-variant duplicate of TC-HP-04 rejected with 409 Conflict!
+        const dupRes = await request(app.getHttpServer())
+          .post(`/api/v1/disbursements/auction/${secondAuction.id}/disburse`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .send({
+            paymentReference: runChequeRef.toLowerCase(),
+          });
+
+        expect(dupRes.status).toBe(409);
+        expect(dupRes.body.error.message).toContain('DUPLICATE_PAYMENT_REFERENCE');
+      } finally {
+        await prisma.auctionWinner.update({
+          where: { id: secondAuction.winner.id },
+          data: originalState,
+        });
+      }
     });
   });
 

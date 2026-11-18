@@ -239,11 +239,14 @@ export function FormXviiAuctionCard({
             {isExpanded ? t('collapseProceedings') : t('expandProceedings')}
           </button>
 
-          {(isExpanded || typeof window === 'undefined') && (
-            <div className="mt-2.5 rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed print:block print:bg-white print:text-black print:border-slate-300">
-              {auction.minutesProceedingsText}
-            </div>
-          )}
+          <div
+            className={cn(
+              'mt-2.5 rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed print:block print:bg-white print:text-black print:border-slate-300',
+              !isExpanded && 'hidden',
+            )}
+          >
+            {auction.minutesProceedingsText}
+          </div>
         </div>
       </CardContent>
     </Card>

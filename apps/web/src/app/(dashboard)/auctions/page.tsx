@@ -22,19 +22,30 @@ import {
   type AuctionScheduleItem,
 } from '@/components/auctions/auction-metrics-cards';
 import { AuctionScheduleTable } from '@/components/auctions/auction-schedule-table';
+import {
+  FinalSettlementModal,
+  type FinalSettlementChitTarget,
+} from '@/components/disbursements/final-settlement-modal';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
 function AuctionsContent() {
   const t = useTranslations('auctions');
   const searchParams = useSearchParams();
   const initialGroupId = searchParams.get('group');
+  const user = useAuthStore((s) => s.user);
 
   const [selectedGroupId, setSelectedGroupId] = React.useState<string | undefined>(
     initialGroupId || undefined,
   );
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
+  const [isFinalSettlementOpen, setIsFinalSettlementOpen] = React.useState(false);
+
+  const canSettleFinalMonth =
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
   // 1. Fetch all chit schemes
   const {
@@ -68,6 +79,7 @@ function AuctionsContent() {
   const {
     data: auctions,
     isLoading: isAuctionsLoading,
+    refetch: refetchAuctions,
   } = useQuery<AuctionScheduleItem[]>({
     queryKey: queryKeys.auctions.list(activeScheme?.id),
     queryFn: async () => {
@@ -80,6 +92,32 @@ function AuctionsContent() {
     },
     enabled: Boolean(activeScheme?.id),
   });
+
+  // 3. Fetch scheme tickets on-demand when Month N Final Settlement Modal is opened
+  const { data: schemeTickets = [] } = useQuery<FinalSettlementChitTarget['tickets']>({
+    queryKey: queryKeys.schemes.roster(activeScheme?.id || ''),
+    queryFn: async () => {
+      if (!activeScheme?.id) return [];
+      return unwrapApiResponse<FinalSettlementChitTarget['tickets']>(
+        apiClient.GET('/api/v1/chits/{id}/tickets', {
+          params: { path: { id: activeScheme.id } },
+        }),
+      );
+    },
+    enabled: isFinalSettlementOpen && Boolean(activeScheme?.id),
+  });
+
+  const preparedMonthNAuction = React.useMemo(() => {
+    if (!activeScheme || !auctions) return null;
+    if (activeScheme.status === 'COMPLETED' || activeScheme.status === 'CLOSED') {
+      return null;
+    }
+    const match = auctions.find((a) => a.installmentMonth === activeScheme.durationMonths);
+    if (!match || match.status === 'COMPLETED' || match.status === 'MINUTES_FILED') {
+      return null;
+    }
+    return match;
+  }, [activeScheme, auctions]);
 
   return (
     <div className="space-y-6">
@@ -167,7 +205,53 @@ function AuctionsContent() {
             auctions={auctions || []}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            canSettleFinalMonth={canSettleFinalMonth}
+            onOpenFinalSettlement={() => setIsFinalSettlementOpen(true)}
             isLoading={isAuctionsLoading}
+          />
+
+          {/* Guardrail 5: Month N Direct Maturity Settlement Modal */}
+          <FinalSettlementModal
+            isOpen={isFinalSettlementOpen}
+            onClose={() => setIsFinalSettlementOpen(false)}
+            chitGroup={{
+              id: activeScheme.id,
+              groupCode: activeScheme.groupCode,
+              chitValue: activeScheme.chitValue,
+              durationMonths: activeScheme.durationMonths,
+              baseInstallment: activeScheme.baseInstallment,
+              foremanCommissionRate: activeScheme.foremanCommissionRate,
+              tickets: schemeTickets,
+              preparedByUserId:
+                preparedMonthNAuction?.conductedByUserId ||
+                preparedMonthNAuction?.winner?.verifiedByUserId ||
+                null,
+              isSettlementPrepared: Boolean(
+                preparedMonthNAuction &&
+                  (preparedMonthNAuction.conductedByUserId ||
+                    preparedMonthNAuction.winner?.verifiedByUserId),
+              ),
+              preparedSettlement: preparedMonthNAuction
+                ? {
+                    disbursedAmount:
+                      preparedMonthNAuction.winner?.disbursedAmount ??
+                      preparedMonthNAuction.prizeMoney ??
+                      null,
+                    disbursementMode: preparedMonthNAuction.winner?.disbursementMode ?? null,
+                    paymentReference:
+                      preparedMonthNAuction.winner?.paymentReference ??
+                      preparedMonthNAuction.winner?.disbursementReference ??
+                      null,
+                    preparedByUserId:
+                      preparedMonthNAuction.conductedByUserId ||
+                      preparedMonthNAuction.winner?.verifiedByUserId ||
+                      null,
+                  }
+                : null,
+            }}
+            onSuccess={() => {
+              refetchAuctions();
+            }}
           />
         </div>
       )}

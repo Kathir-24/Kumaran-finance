@@ -24,19 +24,21 @@ import { formatRupee } from '@/lib/currency';
 import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
+import { toSafeWholeRupeeBigInt } from '@/components/auctions/auction-math.util';
 
 export interface ReleaseWinnerTarget {
   id: string;
   auctionId: string;
   disbursementStatus: string;
   disbursementMode?: string | null;
-  disbursedAmount?: number | bigint | null;
+  disbursedAmount?: number | bigint | string | null;
   auction?: {
-    prizeMoney?: number | bigint;
-    bidDiscount?: number | bigint;
+    prizeMoney?: number | bigint | string;
+    bidDiscount?: number | bigint | string;
     chitGroup?: {
       groupCode?: string;
-      chitValue?: number | bigint;
+      chitValue?: number | bigint | string;
     };
   };
   ticket?: {
@@ -63,6 +65,10 @@ export function DisbursementReleaseModal({
 }: DisbursementReleaseModalProps) {
   const t = useTranslations('disbursements');
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const canReleasePayout =
+    hasAnyRole(user, ['ACCOUNTANT']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
   const [paymentReference, setPaymentReference] = useState<string>('');
   const [disbursedAt, setDisbursedAt] = useState<string>('');
@@ -70,10 +76,12 @@ export function DisbursementReleaseModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const netPrize =
-    winner?.disbursedAmount ??
-    winner?.auction?.prizeMoney ??
-    (BigInt(winner?.auction?.chitGroup?.chitValue ?? 0) -
-      BigInt(winner?.auction?.bidDiscount ?? 0));
+    winner?.disbursedAmount !== undefined && winner?.disbursedAmount !== null
+      ? toSafeWholeRupeeBigInt(winner.disbursedAmount, 0n)
+      : winner?.auction?.prizeMoney !== undefined && winner?.auction?.prizeMoney !== null
+      ? toSafeWholeRupeeBigInt(winner.auction.prizeMoney, 0n)
+      : toSafeWholeRupeeBigInt(winner?.auction?.chitGroup?.chitValue, 0n) -
+        toSafeWholeRupeeBigInt(winner?.auction?.bidDiscount, 0n);
 
   const isCashMode = winner?.disbursementMode === 'CASH';
 
@@ -93,6 +101,9 @@ export function DisbursementReleaseModal({
   const releaseMutation = useMutation({
     mutationFn: async () => {
       if (!winner) throw new Error('No winner record selected');
+      if (!canReleasePayout) {
+        throw new Error(t('releaseRoleGuardAlert'));
+      }
       if (!paymentReference.trim()) {
         throw new Error('Payment reference is mandatory for prize payout release');
       }
@@ -143,7 +154,17 @@ export function DisbursementReleaseModal({
           </DialogDescription>
         </DialogHeader>
 
-        <fieldset disabled={releaseMutation.isPending} className="space-y-4 py-2 disabled:opacity-75">
+        <fieldset
+          disabled={!canReleasePayout || releaseMutation.isPending}
+          className="space-y-4 py-2 disabled:opacity-75"
+        >
+          {!canReleasePayout && (
+            <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{t('releaseRoleGuardAlert')}</span>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -240,7 +261,7 @@ export function DisbursementReleaseModal({
           <Button
             type="button"
             onClick={() => releaseMutation.mutate()}
-            disabled={!paymentReference.trim() || releaseMutation.isPending}
+            disabled={!canReleasePayout || !paymentReference.trim() || releaseMutation.isPending}
             className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow"
           >
             {releaseMutation.isPending ? (

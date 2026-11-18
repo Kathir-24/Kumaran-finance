@@ -20,10 +20,11 @@ import {
 import { formatRupee } from '@/lib/currency';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { toSafeWholeRupeeBigInt } from '@/components/auctions/auction-math.util';
 
 type DisbursementsListResponse =
   | WinnerDisbursementRow[]
-  | { data?: WinnerDisbursementRow[]; total?: number };
+  | { data?: WinnerDisbursementRow[]; total?: number; totalPages?: number; page?: number; limit?: number };
 
 function extractDisbursementRows(res: DisbursementsListResponse | undefined): WinnerDisbursementRow[] {
   if (!res) return [];
@@ -53,17 +54,45 @@ export default function DisbursementsPage() {
     },
   });
 
-  // Query all disbursements without status filter to calculate global metric cards
+  // XR-WM-05: Query ALL pages cleanly so KPI cards & tab counts never silently undercount past 100 rows
   const { data: globalData } = useQuery({
     queryKey: queryKeys.disbursements.list(),
     queryFn: async ({ signal }) => {
       try {
-        return await unwrapApiResponse<DisbursementsListResponse>(
+        const pageSize = 100;
+        const firstPage = await unwrapApiResponse<DisbursementsListResponse>(
           apiClient.GET('/api/v1/disbursements', {
-            params: { query: { limit: 100 } },
+            params: { query: { page: 1, limit: pageSize } },
             signal,
           }),
         );
+        const firstRows = extractDisbursementRows(firstPage);
+        const reportedTotal =
+          !Array.isArray(firstPage) && typeof firstPage?.total === 'number'
+            ? firstPage.total
+            : firstRows.length;
+        const reportedPages =
+          !Array.isArray(firstPage) && typeof firstPage?.totalPages === 'number'
+            ? firstPage.totalPages
+            : Math.ceil(reportedTotal / pageSize);
+
+        if (reportedPages <= 1) {
+          return { data: firstRows, total: reportedTotal };
+        }
+
+        // Fetch remaining pages sequentially/bounded so global KPI totals are exact across all disbursements
+        const allRows: WinnerDisbursementRow[] = [...firstRows];
+        for (let p = 2; p <= reportedPages; p += 1) {
+          const nextPage = await unwrapApiResponse<DisbursementsListResponse>(
+            apiClient.GET('/api/v1/disbursements', {
+              params: { query: { page: p, limit: pageSize } },
+              signal,
+            }),
+          );
+          allRows.push(...extractDisbursementRows(nextPage));
+        }
+
+        return { data: allRows, total: Math.max(reportedTotal, allRows.length) };
       } catch {
         return { data: [], total: 0 };
       }
@@ -73,8 +102,11 @@ export default function DisbursementsPage() {
   const allItems = extractDisbursementRows(globalData);
   const currentItems = extractDisbursementRows(data);
 
-  // Metric counts
-  const totalWinnersCount = allItems.length;
+  // Metric counts (backed by authoritative server total + full paginated set)
+  const totalWinnersCount =
+    globalData && !Array.isArray(globalData) && typeof globalData.total === 'number'
+      ? Math.max(globalData.total, allItems.length)
+      : allItems.length;
   const pendingCount = allItems.filter(
     (w) => w.disbursementStatus === 'PENDING_VERIFICATION',
   ).length;
@@ -91,7 +123,7 @@ export default function DisbursementsPage() {
   const totalDisbursedRupees = allItems
     .filter((w) => w.disbursementStatus === 'DISBURSED')
     .reduce<bigint>((sum, w) => {
-      const amt = BigInt(w.disbursedAmount ?? w.auction?.prizeMoney ?? 0);
+      const amt = toSafeWholeRupeeBigInt(w.disbursedAmount ?? w.auction?.prizeMoney, 0n);
       return sum + amt;
     }, 0n);
 

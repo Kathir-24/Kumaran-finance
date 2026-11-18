@@ -30,10 +30,19 @@ import {
   RegistrarFilingDialog,
   type MarkFiledPayload,
 } from '@/components/auctions/registrar-filing-dialog';
+import {
+  AuctionCorrectionCard,
+  type ApproveAuctionCorrectionPayload,
+  type CorrectionCandidateTicket,
+  type PendingAuctionCorrection,
+  type RequestAuctionCorrectionPayload,
+} from '@/components/auctions/auction-correction-card';
+import { toSafeWholeRupeeBigInt } from '@/components/auctions/auction-math.util';
 import type { AuctionSummaryData } from '@/components/auctions/auction-summary-card';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatRupee } from '@/lib/currency';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 
 interface AuctionDetailRecord extends AuctionSummaryData {
   status: string;
@@ -43,14 +52,20 @@ interface AuctionDetailRecord extends AuctionSummaryData {
     groupName?: string;
     chitValue: number | bigint | string;
     durationMonths: number;
+    baseInstallment?: number | bigint | string;
+    foremanCommissionRate?: number | string | null;
+    maxDiscountCeiling?: number | bigint | string | null;
   };
   minutes?: AuctionMinutesData | null;
+  pendingCorrection?: PendingAuctionCorrection | null;
 }
 
 export default function AuctionDetailPage() {
   const t = useTranslations('auctions');
   const params = useParams();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const canRecordFiling = hasAnyRole(user, ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT']);
 
   const auctionId = String(params.id);
   const [isFilingOpen, setIsFilingOpen] = React.useState(false);
@@ -71,6 +86,27 @@ export default function AuctionDetailPage() {
       );
     },
     enabled: Boolean(auctionId),
+  });
+
+  // 1b. Fetch scheme tickets for finalized Months 2..N-1 to support clerical winner ticket swap (XR-WM-02)
+  const correctionChitGroupId = auction?.chitGroup?.id || auction?.chitGroupId;
+  const { data: schemeTickets = [] } = useQuery<CorrectionCandidateTicket[]>({
+    queryKey: queryKeys.schemes.roster(correctionChitGroupId || ''),
+    queryFn: async () => {
+      if (!correctionChitGroupId) return [];
+      return unwrapApiResponse<CorrectionCandidateTicket[]>(
+        apiClient.GET('/api/v1/chits/{id}/tickets', {
+          params: { path: { id: correctionChitGroupId } },
+        }),
+      );
+    },
+    enabled: Boolean(
+      correctionChitGroupId &&
+        auction &&
+        (auction.status === 'COMPLETED' || auction.status === 'MINUTES_FILED') &&
+        auction.installmentMonth >= 2 &&
+        auction.installmentMonth < Number(auction.chitGroup?.durationMonths || 20),
+    ),
   });
 
   // Finalize Auction Mutation (Checker)
@@ -108,6 +144,39 @@ export default function AuctionDetailPage() {
     },
   });
 
+  // KFC-FIN-005: Maker Partner Request Correction Mutation
+  const requestCorrectionMutation = useMutation({
+    mutationFn: async (payload: RequestAuctionCorrectionPayload) => {
+      return unwrapApiResponse<{ correctionRequestId?: string; message?: string }>(
+        apiClient.POST('/api/v1/auctions/{id}/correction/request', {
+          params: { path: { id: auctionId } },
+          body: payload,
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+      refetch();
+    },
+  });
+
+  // KFC-FIN-005: Checker Partner Approve Correction Mutation
+  const approveCorrectionMutation = useMutation({
+    mutationFn: async (payload: ApproveAuctionCorrectionPayload) => {
+      return unwrapApiResponse(
+        apiClient.POST('/api/v1/auctions/{id}/correction/approve', {
+          params: { path: { id: auctionId } },
+          body: payload,
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+      refetch();
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40">
@@ -139,14 +208,24 @@ export default function AuctionDetailPage() {
   const winnerTicket = winner?.ticket;
   const winnerCustomer = winnerTicket?.customer;
   const isScheduled = auction.status === 'SCHEDULED';
-  const isCompleted = auction.status === 'COMPLETED';
   const isMinutesFiled = auction.status === 'MINUTES_FILED' || auction.minutes?.filedAtRegistrar === true;
+  const isCompleted = auction.status === 'COMPLETED' && !isMinutesFiled;
+  const isFinalized = isCompleted || isMinutesFiled;
 
-  const chitValue = Number(chit?.chitValue || 100000);
-  const durationMonths = Number(chit?.durationMonths || 20);
-  const baseInstallment = Math.floor(chitValue / durationMonths);
-  const dividendPerTicket = Number(auction.dividendPerTicket || 0);
-  const nextMonthNet = Math.max(0, baseInstallment - dividendPerTicket);
+  // Guardrail 2: Pure BigInt whole-rupee metrics
+  const chitValueBig = toSafeWholeRupeeBigInt(chit?.chitValue, 0n);
+  const durationMonths = Math.max(1, Number(chit?.durationMonths || 20));
+  const baseInstallmentBig =
+    chit?.baseInstallment !== undefined && chit?.baseInstallment !== null
+      ? toSafeWholeRupeeBigInt(chit.baseInstallment, chitValueBig / BigInt(durationMonths))
+      : chitValueBig / BigInt(durationMonths);
+  const bidDiscountBig = toSafeWholeRupeeBigInt(auction.bidDiscount, 0n);
+  const prizeMoneyBig = toSafeWholeRupeeBigInt(auction.prizeMoney, 0n);
+  const foremanCommissionBig = toSafeWholeRupeeBigInt(auction.foremanCommissionAmount, 0n);
+  const totalDividendBig = toSafeWholeRupeeBigInt(auction.totalDividend, 0n);
+  const dividendPerTicketBig = toSafeWholeRupeeBigInt(auction.dividendPerTicket, 0n);
+  const nextMonthNetBig =
+    baseInstallmentBig >= dividendPerTicketBig ? baseInstallmentBig - dividendPerTicketBig : 0n;
 
   // Tie-break token info
   const winningTieBidder = auction.tieBidders?.find(
@@ -251,29 +330,29 @@ export default function AuctionDetailPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('chitValueLabel')}</span>
-          <div className="text-sm font-bold text-white font-mono">{formatRupee(BigInt(chitValue))}</div>
+          <div className="text-sm font-bold text-white font-mono">{formatRupee(chitValueBig)}</div>
         </div>
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('discountCol')}</span>
           <div className="text-sm font-bold text-emerald-400 font-mono">
-            {formatRupee(BigInt(auction.bidDiscount || 0))}
+            {formatRupee(bidDiscountBig)}
           </div>
         </div>
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('prizeCol')}</span>
           <div className="text-sm font-bold text-emerald-300 font-mono">
-            {formatRupee(BigInt(auction.prizeMoney || 0))}
+            {formatRupee(prizeMoneyBig)}
           </div>
         </div>
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('dividendPerTicketCol')}</span>
           <div className="text-sm font-bold text-cyan-300 font-mono">
-            {formatRupee(BigInt(dividendPerTicket))}
+            {formatRupee(dividendPerTicketBig)}
           </div>
         </div>
         <div className="col-span-2 sm:col-span-1 lg:col-span-1 rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-0.5">
           <span className="text-[10px] text-slate-400 font-medium">{t('netInstallmentCol')}</span>
-          <div className="text-sm font-bold text-cyan-300 font-mono">{formatRupee(BigInt(nextMonthNet))}</div>
+          <div className="text-sm font-bold text-cyan-300 font-mono">{formatRupee(nextMonthNetBig)}</div>
         </div>
       </div>
 
@@ -297,21 +376,49 @@ export default function AuctionDetailPage() {
           groupName={chit?.groupName || ''}
           installmentMonth={auction.installmentMonth}
           auctionDate={auction.auctionDate}
-          chitValue={chitValue}
-          bidDiscount={Number(auction.bidDiscount || 0)}
-          foremanCommissionAmount={Number(auction.foremanCommissionAmount || 0)}
-          totalDividend={Number(auction.totalDividend || 0)}
-          dividendPerTicket={dividendPerTicket}
-          prizeMoney={Number(auction.prizeMoney || 0)}
+          chitValue={chitValueBig}
+          bidDiscount={bidDiscountBig}
+          foremanCommissionAmount={foremanCommissionBig}
+          totalDividend={totalDividendBig}
+          dividendPerTicket={dividendPerTicketBig}
+          prizeMoney={prizeMoneyBig}
           winnerTicketNumber={winnerTicket?.ticketNumber || 1}
           winnerCustomerName={winnerCustomer?.fullName || 'Winner'}
           minutes={auction.minutes}
+          canRecordFiling={canRecordFiling}
           onOpenFilingDialog={() => setIsFilingOpen(true)}
         />
       ) : (
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-center text-xs text-slate-400">
           Auction finalized. Statutory minutes are being synchronized.
         </div>
+      )}
+
+      {/* KFC-FIN-005 & Guardrail 5: Audited Two-Partner Finalized Auction Correction (Months 2..N-1 only) */}
+      {isFinalized &&
+        auction.installmentMonth >= 2 &&
+        auction.installmentMonth < durationMonths && (
+          <AuctionCorrectionCard
+            auctionId={auction.id}
+            chitValue={chitValueBig}
+            durationMonths={durationMonths}
+            foremanCommissionRate={chit?.foremanCommissionRate}
+            maxDiscountCeiling={chit?.maxDiscountCeiling}
+            currentBidDiscount={bidDiscountBig}
+            currentWinnerTicketId={winner?.ticketId}
+            candidateTickets={schemeTickets}
+            disbursementStatus={winner?.disbursementStatus}
+            pendingCorrection={auction.pendingCorrection}
+            pendingRequestedByUserId={auction.pendingCorrection?.requestedByUserId}
+            onRequestCorrection={async (payload) => {
+              return requestCorrectionMutation.mutateAsync(payload);
+            }}
+            onApproveCorrection={async (payload) => {
+              return approveCorrectionMutation.mutateAsync(payload);
+            }}
+            isRequesting={requestCorrectionMutation.isPending}
+            isApproving={approveCorrectionMutation.isPending}
+          />
       )}
 
       {/* Registrar Filing Dialog */}

@@ -72,12 +72,13 @@ export function createKumaranClient(config: KumaranClientConfig = {}): KumaranAp
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         if (!request.headers.has('Idempotency-Key')) {
           const url = request.url;
-          // Auto-inject on payments, collections, reversals, disbursements
+          // Auto-inject on payments, collections, reversals, disbursements, and auctions
           if (
             url.includes('/payments') ||
             url.includes('/collections') ||
             url.includes('/disbursements') ||
-            url.includes('/reversals')
+            url.includes('/reversals') ||
+            url.includes('/auctions')
           ) {
             request.headers.set('Idempotency-Key', generateUuidV4());
           }

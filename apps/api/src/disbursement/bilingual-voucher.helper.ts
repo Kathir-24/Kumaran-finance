@@ -16,6 +16,8 @@ export interface VoucherDataInput {
   subscriberAddress: string;
   subscriberMobile: string;
   bidDiscount: bigint;
+  grossPrizeMoney?: bigint;
+  arrearsDeducted?: bigint;
   prizeMoney: bigint;
   disbursementMode: string;
   paymentReference: string;
@@ -45,10 +47,15 @@ export function formatBilingualVoucherText(data: VoucherDataInput): string {
 
   const modeStr = modeTamilMap[data.disbursementMode] || data.disbursementMode;
 
+  const arrearsLine =
+    data.arrearsDeducted !== undefined && data.arrearsDeducted > 0n
+      ? `\n  நிலுவை கழிவு / Arrears & Installment Offset : - ₹ ${data.arrearsDeducted.toString()}`
+      : '';
+
   return `================================================================================
                     KUMARAN FINANCE / குமரன் பைனான்ஸ்
                Chit Fund Operations / சீட்டு நிறுவனம்
-        Main Road, Perundurai, Erode / ${data.branchTamilName || 'தலைமை கிளை, பெருந்துறை, ஈரோடு'}
+        ${data.branchName || 'Head Office - Perundurai'} / ${data.branchTamilName || 'தலைமை கிளை, பெருந்துறை, ஈரோடு'}
                  Phone / தொலைபேசி: ${data.branchPhone || '+91 98765 43210'}
 ================================================================================
            பரிசுத் தொகை பட்டுவாடா ரசீது / PRIZE MONEY DISBURSEMENT VOUCHER
@@ -65,7 +72,7 @@ export function formatBilingualVoucherText(data: VoucherDataInput): string {
 --------------------------------------------------------------------------------
 பரிசுத் தொகை கணக்கீடு / PRIZE MONEY CALCULATION:
   மொத்த சீட்டு மதிப்பு / Total Chit Value       : ₹ ${data.chitValue.toString()}
-  ஏலக் கழிவு / Winning Bid Discount           : - ₹ ${data.bidDiscount.toString()}
+  ஏலக் கழிவு / Winning Bid Discount           : - ₹ ${data.bidDiscount.toString()}${arrearsLine}
   ----------------------------------------------------------------------------
   வழங்கப்படும் பரிசுத் தொகை / Net Prize Money : ₹ ${data.prizeMoney.toString()}
 --------------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { getErrorMessage } from '@/lib/api-client';
 import type { SubscriberTicketItem, EligibleBidderItem } from './defaulter-eligibility-roster';
+import { toSafeWholeRupeeBigInt } from './auction-math.util';
 
 export interface TiedTicketEntry {
   ticketId: string;
@@ -30,7 +31,7 @@ export interface RecordTieBreakPayload {
 interface TieBreakModalProps {
   isOpen: boolean;
   onClose: () => void;
-  ceilingDiscount: number;
+  ceilingDiscount: bigint | number | string;
   eligibleTickets: (SubscriberTicketItem | EligibleBidderItem)[];
   onRecordTieBreak: (payload: RecordTieBreakPayload) => Promise<void>;
   isSubmitting?: boolean;
@@ -45,6 +46,7 @@ export function TieBreakModal({
   isSubmitting = false,
 }: TieBreakModalProps) {
   const t = useTranslations('auctions');
+  const ceilingDiscountBig = toSafeWholeRupeeBigInt(ceilingDiscount, 0n);
 
   const [selectedTiedTicketIds, setSelectedTiedTicketIds] = React.useState<string[]>([]);
   const [tokenAssignments, setTokenAssignments] = React.useState<Record<string, number>>({});
@@ -53,14 +55,19 @@ export function TieBreakModal({
   const [auctionDate, setAuctionDate] = React.useState<string>(() => new Date().toISOString().split('T')[0]);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Normalize ticket display
+  // Normalize ticket display across both SubscriberTicketItem & EligibleBidderItem shapes
   const ticketMap = React.useMemo(() => {
     const map = new Map<string, { id: string; ticketNumber: number; name: string; phone: string }>();
     eligibleTickets.forEach((item) => {
-      const id = 'id' in item ? item.id : item.ticketId;
+      const id = ('ticketId' in item && item.ticketId) ? item.ticketId : (item.id || '');
+      if (!id) return;
       const num = item.ticketNumber;
-      const name = 'customer' in item ? item.customer.fullName : item.customerName;
-      const phone = 'customer' in item ? item.customer.phone : item.phone;
+      const name = ('customer' in item && item.customer?.fullName)
+        ? item.customer.fullName
+        : (('customerName' in item && item.customerName) || 'Subscriber');
+      const phone = ('customer' in item && item.customer?.phone)
+        ? item.customer.phone
+        : (('phone' in item && item.phone) || '');
       map.set(id, { id, ticketNumber: num, name, phone });
     });
     return map;
@@ -71,15 +78,23 @@ export function TieBreakModal({
     setSelectedTiedTicketIds((prev) => {
       if (prev.includes(ticketId)) {
         const next = prev.filter((id) => id !== ticketId);
-        const nextTokens = { ...tokenAssignments };
-        delete nextTokens[ticketId];
-        setTokenAssignments(nextTokens);
+        setTokenAssignments((prevT) => {
+          const nextTokens = { ...prevT };
+          delete nextTokens[ticketId];
+          return nextTokens;
+        });
         if (winningTicketId === ticketId) setWinningTicketId('');
         return next;
       } else {
         const next = [...prev, ticketId];
-        const nextTokenNum = next.length;
-        setTokenAssignments((prevT) => ({ ...prevT, [ticketId]: nextTokenNum }));
+        setTokenAssignments((prevT) => {
+          const usedTokens = new Set(Object.values(prevT));
+          let nextTokenNum = 1;
+          while (usedTokens.has(nextTokenNum)) {
+            nextTokenNum += 1;
+          }
+          return { ...prevT, [ticketId]: nextTokenNum };
+        });
         return next;
       }
     });
@@ -98,7 +113,7 @@ export function TieBreakModal({
       return;
     }
 
-    if (!winningTicketId) {
+    if (!winningTicketId || !selectedTiedTicketIds.includes(winningTicketId)) {
       setError('Please select the winning ticket drawn by Foreman from the physical paper token bowl.');
       return;
     }
@@ -107,6 +122,17 @@ export function TieBreakModal({
       ticketId,
       tokenNumber: tokenAssignments[ticketId] || undefined,
     }));
+
+    const assignedTokens = tiedTickets
+      .map((entry) => entry.tokenNumber)
+      .filter((num): num is number => typeof num === 'number');
+    if (
+      assignedTokens.some((n) => !Number.isInteger(n) || n < 1) ||
+      new Set(assignedTokens).size !== assignedTokens.length
+    ) {
+      setError('Each tied subscriber must be assigned a unique positive integer physical paper token number.');
+      return;
+    }
 
     const witnessNames = witnessNamesText
       .split(',')
@@ -117,7 +143,7 @@ export function TieBreakModal({
       await onRecordTieBreak({
         tiedTickets,
         winningTicketId,
-        bidDiscount: ceilingDiscount,
+        bidDiscount: Number(ceilingDiscountBig),
         auctionDate: new Date(auctionDate).toISOString(),
         witnessNames: witnessNames.length > 0 ? witnessNames : undefined,
       });
@@ -141,7 +167,7 @@ export function TieBreakModal({
             <div>
               <h2 className="text-base font-bold text-white">{t('tieBreakModalTitle')}</h2>
               <p className="text-[11px] text-slate-400">
-                {t('tiedSubscribersLabel', { amount: formatRupee(BigInt(ceilingDiscount)) })}
+                {t('tiedSubscribersLabel', { amount: formatRupee(ceilingDiscountBig) })}
               </p>
             </div>
           </div>

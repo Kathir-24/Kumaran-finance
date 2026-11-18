@@ -32,17 +32,30 @@ export interface SubscriberTicketItem {
 }
 
 export interface EligibleBidderItem {
-  ticketId: string;
+  id?: string;
+  ticketId?: string;
   ticketNumber: number;
   customerId: string;
-  customerName: string;
-  customerCode: string;
-  phone: string;
+  customerName?: string;
+  customerCode?: string;
+  phone?: string;
+  customer?: {
+    id: string;
+    customerCode: string;
+    fullName: string;
+    fullNameTamil?: string | null;
+    phone: string;
+  };
+}
+
+export function resolveEligibleBidderTicketId(item: EligibleBidderItem): string {
+  return item.ticketId ?? item.id ?? '';
 }
 
 interface DefaulterEligibilityRosterProps {
   allTickets: SubscriberTicketItem[];
   eligibleTickets: EligibleBidderItem[];
+  hasAuthoritativeEligibility?: boolean;
   selectedTicketId?: string;
   onSelectBidder: (ticket: SubscriberTicketItem) => void;
   isLoading?: boolean;
@@ -51,6 +64,7 @@ interface DefaulterEligibilityRosterProps {
 export function DefaulterEligibilityRoster({
   allTickets,
   eligibleTickets,
+  hasAuthoritativeEligibility = true,
   selectedTicketId,
   onSelectBidder,
   isLoading = false,
@@ -59,24 +73,43 @@ export function DefaulterEligibilityRoster({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState<'ALL' | 'ELIGIBLE' | 'DEFAULTERS' | 'PRIZED'>('ALL');
 
+  // Guardrail 8 (ADR-07): Trust the authoritative server pre-auction eligible-bidders roster
+  // rather than overriding server exclusions with client-side consecutiveUnpaidMonths === 0.
   const eligibleTicketIdSet = React.useMemo(() => {
-    return new Set(eligibleTickets.map((e) => e.ticketId));
+    return new Set(
+      eligibleTickets.map((e) => resolveEligibleBidderTicketId(e)).filter(Boolean),
+    );
   }, [eligibleTickets]);
+
+  const isTicketEligible = React.useCallback(
+    (ticket: SubscriberTicketItem): boolean => {
+      if (ticket.status !== 'ACTIVE' || ticket.isPrized || ticket.consecutiveUnpaidMonths > 0) {
+        return false;
+      }
+      if (hasAuthoritativeEligibility) {
+        return eligibleTicketIdSet.has(ticket.id);
+      }
+      return true;
+    },
+    [eligibleTicketIdSet, hasAuthoritativeEligibility],
+  );
 
   // Metric counts
   const totalCount = allTickets.length;
-  const eligibleCount = allTickets.filter((t) => eligibleTicketIdSet.has(t.id) || (t.status === 'ACTIVE' && !t.isPrized && t.consecutiveUnpaidMonths === 0)).length;
-  const defaultersCount = allTickets.filter((t) => t.consecutiveUnpaidMonths > 0).length;
-  const prizedCount = allTickets.filter((t) => t.isPrized).length;
+  const eligibleCount = allTickets.filter((ticket) => isTicketEligible(ticket)).length;
+  const defaultersCount = allTickets.filter(
+    (ticket) => !ticket.isPrized && !isTicketEligible(ticket),
+  ).length;
+  const prizedCount = allTickets.filter((ticket) => ticket.isPrized).length;
 
   // Search & Filter
   const filteredTickets = React.useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
     return allTickets.filter((ticket) => {
-      const isEligible = eligibleTicketIdSet.has(ticket.id) || (ticket.status === 'ACTIVE' && !ticket.isPrized && ticket.consecutiveUnpaidMonths === 0);
-      const isDefaulter = ticket.consecutiveUnpaidMonths > 0;
+      const isEligible = isTicketEligible(ticket);
       const isPrized = ticket.isPrized;
+      const isDefaulter = !isPrized && !isEligible;
 
       if (activeFilter === 'ELIGIBLE' && !isEligible) return false;
       if (activeFilter === 'DEFAULTERS' && !isDefaulter) return false;
@@ -91,7 +124,7 @@ export function DefaulterEligibilityRoster({
 
       return ticketMatch || nameMatch || codeMatch || phoneMatch;
     });
-  }, [allTickets, eligibleTicketIdSet, activeFilter, searchQuery]);
+  }, [allTickets, isTicketEligible, activeFilter, searchQuery]);
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
@@ -178,9 +211,9 @@ export function DefaulterEligibilityRoster({
           </div>
         ) : (
           filteredTickets.map((ticket) => {
-            const isEligible = eligibleTicketIdSet.has(ticket.id) || (ticket.status === 'ACTIVE' && !ticket.isPrized && ticket.consecutiveUnpaidMonths === 0);
-            const isDefaulter = ticket.consecutiveUnpaidMonths > 0;
+            const isEligible = isTicketEligible(ticket);
             const isPrized = ticket.isPrized;
+            const isDefaulter = !isPrized && !isEligible;
             const isSelected = selectedTicketId === ticket.id;
 
             return (

@@ -28,12 +28,14 @@ import {
 } from '../common/decorators/api-response-envelope.decorator';
 import { AuctionService } from './auction.service';
 import {
+  ApproveAuctionCorrectionResponseDto,
   AuctionDetailResponseDto,
   AuctionMinutesDto,
   AuctionResponseDto,
   EligibleBidderResponseDto,
   FinalizeAuctionResponseDto,
   MarkMinutesFiledResponseDto,
+  RequestAuctionCorrectionResponseDto,
 } from './dto/auction-response.dto';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
 import { MarkMinutesFiledDto } from './dto/mark-minutes-filed.dto';
@@ -43,6 +45,7 @@ import {
   ApproveAuctionCorrectionDto,
   RequestAuctionCorrectionDto,
 } from './dto/auction-correction.dto';
+import { parseOptionalPositiveIntQuery } from './helpers/auction-access.helper';
 
 @ApiTags('Auctions')
 @ApiBearerAuth('JWT-auth')
@@ -115,9 +118,10 @@ export class AuctionController {
   async getEligibleBidders(
     @Param('id') id: string,
     @Query('month') month?: string,
+    @CurrentUser() currentUser?: JwtPayload,
   ) {
-    const monthNum = month ? parseInt(month, 10) : undefined;
-    return this.auctionService.getEligibleBiddersForIdentifier(id, monthNum);
+    const monthNum = parseOptionalPositiveIntQuery(month, 'Installment month');
+    return this.auctionService.getEligibleBiddersForIdentifier(id, monthNum, currentUser);
   }
 
   @Post(':id/record-bid')
@@ -126,7 +130,7 @@ export class AuctionController {
   @ApiOperation({
     summary: 'Maker: Record winning auction bid and whole-rupee discount',
     description:
-      'Records the in-office winning bid discount (Floor >= 4% Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin, Branch Manager.',
+      'Records the in-office winning bid discount (Floor >= frozen Foreman Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin (Partner), Branch Manager (Branch-scoped).',
   })
   @ApiQuery({
     name: 'month',
@@ -142,15 +146,16 @@ export class AuctionController {
   async recordBid(
     @Param('id') id: string,
     @Body() dto: RecordBidDto,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
   ) {
-    const monthNum = month ? parseInt(month, 10) : undefined;
+    const monthNum = parseOptionalPositiveIntQuery(month, 'Installment month');
     return this.auctionService.recordBidForIdentifier(
       id,
       dto,
-      makerUserId,
+      currentUser.sub,
       monthNum,
+      currentUser,
     );
   }
 
@@ -161,7 +166,7 @@ export class AuctionController {
     summary:
       'Option A (Physical Paper Token Draw): Record ceiling tie-break winner',
     description:
-      'Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Super Admin, Branch Manager.',
+      'Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Super Admin (Partner), Branch Manager (Branch-scoped).',
   })
   @ApiQuery({
     name: 'month',
@@ -173,15 +178,16 @@ export class AuctionController {
   async recordTieBreak(
     @Param('id') id: string,
     @Body() dto: RecordTieBreakDto,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
   ) {
-    const monthNum = month ? parseInt(month, 10) : undefined;
+    const monthNum = parseOptionalPositiveIntQuery(month, 'Installment month');
     return this.auctionService.recordTieBreakForIdentifier(
       id,
       dto,
-      makerUserId,
+      currentUser.sub,
       monthNum,
+      currentUser,
     );
   }
 
@@ -201,10 +207,10 @@ export class AuctionController {
   async recordTieBreakAlias(
     @Param('id') id: string,
     @Body() dto: RecordTieBreakDto,
-    @CurrentUser('sub') makerUserId: string,
+    @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
   ) {
-    return this.recordTieBreak(id, dto, makerUserId, month);
+    return this.recordTieBreak(id, dto, currentUser, month);
   }
 
   @Post(':id/finalize')
@@ -238,8 +244,11 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Auction minutes retrieved' })
   @ApiResponse({ status: 404, description: 'Minutes not found' })
-  async getMinutes(@Param('id') auctionId: string) {
-    return this.auctionService.getAuctionMinutes(auctionId);
+  async getMinutes(
+    @Param('id') auctionId: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.auctionService.getAuctionMinutes(auctionId, currentUser);
   }
 
   @Get(':id/minutes/pdf')
@@ -250,8 +259,11 @@ export class AuctionController {
       'Returns formatted statutory auction minutes for printable dispatch and audit recordkeeping.',
   })
   @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Minutes text layout retrieved' })
-  async getMinutesPdf(@Param('id') auctionId: string) {
-    return this.auctionService.getAuctionMinutes(auctionId);
+  async getMinutesPdf(
+    @Param('id') auctionId: string,
+    @CurrentUser() currentUser?: JwtPayload,
+  ) {
+    return this.auctionService.getAuctionMinutes(auctionId, currentUser);
   }
 
   @Patch(':auctionId/mark-filed-with-registrar')
@@ -259,7 +271,7 @@ export class AuctionController {
   @ApiOperation({
     summary: 'Mark auction minutes as filed with Government Chit Registrar',
     description:
-      'Records official government challan/acknowledgement reference, filing date, and staff notes.',
+      'Records official government challan/acknowledgement reference, filing date, and staff notes, transitioning auction status to MINUTES_FILED.',
   })
   @ApiOkResponseEnvelope(MarkMinutesFiledResponseDto, { description: 'Minutes marked as filed successfully' })
   @ApiResponse({ status: 400, description: 'Auction not finalized or minutes not found' })
@@ -269,7 +281,12 @@ export class AuctionController {
     @Body() dto: MarkMinutesFiledDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.auctionService.markMinutesFiled(auctionId, dto, currentUser.sub);
+    return this.auctionService.markMinutesFiled(
+      auctionId,
+      dto,
+      currentUser.sub,
+      currentUser,
+    );
   }
 
   @Post(':id/correction/request')
@@ -280,7 +297,7 @@ export class AuctionController {
     description:
       'Initiates an audited correction of a finalized auction discount or winner. Strictly requires two-partner approval. Fails closed if prize money has already been disbursed.',
   })
-  @ApiOkResponseEnvelope(AuctionResponseDto, {
+  @ApiOkResponseEnvelope(RequestAuctionCorrectionResponseDto, {
     description: 'Finalized auction correction requested successfully (pending checker partner approval)',
   })
   @ApiResponse({ status: 400, description: 'Auction not finalized, prize already disbursed, or non-divisible dividend' })
@@ -307,7 +324,7 @@ export class AuctionController {
     description:
       'Approves auction correction, recalculates universal dividends, updates winner records, and reconciles downstream monthly dues. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).',
   })
-  @ApiOkResponseEnvelope(AuctionResponseDto, {
+  @ApiOkResponseEnvelope(ApproveAuctionCorrectionResponseDto, {
     description: 'Finalized auction correction approved and applied successfully',
   })
   @ApiResponse({ status: 400, description: 'No pending correction request or prize already disbursed' })

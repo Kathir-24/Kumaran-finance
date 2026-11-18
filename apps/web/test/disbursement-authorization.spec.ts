@@ -334,4 +334,103 @@ describe('Task 7.2: Maker != Checker Prize Money Payout Release & Final Settleme
     const taKeys = Object.keys(ta.disbursements).sort();
     assert.deepEqual(enKeys, taKeys, 'Disbursements keys must match 100% between en.json and ta.json');
   });
+
+  // 9. DEF-WM-06 & DEF-WM-07 Regression: Partner-only auth, release RBAC, KFC-FIN-004 no manual override, paymentReference
+  it('DEF-WM-05/06/07 Regression: Enforces isPartner, release RBAC, KFC-FIN-004 no override, Month N Maker != Checker, and paymentReference', () => {
+    const rootDir = fs.existsSync(path.resolve(process.cwd(), 'src/components/disbursements'))
+      ? process.cwd()
+      : path.resolve(process.cwd(), 'apps/web');
+
+    const voucherPageSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/app/(dashboard)/disbursements/[id]/voucher/page.tsx'),
+      'utf8',
+    );
+    const authModalSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/disbursement-auth-modal.tsx'),
+      'utf8',
+    );
+    const releaseModalSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/disbursement-release-modal.tsx'),
+      'utf8',
+    );
+    const finalModalSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/final-settlement-modal.tsx'),
+      'utf8',
+    );
+    const voucherCardSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/payout-voucher-card.tsx'),
+      'utf8',
+    );
+
+    // Guardrail 11: voucher/page.tsx checks user?.isPartner and guards Release Payout button by role
+    assert.match(voucherPageSrc, /Boolean\(user\?\.isPartner\)/);
+    assert.match(voucherPageSrc, /canReleasePayout/);
+
+    // KFC-FIN-004: DisbursementAuthModal must NOT send user-editable disbursedAmount override
+    assert.doesNotMatch(
+      authModalSrc,
+      /disbursedAmount:\s*disbursedAmount\s*\?\s*Number\(disbursedAmount\)/,
+      'DisbursementAuthModal must omit disbursedAmount so server computes arrears-adjusted net payout fail-closed',
+    );
+    assert.match(authModalSrc, /arrearsOffsetNotice/);
+
+    // Guardrail 11 / RBAC on DisbursementReleaseModal
+    assert.match(releaseModalSrc, /canReleasePayout/);
+
+    // Guardrail 10 & 11 on Month N FinalSettlementModal
+    assert.match(finalModalSrc, /isSelfApproval/);
+    assert.match(finalModalSrc, /Boolean\(user\?\.isPartner\)/);
+    assert.match(finalModalSrc, /canApproveStage2/);
+
+    // DEF-WM-07: PayoutVoucherCard reads canonical Prisma paymentReference & workflow stamps
+    assert.match(voucherCardSrc, /voucher\.paymentReference/);
+    assert.match(voucherCardSrc, /isStep2Done \|\| voucher\.verifiedByUserId/);
+    assert.match(voucherCardSrc, /isStep3Done \|\| voucher\.authorizedByUserId/);
+
+    // Guardrail 11 (SEC-A): SafetyProofChecklist enforces read-only for IT Super Admin (isPartner: false)
+    const checklistSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/safety-proof-checklist.tsx'),
+      'utf8',
+    );
+    assert.match(
+      checklistSrc,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+    );
+
+    // XR-WM-01: Stage-2 FinalSettlementModal displays Maker's prepared details & handles MINUTES_FILED/CLOSED
+    const auctionsPageSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/app/(dashboard)/auctions/page.tsx'),
+      'utf8',
+    );
+    const scheduleTableSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/auctions/auction-schedule-table.tsx'),
+      'utf8',
+    );
+    assert.match(finalModalSrc, /Prepared Payout:/);
+    assert.match(finalModalSrc, /Disbursement Mode:/);
+    assert.match(finalModalSrc, /Payment Reference:/);
+    assert.match(finalModalSrc, /Prepared By Maker:/);
+    assert.match(auctionsPageSrc, /activeScheme\.status === 'CLOSED'/);
+    assert.match(auctionsPageSrc, /match\.status === 'MINUTES_FILED'/);
+    assert.match(scheduleTableSrc, /scheme\.status === 'CLOSED'/);
+    assert.match(scheduleTableSrc, /monthNAuction\?\.status === 'MINUTES_FILED'/);
+
+    // XR-WM-04: PERSONAL_GUARANTEE option, KC-VOU- fallback prefix, no fabricated CASH-VAULT fallback
+    const voucherDialogSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/components/disbursements/bilingual-voucher-dialog.tsx'),
+      'utf8',
+    );
+    assert.match(checklistSrc, /PERSONAL_GUARANTEE/);
+    assert.match(voucherDialogSrc, /KC-VOU-/);
+    assert.doesNotMatch(voucherDialogSrc, /KC-VCHR-/);
+    assert.doesNotMatch(voucherCardSrc, /\|\|\s*'CASH-VAULT'/);
+
+    // XR-WM-05: DisbursementsPage aggregates across totalPages / server total without 100-row undercount
+    const disbPageSrc = fs.readFileSync(
+      path.resolve(rootDir, 'src/app/(dashboard)/disbursements/page.tsx'),
+      'utf8',
+    );
+    assert.match(disbPageSrc, /reportedPages/);
+    assert.match(disbPageSrc, /Math\.max\(globalData\.total,\s*allItems\.length\)/);
+  });
 });

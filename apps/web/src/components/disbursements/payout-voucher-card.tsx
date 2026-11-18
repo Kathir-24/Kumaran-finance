@@ -13,6 +13,10 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
+import {
+  computeForemanCommissionBigInt,
+  toSafeWholeRupeeBigInt,
+} from '@/components/auctions/auction-math.util';
 
 export interface PayoutVoucherDetails {
   id: string;
@@ -20,9 +24,12 @@ export interface PayoutVoucherDetails {
   ticketId: string;
   disbursementStatus: string;
   disbursementMode?: string | null;
-  disbursedAmount?: number | bigint | null;
+  disbursedAmount?: number | bigint | string | null;
+  paymentReference?: string | null;
   disbursementReference?: string | null;
   disbursedAt?: string | null;
+  verifiedByUserId?: string | null;
+  authorizedByUserId?: string | null;
   makerName?: string | null;
   checkerName?: string | null;
   verifiedAt?: string | null;
@@ -31,12 +38,14 @@ export interface PayoutVoucherDetails {
     id: string;
     installmentMonth: number;
     auctionDate?: string;
-    bidDiscount?: number | bigint;
-    prizeMoney?: number | bigint;
+    bidDiscount?: number | bigint | string;
+    foremanCommissionAmount?: number | bigint | string | null;
+    prizeMoney?: number | bigint | string;
     chitGroup?: {
       id: string;
       groupCode: string;
-      chitValue: number | bigint;
+      chitValue: number | bigint | string;
+      foremanCommissionRate?: number | string | null;
       branch?: {
         name: string;
       };
@@ -60,10 +69,25 @@ interface PayoutVoucherCardProps {
 export function PayoutVoucherCard({ voucher }: PayoutVoucherCardProps) {
   const t = useTranslations('disbursements');
 
-  const chitValue = BigInt(voucher.auction?.chitGroup?.chitValue ?? 0);
-  const discount = BigInt(voucher.auction?.bidDiscount ?? 0);
-  const commission = (chitValue * 4n) / 100n; // 4.00% Foreman Commission (ADR-04)
-  const netPrize = chitValue - discount; // P = V - D
+  const chitValue = toSafeWholeRupeeBigInt(voucher.auction?.chitGroup?.chitValue, 0n);
+  const discount = toSafeWholeRupeeBigInt(voucher.auction?.bidDiscount, 0n);
+  const commission =
+    voucher.auction?.foremanCommissionAmount !== undefined &&
+    voucher.auction?.foremanCommissionAmount !== null
+      ? toSafeWholeRupeeBigInt(voucher.auction.foremanCommissionAmount, 0n)
+      : computeForemanCommissionBigInt(chitValue, voucher.auction?.chitGroup?.foremanCommissionRate);
+  const grossPrize =
+    voucher.auction?.prizeMoney !== undefined && voucher.auction?.prizeMoney !== null
+      ? toSafeWholeRupeeBigInt(voucher.auction.prizeMoney, chitValue >= discount ? chitValue - discount : 0n)
+      : chitValue >= discount
+      ? chitValue - discount
+      : 0n;
+  const netPrize =
+    voucher.disbursedAmount !== undefined && voucher.disbursedAmount !== null
+      ? toSafeWholeRupeeBigInt(voucher.disbursedAmount, grossPrize)
+      : grossPrize;
+  const arrearsDeducted = grossPrize > netPrize ? grossPrize - netPrize : 0n;
+  const payoutReference = voucher.paymentReference || voucher.disbursementReference || '—';
 
   const status = voucher.disbursementStatus;
   const isStep1Done = true; // Auction finalized
@@ -164,6 +188,11 @@ export function PayoutVoucherCard({ voucher }: PayoutVoucherCardProps) {
             <div className="text-xl font-mono font-black text-emerald-400 mt-1">
               {formatRupee(netPrize)}
             </div>
+            {arrearsDeducted > 0n && (
+              <div className="text-[11px] font-mono text-amber-300 mt-1">
+                Arrears Offset: -{formatRupee(arrearsDeducted)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -214,10 +243,12 @@ export function PayoutVoucherCard({ voucher }: PayoutVoucherCardProps) {
           {/* Maker Verification Stamp */}
           <div className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 text-xs">
             <div className="text-slate-400 font-medium mb-1">Maker Verification</div>
-            {voucher.verifiedAt ? (
+            {isStep2Done || voucher.verifiedByUserId || voucher.verifiedAt ? (
               <div className="text-blue-300">
                 <div className="font-semibold">{t('verifiedByStamp', { name: voucher.makerName || 'Foreman Maker' })}</div>
-                <div className="text-[11px] font-mono text-slate-400 mt-0.5">{formatDate(voucher.verifiedAt)}</div>
+                {voucher.verifiedAt && (
+                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">{formatDate(voucher.verifiedAt)}</div>
+                )}
               </div>
             ) : (
               <span className="text-amber-400/80 italic">Pending Safety Verification</span>
@@ -227,10 +258,12 @@ export function PayoutVoucherCard({ voucher }: PayoutVoucherCardProps) {
           {/* Checker Authorization Stamp */}
           <div className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 text-xs">
             <div className="text-slate-400 font-medium mb-1">Checker Authorization</div>
-            {voucher.authorizedAt ? (
+            {isStep3Done || voucher.authorizedByUserId || voucher.authorizedAt ? (
               <div className="text-purple-300">
                 <div className="font-semibold">{t('authorizedByStamp', { name: voucher.checkerName || 'Second Partner Checker' })}</div>
-                <div className="text-[11px] font-mono text-slate-400 mt-0.5">{formatDate(voucher.authorizedAt)}</div>
+                {voucher.authorizedAt && (
+                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">{formatDate(voucher.authorizedAt)}</div>
+                )}
               </div>
             ) : (
               <span className="text-slate-500 italic">Pending Authorization</span>
@@ -240,9 +273,14 @@ export function PayoutVoucherCard({ voucher }: PayoutVoucherCardProps) {
           {/* Disbursement Release Stamp */}
           <div className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 text-xs">
             <div className="text-slate-400 font-medium mb-1">Release Reference</div>
-            {voucher.disbursedAt ? (
+            {isStep4Done || voucher.disbursedAt ? (
               <div className="text-emerald-300">
-                <div className="font-semibold">{t('disbursedAtStamp', { date: formatDate(voucher.disbursedAt), ref: voucher.disbursementReference || 'CASH-VAULT' })}</div>
+                <div className="font-semibold">
+                  {t('disbursedAtStamp', {
+                    date: voucher.disbursedAt ? formatDate(voucher.disbursedAt) : 'Released',
+                    ref: payoutReference,
+                  })}
+                </div>
                 <div className="text-[11px] font-mono text-slate-400 mt-0.5">Mode: {voucher.disbursementMode}</div>
               </div>
             ) : (

@@ -72,10 +72,11 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       makerUserId = maker?.id || '';
       checkerUserId = checker?.id || '';
 
-      // Resolve an active subscriber ticket that does not have an existing winning auction
+      // Resolve an active unprized subscriber ticket that does not have an existing winning auction
       activeTicket = await prisma.subscriberTicket.findFirst({
         where: {
           status: 'ACTIVE',
+          isPrized: false,
           chitGroup: { status: 'ACTIVE' },
           winningAuction: null,
         },
@@ -199,12 +200,37 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       return;
     }
 
-    const testMonth = 992;
+    const ts = Date.now();
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `KC-INV2-${ts}`,
+        groupName: 'Concurrency Finalization Stampede Scheme',
+        chitValue: 100000n,
+        durationMonths: 20,
+        totalTickets: 20,
+        baseInstallment: 5000n,
+        maxDiscountCeiling: 25000n,
+        status: 'ACTIVE',
+        startDate: new Date('2026-01-01T00:00:00Z'),
+        endDate: new Date('2027-08-31T00:00:00Z'),
+      },
+    });
+
+    const tempTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: tempChit.id,
+        customerId: activeTicket.customerId,
+        ticketNumber: 2,
+        isPrized: false,
+        status: 'ACTIVE',
+      },
+    });
 
     const testAuction = await prisma.auction.create({
       data: {
-        chitGroupId: activeTicket.chitGroupId,
-        installmentMonth: testMonth,
+        chitGroupId: tempChit.id,
+        installmentMonth: 2,
         auctionDate: new Date(),
         status: AuctionStatus.SCHEDULED,
         bidDiscount: 20000n,
@@ -216,7 +242,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         conductedByUserId: makerUserId,
         winner: {
           create: {
-            ticketId: activeTicket.id,
+            ticketId: tempTicket.id,
             wasTieBreakWinner: false,
             disbursementStatus: 'PENDING_VERIFICATION',
           },
@@ -244,7 +270,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
       if (fulfilled.length === 0) {
-        console.error('CONCURR-INV-4 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
+        console.error('CONCURR-INV-2 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
       }
 
       // CRITICAL ASSERTION: Exactly 1 finalization commit
@@ -266,7 +292,9 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
     } finally {
       await prisma.auctionMinutes.deleteMany({ where: { auctionId: testAuction.id } });
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
-      await prisma.auction.delete({ where: { id: testAuction.id } });
+      await prisma.auction.deleteMany({ where: { id: testAuction.id } });
+      await prisma.subscriberTicket.deleteMany({ where: { id: tempTicket.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
     }
   });
 
@@ -279,25 +307,37 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       return;
     }
 
-    const testMonth = 993;
-
-    // Check unpaid dues for activeTicket up to testMonth to match TOCTOU Arrears Verification (FIN-A/D)
-    const unpaidDues = await prisma.installmentDue.findMany({
-      where: {
-        ticketId: activeTicket.id,
-        installmentMonth: { lte: testMonth },
-        status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+    const ts = Date.now();
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `KC-INV3-${ts}`,
+        groupName: 'Concurrency Payout Release Stampede Scheme',
+        chitValue: 100000n,
+        durationMonths: 20,
+        totalTickets: 20,
+        baseInstallment: 5000n,
+        maxDiscountCeiling: 25000n,
+        status: 'ACTIVE',
+        startDate: new Date('2026-01-01T00:00:00Z'),
+        endDate: new Date('2027-08-31T00:00:00Z'),
       },
     });
-    const currentArrears = unpaidDues.reduce(
-      (sum, d) => sum + (BigInt(d.netPayableAmount ?? 0n) - BigInt(d.paidAmount ?? 0n)),
-      0n,
-    );
+
+    const tempTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: tempChit.id,
+        customerId: activeTicket.customerId,
+        ticketNumber: 2,
+        isPrized: true,
+        status: 'ACTIVE',
+      },
+    });
 
     const testAuction = await prisma.auction.create({
       data: {
-        chitGroupId: activeTicket.chitGroupId,
-        installmentMonth: testMonth,
+        chitGroupId: tempChit.id,
+        installmentMonth: 2,
         auctionDate: new Date(),
         status: AuctionStatus.COMPLETED,
         bidDiscount: 20000n,
@@ -310,10 +350,10 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         finalizedByUserId: checkerUserId,
         winner: {
           create: {
-            ticketId: activeTicket.id,
+            ticketId: tempTicket.id,
             wasTieBreakWinner: false,
             disbursementStatus: 'AUTHORIZED_BY_CHECKER',
-            disbursedAmount: 80000n - currentArrears,
+            disbursedAmount: 80000n,
             isSecurityRequired: false,
             agreementSigned: true,
             nomineeSigned: true,
@@ -331,7 +371,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         disbursementService.releasePayout(
           testAuction.id,
           {
-            paymentReference: `CONCURR-PAYOUT-REF-${Date.now()}-${idx + 1}`,
+            paymentReference: `CONCURR-PAYOUT-REF-${ts}-${idx + 1}`,
             disbursedAt: new Date().toISOString(),
           },
           checkerUserId,
@@ -343,7 +383,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
       if (fulfilled.length === 0) {
-        console.error('CONCURR-INV-4 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
+        console.error('CONCURR-INV-3 REJECTED REASONS:', rejected.map(r => (r as PromiseRejectedResult).reason));
       }
 
       // CRITICAL ASSERTION: Exactly 1 payout release succeeds
@@ -362,14 +402,10 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       });
       expect(finalWinner?.disbursementStatus).toBe('DISBURSED');
     } finally {
-      if (unpaidDues && unpaidDues.length > 0) {
-        await prisma.installmentDue.updateMany({
-          where: { id: { in: unpaidDues.map((d: any) => d.id) } },
-          data: { status: DueStatus.UNPAID, paidAmount: 0n },
-        });
-      }
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
-      await prisma.auction.delete({ where: { id: testAuction.id } });
+      await prisma.auction.deleteMany({ where: { id: testAuction.id } });
+      await prisma.subscriberTicket.deleteMany({ where: { id: tempTicket.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
     }
   });
 
@@ -1200,10 +1236,37 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       return;
     }
 
+    const ts = Date.now();
+    const tempChit = await prisma.chitGroup.create({
+      data: {
+        branchId: activeTicket.chitGroup.branchId,
+        groupCode: `KC-INV12-${ts}`,
+        groupName: 'Concurrency Payout Authorization Stampede Scheme',
+        chitValue: 100000n,
+        durationMonths: 20,
+        totalTickets: 20,
+        baseInstallment: 5000n,
+        maxDiscountCeiling: 25000n,
+        status: 'ACTIVE',
+        startDate: new Date('2026-01-01T00:00:00Z'),
+        endDate: new Date('2027-08-31T00:00:00Z'),
+      },
+    });
+
+    const tempTicket = await prisma.subscriberTicket.create({
+      data: {
+        chitGroupId: tempChit.id,
+        customerId: activeTicket.customerId,
+        ticketNumber: 2,
+        isPrized: true,
+        status: 'ACTIVE',
+      },
+    });
+
     const testAuction = await prisma.auction.create({
       data: {
-        chitGroupId: activeTicket.chitGroupId,
-        installmentMonth: 982,
+        chitGroupId: tempChit.id,
+        installmentMonth: 2,
         auctionDate: new Date(),
         status: AuctionStatus.COMPLETED,
         bidDiscount: 20000n,
@@ -1216,7 +1279,7 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
         finalizedByUserId: checkerUserId,
         winner: {
           create: {
-            ticketId: activeTicket.id,
+            ticketId: tempTicket.id,
             wasTieBreakWinner: false,
             disbursementStatus: 'VERIFIED_BY_MAKER',
             agreementSigned: true,
@@ -1259,7 +1322,9 @@ describe('PostgreSQL Row-Locking & Concurrency Integration Tests (Real DB)', () 
       expect(dbWinner?.disbursementStatus).toBe('AUTHORIZED_BY_CHECKER');
     } finally {
       await prisma.auctionWinner.deleteMany({ where: { auctionId: testAuction.id } });
-      await prisma.auction.delete({ where: { id: testAuction.id } });
+      await prisma.auction.deleteMany({ where: { id: testAuction.id } });
+      await prisma.subscriberTicket.deleteMany({ where: { id: tempTicket.id } });
+      await prisma.chitGroup.deleteMany({ where: { id: tempChit.id } });
     }
   }, 20000);
 

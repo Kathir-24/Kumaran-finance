@@ -18,13 +18,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { formatRupee } from '@/lib/currency';
 import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { useIdempotentAction } from '@/hooks/use-idempotent-action';
+import { isSelfApproval } from '@kumaran/api-client';
+import { toSafeWholeRupeeBigInt } from '@/components/auctions/auction-math.util';
 
 type DisbursementModeOption =
   | 'ACCOUNT_PAYEE_CHEQUE'
@@ -50,13 +51,13 @@ export interface AuthWinnerTarget {
   auctionId: string;
   disbursementStatus: string;
   verifiedByUserId?: string | null;
-  disbursedAmount?: number | bigint | null;
+  disbursedAmount?: number | bigint | string | null;
   auction?: {
-    prizeMoney?: number | bigint;
-    bidDiscount?: number | bigint;
+    prizeMoney?: number | bigint | string;
+    bidDiscount?: number | bigint | string;
     chitGroup?: {
       groupCode?: string;
-      chitValue?: number | bigint;
+      chitValue?: number | bigint | string;
     };
   };
   ticket?: {
@@ -86,15 +87,19 @@ export function DisbursementAuthModal({
   const queryClient = useQueryClient();
 
   const [disbursementMode, setDisbursementMode] = useState<DisbursementModeOption>('ACCOUNT_PAYEE_CHEQUE');
-  const [disbursedAmount, setDisbursedAmount] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const grossPrizeBig =
+    winner?.auction?.prizeMoney !== undefined && winner?.auction?.prizeMoney !== null
+      ? toSafeWholeRupeeBigInt(winner.auction.prizeMoney, 0n)
+      : toSafeWholeRupeeBigInt(winner?.auction?.chitGroup?.chitValue, 0n) -
+        toSafeWholeRupeeBigInt(winner?.auction?.bidDiscount, 0n);
+
   const defaultNetPrize =
-    winner?.disbursedAmount ??
-    winner?.auction?.prizeMoney ??
-    (BigInt(winner?.auction?.chitGroup?.chitValue ?? 0) -
-      BigInt(winner?.auction?.bidDiscount ?? 0));
+    winner?.disbursedAmount !== undefined && winner?.disbursedAmount !== null
+      ? toSafeWholeRupeeBigInt(winner.disbursedAmount, grossPrizeBig)
+      : grossPrizeBig;
 
   // Client-Side Idempotency Session Hook
   const { idempotencyKey, resetKey } = useIdempotentAction();
@@ -103,21 +108,16 @@ export function DisbursementAuthModal({
     if (isOpen && winner) {
       resetKey();
       setDisbursementMode('ACCOUNT_PAYEE_CHEQUE');
-      setDisbursedAmount(defaultNetPrize ? defaultNetPrize.toString() : '');
       setNotes('');
       setErrorMsg(null);
     }
-  }, [isOpen, winner, defaultNetPrize, resetKey]);
+  }, [isOpen, winner, resetKey]);
 
-  // Maker != Checker Guard (Guardrail 10)
-  const isMaker = Boolean(
-    user?.id &&
-      winner?.verifiedByUserId &&
-      user.id.toLowerCase() === winner.verifiedByUserId.toLowerCase(),
-  );
-
+  // Maker != Checker Guard (Guardrail 10) & Verified Partner Guard (Guardrail 11 / SEC-A)
+  const isMaker = isSelfApproval(user?.id, { verifiedByUserId: winner?.verifiedByUserId });
   const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
   const isPartner = Boolean(user?.isPartner);
+  const canAuthorize = !isMaker && isSuperAdmin && isPartner;
 
   const authorizeMutation = useMutation({
     mutationFn: async () => {
@@ -126,16 +126,17 @@ export function DisbursementAuthModal({
         throw new Error(t('makerGuardAlertDesc'));
       }
       if (!isSuperAdmin || !isPartner) {
-        throw new Error('Only verified legal partners (isPartner: true) possess financial authority to authorize prize money disbursements');
+        throw new Error(t('partnerOnlyAuthAlert'));
       }
 
+      // KFC-FIN-003 & KFC-FIN-004: Omit disbursedAmount so server computes exact
+      // arrears-adjusted net payout fail-closed with zero manual staff override.
       return unwrapApiResponse<unknown>(
         apiClient.POST('/api/v1/disbursements/auction/{auctionId}/authorize-payout', {
           params: { path: { auctionId: winner.auctionId } },
           headers: { 'Idempotency-Key': idempotencyKey },
           body: {
             disbursementMode,
-            disbursedAmount: disbursedAmount ? Number(disbursedAmount) : undefined,
             notes: notes.trim() || undefined,
           },
         }),
@@ -186,11 +187,11 @@ export function DisbursementAuthModal({
             </div>
           )}
 
-          {/* Legal Partner Guardrail (SEC-A) */}
-          {!isPartner && isSuperAdmin && (
+          {/* Legal Partner / Super Admin Guardrail (Guardrail 11 / SEC-A) */}
+          {(!isSuperAdmin || !isPartner) && (
             <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>Only verified legal partners (isPartner: true) possess financial authority to authorize prize money disbursements.</span>
+              <span>{t('partnerOnlyAuthAlert')}</span>
             </div>
           )}
 
@@ -209,11 +210,16 @@ export function DisbursementAuthModal({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-emerald-400">Calculated Net Prize (P = V - D)</div>
+              <div className="text-xs text-emerald-400">Gross Auction Prize (P = V - D)</div>
               <div className="text-lg font-mono font-bold text-emerald-400">
                 {formatRupee(defaultNetPrize)}
               </div>
             </div>
+          </div>
+
+          {/* KFC-FIN-003 & KFC-FIN-004 Server-Locked Arrears Offset Notice */}
+          <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-200 text-[11px] leading-relaxed">
+            {t('arrearsOffsetNotice')}
           </div>
 
           {/* Authorized Disbursement Mode */}
@@ -223,12 +229,12 @@ export function DisbursementAuthModal({
             </label>
             <select
               value={disbursementMode}
-              disabled={isMaker || authorizeMutation.isPending}
+              disabled={!canAuthorize || authorizeMutation.isPending}
               onChange={(e) => {
                 const val = e.target.value;
                 if (isDisbursementModeOption(val)) setDisbursementMode(val);
               }}
-              className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
+              className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs text-slate-200 focus:border-purple-500 focus:outline-none disabled:opacity-50"
             >
               <option value="ACCOUNT_PAYEE_CHEQUE">Account Payee Cheque (வங்கி கணக்கு காசோலை)</option>
               <option value="BANK_TRANSFER_NEFT">NEFT Bank Transfer (NEFT வங்கி பரிமாற்றம்)</option>
@@ -238,21 +244,6 @@ export function DisbursementAuthModal({
             </select>
           </div>
 
-          {/* Authorized Amount (Whole Rupees) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              {t('authAmountLabel')}
-            </label>
-            <Input
-              type="number"
-              value={disbursedAmount}
-              disabled={isMaker || authorizeMutation.isPending}
-              onChange={(e) => setDisbursedAmount(e.target.value)}
-              placeholder="e.g. 75000"
-              className="text-xs font-mono"
-            />
-          </div>
-
           {/* Checker Notes */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
@@ -260,7 +251,7 @@ export function DisbursementAuthModal({
             </label>
             <Textarea
               value={notes}
-              disabled={isMaker || authorizeMutation.isPending}
+              disabled={!canAuthorize || authorizeMutation.isPending}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={t('authNotesPlaceholder')}
               rows={2}
@@ -282,7 +273,7 @@ export function DisbursementAuthModal({
           <Button
             type="button"
             onClick={() => authorizeMutation.mutate()}
-            disabled={isMaker || !isSuperAdmin || !isPartner || authorizeMutation.isPending}
+            disabled={!canAuthorize || authorizeMutation.isPending}
             className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow"
           >
             {authorizeMutation.isPending ? (

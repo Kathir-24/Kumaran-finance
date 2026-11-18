@@ -6,6 +6,11 @@ import {
   parseWholeRupees,
   sanitizeWholeRupeeInput,
 } from '../src/lib/currency.ts';
+import {
+  computeAuctionBidPreview,
+  parseWholeRupeesBigInt,
+  toSafeWholeRupeeBigInt,
+} from '../src/components/auctions/auction-math.util.ts';
 
 describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
   // 1. Guardrail 6: Floor and Ceiling validation bounds
@@ -211,5 +216,107 @@ describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
       assert.ok(en.auctions[key], `Missing en.auctions.${key}`);
       assert.ok(ta.auctions[key], `Missing ta.auctions.${key}`);
     }
+  });
+
+  // 9. DEF-WM-04: Pure BigInt auction preview & KFC-FIN-002 exact divisibility gate
+  it('DEF-WM-04 (KFC-FIN-002): computeAuctionBidPreview enforces exact whole-rupee dividend divisibility and frozen rate', () => {
+    // Cleanly divisible ceiling bid: ₹1,00,000 / 20 tickets, bid ₹25,000, 4% commission ₹4,000 => Div ₹21,000 / 20 = ₹1,050 (rem 0)
+    const valid = computeAuctionBidPreview({
+      chitValue: 100_000n,
+      totalTickets: 20,
+      bidDiscount: 25_000n,
+      frozenCommissionRate: '4.00',
+    });
+    assert.equal(valid.foremanCommission, 4_000n);
+    assert.equal(valid.ceilingDiscount, 25_000n);
+    assert.equal(valid.totalDividend, 21_000n);
+    assert.equal(valid.dividendRemainder, 0n);
+    assert.equal(valid.isDivisible, true);
+    assert.equal(valid.dividendPerTicket, 1_050n);
+    assert.equal(valid.nextMonthNetInstallment, 3_950n);
+    assert.equal(valid.netPrizeMoney, 75_000n);
+
+    // Non-divisible bid: ₹20,005 => (20,005 - 4,000) % 20 = 5 != 0 -> MUST fail divisibility gate
+    const nonDivisible = computeAuctionBidPreview({
+      chitValue: 100_000n,
+      totalTickets: 20,
+      bidDiscount: 20_005n,
+      frozenCommissionRate: '4.00',
+    });
+    assert.equal(nonDivisible.isFloorViolated, false);
+    assert.equal(nonDivisible.isCeilingViolated, false);
+    assert.equal(nonDivisible.dividendRemainder, 5n);
+    assert.equal(nonDivisible.isDivisible, false);
+
+    // Frozen non-default rate (5.00%): commission = ₹5,000 (Guardrail 3)
+    const frozenRate = computeAuctionBidPreview({
+      chitValue: 100_000n,
+      totalTickets: 20,
+      bidDiscount: 25_000n,
+      frozenCommissionRate: '5.00',
+    });
+    assert.equal(frozenRate.foremanCommission, 5_000n);
+    assert.equal(frozenRate.dividendPerTicket, 1_000n);
+    assert.equal(toSafeWholeRupeeBigInt('9007199254740993'), 9007199254740993n);
+
+    // XR-WM-05: 310+ digit paste must parse cleanly to BigInt without Infinity RangeError
+    const hugePaste = '9'.repeat(320);
+    const parsedHuge = parseWholeRupeesBigInt(hugePaste);
+    assert.equal(parsedHuge, BigInt(hugePaste));
+    const hugePreview = computeAuctionBidPreview({
+      chitValue: 100_000n,
+      totalTickets: 20,
+      bidDiscount: parsedHuge,
+    });
+    assert.equal(hugePreview.isCeilingViolated, true);
+    assert.equal(parseWholeRupeesBigInt('25,000.99'), 25000n);
+  });
+
+  // 10. DEF-WM-03 Regression: Live Room query key isolation, month param forwarding & Guardrail 5/8 guards
+  it('DEF-WM-03 Regression: Live room uses schemes.roster cache key, forwards ?month on bid/tie-break, and enforces Month 1/N guard', () => {
+    const livePageSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/app/(dashboard)/auctions/[id]/live/page.tsx'),
+      'utf-8',
+    );
+    const rosterSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/defaulter-eligibility-roster.tsx'),
+      'utf-8',
+    );
+
+    // Zero cache collision with schemes.detail
+    assert.match(livePageSource, /queryKeys\.schemes\.roster\(chitGroupId/);
+    // Passes ?month=currentMonth to record-bid and tie-break
+    assert.match(livePageSource, /\/api\/v1\/auctions\/\{id\}\/record-bid[\s\S]*?query:\s*\{\s*month:\s*currentMonth\s*\}/);
+    assert.match(livePageSource, /\/api\/v1\/auctions\/\{id\}\/tie-break[\s\S]*?query:\s*\{\s*month:\s*currentMonth\s*\}/);
+    // Guardrail 5 Month 1 & Month N exclusion
+    assert.match(livePageSource, /currentMonth <= 1 \|\| currentMonth >= durationMonths/);
+    // Guardrail 8: roster trusts authoritative server eligibleTicketIdSet without || client bypass
+    assert.doesNotMatch(
+      rosterSource,
+      /eligibleTicketIdSet\.has\(ticket\.id\)\s*\|\|/,
+      'DefaulterEligibilityRoster must never bypass server eligibility with || fallback',
+    );
+
+    // Guardrail 11 (SEC-A): IT Super Admin (isPartner: false) blocked on live room & bidding console
+    const consoleSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/bidding-console.tsx'),
+      'utf-8',
+    );
+    assert.match(
+      livePageSource,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+    );
+    assert.match(
+      consoleSource,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+    );
+
+    // TieBreakModal token auto-assignment allocates smallest unused positive integer (zero duplicates)
+    const tieModalSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/tie-break-modal.tsx'),
+      'utf-8',
+    );
+    assert.match(tieModalSource, /usedTokens\.has\(nextTokenNum\)/);
+    assert.doesNotMatch(tieModalSource, /const nextTokenNum = next\.length;/);
   });
 });

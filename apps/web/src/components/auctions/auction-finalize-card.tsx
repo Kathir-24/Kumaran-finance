@@ -48,16 +48,23 @@ export function AuctionFinalizeCard({
   const [signedByForeman, setSignedByForeman] = React.useState<boolean>(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  // Maker-Checker Dual Control Invariant Check (Guardrail 10) & Legal Partner Guard (SEC-A)
-  const isMaker = isSelfApproval(user?.id, { makerUserId: conductedByUserId });
-  const isAuthorizedRole = hasAnyRole(user, ['SUPER_ADMIN', 'BRANCH_MANAGER']);
+  // Maker-Checker Dual Control Invariant Check (Guardrail 10) & Legal Partner Guard (Guardrail 11 / SEC-A)
+  // Per permissions-matrix §6 & KFC-SEC-003: ONLY Super Admin (verified Partner) can finalize; Branch Manager strictly blocked.
+  const hasRecordedBid = Boolean(conductedByUserId && winnerTicketNumber !== undefined && winnerTicketNumber !== null);
+  const isMaker = isSelfApproval(user?.id, { conductedByUserId });
+  const isAuthorizedRole = hasAnyRole(user, ['SUPER_ADMIN']);
   const isPartner = Boolean(user?.isPartner);
-  const canFinalize = !isMaker && isAuthorizedRole && isPartner;
+  const canFinalize = hasRecordedBid && !isMaker && isAuthorizedRole && isPartner;
   const checkerDisplayName = getUserDisplayName(user, 'Partner');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!hasRecordedBid) {
+      setErrorMsg('Cannot finalize auction: No winning bid has been recorded yet in the live auction room.');
+      return;
+    }
 
     if (isMaker) {
       setErrorMsg(
@@ -117,8 +124,16 @@ export function AuctionFinalizeCard({
         </div>
       </div>
 
+      {/* Missing Bid Guard Warning */}
+      {!hasRecordedBid && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 p-3 text-xs text-amber-200 flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <span>No winning bid has been recorded yet. Enter the live bidding room to record a bid before Checker finalization.</span>
+        </div>
+      )}
+
       {/* Dual Control Blocking Warning */}
-      {isMaker && (
+      {hasRecordedBid && isMaker && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 p-3.5 text-xs text-amber-200 flex items-start gap-3">
           <ShieldAlert className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="space-y-1">

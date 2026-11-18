@@ -12,6 +12,9 @@ export interface ChitGroupSummary {
   groupName: string;
   chitValue: bigint | number | string;
   durationMonths: number;
+  baseInstallment?: bigint | number | string;
+  foremanCommissionRate?: number | string | null;
+  maxDiscountCeiling?: bigint | number | string | null;
   status: string;
 }
 

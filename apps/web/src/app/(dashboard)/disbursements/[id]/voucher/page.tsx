@@ -105,14 +105,19 @@ export default function PayoutVoucherPage() {
 
   const status = winner.disbursementStatus;
 
-  // Maker != Checker Guardrail 10 Evaluation
+  // Maker != Checker Guardrail 10 & Partner Identity Guardrail 11 (SEC-A) Evaluation
   const isMaker = Boolean(
     user?.id &&
       winner?.verifiedByUserId &&
-      user.id.toLowerCase() === winner.verifiedByUserId.toLowerCase(),
+      user.id.trim().toLowerCase() === winner.verifiedByUserId.trim().toLowerCase(),
   );
 
   const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isPartner = Boolean(user?.isPartner);
+  const canAuthorizePayout = !isMaker && isSuperAdmin && isPartner;
+  // Release Payout: Accountant OR verified Partner (Super Admin with isPartner: true)
+  const canReleasePayout =
+    hasAnyRole(user, ['ACCOUNTANT']) || (isSuperAdmin && isPartner);
 
   return (
     <div className="space-y-6">
@@ -171,7 +176,7 @@ export default function PayoutVoucherPage() {
               <Button
                 size="sm"
                 onClick={() => setAuthModalOpen(true)}
-                disabled={isMaker || !isSuperAdmin}
+                disabled={!canAuthorizePayout}
                 className="bg-purple-600 hover:bg-purple-500 text-white text-xs gap-1.5 shadow shrink-0 whitespace-nowrap"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -179,7 +184,7 @@ export default function PayoutVoucherPage() {
               </Button>
             )}
 
-            {status === 'AUTHORIZED_BY_CHECKER' && (
+            {status === 'AUTHORIZED_BY_CHECKER' && canReleasePayout && (
               <Button
                 size="sm"
                 onClick={() => setReleaseModalOpen(true)}
@@ -212,6 +217,17 @@ export default function PayoutVoucherPage() {
           <div>
             <div className="font-semibold text-sm">{t('makerGuardAlertTitle')}</div>
             <div className="text-amber-300/80 mt-1">{t('makerGuardAlertDesc')}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Guardrail 11 (SEC-A) Alert if non-partner Super Admin views voucher awaiting authorization */}
+      {status === 'VERIFIED_BY_MAKER' && !isMaker && isSuperAdmin && !isPartner && (
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold text-sm">Verified Partner Identity Required (Guardrail 11 / SEC-A)</div>
+            <div className="text-amber-300/80 mt-1">{t('partnerOnlyAuthAlert')}</div>
           </div>
         </div>
       )}

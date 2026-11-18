@@ -27,6 +27,7 @@ class IdempotencyHelper {
     return path.contains('/payments') ||
         path.contains('/collections') ||
         path.contains('/disbursements') ||
-        path.contains('/reversals');
+        path.contains('/reversals') ||
+        path.contains('/auctions');
   }
 }
