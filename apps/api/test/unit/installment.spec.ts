@@ -673,7 +673,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
         ticketNumber: 4,
         customerId: 'customer-uuid-001',
         customer: { id: 'customer-uuid-001', fullName: 'K. Kathirvel', phone: '9842100001' },
-        chitGroup: { groupCode: 'KC-LIVE-20M-01', branchId: 'branch-001' },
+        chitGroup: { groupCode: 'KC-LIVE-20M-01', branchId: 'branch-001', status: 'ACTIVE' },
       },
     };
 

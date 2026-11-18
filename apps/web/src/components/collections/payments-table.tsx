@@ -33,7 +33,7 @@ export interface PaymentItem {
   ticketNumber?: number;
   subscriberName?: string;
   subscriberMobile?: string;
-  installmentMonth: number;
+  installmentMonth?: number;
   amount: number | bigint;
   paymentMethod: 'CASH' | 'UPI' | 'CHEQUE' | 'BANK_TRANSFER';
   paymentStatus: 'SUCCESS' | 'INITIATED' | 'FAILED' | 'REVERSED';
@@ -48,6 +48,16 @@ export interface PaymentItem {
   receipt?: {
     receiptNumber: string;
   };
+  allocations?: Array<{
+    due?: {
+      installmentMonth?: number;
+    };
+    ticket?: {
+      ticketNumber?: number;
+      chitGroup?: { groupCode?: string };
+      customer?: { fullName?: string; customerCode?: string; phone?: string; name?: string };
+    };
+  }>;
 }
 
 interface PaymentsTableProps {
@@ -162,11 +172,18 @@ export function PaymentsTable({
         </TableHeader>
         <TableBody>
           {payments.map((p) => {
+            const alloc = p.allocations?.[0];
             const receiptNo = p.receipt?.receiptNumber || p.receiptNumber || '—';
-            const groupCode = p.ticket?.chitGroup?.groupCode || p.chitGroupCode || '—';
-            const ticketNum = p.ticket?.ticketNumber ?? p.ticketNumber ?? '—';
-            const subName = p.ticket?.customer?.name || p.subscriberName || 'Subscriber';
-            const subPhone = p.ticket?.customer?.phone || p.subscriberMobile;
+            const groupCode = alloc?.ticket?.chitGroup?.groupCode || p.ticket?.chitGroup?.groupCode || p.chitGroupCode || '—';
+            const ticketNum = alloc?.ticket?.ticketNumber ?? p.ticket?.ticketNumber ?? p.ticketNumber ?? '—';
+            const subName =
+              alloc?.ticket?.customer?.fullName ||
+              alloc?.ticket?.customer?.name ||
+              p.ticket?.customer?.name ||
+              p.subscriberName ||
+              'Subscriber';
+            const subPhone = alloc?.ticket?.customer?.phone || p.ticket?.customer?.phone || p.subscriberMobile;
+            const installmentMonth = alloc?.due?.installmentMonth ?? p.installmentMonth;
 
             return (
               <TableRow key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
@@ -181,7 +198,7 @@ export function PaymentsTable({
                   {subPhone && <div className="text-[10px] text-slate-400 font-mono whitespace-nowrap">{subPhone}</div>}
                 </TableCell>
                 <TableCell className="text-xs font-mono text-slate-300 whitespace-nowrap">
-                  Month #{p.installmentMonth}
+                  Month #{installmentMonth ?? '—'}
                 </TableCell>
                 <TableCell className="text-xs font-mono font-bold text-slate-100 text-right whitespace-nowrap">
                   {formatRupee(p.amount)}

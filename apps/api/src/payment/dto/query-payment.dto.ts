@@ -29,6 +29,14 @@ export class QueryPaymentDto {
   chitGroupId?: string;
 
   @ApiPropertyOptional({
+    example: 'branch-prd-001',
+    description: 'Filter by branch ID (Super Admin & Auditor)',
+  })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @ApiPropertyOptional({
     enum: PaymentMethod,
     description: 'Filter by payment method (CASH, UPI, BANK_TRANSFER, CHEQUE)',
   })
@@ -69,7 +77,7 @@ export class QueryPaymentDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page: number = 1;
+  page?: number = 1;
 
   @ApiPropertyOptional({
     example: 20,
@@ -81,5 +89,5 @@ export class QueryPaymentDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit: number = 20;
+  limit?: number = 20;
 }

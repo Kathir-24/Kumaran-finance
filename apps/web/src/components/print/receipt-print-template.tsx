@@ -132,7 +132,7 @@ export function ReceiptPrintTemplate({ paymentId, receipt }: ReceiptPrintTemplat
         {/* Reversal Diagonal Watermark */}
         {receipt.isReversed && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden">
-            <div className="text-red-500/20 font-black text-4xl sm:text-5xl uppercase tracking-widest transform -rotate-45 border-4 border-dashed border-red-500/30 px-8 py-3 rounded-lg text-center">
+            <div className="text-[#DC2626]/30 font-bold text-[28pt] uppercase tracking-widest transform -rotate-[35deg] border-4 border-dashed border-[#DC2626]/40 px-6 py-2.5 rounded-lg text-center leading-tight">
               {t('receipt.reversedWatermark')}
             </div>
           </div>

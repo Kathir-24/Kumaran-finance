@@ -647,7 +647,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should approve reversal when Checker (Partner B) approves Partner A request, setting REVERSED and due to UNPAID', async () => {
+    it('should approve reversal when Checker (Partner B) approves Partner A request, setting REVERSED and past due to OVERDUE (DEF-M8-REV-04)', async () => {
       prismaMock.payment.findUnique.mockResolvedValue({
         ...mockSuccessPayment,
         reversal: {
@@ -689,7 +689,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         expect.objectContaining({
           where: { id: mockDue.id },
           data: expect.objectContaining({
-            status: DueStatus.UNPAID,
+            status: DueStatus.OVERDUE,
             paidAmount: 0n,
           }),
         }),
@@ -701,7 +701,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
             userId: mockCheckerId,
             newValue: expect.objectContaining({
               paymentStatus: 'REVERSED',
-              dueStatus: 'UNPAID',
+              dueStatus: DueStatus.OVERDUE,
               makerUserId: mockMakerId,
               checkerUserId: mockCheckerId,
             }),
@@ -709,6 +709,44 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         }),
       );
       expect(result.paymentStatus).toBe(PaymentStatus.REVERSED);
+      expect(result.dueStatus).toBe(DueStatus.OVERDUE);
+    });
+
+    it('DEF-M8-REV-04: should restore due to DueStatus.UNPAID when due date is in the future', async () => {
+      const futureDue = {
+        ...mockDue,
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days in future
+      };
+      prismaMock.payment.findUnique.mockResolvedValue({
+        ...mockSuccessPayment,
+        allocations: [{ ...mockSuccessPayment.allocations[0], due: futureDue }],
+        reversal: {
+          id: 'rev-01',
+          paymentId: mockPaymentId,
+          reason: 'WRONG_TICKET_ENTERED',
+          notes: 'Customer Ticket 7 error',
+          status: 'REQUESTED',
+          initiatedByUserId: mockMakerId,
+        },
+      });
+      prismaMock.installmentDue.findMany.mockResolvedValue([futureDue]);
+
+      const result = await paymentService.approveReversal(
+        mockPaymentId,
+        { notes: 'Future due reversal' },
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(prismaMock.installmentDue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: futureDue.id },
+          data: expect.objectContaining({
+            status: DueStatus.UNPAID,
+            paidAmount: 0n,
+          }),
+        }),
+      );
       expect(result.dueStatus).toBe(DueStatus.UNPAID);
     });
 
@@ -1366,6 +1404,277 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
           mockAccountantUser.roles,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('8. Module 8 Forensic Remediation Regression Tests (XR-M8-PAY-01..12)', () => {
+    it('XR-M8-PAY-01: should pass paymentId in JOB_DISPATCH_PAYMENT_RECEIPT queue payload on payment and verifyUpiClaim', async () => {
+      const mockQueue = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-1' }),
+      };
+      const serviceWithQueue = new PaymentService(
+        prismaMock as unknown as PrismaService,
+        mockQueue as any,
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.receipt.findFirst.mockResolvedValue(null);
+      prismaMock.payment.create.mockResolvedValue({
+        id: 'pmt-pay-id-123',
+        amount: 3750n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date('2026-10-18T10:45:00.000Z'),
+      });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-01' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-01',
+        receiptNumber: 'KC-REC-PRD-2026-00412',
+        isBilingual: true,
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({ ...mockDue, status: DueStatus.PAID, paidAmount: 3750n });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+
+      await serviceWithQueue.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      expect(mockQueue.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-payment-receipt',
+        expect.objectContaining({
+          paymentId: 'pmt-pay-id-123',
+          receiptNumber: 'KC-REC-PRD-2026-00412',
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('XR-M8-PAY-02: verifyUpiClaim invalidates daybook cache post-commit', async () => {
+      const mockRedisClient = {
+        del: jest.fn().mockResolvedValue(1),
+      };
+      const mockRedisProvider = {
+        getClient: jest.fn().mockReturnValue(mockRedisClient),
+        getIsConnected: jest.fn().mockReturnValue(true),
+      };
+      const serviceWithRedis = new PaymentService(
+        prismaMock as unknown as PrismaService,
+        undefined,
+        mockRedisProvider as any,
+      );
+
+      const pendingClaim = {
+        id: 'claim-payment-001',
+        branchId: mockBranchId,
+        recordedByUserId: 'user-submitter-001',
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        allocations: [{ id: 'alloc-01', due: mockDue, ticket: mockTicket }],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(pendingClaim);
+      prismaMock.installmentDue.findFirst.mockResolvedValue(null);
+      prismaMock.payment.update.mockResolvedValue({ ...pendingClaim, paymentStatus: PaymentStatus.SUCCESS });
+      prismaMock.receipt.create.mockResolvedValue({ id: 'rec-01', receiptNumber: 'KC-REC-PRD-2026-00001' });
+      prismaMock.installmentDue.update.mockResolvedValue({ ...mockDue, status: DueStatus.PAID });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-01' });
+
+      await serviceWithRedis.verifyUpiClaim(
+        'claim-payment-001',
+        mockCheckerId,
+        [Role.SUPER_ADMIN],
+        mockBranchId,
+      );
+
+      expect(mockRedisClient.del).toHaveBeenCalled();
+    });
+
+    it('XR-M8-PAY-04: verifyUpiClaim rejects cross-branch verification for non-superadmin staff', async () => {
+      const pendingClaim = {
+        id: 'claim-payment-001',
+        branchId: 'branch-prd-001',
+        recordedByUserId: 'user-submitter-001',
+        customerId: mockCustomerId,
+        amount: 3750n,
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        allocations: [{ id: 'alloc-01', due: mockDue, ticket: mockTicket }],
+      };
+
+      prismaMock.payment.findUnique.mockResolvedValue(pendingClaim);
+
+      await expect(
+        paymentService.verifyUpiClaim(
+          'claim-payment-001',
+          'accountant-user-other-branch',
+          [Role.ACCOUNTANT],
+          'branch-try-002', // Different branch
+        ),
+      ).rejects.toThrow(
+        new ForbiddenException(
+          'CROSS_BRANCH_FORBIDDEN: You cannot verify UPI claims for chit groups belonging to another branch',
+        ),
+      );
+    });
+
+    it('XR-M8-PAY-05: recordPayment replay returns complete RecordPaymentResponseDto contract', async () => {
+      const existingPayment = {
+        id: 'existing-payment-001',
+        amount: 3750n,
+        idempotencyKey: 'idemp-uuid-123',
+        recordedByUserId: mockMakerId,
+        branchId: mockBranchId,
+        receipt: { id: 'rec-01', receiptNumber: 'KC-REC-PRD-2026-00045' },
+        allocations: [{ due: { netPayableAmount: 3750n } }],
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(existingPayment);
+
+      const result = await paymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.UPI,
+          idempotencyKey: 'idemp-uuid-123',
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      expect(result.duplicateIgnored).toBe(true);
+      expect(result.receipt).toBeDefined();
+      expect(result.dueStatus).toBe(DueStatus.PAID);
+      expect(result.paidAmount).toBe(3750n);
+      expect(result.netPayableAmount).toBe(3750n);
+    });
+
+    it('XR-M8-PAY-07: recordPayment trims whitespace in transactionRef', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.payment.create.mockResolvedValue({ id: 'pmt-01', createdAt: new Date() });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-01' });
+      prismaMock.receipt.create.mockResolvedValue({ id: 'rec-01', receiptNumber: 'KC-REC-PRD-2026-00001' });
+      prismaMock.installmentDue.update.mockResolvedValue({ ...mockDue, status: DueStatus.PAID });
+      prismaMock.installmentDue.findMany.mockResolvedValue([mockDue]);
+      prismaMock.subscriberTicket.update.mockResolvedValue(mockTicket);
+
+      await paymentService.recordPayment(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3750,
+          paymentMethod: PaymentMethod.BANK_TRANSFER,
+          transactionRef: '   ', // whitespace
+        },
+        mockMakerId,
+        mockBranchId,
+      );
+
+      expect(prismaMock.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            transactionRef: null,
+          }),
+        }),
+      );
+    });
+
+    it('XR-M8-PAY-09: queryPayments expands 10-char toDate to end-of-day IST timestamp', async () => {
+      prismaMock.payment.count.mockResolvedValue(0);
+      prismaMock.payment.findMany.mockResolvedValue([]);
+
+      const user: JwtPayload = {
+        sub: mockMakerId,
+        roles: [Role.SUPER_ADMIN],
+        phone: '9876543210',
+        branchId: mockBranchId,
+        tokenType: 'access',
+      };
+
+      await paymentService.queryPayments(
+        { toDate: '2026-10-31' },
+        user,
+      );
+
+      expect(prismaMock.payment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdAt: expect.objectContaining({
+              lte: new Date('2026-10-31T23:59:59.999Z'),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('XR-M8-PAY-10: getPaymentById and getBilingualReceipt reject cross-branch access for non-global staff', async () => {
+      const paymentOtherBranch = {
+        id: 'pmt-other-branch',
+        branchId: 'branch-try-002',
+        customerId: 'other-cust',
+        receipt: { receiptNumber: 'KC-REC-TRY-2026-00001' },
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(paymentOtherBranch);
+
+      const bmUser: JwtPayload = {
+        sub: 'bm-user',
+        roles: [Role.BRANCH_MANAGER],
+        phone: '9842100001',
+        branchId: 'branch-prd-001', // Different branch
+        tokenType: 'access',
+      };
+
+      await expect(
+        paymentService.getPaymentById('pmt-other-branch', bmUser),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        paymentService.getBilingualReceipt('pmt-other-branch', bmUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('XR-M8-PAY-11: verifyUpiClaim re-verifies payment.amount === due.netPayableAmount', async () => {
+      const mismatchedClaim = {
+        id: 'claim-payment-mismatched',
+        branchId: mockBranchId,
+        recordedByUserId: 'user-submitter-001',
+        customerId: mockCustomerId,
+        amount: 2500n, // Mismatched vs due 3750n
+        paymentMethod: PaymentMethod.UPI,
+        paymentStatus: PaymentStatus.INITIATED,
+        transactionRef: 'UTR-123456789012',
+        allocations: [{ id: 'alloc-01', due: mockDue, ticket: mockTicket }],
+      };
+      prismaMock.payment.findUnique.mockResolvedValue(mismatchedClaim);
+
+      await expect(
+        paymentService.verifyUpiClaim(
+          'claim-payment-mismatched',
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+          mockBranchId,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'PARTIAL_PAYMENTS_NOT_ALLOWED: Verified payment amount ₹2500 does not match target installment due of ₹3750',
+        ),
+      );
     });
   });
 });

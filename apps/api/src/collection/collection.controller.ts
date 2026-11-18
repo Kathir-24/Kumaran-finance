@@ -187,10 +187,14 @@ export class CollectionController {
   async acknowledgeHandover(
     @Body() dto: AcknowledgeHandoverDto,
     @CurrentUser('sub') acknowledgerUserId: string,
+    @CurrentUser('branchId') staffBranchId?: string | null,
+    @CurrentUser('roles') roles?: Role[],
   ) {
     return this.collectionService.acknowledgeHandover(
       dto,
       acknowledgerUserId,
+      staffBranchId,
+      roles,
     );
   }
 }

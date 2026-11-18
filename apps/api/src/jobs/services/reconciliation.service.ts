@@ -2,6 +2,10 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  computeMaxConsecutiveUnpaidMonths,
+  deriveTicketArrearsStatus,
+} from '../../common/utils/arrears.util';
+import {
   acquirePaymentConcurrencyLocks,
   generateNextReceiptNumber,
   PAYMENT_TRANSACTION_OPTIONS,
@@ -172,32 +176,21 @@ export class ReconciliationService {
               },
             });
 
-            // Recalculate consecutive arrears on ticket
+            // Recalculate consecutive arrears on ticket (canonical ADR-07 longest contiguous streak)
             const allDues = await tx.installmentDue.findMany({
-              where: {
-                ticketId: alloc.ticketId,
-                installmentMonth: { lte: alloc.due.installmentMonth },
-              },
+              where: { ticketId: alloc.ticketId },
               orderBy: { installmentMonth: 'desc' },
             });
 
-            let consecutiveUnpaid = 0;
-            for (const d of allDues) {
-              if (d.id === alloc.installmentDueId) {
-                break;
-              }
-              if (d.status !== DueStatus.PAID) {
-                consecutiveUnpaid++;
-              } else {
-                break;
-              }
-            }
+            const consecutiveUnpaid = computeMaxConsecutiveUnpaidMonths(allDues, {
+              treatAsPaidIds: [alloc.installmentDueId],
+            });
 
             await tx.subscriberTicket.update({
               where: { id: alloc.ticketId },
               data: {
                 consecutiveUnpaidMonths: consecutiveUnpaid,
-                status: consecutiveUnpaid < 3 ? 'ACTIVE' : alloc.ticket.status,
+                status: deriveTicketArrearsStatus(consecutiveUnpaid, alloc.ticket.status),
               },
             });
           }
@@ -260,7 +253,7 @@ export class ReconciliationService {
                   paymentMode: payment.paymentMethod,
                   transactionTimestamp: (record.settledAt || new Date()).toISOString(),
                   receiptDownloadUrl: '',
-                  passbookAppUrl: '',
+                  passbookAppUrl: `https://app.kumaranfinance.in/passbook/${primaryAlloc.ticketId}`,
                   fcmToken: primaryAlloc.ticket.customer.fcmToken || undefined,
                 });
               } catch (notifyErr: any) {

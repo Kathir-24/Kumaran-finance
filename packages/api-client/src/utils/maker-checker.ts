@@ -10,6 +10,8 @@ export interface MakerCheckerEntity {
   createdByUserId?: string | null;
   requestedByUserId?: string | null;
   collectorUserId?: string | null;
+  initiatedByUserId?: string | null;
+  recordedByUserId?: string | null;
 }
 
 /**
@@ -31,7 +33,9 @@ export function isSelfApproval(
     entity.verifiedByUserId ||
     entity.createdByUserId ||
     entity.requestedByUserId ||
-    entity.collectorUserId;
+    entity.collectorUserId ||
+    entity.initiatedByUserId ||
+    entity.recordedByUserId;
 
   return Boolean(
     makerId && currentUserId.trim().toLowerCase() === makerId.trim().toLowerCase(),

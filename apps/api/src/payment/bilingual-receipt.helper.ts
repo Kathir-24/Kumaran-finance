@@ -31,11 +31,12 @@ export interface ReceiptDataInput {
 }
 
 export function formatBilingualReceiptText(data: ReceiptDataInput): string {
-  const dateStr = data.issuedAt.toISOString().slice(0, 10);
+  const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(data.issuedAt);
   const timeStr = data.issuedAt.toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   });
 
   const methodTamilMap: Record<string, string> = {

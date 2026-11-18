@@ -95,10 +95,31 @@ export default function CollectionsPage() {
     [claimsData],
   );
 
-  const totalCollectionsToday = allItems.length;
-  const totalCashToday = useMemo(() => allItems.filter((p) => p.paymentMethod === 'CASH' && p.paymentStatus !== 'REVERSED').reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n), [allItems]);
-  const totalUpiToday = useMemo(() => allItems.filter((p) => p.paymentMethod === 'UPI' && p.paymentStatus !== 'REVERSED').reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n), [allItems]);
-  const totalChequeToday = useMemo(() => allItems.filter((p) => p.paymentMethod === 'CHEQUE' && p.paymentStatus !== 'REVERSED').reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n), [allItems]);
+  const totalCollectionsToday = useMemo(
+    () => allItems.filter((p) => p.paymentStatus === 'SUCCESS').length,
+    [allItems],
+  );
+  const totalCashToday = useMemo(
+    () =>
+      allItems
+        .filter((p) => p.paymentMethod === 'CASH' && p.paymentStatus === 'SUCCESS')
+        .reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n),
+    [allItems],
+  );
+  const totalUpiToday = useMemo(
+    () =>
+      allItems
+        .filter((p) => p.paymentMethod === 'UPI' && p.paymentStatus === 'SUCCESS')
+        .reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n),
+    [allItems],
+  );
+  const totalChequeToday = useMemo(
+    () =>
+      allItems
+        .filter((p) => p.paymentMethod === 'CHEQUE' && p.paymentStatus === 'SUCCESS')
+        .reduce((sum, p) => sum + BigInt(p.amount ?? 0), 0n),
+    [allItems],
+  );
 
   const handleOpenReceipt = (paymentId: string) => {
     setActiveReceiptId(paymentId);

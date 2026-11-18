@@ -988,7 +988,8 @@
     "printVoucherBtn": "Print Settlement Voucher",
     "settlementSuccessful": "Cash handover of {amount} successfully verified and deposited into branch vault!",
     "viewVoucherBtn": "View Voucher",
-    "filterDateLabel": "Collection Date"
+    "filterDateLabel": "Collection Date",
+    "partnerAuthorityRequired": "Partner, Branch Manager, or Accountant Authority Required"
   },
   "reversals": {
     "title": "Payment Reversals",
@@ -1981,7 +1982,7 @@
       "disclaimer1": "* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. கையொப்பம் தேவையில்லை. / This is a computer-generated digital receipt.",
       "disclaimer2": "* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).",
       "disclaimer3": "* The primary acknowledged legal proof of payment is the signed physical paper passbook.",
-      "reversedWatermark": "REVERSED / ரத்து செய்யப்பட்டது"
+      "reversedWatermark": "ரத்து செய்யப்பட்டது / CANCELLED"
     },
     "voucher": {
       "voucherTitle": "பரிசு தொகை பட்டுவாடா வவுச்சர் / PRIZE DISBURSEMENT VOUCHER",

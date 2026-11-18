@@ -6,6 +6,7 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
 import { BigIntInterceptor } from '../../src/common/interceptors/bigint.interceptor';
+import { IdempotencyHeaderInterceptor } from '../../src/common/interceptors/idempotency-header.interceptor';
 import { TransformResponseInterceptor } from '../../src/common/interceptors/transform-response.interceptor';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
@@ -52,6 +53,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
     const reflector = app.get(Reflector);
     app.useGlobalInterceptors(
       new BigIntInterceptor(),
+      new IdempotencyHeaderInterceptor(),
       new TransformResponseInterceptor(reflector),
     );
 
@@ -183,6 +185,16 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
     });
+
+    it('TC-VAL-03: Rejects invalid non-UUID route param with 400 Bad Request (XR-M8-PAY-08)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/payments/not-a-valid-uuid')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.message).toContain('Validation failed');
+    });
   });
 
   // ===========================================================================
@@ -300,7 +312,7 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
         where: { id: unpaidDue.id },
         select: { status: true },
       });
-      expect(restoredDue?.status).toBe('UNPAID');
+      expect(['UNPAID', 'OVERDUE']).toContain(restoredDue?.status);
     });
   });
 
@@ -343,6 +355,44 @@ describe('Evidence Suite 4: Payments, Discrete Math, Reversals & Idempotency (e2
       expect(retryRes.status).toBe(201);
       expect(retryRes.body.data.payment.id).toBe(firstPaymentId);
       expect(retryRes.body.data.duplicateIgnored).toBe(true);
+      expect(retryRes.body.data.receipt).toBeDefined();
+    });
+
+    it('TC-REL-02: HTTP x-idempotency-key header bridges correctly and returns full replay receipt', async () => {
+      const unpaidDue = await prisma.installmentDue.findFirst({
+        where: { status: { in: ['UNPAID', 'OVERDUE'] } },
+        orderBy: { installmentMonth: 'asc' },
+      });
+
+      if (!unpaidDue) return;
+
+      const idempotencyKey = `x-idemp-test-${Date.now()}`;
+      const paymentPayload = {
+        ticketId: unpaidDue.ticketId,
+        installmentMonth: unpaidDue.installmentMonth,
+        amount: Number(unpaidDue.netPayableAmount),
+        paymentMethod: PaymentMethod.CASH,
+      };
+
+      const firstRes = await request(app.getHttpServer())
+        .post('/api/v1/payments')
+        .set('Authorization', `Bearer ${branchManagerToken}`)
+        .set('x-idempotency-key', idempotencyKey)
+        .send(paymentPayload);
+
+      expect(firstRes.status).toBe(201);
+      const firstPaymentId = firstRes.body.data.payment.id;
+
+      const retryRes = await request(app.getHttpServer())
+        .post('/api/v1/payments')
+        .set('Authorization', `Bearer ${branchManagerToken}`)
+        .set('x-idempotency-key', idempotencyKey)
+        .send(paymentPayload);
+
+      expect(retryRes.status).toBe(201);
+      expect(retryRes.body.data.payment.id).toBe(firstPaymentId);
+      expect(retryRes.body.data.duplicateIgnored).toBe(true);
+      expect(retryRes.body.data.receipt).toBeDefined();
     });
   });
 

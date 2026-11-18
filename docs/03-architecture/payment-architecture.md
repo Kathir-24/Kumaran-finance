@@ -267,7 +267,7 @@ All endpoints are protected by [`JwtAuthGuard`](file:///u:/Kumaran-finance/apps/
 | `POST /payments/upi-claim` | Customer, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
 | `GET /payments/pending-upi-claims` | Accountant, Branch Manager, Super Admin | Lists all pending UPI claims for Accounting Desk statement matching. |
 | `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
-| `POST /payments/:id/request-reversal` | Accountant, Branch Manager, Super Admin | Maker creates reversal request with mandatory reason code. Enqueues partner push alert. |
+| `POST /payments/:id/request-reversal` | **Super Admin Strictly (Partner A)** | Maker creates reversal request with mandatory reason code. Enqueues partner push alert. |
 | `POST /payments/:id/approve-reversal` | **Super Admin Strictly** | Checker approves reversal. Enforces `maker_user_id != checker_user_id`. Restores due to `UNPAID`. |
 | `POST /payments/:id/reject-reversal` | **Super Admin Strictly** | Checker rejects reversal. Enforces `maker_user_id != checker_user_id`. Retains `SUCCESS`. |
 

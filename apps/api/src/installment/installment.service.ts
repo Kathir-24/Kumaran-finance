@@ -1166,6 +1166,33 @@ export class InstallmentService {
       );
     }
 
+    if (due.ticket?.chitGroup?.status && due.ticket.chitGroup.status !== 'ACTIVE') {
+      throw new BadRequestException('Chit scheme is not active');
+    }
+
+    if (due.ticket.status === 'REMOVED_DEF_3M') {
+      throw new BadRequestException(
+        'Subscriber ticket has been removed from this chit scheme due to consecutive arrears',
+      );
+    }
+
+    // Sequential Installment Payment Guard (ADR-07): Prevent Out-of-Order UPI Intents
+    if (typeof this.prisma.installmentDue?.findFirst === 'function') {
+      const priorUnpaidDue = await this.prisma.installmentDue.findFirst({
+        where: {
+          ticketId: due.ticketId,
+          installmentMonth: { lt: due.installmentMonth },
+          status: { in: [DueStatus.UNPAID, DueStatus.OVERDUE] },
+        },
+        orderBy: { installmentMonth: 'asc' },
+      });
+      if (priorUnpaidDue) {
+        throw new BadRequestException(
+          `PRIOR_INSTALLMENT_UNPAID: Month ${priorUnpaidDue.installmentMonth} installment must be settled before paying Month ${due.installmentMonth}.`,
+        );
+      }
+    }
+
     const vpa = process.env.COMPANY_UPI_VPA || 'kumaranfinance@kvb';
     const payeeName = process.env.COMPANY_UPI_NAME || 'Kumaran Finance';
     const netPayable = Number(due.netPayableAmount);

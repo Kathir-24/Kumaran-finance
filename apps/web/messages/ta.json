@@ -988,7 +988,8 @@
     "printVoucherBtn": "தீர்வு வவுச்சரை அச்சிடுக",
     "settlementSuccessful": "ரொக்க ஒப்படைப்பு {amount} வெற்றிகரமாகச் சரிபார்க்கப்பட்டு கிளைக் கருவூலத்தில் வைக்கப்பட்டது!",
     "viewVoucherBtn": "வவுச்சரைப் பார்",
-    "filterDateLabel": "வசூல் தேதி"
+    "filterDateLabel": "வசூல் தேதி",
+    "partnerAuthorityRequired": "கூட்டாளர், கிளை மேலாளர் அல்லது எழுத்தர் அனுமதி தேவை"
   },
   "reversals": {
     "title": "பணம் திரும்பப் பெறுதல் கோரிக்கைகள்",
@@ -1981,7 +1982,7 @@
       "disclaimer1": "* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. கையொப்பம் தேவையில்லை. / This is a computer-generated digital receipt.",
       "disclaimer2": "* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).",
       "disclaimer3": "* The primary acknowledged legal proof of payment is the signed physical paper passbook.",
-      "reversedWatermark": "REVERSED / ரத்து செய்யப்பட்டது"
+      "reversedWatermark": "ரத்து செய்யப்பட்டது / CANCELLED"
     },
     "voucher": {
       "voucherTitle": "பரிசு தொகை பட்டுவாடா வவுச்சர் / PRIZE DISBURSEMENT VOUCHER",

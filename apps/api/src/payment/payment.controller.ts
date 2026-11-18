@@ -2,16 +2,19 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -74,6 +77,16 @@ export class PaymentController {
       'Records discrete payment for an installment due. Enforces ADR-07: Exact Inet matching, single discrete payment, zero partials, zero doubles. Generates bilingual receipt.',
   })
   @ApiCreatedResponseEnvelope(RecordPaymentResponseDto, { description: 'Payment recorded and receipt issued' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Optional unique UUID to prevent duplicate payments on retry (ADR-07)',
+  })
+  @ApiHeader({
+    name: 'x-idempotency-key',
+    required: false,
+    description: 'Alternative lowercase HTTP header for idempotency key',
+  })
   @ApiResponse({
     status: 400,
     description: 'Partial payment, duplicate payment, or invalid scheme state',
@@ -85,7 +98,15 @@ export class PaymentController {
   async recordPayment(
     @Body() dto: CreatePaymentDto,
     @CurrentUser() currentUser: JwtPayload,
+    @Headers('idempotency-key') idempotencyKeyHeader?: string,
+    @Headers('x-idempotency-key') xIdempotencyKeyHeader?: string,
   ) {
+    if (!dto.idempotencyKey) {
+      const headerKey = idempotencyKeyHeader?.trim() || xIdempotencyKeyHeader?.trim();
+      if (headerKey) {
+        dto.idempotencyKey = headerKey;
+      }
+    }
     return this.paymentService.recordPayment(
       dto,
       currentUser.sub,
@@ -161,7 +182,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Payment record not found' })
   async getPaymentById(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.paymentService.getPaymentById(id, currentUser);
@@ -190,7 +211,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Receipt not found' })
   async getReceipt(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.paymentService.getBilingualReceipt(id, currentUser);
@@ -214,7 +235,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async requestReversal(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: RequestReversalDto,
     @CurrentUser('sub') userId: string,
   ) {
@@ -240,7 +261,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async approveReversal(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: ApproveReversalDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
@@ -270,7 +291,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async rejectReversal(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: RejectReversalDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
@@ -318,7 +339,7 @@ export class PaymentController {
   @ApiResponse({ status: 400, description: 'Invalid claim state or already paid' })
   @ApiResponse({ status: 403, description: 'Maker != Checker violation or insufficient role' })
   async verifyUpiClaim(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() currentUser: JwtPayload,
     @Body() dto?: VerifyUpiClaimDto,
   ) {
@@ -326,6 +347,7 @@ export class PaymentController {
       id,
       currentUser.sub,
       currentUser.roles,
+      currentUser.branchId,
       dto,
     );
   }

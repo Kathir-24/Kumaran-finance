@@ -76,7 +76,7 @@ export function HandoverVerificationCard({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const expectedTotal = useMemo(
-    () => batch.collections.reduce((sum, item) => sum + item.amount, 0),
+    () => batch.collections.reduce((sum, item) => sum + Number(item.amount || 0), 0),
     [batch.collections],
   );
 
@@ -88,6 +88,11 @@ export function HandoverVerificationCard({
   const isExactMatch = countedTotal === expectedTotal && countedTotal > 0;
   const variance = countedTotal - expectedTotal;
   const isMaker = Boolean(currentUser && currentUser.id === batch.collectorUserId);
+  const canAcknowledgeRole = Boolean(
+    currentUser?.roles?.some((r) =>
+      ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(r),
+    ),
+  );
 
   const handleDenomChange = (denom: number, val: string) => {
     const parsed = parseInt(val, 10);
@@ -98,6 +103,7 @@ export function HandoverVerificationCard({
   const acknowledgeMutation = useMutation({
     mutationFn: async () => {
       if (isMaker) throw new Error(t('makerCheckerHandoverAlert'));
+      if (!canAcknowledgeRole) throw new Error(t('partnerAuthorityRequired'));
       if (!isExactMatch) {
         throw new Error(`Discrepancy: Physically counted (₹${countedTotal}) != batch receipts (₹${expectedTotal})`);
       }
@@ -289,7 +295,7 @@ export function HandoverVerificationCard({
       <div className="flex items-center justify-end gap-3 pt-1">
         <Button
           type="button"
-          disabled={!isExactMatch || isMaker || acknowledgeMutation.isPending}
+          disabled={!isExactMatch || isMaker || !canAcknowledgeRole || acknowledgeMutation.isPending}
           onClick={() => acknowledgeMutation.mutate()}
           className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-5 h-9 shadow-lg shadow-emerald-950/40 disabled:opacity-40 shrink-0 whitespace-nowrap justify-center"
         >
@@ -302,6 +308,11 @@ export function HandoverVerificationCard({
             <>
               <Lock className="mr-2 h-4 w-4" />
               {t('makerCheckerClaimAlert')}
+            </>
+          ) : !canAcknowledgeRole ? (
+            <>
+              <Lock className="mr-2 h-4 w-4" />
+              {t('partnerAuthorityRequired')}
             </>
           ) : (
             <>

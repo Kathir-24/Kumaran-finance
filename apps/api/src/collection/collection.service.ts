@@ -404,6 +404,7 @@ export class CollectionService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_PAYMENT_RECEIPT,
           {
+            paymentId: result.paymentId,
             recipientPhone: ticket.customer.phone,
             fcmToken: ticket.customer.fcmToken || undefined,
             amountPaid: collectionAmount.toString(),
@@ -490,6 +491,8 @@ export class CollectionService {
   async acknowledgeHandover(
     dto: AcknowledgeHandoverDto,
     acknowledgerUserId: string,
+    staffBranchId?: string | null,
+    roles?: Role[],
   ) {
     // 1. DUAL-ROLE HARD GUARD: Separation of Duties
     if (dto.collectorUserId === acknowledgerUserId) {
@@ -498,11 +501,13 @@ export class CollectionService {
       );
     }
 
+    const uniquePaymentIds = [...new Set(dto.paymentIds)];
+
     // 2. Fetch Specified Payments & Verify Collector Ownership within atomic transaction
     return withTransactionRetry(this.prisma, async (tx) => {
       // 0. Pessimistic Row Lock (SELECT FOR UPDATE) with deterministic ID sorting to eliminate deadlocks (40P01)
-      if (typeof tx.$queryRaw === 'function' && dto.paymentIds && dto.paymentIds.length > 0) {
-        const sortedPaymentIds = [...new Set(dto.paymentIds)].sort();
+      if (typeof tx.$queryRaw === 'function' && uniquePaymentIds.length > 0) {
+        const sortedPaymentIds = [...uniquePaymentIds].sort();
         const lockedPayments = await tx.$queryRaw<
           Array<{ id: string; cashHandoverStatus: string; paymentStatus?: string }>
         >`
@@ -526,12 +531,24 @@ export class CollectionService {
 
       const payments = await tx.payment.findMany({
         where: {
-          id: { in: dto.paymentIds },
+          id: { in: uniquePaymentIds },
         },
       });
 
-      if (payments.length !== dto.paymentIds.length) {
+      if (payments.length !== uniquePaymentIds.length) {
         throw new BadRequestException('One or more payment IDs in the batch could not be found');
+      }
+
+      // Branch Scoping Guard: Enforce single branch and verify non-Super-Admin matches staffBranchId (Anti-BOLA)
+      const batchBranchIds = [...new Set(payments.map((p: any) => p.branchId).filter(Boolean))];
+      if (batchBranchIds.length > 1) {
+        throw new BadRequestException('All payments in a cash handover batch must belong to the same branch');
+      }
+      const isSuperAdmin = roles?.includes(Role.SUPER_ADMIN);
+      if (!isSuperAdmin && staffBranchId && batchBranchIds[0] && staffBranchId !== batchBranchIds[0]) {
+        throw new ForbiddenException(
+          'CROSS_BRANCH_FORBIDDEN: You cannot acknowledge cash handover for payments belonging to another branch',
+        );
       }
 
       // Verify all belong to collector, are SUCCESS cash collections, and are in PENDING_HANDOVER
@@ -572,7 +589,7 @@ export class CollectionService {
 
       // 4. Update Payments Status to ACKNOWLEDGED
       await tx.payment.updateMany({
-        where: { id: { in: dto.paymentIds } },
+        where: { id: { in: uniquePaymentIds } },
         data: {
           cashHandoverStatus: 'ACKNOWLEDGED',
           cashHandoverAcknowledgedByUserId: acknowledgerUserId,
@@ -607,7 +624,7 @@ export class CollectionService {
             totalPaymentsAcknowledged: payments.length,
             remainingPendingPayments,
             isPartialHandover,
-            paymentIds: dto.paymentIds,
+            paymentIds: uniquePaymentIds,
             notes: dto.notes || null,
           },
         },
@@ -807,10 +824,10 @@ export class CollectionService {
     // Sort multi-month offline items chronologically per ticket (oldest month first)
     // so sequential payment validation (PRIOR_INSTALLMENT_UNPAID) succeeds cleanly
     const orderedItems = [...dto.items].sort((a, b) => {
-      if (a.ticketId === b.ticketId) {
-        return a.installmentMonth - b.installmentMonth;
+      if (a.ticketId !== b.ticketId) {
+        return a.ticketId.localeCompare(b.ticketId);
       }
-      return 0;
+      return a.installmentMonth - b.installmentMonth;
     });
 
     for (const item of orderedItems) {
@@ -888,7 +905,11 @@ export class CollectionService {
           err?.message || 'Failed to record offline collection';
         let errorCode = 'SYNC_FAILED';
 
-        if (errorMessage.includes('INSTALLMENT_ALREADY_PAID')) {
+        if (errorMessage.includes('DUPLICATE_TRANSACTION_REF')) {
+          errorCode = 'DUPLICATE_TRANSACTION_REF';
+        } else if (errorMessage.includes('CROSS_BRANCH_FORBIDDEN')) {
+          errorCode = 'CROSS_BRANCH_FORBIDDEN';
+        } else if (errorMessage.includes('INSTALLMENT_ALREADY_PAID')) {
           errorCode = 'INSTALLMENT_ALREADY_PAID';
         } else if (errorMessage.includes('PRIOR_INSTALLMENT_UNPAID')) {
           errorCode = 'PRIOR_INSTALLMENT_UNPAID';

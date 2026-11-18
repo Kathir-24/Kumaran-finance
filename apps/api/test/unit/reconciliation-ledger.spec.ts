@@ -253,6 +253,79 @@ describe('Financial Integrity & Reconciliation: Ghost Drop Ledger Atomicity Test
       );
     });
 
+    it('DEF-M8-REV-01: never resurrects REMOVED_DEF_3M status back to ACTIVE on reconciliation', async () => {
+      const mockPayment = buildMockGhostPayment();
+      // Overwrite ticket status to terminal REMOVED_DEF_3M
+      mockPayment.allocations[0].ticket.status = 'REMOVED_DEF_3M';
+
+      prismaMock.payment.findFirst.mockResolvedValue(mockPayment);
+      prismaMock.payment.findUnique.mockResolvedValue(mockPayment);
+      prismaMock.payment.update.mockResolvedValue(mockPayment);
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.findMany.mockResolvedValue([]);
+      prismaMock.receipt.findUnique.mockResolvedValue({ id: 'rec-existing' });
+
+      await reconciliationService.reconcileSettlement([
+        {
+          gatewayOrderId: mockOrderRef,
+          gatewayPaymentId: mockGatewayPaymentId,
+          amount: mockInstallmentAmount,
+          status: 'SUCCESS',
+          settledAt: new Date(),
+        },
+      ]);
+
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 0,
+            status: 'REMOVED_DEF_3M',
+          }),
+        }),
+      );
+    });
+
+    it('DEF-M8-REV-01: accurately recomputes multi-month consecutive unpaid streak using treatAsPaidIds', async () => {
+      const mockPayment = buildMockGhostPayment();
+      const dues = [
+        { id: 'due-1', installmentMonth: 1, status: DueStatus.PAID },
+        { id: 'due-2', installmentMonth: 2, status: DueStatus.PAID },
+        { id: mockDueId, installmentMonth: 3, status: DueStatus.UNPAID }, // being paid
+        { id: 'due-4', installmentMonth: 4, status: DueStatus.UNPAID },
+        { id: 'due-5', installmentMonth: 5, status: DueStatus.UNPAID },
+        { id: 'due-6', installmentMonth: 6, status: DueStatus.UNPAID },
+      ];
+
+      prismaMock.payment.findFirst.mockResolvedValue(mockPayment);
+      prismaMock.payment.findUnique.mockResolvedValue(mockPayment);
+      prismaMock.payment.update.mockResolvedValue(mockPayment);
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.installmentDue.findMany.mockResolvedValue(dues);
+      prismaMock.receipt.findUnique.mockResolvedValue({ id: 'rec-existing' });
+
+      await reconciliationService.reconcileSettlement([
+        {
+          gatewayOrderId: mockOrderRef,
+          gatewayPaymentId: mockGatewayPaymentId,
+          amount: mockInstallmentAmount,
+          status: 'SUCCESS',
+          settledAt: new Date(),
+        },
+      ]);
+
+      // Month 3 is treated as paid, so remaining unpaid contiguous streak is Months 4, 5, 6 (= 3) -> DEFAULT_3_MONTHS
+      expect(prismaMock.subscriberTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockTicketId },
+          data: expect.objectContaining({
+            consecutiveUnpaidMonths: 3,
+            status: 'DEFAULT_3_MONTHS',
+          }),
+        }),
+      );
+    });
+
     it('RECON-INV-05: dispatches official receipt notification asynchronously post-commit', async () => {
       const mockPayment = buildMockGhostPayment();
 
@@ -287,6 +360,7 @@ describe('Financial Integrity & Reconciliation: Ghost Drop Ledger Atomicity Test
           chitCode: 'KCA-1L-20M-01',
           ticketNumber: 8,
           paymentMode: PaymentMethod.UPI,
+          passbookAppUrl: `https://app.kumaranfinance.in/passbook/${mockTicketId}`,
         }),
       );
     });

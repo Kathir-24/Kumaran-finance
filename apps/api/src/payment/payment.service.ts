@@ -53,9 +53,9 @@ export class PaymentService {
     const redis = this.redisProvider?.getClient();
     if (redis && this.redisProvider?.getIsConnected()) {
       try {
-        const dateStr = paymentDate
-          ? paymentDate.toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0];
+        const dateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+        }).format(paymentDate || new Date());
         const keys = [
           `report:daybook:ALL:${dateStr}`,
           `report:daybook:ALL_BRANCHES:${dateStr}`,
@@ -126,6 +126,10 @@ export class PaymentService {
           duplicateIgnored: true,
           message: 'Payment already recorded with this idempotency key',
           payment: existing,
+          receipt: existing.receipt,
+          dueStatus: DueStatus.PAID,
+          paidAmount: existing.amount,
+          netPayableAmount: existing.allocations?.[0]?.due?.netPayableAmount || existing.amount,
         };
       }
     }
@@ -212,7 +216,14 @@ export class PaymentService {
     const branchId = ticket.chitGroup.branchId;
     const lockBranchId = ticket.chitGroup.branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
-    const year = new Date().getFullYear();
+    const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
+    const year = parseInt(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+      }).format(paymentDate),
+      10,
+    );
 
     // 6. Prefix for Sequential Bilingual Receipt Number: KC-REC-PRD-YYYY-XXXXX
     const prefix = `KC-REC-${branchCode}-${year}-`;
@@ -221,8 +232,6 @@ export class PaymentService {
       dto.paymentMethod === PaymentMethod.CASH
         ? 'PENDING_HANDOVER'
         : 'ACKNOWLEDGED';
-
-    const paymentDate = dto.collectedAt ? new Date(dto.collectedAt) : new Date();
 
     let result: any;
     try {
@@ -267,7 +276,7 @@ export class PaymentService {
             paymentMethod: dto.paymentMethod,
             paymentStatus: PaymentStatus.SUCCESS,
             idempotencyKey: dto.idempotencyKey || null,
-            transactionRef: dto.transactionRef || null,
+            transactionRef: dto.transactionRef?.trim() || null,
             cashHandoverStatus,
             notes: dto.notes?.trim() || null,
             createdAt: paymentDate,
@@ -357,6 +366,10 @@ export class PaymentService {
               duplicateIgnored: true,
               message: 'Payment already recorded with this idempotency key',
               payment: existing,
+              receipt: existing.receipt,
+              dueStatus: DueStatus.PAID,
+              paidAmount: existing.amount,
+              netPayableAmount: existing.allocations?.[0]?.due?.netPayableAmount || existing.amount,
             };
           }
         }
@@ -370,6 +383,7 @@ export class PaymentService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_PAYMENT_RECEIPT,
           {
+            paymentId: result.payment.id,
             recipientPhone: ticket.customer.phone,
             fcmToken: ticket.customer.fcmToken || undefined,
             amountPaid: paymentAmount.toString(),
@@ -439,6 +453,21 @@ export class PaymentService {
       }
     }
 
+    // Non-global staff branch scoping
+    const isGlobalViewer =
+      requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.AUDITOR);
+    if (
+      !isGlobalViewer &&
+      requestingUser.branchId &&
+      payment.branchId &&
+      requestingUser.branchId !== payment.branchId
+    ) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot view payment records belonging to another branch',
+      );
+    }
+
     return payment;
   }
 
@@ -463,14 +492,15 @@ export class PaymentService {
       where.customerId = query.customerId;
     }
 
-    // Branch scoping for branch manager
-    if (
-      requestingUser.roles.includes(Role.BRANCH_MANAGER) &&
-      !requestingUser.roles.includes(Role.SUPER_ADMIN)
-    ) {
-      if (requestingUser.branchId) {
-        where.branchId = requestingUser.branchId;
-      }
+    // Branch scoping for branch-bound staff roles
+    const isGlobalViewer =
+      requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.AUDITOR);
+
+    if (!isGlobalViewer && requestingUser.branchId) {
+      where.branchId = requestingUser.branchId;
+    } else if (query.branchId) {
+      where.branchId = query.branchId;
     }
 
     if (query.ticketId) {
@@ -497,7 +527,10 @@ export class PaymentService {
         where.createdAt.gte = new Date(query.fromDate);
       }
       if (query.toDate) {
-        where.createdAt.lte = new Date(query.toDate);
+        const toDateStr = query.toDate.length <= 10
+          ? `${query.toDate}T23:59:59.999Z`
+          : query.toDate;
+        where.createdAt.lte = new Date(toDateStr);
       }
     }
 
@@ -578,6 +611,21 @@ export class PaymentService {
           'Access denied: You can only view your own receipts',
         );
       }
+    }
+
+    // Non-global staff branch scoping
+    const isGlobalStaff =
+      requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.AUDITOR);
+    if (
+      !isGlobalStaff &&
+      requestingUser.branchId &&
+      payment.branchId &&
+      requestingUser.branchId !== payment.branchId
+    ) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot view receipts belonging to another branch',
+      );
     }
 
     const allocation = payment.allocations[0];
@@ -850,12 +898,17 @@ export class PaymentService {
         data: { paymentStatus: PaymentStatus.REVERSED },
       });
 
-      // 3. Restore InstallmentDue to UNPAID
+      // 3. Restore InstallmentDue to UNPAID or OVERDUE (ADR-07 status restoration)
       for (const alloc of payment.allocations) {
+        const restoredStatus =
+          alloc.due?.dueDate && alloc.due.dueDate < now
+            ? DueStatus.OVERDUE
+            : DueStatus.UNPAID;
+
         await tx.installmentDue.update({
           where: { id: alloc.installmentDueId },
           data: {
-            status: DueStatus.UNPAID,
+            status: restoredStatus,
             paidAmount: 0n,
           },
         });
@@ -879,6 +932,12 @@ export class PaymentService {
         });
       }
 
+      const primaryDue = payment.allocations[0]?.due;
+      const primaryDueRestoredStatus =
+        primaryDue?.dueDate && primaryDue.dueDate < now
+          ? DueStatus.OVERDUE
+          : DueStatus.UNPAID;
+
       // 5. Create Immutable Audit Log
       await tx.auditLog.create({
         data: {
@@ -889,7 +948,7 @@ export class PaymentService {
           oldValue: { paymentStatus: 'SUCCESS', dueStatus: 'PAID' },
           newValue: {
             paymentStatus: 'REVERSED',
-            dueStatus: 'UNPAID',
+            dueStatus: primaryDueRestoredStatus,
             makerUserId: payment.reversal?.initiatedByUserId,
             checkerUserId,
             reason: payment.reversal?.reason,
@@ -899,10 +958,10 @@ export class PaymentService {
 
       return {
         message:
-          'Payment reversal approved and committed successfully. Installment due restored to UNPAID.',
+          'Payment reversal approved and committed successfully. Installment due restored.',
         reversal,
         paymentStatus: PaymentStatus.REVERSED,
-        dueStatus: DueStatus.UNPAID,
+        dueStatus: primaryDueRestoredStatus,
       };
     });
 
@@ -1064,6 +1123,21 @@ export class PaymentService {
       }
     }
 
+    // Cross-Branch Invariant for Staff: Ensure staff does not submit claims across branches
+    if (
+      !requestingUser.roles.includes(Role.SUPER_ADMIN) &&
+      requestingUser.roles.some((r) =>
+        ([Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT] as Role[]).includes(r),
+      ) &&
+      requestingUser.branchId &&
+      due.ticket.chitGroup.branchId &&
+      requestingUser.branchId !== due.ticket.chitGroup.branchId
+    ) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot submit UPI claims for chit groups belonging to another branch',
+      );
+    }
+
     const cleanUtr = dto.utrNumber.trim();
 
     // Check if this UTR already exists in Payment table
@@ -1181,8 +1255,23 @@ export class PaymentService {
     paymentId: string,
     checkerUserId: string,
     checkerRoles: Role[],
-    dto?: VerifyUpiClaimDto,
+    checkerBranchIdOrDto?: string | null | VerifyUpiClaimDto,
+    dtoArg?: VerifyUpiClaimDto,
   ) {
+    let checkerBranchId: string | null | undefined;
+    let dto: VerifyUpiClaimDto | undefined;
+
+    if (
+      checkerBranchIdOrDto &&
+      typeof checkerBranchIdOrDto === 'object' &&
+      !Array.isArray(checkerBranchIdOrDto)
+    ) {
+      dto = checkerBranchIdOrDto as VerifyUpiClaimDto;
+      checkerBranchId = undefined;
+    } else {
+      checkerBranchId = checkerBranchIdOrDto as string | null | undefined;
+      dto = dtoArg;
+    }
     if (
       !checkerRoles.some((r) =>
         ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
@@ -1246,15 +1335,32 @@ export class PaymentService {
     }
 
     const branchId = ticket.chitGroup.branchId;
+    if (
+      !checkerRoles.includes(Role.SUPER_ADMIN) &&
+      checkerBranchId &&
+      branchId &&
+      checkerBranchId !== branchId
+    ) {
+      throw new ForbiddenException(
+        'CROSS_BRANCH_FORBIDDEN: You cannot verify UPI claims for chit groups belonging to another branch',
+      );
+    }
+
     const lockBranchId = ticket.chitGroup.branchId || branchId;
     const branchCode = ticket.chitGroup.branch?.code || 'PRD';
-    const year = new Date().getFullYear();
+    const verificationDate = new Date();
+    const year = parseInt(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+      }).format(verificationDate),
+      10,
+    );
 
     const prefix = `KC-REC-${branchCode}-${year}-`;
     const ticketIds = payment.allocations.map((a) => a.ticketId || ticket.id);
     const dueIds = payment.allocations.map((a) => a.installmentDueId || due.id);
 
-    const verificationDate = new Date();
     const updatedNotes = dto?.verificationNotes
       ? `${payment.notes || ''} | Verified by ${checkerUserId}: ${dto.verificationNotes.trim()}`
       : `${payment.notes || ''} | Verified by ${checkerUserId}`;
@@ -1279,6 +1385,13 @@ export class PaymentService {
       if (settledDue) {
         throw new BadRequestException(
           'INSTALLMENT_ALREADY_PAID: Target installment due has already been settled in full by another payment',
+        );
+      }
+
+      const targetNetPayable = due.netPayableAmount ?? lockedDues.find((d) => d.id === due.id)?.netPayableAmount;
+      if (targetNetPayable != null && payment.amount !== targetNetPayable) {
+        throw new BadRequestException(
+          `PARTIAL_PAYMENTS_NOT_ALLOWED: Verified payment amount ₹${payment.amount.toString()} does not match target installment due of ₹${targetNetPayable.toString()}`,
         );
       }
 
@@ -1382,6 +1495,7 @@ export class PaymentService {
           NOTIFICATION_QUEUE,
           JOB_DISPATCH_PAYMENT_RECEIPT,
           {
+            paymentId: payment.id,
             recipientPhone: ticket.customer.phone,
             fcmToken: ticket.customer.fcmToken || undefined,
             amountPaid: payment.amount.toString(),
@@ -1402,6 +1516,8 @@ export class PaymentService {
         );
       }
     }
+
+    this.invalidateDaybookCache(branchId, verificationDate).catch(() => {});
 
     return {
       success: true,

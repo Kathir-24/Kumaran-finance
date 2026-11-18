@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
 import { DueStatus, PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { CollectionService, getIstDayRange } from '../../src/collection/collection.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { BullMqQueueProvider } from '../../src/jobs/providers/bullmq-queue.provider';
 
 describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () => {
   let collectionService: CollectionService;
@@ -918,6 +920,244 @@ describe('Module 6: Field Collections & Dual-Control Cash Handover Tests', () =>
       expect(res.failureCount).toBe(1);
       expect(res.failed[0].errorCode).toBe('PRIOR_INSTALLMENT_UNPAID');
       recordSpy.mockRestore();
+    });
+  });
+
+  describe('Module 8 Forensic Hardening Regression Tests (DEF-M8-REV-02..07 & XR-M8-PAY-01)', () => {
+    it('DEF-M8-REV-02: sorts multi-ticket interleaved offline sync items strictly chronologically per ticket', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      const recordSpy = jest
+        .spyOn(collectionService, 'recordCollection')
+        .mockResolvedValue({
+          paymentId: 'pmt-ok',
+          receiptNumber: 'KC-REC-PRD-2026-00999',
+          amount: 3950n,
+          collectedAt: new Date(),
+        } as any);
+
+      const items = [
+        { ticketId: 'ticket-A', installmentMonth: 3, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-A3', collectedAt: '2026-11-18T10:00:00.000Z' },
+        { ticketId: 'ticket-B', installmentMonth: 1, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-B1', collectedAt: '2026-11-18T10:05:00.000Z' },
+        { ticketId: 'ticket-A', installmentMonth: 2, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-A2', collectedAt: '2026-11-18T10:10:00.000Z' },
+        { ticketId: 'ticket-C', installmentMonth: 5, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-C5', collectedAt: '2026-11-18T10:15:00.000Z' },
+        { ticketId: 'ticket-A', installmentMonth: 1, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-A1', collectedAt: '2026-11-18T10:20:00.000Z' },
+      ];
+
+      const res = await collectionService.syncOfflineQueue({ items }, mockCollectorId, mockBranchId);
+      expect(res.successCount).toBe(5);
+
+      // Verify execution order grouped by ticketId ascending and installmentMonth ascending
+      const callSequence = recordSpy.mock.calls.map((call) => `${call[0].ticketId}:${call[0].installmentMonth}`);
+      expect(callSequence).toEqual([
+        'ticket-A:1',
+        'ticket-A:2',
+        'ticket-A:3',
+        'ticket-B:1',
+        'ticket-C:5',
+      ]);
+      recordSpy.mockRestore();
+    });
+
+    it('DEF-M8-REV-03: rejects cash handover acknowledgment when batch spans multiple branches', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-branch-1',
+          branchId: 'branch-uuid-1',
+          recordedByUserId: mockCollectorId,
+          amount: 3950n,
+          paymentMethod: PaymentMethod.CASH,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+        {
+          id: 'pmt-branch-2',
+          branchId: 'branch-uuid-2',
+          recordedByUserId: mockCollectorId,
+          amount: 3950n,
+          paymentMethod: PaymentMethod.CASH,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+      ]);
+
+      await expect(
+        collectionService.acknowledgeHandover(
+          {
+            collectorUserId: mockCollectorId,
+            acknowledgedAmount: 7900,
+            paymentIds: ['pmt-branch-1', 'pmt-branch-2'],
+          },
+          mockPartnerId,
+          'branch-uuid-1',
+          [Role.BRANCH_MANAGER],
+        ),
+      ).rejects.toThrow('All payments in a cash handover batch must belong to the same branch');
+    });
+
+    it('DEF-M8-REV-03: blocks non-Super-Admin from acknowledging cash handover for another branch (CROSS_BRANCH_FORBIDDEN)', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-branch-2',
+          branchId: 'branch-uuid-2',
+          recordedByUserId: mockCollectorId,
+          amount: 3950n,
+          paymentMethod: PaymentMethod.CASH,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+      ]);
+
+      await expect(
+        collectionService.acknowledgeHandover(
+          {
+            collectorUserId: mockCollectorId,
+            acknowledgedAmount: 3950,
+            paymentIds: ['pmt-branch-2'],
+          },
+          mockPartnerId,
+          'branch-uuid-1', // Manager of Branch 1 attempting to acknowledge Branch 2!
+          [Role.BRANCH_MANAGER],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('DEF-M8-REV-03: allows Super Admin to acknowledge cash handover regardless of branch', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-branch-2',
+          branchId: 'branch-uuid-2',
+          recordedByUserId: mockCollectorId,
+          amount: 3950n,
+          paymentMethod: PaymentMethod.CASH,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+      ]);
+      prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await collectionService.acknowledgeHandover(
+        {
+          collectorUserId: mockCollectorId,
+          acknowledgedAmount: 3950,
+          paymentIds: ['pmt-branch-2'],
+        },
+        mockPartnerId,
+        'branch-uuid-1', // Super Admin can acknowledge across branches
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.acknowledgedAmount).toBe(3950n);
+    });
+
+    it('DEF-M8-REV-05: deduplicates duplicate payment IDs in acknowledgeHandover dto', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([
+        {
+          id: 'pmt-dup-1',
+          branchId: mockBranchId,
+          recordedByUserId: mockCollectorId,
+          amount: 3950n,
+          paymentMethod: PaymentMethod.CASH,
+          cashHandoverStatus: 'PENDING_HANDOVER',
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+      ]);
+      prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await collectionService.acknowledgeHandover(
+        {
+          collectorUserId: mockCollectorId,
+          acknowledgedAmount: 3950,
+          paymentIds: ['pmt-dup-1', 'pmt-dup-1'], // Duplicate ID in request
+        },
+        mockPartnerId,
+        mockBranchId,
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.totalPaymentsAcknowledged).toBe(1);
+    });
+
+    it('DEF-M8-REV-07: maps DUPLICATE_TRANSACTION_REF and CROSS_BRANCH_FORBIDDEN in syncOfflineQueue', async () => {
+      prismaMock.payment.findMany.mockResolvedValue([]);
+      const recordSpy = jest
+        .spyOn(collectionService, 'recordCollection')
+        .mockRejectedValueOnce(
+          new ConflictException(
+            'DUPLICATE_TRANSACTION_REF: The bank UTR "123456789012" has already been recorded in another payment.',
+          ),
+        )
+        .mockRejectedValueOnce(
+          new ForbiddenException(
+            'CROSS_BRANCH_FORBIDDEN: You cannot record collections for chit groups belonging to another branch',
+          ),
+        );
+
+      const res = await collectionService.syncOfflineQueue(
+        {
+          items: [
+            { ticketId: 'ticket-1', installmentMonth: 1, amount: 3950, paymentMethod: PaymentMethod.UPI, idempotencyKey: 'k-dup-utr', transactionRef: '123456789012', collectedAt: '2026-11-18T10:00:00.000Z' },
+            { ticketId: 'ticket-2', installmentMonth: 1, amount: 3950, paymentMethod: PaymentMethod.CASH, idempotencyKey: 'k-xbranch', collectedAt: '2026-11-18T10:05:00.000Z' },
+          ],
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(res.failureCount).toBe(2);
+      expect(res.failed[0].errorCode).toBe('DUPLICATE_TRANSACTION_REF');
+      expect(res.failed[1].errorCode).toBe('CROSS_BRANCH_FORBIDDEN');
+      recordSpy.mockRestore();
+    });
+
+    it('XR-M8-PAY-01 & M8-REV: passes paymentId in collection receipt notification payload', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'job-1' }),
+      };
+      const queuedCollectionService = new CollectionService(
+        prismaMock as unknown as PrismaService,
+        mockQueueProvider as unknown as BullMqQueueProvider,
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+      prismaMock.installmentDue.findUnique.mockResolvedValue(mockDue);
+      prismaMock.payment.create.mockResolvedValue({
+        id: 'pmt-with-id-123',
+        branchId: mockBranchId,
+        amount: 3950n,
+        paymentMethod: PaymentMethod.CASH,
+        cashHandoverStatus: 'PENDING_HANDOVER',
+        createdAt: new Date(),
+      });
+      prismaMock.paymentAllocation.create.mockResolvedValue({ id: 'alloc-1' });
+      prismaMock.receipt.create.mockResolvedValue({
+        id: 'rec-1',
+        receiptNumber: 'KC-REC-PRD-2026-00055',
+      });
+      prismaMock.installmentDue.update.mockResolvedValue({});
+      prismaMock.subscriberTicket.update.mockResolvedValue({});
+
+      await queuedCollectionService.recordCollection(
+        {
+          ticketId: mockTicketId,
+          installmentMonth: 4,
+          amount: 3950,
+          paymentMethod: PaymentMethod.CASH,
+        },
+        mockCollectorId,
+        mockBranchId,
+      );
+
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        'notification-queue',
+        'dispatch-payment-receipt',
+        expect.objectContaining({
+          paymentId: 'pmt-with-id-123',
+          receiptNumber: 'KC-REC-PRD-2026-00055',
+        }),
+        expect.any(Object),
+      );
     });
   });
 });

@@ -111,11 +111,11 @@ export default function PaymentReversalsPage() {
 
   // KPI Calculations
   const pendingTotal = useMemo(() => {
-    return pendingReversals.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return pendingReversals.reduce((sum, item) => sum + BigInt(item.amount || 0), 0n);
   }, [pendingReversals]);
 
   const reversedTotal = useMemo(() => {
-    return reversedPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return reversedPayments.reduce((sum, item) => sum + BigInt(item.amount || 0), 0n);
   }, [reversedPayments]);
 
   const handleRefreshAll = () => {
@@ -124,6 +124,7 @@ export default function PaymentReversalsPage() {
   };
 
   const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
+  const isPartner = isSuperAdmin && Boolean(user?.isPartner);
 
   return (
     <div className="space-y-6">
@@ -204,7 +205,7 @@ export default function PaymentReversalsPage() {
             <span>{t('kpiCheckerStatus')}</span>
           </span>
           <p className="text-sm font-bold text-slate-200 pt-1 leading-snug">
-            {isSuperAdmin ? t('partnerAuthorized') : t('deskStaffMakerOnly')}
+            {isPartner ? t('partnerAuthorized') : t('deskStaffMakerOnly')}
           </p>
           <p className="text-[10px] text-slate-400">{t('guardrail10Label')}</p>
         </div>
@@ -309,7 +310,7 @@ export default function PaymentReversalsPage() {
                           {alloc?.ticket?.chitGroup?.groupCode} T#{alloc?.ticket?.ticketNumber}
                         </td>
                         <td className="p-3 text-right font-mono font-bold text-slate-100 whitespace-nowrap">
-                          {formatRupee(Number(p.amount))}
+                          {formatRupee(p.amount)}
                         </td>
                         <td className="p-3 text-slate-300 font-mono text-[11px] max-w-xs truncate" title={rev?.reason}>
                           {rev?.reason || 'Payment Reversal'}

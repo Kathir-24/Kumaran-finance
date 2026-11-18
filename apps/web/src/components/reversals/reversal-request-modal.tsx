@@ -94,19 +94,40 @@ export function ReversalRequestModal({
     setErrorMessage(null);
 
     try {
-      const result = await unwrapApiResponse<unknown>(
-        apiClient.GET('/api/v1/payments', {
-          params: { query: { limit: 5 } },
-        }),
-      );
-      const list = unwrapPaginatedList<SearchablePaymentRecord>(result);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+      let match: SearchablePaymentRecord | null = null;
 
-      const match = list.find(
-        (p) =>
-          p.id === q ||
-          p.receipt?.receiptNumber?.toLowerCase() === q.toLowerCase() ||
-          p.receipt?.receiptNumber?.toLowerCase().includes(q.toLowerCase()),
-      );
+      if (isUuid) {
+        try {
+          const directPayment = await unwrapApiResponse<SearchablePaymentRecord>(
+            apiClient.GET('/api/v1/payments/{id}', {
+              params: { path: { id: q } },
+            }),
+          );
+          if (directPayment && directPayment.id) {
+            match = directPayment;
+          }
+        } catch {
+          // Fall through to list query if single lookup fails
+        }
+      }
+
+      if (!match) {
+        const result = await unwrapApiResponse<unknown>(
+          apiClient.GET('/api/v1/payments', {
+            params: { query: { limit: 50, paymentStatus: 'SUCCESS' } },
+          }),
+        );
+        const list = unwrapPaginatedList<SearchablePaymentRecord>(result);
+
+        match =
+          list.find(
+            (p) =>
+              p.id === q ||
+              p.receipt?.receiptNumber?.toLowerCase() === q.toLowerCase() ||
+              p.receipt?.receiptNumber?.toLowerCase().includes(q.toLowerCase()),
+          ) || null;
+      }
 
       if (!match) {
         throw new Error(`No successful payment found matching "${q}"`);

@@ -361,6 +361,7 @@ describe('Module 12: High-Concurrency Pessimistic Row Locking (SELECT FOR UPDATE
           due: {
             id: 'due-uuid-001',
             installmentMonth: 3,
+            netPayableAmount: 4000n,
             status: DueStatus.UNPAID,
           },
           ticket: {

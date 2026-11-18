@@ -48,7 +48,7 @@ export function BilingualReceiptModal({
     queryKey: queryKeys.payments.receipt(paymentId || ''),
     queryFn: async ({ signal }) => {
       if (!paymentId) return null;
-      return unwrapApiResponse<{ data?: ReceiptData; receiptNumber?: string; issuedAt?: string | Date }>(
+      return unwrapApiResponse<{ data?: ReceiptData; receiptNumber?: string; issuedAt?: string | Date; isReversed?: boolean }>(
         apiClient.GET('/api/v1/payments/{id}/receipt', {
           params: { path: { id: paymentId } },
           signal,
@@ -74,10 +74,20 @@ export function BilingualReceiptModal({
   };
 
   const receiptData = data?.data;
+  const isReversed = Boolean(data?.isReversed ?? receiptData?.isReversed);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl border-slate-800 bg-slate-900 text-slate-100">
+      <DialogContent className="max-w-xl border-slate-800 bg-slate-900 text-slate-100 relative overflow-hidden">
+        {/* Reversal Diagonal Watermark */}
+        {isReversed && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+            <div className="text-red-600/25 font-black text-2xl sm:text-3xl uppercase tracking-widest transform -rotate-[35deg] border-4 border-dashed border-red-600/30 px-6 py-2.5 rounded-lg text-center font-mono select-none">
+              ரத்து செய்யப்பட்டது / CANCELLED
+            </div>
+          </div>
+        )}
+
         <DialogHeader>
           <div className="flex items-center gap-2.5 text-emerald-400">
             <FileText className="h-5 w-5" />
@@ -102,6 +112,19 @@ export function BilingualReceiptModal({
           </div>
         ) : (
           <div className="space-y-4 text-xs">
+            {/* Reversal Notice Banner */}
+            {isReversed && (
+              <div className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                  ரத்து செய்யப்பட்ட ரசீது / VOID - REVERSED RECEIPT
+                </span>
+                <span className="text-[10px] font-mono uppercase bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">
+                  CANCELLED
+                </span>
+              </div>
+            )}
+
             {/* Header / Receipt Metadata */}
             <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 flex items-center justify-between">
               <div>
