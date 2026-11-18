@@ -11,7 +11,7 @@
 
 The **Sentry Error Monitoring** integration provides enterprise crash tracking and real-time failure observability for the Kumaran Chits NestJS backend API.
 
-```
+```text
                           +-------------------------------+
                           |     Incoming HTTP Request     |
                           +-------------------------------+
@@ -53,13 +53,14 @@ The **Sentry Error Monitoring** integration provides enterprise crash tracking a
 
 1. **Safe-Bypass Mode (Zero Cost in Dev & CI)**:
    - When `SENTRY_DSN` is empty or omitted, Sentry remains completely disabled. Zero outbound HTTP requests are made, ensuring no crashes or slowdowns during offline development or testing.
+   - `GET /health` exposes live activation telemetry via `sentryActive: isSentryActive()`.
 2. **Indian DPDP Act 2023 PII Protection**:
    - Every event passes through [`beforeSend`](sentry.config.ts) and [`scrubPii`](sentry.config.ts).
    - Sensitive fields (`password`, `mpin`, `refreshToken`, `token`, `totpSecret`, `aadhaar`, `pan`) are automatically redacted to `[FILTERED]`.
    - Customer phone numbers are normalized and masked as `+91******3210` via [`PhoneHelper.maskPhone()`](../../notification/helpers/phone.helper.ts).
 3. **4xx vs 5xx Separation**:
-   - Normal client validation errors (400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found) are returned to the caller without creating noise in Sentry.
-   - Only true server-side failures (500 Internal Server Errors, database timeouts, uncaught runtime errors) are captured.
+   - Normal client validation errors (`400`, `401`, `403`, `404`) are returned to the caller without creating noise in Sentry.
+   - Only true server-side failures (`500` Internal Server Errors, database timeouts, uncaught runtime errors) are captured.
 4. **`BigInt` Serialization Protection**:
    - All `bigint` properties in diagnostic payloads are converted to strings before event capture to prevent JSON serialization errors.
 5. **Non-Blocking Safety**:
@@ -99,32 +100,33 @@ import { SentryService } from '../common/sentry/sentry.service';
 export class ReconciliationService {
   constructor(private readonly sentry: SentryService) {}
 
-  handleGatewayAnomaly(error: Error, orderId: string, amount: bigint) {
+  handleReconciliationAnomaly(error: Error, paymentId: string, amount: bigint) {
     this.sentry.captureException(error, {
-      tags: { orderId },
-      extra: { amount }, // BigInt automatically stringified
+      tags: { paymentId },
+      extra: { amount }, // BigInt automatically stringified (ADR-19 direct UPI claim reconciliation)
     });
   }
 }
 ```
 
-### Diagnostic Verification Endpoint
-To test that error reporting is working properly in a staging environment:
+### Diagnostic Verification Endpoints
+- Check live activation flag (`sentryActive: true | false`) via `GET /health`.
+- Trigger an intentional 500 error in staging to confirm Sentry ingestion (`apps/api/src/health/health.controller.ts`):
 ```bash
 curl http://localhost:3000/health/sentry-test
 ```
-This triggers an intentional 500 error: `InternalServerErrorException('Sentry Verification Diagnostic Test Error')`.
+This throws `InternalServerErrorException('Sentry Verification Diagnostic Test Error')`.
 
 ---
 
 ## 5. Verification & Testing
 
-Run the automated test suite verifying bypass, PII scrubbing, BigInt compatibility, JWT `sub` user attribution (`DEF-BE-03`), and 4xx/5xx filtering:
+Run the automated test suite verifying safe-bypass mode, PII scrubbing, `BigInt` compatibility, JWT `sub` user attribution (`DEF-BE-03`), and 4xx/5xx filtering:
 
 ```bash
 # Run Sentry unit tests (16 passing tests)
-pnpm --filter api test -- test/sentry.spec.ts
+pnpm --filter api test -- test/unit/sentry.spec.ts
 
-# Run all API tests (54 suites, 821 passing unit tests)
+# Run full API unit & integration test suite (63 suites, 1,226 passing tests)
 pnpm --filter api test
 ```
