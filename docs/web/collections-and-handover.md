@@ -3,13 +3,13 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office — Perundurai, Tamil Nadu)  
 > **Route Paths**: `/collections`, `/collections/handover`  
-> **Status**: **Phase 8 (Tasks 8.1, 8.2, 8.3) COMPLETED & VERIFIED** (24/24 Phase 8 tests pass, 192/192 full web test suite pass, 0 TS errors, clean Next.js 15 build)
+> **Status**: **Phase 8 (Tasks 8.1, 8.2, 8.3) COMPLETED & VERIFIED** (24/24 Phase 8 unit tests passing; **376/376** full Web test suite passing across 52 spec files / 14 suites; 0 TS errors; clean Next.js 15 build across 35 App Router routes)
 
 ---
 
 ## 1. Overview & Business Reality
 
-At the Perundurai branch office counter and during field rounds, subscribers pay their monthly chit subscription installments in person (cash, cheque, or scanning dynamic counter UPI QR) and remotely through mobile UPI applications. Desk accountants, cashiers, and partners record discrete payments, verify self-reported bank credits against company bank statements, count evening field collection cash bags into the vault, and issue official sequential bilingual receipts.
+At the Perundurai branch office counter and during field rounds, subscribers pay their monthly chit subscription installments in person (cash, cheque, or zero-fee NPCI Native UPI Intent directly to Karur Vysya Bank per `ADR-19`) and remotely through mobile UPI applications. Desk accountants, cashiers, and partners record discrete payments, verify self-reported 12-digit Bank UTR credits against KVB corporate net banking statements, count evening field collection cash bags into the vault, and issue official sequential bilingual receipts.
 
 ### Key Operational Capabilities
 
@@ -21,19 +21,19 @@ At the Perundurai branch office counter and during field rounds, subscribers pay
    - **Zero double payments / advance balances**: Attempting to pay ahead in one single transaction is strictly rejected (`ADVANCE_OR_DOUBLE_PAYMENT_NOT_ALLOWED`).
 2. **Four Supported Payment Methods**:
    - `CASH`: Collected directly into the counter drawer / safe.
-   - `UPI`: Generates dynamic NPCI-compliant UPI QR code on the counter screen (`GET /api/v1/installments/:dueId/upi-intent`) with payee VPA and locked $I_{net}$ amount for walk-in scanning.
+   - `UPI`: Generates zero-fee NPCI Native UPI Intent QR (`GET /api/v1/installments/:dueId/upi-intent`, `ADR-19`) locking Kumaran Finance's KVB payee VPA (`kumaranfinance@kvb`) and exact whole-rupee $I_{net}$ amount (zero commercial payment gateway fees).
    - `CHEQUE`: Captures Cheque # and Bank Name (`transactionRef`).
    - `BANK_TRANSFER`: Captures NEFT/RTGS/IMPS bank UTR (`transactionRef`).
-3. **Sequential Bilingual Receipts**:
+3. **Sequential Bilingual Receipts & Reversed Watermark (`KFC-PDF-001`)**:
    - Atomically generates sequential receipt numbers in format `KC-REC-{BRANCH}-{YYYY}-{XXXXX}` with 5-digit padding.
-   - Direct download of pixel-accurate printable A5 bilingual PDF via `GET /api/v1/pdf/receipt/:paymentId`.
+   - Direct download of pixel-accurate printable A5 bilingual PDF via `GET /api/v1/pdf/receipt/:paymentId` (streamed via BFF). Any reversed payment (`paymentStatus === 'REVERSED'`) automatically stamps a bold diagonal red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark on both the A5 web print preview and server-generated PDF (`KFC-PDF-001`).
 4. **Same-Branch Idempotency Isolation & Branch Scope Locking (F09)**:
    - Replaying a cached idempotency key is strictly restricted to the user who recorded the payment (`existingPayment.recordedByUserId === currentUser.id`), preventing cross-agent payment sniffing within the branch.
    - Accounting branch is strictly derived from `ticket.chitGroup.branchId`, ensuring ticket payments cannot be diverted to foreign branch ledgers.
 
-#### B. Task 8.2: Customer Self-Reported UPI Claims Verification Desk
-1. **Customer Mobile UPI Payment Claim**:
-   - Customers paying remotely via deep-link or counter QR self-report their Bank UTR number (`POST /api/v1/payments/upi-claim`).
+#### B. Task 8.2: Customer Self-Reported UPI Claims Verification Desk (`ADR-19`)
+1. **Customer / Branch Desk UPI Payment Claim**:
+   - Subscribers (or office desk staff on their behalf: `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` per `payment.controller.ts:309`) submit the 12-digit Bank UTR number via `POST /api/v1/payments/upi-claim` (`COLLECTION_AGENT` is not permitted to invoke `upi-claim`).
    - Initial claim recorded in `PaymentStatus.INITIATED` without issuing a receipt. Due remains `UNPAID` or `OVERDUE`.
 2. **Accounting Desk Verification Queue**:
    - Accounting staff accesses the **UPI Claims Verification Desk** tab at `/collections`.
@@ -57,7 +57,7 @@ At the Perundurai branch office counter and during field rounds, subscribers pay
    - System performs live tallying of physically counted cash vs system receipts sum.
    - Submission is strictly blocked if there is any variance between counted cash and receipts total.
 3. **Guardrail 10 Maker $\ne$ Checker Hard Guard**:
-   - Enforces $\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$ at UI and database levels.
+   - Enforces $\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$ at UI and database levels (`chk_payment_cash_handover_maker_checker`).
    - An agent who collected the cash can never sign off on their own vault deposit.
    - Only a different Partner, Branch Manager, or Desk Accountant can acknowledge cash into the branch vault.
 4. **Daily Cash Settlement Voucher**:
@@ -79,8 +79,8 @@ flowchart TD
         POST1 --> R1["Atomic Result:\n1. Payment SUCCESS\n2. Due PAID\n3. Receipt KC-REC-PRD-YYYY-XXXXX"]
     end
 
-    subgraph ClaimsDesk["Task 8.2: Customer UPI Claims Desk"]
-        MOB["Mobile Customer / Agent Submits UTR\nPOST /api/v1/payments/upi-claim"] --> PEND["Payment INITIATED\nDue UNPAID\nNo Receipt Issued"]
+    subgraph ClaimsDesk["Task 8.2: Customer UPI Claims Desk (ADR-19)"]
+        MOB["Customer or Branch Staff Submits UTR\nPOST /api/v1/payments/upi-claim"] --> PEND["Payment INITIATED\nDue UNPAID\nNo Receipt Issued"]
         PEND --> QUEUE["GET /api/v1/payments/pending-upi-claims"]
         QUEUE --> ACCT["Desk Accountant Matches Bank Statement\n(KVB NetBanking Credit)"]
         ACCT --> G2{"Guardrail 10\nmaker != checker?"}
@@ -132,8 +132,8 @@ All files strictly comply with the $\le 300\text{--}350$ lines limit per **AGENT
 - **`POST /api/v1/payments`**: Records discrete counter payment with `{ ticketId, installmentMonth, amount, paymentMethod, transactionRef, notes, idempotencyKey }`.
 - **`GET /api/v1/payments`**: Queries paginated ledger with filters (`paymentMethod`, `paymentStatus`, `limit`).
 - **`GET /api/v1/payments/:id/receipt`**: Returns structured bilingual receipt data (`BilingualReceiptResponseDto`).
-- **`GET /api/v1/pdf/receipt/:paymentId`**: Streams pixel-accurate A5 bilingual printable PDF.
-- **`GET /api/v1/installments/:dueId/upi-intent`**: Returns NPCI UPI deep-link URI with locked $I_{net}$ amount.
+- **`GET /api/v1/pdf/receipt/:paymentId`**: Streams pixel-accurate A5 bilingual printable PDF via BFF (stamps diagonal red `ரத்து செய்யப்பட்டது / CANCELLED` watermark when `paymentStatus === 'REVERSED'` per `KFC-PDF-001`).
+- **`GET /api/v1/installments/:dueId/upi-intent`**: Returns zero-fee NPCI Native UPI Intent URI (`ADR-19`) locking KVB VPA and exact $I_{net}$ amount.
 - **`GET /api/v1/installments/group/:chitGroupId/month/:month`**: Returns member dues for selected scheme and month.
 - **`GET /api/v1/payments/pending-upi-claims`**: Lists paginated pending self-reported UPI claims in `INITIATED` status (`ApiPaginatedResponseEnvelope` `{ data, total, page, limit, totalPages }`, unwrapped safely via `unwrapPaginatedList` in `apps/web/src/app/(dashboard)/collections/page.tsx`).
 - **`POST /api/v1/payments/:id/verify-upi-claim`**: Verifies bank statement credit, transitions payment to `SUCCESS`, and issues sequential receipt (`maker != checker`).
@@ -178,7 +178,7 @@ Phase 8 is validated by **three dedicated automated test suites asserting 24 non
 - Bilingual Parity: All collections handover keys match 100% between en.json and ta.json.
 
 ### D. Workspace Health
-- **Total Tests**: **192 / 192 tests passing** (`pnpm --filter web test`).
-- **Static Typecheck**: `tsc --noEmit` exited with **0 errors**.
-- **Production Build**: `next build` compiled all 17 routes cleanly.
-- **Bilingual Dictionary Parity**: 114/114 keys match 100% across English and Tamil.
+- **Total Tests**: **376 / 376 tests passing across 52 spec files (14 top-level suites)** (`pnpm --filter web test`).
+- **Static Typecheck**: `pnpm --filter web typecheck` exited with **0 errors**.
+- **Production Build**: `next build` compiled all **35** App Router `page.tsx` routes cleanly.
+- **Bilingual Dictionary Parity**: **117 / 117** `'collections'` leaf keys (and `1,921 / 1,921` total keys across 22 namespaces) match 100% across English and Tamil.

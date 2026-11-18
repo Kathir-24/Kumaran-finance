@@ -5,13 +5,13 @@
 > **Status**: **Phase 6 Task 6.4 100% COMPLETED & VERIFIED**  
 > **Target Audience**: Web Engineers, Backend Engineers, CA Auditors, Partner/Foreman Operations, Desk Accountants  
 > **Scope**: Scheme Defaulters Desk, Ineligible Bidder Warnings, Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12), Replacement Subscriber Substitution (ADR-13 & Guardrail 7), Defaulter Account Exit Settlement & Voucher (`KC-VOU-DEF-XXXXXX`), and 4.00% Foreman Commission Damages Math.  
-> **Applicable Architectural Guardrails**: Guardrail 1 (Single Company), Guardrail 2 (Pure Whole Rupee Math), Guardrail 3 (4.00% Commission Damages), Guardrail 7 / ADR-13 (Max 1 Ticket Per Scheme Limit), Guardrail 8 / ADR-07 (Defaulter Rules & 3-Month Arrears Removal), Guardrail 10 (Role Authority & Dual Control).
+> **Applicable Architectural Guardrails**: Guardrail 1 (Single Company), Guardrail 2 (Pure Whole Rupee Math), Guardrail 3 (4.00% Commission Damages — proposed model locked under Q25), Guardrail 7 / ADR-13 (Max 1 Ticket Per Scheme Limit), Guardrail 8 / ADR-07 (Defaulter Rules & 3-Month Arrears Removal), Guardrail 10 (Maker $\ne$ Checker), Guardrail 11 / ADR-21 (Verified Partner `isPartner: true`), `KFC-SEC-004` (`PRIZED_TICKET_IMMUTABLE`).
 
 ---
 
 ## 1. Executive Summary & Capabilities Delivered
 
-Under the **Tamil Nadu Chit Funds Act, 1982** and **Kumaran Chits Master Architectural Rules (ADR-07, ADR-12, ADR-13)**, Task 6.4 delivers a dedicated operational desk for managing subscriber arrears, exercising statutory company removal rights, onboarding replacement members, and issuing terminal exit settlement vouchers:
+Under the **Tamil Nadu Chit Funds Act, 1982** and **Kumaran Chits Master Architectural Rules (ADR-07, ADR-12, ADR-13, ADR-21)**, Task 6.4 delivers a dedicated operational desk for managing subscriber arrears, exercising statutory company removal rights under two-partner dual control (`SEC-B`), onboarding replacement members, and enforcing the fail-closed Q25 exit settlement lock:
 
 ```mermaid
 flowchart TD
@@ -20,10 +20,10 @@ flowchart TD
         Table["Defaulters Table with Arrears Badges\nIneligible to Bid (1-2 Mo) | Removal Eligible (>=3 Mo) | Removed (REMOVED_DEF_3M)"]
     end
 
-    subgraph Actions["2. Authorized Partner & Staff Operations"]
-        Remove["Company 3-Month Removal Rights (ADR-07 & ADR-12)\nStrictly Super Admin (Partners)\nRequires >= 3 consecutive missed months & >= 10 char notice record"]
-        Substitute["Replacement Subscriber Substitution (ADR-13 & Guardrail 7)\nStrictly Super Admin (Partners)\nValidates replacement is KYC-Verified\nStrictly prevents duplicate ticket in same scheme (@@unique)"]
-        Settle["Defaulter Account Settlement & Exit Voucher\nSuper Admin & Accountant\nTotal Paid - 4.00% Foreman Commission Damages\nIssues KC-VOU-DEF-XXXXXX exit voucher"]
+    subgraph Actions["2. Authorized Verified Partner Operations (isPartner: true)"]
+        Remove["Company 3-Month Removal Rights (ADR-07, ADR-12 & SEC-B)\nTwo-Partner Dual Control (Partner A requests -> Partner B approves/rejects)\nRequires >= 3 consecutive missed months & >= 10 char notice\nPrized tickets strictly immutable (KFC-SEC-004)"]
+        Substitute["Replacement Subscriber Substitution (ADR-13 & Guardrail 7)\nStrictly Verified Partners (SUPER_ADMIN)\nValidates replacement is KYC-Verified\nStrictly prevents duplicate ticket in same scheme (@@unique)"]
+        Settle["Defaulter Account Exit Settlement (Q25 Fail-Closed Lock)\nStrictly Verified Partners (SUPER_ADMIN)\nLocked Fail-Closed: HTTP 400 UNAPPROVED_SETTLEMENT_POLICY\nPending written Partner Board & legal damages policy"]
     end
 
     DefaultersDesk -->|>= 3 Mo Arrears| Remove
@@ -41,14 +41,14 @@ flowchart TD
 2. **Arrears Aging & Ineligibility Badging (`DefaultersTable`)**:
    - Tabbed filtering: All Tickets, Active Arrears ($1\text{--}2$ mo), Removal Eligible ($\ge 3$ mo), and Removed Members.
    - **$1\text{--}2$ Consecutive Unpaid Months**: Highlighted with an amber badge (`Ineligible to Bid - ADR-07`). Removal button is strictly disabled with a protective tooltip: *"Removal blocked: Requires at least 3 consecutive unpaid months (ADR-07)"*.
-   - **$\ge 3$ Consecutive Unpaid Months**: Highlighted with a red badge (`Removal Eligible - ADR-07 & ADR-12`), exposing the `Remove Defaulter` action for Partners.
-   - **Removed Tickets (`REMOVED_DEF_3M`)**: Highlighted with a purple badge, exposing `Substitute Member` and `Settle Account` actions.
+   - **$\ge 3$ Consecutive Unpaid Months**: Highlighted with a red badge (`Removal Eligible - ADR-07 & ADR-12`), exposing the `Remove Defaulter` action for Verified Partners.
+   - **Removed Tickets (`REMOVED_DEF_3M`)**: Highlighted with a purple badge, exposing `Substitute Member` and the Q25 fail-closed `Settle Account` guard.
 
-3. **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**:
-   - Restricted strictly to **Super Admin (Partners)** with `isPartner: true` (`SEC-A`).
-   - Two-Partner Dual Control (`SEC-B`): Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`) with mandatory justification ($\ge 10$ characters), placing the ticket into `PENDING_REMOVAL_APPROVAL`.
-   - Partner B reviews and approves removal (`POST /api/v1/tickets/:id/remove-defaulter/approve`). Hard guard: `maker != checker`.
-   - Upon approval, transitions ticket status to `REMOVED_DEF_3M`, recording `removedAt` and `removedByUserId`. Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
+3. **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog` — `SEC-B` / `KFC-SEC-004`)**:
+   - Restricted strictly to **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)** (`SEC-A` / Guardrail 11).
+   - **Two-Partner Dual Control (`SEC-B`)**: Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`, alias `/remove-defaulter`) with mandatory justification ($\ge 10$ characters), placing the ticket into `PENDING_REMOVAL_APPROVAL`.
+   - Independent Partner B reviews and either approves (`POST /api/v1/tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`) or rejects (`POST /api/v1/tickets/:id/remove-defaulter/reject` $\to$ restores `DEFAULT_3_MONTHS`). Hard guard: `maker != checker`.
+   - **Prized Subscriber Immutability (`KFC-SEC-004`)**: Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
 
 4. **ADR-13 Subscriber Substitution (`DefaulterSubstitutionModal`)**:
    - Restricted strictly to **Super Admin**.
@@ -67,14 +67,17 @@ flowchart TD
 
 ## 2. API Contracts & Verified Backend Integration
 
+> **Dual Route Prefix (`ticket.controller.ts:45`)**: `TicketController` mounts at `@Controller(['tickets', 'installments/tickets'])`, so every `/api/v1/tickets/*` route below is equivalently addressable at `/api/v1/installments/tickets/*`.
+
 | Action | HTTP Method & Path | Allowed Roles | Request Body / Params | Success Status & Payload |
 |---|---|---|---|---|
-| **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Query: `minConsecutiveMonths=1` | Array of tickets with unpaid dues and overdue totals |
-| **Scheme Tickets** | `GET /api/v1/chits/:id` | Authenticated Staff / Customers | Path: `id` (chit group UUID) | Scheme details + 20 tickets with status, dues & customers |
-| **Request Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/request` | Strictly `SUPER_ADMIN` (Partners) | `{ reason: string }` ($\ge 10$ chars) | Transitions to `PENDING_REMOVAL_APPROVAL` (`SEC-B`) |
-| **Approve Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `SUPER_ADMIN` (Partners) | None (Maker != Checker) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
-| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (Partners) | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
-| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (Partners) | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Fails closed with `UNAPPROVED_SETTLEMENT_POLICY` (Q25) |
+| **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Query: `minConsecutiveMonths=1` | Paginated tickets with unpaid dues and overdue totals |
+| **Scheme Tickets** | `GET /api/v1/chits/:id` | Authenticated Staff / Customers | Path: `id` (chit group UUID) | Scheme details + $N$ tickets with status, dues & customers |
+| **Request Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/request` *(alias `/remove-defaulter`)* | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ reason: string }` ($\ge 10$ chars) | Transitions to `PENDING_REMOVAL_APPROVAL` (`SEC-B`; blocks prized tickets `KFC-SEC-004`) |
+| **Approve Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Optional `{ notes?: string }` (`maker != checker`) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
+| **Reject Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/reject` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Optional `{ reason?: string }` (`maker != checker`) | Rejects request and restores ticket to `DEFAULT_3_MONTHS` |
+| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
+| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` (Q25) |
 
 ---
 
@@ -125,24 +128,24 @@ Attempt 2: Selects Suresh P (cust-004, isKycVerified: true)
 
 ## 4. Modular File Architecture & Rule 4 Compliance
 
-All component and route files strictly adhere to **AGENTS.md Rule 4 ($\le 300\text{--}350$ lines)**:
+All component and route files adhere to **AGENTS.md Rule 4**:
 
-| File Path | Description | Line Count | Status |
-|---|---|:---:|:---:|
-| `apps/web/src/app/(dashboard)/schemes/[id]/defaulters/page.tsx` | Scheme defaulters desk route orchestrator | 265 lines | ✅ Clean (< 280) |
-| `apps/web/src/components/schemes/defaulters-table.tsx` | Tabular list, arrears aging badges & actions | 311 lines | ✅ Clean (< 320) |
-| `apps/web/src/components/schemes/defaulter-removal-dialog.tsx` | Super Admin 3-month removal action dialog | 223 lines | ✅ Clean (< 240) |
-| `apps/web/src/components/schemes/defaulter-substitution-modal.tsx` | Super Admin replacement subscriber picker & KYC/ADR-13 checks | 343 lines | ✅ Clean (< 350) |
-| `apps/web/src/components/schemes/defaulter-settlement-dialog.tsx` | Total paid, 4% damages deduction & exit voucher display | 282 lines | ✅ Clean (< 300) |
-| `apps/web/src/components/ui/textarea.tsx` | Accessible textarea component with error states | 26 lines | ✅ Clean |
-| `apps/web/src/app/(dashboard)/schemes/[id]/page.tsx` | Scheme detail page with Defaulters Desk quick action | 314 lines | ✅ Clean (< 350) |
-| `apps/web/test/defaulter-substitution.spec.ts` | Automated unit test suite asserting 8 core invariants | 269 lines | ✅ Clean (< 280) |
+| File Path | Description | Status |
+|---|---|:---:|
+| `apps/web/src/app/(dashboard)/schemes/[id]/defaulters/page.tsx` | Scheme defaulters desk route orchestrator | ✅ Clean |
+| `apps/web/src/components/schemes/defaulters-table.tsx` | Tabular list, arrears aging badges & actions | ✅ Clean |
+| `apps/web/src/components/schemes/defaulter-removal-dialog.tsx` | Verified Partner 3-month removal action dialog (`SEC-B`) | ✅ Clean |
+| `apps/web/src/components/schemes/defaulter-substitution-modal.tsx` | Verified Partner replacement subscriber picker & KYC/ADR-13 checks | ✅ Clean |
+| `apps/web/src/components/schemes/defaulter-settlement-dialog.tsx` | Q25 fail-closed exit settlement guard dialog | ✅ Clean |
+| `apps/web/src/components/ui/textarea.tsx` | Accessible textarea component with error states | ✅ Clean |
+| `apps/web/src/app/(dashboard)/schemes/[id]/page.tsx` | Scheme detail page with Defaulters Desk quick action | ✅ Clean |
+| `apps/web/test/defaulter-substitution.spec.ts` | Automated unit test suite asserting 8 core invariants | ✅ Clean |
 
 ---
 
 ## 5. Verification & Test Proofs
 
 - **TypeScript Compilation**: `pnpm --filter web typecheck` $\to$ **0 compiler errors**.
-- **Automated Unit Tests**: `pnpm --filter web test` $\to$ **152/152 tests passing** (144 existing + 8 new defaulter tests).
-- **Next.js 15 Production Build**: `pnpm --filter web build` $\to$ Clean dynamic compilation with `/schemes/[id]/defaulters` generated (`10 kB / 188 kB`).
-- **Bilingual Dictionary Parity**: 100% complete parity across English and Tamil (`messages/en.json` $\longleftrightarrow$ `messages/ta.json`).
+- **Automated Unit Tests**: `pnpm --filter web test` $\to$ **376 / 376 tests passing across 52 spec files (14 top-level suites)** (including 8/8 in `defaulter-substitution.spec.ts`).
+- **Next.js 15 Production Build**: `pnpm --filter web build` $\to$ Clean standalone compilation across all **35** App Router `page.tsx` routes.
+- **Bilingual Dictionary Parity**: 100% complete parity across English and Tamil (`apps/web/messages/en.json` $\longleftrightarrow$ `ta.json`, `1,921` keys each).
