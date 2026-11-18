@@ -1969,4 +1969,92 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       expect(prismaMock.auctionWinner.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('9. Module 9 Forensic Dual-Control Remediation Proofs (M9-DUAL-DEF-02)', () => {
+    it('M9-DUAL-DEF-02: verifySafetyProof, authorizePayout, and releasePayout reject with PENDING_CORRECTION_LOCKOUT when an auction correction request is pending partner review', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockAuction);
+      prismaMock.auctionWinner.findUnique = jest.fn().mockResolvedValue(mockWinner);
+
+      // Mock an active AUCTION_CORRECTION_REQUESTED with no resolution
+      prismaMock.auditLog.findFirst = jest.fn().mockImplementation(({ where }: any) => {
+        if (where?.action === 'AUCTION_CORRECTION_REQUESTED') {
+          return Promise.resolve({
+            id: 'audit-corr-req-1',
+            action: 'AUCTION_CORRECTION_REQUESTED',
+            timestamp: new Date(),
+          });
+        }
+        if (where?.action?.in?.includes('AUCTION_CORRECTION_APPROVED')) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
+
+      // 1. verifySafetyProof
+      await expect(
+        disbursementService.verifySafetyProof(
+          mockAuctionId,
+          {
+            isSecurityRequired: true,
+            securityType: 'BLANK_CHEQUE',
+            blankChequeDetails: 'SBI Cheque #004512',
+            agreementSigned: true,
+            nomineeSigned: true,
+            notes: 'Customer verified at branch counter',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/PENDING_CORRECTION_LOCKOUT/i);
+
+      // 2. authorizePayout
+      const verifiedWinner = {
+        ...mockWinner,
+        disbursementStatus: 'VERIFIED_BY_MAKER',
+        verifiedByUserId: mockMakerId,
+      };
+      prismaMock.auctionWinner.findUnique = jest.fn().mockResolvedValue(verifiedWinner);
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockAuction,
+        winner: verifiedWinner,
+      });
+
+      await expect(
+        disbursementService.authorizePayout(
+          mockAuctionId,
+          {
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+            disbursedAmount: 75000,
+          },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PENDING_CORRECTION_LOCKOUT/i);
+
+      // 3. releasePayout
+      const authorizedWinner = {
+        ...mockWinner,
+        disbursementStatus: 'AUTHORIZED_BY_CHECKER',
+        verifiedByUserId: mockMakerId,
+        authorizedByUserId: mockCheckerId,
+        disbursedAmount: 75000n,
+        disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+      };
+      prismaMock.auctionWinner.findUnique = jest.fn().mockResolvedValue(authorizedWinner);
+      prismaMock.auction.findUnique.mockResolvedValue({
+        ...mockAuction,
+        winner: authorizedWinner,
+      });
+
+      await expect(
+        disbursementService.releasePayout(
+          mockAuctionId,
+          {
+            paymentReference: 'CHQ-RELEASE-999',
+            idempotencyKey: 'idem-new-001',
+          },
+          mockDisburserId,
+        ),
+      ).rejects.toThrow(/PENDING_CORRECTION_LOCKOUT/i);
+    });
+  });
 });

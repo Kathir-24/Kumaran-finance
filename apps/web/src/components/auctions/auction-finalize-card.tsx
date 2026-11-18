@@ -92,6 +92,11 @@ export function AuctionFinalizeCard({
       return;
     }
 
+    if (!signedByForeman) {
+      setErrorMsg('Foreman signature declaration must be confirmed prior to finalization.');
+      return;
+    }
+
     try {
       await onFinalize({
         subscribersPresent: Math.floor(subscribersPresent),

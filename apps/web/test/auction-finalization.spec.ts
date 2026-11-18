@@ -252,4 +252,32 @@ describe('Task 6.3: Dual-Control Maker-Checker Auction Finalization & Minutes Un
       assert.ok(ta.auctions[key], `Missing ta.auctions.${key}`);
     }
   });
+
+  // 9. M9-WEB-DEF-02 & M9-WEB-DEF-06 Regressions
+  it('M9-WEB-DEF Regressions: canRecordFiling Guardrail 11 partner authority & signedByForeman validation', () => {
+    const detailSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/app/(dashboard)/auctions/[id]/page.tsx'),
+      'utf-8',
+    );
+    const finalizeCardSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/auction-finalize-card.tsx'),
+      'utf-8',
+    );
+    const filingDialogSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/registrar-filing-dialog.tsx'),
+      'utf-8',
+    );
+
+    // M9-WEB-DEF-02: canRecordFiling enforces isPartner on Super Admin
+    assert.match(
+      detailSource,
+      /canRecordFiling\s*=\s*hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+    );
+
+    // M9-WEB-DEF-06: AuctionFinalizeCard validates signedByForeman before onFinalize
+    assert.match(finalizeCardSource, /if\s*\(!signedByForeman\)\s*\{\s*setErrorMsg/);
+
+    // M9-WEB-DEF-03: RegistrarFilingDialog safe ISO date parsing
+    assert.match(filingDialogSource, /!isNaN\(validFiledDate\.getTime\(\)\)/);
+  });
 });

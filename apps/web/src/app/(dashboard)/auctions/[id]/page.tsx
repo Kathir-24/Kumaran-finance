@@ -65,7 +65,9 @@ export default function AuctionDetailPage() {
   const params = useParams();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const canRecordFiling = hasAnyRole(user, ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT']);
+  const canRecordFiling =
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) ||
+    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
 
   const auctionId = String(params.id);
   const [isFilingOpen, setIsFilingOpen] = React.useState(false);

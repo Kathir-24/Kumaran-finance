@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -35,6 +36,7 @@ import {
   EligibleBidderResponseDto,
   FinalizeAuctionResponseDto,
   MarkMinutesFiledResponseDto,
+  RejectAuctionCorrectionResponseDto,
   RequestAuctionCorrectionResponseDto,
 } from './dto/auction-response.dto';
 import { FinalizeAuctionDto } from './dto/finalize-auction.dto';
@@ -43,6 +45,7 @@ import { RecordBidDto } from './dto/record-bid.dto';
 import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 import {
   ApproveAuctionCorrectionDto,
+  RejectAuctionCorrectionDto,
   RequestAuctionCorrectionDto,
 } from './dto/auction-correction.dto';
 import { parseOptionalPositiveIntQuery } from './helpers/auction-access.helper';
@@ -72,7 +75,7 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionResponseDto, { isArray: true, description: 'Auctions retrieved successfully' })
   async getGroupAuctions(
-    @Param('chitGroupId') chitGroupId: string,
+    @Param('chitGroupId', new ParseUUIDPipe({ version: '4' })) chitGroupId: string,
     @CurrentUser() currentUser?: JwtPayload,
   ) {
     return this.auctionService.getGroupAuctions(chitGroupId, currentUser);
@@ -95,7 +98,7 @@ export class AuctionController {
   @ApiOkResponseEnvelope(AuctionDetailResponseDto, { description: 'Auction retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async findOne(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() currentUser?: JwtPayload,
   ) {
     return this.auctionService.findOne(id, currentUser);
@@ -116,7 +119,7 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(EligibleBidderResponseDto, { isArray: true, description: 'Eligible bidders list retrieved' })
   async getEligibleBidders(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('month') month?: string,
     @CurrentUser() currentUser?: JwtPayload,
   ) {
@@ -144,7 +147,7 @@ export class AuctionController {
     description: 'Ceiling exceeded or defaulter violation',
   })
   async recordBid(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: RecordBidDto,
     @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
@@ -176,7 +179,7 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionResponseDto, { description: 'Tie-break recorded successfully' })
   async recordTieBreak(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: RecordTieBreakDto,
     @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
@@ -205,7 +208,7 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionResponseDto, { description: 'Tie-break recorded successfully' })
   async recordTieBreakAlias(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: RecordTieBreakDto,
     @CurrentUser() currentUser: JwtPayload,
     @Query('month') month?: string,
@@ -227,7 +230,7 @@ export class AuctionController {
     description: 'Maker-Checker separation violated or non-partner caller',
   })
   async finalize(
-    @Param('id') auctionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @CurrentUser('sub') checkerUserId: string,
     @CurrentUser('roles') userRoles: Role[],
     @Body() dto?: FinalizeAuctionDto,
@@ -245,7 +248,7 @@ export class AuctionController {
   @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Auction minutes retrieved' })
   @ApiResponse({ status: 404, description: 'Minutes not found' })
   async getMinutes(
-    @Param('id') auctionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @CurrentUser() currentUser?: JwtPayload,
   ) {
     return this.auctionService.getAuctionMinutes(auctionId, currentUser);
@@ -260,7 +263,7 @@ export class AuctionController {
   })
   @ApiOkResponseEnvelope(AuctionMinutesDto, { description: 'Minutes text layout retrieved' })
   async getMinutesPdf(
-    @Param('id') auctionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @CurrentUser() currentUser?: JwtPayload,
   ) {
     return this.auctionService.getAuctionMinutes(auctionId, currentUser);
@@ -277,7 +280,7 @@ export class AuctionController {
   @ApiResponse({ status: 400, description: 'Auction not finalized or minutes not found' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async markMinutesFiled(
-    @Param('auctionId') auctionId: string,
+    @Param('auctionId', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @Body() dto: MarkMinutesFiledDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
@@ -304,7 +307,7 @@ export class AuctionController {
   @ApiResponse({ status: 403, description: 'Forbidden: Super Admin only' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async requestAuctionCorrection(
-    @Param('id') auctionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @Body() dto: RequestAuctionCorrectionDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
@@ -331,11 +334,38 @@ export class AuctionController {
   @ApiResponse({ status: 403, description: 'Maker-Checker violation or insufficient role' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async approveAuctionCorrection(
-    @Param('id') auctionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @Body() dto: ApproveAuctionCorrectionDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.auctionService.approveAuctionCorrection(
+      auctionId,
+      currentUser.sub,
+      dto,
+      currentUser.roles,
+    );
+  }
+
+  @Post(':id/correction/reject')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Checker: Reject finalized auction correction request (Independent Partner)',
+    description:
+      'Rejects a pending auction correction request, leaving auction and prize records unchanged. Strictly enforces Maker != Checker (maker_partner_id != checker_partner_id).',
+  })
+  @ApiOkResponseEnvelope(RejectAuctionCorrectionResponseDto, {
+    description: 'Finalized auction correction request rejected successfully',
+  })
+  @ApiResponse({ status: 400, description: 'No pending correction request' })
+  @ApiResponse({ status: 403, description: 'Maker-Checker violation or non-partner caller' })
+  @ApiResponse({ status: 404, description: 'Auction not found' })
+  async rejectAuctionCorrection(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
+    @Body() dto: RejectAuctionCorrectionDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.auctionService.rejectAuctionCorrection(
       auctionId,
       currentUser.sub,
       dto,

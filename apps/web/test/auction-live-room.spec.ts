@@ -319,4 +319,35 @@ describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
     assert.match(tieModalSource, /usedTokens\.has\(nextTokenNum\)/);
     assert.doesNotMatch(tieModalSource, /const nextTokenNum = next\.length;/);
   });
+
+  // 11. M9-WEB-DEF-01, M9-WEB-DEF-03, M9-WEB-DEF-04, M9-WEB-DEF-05 Regressions
+  it('M9-WEB-DEF Regressions: Live room route replacement, safe date handling, tie-break full token check & dropdown normalization', () => {
+    const livePageSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/app/(dashboard)/auctions/[id]/live/page.tsx'),
+      'utf-8',
+    );
+    const consoleSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/bidding-console.tsx'),
+      'utf-8',
+    );
+    const tieModalSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/components/auctions/tie-break-modal.tsx'),
+      'utf-8',
+    );
+
+    // M9-WEB-DEF-01: Navigates to real auction ID if launched via ChitGroup UUID
+    assert.match(livePageSource, /record\.id !== auctionId/);
+    assert.match(livePageSource, /router\.replace\(`\/auctions\/\$\{record\.id\}\/live`\)/);
+
+    // M9-WEB-DEF-03: Safe ISO date parsing across console and modal
+    assert.match(consoleSource, /!isNaN\(validAuctionDate\.getTime\(\)\)/);
+    assert.match(tieModalSource, /!isNaN\(validAuctionDate\.getTime\(\)\)/);
+
+    // M9-WEB-DEF-04: Full token assignment check (cannot submit missing tokens)
+    assert.match(tieModalSource, /assignedTokens\.length !== tiedTickets\.length/);
+
+    // M9-WEB-DEF-05: Dropdown fallback normalization for flat EligibleBidderItem
+    assert.match(consoleSource, /flatCustCode/);
+    assert.match(consoleSource, /flatCustName/);
+  });
 });

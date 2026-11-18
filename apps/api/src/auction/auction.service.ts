@@ -42,6 +42,7 @@ import { RecordTieBreakDto } from './dto/record-tie-break.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApproveAuctionCorrectionDto,
+  RejectAuctionCorrectionDto,
   RequestAuctionCorrectionDto,
 } from './dto/auction-correction.dto';
 import {
@@ -55,6 +56,7 @@ import {
   isPureCustomer,
   sanitizeAuctionForCustomer,
 } from './helpers/auction-access.helper';
+import { computeRegistrarFilingCompliance } from '../report/helpers/report-scope.helper';
 
 /**
  * XR-AUC-01: Complete collateral & disbursement reset applied whenever AuctionWinner.ticketId changes,
@@ -130,6 +132,7 @@ export class AuctionService {
       prizedAuctionId?: string | null;
       status?: string;
       consecutiveUnpaidMonths?: number;
+      removalRequestedByUserId?: string | null;
       customer?: { fullName?: string | null } | null;
     } | null,
     chitGroupId: string,
@@ -176,6 +179,12 @@ export class AuctionService {
       );
     }
 
+    if (ticket.removalRequestedByUserId) {
+      throw new BadRequestException(
+        `ADR-12 Violation: Ticket #${ticket.ticketNumber}${holderLabel} is pending removal and is strictly ineligible to participate in auctions`,
+      );
+    }
+
     if (typeof db.installmentDue?.findFirst === 'function') {
       const unpaidDue = await db.installmentDue.findFirst({
         where: {
@@ -204,7 +213,9 @@ export class AuctionService {
     }
 
     try {
-      const targetDate = new Date().toISOString().split('T')[0];
+      const targetDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+      }).format(new Date());
       const keys = [
         `report:daybook:ALL:${targetDate}`,
         `report:daybook:ALL_BRANCHES:${targetDate}`,
@@ -256,6 +267,7 @@ export class AuctionService {
         isPrized: false,
         status: 'ACTIVE',
         consecutiveUnpaidMonths: 0,
+        removalRequestedByUserId: null,
         dues: {
           none: {
             installmentMonth: { lte: month },
@@ -363,7 +375,13 @@ export class AuctionService {
         ? {
             ...txTicket,
             ...(lockedTicket
-              ? { status: lockedTicket.status, isPrized: lockedTicket.isPrized }
+              ? {
+                  status: lockedTicket.status,
+                  isPrized: lockedTicket.isPrized,
+                  consecutiveUnpaidMonths: lockedTicket.consecutiveUnpaidMonths,
+                  removalRequestedByUserId:
+                    lockedTicket.removalRequestedByUserId,
+                }
               : {}),
           }
         : null;
@@ -386,14 +404,16 @@ export class AuctionService {
         include: { winner: true },
       });
 
-      if (
-        existingAuction &&
-        (existingAuction.status === AuctionStatus.COMPLETED ||
-          existingAuction.status === AuctionStatus.MINUTES_FILED)
-      ) {
-        throw new BadRequestException(
-          `Cannot record bid: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
-        );
+      if (existingAuction) {
+        await lockAuctionRow(tx, existingAuction.id);
+        if (
+          existingAuction.status === AuctionStatus.COMPLETED ||
+          existingAuction.status === AuctionStatus.MINUTES_FILED
+        ) {
+          throw new BadRequestException(
+            `Cannot record bid: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
+          );
+        }
       }
 
       // 1. Upsert auction record
@@ -621,7 +641,12 @@ export class AuctionService {
       // Deterministic sorted row locks on all tied tickets to prevent deadlocks & TOCTOU eligibility bypass
       const lockedTicketMap = new Map<
         string,
-        { status: string; isPrized: boolean }
+        {
+          status: string;
+          isPrized: boolean;
+          consecutiveUnpaidMonths?: number;
+          removalRequestedByUserId?: string | null;
+        }
       >();
       for (const tid of sortedTicketIds) {
         const locked = await lockSubscriberTicketRow(tx, tid);
@@ -641,14 +666,16 @@ export class AuctionService {
         include: { winner: true },
       });
 
-      if (
-        existingAuction &&
-        (existingAuction.status === AuctionStatus.COMPLETED ||
-          existingAuction.status === AuctionStatus.MINUTES_FILED)
-      ) {
-        throw new BadRequestException(
-          `Cannot conduct tie-break draw: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
-        );
+      if (existingAuction) {
+        await lockAuctionRow(tx, existingAuction.id);
+        if (
+          existingAuction.status === AuctionStatus.COMPLETED ||
+          existingAuction.status === AuctionStatus.MINUTES_FILED
+        ) {
+          throw new BadRequestException(
+            `Cannot conduct tie-break draw: Auction for Month ${month} is already finalized (status: ${existingAuction.status})`,
+          );
+        }
       }
 
       // 0.1 Guardrail 8 / ADR-07: Validate EVERY participating tied ticket belongs to this group,
@@ -669,7 +696,12 @@ export class AuctionService {
           ? {
               ...row,
               ...(locked
-                ? { status: locked.status, isPrized: locked.isPrized }
+                ? {
+                    status: locked.status,
+                    isPrized: locked.isPrized,
+                    consecutiveUnpaidMonths: locked.consecutiveUnpaidMonths,
+                    removalRequestedByUserId: locked.removalRequestedByUserId,
+                  }
                 : {}),
             }
           : null;
@@ -1305,6 +1337,15 @@ export class AuctionService {
       orderBy: { timestamp: 'desc' },
     });
 
+    const latestRejection = await this.prisma.auditLog.findFirst({
+      where: {
+        entityType: 'Auction',
+        entityId: auctionId,
+        action: 'AUCTION_CORRECTION_REJECTED',
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
     const alreadyApproved =
       latestApproval &&
       latestApproval.id !== latestRequest.id &&
@@ -1313,7 +1354,15 @@ export class AuctionService {
           latestRequest.timestamp instanceof Date &&
           latestApproval.timestamp.getTime() >= latestRequest.timestamp.getTime()));
 
-    if (alreadyApproved) {
+    const alreadyRejected =
+      latestRejection &&
+      latestRejection.id !== latestRequest.id &&
+      ((latestRejection.newValue as any)?.correctionRequestId === latestRequest.id ||
+        (latestRejection.timestamp instanceof Date &&
+          latestRequest.timestamp instanceof Date &&
+          latestRejection.timestamp.getTime() >= latestRequest.timestamp.getTime()));
+
+    if (alreadyApproved || alreadyRejected) {
       return null;
     }
 
@@ -1442,6 +1491,11 @@ export class AuctionService {
   ) {
     const auction = await this.prisma.auction.findUnique({ where: { id } });
     if (auction) {
+      if (monthParam !== undefined && monthParam !== auction.installmentMonth) {
+        throw new BadRequestException(
+          `Installment month in query (Month ${monthParam}) does not match auction record (Month ${auction.installmentMonth})`,
+        );
+      }
       return this.getEligibleBidders(
         auction.chitGroupId,
         auction.installmentMonth,
@@ -1475,6 +1529,11 @@ export class AuctionService {
   ) {
     const auction = await this.prisma.auction.findUnique({ where: { id } });
     if (auction) {
+      if (monthParam !== undefined && monthParam !== auction.installmentMonth) {
+        throw new BadRequestException(
+          `Installment month in query (Month ${monthParam}) does not match auction record (Month ${auction.installmentMonth})`,
+        );
+      }
       return this.recordBid(
         auction.chitGroupId,
         auction.installmentMonth,
@@ -1509,6 +1568,11 @@ export class AuctionService {
   ) {
     const auction = await this.prisma.auction.findUnique({ where: { id } });
     if (auction) {
+      if (monthParam !== undefined && monthParam !== auction.installmentMonth) {
+        throw new BadRequestException(
+          `Installment month in query (Month ${monthParam}) does not match auction record (Month ${auction.installmentMonth})`,
+        );
+      }
       return this.recordTieBreak(
         auction.chitGroupId,
         auction.installmentMonth,
@@ -1593,9 +1657,34 @@ export class AuctionService {
       );
     }
 
+    const trimmedRef = (dto.filingReference ?? '').trim();
+    if (!trimmedRef) {
+      throw new BadRequestException(
+        'FILING_REFERENCE_REQUIRED: Government challan or filing reference is required and cannot be blank',
+      );
+    }
+
     const filedDate = dto.filedDate
       ? this.parseValidDate(dto.filedDate, 'Filed date')
       : new Date();
+
+    if (filedDate < auction.auctionDate) {
+      throw new BadRequestException(
+        'FILED_DATE_BEFORE_AUCTION: Filing date cannot be prior to auction date.',
+      );
+    }
+
+    if (filedDate > new Date()) {
+      throw new BadRequestException(
+        'FILED_DATE_IN_FUTURE: Filing date cannot be in the future.',
+      );
+    }
+
+    const compliance = computeRegistrarFilingCompliance(
+      auction.auctionDate,
+      true,
+      filedDate,
+    );
 
     const updated = await withTransactionRetry(this.prisma, async (tx) => {
       // Lock Auction -> AuctionMinutes strictly in DAG order
@@ -1631,7 +1720,7 @@ export class AuctionService {
         data: {
           filedAtRegistrar: true,
           filedDate,
-          filingReference: dto.filingReference?.trim() || null,
+          filingReference: trimmedRef,
           filingNotes: dto.notes?.trim() || null,
         },
       });
@@ -1649,7 +1738,10 @@ export class AuctionService {
             installmentMonth: auction.installmentMonth,
             filedAtRegistrar: true,
             filedDate,
-            filingReference: dto.filingReference || null,
+            filingReference: trimmedRef,
+            filingDeadline: compliance.filingDeadline,
+            filingStatus: compliance.filingStatus,
+            isDelayedFiling: compliance.filingStatus === 'FILED_LATE',
           },
         },
       });
@@ -1695,7 +1787,7 @@ export class AuctionService {
       );
     }
 
-    const auction = await this.prisma.auction.findUnique({
+    const preflightAuction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
       include: {
         chitGroup: true,
@@ -1703,62 +1795,44 @@ export class AuctionService {
       },
     });
 
-    if (!auction) {
+    if (!preflightAuction) {
       throw new NotFoundException('Auction record not found');
     }
 
     // XR-AUC-03: Closed/completed schemes cannot be mutated via auction correction
     if (
-      auction.chitGroup?.status &&
-      auction.chitGroup.status !== ChitStatus.ACTIVE
+      preflightAuction.chitGroup?.status &&
+      preflightAuction.chitGroup.status !== ChitStatus.ACTIVE
     ) {
       throw new BadRequestException(
-        `Cannot request auction correction: Chit scheme must be ACTIVE (current status: ${auction.chitGroup.status})`,
+        `Cannot request auction correction: Chit scheme must be ACTIVE (current status: ${preflightAuction.chitGroup.status})`,
       );
     }
 
     if (
-      auction.status !== AuctionStatus.COMPLETED &&
-      auction.status !== AuctionStatus.MINUTES_FILED
+      preflightAuction.status !== AuctionStatus.COMPLETED &&
+      preflightAuction.status !== AuctionStatus.MINUTES_FILED
     ) {
       throw new BadRequestException(
-        `AUCTION_NOT_FINALIZED: Only finalized auctions can be corrected (current status: ${auction.status})`,
+        `AUCTION_NOT_FINALIZED: Only finalized auctions can be corrected (current status: ${preflightAuction.status})`,
       );
     }
 
     // Guardrail 5: Month 1 company pool and Month N maturity settlement cannot be auction-corrected
     if (
-      auction.installmentMonth < FIRST_AUCTION_MONTH ||
-      auction.installmentMonth >= auction.chitGroup.durationMonths
+      preflightAuction.installmentMonth < FIRST_AUCTION_MONTH ||
+      preflightAuction.installmentMonth >= preflightAuction.chitGroup.durationMonths
     ) {
       throw new BadRequestException(
-        `Guardrail 5 Violation: Month ${auction.installmentMonth} cannot be modified via auction correction (only Months 2 through ${auction.chitGroup.durationMonths - 1} are auctions).`,
+        `Guardrail 5 Violation: Month ${preflightAuction.installmentMonth} cannot be modified via auction correction (only Months 2 through ${preflightAuction.chitGroup.durationMonths - 1} are auctions).`,
       );
     }
 
     // Safety Invariant: Disbursed prize money is mathematically and legally immutable
-    if (auction.winner?.disbursementStatus === 'DISBURSED') {
+    if (preflightAuction.winner?.disbursementStatus === 'DISBURSED') {
       throw new BadRequestException(
         'DISBURSED_PRIZE_IMMUTABLE: Cannot correct an auction whose prize money has already been disbursed to the winner.',
       );
-    }
-
-    // FIN-E: Fail closed if subsequent month dues have already been paid
-    const nextMonth = auction.installmentMonth + 1;
-    if (typeof this.prisma.installmentDue?.findMany === 'function') {
-      const nextMonthPaidDues = await this.prisma.installmentDue.findMany({
-        where: {
-          chitGroupId: auction.chitGroupId,
-          installmentMonth: nextMonth,
-          status: DueStatus.PAID,
-        },
-      });
-
-      if (nextMonthPaidDues.length > 0) {
-        throw new BadRequestException(
-          `ALREADY_PAID_DUES_EXIST: Cannot request correction for Month ${auction.installmentMonth} auction because ${nextMonthPaidDues.length} subscriber(s) have already paid dues for Month ${nextMonth}. Correction would invalidate settled financial history.`,
-        );
-      }
     }
 
     const correctedDiscount = toWholeRupeeBigInt(
@@ -1767,66 +1841,188 @@ export class AuctionService {
       { min: 1n },
     );
 
-    // Guardrails 2, 3, 6: Validate frozen commission floor (D >= Cf), 1/4 ceiling (D <= V/4),
-    // and exact whole-rupee dividend divisibility (KFC-FIN-002)
-    const math = calculateAuctionMath(
-      auction.chitGroup.chitValue,
-      BigInt(auction.chitGroup.totalTickets),
-      correctedDiscount,
-      auction.foremanCommissionRate ?? auction.chitGroup.foremanCommissionRate,
-      auction.chitGroup.maxDiscountCeiling,
-    );
-
-    let correctedTicket: any = null;
-    if (dto.correctedWinningTicketId) {
-      correctedTicket = await this.prisma.subscriberTicket.findUnique({
-        where: { id: dto.correctedWinningTicketId },
-        include: { customer: true },
-      });
-
-      await this.assertTicketEligibleForAuction(
-        this.prisma,
-        correctedTicket,
-        auction.chitGroupId,
-        auction.installmentMonth,
-        {
-          allowExistingWinnerTicketId: auction.winner?.ticketId ?? null,
-          notFoundAsBadRequest: true,
-        },
+    // M9-DUAL-DEF-08: Reject zero-change no-op correction requests
+    if (
+      Number(correctedDiscount) === Number(preflightAuction.bidDiscount) &&
+      (!dto.correctedWinningTicketId ||
+        dto.correctedWinningTicketId === preflightAuction.winner?.ticketId)
+    ) {
+      throw new BadRequestException(
+        'NO_CHANGES_DETECTED: Requested correction values are identical to current finalized auction values.',
       );
     }
 
-    const log = await this.prisma.auditLog.create({
-      data: {
-        userId: partnerUserId,
-        action: 'AUCTION_CORRECTION_REQUESTED',
-        entityType: 'Auction',
-        entityId: auctionId,
-        oldValue: {
-          bidDiscount: auction.bidDiscount?.toString(),
-          prizeMoney: auction.prizeMoney?.toString(),
-          dividendPerTicket: auction.dividendPerTicket?.toString(),
-          ticketId: auction.winner?.ticketId,
-          ticketNumber: auction.winner?.ticket?.ticketNumber,
+    // Guardrails 2, 3, 6: Validate frozen commission floor (D >= Cf), 1/4 ceiling (D <= V/4),
+    // and exact whole-rupee dividend divisibility (KFC-FIN-002)
+    const math = calculateAuctionMath(
+      preflightAuction.chitGroup.chitValue,
+      BigInt(preflightAuction.chitGroup.totalTickets),
+      correctedDiscount,
+      preflightAuction.foremanCommissionRate ?? preflightAuction.chitGroup.foremanCommissionRate,
+      preflightAuction.chitGroup.maxDiscountCeiling,
+    );
+
+    const log = await withTransactionRetry(this.prisma, async (tx) => {
+      // M9-DUAL-DEF-05: Enforce strict monotonic DAG lock order: ChitGroup -> Auction -> AuctionWinner
+      const lockedChit = await lockChitGroupRow(tx, preflightAuction.chitGroupId);
+      if (lockedChit?.status && lockedChit.status !== ChitStatus.ACTIVE) {
+        throw new BadRequestException(
+          `Cannot request auction correction: Chit scheme must be ACTIVE (current status: ${lockedChit.status})`,
+        );
+      }
+
+      const lockedAuction = await lockAuctionRow(tx, auctionId);
+      const authoritativeStatus = lockedAuction?.status ?? preflightAuction.status;
+      if (
+        authoritativeStatus !== AuctionStatus.COMPLETED &&
+        authoritativeStatus !== AuctionStatus.MINUTES_FILED
+      ) {
+        throw new BadRequestException(
+          `AUCTION_NOT_FINALIZED: Only finalized auctions can be corrected (current status: ${authoritativeStatus})`,
+        );
+      }
+
+      const lockedWinner = preflightAuction.winner
+        ? await lockAuctionWinnerRow(tx, preflightAuction.winner.id)
+        : null;
+      const authoritativeDisbursementStatus =
+        lockedWinner?.disbursementStatus ?? preflightAuction.winner?.disbursementStatus;
+      if (authoritativeDisbursementStatus === 'DISBURSED') {
+        throw new BadRequestException(
+          'DISBURSED_PRIZE_IMMUTABLE: Cannot correct an auction whose prize money has already been disbursed to the winner.',
+        );
+      }
+
+      // Check whether an unresolved correction request is already pending
+      const latestRequest = await tx.auditLog.findFirst({
+        where: {
+          entityType: 'Auction',
+          entityId: auctionId,
+          action: 'AUCTION_CORRECTION_REQUESTED',
         },
-        newValue: {
-          correctedBidDiscount: correctedDiscount.toString(),
-          correctedPrizeMoney: math.prizeMoney.toString(),
-          correctedDividendPerTicket: math.dividendPerTicket.toString(),
-          correctedWinningTicketId:
-            dto.correctedWinningTicketId || auction.winner?.ticketId,
-          correctedTicketNumber:
-            correctedTicket?.ticketNumber || auction.winner?.ticket?.ticketNumber,
-          reason: trimmedReason,
-          notes: dto.notes?.trim() || null,
-          requestedByUserId: partnerUserId,
+        orderBy: { timestamp: 'desc' },
+      });
+
+      if (latestRequest) {
+        const latestApproval = await tx.auditLog.findFirst({
+          where: {
+            entityType: 'Auction',
+            entityId: auctionId,
+            action: 'AUCTION_CORRECTION_APPROVED',
+          },
+          orderBy: { timestamp: 'desc' },
+        });
+
+        const latestRejection = await tx.auditLog.findFirst({
+          where: {
+            entityType: 'Auction',
+            entityId: auctionId,
+            action: 'AUCTION_CORRECTION_REJECTED',
+          },
+          orderBy: { timestamp: 'desc' },
+        });
+
+        const isResolvedByApproval =
+          latestApproval &&
+          ((latestApproval.newValue as any)?.correctionRequestId === latestRequest.id ||
+            (latestApproval.timestamp instanceof Date &&
+              latestRequest.timestamp instanceof Date &&
+              latestApproval.timestamp.getTime() >= latestRequest.timestamp.getTime()));
+
+        const isResolvedByRejection =
+          latestRejection &&
+          ((latestRejection.newValue as any)?.correctionRequestId === latestRequest.id ||
+            (latestRejection.timestamp instanceof Date &&
+              latestRequest.timestamp instanceof Date &&
+              latestRejection.timestamp.getTime() >= latestRequest.timestamp.getTime()));
+
+        if (!isResolvedByApproval && !isResolvedByRejection) {
+          throw new BadRequestException(
+            'PENDING_CORRECTION_EXISTS: An unapproved correction request is already pending review for this auction.',
+          );
+        }
+      }
+
+      // FIN-E: Lock all Month N+1 InstallmentDue rows in deterministic ORDER BY id FOR UPDATE
+      // to eliminate TOCTOU races with concurrent recordPayment
+      const nextMonth = preflightAuction.installmentMonth + 1;
+      if (typeof tx.$queryRaw === 'function') {
+        await tx.$queryRaw`
+          SELECT id FROM "InstallmentDue"
+          WHERE "chitGroupId" = ${preflightAuction.chitGroupId}
+            AND "installmentMonth" = ${nextMonth}
+          ORDER BY id FOR UPDATE
+        `;
+      }
+
+      if (typeof tx.installmentDue?.findMany === 'function') {
+        const nextMonthPaidDues = await tx.installmentDue.findMany({
+          where: {
+            chitGroupId: preflightAuction.chitGroupId,
+            installmentMonth: nextMonth,
+            status: DueStatus.PAID,
+          },
+        });
+
+        if (nextMonthPaidDues.length > 0) {
+          throw new BadRequestException(
+            `ALREADY_PAID_DUES_EXIST: Cannot request correction for Month ${preflightAuction.installmentMonth} auction because ${nextMonthPaidDues.length} subscriber(s) have already paid dues for Month ${nextMonth}. Correction would invalidate settled financial history.`,
+          );
+        }
+      }
+
+      let correctedTicket: any = null;
+      if (dto.correctedWinningTicketId) {
+        await lockSubscriberTicketRow(tx, dto.correctedWinningTicketId);
+        correctedTicket = await tx.subscriberTicket.findUnique({
+          where: { id: dto.correctedWinningTicketId },
+          include: { customer: true },
+        });
+
+        await this.assertTicketEligibleForAuction(
+          tx,
+          correctedTicket,
+          preflightAuction.chitGroupId,
+          preflightAuction.installmentMonth,
+          {
+            allowExistingWinnerTicketId: preflightAuction.winner?.ticketId ?? null,
+            notFoundAsBadRequest: true,
+          },
+        );
+      }
+
+      return await tx.auditLog.create({
+        data: {
+          userId: partnerUserId,
+          action: 'AUCTION_CORRECTION_REQUESTED',
+          entityType: 'Auction',
+          entityId: auctionId,
+          oldValue: {
+            bidDiscount: preflightAuction.bidDiscount?.toString(),
+            prizeMoney: preflightAuction.prizeMoney?.toString(),
+            dividendPerTicket: preflightAuction.dividendPerTicket?.toString(),
+            ticketId: preflightAuction.winner?.ticketId,
+            ticketNumber: preflightAuction.winner?.ticket?.ticketNumber,
+          },
+          newValue: {
+            correctedBidDiscount: correctedDiscount.toString(),
+            correctedPrizeMoney: math.prizeMoney.toString(),
+            correctedDividendPerTicket: math.dividendPerTicket.toString(),
+            correctedWinningTicketId:
+              dto.correctedWinningTicketId || preflightAuction.winner?.ticketId,
+            correctedTicketNumber:
+              correctedTicket?.ticketNumber || preflightAuction.winner?.ticket?.ticketNumber,
+            reason: trimmedReason,
+            notes: dto.notes?.trim() || null,
+            requestedByUserId: partnerUserId,
+          },
         },
-      },
+      });
     });
 
     return {
       success: true,
-      message: `Auction Month ${auction.installmentMonth} correction requested. An independent Partner must review and authorize approval.`,
+      message: `Auction Month ${preflightAuction.installmentMonth} correction requested. An independent Partner must review and authorize approval.`,
       correctionRequestId: log.id,
       auctionId,
       correctedMath: {
@@ -2007,6 +2203,31 @@ export class AuctionService {
             'NO_PENDING_CORRECTION: This auction correction request has already been approved.',
           );
         }
+
+        const latestRejection = await tx.auditLog.findFirst({
+          where: {
+            entityType: 'Auction',
+            entityId: auctionId,
+            action: 'AUCTION_CORRECTION_REJECTED',
+          },
+          orderBy: { timestamp: 'desc' },
+        });
+
+        const alreadyRejected =
+          latestRejection &&
+          latestRejection.id !== pendingRequest.id &&
+          ((latestRejection.newValue as any)?.correctionRequestId ===
+            pendingRequest.id ||
+            (latestRejection.timestamp instanceof Date &&
+              pendingRequest.timestamp instanceof Date &&
+              latestRejection.timestamp.getTime() >=
+                pendingRequest.timestamp.getTime()));
+
+        if (alreadyRejected) {
+          throw new BadRequestException(
+            'NO_PENDING_CORRECTION: This auction correction request has already been rejected.',
+          );
+        }
       }
 
       const reqData = pendingRequest.newValue as any;
@@ -2037,7 +2258,12 @@ export class AuctionService {
 
       const lockedTickets = new Map<
         string,
-        { status: string; isPrized: boolean }
+        {
+          status: string;
+          isPrized: boolean;
+          consecutiveUnpaidMonths?: number;
+          removalRequestedByUserId?: string | null;
+        }
       >();
       for (const tid of ticketIdsToLock) {
         const locked = await lockSubscriberTicketRow(tx, tid);
@@ -2064,7 +2290,12 @@ export class AuctionService {
           ? {
               ...fetchedTicket,
               ...(locked
-                ? { status: locked.status, isPrized: locked.isPrized }
+                ? {
+                    status: locked.status,
+                    isPrized: locked.isPrized,
+                    consecutiveUnpaidMonths: locked.consecutiveUnpaidMonths,
+                    removalRequestedByUserId: locked.removalRequestedByUserId,
+                  }
                 : {}),
             }
           : null;
@@ -2135,6 +2366,28 @@ export class AuctionService {
         },
       });
 
+      // M9-DUAL-DEF-04: If corrected discount is below 1/4 ceiling, Option A physical tie-breaks are inapplicable.
+      // Purge any stale AuctionTieBidder rows and reset wasTieBreakWinner on the winner.
+      const effectiveCeiling =
+        auction.chitGroup.maxDiscountCeiling ??
+        (auction.chitGroup.chitValue / 4n);
+
+      if (correctedDiscount < effectiveCeiling) {
+        if (
+          auction.tieBidders &&
+          auction.tieBidders.length > 0 &&
+          typeof tx.auctionTieBidder?.deleteMany === 'function'
+        ) {
+          await tx.auctionTieBidder.deleteMany({ where: { auctionId } });
+        }
+        if (auction.winner && auction.winner.wasTieBreakWinner) {
+          await tx.auctionWinner.update({
+            where: { id: auction.winner.id },
+            data: { wasTieBreakWinner: false },
+          });
+        }
+      }
+
       // 2. Winner ticket swap (XR-AUC-01 full safety proof & tie-bidder reset) OR payout authorization invalidation
       if (isWinnerChanging && auction.winner && correctedTicketId) {
         // Un-prize old ticket
@@ -2149,14 +2402,16 @@ export class AuctionService {
           data: { isPrized: true, prizedAuctionId: auctionId },
         });
 
-        // Resync AuctionTieBidder.isWinner & wasTieBreakWinner if tie-bidders exist
+        // Resync AuctionTieBidder.isWinner & wasTieBreakWinner if tie-bidders exist at ceiling
         const tieBidders = Array.isArray(auction.tieBidders)
           ? auction.tieBidders
           : [];
-        const newWinnerIsTieBidder = tieBidders.some(
-          (tb: any) => tb.ticketId === correctedTicketId,
-        );
+        const newWinnerIsTieBidder =
+          correctedDiscount >= effectiveCeiling &&
+          tieBidders.some((tb: any) => tb.ticketId === correctedTicketId);
+
         if (
+          correctedDiscount >= effectiveCeiling &&
           tieBidders.length > 0 &&
           typeof tx.auctionTieBidder?.updateMany === 'function'
         ) {
@@ -2302,6 +2557,167 @@ export class AuctionService {
       success: true,
       message: `Auction Month ${committedMonth} correction approved by Partner. Dividends and subsequent dues reconciled.`,
       auction: result,
+    };
+  }
+
+  /**
+   * KFC-FIN-005 / Q12: Independent Checker Partner rejects auction correction request.
+   * Strictly enforces Maker != Checker (Guardrail 10), verified partner identity (Guardrail 11),
+   * pessimistic DAG locking, replay prevention, and audit log tracking.
+   */
+  async rejectAuctionCorrection(
+    auctionId: string,
+    checkerPartnerUserId: string,
+    dto: RejectAuctionCorrectionDto,
+    userRoles?: string[],
+  ) {
+    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to reject auction corrections.',
+      );
+    }
+
+    await assertVerifiedPartner(
+      this.prisma,
+      checkerPartnerUserId,
+      'reject auction corrections',
+    );
+
+    const trimmedReason = (dto.reason ?? '').trim();
+    if (!trimmedReason) {
+      throw new BadRequestException(
+        'REJECTION_REASON_REQUIRED: Rejection reason is required and cannot be blank',
+      );
+    }
+
+    const preflightAuction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { chitGroup: true },
+    });
+
+    if (!preflightAuction) {
+      throw new NotFoundException('Auction record not found');
+    }
+
+    let committedBranchId: string | null | undefined =
+      preflightAuction.chitGroup?.branchId;
+    let committedMonth = preflightAuction.installmentMonth;
+
+    await withTransactionRetry(this.prisma, async (tx) => {
+      // Pessimistic Acyclic Row Locks: ChitGroup -> Auction
+      await lockChitGroupRow(tx, preflightAuction.chitGroupId);
+      await lockAuctionRow(tx, auctionId);
+
+      // Find pending correction request
+      const pendingRequest = await tx.auditLog.findFirst({
+        where: {
+          entityType: 'Auction',
+          entityId: auctionId,
+          action: 'AUCTION_CORRECTION_REQUESTED',
+        },
+        orderBy: { timestamp: 'desc' },
+      });
+
+      if (!pendingRequest || !pendingRequest.newValue) {
+        throw new BadRequestException(
+          'NO_PENDING_CORRECTION: No pending correction request found for this auction.',
+        );
+      }
+
+      // Strict Maker != Checker Dual Control
+      if (pendingRequest.userId === checkerPartnerUserId) {
+        throw new ForbiddenException(
+          'Maker-Checker Separation of Duties Violated: The Partner who requested the auction correction cannot reject it. An independent Partner must review and authorize.',
+        );
+      }
+
+      // Check if already approved
+      const latestApproval = await tx.auditLog.findFirst({
+        where: {
+          entityType: 'Auction',
+          entityId: auctionId,
+          action: 'AUCTION_CORRECTION_APPROVED',
+        },
+        orderBy: { timestamp: 'desc' },
+      });
+
+      const alreadyApproved =
+        latestApproval &&
+        latestApproval.id !== pendingRequest.id &&
+        ((latestApproval.newValue as any)?.correctionRequestId ===
+          pendingRequest.id ||
+          (latestApproval.timestamp instanceof Date &&
+            pendingRequest.timestamp instanceof Date &&
+            latestApproval.timestamp.getTime() >=
+              pendingRequest.timestamp.getTime()));
+
+      if (alreadyApproved) {
+        throw new BadRequestException(
+          'NO_PENDING_CORRECTION: This auction correction request has already been approved.',
+        );
+      }
+
+      // Check if already rejected
+      const latestRejection = await tx.auditLog.findFirst({
+        where: {
+          entityType: 'Auction',
+          entityId: auctionId,
+          action: 'AUCTION_CORRECTION_REJECTED',
+        },
+        orderBy: { timestamp: 'desc' },
+      });
+
+      const alreadyRejected =
+        latestRejection &&
+        latestRejection.id !== pendingRequest.id &&
+        ((latestRejection.newValue as any)?.correctionRequestId ===
+          pendingRequest.id ||
+          (latestRejection.timestamp instanceof Date &&
+            pendingRequest.timestamp instanceof Date &&
+            latestRejection.timestamp.getTime() >=
+              pendingRequest.timestamp.getTime()));
+
+      if (alreadyRejected) {
+        throw new BadRequestException(
+          'NO_PENDING_CORRECTION: This auction correction request has already been rejected.',
+        );
+      }
+
+      const reqData = pendingRequest.newValue as any;
+
+      await tx.auditLog.create({
+        data: {
+          userId: checkerPartnerUserId,
+          action: 'AUCTION_CORRECTION_REJECTED',
+          entityType: 'Auction',
+          entityId: auctionId,
+          oldValue: {
+            correctionRequestId: pendingRequest.id,
+            requestedByUserId: pendingRequest.userId,
+            correctedBidDiscount: reqData.correctedBidDiscount,
+            correctedWinningTicketId: reqData.correctedWinningTicketId,
+            reason: reqData.reason,
+          },
+          newValue: {
+            correctionRequestId: pendingRequest.id,
+            rejectedByUserId: checkerPartnerUserId,
+            reason: trimmedReason,
+            notes: dto.notes?.trim() || null,
+            rejectedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      committedBranchId = preflightAuction.chitGroup?.branchId;
+      committedMonth = preflightAuction.installmentMonth;
+    });
+
+    await this.invalidateReportCaches(committedBranchId);
+
+    return {
+      success: true,
+      message: `Auction Month ${committedMonth} correction request rejected by Partner.`,
+      auctionId,
     };
   }
 }

@@ -127,8 +127,9 @@ export function TieBreakModal({
       .map((entry) => entry.tokenNumber)
       .filter((num): num is number => typeof num === 'number');
     if (
+      assignedTokens.length !== tiedTickets.length ||
       assignedTokens.some((n) => !Number.isInteger(n) || n < 1) ||
-      new Set(assignedTokens).size !== assignedTokens.length
+      new Set(assignedTokens).size !== tiedTickets.length
     ) {
       setError('Each tied subscriber must be assigned a unique positive integer physical paper token number.');
       return;
@@ -139,12 +140,17 @@ export function TieBreakModal({
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const validAuctionDate = auctionDate ? new Date(auctionDate) : new Date();
+    const safeIsoDate = !isNaN(validAuctionDate.getTime())
+      ? validAuctionDate.toISOString()
+      : new Date().toISOString();
+
     try {
       await onRecordTieBreak({
         tiedTickets,
         winningTicketId,
         bidDiscount: Number(ceilingDiscountBig),
-        auctionDate: new Date(auctionDate).toISOString(),
+        auctionDate: safeIsoDate,
         witnessNames: witnessNames.length > 0 ? witnessNames : undefined,
       });
       onClose();

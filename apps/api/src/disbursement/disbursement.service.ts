@@ -226,6 +226,49 @@ export class DisbursementService {
   }
 
   /**
+   * Asserts that no unapproved/unrejected auction correction request is pending for the given auction.
+   * Fails closed to eliminate concurrent prize payouts to disputed or erroneous auction winners (M9-DUAL-DEF-02).
+   */
+  private async assertNoPendingAuctionCorrection(
+    tx: any,
+    auctionId: string,
+  ): Promise<void> {
+    if (typeof tx?.auditLog?.findFirst !== 'function') return;
+
+    const latestRequest = await tx.auditLog.findFirst({
+      where: {
+        entityType: 'Auction',
+        entityId: auctionId,
+        action: 'AUCTION_CORRECTION_REQUESTED',
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    if (!latestRequest) return;
+
+    const latestResolution = await tx.auditLog.findFirst({
+      where: {
+        entityType: 'Auction',
+        entityId: auctionId,
+        action: { in: ['AUCTION_CORRECTION_APPROVED', 'AUCTION_CORRECTION_REJECTED'] },
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    const isPending =
+      !latestResolution ||
+      (latestResolution.timestamp instanceof Date &&
+        latestRequest.timestamp instanceof Date &&
+        latestResolution.timestamp.getTime() < latestRequest.timestamp.getTime());
+
+    if (isPending) {
+      throw new BadRequestException(
+        'PENDING_CORRECTION_LOCKOUT: Cannot verify safety proof, authorize, or release prize payout while an auction correction request is pending partner review.',
+      );
+    }
+  }
+
+  /**
    * Guardrail 2 & 3 (ADR-04): Pure BigInt basis-point calculation using the chit group's
    * permanently frozen foremanCommissionRate (zero floating-point math, zero silent truncation).
    */
@@ -683,6 +726,8 @@ export class DisbursementService {
           `SAFETY_PROOF_ALREADY_VERIFIED: Safety proof has already been verified or status has changed (current: ${lockedWinner.disbursementStatus})`,
         );
       }
+
+      await this.assertNoPendingAuctionCorrection(tx, auction.id);
 
       const freshWinner =
         typeof tx.auctionWinner?.findUnique === 'function'
@@ -1155,6 +1200,8 @@ export class DisbursementService {
         authMonth,
       );
 
+      await this.assertNoPendingAuctionCorrection(tx, auctionId);
+
       // KFC-FIN-003: Query all outstanding unpaid dues up to this auction month UNDER LOCK
       const unpaidDues =
         typeof tx.installmentDue?.findMany === 'function'
@@ -1422,6 +1469,8 @@ export class DisbursementService {
           authoritativeWinner.ticketId,
         );
         await this.lockTicketInstallmentDues(tx, authoritativeWinner.ticketId);
+
+        await this.assertNoPendingAuctionCorrection(tx, auctionId);
 
         // Duplicate Bank UTR / Cheque Reference Prevention (case-insensitive)
         await this.assertUniqueNonCashPaymentReference(

@@ -1,14 +1,15 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class MarkMinutesFiledDto {
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 'DRC/ERD/CHAL-2026-00412',
     description: 'Government challan, seal, or acknowledgement receipt number from Registrar office',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Government challan or filing reference is required' })
   @IsString()
-  filingReference?: string;
+  @MaxLength(100, { message: 'Filing reference cannot exceed 100 characters' })
+  filingReference: string;
 
   @ApiPropertyOptional({
     example: '2026-10-25T11:00:00.000Z',
@@ -25,5 +26,6 @@ export class MarkMinutesFiledDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500, { message: 'Notes cannot exceed 500 characters' })
   notes?: string;
 }

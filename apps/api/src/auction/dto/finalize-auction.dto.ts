@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class FinalizeAuctionDto {
   @ApiProperty({
@@ -11,6 +11,7 @@ export class FinalizeAuctionDto {
   @Type(() => Number)
   @IsInt()
   @Min(1, { message: 'At least 1 subscriber must be present' })
+  @Max(100, { message: 'Number of subscribers present cannot exceed 100' })
   subscribersPresent: number;
 
   @ApiPropertyOptional({
@@ -19,6 +20,7 @@ export class FinalizeAuctionDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500, { message: 'Notes cannot exceed 500 characters' })
   notes?: string;
 
   @ApiPropertyOptional({

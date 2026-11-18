@@ -238,5 +238,52 @@ void main() {
     );
   }
 
-  print('ALL Module 6 Dart model & idempotency tests PASSED successfully!');
+  // Test 9: M9-MOB-DEF-07 — AuctionDetailResponseDto parses PendingAuctionCorrectionDto
+  {
+    final detailJson = <String, dynamic>{
+      'id': 'auc-005',
+      'chitGroupId': 'chit-001',
+      'installmentMonth': 5,
+      'auctionDate': '2026-12-22T05:30:00.000Z',
+      'status': 'COMPLETED',
+      'tieBidders': <dynamic>[],
+      'pendingCorrection': {
+        'requestId': 'audit-req-001',
+        'requestedByUserId': 'partner-a-001',
+        'correctedBidDiscount': '24000',
+        'correctedWinningTicketId': 'ticket-uuid-008',
+        'correctedTicketNumber': 8,
+        'reason': 'Clerical transcription adjustment per physical paper lot',
+        'notes': 'Verified with 4 witnesses',
+        'requestedAt': '2026-12-22T10:00:00.000Z',
+      },
+    };
+
+    final aucDetail = AuctionDetailResponseDto.fromJson(detailJson);
+    assertTrue(aucDetail.pendingCorrection != null, 'pendingCorrection must be parsed');
+    assertEqual(aucDetail.pendingCorrection!.requestId, 'audit-req-001', 'requestId matches');
+    assertEqual(aucDetail.pendingCorrection!.requestedByUserId, 'partner-a-001', 'requestedByUserId matches');
+    assertEqual(aucDetail.pendingCorrection!.correctedBidDiscount, 24000, 'correctedBidDiscount is int 24000');
+    assertEqual(aucDetail.pendingCorrection!.correctedTicketNumber, 8, 'correctedTicketNumber is int 8');
+    assertEqual(aucDetail.pendingCorrection!.reason, 'Clerical transcription adjustment per physical paper lot', 'reason matches');
+
+    final roundTrip = jsonDecode(jsonEncode(aucDetail.toJson())) as Map<String, dynamic>;
+    assertTrue(roundTrip['pendingCorrection'] != null, 'pendingCorrection must round-trip in toJson()');
+    assertEqual((roundTrip['pendingCorrection'] as Map<String, dynamic>)['correctedBidDiscount'], 24000, 'nested discount preserved');
+  }
+
+  // Test 10: M9-MOB-DEF-08 — PreAuctionScanResultDto parses discrete int counts
+  {
+    final scanJson = <String, dynamic>{
+      'auctionsFound': 2,
+      'totalRemindersBroadcasted': 40,
+      'details': <dynamic>['Scan complete'],
+    };
+
+    final scanDto = PreAuctionScanResultDto.fromJson(scanJson);
+    assertEqual(scanDto.auctionsFound, 2, 'auctionsFound must be 2');
+    assertEqual(scanDto.totalRemindersBroadcasted, 40, 'totalRemindersBroadcasted must be 40');
+  }
+
+  print('ALL Module 6 & 9 Dart model & idempotency tests PASSED successfully!');
 }

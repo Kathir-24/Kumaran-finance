@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsNotEmpty,
   IsOptional,
@@ -91,6 +92,7 @@ export class SendAuctionReminderDto {
     description: 'List of chit subscribers to receive bilingual auction reminder',
   })
   @IsArray({ message: 'subscribers must be an array' })
+  @ArrayMinSize(1, { message: 'At least 1 subscriber must be specified for reminder dispatch' })
   @ValidateNested({ each: true })
   @Type(() => ReminderSubscriberItemDto)
   subscribers: ReminderSubscriberItemDto[];

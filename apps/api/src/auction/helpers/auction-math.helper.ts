@@ -4,6 +4,7 @@ import {
   DISCOUNT_CEILING_DIVISOR,
   FOREMAN_COMMISSION_PERCENT,
 } from '../../common/constants';
+import { formatIstDate } from '../../report/helpers/report-scope.helper';
 
 const COMMISSION_RATE_REGEX = /^(\d+)(?:\.(\d{1,2}))?$/;
 const BASIS_POINTS_DENOMINATOR = 10000n;
@@ -165,7 +166,7 @@ export function formatStatutoryAuctionMinutesText(params: {
   prizeMoney: bigint;
   notes?: string | null;
 }): string {
-  const auctionDateStr = params.auctionDate.toISOString().split('T')[0];
+  const auctionDateStr = formatIstDate(params.auctionDate);
   return (
     `KUMARAN FINANCE — STATUTORY AUCTION PROCEEDINGS (MONTH ${params.installmentMonth})\n` +
     `Group: ${params.groupName} (${params.groupCode})\n` +

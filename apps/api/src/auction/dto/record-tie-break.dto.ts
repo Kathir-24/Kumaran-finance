@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsDateString,
   IsInt,
@@ -44,6 +45,7 @@ export class RecordTieBreakDto {
       'List of all subscriber tickets that simultaneously bid the maximum 1/4 ceiling discount',
   })
   @IsArray()
+  @ArrayMinSize(2, { message: 'At least 2 tied tickets are required to conduct a tie-break draw' })
   @ValidateNested({ each: true })
   @Type(() => TiedTicketDto)
   tiedTickets: TiedTicketDto[];

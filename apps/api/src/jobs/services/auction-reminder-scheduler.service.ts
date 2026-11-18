@@ -1,9 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { AuctionStatus } from '@prisma/client';
+import { AuctionStatus, ChitStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuctionReminderJobPayload } from '../dto/job-payloads.dto';
 import { NotificationService } from './notification.service';
 import { RedisConnectionProvider } from '../providers/redis-connection.provider';
+import { FIRST_AUCTION_MONTH } from '../../common/constants';
 
 export interface ScanUpcomingAuctionsResult {
   chitsCount: number;
@@ -45,6 +46,11 @@ export class AuctionReminderSchedulerService {
     const scheduledAuctions = await this.prisma.auction.findMany({
       where: {
         status: AuctionStatus.SCHEDULED,
+        conductedByUserId: null,
+        installmentMonth: { gte: FIRST_AUCTION_MONTH },
+        chitGroup: {
+          status: ChitStatus.ACTIVE,
+        },
         auctionDate: {
           gte: startOfDay,
           lte: endOfDay,
@@ -55,6 +61,9 @@ export class AuctionReminderSchedulerService {
           include: {
             branch: true,
             tickets: {
+              where: {
+                status: 'ACTIVE',
+              },
               include: {
                 customer: true,
               },
@@ -69,10 +78,17 @@ export class AuctionReminderSchedulerService {
 
     for (const auction of scheduledAuctions) {
       const { chitGroup } = auction;
+
+      // Guardrail 5: Month N maturity settlement has no auction
+      if (auction.installmentMonth >= chitGroup.durationMonths) {
+        continue;
+      }
+
       const formattedDate = auction.auctionDate.toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
+        timeZone: 'Asia/Kolkata',
       });
 
       const subscribers = chitGroup.tickets

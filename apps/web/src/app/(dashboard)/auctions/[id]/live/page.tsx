@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -65,6 +65,7 @@ interface LiveAuctionRecord extends AuctionSummaryData {
 }
 
 function LiveAuctionRoomContent() {
+  const router = useRouter();
   const t = useTranslations('auctions');
   const params = useParams();
   const searchParams = useSearchParams();
@@ -217,7 +218,7 @@ function LiveAuctionRoomContent() {
   // Record Bid Mutation (passes ?month=currentMonth for both Auction UUID and ChitGroup UUID)
   const recordBidMutation = useMutation({
     mutationFn: async (payload: RecordBidPayload) => {
-      return unwrapApiResponse(
+      return unwrapApiResponse<LiveAuctionRecord>(
         apiClient.POST('/api/v1/auctions/{id}/record-bid', {
           params: {
             path: { id: auctionId },
@@ -227,18 +228,24 @@ function LiveAuctionRoomContent() {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (data: LiveAuctionRecord | unknown) => {
       setIsModifying(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
-      refetchAuction();
+      const record = data as LiveAuctionRecord | undefined;
+      if (record?.id && record.id !== auctionId) {
+        queryClient.setQueryData(queryKeys.auctions.detail(record.id), record);
+        router.replace(`/auctions/${record.id}/live`);
+      } else {
+        queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+        refetchAuction();
+      }
     },
   });
 
   // Record Tie-Break Mutation (passes ?month=currentMonth for both Auction UUID and ChitGroup UUID)
   const recordTieBreakMutation = useMutation({
     mutationFn: async (payload: RecordTieBreakPayload) => {
-      return unwrapApiResponse(
+      return unwrapApiResponse<LiveAuctionRecord>(
         apiClient.POST('/api/v1/auctions/{id}/tie-break', {
           params: {
             path: { id: auctionId },
@@ -248,12 +255,18 @@ function LiveAuctionRoomContent() {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (data: LiveAuctionRecord | unknown) => {
       setIsModifying(false);
       setIsTieBreakOpen(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
-      refetchAuction();
+      const record = data as LiveAuctionRecord | undefined;
+      if (record?.id && record.id !== auctionId) {
+        queryClient.setQueryData(queryKeys.auctions.detail(record.id), record);
+        router.replace(`/auctions/${record.id}/live`);
+      } else {
+        queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
+        refetchAuction();
+      }
     },
   });
 

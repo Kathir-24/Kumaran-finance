@@ -175,11 +175,16 @@ export function BiddingConsole({
       return;
     }
 
+    const validAuctionDate = auctionDate ? new Date(auctionDate) : new Date();
+    const safeIsoDate = !isNaN(validAuctionDate.getTime())
+      ? validAuctionDate.toISOString()
+      : new Date().toISOString();
+
     try {
       await onRecordBid({
         ticketId: selectedTicketId,
         bidDiscount: Number(currentDiscountBig),
-        auctionDate: new Date(auctionDate).toISOString(),
+        auctionDate: safeIsoDate,
       });
     } catch (err: unknown) {
       setErrorMsg(getErrorMessage(err, 'Failed to record auction bid'));
@@ -227,8 +232,30 @@ export function BiddingConsole({
                 const id = ('ticketId' in item && item.ticketId) ? item.ticketId : item.id;
                 return id === ticketId;
               });
-              if (found && 'customer' in found && found.customer) {
-                onSelectTicket(found as SubscriberTicketItem);
+              if (found) {
+                const flatCustCode = ('customerCode' in found && typeof found.customerCode === 'string') ? found.customerCode : '';
+                const flatCustName = ('customerName' in found && typeof found.customerName === 'string') ? found.customerName : 'Subscriber';
+                const flatPhone = ('phone' in found && typeof found.phone === 'string') ? found.phone : '';
+                const normalized: SubscriberTicketItem =
+                  'customer' in found && found.customer
+                    ? (found as SubscriberTicketItem)
+                    : {
+                        id: (('ticketId' in found && found.ticketId) ? found.ticketId : found.id) || '',
+                        ticketNumber: found.ticketNumber,
+                        chitGroupId: '',
+                        customerId: found.customerId,
+                        isPrized: false,
+                        status: 'ACTIVE',
+                        consecutiveUnpaidMonths: 0,
+                        customer: {
+                          id: found.customerId,
+                          customerCode: flatCustCode,
+                          fullName: flatCustName,
+                          fullNameTamil: null,
+                          phone: flatPhone,
+                        },
+                      };
+                onSelectTicket(normalized);
               }
             }}
             className="w-full rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-emerald-500/60 focus:outline-none disabled:opacity-50"

@@ -6,7 +6,9 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUUID,
   Max,
+  MaxLength,
 } from 'class-validator';
 import {
   MAX_SAFE_WHOLE_RUPEE,
@@ -35,7 +37,7 @@ export class RequestAuctionCorrectionDto {
       'UUID of the corrected winning subscriber ticket (optional if winner ticket is unchanged)',
   })
   @IsOptional()
-  @IsString()
+  @IsUUID('4', { message: 'Corrected winning ticket ID must be a valid UUID' })
   correctedWinningTicketId?: string;
 
   @ApiProperty({
@@ -44,6 +46,7 @@ export class RequestAuctionCorrectionDto {
   })
   @IsNotEmpty({ message: 'Correction reason is required' })
   @IsString()
+  @MaxLength(500, { message: 'Correction reason cannot exceed 500 characters' })
   reason: string;
 
   @ApiPropertyOptional({
@@ -52,6 +55,7 @@ export class RequestAuctionCorrectionDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500, { message: 'Notes cannot exceed 500 characters' })
   notes?: string;
 }
 
@@ -62,5 +66,26 @@ export class ApproveAuctionCorrectionDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500, { message: 'Notes cannot exceed 500 characters' })
+  notes?: string;
+}
+
+export class RejectAuctionCorrectionDto {
+  @ApiProperty({
+    example: 'Correction request rejected after comparing physical token register and member signatures',
+    description: 'Mandatory justification reason for rejecting the auction correction request',
+  })
+  @IsNotEmpty({ message: 'Rejection reason is required' })
+  @IsString()
+  @MaxLength(500, { message: 'Rejection reason cannot exceed 500 characters' })
+  reason: string;
+
+  @ApiPropertyOptional({
+    example: 'Verified by Partner B against physical lot draw sheet',
+    description: 'Additional administrative remarks or notes',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'Notes cannot exceed 500 characters' })
   notes?: string;
 }

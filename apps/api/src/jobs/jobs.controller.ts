@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  NotFoundException,
+  Optional,
   Param,
   ParseIntPipe,
   Post,
@@ -15,14 +18,19 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { ChitStatus, Role } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { FIRST_AUCTION_MONTH } from '../common/constants';
 import { toWholeRupeeBigInt } from '../common/utils/whole-rupee.util';
+import { assertAuctionBranchAccess } from '../auction/helpers/auction-access.helper';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   DAILY_MAINTENANCE_QUEUE,
   JOB_DISPATCH_AUCTION_REMINDER,
@@ -61,6 +69,7 @@ export class JobsController {
     private readonly reconciliationService: ReconciliationService,
     private readonly auctionReminderSchedulerService: AuctionReminderSchedulerService,
     private readonly queueProvider: BullMqQueueProvider,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   @Post('run-daily-arrears')
@@ -147,7 +156,28 @@ export class JobsController {
     @Param('chitGroupId') chitGroupId: string,
     @Param('month', ParseIntPipe) month: number,
     @Body() dto: SendAuctionReminderDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
+    if (this.prisma) {
+      const chit = await this.prisma.chitGroup.findUnique({
+        where: { id: chitGroupId },
+      });
+      if (!chit) {
+        throw new NotFoundException('Chit scheme not found');
+      }
+      assertAuctionBranchAccess(chit.branchId, currentUser);
+      if (chit.status !== ChitStatus.ACTIVE) {
+        throw new BadRequestException(
+          `Cannot send reminders: Chit scheme must be ACTIVE (current status: ${chit.status})`,
+        );
+      }
+      if (month < FIRST_AUCTION_MONTH || month >= chit.durationMonths) {
+        throw new BadRequestException(
+          `Auctions take place exclusively in Months 2 through ${chit.durationMonths - 1} (Month 1 and Month ${chit.durationMonths} have no auctions)`,
+        );
+      }
+    }
+
     return this.queueProvider.addJob(
       NOTIFICATION_QUEUE,
       JOB_DISPATCH_AUCTION_REMINDER,

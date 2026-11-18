@@ -21,9 +21,12 @@ describe('AuctionReminderSchedulerService (Broadcast Idempotency & Cost Protecti
     installmentMonth: 4,
     auctionDate: new Date('2026-10-25T10:30:00Z'),
     status: AuctionStatus.SCHEDULED,
+    conductedByUserId: null,
     chitGroup: {
       id: 'chit-group-uuid-001',
       groupCode: 'KCA-1L-20M-01',
+      status: 'ACTIVE',
+      durationMonths: 20,
       branch: {
         id: 'branch-prd-001',
         name: 'Head Office - Perundurai',
@@ -161,5 +164,48 @@ describe('AuctionReminderSchedulerService (Broadcast Idempotency & Cost Protecti
     expect(result.remindersCount).toBe(0);
     expect(notificationServiceMock.dispatchAuctionReminder).not.toHaveBeenCalled();
     expect(redisClientMock.set).not.toHaveBeenCalled();
+  });
+
+  it('REMIND-05: DEF-M9-ENG-02 - Scans with conductedByUserId: null, chitGroup ACTIVE, installmentMonth >= FIRST_AUCTION_MONTH, and tickets with status: ACTIVE', async () => {
+    const targetDate = new Date('2026-10-25T00:00:00Z');
+    await service.scanAndBroadcastUpcomingAuctions(targetDate);
+
+    expect(prismaMock.auction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: AuctionStatus.SCHEDULED,
+          conductedByUserId: null,
+          installmentMonth: { gte: 2 },
+          chitGroup: { status: 'ACTIVE' },
+        }),
+        include: expect.objectContaining({
+          chitGroup: expect.objectContaining({
+            include: expect.objectContaining({
+              tickets: expect.objectContaining({
+                where: { status: 'ACTIVE' },
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('REMIND-06: DEF-M9-ENG-02 - Guardrail 5: Skips Month N maturity settlement (durationMonths)', async () => {
+    const monthNAuction = {
+      ...mockAuction,
+      installmentMonth: 20, // Month 20 on 20-month duration -> direct settlement, no auction
+      chitGroup: {
+        ...mockAuction.chitGroup,
+        durationMonths: 20,
+      },
+    };
+    prismaMock.auction.findMany.mockResolvedValue([monthNAuction]);
+
+    const targetDate = new Date('2026-10-25T00:00:00Z');
+    const result = await service.scanAndBroadcastUpcomingAuctions(targetDate);
+
+    expect(result.remindersCount).toBe(0);
+    expect(notificationServiceMock.dispatchAuctionReminder).not.toHaveBeenCalled();
   });
 });

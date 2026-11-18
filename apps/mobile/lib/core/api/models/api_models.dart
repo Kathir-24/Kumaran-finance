@@ -409,9 +409,9 @@ class NotificationLogItemDto {
 
 class PreAuctionScanResultDto {
   /// Upcoming auctions identified
-  final double auctionsFound;
+  final int auctionsFound;
   /// Reminders dispatched to subscribers
-  final double totalRemindersBroadcasted;
+  final int totalRemindersBroadcasted;
   /// Auction notification breakdown
   final List<dynamic> details;
 
@@ -423,8 +423,8 @@ class PreAuctionScanResultDto {
 
   factory PreAuctionScanResultDto.fromJson(Map<String, dynamic> json) {
     return PreAuctionScanResultDto(
-      auctionsFound: (json['auctionsFound'] != null ? (json['auctionsFound'] as num).toDouble() : null) ?? 0.0,
-      totalRemindersBroadcasted: (json['totalRemindersBroadcasted'] != null ? (json['totalRemindersBroadcasted'] as num).toDouble() : null) ?? 0.0,
+      auctionsFound: _parseWholeRupeeInt(json['auctionsFound']),
+      totalRemindersBroadcasted: _parseWholeRupeeInt(json['totalRemindersBroadcasted']),
       details: (json['details'] as List<dynamic>?) ?? [],
     );
   }
@@ -3310,6 +3310,62 @@ class AuctionMinutesDto {
   }
 }
 
+class PendingAuctionCorrectionDto {
+  /// Pending correction request audit ID
+  final String requestId;
+  /// Partner user ID who requested the correction
+  final String requestedByUserId;
+  /// Requested corrected winning bid discount in whole Rupees
+  final int correctedBidDiscount;
+  /// UUID of the corrected winning subscriber ticket
+  final String? correctedWinningTicketId;
+  /// Corrected winning ticket number 1..N
+  final int? correctedTicketNumber;
+  /// Mandatory justification reason for the finalized auction correction
+  final String reason;
+  /// Additional administrative remarks or notes
+  final String? notes;
+  /// Timestamp of the correction request
+  final String requestedAt;
+
+  const PendingAuctionCorrectionDto({
+    required this.requestId,
+    required this.requestedByUserId,
+    required this.correctedBidDiscount,
+    this.correctedWinningTicketId,
+    this.correctedTicketNumber,
+    required this.reason,
+    this.notes,
+    required this.requestedAt,
+  });
+
+  factory PendingAuctionCorrectionDto.fromJson(Map<String, dynamic> json) {
+    return PendingAuctionCorrectionDto(
+      requestId: json['requestId']?.toString() ?? '',
+      requestedByUserId: json['requestedByUserId']?.toString() ?? '',
+      correctedBidDiscount: _parseWholeRupeeInt(json['correctedBidDiscount']),
+      correctedWinningTicketId: json['correctedWinningTicketId']?.toString(),
+      correctedTicketNumber: _parseWholeRupeeIntOrNull(json['correctedTicketNumber']),
+      reason: json['reason']?.toString() ?? '',
+      notes: json['notes']?.toString(),
+      requestedAt: json['requestedAt']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['requestId'] = requestId;
+    data['requestedByUserId'] = requestedByUserId;
+    data['correctedBidDiscount'] = correctedBidDiscount;
+    data['correctedWinningTicketId'] = correctedWinningTicketId;
+    data['correctedTicketNumber'] = correctedTicketNumber;
+    data['reason'] = reason;
+    data['notes'] = notes;
+    data['requestedAt'] = requestedAt;
+    return data;
+  }
+}
+
 class AuctionDetailResponseDto {
   /// Auction unique ID
   final String id;
@@ -3345,6 +3401,8 @@ class AuctionDetailResponseDto {
   final dynamic minutes;
   /// Parent chit scheme parameters
   final dynamic chitGroup;
+  /// Pending unapproved correction request metadata
+  final PendingAuctionCorrectionDto? pendingCorrection;
 
   const AuctionDetailResponseDto({
     required this.id,
@@ -3364,6 +3422,7 @@ class AuctionDetailResponseDto {
     required this.tieBidders,
     this.minutes,
     this.chitGroup,
+    this.pendingCorrection,
   });
 
   factory AuctionDetailResponseDto.fromJson(Map<String, dynamic> json) {
@@ -3387,6 +3446,9 @@ class AuctionDetailResponseDto {
       tieBidders: ((json['tieBidders'] as List<dynamic>?)?.map((e) => AuctionTieBidderDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       minutes: json['minutes'],
       chitGroup: json['chitGroup'],
+      pendingCorrection: json['pendingCorrection'] != null && json['pendingCorrection'] is Map<String, dynamic>
+          ? PendingAuctionCorrectionDto.fromJson(json['pendingCorrection'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -3409,6 +3471,7 @@ class AuctionDetailResponseDto {
     data['tieBidders'] = tieBidders.map((v) => v.toJson()).toList();
     data['minutes'] = minutes;
     data['chitGroup'] = chitGroup;
+    data['pendingCorrection'] = pendingCorrection?.toJson();
     return data;
   }
 }

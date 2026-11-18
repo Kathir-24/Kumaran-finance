@@ -47,10 +47,15 @@ export function RegistrarFilingDialog({
     e.preventDefault();
     setErrorMsg(null);
 
+    const validFiledDate = filedDate ? new Date(filedDate) : new Date();
+    const safeIsoDate = !isNaN(validFiledDate.getTime())
+      ? validFiledDate.toISOString()
+      : new Date().toISOString();
+
     try {
       await onMarkFiled({
         filingReference: filingReference.trim() || undefined,
-        filedDate: new Date(filedDate).toISOString(),
+        filedDate: safeIsoDate,
         notes: notes.trim() || undefined,
       });
       onClose();

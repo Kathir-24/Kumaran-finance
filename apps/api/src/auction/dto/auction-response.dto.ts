@@ -100,8 +100,11 @@ export class AuctionMinutesDto {
   @ApiProperty({ type: String, example: null, description: 'Government challan or filing reference', nullable: true })
   filingReference?: string | null;
 
-  @ApiProperty({ type: String, format: 'date-time', example: null, description: 'Filing date at Registrar office', nullable: true })
+  @ApiPropertyOptional({ type: String, format: 'date-time', example: null, description: 'Filing date at Registrar office', nullable: true })
   filedDate?: Date | string | null;
+
+  @ApiPropertyOptional({ type: String, example: null, description: 'Staff remarks or filing details', nullable: true })
+  filingNotes?: string | null;
 }
 
 export class AuctionResponseDto {
@@ -239,6 +242,17 @@ export class ApproveAuctionCorrectionResponseDto {
 
   @ApiProperty({ type: AuctionResponseDto })
   auction: AuctionResponseDto;
+}
+
+export class RejectAuctionCorrectionResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ example: 'Auction Month 3 correction request rejected by Partner.' })
+  message: string;
+
+  @ApiProperty({ example: 'auc-uuid-001' })
+  auctionId: string;
 }
 
 export class FinalizeAuctionResponseDto extends AuctionDetailResponseDto {}

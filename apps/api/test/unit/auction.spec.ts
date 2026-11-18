@@ -4,8 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuctionStatus, ChitStatus, DueStatus, Role } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { AuctionService } from '../../src/auction/auction.service';
 import { parseOptionalPositiveIntQuery } from '../../src/auction/helpers/auction-access.helper';
+import { RecordTieBreakDto } from '../../src/auction/dto/record-tie-break.dto';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
@@ -96,6 +99,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           customer: { fullName: 'Muthusamy K', customerCode: 'KC-CUST-00002' },
         },
       ]);
@@ -108,6 +112,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           dues: {
             none: {
               installmentMonth: { lte: 2 },
@@ -339,6 +344,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           customer: { fullName: 'M. Palanisamy' },
         },
         {
@@ -348,6 +354,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           customer: { fullName: 'S. Ramasamy' },
         },
       ]);
@@ -1266,6 +1273,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
         },
       ]);
       await expect(
@@ -1281,6 +1289,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           customer: { fullName: 'Unpaid Member' },
         },
         {
@@ -1290,6 +1299,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           isPrized: false,
           status: 'ACTIVE',
           consecutiveUnpaidMonths: 0,
+          removalRequestedByUserId: null,
           customer: { fullName: 'Paid Member' },
         },
       ]);
@@ -1860,7 +1870,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           timestamp: new Date('2026-12-21T10:00:00.000Z'),
           oldValue: { ticketId: mockTicketId1 },
           newValue: {
-            correctedBidDiscount: '24000',
+            correctedBidDiscount: '25000',
             correctedWinningTicketId: mockTicketId2,
             correctedTicketNumber: 4,
             reason: 'Wrong token number transcribed',
@@ -1870,7 +1880,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       prismaMock.auction.update.mockResolvedValue({
         ...baseFinalizedAuction,
         status: AuctionStatus.COMPLETED,
-        bidDiscount: 24000n,
+        bidDiscount: 25000n,
       });
       prismaMock.installmentDue.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
       prismaMock.auctionMinutes.update.mockResolvedValue({});
@@ -2128,6 +2138,506 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           [Role.SUPER_ADMIN],
         ),
       ).rejects.toThrow(/CORRECTION_REASON_REQUIRED/);
+    });
+  });
+
+  describe('10. Module 9 Forensic Engine Remediation Proofs (DEF-M9-ENG-01 .. DEF-M9-ENG-07)', () => {
+    it('DEF-M9-ENG-01: rejects ticket with removalRequestedByUserId from auction bidding and excludes from eligible bidders', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([]);
+
+      await auctionService.getEligibleBidders(mockChitGroupId, 2);
+      expect(prismaMock.subscriberTicket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            removalRequestedByUserId: null,
+          }),
+        }),
+      );
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 3,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        removalRequestedByUserId: 'mgr-removal-uuid',
+        customer: { fullName: 'Defaulter Candidate' },
+      });
+
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          {
+            ticketId: mockTicketId1,
+            bidDiscount: 20000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/ADR-12 Violation/);
+    });
+
+    it('DEF-M9-ENG-01: authoritative locked ticket preserves consecutiveUnpaidMonths and rejects if arrears exist', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      // Pre-flight ticket has 0 arrears, but locked ticket has 2 months arrears
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 3,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'Subscriber' },
+      });
+
+      prismaMock.$queryRaw = jest.fn().mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"ChitGroup"')) {
+          return [{ id: mockChitGroupId, status: ChitStatus.ACTIVE }];
+        }
+        if (sql.includes('"SubscriberTicket"')) {
+          return [{ id: mockTicketId1, status: 'ACTIVE', isPrized: false, consecutiveUnpaidMonths: 2 }];
+        }
+        return [];
+      });
+
+      await expect(
+        auctionService.recordBid(
+          mockChitGroupId,
+          2,
+          {
+            ticketId: mockTicketId1,
+            bidDiscount: 20000,
+            auctionDate: '2026-12-15T00:00:00.000Z',
+          },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(/ADR-07 Violation.*unpaid arrears/);
+    });
+
+    it('DEF-M9-ENG-04: rejects mismatched ?month=X query param when targeting Auction UUID', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+      });
+
+      // Query ?month=5 against Month 2 auction record -> MUST REJECT 400
+      await expect(
+        auctionService.getEligibleBiddersForIdentifier(mockAuctionId, 5),
+      ).rejects.toThrow(/does not match auction record \(Month 2\)/);
+
+      await expect(
+        auctionService.recordBidForIdentifier(
+          mockAuctionId,
+          { ticketId: mockTicketId1, bidDiscount: 20000, auctionDate: '2026-12-15' },
+          mockMakerId,
+          5,
+        ),
+      ).rejects.toThrow(/does not match auction record \(Month 2\)/);
+
+      await expect(
+        auctionService.recordTieBreakForIdentifier(
+          mockAuctionId,
+          {
+            tiedTickets: [{ ticketId: mockTicketId1 }, { ticketId: mockTicketId2 }],
+            winningTicketId: mockTicketId1,
+            bidDiscount: 25000,
+            auctionDate: '2026-12-15',
+          },
+          mockMakerId,
+          5,
+        ),
+      ).rejects.toThrow(/does not match auction record \(Month 2\)/);
+    });
+
+    it('DEF-M9-ENG-05: RecordTieBreakDto validation rejects fewer than 2 tied tickets', async () => {
+      const dtoSingle = plainToInstance(RecordTieBreakDto, {
+        tiedTickets: [{ ticketId: mockTicketId1, tokenNumber: 1 }],
+        winningTicketId: mockTicketId1,
+        bidDiscount: 25000,
+        auctionDate: '2026-12-15T00:00:00.000Z',
+      });
+      const errorsSingle = await validate(dtoSingle);
+      expect(errorsSingle.length).toBeGreaterThan(0);
+      expect(errorsSingle.some((e) => e.property === 'tiedTickets')).toBe(true);
+
+      const dtoEmpty = plainToInstance(RecordTieBreakDto, {
+        tiedTickets: [],
+        winningTicketId: mockTicketId1,
+        bidDiscount: 25000,
+        auctionDate: '2026-12-15T00:00:00.000Z',
+      });
+      const errorsEmpty = await validate(dtoEmpty);
+      expect(errorsEmpty.some((e) => e.property === 'tiedTickets')).toBe(true);
+    });
+
+    it('DEF-M9-ENG-07: recordBid acquires row lock on existing auction before mutating', async () => {
+      prismaMock.chitGroup.findUnique.mockResolvedValue(mockChitScheme);
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        chitGroupId: mockChitGroupId,
+        ticketNumber: 3,
+        isPrized: false,
+        status: 'ACTIVE',
+        consecutiveUnpaidMonths: 0,
+        customer: { fullName: 'Subscriber' },
+      });
+
+      const existingAuctionRow = {
+        id: mockAuctionId,
+        status: AuctionStatus.SCHEDULED,
+      };
+
+      prismaMock.$queryRaw = jest.fn().mockImplementation(async (query: any) => {
+        const sql = Array.isArray(query) ? query.join('') : String(query);
+        if (sql.includes('"ChitGroup"')) {
+          return [{ id: mockChitGroupId, status: ChitStatus.ACTIVE }];
+        }
+        if (sql.includes('"SubscriberTicket"')) {
+          return [{ id: mockTicketId1, status: 'ACTIVE', isPrized: false, consecutiveUnpaidMonths: 0 }];
+        }
+        if (sql.includes('"Auction"')) {
+          return [{ id: mockAuctionId, status: AuctionStatus.SCHEDULED }];
+        }
+        return [];
+      });
+
+      prismaMock.auction.findUnique.mockResolvedValue(existingAuctionRow);
+      prismaMock.auction.upsert.mockResolvedValue({
+        id: mockAuctionId,
+        chitGroupId: mockChitGroupId,
+        installmentMonth: 2,
+        status: AuctionStatus.SCHEDULED,
+      });
+      prismaMock.auctionWinner.upsert.mockResolvedValue({});
+
+      await auctionService.recordBid(
+        mockChitGroupId,
+        2,
+        {
+          ticketId: mockTicketId1,
+          bidDiscount: 20000,
+          auctionDate: '2026-12-15T00:00:00.000Z',
+        },
+        mockMakerId,
+      );
+
+      // Verify $queryRaw was called to lock Auction row
+      const calls = prismaMock.$queryRaw.mock.calls;
+      const auctionLockCall = calls.find((c: any) => {
+        const sql = Array.isArray(c[0]) ? c[0].join('') : String(c[0]);
+        return sql.includes('"Auction"') && sql.includes('FOR UPDATE');
+      });
+      expect(auctionLockCall).toBeDefined();
+    });
+  });
+
+  describe('11. Module 9 Forensic Dual-Control, Minutes Filing, and Correction Workflow Remediation Proofs (M9-DUAL-DEF-01 .. M9-DUAL-DEF-08)', () => {
+    const partnerA = 'partner-maker-uuid-001';
+    const partnerB = 'partner-checker-uuid-002';
+
+    const mockCompletedAuction = {
+      id: mockAuctionId,
+      chitGroupId: mockChitGroupId,
+      installmentMonth: 3,
+      auctionDate: new Date('2026-11-01T10:00:00.000Z'),
+      status: AuctionStatus.COMPLETED,
+      bidDiscount: 25000n,
+      prizeMoney: 75000n,
+      dividendPerTicket: 1050n,
+      foremanCommissionRate: 4.0,
+      foremanCommissionAmount: 4000n,
+      totalDividend: 21000n,
+      chitGroup: mockChitScheme,
+      winner: {
+        id: 'win-001',
+        ticketId: mockTicketId1,
+        wasTieBreakWinner: true,
+        disbursementStatus: 'PENDING_VERIFICATION',
+        ticket: {
+          id: mockTicketId1,
+          ticketNumber: 2,
+          customer: { fullName: 'Prized Winner' },
+        },
+      },
+      minutes: {
+        id: 'min-001',
+        auctionId: mockAuctionId,
+        filedAtRegistrar: false,
+        subscribersPresent: 18,
+      },
+      tieBidders: [
+        { id: 'tb-1', auctionId: mockAuctionId, ticketId: mockTicketId1, isWinner: true },
+        { id: 'tb-2', auctionId: mockAuctionId, ticketId: mockTicketId2, isWinner: false },
+      ],
+    };
+
+    it('M9-DUAL-DEF-01: rejectAuctionCorrection enforces Maker != Checker, verifies partner identity, logs rejection, and blocks subsequent approval', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+      prismaMock.user.findUnique.mockImplementation(({ where }: any) => {
+        if (where?.id === 'non-partner-uuid') {
+          return Promise.resolve({ id: 'non-partner-uuid', isPartner: false });
+        }
+        return Promise.resolve({ id: where?.id || 'partner-id', isPartner: true });
+      });
+
+      const pendingCorrectionAudit = {
+        id: 'audit-corr-req-001',
+        userId: partnerA,
+        action: 'AUCTION_CORRECTION_REQUESTED',
+        timestamp: new Date('2026-11-02T10:00:00.000Z'),
+        newValue: {
+          correctedBidDiscount: '22000',
+          correctedWinningTicketId: mockTicketId1,
+          reason: 'Correcting bid amount to match hand-written token',
+        },
+      };
+
+      prismaMock.auditLog.findFirst = jest.fn().mockImplementation(({ where }: any) => {
+        if (where?.action === 'AUCTION_CORRECTION_REQUESTED') {
+          return Promise.resolve(pendingCorrectionAudit);
+        }
+        return Promise.resolve(null);
+      });
+
+      // 1. Non-partner IT Super Admin blocked fail-closed (Guardrail 11)
+      await expect(
+        auctionService.rejectAuctionCorrection(
+          mockAuctionId,
+          'non-partner-uuid',
+          { reason: 'Invalid correction request' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/i);
+
+      // 2. Maker != Checker: Requester Partner A attempting to reject their own correction request is blocked
+      await expect(
+        auctionService.rejectAuctionCorrection(
+          mockAuctionId,
+          partnerA,
+          { reason: 'Self-canceling request' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/Maker-Checker Separation of Duties Violated/i);
+
+      // 3. Independent Partner B successfully rejects correction request
+      prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-reject-001' });
+
+      const rejectResult = await auctionService.rejectAuctionCorrection(
+        mockAuctionId,
+        partnerB,
+        { reason: 'Token verification matched original 25,000 bid', notes: 'Checked physical slips' },
+        [Role.SUPER_ADMIN],
+      );
+
+      expect(rejectResult.success).toBe(true);
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'AUCTION_CORRECTION_REJECTED',
+            userId: partnerB,
+            newValue: expect.objectContaining({
+              correctionRequestId: 'audit-corr-req-001',
+              rejectedByUserId: partnerB,
+              reason: 'Token verification matched original 25,000 bid',
+            }),
+          }),
+        }),
+      );
+
+      // 4. Once rejected, approveAuctionCorrection fails closed with NO_PENDING_CORRECTION
+      prismaMock.auditLog.findFirst = jest.fn().mockImplementation(({ where }: any) => {
+        if (where?.action === 'AUCTION_CORRECTION_REQUESTED') {
+          return Promise.resolve(pendingCorrectionAudit);
+        }
+        if (where?.action === 'AUCTION_CORRECTION_REJECTED') {
+          return Promise.resolve({
+            id: 'audit-reject-001',
+            action: 'AUCTION_CORRECTION_REJECTED',
+            timestamp: new Date('2026-11-02T11:00:00.000Z'),
+            newValue: { correctionRequestId: 'audit-corr-req-001' },
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await expect(
+        auctionService.approveAuctionCorrection(
+          mockAuctionId,
+          partnerB,
+          { notes: 'Attempting to approve rejected request' },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/already been rejected/i);
+    });
+
+    it('M9-DUAL-DEF-03: markMinutesFiled validates required non-blank filingReference and legal filedDate bounds', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+
+      // 1. Missing / blank / whitespace-only filing reference rejected
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          { filingReference: '   ' } as any,
+          partnerA,
+        ),
+      ).rejects.toThrow(/FILING_REFERENCE_REQUIRED/i);
+
+      // 2. Retroactive filedDate before auction date rejected
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          {
+            filingReference: 'TN-CHALLAN-001',
+            filedDate: '2026-10-15T00:00:00.000Z', // Before 2026-11-01 auction
+          },
+          partnerA,
+        ),
+      ).rejects.toThrow(/FILED_DATE_BEFORE_AUCTION/i);
+
+      // 3. Future filedDate rejected
+      await expect(
+        auctionService.markMinutesFiled(
+          mockAuctionId,
+          {
+            filingReference: 'TN-CHALLAN-001',
+            filedDate: '2099-01-01T00:00:00.000Z',
+          },
+          partnerA,
+        ),
+      ).rejects.toThrow(/FILED_DATE_IN_FUTURE/i);
+
+      // 4. Valid filing computes Form XVII compliance metadata and persists to AuditLog
+      prismaMock.auctionMinutes.update.mockResolvedValue({
+        id: 'min-001',
+        filedAtRegistrar: true,
+        filingReference: 'TN-CHALLAN-2026-1234',
+      });
+
+      const filingResult = await auctionService.markMinutesFiled(
+        mockAuctionId,
+        {
+          filingReference: 'TN-CHALLAN-2026-1234',
+          filedDate: '2026-11-10T10:00:00.000Z', // Within statutory 21 days
+          notes: 'Filed at Perundurai Sub-Registrar Office',
+        },
+        partnerA,
+      );
+
+      expect(filingResult.minutes.filedAtRegistrar).toBe(true);
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'MINUTES_FILED_AT_REGISTRAR',
+            newValue: expect.objectContaining({
+              filingReference: 'TN-CHALLAN-2026-1234',
+              filingStatus: 'FILED',
+              isDelayedFiling: false,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('M9-DUAL-DEF-04: approveAuctionCorrection purges stale AuctionTieBidder rows and resets wasTieBreakWinner on sub-ceiling discount corrections', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+
+      const subCeilingCorrectionRequest = {
+        id: 'audit-corr-sub-001',
+        userId: partnerA,
+        action: 'AUCTION_CORRECTION_REQUESTED',
+        timestamp: new Date('2026-11-02T10:00:00.000Z'),
+        newValue: {
+          correctedBidDiscount: '20000', // ₹20,000 < ₹25,000 ceiling!
+          correctedWinningTicketId: mockTicketId1,
+          reason: 'Correcting from ceiling to actual single high bid',
+        },
+      };
+
+      prismaMock.auditLog.findFirst = jest.fn().mockImplementation(({ where }: any) => {
+        if (where?.action === 'AUCTION_CORRECTION_REQUESTED') {
+          return Promise.resolve(subCeilingCorrectionRequest);
+        }
+        return Promise.resolve(null);
+      });
+
+      prismaMock.auction.update.mockResolvedValue({
+        ...mockCompletedAuction,
+        bidDiscount: 20000n,
+      });
+
+      await auctionService.approveAuctionCorrection(
+        mockAuctionId,
+        partnerB,
+        { notes: 'Approved sub-ceiling correction' },
+        [Role.SUPER_ADMIN],
+      );
+
+      // Must purge stale tie-bidders because tie-breaks only exist at ceiling
+      expect(prismaMock.auctionTieBidder.deleteMany).toHaveBeenCalledWith({
+        where: { auctionId: mockAuctionId },
+      });
+
+      // Must reset wasTieBreakWinner on winner record
+      expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'win-001' },
+          data: expect.objectContaining({
+            wasTieBreakWinner: false,
+          }),
+        }),
+      );
+    });
+
+    it('M9-DUAL-DEF-05: requestAuctionCorrection acquires DAG locks inside withTransactionRetry and rejects concurrent pending requests', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+
+      // Existing unapproved pending correction request
+      prismaMock.auditLog.findFirst = jest.fn().mockImplementation(({ where }: any) => {
+        if (where?.action === 'AUCTION_CORRECTION_REQUESTED') {
+          return Promise.resolve({
+            id: 'audit-existing-pending-001',
+            action: 'AUCTION_CORRECTION_REQUESTED',
+            timestamp: new Date(),
+            newValue: { correctedBidDiscount: '22000' },
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          partnerA,
+          {
+            correctedBidDiscount: 21000,
+            reason: 'Second correction request while first is pending',
+          },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PENDING_CORRECTION_EXISTS/i);
+    });
+
+    it('M9-DUAL-DEF-08: requestAuctionCorrection rejects zero-change no-op correction requests', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+
+      // Attempting to request correction with identical discount (25000) and same winner ticket
+      await expect(
+        auctionService.requestAuctionCorrection(
+          mockAuctionId,
+          partnerA,
+          {
+            correctedBidDiscount: 25000,
+            correctedWinningTicketId: mockTicketId1,
+            reason: 'Identical values without changes',
+          },
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/NO_CHANGES_DETECTED/i);
     });
   });
 });
