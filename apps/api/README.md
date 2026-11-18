@@ -2,10 +2,10 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Package Architecture**: NestJS 12 Modular Monolith in `apps/api/`  
-> **Monorepo Manager**: `pnpm 12+` (Workspace Monorepo)  
-> **Database & Cache**: PostgreSQL 17 + Prisma ORM 6, Redis 7 + BullMQ  
-> **Financial Math**: Pure whole-rupee integer arithmetic (`BigInt`). Zero paise and zero floats.
+> **Package Architecture**: NestJS 12 Modular Monolith in `apps/api/` (**18 Controllers**, **134 HTTP Operations** + Bull Board UI `/admin/queues`)  
+> **Monorepo Manager**: `pnpm@12.14.0` (Workspace Monorepo, Node.js 24 LTS)  
+> **Database & Cache**: PostgreSQL 17 + Prisma ORM 6 (**18 models**, **8 enums**, **23 linear migrations**), Redis 7 (`noeviction`) + BullMQ  
+> **Financial Math**: Pure whole-rupee integer arithmetic (`BigInt`). Zero paise and zero floating-point math.
 
 ---
 
@@ -20,10 +20,10 @@ pnpm run start:dev
 # Run Oxlint fast linter (0 errors, 0 warnings required)
 pnpm run lint
 
-# Run all automated unit and financial invariant tests
+# Run all automated unit and financial invariant tests (63 suites / 1,226 tests)
 pnpm test
 
-# Run end-to-end (e2e) tests
+# Run end-to-end (e2e) tests (14 suites / 187 tests)
 pnpm run test:e2e
 
 # Compile production NestJS build into dist/
@@ -32,10 +32,11 @@ pnpm run build
 # Regenerate Prisma Client
 pnpm run prisma:generate
 
-# Apply database migrations to PostgreSQL
+# Apply database migrations to PostgreSQL (dev / deploy)
 pnpm run prisma:migrate
+pnpm --filter api exec prisma migrate deploy
 
-# Seed Head Office (PRD) and initial Super Admin partner
+# Seed Head Office (PRD) and initial 9 staff accounts (including 4 Verified Partners)
 pnpm run prisma:seed
 
 # Launch visual database inspector (Prisma Studio)
@@ -44,6 +45,11 @@ pnpm run prisma:studio
 # Re-export OpenAPI / Swagger JSON contract
 pnpm --filter api run openapi:export
 ```
+
+### Verified Automated Test Baselines
+- **Unit & Financial Invariant Tests**: **63 suites / 1,226 tests** passing.
+- **API E2E Integration Suites**: **14 suites / 187 tests** passing against real PostgreSQL 17 + Redis 7.
+- **Real PostgreSQL 17 Concurrency Suite**: **26 / 26** invariants passing (`CONCURR-INV-1..26` verifying `SELECT FOR UPDATE`, deterministic lock ordering, `withTransactionRetry`, and distributed locks).
 
 ### Direct Workspace Invocation
 If you prefer targeting the `api` workspace explicitly:
@@ -54,40 +60,46 @@ pnpm --filter api <command>
 
 ---
 
-## 2. Environment Configuration & Validation
+## 2. Environment Configuration & Fail-Fast Validation
 
-Environment variables are validated fail-fast at server startup via [`src/config/env.validation.ts`](src/config/env.validation.ts). If any mandatory variable is missing or malformed, the process halts immediately with an explicit error.
+Environment variables are validated fail-fast at startup via [`src/config/env.validation.ts`](src/config/env.validation.ts). If any mandatory variable is missing or violates production hardening guards, the NestJS process halts immediately with an explicit configuration error.
+
+### Production Hardening Guards (`NODE_ENV=production`)
+When `NODE_ENV=production`, `validateEnv()` strictly enforces:
+1. `STORAGE_DRIVER` **must** be `'s3'` (blocks local disk fragmentation across instances).
+2. `JWT_SECRET` **must** be a cryptographically secure string of at least **32 characters** and must not contain placeholder text (`replace-with-a-secure-random`).
+3. `BULL_BOARD_PASSWORD` and `METRICS_PASSWORD` **cannot** use the insecure default `"chitflow_secret"`.
+4. `SMS_DRIVER=msg91` requires `MSG91_AUTH_KEY`; `STORAGE_DRIVER=s3` requires `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`.
 
 ### Environment Variable Catalog (`apps/api/.env`)
 
 | Variable | Type | Mandatory? | Default (Local Dev) | Description |
 |---|:---:|:---:|---|---|
-| `PORT` | `number` | Optional | `3000` | HTTP port for NestJS server. |
+| `PORT` | `number` | Optional | `3000` | HTTP port for NestJS API (`3002` for dedicated worker container). |
 | `NODE_ENV` | `string` | Optional | `development` | Runtime environment (`development`, `staging`, `production`, `test`). |
 | `API_PREFIX` | `string` | Optional | `api/v1` | Global URI prefix for all REST controllers. |
-| `DATABASE_URL` | `string` | **Yes** | `postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public` | PostgreSQL connection string. |
-| `JWT_SECRET` | `string` | **Yes** | Configured in `.env` | Secret key for signing staff JWT access tokens. |
-| `JWT_EXPIRES_IN` | `string` | Optional | `15m` | Access token lifespan. |
-| `REFRESH_TOKEN_EXPIRES_IN`| `string` | Optional | `7d` | Refresh token lifespan. |
-| `CORS_ALLOWED_ORIGINS` | `string` | Optional | `http://localhost:3000,http://localhost:3001` | Comma-separated allowed web origins. |
-| `DEFAULT_FOREMAN_COMMISSION_PERCENT`| `number` | Optional | `4.00` | Default Foreman commission rate frozen per group upon activation (ADR-04). |
+| `DATABASE_URL` | `string` | **Yes** | `postgresql://chitflow:chitflow_dev_only@127.0.0.1:5433/chitflow_dev?schema=public` | PostgreSQL 17 connection string. |
+| `JWT_SECRET` | `string` | **Yes** | Configured in `.env` | HS256 signing secret ($\ge 32$ chars in production; shared with `apps/web` Edge Middleware). |
+| `JWT_EXPIRES_IN` | `string` | Optional | `15m` | Short-lived access token lifespan. |
+| `REFRESH_TOKEN_EXPIRES_IN` | `string` | Optional | `7d` | Refresh token session lifespan. |
+| `CORS_ALLOWED_ORIGINS` | `string` | Optional | `undefined` | Comma-separated allowed web origins (also falls back to `CORS_ORIGINS`). |
+| `TRUST_PROXY` | `string` | Optional | `undefined` | Express reverse-proxy trust setting validated by `parseTrustProxySetting()`. |
+| `DEFAULT_FOREMAN_COMMISSION_PERCENT` | `number` | Optional | `4.00` | Default Foreman commission frozen per group upon activation (`ADR-04`). |
 | `PRIMARY_BRANCH_CODE` | `string` | Optional | `PRD` | Branch code for Head Office (Perundurai). |
-| `STORAGE_DRIVER` | `string` | Optional | `local` | Attachment storage driver (`local` or `s3`). |
-| `LOCAL_STORAGE_PATH` | `string` | Optional | `./storage/uploads` | Path for uploaded KYC documents and PDF receipts in local mode. |
-| `S3_BUCKET` | `string` | If S3 | `kumaran-chits-private` | Universal S3 bucket name (Cloudflare R2, MinIO, S3). |
-| `S3_REGION` | `string` | Optional | `ap-south-1` | S3 region (Mumbai). |
-| `S3_ACCESS_KEY_ID` | `string` | If S3 | `undefined` | S3 access key ID. |
-| `S3_SECRET_ACCESS_KEY`| `string` | If S3 | `undefined` | S3 secret access key. |
-| `S3_ENDPOINT` | `string` | Optional | `undefined` | Custom S3 endpoint (e.g. `http://127.0.0.1:9000` for MinIO). |
-| `S3_FORCE_PATH_STYLE` | `boolean`| Optional | `false` | Required true for local MinIO compatibility. |
-| `REDIS_HOST` | `string` | Optional | `127.0.0.1` | Redis host for BullMQ background queues and distributed OTP storage. |
-| `REDIS_PORT` | `number` | Optional | `6379` | Redis port for BullMQ background queues and distributed OTP storage. |
-| `REDIS_DB` | `number` | Optional | `0` | Redis logical database index (`0`–`15`; use `1` for isolated test runs). |
-| `BULL_BOARD_USER` | `string` | Optional | `admin` | Secondary HTTP Basic Auth username for `/admin/queues` (Primary auth uses Super Admin JWT session). |
-| `BULL_BOARD_PASSWORD` | `string` | Optional | `undefined` | Secondary HTTP Basic Auth password for `/admin/queues` (Insecure default `chitflow_secret` is strictly rejected). |
-| `SMS_DRIVER` | `string` | Optional | `mock` | SMS gateway driver (`mock` for dev/test, `msg91` for production DLT). |
-| `PUSH_DRIVER` | `string` | Optional | `mock` | Mobile Push driver (`mock` or `firebase` for FCM). |
-| `SENTRY_DSN` | `string` | Optional | `""` | Sentry DSN (safe-bypass when empty). |
+| `STORAGE_DRIVER` | `string` | Optional | `local` | Attachment storage driver (`local` or `s3`; forced to `s3` in production). |
+| `LOCAL_STORAGE_PATH` | `string` | Optional | `./storage/uploads` | Local upload path in dev/test mode. |
+| `S3_BUCKET` / `S3_REGION` | `string` | If S3 | `undefined` / `ap-south-1` | Private S3 / Cloudflare R2 / MinIO bucket & region. |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | `string` | If S3 | `undefined` | Object storage credentials. |
+| `S3_ENDPOINT` / `S3_FORCE_PATH_STYLE` | `string` / `boolean` | Optional | `undefined` | Custom S3 endpoint (e.g., Cloudflare R2 or `http://127.0.0.1:9000` MinIO). |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_DB` | `string` / `number` | Optional | `127.0.0.1` / `6379` / `0` | Redis 7 host, port, and logical DB (`0`–`15`; use `1` for isolated test runs). |
+| `BULL_BOARD_USER` / `BULL_BOARD_PASSWORD` | `string` | Optional | `admin` / `chitflow_secret` | Secondary HTTP Basic Auth for `/admin/queues` (default password blocked in production). |
+| `METRICS_USER` / `METRICS_PASSWORD` | `string` | Optional | Falls back to Bull Board creds | HTTP Basic Auth for Prometheus `/metrics` endpoint (default password blocked in production). |
+| `SMS_DRIVER` / `SMS_SENDER_ID` | `string` | Optional | `mock` / `KMRCHT` | TRAI DLT SMS driver (`mock` or `msg91`) and registered DLT header (`ADR-23`). |
+| `MSG91_AUTH_KEY` / `MSG91_DLT_TE_ID` / `MSG91_DLT_*_TEMPLATE_ID` | `string` | If `msg91` | `undefined` | MSG91 API key, DLT Entity ID, and approved OTP/Receipt/Auction/Default template IDs. |
+| `SMS_MAX_RETRIES` / `SMS_RETRY_BASE_DELAY_MS` / `SMS_REQUEST_TIMEOUT_MS` / `MAX_DAILY_OTP_REQUESTS` | `number` | Optional | `2` / `400` / `5000` / `5` | SMS circuit/retry backoff and per-phone daily OTP cap. |
+| `PUSH_DRIVER` / `FIREBASE_*` | `string` | Optional | `undefined` | Phase 2 Q2 2027 Android FCM Push driver (`mock` or `firebase`, `ADR-26`). |
+| `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_TRACES_SAMPLE_RATE` | `string` / `number` | Optional | `undefined` / `NODE_ENV` | Error tracking & APM sampling (`0.0`–`1.0`; safe bypass when DSN is empty). |
+| `COMPANY_UPI_VPA` / `COMPANY_UPI_NAME` | `string` | Optional | `kumaranfinance@kvb` / `Kumaran Finance` | Official Karur Vysya Bank UPI payee VPA for customer claim verification (`ADR-19`). |
 
 ---
 
@@ -109,40 +121,47 @@ docker run -d \
 
 ---
 
-## 4. Backend Architectural Invariants (`CONFIRMED-BY-DEVELOPER`)
+## 4. The 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`)
 
-Every engineer and AI assistant contributing to `apps/api/` must strictly uphold these 9 non-negotiable architectural rules:
+Every engineer and AI assistant contributing to `apps/api/` must strictly uphold all **11 non-negotiable architectural guardrails** (aligned with `AGENTS.md`):
 
-1. **Whole-Rupee Math (`BigInt`)**: All monetary figures (installments, bids, dividends, commissions, prize money) are 64-bit integer Rupees (`BigInt` in Prisma, native `bigint` in TypeScript). Paise, `.00` decimals, and IEEE 754 floating-point numbers are strictly prohibited in financial code.
-2. **BigInt Serialization**: Handled automatically on outgoing responses via [`src/common/interceptors/bigint.interceptor.ts`](src/common/interceptors/bigint.interceptor.ts).
-3. **Single-Company Tenancy (ADR-01)**: Built solely for Kumaran Finance. Zero `company_id` columns exist in any table.
-4. **Ticket Limit Constraint (ADR-13)**: Database-enforced rule `@@unique([chitGroupId, customerId])` prevents a customer from holding 2 or more tickets in the same chit group.
-5. **Single Discrete Monthly Payment (ADR-07)**: Each installment month has strictly one discrete payment. Zero partial payments, double payments, or advance balances exist. `DueStatus` is strictly `UNPAID`, `PAID`, `OVERDUE`.
-6. **Maker-Checker Separation of Duties**: Critical endpoints (payment reversals, auction finalization, prize disbursements) strictly enforce `maker_user_id != checker_user_id` at both application and database levels.
-7. **Evening Cash Handover Guard**: Strictly enforces `collector_user_id != acknowledger_user_id` when acknowledging physical field cash into the branch vault.
-8. **Hard Cash / Zero Cash Block**: Full cash receipts and prize payouts are supported at any rupee value without artificial software thresholds or blocks (`DisbursementMode.CASH`).
-9. **Lightweight Notebook Intake**: Customer intake mirrors physical notebooks—only Full Name, Phone, and Address are required (Aadhaar, PAN, and document scans are strictly optional).
-10. **PostgreSQL Sole Financial Truth & Caching Strategy**: Volatile financial ledgers and dues are never cached in Redis or in-memory. Master reference data (branches, schemes) are cached in Redis with atomic invalidation. Historical closed reports leverage HTTP 304 ETags ([`docs/03-architecture/caching-architecture.md`](../../docs/03-architecture/caching-architecture.md)).
+1. **Single-Company Tenancy (`ADR-01`)**: Built solely for Kumaran Finance. Zero `company_id` columns exist in any table.
+2. **Whole-Rupee Math (`BigInt`) & Divisibility (`KFC-FIN-002`)**: All monetary figures (installments, bids, dividends, commissions, prize money) are 64-bit integer Rupees (`BigInt` in Prisma, native `bigint` in TypeScript; serialized via [`src/common/interceptors/bigint.interceptor.ts`](src/common/interceptors/bigint.interceptor.ts)). Paise, `.00` decimals, and floats are prohibited; net distributable dividends must divide evenly across all $N$ tickets.
+3. **Commission Freeze (`ADR-04`)**: Foreman commission defaults to **4.00%**, copied and permanently frozen per chit group upon activation.
+4. **Universal Equal Dividend Deduction**: Dividends are divided equally across **ALL** subscribers in the chit group, including the auction winner and past prized winners ($I_{net} = I_{base} - Div_{ticket}$).
+5. **Month 1 & Month $N$ Rules (`FIN-B`)**: Month 1 full pool is taken by the company ticket (**no auction**, ₹0 dividend). Month $N$ settles directly to the final subscriber minus 4% commission (**no auction**). Auctions occur exclusively in Months $2$ through $N-1$.
+6. **Fixed 1/4 Ceiling & Option A Tie-Break (`ADR-06`)**: Auction discount ceiling is fixed strictly at **25% ($V / 4$)**. Ties at the ceiling are broken via physical paper token draw at the branch; staff records the physically drawn winner — **zero autonomous software lottery draws**.
+7. **Ticket Limit Constraint (`ADR-13`)**: Database-enforced `@@unique([chitGroupId, customerId])` prevents a customer from holding 2 or more tickets in the same chit group.
+8. **Defaulter & Single Discrete Payment Rules (`ADR-07`)**: Unpaid members cannot bid in that month's auction; 3 consecutive unpaid months grants removal rights. Each installment month has strictly one discrete payment — zero partial payments, zero double payments, zero late fees, and zero advance balances (`DueStatus`: `UNPAID`, `PAID`, `OVERDUE`). Full cash receipts & prize payouts are supported without artificial caps (`DisbursementMode.CASH`), and customer intake requires only Full Name, Phone, Address, and City (`ADR-16`; Aadhaar/PAN/scans optional).
+9. **Company Safety Proof Checklist (`ADR-15`)**: Property documents are completely eliminated. Collateral/surety is non-mandatory and tracked via a flexible checklist and scanned attachments (signed agreement, blank cheques, promissory notes).
+10. **Maker $\ne$ Checker Dual Control**: Critical mutations (payment reversals, auction finalization, prize disbursements, evening cash handover `collector_user_id != acknowledger_user_id`, defaulter removal) strictly enforce **`maker_user_id != checker_user_id`** in application logic and **8 PostgreSQL engine-level `CHECK` constraints**.
+11. **Verified Partner Identity (`ADR-21` / `SEC-A`)**: Administrative IT Super Admins (`isPartner: false`) cannot authorize financial mutations; only verified statutory partners (`isPartner: true`) can act as Maker or Checker on financial controls. Viewing immutable Audit Logs (`/api/v1/reports/audit-logs`) and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`) is restricted strictly to `SUPER_ADMIN`. PostgreSQL 17 remains the sole financial truth (volatile ledgers are never cached in Redis; historical closed reports leverage HTTP 304 ETags).
 
 ---
 
-## 5. Module Structure Overview
+## 5. Module Structure Overview (`21` Subdirectories in `apps/api/src/`)
 
 ```text
 apps/api/src/
-├── auth/            # 6-persona identity, Redis SMS OTP (300s TTL), MPIN, 2FA TOTP, JWT, RBAC guards
+├── assets/          # Bundled Tamil/English Noto Sans fonts & static PDF receipt assets
+├── auction/         # In-office auctions (Months 2..N-1), Option A tie-break, Registrar filing
+├── auth/            # 6-persona identity, 15 auth endpoints, Redis SMS OTP, MPIN, TOTP, JWT, RBAC guards
 ├── branch/          # Branch office administration (PRD, ERD) & bilingual Tamil names
-├── user/            # Staff user administration, RBAC role assignment & status toggle
-├── customer/        # Customer intake, S3 KYC scans, directory & nominees
-├── chit/            # Chit schemes, groups, lifecycle & mid-cycle onboarding
-├── auction/         # In-office auctions, Option A physical token tie-break, Registrar filing
-├── installment/     # Universal dividend dues generation, digital passbook, defaulters
-├── collection/      # Field cash collection, BullMQ receipt queueing, evening vault cash handover
-├── payment/         # Discrete payments, BullMQ receipt queueing, maker-checker reversals
-├── disbursement/    # Prize payouts (Cash/Bank) & company safety proof checklist
-├── report/          # Form XVII statutory registers & partner audit registers
-├── storage/         # Local & Private S3 driver with presigned URLs
-├── pdf/             # Bilingual PDF canvas engine (EN + தமிழ்)
-├── jobs/            # BullMQ background workers (daily arrears, reconciliation, receipt dispatches)
-└── common/          # Interceptors (BigInt, Response envelope), filters, guards, decorators
+├── chit/            # Chit schemes, groups, activation freeze, lifecycle & mid-cycle notebook onboarding
+├── collection/      # Field cash collection, UPI claim intake, evening vault cash handover
+├── common/          # Interceptors (BigInt, Envelope), filters, guards, distributed locks, retry, Sentry, throttler
+├── config/          # Fail-fast environment schema & production hardening validator (env.validation.ts)
+├── customer/        # Lightweight notebook intake (ADR-16), S3 KYC scans, directory & nominees
+├── disbursement/    # Prize payouts (Cash/Bank), maker-checker release & safety proof checklist (ADR-15)
+├── health/          # Liveness & readiness probes (/health, /health/liveness, /health/readiness)
+├── installment/     # Universal equal dividend dues, digital passbook, arrears & defaulters
+├── jobs/            # BullMQ workers, 9 admin job routes, IST cron schedules & Bull Board (/admin/queues)
+├── metrics/         # Prometheus /metrics exporter & APM instrumentation (HTTP Basic Auth)
+├── notification/    # Bilingual TRAI DLT SMS (MSG91) & Phase 2 FCM Push drivers (zero WhatsApp)
+├── payment/         # Discrete whole-rupee payments, UPI claims, bilingual receipts, Partner-only reversals
+├── pdf/             # Bilingual PDF engine (English + தமிழ் A5 receipts & payout vouchers)
+├── prisma/          # PrismaService lifecycle, connection pooling & transaction retry helpers
+├── report/          # Form XVII, Form XXI, Form XXII Cash Book, Day Book, Defaulters, Approvals SSE & SUPER_ADMIN Audit Logs
+├── storage/         # Local & Private S3/R2 driver with 15-minute presigned URLs
+└── user/            # Staff administration, RBAC role & isPartner governance, emergency password reset
 ```
