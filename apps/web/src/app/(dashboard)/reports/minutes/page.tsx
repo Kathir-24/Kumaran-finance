@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
   Download,
   FileCheck2,
   Printer,
@@ -14,9 +15,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
-import { apiClient, unwrapApiResponse } from '@/lib/api-client';
+import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
-import { downloadCsv } from '@/lib/csv-export';
+import { downloadCsv, type CsvCellValue } from '@/lib/csv-export';
 import { downloadMinutesPdf } from '@/lib/pdf-download';
 import { FormXviiKpiBar } from '@/components/reports/form-xvii-kpi-bar';
 import {
@@ -24,7 +25,12 @@ import {
   FormXviiReportData,
   FormXviiViewer,
 } from '@/components/reports/form-xvii-viewer';
-import { RegistrarFilingModal } from '@/components/reports/registrar-filing-modal';
+import {
+  RegistrarFilingModal,
+  canUserRecordRegistrarFiling,
+} from '@/components/reports/registrar-filing-modal';
+import { formatIstDateString } from '@/components/reports/report-bigint';
+import { resolveFormXviiKpiCounts } from '@/components/reports/report-access';
 import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
 
 interface MinutesSchemeOption {
@@ -47,9 +53,8 @@ function FormXviiMinutesContent() {
   const hasAccess = roles.some((r: string) =>
     ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
   );
-  const canRecordFiling = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(r)
-  );
+  // Guardrail 11 / XR-AUC-05: Verified Partner, Branch Manager, or Accountant only
+  const canRecordFiling = canUserRecordRegistrarFiling(user);
 
   // Scheme Selection State
   const initialGroupId = searchParams.get('chitGroupId') || '';
@@ -57,8 +62,9 @@ function FormXviiMinutesContent() {
   const [fromDate] = React.useState<string>('');
   const [toDate] = React.useState<string>('');
 
-  // Filing Modal State
+  // Filing Modal & PDF Download Error State
   const [filingAuction, setFilingAuction] = React.useState<FormXviiAuctionRecord | null>(null);
+  const [pdfError, setPdfError] = React.useState<string | null>(null);
 
   // 1. Fetch Chit Schemes for the Scheme Selector
   const { data: schemes = [] } = useQuery<MinutesSchemeOption[]>({
@@ -96,8 +102,8 @@ function FormXviiMinutesContent() {
           params: {
             query: {
               chitGroupId: selectedGroupId,
-              fromDate: fromDate ? new Date(fromDate).toISOString() : undefined,
-              toDate: toDate ? new Date(toDate).toISOString() : undefined,
+              fromDate: fromDate.trim() || undefined,
+              toDate: toDate.trim() || undefined,
             },
           },
         })
@@ -111,9 +117,9 @@ function FormXviiMinutesContent() {
   const handleExportCsv = () => {
     if (!formXviiData || !formXviiData.auctions) return;
 
-    const rows: (string | number)[][] = formXviiData.auctions.map((a) => {
-      const auctionDate = new Date(a.auctionDate).toISOString().split('T')[0];
-      const filedDate = a.filedDate ? new Date(a.filedDate).toISOString().split('T')[0] : 'N/A';
+    const rows: CsvCellValue[][] = formXviiData.auctions.map((a) => {
+      const auctionDate = formatIstDateString(new Date(a.auctionDate));
+      const filedDate = a.filedDate ? formatIstDateString(new Date(a.filedDate)) : 'N/A';
       return [
         `Month ${a.installmentMonth}`,
         auctionDate,
@@ -141,7 +147,7 @@ function FormXviiMinutesContent() {
         'Chit Value (INR)',
         'Bid Discount (INR)',
         'Prize Money (INR)',
-        'Commission 4% (INR)',
+        'Foreman Commission (INR)',
         'Dividend / Ticket (INR)',
         'Next Net Installment (INR)',
         'Winner Ticket',
@@ -164,9 +170,10 @@ function FormXviiMinutesContent() {
 
   const handleDownloadPdf = async (auctionId: string) => {
     try {
+      setPdfError(null);
       await downloadMinutesPdf(auctionId, `form-xvii-minutes-${auctionId.slice(0, 8)}.pdf`);
-    } catch (err) {
-      console.error('Failed to download Form XVII PDF', err);
+    } catch (err: unknown) {
+      setPdfError(getErrorMessage(err, 'Failed to download Form XVII PDF'));
     }
   };
 
@@ -193,27 +200,10 @@ function FormXviiMinutesContent() {
     );
   }
 
-  // Calculate KPI Counts
+  // Calculate KPI Counts (XR-M7-WEB-02: prefer authoritative backend IST filingSummary / countdown)
   const auctions = formXviiData?.auctions || [];
-  const totalFinalized = auctions.length;
-  let filedCount = 0;
-  let pendingCount = 0;
-  let overdueCount = 0;
-
-  auctions.forEach((a) => {
-    if (a.filedAtRegistrar) {
-      filedCount += 1;
-    } else {
-      const aDate = new Date(a.auctionDate);
-      const deadline = new Date(aDate.getTime() + 21 * 24 * 60 * 60 * 1000);
-      const diffDays = Math.ceil((deadline.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-      if (diffDays < 0) {
-        overdueCount += 1;
-      } else {
-        pendingCount += 1;
-      }
-    }
-  });
+  const { totalFinalized, filedCount, pendingCount, overdueCount } =
+    resolveFormXviiKpiCounts(auctions, formXviiData?.filingSummary);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -295,6 +285,14 @@ function FormXviiMinutesContent() {
         </div>
       </div>
 
+      {/* PDF Download Error Banner */}
+      {pdfError && (
+        <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3 text-xs text-rose-300 flex items-center gap-2 print:hidden">
+          <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+          <span>{pdfError}</span>
+        </div>
+      )}
+
       {/* Statutory KPI Bar */}
       <FormXviiKpiBar
         totalFinalized={totalFinalized}
@@ -331,7 +329,10 @@ function FormXviiMinutesContent() {
           installmentMonth={filingAuction.installmentMonth}
           onSuccess={() => {
             queryClient.invalidateQueries({
-              queryKey: queryKeys.reports.formXvii({ chitGroupId: selectedGroupId }),
+              queryKey: ['reports', 'form-xvii'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.dashboard.all,
             });
           }}
         />

@@ -11,18 +11,38 @@ import {
   RotateCcw,
   FileCheck2,
   CheckCircle2,
+  Lock,
+  Gavel,
+  UserMinus,
+  Landmark,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ApprovalsSummary } from '@/stores/approvals-store';
+import {
+  evaluateApprovalBannerAccess,
+  resolvePrimaryQueueHref,
+  type ApprovalBannerAccessState,
+  type ApprovalBannerUserContext,
+  type ExtendedApprovalsSummary,
+} from '@/components/reports/report-access';
+
+export {
+  evaluateApprovalBannerAccess,
+  resolvePrimaryQueueHref,
+  type ApprovalBannerAccessState,
+  type ApprovalBannerUserContext,
+  type ExtendedApprovalsSummary,
+};
 
 interface PendingApprovalsBannerProps {
-  approvals: ApprovalsSummary;
+  approvals: ExtendedApprovalsSummary;
+  user?: ApprovalBannerUserContext | null;
   isLoading?: boolean;
 }
 
 export function PendingApprovalsBanner({
   approvals,
+  user,
   isLoading = false,
 }: PendingApprovalsBannerProps) {
   const t = useTranslations('dashboard');
@@ -42,7 +62,14 @@ export function PendingApprovalsBanner({
     disbursementAuthorizationsCount,
     paymentReversalsCount,
     safetyProofVerificationsCount = 0,
+    auctionFinalizationsCount = 0,
+    auctionCorrectionsCount = 0,
+    defaulterRemovalsCount = 0,
+    finalMonthSettlementsCount = 0,
   } = approvals;
+
+  const access = evaluateApprovalBannerAccess(user);
+  const primaryQueueHref = resolvePrimaryQueueHref(approvals);
 
   if (totalPendingCount === 0) {
     return (
@@ -62,57 +89,111 @@ export function PendingApprovalsBanner({
     <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-slate-900/80 to-slate-900/60 p-4 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5 min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
             <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 shrink-0" />
               <span>{t('pendingApprovals')} ({totalPendingCount})</span>
             </h3>
+            {access.isNonPartnerSuperAdmin && (
+              <Badge variant="outline" className="border-rose-500/40 bg-rose-500/10 text-rose-300 text-[10px] gap-1">
+                <Lock className="h-3 w-3" />
+                <span>{t('partnerApprovalRequiredBadge')}</span>
+              </Badge>
+            )}
           </div>
 
           <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
-            {t('makerCheckerReminder')}
+            {access.isNonPartnerSuperAdmin
+              ? t('nonPartnerApprovalNotice')
+              : t('makerCheckerReminder')}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {cashHandoversCount > 0 && (
-              <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300 gap-1.5 text-xs">
-                <HandCoins className="h-3 w-3" />
-                <span>{cashHandoversCount} Cash Handovers</span>
-              </Badge>
+              <Link href="/collections/handover">
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors gap-1.5 text-xs">
+                  <HandCoins className="h-3 w-3" />
+                  <span>{cashHandoversCount} Cash Handovers</span>
+                </Badge>
+              </Link>
             )}
 
             {disbursementAuthorizationsCount > 0 && (
-              <Badge variant="outline" className="border-purple-500/30 bg-purple-500/10 text-purple-300 gap-1.5 text-xs">
-                <Award className="h-3 w-3" />
-                <span>{disbursementAuthorizationsCount} Prize Authorizations</span>
-              </Badge>
+              <Link href="/disbursements">
+                <Badge variant="outline" className="border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 transition-colors gap-1.5 text-xs">
+                  <Award className="h-3 w-3" />
+                  <span>{disbursementAuthorizationsCount} Prize Authorizations</span>
+                </Badge>
+              </Link>
             )}
 
             {paymentReversalsCount > 0 && (
-              <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-300 gap-1.5 text-xs">
-                <RotateCcw className="h-3 w-3" />
-                <span>{paymentReversalsCount} Payment Reversals</span>
-              </Badge>
+              <Link href="/reversals">
+                <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 transition-colors gap-1.5 text-xs">
+                  <RotateCcw className="h-3 w-3" />
+                  <span>{paymentReversalsCount} Payment Reversals</span>
+                </Badge>
+              </Link>
             )}
 
             {safetyProofVerificationsCount > 0 && (
-              <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300 gap-1.5 text-xs">
-                <FileCheck2 className="h-3 w-3" />
-                <span>{safetyProofVerificationsCount} Safety Proofs</span>
-              </Badge>
+              <Link href="/disbursements">
+                <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors gap-1.5 text-xs">
+                  <FileCheck2 className="h-3 w-3" />
+                  <span>{safetyProofVerificationsCount} Safety Proofs</span>
+                </Badge>
+              </Link>
+            )}
+
+            {auctionFinalizationsCount > 0 && (
+              <Link href="/auctions">
+                <Badge variant="outline" className="border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition-colors gap-1.5 text-xs">
+                  <Gavel className="h-3 w-3" />
+                  <span>{auctionFinalizationsCount} Auction Finalizations</span>
+                </Badge>
+              </Link>
+            )}
+
+            {auctionCorrectionsCount > 0 && (
+              <Link href="/auctions">
+                <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 transition-colors gap-1.5 text-xs">
+                  <Gavel className="h-3 w-3" />
+                  <span>{auctionCorrectionsCount} Auction Corrections</span>
+                </Badge>
+              </Link>
+            )}
+
+            {defaulterRemovalsCount > 0 && (
+              <Link href="/reports/defaulters">
+                <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors gap-1.5 text-xs">
+                  <UserMinus className="h-3 w-3" />
+                  <span>{defaulterRemovalsCount} Defaulter Removals</span>
+                </Badge>
+              </Link>
+            )}
+
+            {finalMonthSettlementsCount > 0 && (
+              <Link href="/disbursements">
+                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors gap-1.5 text-xs">
+                  <Landmark className="h-3 w-3" />
+                  <span>{finalMonthSettlementsCount} Month N Settlements</span>
+                </Badge>
+              </Link>
             )}
           </div>
         </div>
 
-        <div className="flex items-center self-start md:self-center shrink-0">
-          <Button asChild size="sm" className="bg-amber-500 text-slate-950 hover:bg-amber-400 font-medium text-xs">
-            <Link href="/reports">
-              <span>{t('reviewQueue')}</span>
-              <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-            </Link>
-          </Button>
-        </div>
+        {!access.isNonPartnerSuperAdmin && !access.isReadOnlyAuditor && (
+          <div className="flex items-center self-start md:self-center shrink-0">
+            <Button asChild size="sm" className="bg-amber-500 text-slate-950 hover:bg-amber-400 font-medium text-xs">
+              <Link href={primaryQueueHref}>
+                <span>{t('reviewQueue')}</span>
+                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -23,8 +23,13 @@ import {
   RefreshCw,
   Lock,
   ArrowLeft,
-  UserCheck,
+  AlertCircle,
 } from 'lucide-react';
+import { formatIstDateString } from '@/components/reports/report-bigint';
+import {
+  buildAuditLogsQueryParams,
+  isInvertedDateRange,
+} from '@/components/reports/report-access';
 
 interface StaffUserRaw {
   id: string;
@@ -50,8 +55,8 @@ export default function AuditLogsReportPage() {
   // Diff inspection modal state
   const [activeDiffLog, setActiveDiffLog] = useState<AuditLogItem | null>(null);
 
+  // Guardrail 11: Viewing audit logs is restricted strictly to SUPER_ADMIN only
   const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
-  const isCustomer = false;
   const hasAccess = isSuperAdmin;
 
   // 1. Fetch Staff Users for Actor Filter Dropdown
@@ -68,19 +73,20 @@ export default function AuditLogsReportPage() {
       if (res && Array.isArray(res.users)) return res.users;
       return [];
     },
-    enabled: hasAccess && !isCustomer,
+    enabled: hasAccess,
   });
 
-  // 2. Fetch Audit Logs with Query Filters
-  const queryParams = {
-    action: selectedAction === 'ALL' ? undefined : selectedAction,
-    entityType: selectedEntity === 'ALL' ? undefined : selectedEntity,
-    userId: selectedUserId === 'ALL' ? undefined : selectedUserId,
-    fromDate: fromDate ? new Date(fromDate).toISOString() : undefined,
-    toDate: toDate ? new Date(`${toDate}T23:59:59.999Z`).toISOString() : undefined,
+  // 2. Fetch Audit Logs with IST-safe Query Filters (plain YYYY-MM-DD -> backend +05:30 IST bounds)
+  const hasInvalidDateRange = isInvertedDateRange(fromDate, toDate);
+  const queryParams = buildAuditLogsQueryParams({
+    selectedAction,
+    selectedEntity,
+    selectedUserId,
+    fromDate,
+    toDate,
     page,
     limit,
-  };
+  });
 
   const {
     data: auditReport,
@@ -105,7 +111,7 @@ export default function AuditLogsReportPage() {
       );
       return res;
     },
-    enabled: hasAccess,
+    enabled: hasAccess && !hasInvalidDateRange,
   });
 
   const logs: AuditLogItem[] = auditReport?.logs || [];
@@ -120,10 +126,14 @@ export default function AuditLogsReportPage() {
   const isDualControl = (action: string) =>
     [
       'AUCTION_FINALIZED',
+      'AUCTION_CORRECTION_APPROVED',
+      'DEFAULTER_REMOVAL_APPROVED',
       'PAYMENT_REVERSED',
       'PAYMENT_REVERSAL_REJECTED',
       'CASH_HANDOVER_ACKNOWLEDGED',
       'PRIZE_PAYOUT_AUTHORIZED',
+      'FINAL_MONTH_SETTLEMENT_EXECUTED',
+      'FINAL_SETTLEMENT_APPROVED',
       'SAFETY_PROOF_VERIFIED',
       'UPI_CLAIM_VERIFIED',
     ].includes(action);
@@ -132,8 +142,10 @@ export default function AuditLogsReportPage() {
     [
       'PAYMENT_REVERSED',
       'CASH_HANDOVER_ACKNOWLEDGED',
+      'PRIZE_PAYOUT_AUTHORIZED',
       'PRIZE_PAYOUT_DISBURSED',
       'FINAL_MONTH_SETTLEMENT_EXECUTED',
+      'FINAL_SETTLEMENT_APPROVED',
       'DEF_SETTLEMENT_PROCESSED',
       'UPI_CLAIM_VERIFIED',
     ].includes(action);
@@ -175,12 +187,12 @@ export default function AuditLogsReportPage() {
       l.entityId,
       l.performedBy?.name || 'System Automated',
       l.performedBy?.roles?.join('; ') || 'SYSTEM',
-      l.ipAddress || '127.0.0.1',
+      l.ipAddress || 'SYSTEM',
       l.oldValue ? JSON.stringify(l.oldValue) : '',
       l.newValue ? JSON.stringify(l.newValue) : '',
     ]);
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatIstDateString();
     downloadCsv({
       filename: `kumaran-chits-audit-trail-${todayStr}`,
       headers,
@@ -196,9 +208,9 @@ export default function AuditLogsReportPage() {
             <div className="mx-auto w-12 h-12 rounded-full bg-rose-900/30 flex items-center justify-center text-rose-400 mb-2">
               <Lock className="w-6 h-6" />
             </div>
-            <CardTitle className="text-white text-base">Access Restricted</CardTitle>
+            <CardTitle className="text-white text-base">Super Admin Access Required</CardTitle>
             <CardDescription className="text-rose-200/70 text-xs mt-1">
-              Only authorized staff or verified subscribers can inspect forensic audit registers.
+              Guardrail 11: Viewing immutable forensic audit trail logs is restricted strictly to Super Admin accounts.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -282,17 +294,6 @@ export default function AuditLogsReportPage() {
         <p className="leading-relaxed">{t('statutoryBannerDesc')}</p>
       </div>
 
-      {/* Customer Self-Isolation Notice */}
-      {isCustomer && (
-        <div className="rounded-xl border border-blue-900/40 bg-blue-950/20 p-4 text-xs text-blue-300 space-y-1">
-          <div className="font-semibold flex items-center gap-2 text-blue-200">
-            <UserCheck className="h-4 w-4 text-blue-400 shrink-0" />
-            <span>{t('customerNoticeTitle')}</span>
-          </div>
-          <p>{t('customerNoticeDesc')}</p>
-        </div>
-      )}
-
       {/* KPI Summary Bar */}
       <AuditLogKpiBar
         totalEvents={pagination.totalRecords || logs.length}
@@ -302,42 +303,50 @@ export default function AuditLogsReportPage() {
         isLoading={isLoading}
       />
 
-      {/* Filter Controls (Hidden for Customer self-view) */}
-      {!isCustomer && (
-        <AuditLogFilters
-          selectedAction={selectedAction}
-          onActionChange={(val) => {
-            setSelectedAction(val);
-            setPage(1);
-          }}
-          selectedEntity={selectedEntity}
-          onEntityChange={(val) => {
-            setSelectedEntity(val);
-            setPage(1);
-          }}
-          selectedUserId={selectedUserId}
-          onUserIdChange={(val) => {
-            setSelectedUserId(val);
-            setPage(1);
-          }}
-          fromDate={fromDate}
-          onFromDateChange={(val) => {
-            setFromDate(val);
-            setPage(1);
-          }}
-          toDate={toDate}
-          onToDateChange={(val) => {
-            setToDate(val);
-            setPage(1);
-          }}
-          limit={limit}
-          onLimitChange={(val) => {
-            setLimit(val);
-            setPage(1);
-          }}
-          onReset={handleResetFilters}
-          staffUsers={staffUsers}
-        />
+      {/* Filter Controls */}
+      <AuditLogFilters
+        selectedAction={selectedAction}
+        onActionChange={(val) => {
+          setSelectedAction(val);
+          setPage(1);
+        }}
+        selectedEntity={selectedEntity}
+        onEntityChange={(val) => {
+          setSelectedEntity(val);
+          setPage(1);
+        }}
+        selectedUserId={selectedUserId}
+        onUserIdChange={(val) => {
+          setSelectedUserId(val);
+          setPage(1);
+        }}
+        fromDate={fromDate}
+        onFromDateChange={(val) => {
+          setFromDate(val);
+          setPage(1);
+        }}
+        toDate={toDate}
+        onToDateChange={(val) => {
+          setToDate(val);
+          setPage(1);
+        }}
+        limit={limit}
+        onLimitChange={(val) => {
+          setLimit(val);
+          setPage(1);
+        }}
+        onReset={handleResetFilters}
+        staffUsers={staffUsers}
+      />
+
+      {/* Inverted Date Range Warning */}
+      {hasInvalidDateRange && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-3 text-xs text-amber-200 flex items-center gap-2 print:hidden">
+          <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+          <span>
+            Invalid date range: From Date ({fromDate}) cannot be after To Date ({toDate}). Adjust the filter dates to query records.
+          </span>
+        </div>
       )}
 
       {/* Main Immutable Audit Table */}

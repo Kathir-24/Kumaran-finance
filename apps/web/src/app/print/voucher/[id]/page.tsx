@@ -5,43 +5,13 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { VoucherPrintTemplate, type VoucherData } from '@/components/print/voucher-print-template';
+import {
+  VoucherPrintTemplate,
+  mapVoucherApiResponseToVoucherData,
+  type PrintVoucherApiResponse,
+} from '@/components/print/voucher-print-template';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
-
-interface PrintVoucherApiResponse {
-  voucherNumber?: string;
-  disbursedAt?: string;
-  chitGroupCode?: string;
-  chitValue?: number | bigint;
-  installmentMonth?: number;
-  ticketNumber?: number;
-  winnerCode?: string;
-  winnerName?: string;
-  winnerNameTamil?: string | null;
-  winnerPhone?: string;
-  bidDiscount?: number | bigint;
-  netPrizeMoney?: number | bigint;
-  disbursementMode?: string;
-  paymentReference?: string | null;
-  agreementSigned?: boolean;
-  nomineeSigned?: boolean;
-  isSecurityRequired?: boolean;
-  blankChequeDetails?: string | null;
-  verifiedByUserName?: string;
-  authorizedByUserName?: string;
-  branchName?: string | null;
-  branchAddress?: string | null;
-  branchPhone?: string | null;
-  chitGroup?: { groupCode?: string; chitValue?: number | bigint };
-  auction?: { auctionMonth?: number; bidDiscount?: number | bigint; prizeMoney?: number | bigint };
-  winner?: { ticketNumber?: number; ticketCode?: string; customer?: { fullName?: string; fullNameTamil?: string | null; phone?: string } };
-  disbursement?: { disbursementMode?: string; referenceNumber?: string | null };
-  safetyProof?: { agreementSigned?: boolean; nomineeSigned?: boolean; isSecurityRequired?: boolean; blankChequeDetails?: string | null };
-  verifiedByUser?: { name?: string };
-  authorizedByUser?: { name?: string };
-  branch?: { name?: string; address?: string; phone?: string };
-}
 
 export default function PrintVoucherPage() {
   const params = useParams();
@@ -87,31 +57,7 @@ export default function PrintVoucherPage() {
     );
   }
 
-  const voucherData: VoucherData = {
-    voucherNumber: data.voucherNumber || `KC-VOU-${auctionId.slice(0, 6)}`,
-    disbursedAt: data.disbursedAt || new Date().toISOString(),
-    chitGroupCode: data.chitGroup?.groupCode || data.chitGroupCode || 'KCA',
-    chitValue: data.chitGroup?.chitValue || data.chitValue || 0,
-    installmentMonth: data.auction?.auctionMonth || data.installmentMonth || 1,
-    ticketNumber: data.winner?.ticketNumber || data.ticketNumber || 1,
-    winnerCode: data.winner?.ticketCode || data.winnerCode || 'WIN-01',
-    winnerName: data.winner?.customer?.fullName || data.winnerName || 'Winner',
-    winnerNameTamil: data.winner?.customer?.fullNameTamil || data.winnerNameTamil,
-    winnerPhone: data.winner?.customer?.phone || data.winnerPhone || '',
-    bidDiscount: data.auction?.bidDiscount || data.bidDiscount || 0,
-    netPrizeMoney: data.auction?.prizeMoney || data.netPrizeMoney || 0,
-    disbursementMode: data.disbursement?.disbursementMode || data.disbursementMode || 'CASH',
-    paymentReference: data.disbursement?.referenceNumber || data.paymentReference,
-    agreementSigned: data.safetyProof?.agreementSigned ?? true,
-    nomineeSigned: data.safetyProof?.nomineeSigned ?? true,
-    isSecurityRequired: data.safetyProof?.isSecurityRequired ?? false,
-    blankChequeDetails: data.safetyProof?.blankChequeDetails,
-    verifiedByUserName: data.verifiedByUser?.name || data.verifiedByUserName || 'Staff Maker',
-    authorizedByUserName: data.authorizedByUser?.name || data.authorizedByUserName || 'Partner Checker',
-    branchName: data.branch?.name || data.branchName,
-    branchAddress: data.branch?.address || data.branchAddress,
-    branchPhone: data.branch?.phone || data.branchPhone,
-  };
+  const voucherData = mapVoucherApiResponseToVoucherData(data);
 
   return <VoucherPrintTemplate auctionId={auctionId} voucher={voucherData} />;
 }

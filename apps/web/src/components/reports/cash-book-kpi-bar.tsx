@@ -12,12 +12,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
+import { toSafeBigInt, type WholeRupeeValue } from './report-bigint';
 
 interface CashBookKpiBarProps {
-  openingBalance: number;
-  todayInflows: number;
-  todayOutflows: number;
-  closingBalance: number;
+  openingBalance: WholeRupeeValue;
+  todayInflows: WholeRupeeValue;
+  todayOutflows: WholeRupeeValue;
+  closingBalance: WholeRupeeValue;
 }
 
 export function CashBookKpiBar({
@@ -28,10 +29,14 @@ export function CashBookKpiBar({
 }: CashBookKpiBarProps) {
   const t = useTranslations('reports');
 
-  // Mathematical Reconciliation Check
-  // Formula: Closing === Opening + Inflows - Outflows
-  const expectedClosing = openingBalance + todayInflows - todayOutflows;
-  const isBalanced = expectedClosing === closingBalance;
+  // Guardrail 2: Pure 64-bit BigInt Reconciliation (Closing === Opening + Inflows - Outflows)
+  const openingBig = toSafeBigInt(openingBalance);
+  const inflowsBig = toSafeBigInt(todayInflows);
+  const outflowsBig = toSafeBigInt(todayOutflows);
+  const closingBig = toSafeBigInt(closingBalance);
+
+  const expectedClosing = openingBig + inflowsBig - outflowsBig;
+  const isBalanced = expectedClosing === closingBig;
 
   return (
     <div className="space-y-3">
@@ -47,7 +52,7 @@ export function CashBookKpiBar({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold font-mono text-slate-100">
-              {formatRupee(openingBalance)}
+              {formatRupee(openingBig)}
             </div>
             <p className="text-[11px] text-slate-500 mt-1">Carried forward from yesterday</p>
           </CardContent>
@@ -63,7 +68,7 @@ export function CashBookKpiBar({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold font-mono text-emerald-400">
-              +{formatRupee(todayInflows)}
+              +{formatRupee(inflowsBig)}
             </div>
             <p className="text-[11px] text-slate-500 mt-1">Counter + acknowledged field cash</p>
           </CardContent>
@@ -79,7 +84,7 @@ export function CashBookKpiBar({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold font-mono text-rose-400">
-              -{formatRupee(todayOutflows)}
+              -{formatRupee(outflowsBig)}
             </div>
             <p className="text-[11px] text-slate-500 mt-1">Cash prize payout vouchers</p>
           </CardContent>
@@ -95,7 +100,7 @@ export function CashBookKpiBar({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold font-mono text-emerald-300">
-              {formatRupee(closingBalance)}
+              {formatRupee(closingBig)}
             </div>
             <div className="flex items-center gap-1.5 mt-1">
               <span
@@ -122,7 +127,7 @@ export function CashBookKpiBar({
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300 flex items-center gap-2.5">
           <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
           <span>
-            {t('kpi.vaultDiscrepancy')}: Safe balance ({formatRupee(closingBalance)}) does not
+            {t('kpi.vaultDiscrepancy')}: Safe balance ({formatRupee(closingBig)}) does not
             identically match calculated expected cash ({formatRupee(expectedClosing)}). Please
             audit unacknowledged field collections or unrecorded prize payments.
           </span>

@@ -93,11 +93,11 @@ flowchart LR
     end
 ```
 
-* **Endpoint**: `GET /metrics` (Exempt from response wrapper via `@BypassEnvelope()`).
-* **Security**: Strictly protected by HTTP Basic Authentication via [`MetricsAuthGuard`](file:///u:/Kumaran-finance/apps/api/src/metrics/guards/metrics-auth.guard.ts). Unauthenticated scrapes return `401 Unauthorized` with `WWW-Authenticate: Basic realm="Prometheus Metrics"`.
+* **Endpoint**: `GET /metrics` (Exempt from response wrapper via `@BypassEnvelope()`, emits `Cache-Control: no-store`).
+* **Security**: Strictly protected by constant-time SHA-256 `crypto.timingSafeEqual` authentication via [`MetricsAuthGuard`](file:///u:/Kumaran-finance/apps/api/src/metrics/guards/metrics-auth.guard.ts) supporting both Bearer Token (`METRICS_BEARER_TOKEN`) and RFC 7617 HTTP Basic Authentication (`METRICS_USER` / `METRICS_PASSWORD`, supporting `:` in passwords). Enforces strict fail-closed credentials in every environment except explicit `development` or `test` (including unset `NODE_ENV`, `production`, `staging`, `uat`), disables dev `admin:chitflow_secret` fallback whenever `METRICS_BEARER_TOKEN` is configured, and rejects whitespace-padded default secrets. Unauthenticated scrapes return `401 Unauthorized` with a matching `WWW-Authenticate` header.
 * **URL Route Normalization ([`HttpMetricsInterceptor`](file:///u:/Kumaran-finance/apps/api/src/metrics/interceptors/http-metrics.interceptor.ts))**:
-  - In high-throughput APIs, dynamic paths like `/api/v1/customers/550e8400-e29b-41d4-a716-446655440000` create unique metric labels for every customer, leading to **Prometheus high-cardinality memory exhaustion**.
-  - `HttpMetricsInterceptor` normalizes paths using regex: any dynamic UUID or numeric ID is converted to `:id` (e.g. `/api/v1/customers/:id`).
+  - In high-throughput APIs, dynamic paths like `/api/v1/customers/550e8400-e29b-41d4-a716-446655440000` or scanner 404 probes create unbounded metric labels, leading to **Prometheus high-cardinality memory exhaustion**.
+  - `HttpMetricsInterceptor` prefers Express matched route templates (`req.route.path`), collapses unmatched `404` scanner paths to `__unmatched__`, normalizes UUIDs, numeric IDs, long hex/opaque tokens, domain codes (`KC-REC-*`, `KC-VOU-*`, `KC-CUST-*`, `KCA-*`), and storage wildcards (`/storage/file/:key`), enforces a hard `200`-route fallback cardinality cap (`__other__`), captures true controller exception status codes via `tap({ error })`, and isolates telemetry inside `try/catch`.
   - Self-metrics exclusion: Requests to `/metrics`, `/health`, `/api/docs`, and `/admin/queues` are ignored to prevent telemetry feedback loops.
 
 ### 2.2 Complete Exported Metrics Catalog
@@ -347,11 +347,11 @@ flowchart TD
         TABLE[("public.'AuditLog' Table\nCompound Indexes:\n• [entityType, entityId]\n• [timestamp]\n• [userId], [action]")]
     end
 
-    subgraph QUERY["3. Audit Query & Compliance Verification"]
+    subgraph QUERY["3. Audit Query & Compliance Verification (Guardrail 11)"]
         GET["GET /api/v1/reports/audit-logs"]
-        AUTH["Role & Scope Guardian"]
-        ADMIN["Super Admin / Auditor:\nCompany-Wide Audit Trail (90+ records)"]
-        CUST["Subscriber Customer:\nHard Isolation (where.userId = customer.id)"]
+        AUTH["Role Guardian (@Roles: SUPER_ADMIN strictly)"]
+        ADMIN["Super Admin Only:\nCompany-Wide Audit Trail + Recursive PII/Secret Redaction"]
+        DENY["All Non-Super-Admin Roles (Auditor, BM, Accountant, Agent, Customer):\nHTTP 403 Forbidden (SUPER_ADMIN_REQUIRED)"]
     end
 
     REQ --> SVC --> TX
@@ -360,8 +360,8 @@ flowchart TD
     AUD --> TABLE
     TABLE --> GET
     GET --> AUTH
-    AUTH -->|Role.SUPER_ADMIN / AUDITOR| ADMIN
-    AUTH -->|Role.CUSTOMER| CUST
+    AUTH -->|Role.SUPER_ADMIN| ADMIN
+    AUTH -->|All Other Roles| DENY
 ```
 
 ### 5.1 Database Schema (`public."AuditLog"`)
@@ -404,8 +404,9 @@ Every critical mutation in the codebase automatically writes an append-only entr
 
 ### 5.3 Audit Query Endpoints & Access Boundaries
 * **`GET /api/v1/reports/audit-logs`**:
-  - Paginated audit trail with filters by `action`, `entityType`, and date range.
-  - **Super Admin Exclusive Access**: Restricted strictly to `Role.SUPER_ADMIN` across controller and service layers. Non-Super-Admin roles (Auditors, Customers, Accountants, Branch Managers) receive `403 Forbidden`.
+  - Paginated (`1 <= limit <= 100`) audit trail with filters by `action`, `entityType`, `userId`, and strict IST (`Asia/Kolkata`, `UTC+05:30`) date range (`fromDate <= toDate`).
+  - **Super Admin Exclusive Access (Guardrail 11)**: Restricted strictly to `Role.SUPER_ADMIN` across controller and service layers. Non-Super-Admin roles (Auditors, Customers, Accountants, Branch Managers, Collection Agents) receive `403 Forbidden`.
+  - **Secret & PII Redaction**: `oldValue` / `newValue` JSON snapshots are recursively sanitized via `sanitizeAuditPayload()` (redacting passwords, hashes, TOTP secrets/URIs, MPINs, refresh/access/FCM tokens, OTPs, JWTs, auth keys, bank account numbers, and cheque numbers, and masking all PAN & Aadhaar variants while preserving `aadhaarLast4`) before returning.
 * **`GET /api/v1/jobs/notification-audit-logs`**:
   - Detailed audit trail of all outbound FCM Push Notifications and DLT SMS messages, including recipient phone numbers, template IDs, message bodies, timestamps, and delivery status (`DELIVERED` / `FAILED`). Restricted strictly to `Role.SUPER_ADMIN`.
 
@@ -453,7 +454,7 @@ Time:        3.642 s
 1. `metrics.spec.ts`: Default process metrics initialized; `http_requests_total` increments; `MetricsAuthGuard` rejects unauthenticated requests with `401`; route normalizer masks dynamic UUIDs to `:id`.
 2. `sentry.spec.ts`: Safe-bypass mode confirmed when `SENTRY_DSN` is empty; DPDP PII sanitizer scrubs passwords, tokens, Aadhaar, and masks phone numbers; `bigint` primitives stringified.
 3. `bull-board.spec.ts`: `BullBoardAuthMiddleware` rejects missing or invalid credentials with `401`; valid admin credentials pass; service initializes in clean fallback when Redis is offline.
-4. `report.spec.ts`: `AuditLog` queries return filtered results; customer caller is strictly scoped to own user ID (`where.userId = customerUser.sub`).
+4. `report.spec.ts`: `AuditLog` queries enforce strict `Role.SUPER_ADMIN` exclusive access (403 for Auditor, Branch Manager, Accountant, Collection Agent, Customer), strict IST date ranges, `1 <= limit <= 100` pagination, and recursive secret/PII redaction in `oldValue`/`newValue`.
 
 ---
 
@@ -497,9 +498,9 @@ Time:        3.642 s
 
 | Pillar | Technology | Endpoint / Route | Security Guard | Cost | Status |
 |---|---|---|---|:---:|:---:|
-| **1. Metrics** | `prom-client` | `GET /metrics` | `MetricsAuthGuard` (Basic Auth) | **₹0** | ✅ 100% Verified |
+| **1. Metrics** | `prom-client` | `GET /metrics` | `MetricsAuthGuard` (Constant-Time Bearer / Basic Auth) | **₹0** | ✅ 100% Verified |
 | **2. Error Tracking** | `@sentry/nestjs` | `GET /health/sentry-test` | Safe-Bypass / DPDP Sanitizer | **₹0** | ✅ 100% Verified |
 | **3. Queue UI** | `@bull-board/express` | `GET /admin/queues/` | `BullBoardAuthMiddleware` (Super Admin JWT / Basic Auth) | **₹0** | ✅ 100% Verified |
-| **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Super Admin Only | **₹0** | ✅ 100% Verified |
+| **4. Audit Logs** | PostgreSQL `AuditLog` | `GET /reports/audit-logs` | `JwtAuthGuard` + Super Admin Only + Payload Redaction | **₹0** | ✅ 100% Verified |
 | **Liveness Probe** | Core NestJS | `GET /health` | Public / Container Probe | **₹0** | ✅ 100% Verified |
-| **Live Alert Stream**| Server-Sent Events | `GET /reports/pending-approvals/stream` | `JwtAuthGuard` + Active Session/Expiry Assertion (F15) | **₹0** | ✅ 100% Verified |
+| **Live Alert Stream**| Server-Sent Events | `GET /reports/approvals-stream` | `JwtAuthGuard` + Active Session/Expiry/Branch-Scope Assertion (F15) | **₹0** | ✅ 100% Verified |

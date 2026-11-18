@@ -16,6 +16,7 @@ import {
 @Injectable()
 export class MetricsService implements OnModuleInit {
   private readonly registry: Registry;
+  private defaultMetricsInitialized = false;
 
   // HTTP Metrics
   public readonly httpRequestsTotal: Counter<string>;
@@ -116,7 +117,7 @@ export class MetricsService implements OnModuleInit {
 
     this.dailyCollectedAmountRupees = new Gauge({
       name: 'chitflow_daily_collected_amount_rupees',
-      help: 'Cumulative collections recorded today in whole integer Rupees (BigInt)',
+      help: 'Cumulative collections recorded today (IST) in whole integer Rupees (BigInt)',
       registers: [this.registry],
     });
 
@@ -124,7 +125,7 @@ export class MetricsService implements OnModuleInit {
     this.smsDispatchesTotal = new Counter({
       name: 'kumaran_sms_dispatches_total',
       help: 'Total count of SMS messages dispatched to external telecom providers',
-      labelNames: ['provider', 'template', 'status'], // status: 'success' | 'failure' | 'circuit_open' | 'bypassed'
+      labelNames: ['provider', 'template', 'status'], // status: 'success' | 'fallback_success' | 'failure' | 'circuit_open' | 'bypassed'
       registers: [this.registry],
     });
 
@@ -137,6 +138,10 @@ export class MetricsService implements OnModuleInit {
   }
 
   onModuleInit(): void {
+    if (this.defaultMetricsInitialized) {
+      return;
+    }
+    this.defaultMetricsInitialized = true;
     // Collect standard V8 / Node.js process and memory metrics
     collectDefaultMetrics({
       register: this.registry,

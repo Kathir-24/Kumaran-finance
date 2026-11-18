@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
+import { toSafeBigInt, type WholeRupeeValue } from './report-bigint';
 
 export interface DayBookInflowItem {
   paymentId: string;
@@ -17,7 +18,7 @@ export interface DayBookInflowItem {
   time: string | Date;
   paymentMethod: 'CASH' | 'UPI' | 'BANK_TRANSFER' | 'CHEQUE';
   transactionRef?: string;
-  amount: number;
+  amount: WholeRupeeValue;
   groupCode: string;
   ticketNumber: number | null;
   customerCode: string;
@@ -30,7 +31,7 @@ export interface DayBookOutflowItem {
   voucherNumber: string;
   time: string | Date;
   disbursementMode: string;
-  amount: number;
+  amount: WholeRupeeValue;
   groupCode: string;
   installmentMonth: number;
   ticketNumber: number;
@@ -39,14 +40,14 @@ export interface DayBookOutflowItem {
 }
 
 export interface DayBookSummary {
-  totalInflows: number;
-  totalOutflows: number;
-  netCashFlow: number;
+  totalInflows: WholeRupeeValue;
+  totalOutflows: WholeRupeeValue;
+  netCashFlow: WholeRupeeValue;
   inflowByMethod: {
-    cash: number;
-    upi: number;
-    bankTransfer: number;
-    cheque: number;
+    cash: WholeRupeeValue;
+    upi: WholeRupeeValue;
+    bankTransfer: WholeRupeeValue;
+    cheque: WholeRupeeValue;
   };
 }
 
@@ -123,7 +124,7 @@ export function DayBookTable({ summary, inflows, outflows, isLoading }: DayBookT
       partyCode: string;
       groupInfo: string;
       actor: string;
-      amount: number;
+      amount: WholeRupeeValue;
     }> = [];
 
     inflows.forEach((item) => {
@@ -217,14 +218,17 @@ export function DayBookTable({ summary, inflows, outflows, isLoading }: DayBookT
               </CardDescription>
             </div>
 
-            {summary && (
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-slate-400">{t('kpi.netCashFlow')}:</span>
-                <span className={cn('font-bold', summary.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                  {summary.netCashFlow >= 0 ? '+' : ''}{formatRupee(summary.netCashFlow)}
-                </span>
-              </div>
-            )}
+            {summary && (() => {
+              const netCashFlowBig = toSafeBigInt(summary.netCashFlow);
+              return (
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-slate-400">{t('kpi.netCashFlow')}:</span>
+                  <span className={cn('font-bold', netCashFlowBig >= 0n ? 'text-emerald-400' : 'text-rose-400')}>
+                    {netCashFlowBig >= 0n ? '+' : ''}{formatRupee(netCashFlowBig)}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </CardHeader>
 

@@ -7,12 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
+import { sumWholeRupees, type WholeRupeeValue } from './report-bigint';
 
 export interface FormXxiiInflowItem {
   paymentId: string;
   receiptNumber: string;
   time: string | Date;
-  amount: number;
+  amount: WholeRupeeValue;
   customerCode: string;
   customerName: string;
   groupCode: string;
@@ -25,7 +26,7 @@ export interface FormXxiiOutflowItem {
   winnerId: string;
   voucherNumber: string;
   time: string | Date;
-  amount: number;
+  amount: WholeRupeeValue;
   groupCode: string;
   installmentMonth: number;
   ticketNumber: number;
@@ -57,8 +58,8 @@ export function FormXxiiTable({ inflows, outflows, isLoading }: FormXxiiTablePro
     }
   };
 
-  const totalInflows = inflows.reduce((sum, item) => sum + item.amount, 0);
-  const totalOutflows = outflows.reduce((sum, item) => sum + item.amount, 0);
+  const totalInflows = sumWholeRupees(inflows.map((item) => item.amount));
+  const totalOutflows = sumWholeRupees(outflows.map((item) => item.amount));
 
   return (
     <div className="space-y-6">

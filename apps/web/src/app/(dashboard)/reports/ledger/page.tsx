@@ -15,9 +15,11 @@ import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
-import { downloadCsv } from '@/lib/csv-export';
+import { downloadCsv, type CsvCellValue } from '@/lib/csv-export';
 import { FormXxiTable, FormXxiTicketLedger } from '@/components/reports/form-xxi-table';
 import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
+import { formatIstDateString, toSafeBigInt, type WholeRupeeValue } from '@/components/reports/report-bigint';
+import { parseTicketFilterParam } from '@/components/reports/report-access';
 
 interface LedgerSchemeOption {
   id: string;
@@ -33,7 +35,7 @@ interface FormXxiReportResponse {
     id: string;
     groupCode: string;
     groupName: string;
-    chitValue?: number;
+    chitValue?: WholeRupeeValue;
     durationMonths?: number;
     status?: string;
   };
@@ -53,7 +55,7 @@ function FormXxiLedgerContent() {
 
   // Filter States
   const initialGroupId = searchParams.get('chitGroupId') || '';
-  const initialTicketNumber = searchParams.get('ticketNumber') ? Number(searchParams.get('ticketNumber')) : 'ALL';
+  const initialTicketNumber = parseTicketFilterParam(searchParams.get('ticketNumber'));
 
   const [selectedGroupId, setSelectedGroupId] = React.useState<string>(initialGroupId);
   const [selectedTicket, setSelectedTicket] = React.useState<number | 'ALL'>(initialTicketNumber);
@@ -107,13 +109,14 @@ function FormXxiLedgerContent() {
   const handleExportCsv = () => {
     if (!formXxiData || !formXxiData.ledgers) return;
 
-    const rows: (string | number)[][] = [];
+    const rows: CsvCellValue[][] = [];
     const ledgers: FormXxiTicketLedger[] = formXxiData.ledgers;
 
     ledgers.forEach((l) => {
       l.monthlySchedule.forEach((row) => {
-        const dueDate = new Date(row.dueDate).toISOString().split('T')[0];
-        const unpaid = row.status !== 'PAID' ? Math.max(0, row.netPayableAmount - row.paidAmount) : 0;
+        const dueDate = formatIstDateString(new Date(row.dueDate));
+        const netDiff = toSafeBigInt(row.netPayableAmount) - toSafeBigInt(row.paidAmount);
+        const unpaid = row.status !== 'PAID' && netDiff > 0n ? netDiff : 0n;
         rows.push([
           `Ticket #${l.ticketNumber}`,
           l.customer.customerCode,

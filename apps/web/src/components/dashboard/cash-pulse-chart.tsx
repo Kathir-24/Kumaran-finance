@@ -16,17 +16,33 @@ import { formatRupee } from '@/lib/currency';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Activity, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { toSafeBigInt, type WholeRupeeValue } from '@/components/reports/report-bigint';
 
 interface CashPulseChartProps {
   collections?: {
-    cash: number | bigint | string;
-    upi: number | bigint | string;
-    bankTransfer: number | bigint | string;
-    cheque: number | bigint | string;
-    total: number | bigint | string;
+    cash: WholeRupeeValue;
+    upi: WholeRupeeValue;
+    bankTransfer: WholeRupeeValue;
+    cheque: WholeRupeeValue;
+    total: WholeRupeeValue;
   };
-  disbursementsTotal?: number | bigint | string;
+  disbursementsTotal?: WholeRupeeValue;
   isLoading: boolean;
+}
+
+interface CashPulseDatum {
+  mode: string;
+  /** Scaled numeric height strictly for Recharts SVG plotting */
+  amount: number;
+  /** Exact 64-bit BigInt rupee value for Guardrail 2 lossless display */
+  exactAmount: bigint;
+  type: 'inflow' | 'outflow';
+  color: string;
+}
+
+function toChartPlotNumber(value: bigint): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
 }
 
 export function CashPulseChart({
@@ -41,42 +57,48 @@ export function CashPulseChart({
     setIsMounted(true);
   }, []);
 
-  const cashVal = Number(collections?.cash ?? 0);
-  const upiVal = Number(collections?.upi ?? 0);
-  const bankVal = Number(collections?.bankTransfer ?? 0);
-  const chequeVal = Number(collections?.cheque ?? 0);
-  const disbVal = Number(disbursementsTotal ?? 0);
-  const totalInflows = cashVal + upiVal + bankVal + chequeVal;
-  const netFlow = totalInflows - disbVal;
+  // Guardrail 2: Exact BigInt accumulation — zero IEEE-754 precision loss or NaN
+  const cashBig = toSafeBigInt(collections?.cash);
+  const upiBig = toSafeBigInt(collections?.upi);
+  const bankBig = toSafeBigInt(collections?.bankTransfer);
+  const chequeBig = toSafeBigInt(collections?.cheque);
+  const disbBig = toSafeBigInt(disbursementsTotal);
+  const totalInflowsBig = cashBig + upiBig + bankBig + chequeBig;
+  const netFlowBig = totalInflowsBig - disbBig;
 
-  const chartData = [
+  const chartData: CashPulseDatum[] = [
     {
       mode: t('modeCash'),
-      amount: cashVal,
+      amount: toChartPlotNumber(cashBig),
+      exactAmount: cashBig,
       type: 'inflow',
       color: '#10b981', // emerald-500
     },
     {
       mode: t('modeUpi'),
-      amount: upiVal,
+      amount: toChartPlotNumber(upiBig),
+      exactAmount: upiBig,
       type: 'inflow',
       color: '#3b82f6', // blue-500
     },
     {
       mode: t('modeBank'),
-      amount: bankVal,
+      amount: toChartPlotNumber(bankBig),
+      exactAmount: bankBig,
       type: 'inflow',
       color: '#8b5cf6', // purple-500
     },
     {
       mode: t('modeCheque'),
-      amount: chequeVal,
+      amount: toChartPlotNumber(chequeBig),
+      exactAmount: chequeBig,
       type: 'inflow',
       color: '#f59e0b', // amber-500
     },
     {
       mode: t('todayDisbursements'),
-      amount: disbVal,
+      amount: toChartPlotNumber(disbBig),
+      exactAmount: disbBig,
       type: 'outflow',
       color: '#f43f5e', // rose-500
     },
@@ -100,15 +122,15 @@ export function CashPulseChart({
 
           <div className="flex items-center gap-2">
             <Badge
-              variant={netFlow >= 0 ? 'paid' : 'destructive'}
+              variant={netFlowBig >= 0n ? 'paid' : 'destructive'}
               className="font-mono text-xs gap-1 py-1"
             >
-              {netFlow >= 0 ? (
+              {netFlowBig >= 0n ? (
                 <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />
               ) : (
                 <ArrowDownLeft className="h-3.5 w-3.5 text-rose-400" />
               )}
-              <span>Net: {formatRupee(netFlow)}</span>
+              <span>Net: {formatRupee(netFlowBig)}</span>
             </Badge>
           </div>
         </div>
@@ -148,21 +170,26 @@ export function CashPulseChart({
                   tickLine={false}
                   axisLine={{ stroke: '#334155' }}
                   tickFormatter={(v) => {
-                    if (v >= 100000) return `₹${(v / 100000).toFixed(0)}L`;
-                    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}k`;
-                    return `₹${v}`;
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return '₹0';
+                    const abs = Math.abs(n);
+                    const sign = n < 0 ? '-' : '';
+                    if (abs >= 10000000) return `${sign}₹${Math.trunc(abs / 10000000)}Cr`;
+                    if (abs >= 100000) return `${sign}₹${Math.trunc(abs / 100000)}L`;
+                    if (abs >= 1000) return `${sign}₹${Math.trunc(abs / 1000)}k`;
+                    return `${sign}₹${Math.trunc(abs)}`;
                   }}
                 />
                 <Tooltip
                   cursor={{ fill: 'rgba(51, 65, 85, 0.3)' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const item = payload[0].payload;
+                      const item = payload[0].payload as CashPulseDatum;
                       return (
                         <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-2.5 shadow-xl backdrop-blur-md text-xs">
                           <p className="font-medium text-slate-200 mb-1">{item.mode}</p>
                           <p className="font-mono text-sm font-bold text-white">
-                            {formatRupee(item.amount)}
+                            {formatRupee(item.exactAmount)}
                           </p>
                           <span
                             className={`inline-block mt-1 text-[10px] uppercase font-semibold ${

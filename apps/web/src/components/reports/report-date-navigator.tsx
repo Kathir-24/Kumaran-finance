@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { formatIstDateString } from './report-bigint';
 
 interface ReportDateNavigatorProps {
   selectedDate: string;
@@ -27,9 +28,9 @@ export function ReportDateNavigator({
 
   const shiftDate = (days: number) => {
     try {
-      const current = new Date(selectedDate);
+      const current = new Date(`${selectedDate}T00:00:00.000Z`);
       if (isNaN(current.getTime())) return;
-      current.setDate(current.getDate() + days);
+      current.setUTCDate(current.getUTCDate() + days);
       onDateChange(current.toISOString().split('T')[0]);
     } catch {
       // Ignore invalid date
@@ -37,13 +38,13 @@ export function ReportDateNavigator({
   };
 
   const setToday = () => {
-    onDateChange(new Date().toISOString().split('T')[0]);
+    onDateChange(formatIstDateString(new Date()));
   };
 
   const setYesterday = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    onDateChange(yesterday.toISOString().split('T')[0]);
+    const todayIst = new Date(`${formatIstDateString(new Date())}T00:00:00.000Z`);
+    todayIst.setUTCDate(todayIst.getUTCDate() - 1);
+    onDateChange(todayIst.toISOString().split('T')[0]);
   };
 
   return (

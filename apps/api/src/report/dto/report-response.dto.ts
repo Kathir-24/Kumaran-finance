@@ -4,7 +4,7 @@ export class ReportPaginationDto {
   @ApiProperty({ example: 1, description: 'Current page number' })
   page: number;
 
-  @ApiProperty({ example: 20, description: 'Maximum records per page' })
+  @ApiProperty({ example: 20, description: 'Maximum records per page (max 100)' })
   limit: number;
 
   @ApiProperty({ example: 45, description: 'Total matching records' })
@@ -15,143 +15,188 @@ export class ReportPaginationDto {
 }
 
 export class ExecutiveDashboardKpiResponseDto {
-  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
+  @ApiProperty({ example: 'COMPANY_WIDE', description: 'Reporting scope (COMPANY_WIDE or BRANCH_<uuid>)' })
   scope: string;
 
   @ApiProperty({ example: 4, description: 'Active chit schemes count' })
   activeChitsCount: number;
 
-  @ApiProperty({ example: 80, description: 'Active subscriber count' })
-  activeSubscribersCount: number;
+  @ApiProperty({ example: 80, description: 'Total subscriber profiles count' })
+  totalSubscribersCount: number;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today collection totals breakdown' })
-  todayCollections: any;
+  @ApiProperty({ example: 80, description: 'Active subscriber tickets count' })
+  activeTicketsCount: number;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today disbursement totals' })
-  todayDisbursements: any;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today IST collection totals breakdown in whole Rupees (BigInt decimal strings)' })
+  todayCollections: Record<string, unknown>;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Branch vault cash balance status' })
-  vaultBalance: any;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Today IST disbursement total in whole Rupees (BigInt decimal string)' })
+  todayDisbursements: Record<string, unknown>;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Arrears aging summary' })
-  arrearsSummary: any;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Branch vault cash balance in whole Rupees (BigInt decimal string)' })
+  branchVault: Record<string, unknown>;
 
-  @ApiProperty({ example: 3, description: 'Maker-checker pending signoffs count' })
-  pendingApprovalsCount: number;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Pending dual-control operational action counters' })
+  pendingActions: Record<string, unknown>;
+
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Arrears aging buckets (1M, 2M, 3M+) with whole Rupee totals' })
+  arrearsAging: Record<string, unknown>;
 }
 
 export class PendingApprovalsSummaryDto {
-  @ApiProperty({ example: 1, description: 'Unacknowledged field handovers count' })
-  unacknowledgedHandoversCount: number;
+  @ApiProperty({ example: 6, description: 'Total pending dual-control items across all queues' })
+  totalPendingCount: number;
+
+  @ApiProperty({ example: 4, description: 'Pending items eligible for approval by current caller under Guardrails 10 & 11' })
+  actionableByCurrentUserCount: number;
+
+  @ApiProperty({ example: 1, description: 'Unacknowledged field cash handover batches count' })
+  cashHandoversCount: number;
+
+  @ApiProperty({ example: 1, description: 'Pending prize payout authorizations count (VERIFIED_BY_MAKER)' })
+  disbursementAuthorizationsCount: number;
 
   @ApiProperty({ example: 1, description: 'Pending payment reversal requests count' })
-  pendingReversalsCount: number;
+  paymentReversalsCount: number;
 
-  @ApiProperty({ example: 1, description: 'Pending prize payout authorizations count' })
-  pendingAuthorizationsCount: number;
+  @ApiProperty({ example: 1, description: 'Pending safety proof verifications count (finalized auctions)' })
+  safetyProofVerificationsCount: number;
 
-  @ApiProperty({ example: 0, description: 'Pending safety proof verifications count' })
-  pendingSafetyVerificationsCount: number;
+  @ApiProperty({ example: 1, description: 'Pending offline auction finalizations awaiting Checker Partner' })
+  auctionFinalizationsCount: number;
 
-  @ApiProperty({ example: 3, description: 'Total pending dual control items' })
-  totalPendingCount: number;
+  @ApiProperty({ example: 0, description: 'Pending finalized auction correction requests awaiting Checker Partner' })
+  auctionCorrectionsCount: number;
+
+  @ApiProperty({ example: 1, description: 'Pending 3-month defaulter removal approvals awaiting Checker Partner' })
+  defaulterRemovalsCount: number;
+
+  @ApiProperty({ example: 0, description: 'Pending Month N final settlement authorizations awaiting Checker Partner' })
+  finalMonthSettlementsCount: number;
+
+  @ApiProperty({ example: '7900', description: 'Total pending cash handover amount in whole Rupees' })
+  cashHandoversTotalAmount: string;
+
+  @ApiProperty({ example: '75000', description: 'Total pending prize disbursement authorization amount in whole Rupees' })
+  disbursementsTotalAmount: string;
+
+  @ApiProperty({ example: '3950', description: 'Total pending payment reversal amount in whole Rupees' })
+  reversalsTotalAmount: string;
+
+  @ApiProperty({ example: '91000', description: 'Total pending Month N final settlement amount in whole Rupees' })
+  finalMonthSettlementsTotalAmount: string;
 }
 
 export class PendingApprovalsResponseDto {
-  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
+  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope (ALL_BRANCHES or BRANCH_<uuid>)' })
   scope: string;
 
-  @ApiProperty({ type: PendingApprovalsSummaryDto, description: 'Approval queue metrics' })
+  @ApiProperty({ type: PendingApprovalsSummaryDto, description: 'Aggregated dual-control approval queue metrics' })
   summary: PendingApprovalsSummaryDto;
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Unacknowledged cash handover batches' })
-  handovers: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Unacknowledged cash handover batches grouped by collector and branch' })
+  cashHandovers: Record<string, unknown>[];
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending payment reversals awaiting Checker signoff' })
-  reversals: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending prize payouts awaiting Checker Partner authorization' })
+  disbursementAuthorizations: Record<string, unknown>[];
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending prize payouts awaiting Checker authorization' })
-  authorizations: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending payment reversals awaiting Checker Partner signoff' })
+  paymentReversals: Record<string, unknown>[];
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending safety proofs awaiting Maker verification' })
-  safetyProofs: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending safety proofs awaiting Maker verification (finalized auctions only)' })
+  safetyProofVerifications: Record<string, unknown>[];
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending offline auctions awaiting Checker Partner finalization' })
+  auctionFinalizations: Record<string, unknown>[];
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending finalized auction correction requests awaiting Checker Partner approval' })
+  auctionCorrections: Record<string, unknown>[];
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending 3-month defaulter removal requests awaiting Checker Partner approval' })
+  defaulterRemovals: Record<string, unknown>[];
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Pending Month N maturity settlements awaiting Checker Partner approval' })
+  finalMonthSettlements: Record<string, unknown>[];
 }
 
 export class DayBookReportResponseDto {
-  @ApiProperty({ example: '2026-10-22', description: 'Report date (YYYY-MM-DD)' })
+  @ApiProperty({ example: '2026-10-22', description: 'IST report calendar date (YYYY-MM-DD)' })
   date: string;
 
-  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Reporting scope' })
-  scope: string;
+  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Branch ID or ALL_BRANCHES' })
+  branchId: string;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Opening cash in safe' })
-  openingCash: any;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Daily inflow, outflow, net cash flow, and payment mode summary in whole Rupees' })
+  summary: Record<string, unknown>;
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Total daily collection receipts' })
-  totalCollections: any;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Itemized collection receipt inflows' })
+  inflows: Record<string, unknown>[];
 
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Total daily disbursements' })
-  totalDisbursements: any;
-
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Closing cash in safe' })
-  closingCash: any;
-
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Itemized receipts and payout voucher records' })
-  entries: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Itemized prize payout voucher outflows' })
+  outflows: Record<string, unknown>[];
 }
 
 export class FormXxiiReportResponseDto {
-  @ApiProperty({ example: '2026-10-22', description: 'Record date (YYYY-MM-DD)' })
+  @ApiProperty({ example: 'UNVERIFIED-LEGAL', description: 'Statutory review status tag' })
+  statutoryStatus: string;
+
+  @ApiProperty({ example: 'Form XXII: Cash Book Register', description: 'Statutory register title' })
+  registerName: string;
+
+  @ApiProperty({ example: 'Daily register of physical currency notes and coins held in the branch safe / vault.' })
+  description: string;
+
+  @ApiProperty({ example: '2026-10-22', description: 'IST calendar date (YYYY-MM-DD)' })
   date: string;
 
-  @ApiProperty({ example: 'HEAD_OFFICE_PERUNDURAI', description: 'Operating branch' })
-  scope: string;
+  @ApiProperty({ example: 'ALL_BRANCHES', description: 'Branch ID or ALL_BRANCHES' })
+  branchId: string;
 
-  @ApiProperty({ example: 50000, description: 'Opening vault balance in whole Rupees' })
-  openingBalance: number;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Safe cash reconciliation (openingCashInSafe, todayCashInflows, todayCashOutflows, closingCashInSafe) in whole Rupees' })
+  reconciliation: Record<string, unknown>;
 
-  @ApiProperty({ example: 35000, description: 'Total physical cash receipts today' })
-  cashInflows: number;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological physical cash receipt inflows' })
+  inflows: Record<string, unknown>[];
 
-  @ApiProperty({ example: 20000, description: 'Total physical cash disbursements today' })
-  cashOutflows: number;
-
-  @ApiProperty({ example: 65000, description: 'Closing physical cash in safe in whole Rupees' })
-  closingBalance: number;
-
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological cash ledger entries' })
-  entries: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological physical cash disbursement outflows' })
+  outflows: Record<string, unknown>[];
 }
 
 export class FormXviiReportResponseDto {
-  @ApiProperty({ example: 'chit-uuid-001', description: 'Chit group ID' })
-  chitGroupId: string;
+  @ApiProperty({ example: 'UNVERIFIED-LEGAL', description: 'Statutory review status tag' })
+  statutoryStatus: string;
 
-  @ApiProperty({ example: 'KCA-1L-20M-01', description: 'Chit group code' })
-  groupCode: string;
+  @ApiProperty({ example: 'Form XVII: Auction Minutes Consolidated Register', description: 'Statutory register title' })
+  registerName: string;
 
-  @ApiProperty({ example: 20, description: 'Duration in months' })
-  durationMonths: number;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Chit group metadata including frozen foremanCommissionRate' })
+  chitGroup: Record<string, unknown>;
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological list of all auctions and minutes proceedings' })
-  auctions: any[];
+  @ApiProperty({ example: 5, description: 'Total finalized auctions (Months 2..N-1)' })
+  totalAuctionsFinalized: number;
+
+  @ApiProperty({ type: 'object', additionalProperties: true, description: '21-day Registrar filing compliance summary (totalAuctions, filedCount, pendingCount, overdueCount)' })
+  filingSummary: Record<string, unknown>;
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Chronological auction proceedings with frozen commission rate and 21-day filing deadline countdown' })
+  auctions: Record<string, unknown>[];
 }
 
 export class FormXxiReportResponseDto {
-  @ApiProperty({ example: 'ticket-uuid-001', description: 'Subscriber ticket ID' })
-  ticketId: string;
+  @ApiProperty({ example: 'UNVERIFIED-LEGAL', description: 'Statutory review status tag' })
+  statutoryStatus: string;
 
-  @ApiProperty({ example: 4, description: 'Ticket number 1..N' })
-  ticketNumber: number;
-
-  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Subscriber details' })
-  customer: any;
+  @ApiProperty({ example: 'Form XXI: Subscriber Ledger Register', description: 'Statutory register title' })
+  registerName: string;
 
   @ApiProperty({ type: 'object', additionalProperties: true, description: 'Chit scheme parameters' })
-  chitGroup: any;
+  chitGroup: Record<string, unknown>;
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: '20-month schedule of dues, dividend credits, payments, and arrears' })
-  schedule: any[];
+  @ApiProperty({ example: 1, description: 'Number of subscriber ticket ledgers returned' })
+  totalTicketsReturned: number;
+
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Per-ticket continuous N-month schedule of dues, dividends, payments, and arrears' })
+  ledgers: Record<string, unknown>[];
 }
 
 export class DefaultersReportResponseDto {
@@ -162,13 +207,13 @@ export class DefaultersReportResponseDto {
   pagination: ReportPaginationDto;
 
   @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'List of defaulting subscribers categorized by arrears buckets' })
-  defaulters: any[];
+  defaulters: Record<string, unknown>[];
 }
 
 export class AuditLogsReportResponseDto {
   @ApiProperty({ type: () => ReportPaginationDto, description: 'Pagination details' })
   pagination: ReportPaginationDto;
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Append-only audit trail logs' })
-  logs: any[];
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Append-only sanitized audit trail logs (SUPER_ADMIN only)' })
+  logs: Record<string, unknown>[];
 }

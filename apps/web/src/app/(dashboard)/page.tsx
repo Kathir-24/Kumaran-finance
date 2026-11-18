@@ -31,6 +31,7 @@ import {
 import { PendingApprovalsBanner } from '@/components/dashboard/pending-approvals-banner';
 import { ArrearAlertsWidget } from '@/components/dashboard/arrear-alerts-widget';
 import { FilingCountdownWidget } from '@/components/dashboard/filing-countdown-widget';
+import { canQueryDashboardReports } from '@/components/reports/report-access';
 
 const CashPulseChart = dynamic(
   () => import('@/components/dashboard/cash-pulse-chart').then((mod) => mod.CashPulseChart),
@@ -50,6 +51,8 @@ export default function DashboardRootPage() {
   const t = useTranslations();
   const user = useAuthStore((s) => s.user);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
+  // XR-M7-WEB-04: Prevent COLLECTION_AGENT / unauthorized roles from firing 403 dashboard queries
+  const canViewDashboardReports = canQueryDashboardReports(user);
 
   // Fetch Executive KPI Dashboard metrics from real backend
   const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
@@ -61,11 +64,12 @@ export default function DashboardRootPage() {
         }),
       );
     },
+    enabled: canViewDashboardReports,
     staleTime: 60 * 1000,
   });
 
-  // Real-time Maker-Checker approvals from zustand store (fed via SSE / initial fetch)
-  const approvals = useApprovalsStore(
+  // Real-time Maker-Checker approvals from zustand store + full 8-queue summary cache
+  const approvalsFromStore = useApprovalsStore(
     useShallow((s) => ({
       totalPendingCount: s.totalPendingCount,
       cashHandoversCount: s.cashHandoversCount,
@@ -75,7 +79,56 @@ export default function DashboardRootPage() {
     }))
   );
 
+  const { data: pendingApprovalsData } = useQuery({
+    queryKey: ['approvals', 'pending', { branchId: activeBranchId }],
+    queryFn: async ({ signal }) => {
+      return unwrapApiResponse<{
+        summary?: {
+          totalPendingCount?: number;
+          cashHandoversCount?: number;
+          disbursementAuthorizationsCount?: number;
+          paymentReversalsCount?: number;
+          safetyProofVerificationsCount?: number;
+          auctionFinalizationsCount?: number;
+          auctionCorrectionsCount?: number;
+          defaulterRemovalsCount?: number;
+          finalMonthSettlementsCount?: number;
+        };
+      }>(
+        apiClient.GET('/api/v1/reports/pending-approvals', {
+          params: {
+            query: activeBranchId ? { branchId: activeBranchId } : undefined,
+          },
+          signal,
+        }),
+      );
+    },
+    enabled: canViewDashboardReports,
+    staleTime: 15_000,
+  });
+
+  const approvals = {
+    totalPendingCount:
+      pendingApprovalsData?.summary?.totalPendingCount ?? approvalsFromStore.totalPendingCount,
+    cashHandoversCount:
+      pendingApprovalsData?.summary?.cashHandoversCount ?? approvalsFromStore.cashHandoversCount,
+    disbursementAuthorizationsCount:
+      pendingApprovalsData?.summary?.disbursementAuthorizationsCount ??
+      approvalsFromStore.disbursementAuthorizationsCount,
+    paymentReversalsCount:
+      pendingApprovalsData?.summary?.paymentReversalsCount ??
+      approvalsFromStore.paymentReversalsCount,
+    safetyProofVerificationsCount:
+      pendingApprovalsData?.summary?.safetyProofVerificationsCount ??
+      approvalsFromStore.safetyProofVerificationsCount,
+    auctionFinalizationsCount: pendingApprovalsData?.summary?.auctionFinalizationsCount ?? 0,
+    auctionCorrectionsCount: pendingApprovalsData?.summary?.auctionCorrectionsCount ?? 0,
+    defaulterRemovalsCount: pendingApprovalsData?.summary?.defaulterRemovalsCount ?? 0,
+    finalMonthSettlementsCount: pendingApprovalsData?.summary?.finalMonthSettlementsCount ?? 0,
+  };
+
   const currentDate = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -156,8 +209,8 @@ export default function DashboardRootPage() {
         </div>
       </div>
 
-      {/* 2. Maker-Checker Pending Approvals Queue Banner (Guardrail 10) */}
-      <PendingApprovalsBanner approvals={approvals} />
+      {/* 2. Maker-Checker Pending Approvals Queue Banner (Guardrail 10 & 11) */}
+      <PendingApprovalsBanner approvals={approvals} user={user} />
 
       {/* 3. Executive KPI Cards (Guardrail 2 Whole Rupee Math) */}
       <section className="space-y-2">
@@ -188,7 +241,10 @@ export default function DashboardRootPage() {
       </div>
 
       {/* 5. Statutory 21-Day Form XVII Filing Countdown */}
-      <FilingCountdownWidget branchId={activeBranchId ?? undefined} />
+      <FilingCountdownWidget
+        branchId={activeBranchId ?? undefined}
+        enabled={canViewDashboardReports}
+      />
 
       {/* 6. Contextual Rule Banner (Guardrail 1 Single-Company Tenancy) */}
       <BusinessRuleBanner

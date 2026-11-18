@@ -3,17 +3,24 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Printer, Download, ArrowLeft } from 'lucide-react';
+import { Printer, Download, ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { RupeeWords } from '@/lib/rupee-words';
 import { downloadReceiptPdf } from '@/lib/pdf-download';
+import { getErrorMessage } from '@/lib/api-client';
+import {
+  formatIstDisplayDate,
+  formatIstDisplayTime,
+  toSafeBigInt,
+  type WholeRupeeValue,
+} from '@/components/reports/report-bigint';
 
 export interface ReceiptData {
   receiptNumber: string;
   issuedAt: string | Date;
   chitGroupCode: string;
-  chitValue?: bigint | number;
+  chitValue?: WholeRupeeValue;
   durationMonths: number;
   installmentMonth: number;
   ticketNumber: number;
@@ -21,10 +28,10 @@ export interface ReceiptData {
   subscriberTamilName?: string | null;
   subscriberAddress?: string | null;
   subscriberMobile: string;
-  baseInstallment: bigint | number;
-  dividendDeduction: bigint | number;
-  netPayableAmount: bigint | number;
-  amountPaid: bigint | number;
+  baseInstallment: WholeRupeeValue;
+  dividendDeduction: WholeRupeeValue;
+  netPayableAmount: WholeRupeeValue;
+  amountPaid: WholeRupeeValue;
   paymentMethod: string;
   transactionRef?: string | null;
   collectorName: string;
@@ -44,28 +51,26 @@ interface ReceiptPrintTemplateProps {
 export function ReceiptPrintTemplate({ paymentId, receipt }: ReceiptPrintTemplateProps) {
   const t = useTranslations('print');
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const formattedDate = new Date(receipt.issuedAt).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  const formattedDate = formatIstDisplayDate(receipt.issuedAt);
+  const formattedTime = formatIstDisplayTime(receipt.issuedAt);
 
-  const formattedTime = new Date(receipt.issuedAt).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const baseInstallmentBig = toSafeBigInt(receipt.baseInstallment);
+  const dividendDeductionBig = toSafeBigInt(receipt.dividendDeduction);
+  const netPayableAmountBig = toSafeBigInt(receipt.netPayableAmount);
+  const amountPaidBig = toSafeBigInt(receipt.amountPaid);
 
-  const englishWords = RupeeWords.toEnglishWords(receipt.amountPaid);
-  const tamilWords = RupeeWords.toTamilWords(receipt.amountPaid);
+  const englishWords = RupeeWords.toEnglishWords(amountPaidBig);
+  const tamilWords = RupeeWords.toTamilWords(amountPaidBig);
 
   const handleDownloadPdf = async () => {
     try {
       setDownloading(true);
+      setDownloadError(null);
       await downloadReceiptPdf(paymentId, `receipt-${receipt.receiptNumber}.pdf`);
-    } catch {
-      // Fallback
+    } catch (err: unknown) {
+      setDownloadError(getErrorMessage(err, 'Failed to download receipt PDF'));
     } finally {
       setDownloading(false);
     }
@@ -109,6 +114,13 @@ export function ReceiptPrintTemplate({ paymentId, receipt }: ReceiptPrintTemplat
           </Button>
         </div>
       </div>
+
+      {downloadError && (
+        <div className="w-full max-w-[148mm] mb-3 rounded-xl border border-rose-500/40 bg-rose-950/40 px-4 py-2.5 text-xs text-rose-200 flex items-center gap-2 print:hidden">
+          <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
 
       {/* ADR-11 Standard Notice (Hidden during Print) */}
       <div className="w-full max-w-[148mm] mb-3 text-center text-[11px] text-slate-400 font-sans print:hidden">
@@ -217,25 +229,25 @@ export function ReceiptPrintTemplate({ paymentId, receipt }: ReceiptPrintTemplat
               <tr>
                 <td className="py-1.5 px-3 text-slate-700">{t('receipt.baseInstallment')}</td>
                 <td className="py-1.5 px-3 text-right font-mono text-black">
-                  {formatRupee(BigInt(receipt.baseInstallment))}
+                  {formatRupee(baseInstallmentBig)}
                 </td>
               </tr>
               <tr>
                 <td className="py-1.5 px-3 text-emerald-800 font-medium">{t('receipt.dividendCredit')}</td>
                 <td className="py-1.5 px-3 text-right font-mono text-emerald-800 font-medium">
-                  - {formatRupee(BigInt(receipt.dividendDeduction))}
+                  - {formatRupee(dividendDeductionBig)}
                 </td>
               </tr>
               <tr className="bg-slate-50 font-semibold text-black">
                 <td className="py-1.5 px-3">{t('receipt.netPayable')}</td>
                 <td className="py-1.5 px-3 text-right font-mono">
-                  {formatRupee(BigInt(receipt.netPayableAmount))}
+                  {formatRupee(netPayableAmountBig)}
                 </td>
               </tr>
               <tr className="bg-slate-200/80 font-bold text-black border-t-2 border-slate-400 text-xs">
                 <td className="py-2 px-3 uppercase">{t('receipt.totalAmountPaid')}</td>
                 <td className="py-2 px-3 text-right font-mono text-sm font-extrabold text-black">
-                  {formatRupee(BigInt(receipt.amountPaid))}
+                  {formatRupee(amountPaidBig)}
                 </td>
               </tr>
             </tbody>

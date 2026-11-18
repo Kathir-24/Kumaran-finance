@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Query,
   Res,
   UseGuards,
@@ -27,7 +28,8 @@ import {
   THROTTLE_PDF_TTL_MS,
 } from '../common/constants';
 import { SetTimeout } from '../common/decorators/set-timeout.decorator';
-import { PdfService } from './pdf.service';
+import { FontResolverHelper } from './helpers/font-resolver.helper';
+import { GeneratedPdfResult, PdfService } from './pdf.service';
 
 @ApiTags('Bilingual PDF Documents')
 @ApiBearerAuth('JWT-auth')
@@ -38,6 +40,43 @@ import { PdfService } from './pdf.service';
 @Controller('pdf')
 export class PdfController {
   constructor(private readonly pdfService: PdfService) {}
+
+  private deliverPdfResponse(
+    res: Response,
+    result: GeneratedPdfResult,
+    prefix: string,
+    rawId: string,
+    download?: boolean,
+    redirect?: string,
+    stream?: string,
+  ): void {
+    // Prevent browser/proxy caching of sensitive PDFs and 15-minute presigned bearer URLs across all modes
+    res.setHeader('Cache-Control', 'private, no-store');
+
+    if (String(download) === 'true') {
+      res.json({
+        key: result.key,
+        presignedUrl: result.presignedUrl,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
+      });
+      return;
+    }
+
+    if (String(redirect) === 'true' && String(stream) !== 'true') {
+      res.redirect(result.presignedUrl);
+      return;
+    }
+
+    const safeId = FontResolverHelper.sanitizeDispositionSegment(rawId, 'document');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', result.buffer.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${prefix}-${safeId}.pdf"`,
+    );
+    res.end(result.buffer);
+  }
 
   @Get('receipt/:paymentId')
   @Roles(
@@ -86,8 +125,8 @@ export class PdfController {
         schema: {
           type: 'object',
           properties: {
-            key: { type: 'string', example: 'receipts/KC-REC-PRD-2026-00001.pdf' },
-            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/receipts/KC-REC-PRD-2026-00001.pdf?sig=...' },
+            key: { type: 'string', example: 'receipts/PRD/2026/KC-REC-PRD-2026-00001.pdf' },
+            presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/receipts/PRD/2026/KC-REC-PRD-2026-00001.pdf?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
         },
@@ -98,7 +137,7 @@ export class PdfController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to receipt' })
   async getReceiptPdf(
-    @Param('paymentId') paymentId: string,
+    @Param('paymentId', new ParseUUIDPipe()) paymentId: string,
     @Query('download') download: boolean,
     @Query('redirect') redirect: string,
     @Query('stream') stream: string,
@@ -106,28 +145,7 @@ export class PdfController {
     @Res() res: Response,
   ) {
     const result = await this.pdfService.generateReceiptPdf(paymentId, currentUser);
-
-    if (String(download) === 'true') {
-      res.json({
-        key: result.key,
-        presignedUrl: result.presignedUrl,
-        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
-      });
-      return;
-    }
-
-    if (String(redirect) === 'true') {
-      res.redirect(result.presignedUrl);
-      return;
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', result.buffer.length);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="receipt-${paymentId}.pdf"`,
-    );
-    res.end(result.buffer);
+    this.deliverPdfResponse(res, result, 'receipt', paymentId, download, redirect, stream);
   }
 
   @Get('voucher/:auctionId')
@@ -169,14 +187,14 @@ export class PdfController {
         schema: {
           type: 'string',
           format: 'binary',
-          description: 'A4 prize disbursement voucher PDF binary stream',
+          description: 'A5 landscape prize disbursement voucher PDF binary stream',
         },
       },
       'application/json': {
         schema: {
           type: 'object',
           properties: {
-            key: { type: 'string', example: 'vouchers/payout-voucher-2026-01.pdf' },
+            key: { type: 'string', example: 'vouchers/PRD/2026/KC-VOU-PRD-2026-KCA-1L-20M-01-00004.pdf' },
             presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/vouchers/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
@@ -188,7 +206,7 @@ export class PdfController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to voucher' })
   async getVoucherPdf(
-    @Param('auctionId') auctionId: string,
+    @Param('auctionId', new ParseUUIDPipe()) auctionId: string,
     @Query('download') download: boolean,
     @Query('redirect') redirect: string,
     @Query('stream') stream: string,
@@ -196,28 +214,7 @@ export class PdfController {
     @Res() res: Response,
   ) {
     const result = await this.pdfService.generatePayoutVoucherPdf(auctionId, currentUser);
-
-    if (String(download) === 'true') {
-      res.json({
-        key: result.key,
-        presignedUrl: result.presignedUrl,
-        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
-      });
-      return;
-    }
-
-    if (String(redirect) === 'true') {
-      res.redirect(result.presignedUrl);
-      return;
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', result.buffer.length);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="voucher-${auctionId}.pdf"`,
-    );
-    res.end(result.buffer);
+    this.deliverPdfResponse(res, result, 'voucher', auctionId, download, redirect, stream);
   }
 
   @Get('minutes/:auctionId')
@@ -265,7 +262,7 @@ export class PdfController {
         schema: {
           type: 'object',
           properties: {
-            key: { type: 'string', example: 'minutes/form-xvii-2026-01.pdf' },
+            key: { type: 'string', example: 'minutes/group-uuid/month-4.pdf' },
             presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/minutes/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
@@ -277,7 +274,7 @@ export class PdfController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to auction minutes' })
   async getMinutesPdf(
-    @Param('auctionId') auctionId: string,
+    @Param('auctionId', new ParseUUIDPipe()) auctionId: string,
     @Query('download') download: boolean,
     @Query('redirect') redirect: string,
     @Query('stream') stream: string,
@@ -285,28 +282,7 @@ export class PdfController {
     @Res() res: Response,
   ) {
     const result = await this.pdfService.generateAuctionMinutesPdf(auctionId, currentUser);
-
-    if (String(download) === 'true') {
-      res.json({
-        key: result.key,
-        presignedUrl: result.presignedUrl,
-        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
-      });
-      return;
-    }
-
-    if (String(redirect) === 'true') {
-      res.redirect(result.presignedUrl);
-      return;
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', result.buffer.length);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="form-xvii-minutes-${auctionId}.pdf"`,
-    );
-    res.end(result.buffer);
+    this.deliverPdfResponse(res, result, 'form-xvii-minutes', auctionId, download, redirect, stream);
   }
 
   @Get('passbook/:ticketId')
@@ -355,7 +331,7 @@ export class PdfController {
         schema: {
           type: 'object',
           properties: {
-            key: { type: 'string', example: 'passbooks/form-xxi-passbook-01.pdf' },
+            key: { type: 'string', example: 'passbooks/group-uuid/ticket-7.pdf' },
             presignedUrl: { type: 'string', example: 'https://storage.kumaranfinance.in/passbooks/...?sig=...' },
             expiresInSeconds: { type: 'number', example: 900 },
           },
@@ -367,7 +343,7 @@ export class PdfController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden access to passbook' })
   async getPassbookPdf(
-    @Param('ticketId') ticketId: string,
+    @Param('ticketId', new ParseUUIDPipe()) ticketId: string,
     @Query('download') download: boolean,
     @Query('redirect') redirect: string,
     @Query('stream') stream: string,
@@ -375,28 +351,6 @@ export class PdfController {
     @Res() res: Response,
   ) {
     const result = await this.pdfService.generatePassbookPdf(ticketId, currentUser);
-
-    if (String(download) === 'true') {
-      res.json({
-        key: result.key,
-        presignedUrl: result.presignedUrl,
-        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
-      });
-      return;
-    }
-
-    if (String(redirect) === 'true') {
-      res.redirect(result.presignedUrl);
-      return;
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', result.buffer.length);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="form-xxi-passbook-${ticketId}.pdf"`,
-    );
-    res.end(result.buffer);
+    this.deliverPdfResponse(res, result, 'form-xxi-passbook', ticketId, download, redirect, stream);
   }
 }
-

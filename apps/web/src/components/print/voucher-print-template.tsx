@@ -3,37 +3,28 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Printer, Download, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Printer, Download, ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatRupee } from '@/lib/currency';
 import { RupeeWords } from '@/lib/rupee-words';
 import { downloadVoucherPdf } from '@/lib/pdf-download';
+import { getErrorMessage } from '@/lib/api-client';
+import { formatIstDisplayDate, toSafeBigInt } from '@/components/reports/report-bigint';
+import {
+  buildCanonicalVoucherNumber,
+  mapVoucherApiResponseToVoucherData,
+  type PrintVoucherApiResponse,
+  type PrintVoucherBackendData,
+  type VoucherData,
+} from './voucher-mapper';
 
-export interface VoucherData {
-  voucherNumber: string;
-  disbursedAt: string | Date;
-  chitGroupCode: string;
-  chitValue: bigint | number;
-  installmentMonth: number;
-  ticketNumber: number;
-  winnerCode: string;
-  winnerName: string;
-  winnerNameTamil?: string | null;
-  winnerPhone: string;
-  bidDiscount: bigint | number;
-  netPrizeMoney: bigint | number;
-  disbursementMode: string;
-  paymentReference?: string | null;
-  agreementSigned?: boolean;
-  nomineeSigned?: boolean;
-  isSecurityRequired?: boolean;
-  blankChequeDetails?: string | null;
-  verifiedByUserName: string;
-  authorizedByUserName: string;
-  branchName?: string | null;
-  branchAddress?: string | null;
-  branchPhone?: string | null;
-}
+export {
+  buildCanonicalVoucherNumber,
+  mapVoucherApiResponseToVoucherData,
+  type PrintVoucherApiResponse,
+  type PrintVoucherBackendData,
+  type VoucherData,
+};
 
 interface VoucherPrintTemplateProps {
   auctionId: string;
@@ -43,22 +34,25 @@ interface VoucherPrintTemplateProps {
 export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplateProps) {
   const t = useTranslations('print');
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const formattedDate = new Date(voucher.disbursedAt).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  const formattedDate = formatIstDisplayDate(voucher.disbursedAt);
 
-  const englishWords = RupeeWords.toEnglishWords(voucher.netPrizeMoney);
-  const tamilWords = RupeeWords.toTamilWords(voucher.netPrizeMoney);
+  const chitValueBig = toSafeBigInt(voucher.chitValue);
+  const bidDiscountBig = toSafeBigInt(voucher.bidDiscount);
+  const netPrizeMoneyBig = toSafeBigInt(voucher.netPrizeMoney);
+  const arrearsDeductedBig = toSafeBigInt(voucher.arrearsDeducted ?? 0n);
+
+  const englishWords = RupeeWords.toEnglishWords(netPrizeMoneyBig);
+  const tamilWords = RupeeWords.toTamilWords(netPrizeMoneyBig);
 
   const handleDownloadPdf = async () => {
     try {
       setDownloading(true);
+      setDownloadError(null);
       await downloadVoucherPdf(auctionId, `payout-voucher-${voucher.voucherNumber}.pdf`);
-    } catch {
-      // Fallback
+    } catch (err: unknown) {
+      setDownloadError(getErrorMessage(err, 'Failed to download payout voucher PDF'));
     } finally {
       setDownloading(false);
     }
@@ -102,6 +96,13 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
           </Button>
         </div>
       </div>
+
+      {downloadError && (
+        <div className="w-full max-w-[210mm] mb-3 rounded-xl border border-rose-500/40 bg-rose-950/40 px-4 py-2.5 text-xs text-rose-200 flex items-center gap-2 print:hidden">
+          <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
 
       {/* A5 Landscape / A4 Voucher Canvas */}
       <div className="w-full max-w-[210mm] bg-white text-slate-900 p-6 sm:p-8 rounded-sm shadow-2xl relative border border-slate-200 print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full print:m-0">
@@ -174,23 +175,31 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
             {t('voucher.financialBoxTitle')}:
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center py-2 bg-white rounded border border-slate-200">
+          <div className={`grid ${arrearsDeductedBig > 0n ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 text-center py-2 bg-white rounded border border-slate-200`}>
             <div>
               <p className="text-[10px] text-slate-600">{t('voucher.chitValue')}</p>
               <p className="text-xs sm:text-sm font-bold font-mono text-black">
-                {formatRupee(BigInt(voucher.chitValue))}
+                {formatRupee(chitValueBig)}
               </p>
             </div>
             <div>
               <p className="text-[10px] text-slate-600">{t('voucher.bidDiscount')}</p>
               <p className="text-xs sm:text-sm font-bold font-mono text-amber-700">
-                - {formatRupee(BigInt(voucher.bidDiscount))}
+                - {formatRupee(bidDiscountBig)}
               </p>
             </div>
+            {arrearsDeductedBig > 0n && (
+              <div>
+                <p className="text-[10px] text-rose-700">{t('voucher.arrearsOffset')}</p>
+                <p className="text-xs sm:text-sm font-bold font-mono text-rose-700">
+                  - {formatRupee(arrearsDeductedBig)}
+                </p>
+              </div>
+            )}
             <div className="border-l border-slate-200 bg-emerald-50/50 rounded-r">
               <p className="text-[10px] font-bold text-emerald-800 uppercase">{t('voucher.netPrizeMoney')}</p>
               <p className="text-sm sm:text-base font-extrabold font-mono text-emerald-900">
-                {formatRupee(BigInt(voucher.netPrizeMoney))}
+                {formatRupee(netPrizeMoneyBig)}
               </p>
             </div>
           </div>
@@ -208,7 +217,7 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
           </div>
         </div>
 
-        {/* 5. Safety Proof Stamps & Dual Control Signatures */}
+        {/* 5. Safety Proof Stamps (ADR-15: Agreements / Cheques / Promissory Notes) & Dual Control Signatures */}
         <div className="my-3 p-2.5 rounded bg-slate-50 border border-slate-300">
           <div className="flex items-center justify-between text-[10.5px] mb-2 border-b border-slate-200 pb-1.5 flex-wrap gap-2">
             <span className="font-semibold text-slate-800 flex items-center gap-1">
@@ -229,12 +238,12 @@ export function VoucherPrintTemplate({ auctionId, voucher }: VoucherPrintTemplat
               <p className="text-[9.5px] text-slate-500">Maker Signature & Date</p>
             </div>
 
-            {/* Checker (Authorized By) */}
+            {/* Checker (Authorized By — Verified Partner strictly per Guardrails 10 & 11) */}
             <div className="space-y-1 text-right">
               <p className="text-[10px] text-slate-600">{t('voucher.authorizedByChecker')}:</p>
               <p className="font-semibold text-black">{voucher.authorizedByUserName}</p>
               <div className="w-36 border-b border-dashed border-slate-400 pt-6 mb-1 ml-auto" />
-              <p className="text-[9.5px] text-slate-500">Partner / Manager Signature</p>
+              <p className="text-[9.5px] text-slate-500">Verified Partner (Checker) Signature</p>
             </div>
           </div>
         </div>

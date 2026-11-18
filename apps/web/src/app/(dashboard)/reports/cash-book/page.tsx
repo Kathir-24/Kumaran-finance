@@ -16,20 +16,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { downloadCsv } from '@/lib/csv-export';
+import { downloadCsv, type CsvCellValue } from '@/lib/csv-export';
 import { CashBookKpiBar } from '@/components/reports/cash-book-kpi-bar';
 import { ReportDateNavigator } from '@/components/reports/report-date-navigator';
 import { FormXxiiTable, type FormXxiiInflowItem, type FormXxiiOutflowItem } from '@/components/reports/form-xxii-table';
 import { DayBookTable, type DayBookInflowItem, type DayBookOutflowItem, type DayBookSummary } from '@/components/reports/day-book-table';
+import { formatIstDateString, type WholeRupeeValue } from '@/components/reports/report-bigint';
 
 interface FormXxiiReportResponse {
   inflows?: FormXxiiInflowItem[];
   outflows?: FormXxiiOutflowItem[];
   reconciliation?: {
-    openingCashInSafe: number;
-    todayCashInflows: number;
-    todayCashOutflows: number;
-    closingCashInSafe: number;
+    openingCashInSafe: WholeRupeeValue;
+    todayCashInflows: WholeRupeeValue;
+    todayCashOutflows: WholeRupeeValue;
+    closingCashInSafe: WholeRupeeValue;
   };
 }
 
@@ -53,9 +54,9 @@ export default function FormXxiiCashBookPage() {
   const allowedRoles = ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
   const hasAccess = user?.roles?.some((r) => allowedRoles.includes(r));
 
-  // Current Date State (defaults to today YYYY-MM-DD)
+  // Current Date State (defaults to today IST YYYY-MM-DD)
   const [selectedDate, setSelectedDate] = React.useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
+    return formatIstDateString();
   });
 
   // Selected Branch ID (defaults to activeBranchId if set, or undefined for consolidated)
@@ -111,7 +112,7 @@ export default function FormXxiiCashBookPage() {
       const inflows: FormXxiiInflowItem[] = formXxiiData?.inflows || [];
       const outflows: FormXxiiOutflowItem[] = formXxiiData?.outflows || [];
 
-      const rows: (string | number)[][] = [];
+      const rows: CsvCellValue[][] = [];
       inflows.forEach((item) => {
         rows.push([
           selectedDate,
@@ -149,7 +150,7 @@ export default function FormXxiiCashBookPage() {
       const inflows: DayBookInflowItem[] = dayBookData?.inflows || [];
       const outflows: DayBookOutflowItem[] = dayBookData?.outflows || [];
 
-      const rows: (string | number)[][] = [];
+      const rows: CsvCellValue[][] = [];
       inflows.forEach((item) => {
         rows.push([
           selectedDate,

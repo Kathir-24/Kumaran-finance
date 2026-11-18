@@ -65,10 +65,14 @@ export function AuditLogTable({
   const isDualControlAction = (action: string): boolean => {
     return [
       'AUCTION_FINALIZED',
+      'AUCTION_CORRECTION_APPROVED',
+      'DEFAULTER_REMOVAL_APPROVED',
       'PAYMENT_REVERSED',
       'PAYMENT_REVERSAL_REJECTED',
       'CASH_HANDOVER_ACKNOWLEDGED',
       'PRIZE_PAYOUT_AUTHORIZED',
+      'FINAL_MONTH_SETTLEMENT_EXECUTED',
+      'FINAL_SETTLEMENT_APPROVED',
       'SAFETY_PROOF_VERIFIED',
       'UPI_CLAIM_VERIFIED',
     ].includes(action);
@@ -229,7 +233,7 @@ export function AuditLogTable({
 
                     {/* IP Address */}
                     <td className="py-3 px-4 font-mono text-slate-400 text-[11px]">
-                      {log.ipAddress || '127.0.0.1 (Local)'}
+                      {log.ipAddress || '—'}
                     </td>
 
                     {/* Diff Trigger */}

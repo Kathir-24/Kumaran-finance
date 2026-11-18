@@ -81,7 +81,7 @@ export class ReportController {
   @ApiOperation({
     summary: 'Aggregated Maker-Checker Pending Approvals Queue',
     description:
-      'Aggregates pending operational items requiring partner or branch manager action: unacknowledged cash handovers, prize disbursement authorizations, payment reversal requests, and pending safety proof verifications. Scoped to branch for Branch Manager.',
+      'Aggregates all dual-control operational queues requiring action: unacknowledged cash handovers, prize disbursement authorizations, payment reversals, safety proof verifications, auction finalizations, finalized auction corrections, defaulter removals, and Month N final settlements. Annotates Maker != Checker and Partner (isPartner) actionability per caller. Fail-closed branch scoping for Branch Manager.',
   })
   @ApiOkResponseEnvelope(PendingApprovalsResponseDto, {
     description: 'Aggregated pending approvals queue returned',
@@ -122,12 +122,13 @@ export class ReportController {
     return interval(15000).pipe(
       startWith(0),
       switchMap(async () => {
-        // Mid-flight authentication & session validity assertion (F15)
-        await this.reportService.assertStreamAuthorization(currentUser);
+        // Mid-flight authentication, session validity & live DB role/branch/partner refresh (F15 + XR-M7-RPT-01)
+        const effectiveUser =
+          await this.reportService.resolveLiveStreamUser(currentUser);
 
         try {
           const approvals = await this.reportService.getPendingApprovals(
-            currentUser,
+            effectiveUser,
             query,
           );
           return {
@@ -195,7 +196,7 @@ export class ReportController {
   @ApiOperation({
     summary: 'Form XVII: Auction Minutes Consolidated Register [UNVERIFIED-LEGAL]',
     description:
-      'Consolidated chronological record of all auctions for a chit scheme (Months 2 to N-1). Includes winning discounts, 4% commission, dividends, tie-break draws, and statutory proceedings.',
+      'Consolidated chronological record of all auctions for a chit scheme (Months 2 to N-1). Includes winning discounts, dynamic frozen foreman commission rate, dividends, tie-break draws, statutory proceedings, and 21-day Deputy Registrar filing countdown.',
   })
   @ApiOkResponseEnvelope(FormXviiReportResponseDto, { description: 'Auction minutes register returned' })
   async getAuctionMinutesFormXvii(
@@ -216,7 +217,7 @@ export class ReportController {
   @ApiOperation({
     summary: 'Form XXI: Subscriber Ledger Register [UNVERIFIED-LEGAL]',
     description:
-      'Continuous 20-month schedule of base dues, dividend credits, payments, and arrears per ticket. Customers are strictly restricted to their own ticket passbook statement.',
+      'Continuous N-month schedule of base dues, dividend credits, payments, and arrears per ticket. Customers are strictly restricted to their own ticket passbook statement.',
   })
   @ApiOkResponseEnvelope(FormXxiReportResponseDto, { description: 'Subscriber ledger returned' })
   async getSubscriberLedgerFormXxi(

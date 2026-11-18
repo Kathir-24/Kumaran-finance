@@ -1,22 +1,47 @@
 // ==============================================================================
 // Kumaran Chits — Shared Authenticated PDF Blob Download Helper
 // Routes PDF downloads through typed @kumaran/api-client (BFF + HttpOnly cookies)
-// with uniform KumaranApiError propagation and ObjectURL cleanup.
+// with explicit credentials forwarding, filename sanitization, uniform
+// KumaranApiError propagation, and guaranteed ObjectURL cleanup.
 // ==============================================================================
 
-import { apiClient, unwrapApiResponse } from './api-client.ts';
+import { apiClient, KumaranApiError, unwrapApiResponse } from './api-client.ts';
 
 export interface PdfDownloadDeps {
   getClient?: () => typeof apiClient;
   triggerDownload?: (blob: Blob, filename: string) => void;
 }
 
+/**
+ * Sanitizes a PDF download filename against path traversal, CRLF/control chars,
+ * and illegal filesystem characters, guaranteeing a `.pdf` suffix.
+ */
+export function sanitizePdfFilename(filename: string, fallback = 'kumaran-document'): string {
+  const cleaned = (filename ?? '')
+    .replace(/[\r\n\t\0]/g, '')
+    .replace(/(?:\.\.[\\/])+/g, '')
+    .replace(/[\\/]+/g, '_')
+    .replace(/\.\.+/g, '.')
+    .replace(/[<>:"|?*]/g, '_')
+    .replace(/^[_.\s]+|[_.\s]+$/g, '')
+    .trim();
+
+  const safe = cleaned || fallback;
+  return safe.toLowerCase().endsWith('.pdf') ? safe : `${safe}.pdf`;
+}
+
 export function triggerBlobDownload(blob: Blob, filename: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const safeFilename = sanitizePdfFilename(filename);
   const objectUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   try {
     anchor.href = objectUrl;
-    anchor.download = filename;
+    anchor.download = safeFilename;
+    if (anchor.style) {
+      anchor.style.visibility = 'hidden';
+    }
     document.body.appendChild(anchor);
     anchor.click();
   } finally {
@@ -33,7 +58,14 @@ async function downloadPdfAndSave(
   deps: PdfDownloadDeps = {},
 ): Promise<void> {
   const blob = await unwrapApiResponse<Blob>(requestPromise);
-  (deps.triggerDownload ?? triggerBlobDownload)(blob, filename);
+  if (!(blob instanceof Blob) || blob.size === 0) {
+    throw new KumaranApiError(502, {
+      code: 'INVALID_PDF_PAYLOAD',
+      message: 'Server returned an empty or invalid PDF payload',
+    });
+  }
+  const safeFilename = sanitizePdfFilename(filename);
+  (deps.triggerDownload ?? triggerBlobDownload)(blob, safeFilename);
 }
 
 export async function downloadReceiptPdf(
@@ -46,6 +78,7 @@ export async function downloadReceiptPdf(
     client.GET('/api/v1/pdf/receipt/{paymentId}', {
       params: { path: { paymentId } },
       parseAs: 'blob',
+      credentials: 'include',
     }),
     filename,
     deps,
@@ -62,6 +95,7 @@ export async function downloadVoucherPdf(
     client.GET('/api/v1/pdf/voucher/{auctionId}', {
       params: { path: { auctionId } },
       parseAs: 'blob',
+      credentials: 'include',
     }),
     filename,
     deps,
@@ -78,6 +112,7 @@ export async function downloadMinutesPdf(
     client.GET('/api/v1/pdf/minutes/{auctionId}', {
       params: { path: { auctionId } },
       parseAs: 'blob',
+      credentials: 'include',
     }),
     filename,
     deps,
@@ -94,6 +129,7 @@ export async function downloadPassbookPdf(
     client.GET('/api/v1/pdf/passbook/{ticketId}', {
       params: { path: { ticketId } },
       parseAs: 'blob',
+      credentials: 'include',
     }),
     filename,
     deps,

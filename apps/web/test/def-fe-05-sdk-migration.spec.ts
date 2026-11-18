@@ -112,13 +112,13 @@ test('DEF-FE-05 (N2): pdf-download downloads authenticated PDF blobs via apiClie
 
   assert.equal(calls.length, 4);
   assert.equal(calls[0].url, '/api/v1/pdf/receipt/{paymentId}');
-  assert.deepEqual(calls[0].opts, { params: { path: { paymentId: 'pay-123' } }, parseAs: 'blob' });
+  assert.deepEqual(calls[0].opts, { params: { path: { paymentId: 'pay-123' } }, parseAs: 'blob', credentials: 'include' });
   assert.equal(calls[1].url, '/api/v1/pdf/voucher/{auctionId}');
-  assert.deepEqual(calls[1].opts, { params: { path: { auctionId: 'auc-456' } }, parseAs: 'blob' });
+  assert.deepEqual(calls[1].opts, { params: { path: { auctionId: 'auc-456' } }, parseAs: 'blob', credentials: 'include' });
   assert.equal(calls[2].url, '/api/v1/pdf/minutes/{auctionId}');
-  assert.deepEqual(calls[2].opts, { params: { path: { auctionId: 'auc-789' } }, parseAs: 'blob' });
+  assert.deepEqual(calls[2].opts, { params: { path: { auctionId: 'auc-789' } }, parseAs: 'blob', credentials: 'include' });
   assert.equal(calls[3].url, '/api/v1/pdf/passbook/{ticketId}');
-  assert.deepEqual(calls[3].opts, { params: { path: { ticketId: 'tkt-101' } }, parseAs: 'blob' });
+  assert.deepEqual(calls[3].opts, { params: { path: { ticketId: 'tkt-101' } }, parseAs: 'blob', credentials: 'include' });
   assert.deepEqual(
     downloads.map((d) => d.filename),
     [

@@ -19,9 +19,13 @@ import { DefaulterItem } from './defaulter-kpi-bar';
 
 interface DefaulterAnalysisTableProps {
   defaulters: DefaulterItem[];
+  groupIdByCode?: Record<string, string>;
 }
 
-export function DefaulterAnalysisTable({ defaulters }: DefaulterAnalysisTableProps) {
+export function DefaulterAnalysisTable({
+  defaulters,
+  groupIdByCode = {},
+}: DefaulterAnalysisTableProps) {
   const t = useTranslations('reports.defaulters');
   const [expandedIds, setExpandedIds] = React.useState<Record<string, boolean>>({});
 
@@ -145,25 +149,37 @@ export function DefaulterAnalysisTable({ defaulters }: DefaulterAnalysisTablePro
 
                   {/* Quick Actions */}
                   <td className="py-3 px-3.5 text-right print:hidden">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* View Passbook */}
-                      <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 gap-1">
-                        <Link href={`/reports/ledger?ticketNumber=${item.ticketNumber}`}>
-                          <BookOpen className="h-3.5 w-3.5" />
-                          <span>{t('actionPassbook')}</span>
-                        </Link>
-                      </Button>
+                    {(() => {
+                      const resolvedGroupId = item.chitGroupId || groupIdByCode[item.groupCode];
+                      const ledgerHref = resolvedGroupId
+                        ? `/reports/ledger?chitGroupId=${encodeURIComponent(resolvedGroupId)}&ticketNumber=${item.ticketNumber}`
+                        : `/reports/ledger?ticketNumber=${item.ticketNumber}`;
+                      const substituteHref = resolvedGroupId
+                        ? `/schemes/${encodeURIComponent(resolvedGroupId)}/defaulters`
+                        : '/schemes';
 
-                      {/* ADR-07 Substitute Defaulter */}
-                      {isHighRisk && (
-                        <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1">
-                          <Link href={`/schemes`}>
-                            <UserMinus className="h-3.5 w-3.5" />
-                            <span>{t('actionSubstitute')}</span>
-                          </Link>
-                        </Button>
-                      )}
-                    </div>
+                      return (
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* View Passbook */}
+                          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 gap-1">
+                            <Link href={ledgerHref}>
+                              <BookOpen className="h-3.5 w-3.5" />
+                              <span>{t('actionPassbook')}</span>
+                            </Link>
+                          </Button>
+
+                          {/* ADR-07 Substitute Defaulter */}
+                          {isHighRisk && (
+                            <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1">
+                              <Link href={substituteHref}>
+                                <UserMinus className="h-3.5 w-3.5" />
+                                <span>{t('actionSubstitute')}</span>
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                 </tr>
 
@@ -188,7 +204,15 @@ export function DefaulterAnalysisTable({ defaulters }: DefaulterAnalysisTablePro
                                 </Badge>
                               </div>
                               <div className="text-[10px] text-slate-400">
-                                Due: {new Date(due.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                Due:{' '}
+                                {Number.isNaN(new Date(due.dueDate).getTime())
+                                  ? '—'
+                                  : new Date(due.dueDate).toLocaleDateString('en-IN', {
+                                      timeZone: 'Asia/Kolkata',
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
                               </div>
                               <div className="text-right font-mono font-semibold text-rose-400">
                                 {formatRupee(due.outstandingDue)}

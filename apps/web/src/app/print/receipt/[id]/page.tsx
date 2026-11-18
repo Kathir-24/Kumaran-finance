@@ -9,20 +9,33 @@ import { ReceiptPrintTemplate, type ReceiptData } from '@/components/print/recei
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 
+interface ReceiptApiEnvelope {
+  receiptNumber?: string;
+  issuedAt?: string | Date;
+  isReversed?: boolean;
+  data?: ReceiptData;
+}
+
 export default function PrintReceiptPage() {
   const params = useParams();
   const paymentId = params?.id as string;
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.payments.receipt(paymentId),
-    queryFn: async () => {
-      const res = await unwrapApiResponse<{ data?: ReceiptData } | ReceiptData>(
+    queryFn: async ({ signal }) => {
+      const res = await unwrapApiResponse<ReceiptApiEnvelope | ReceiptData>(
         apiClient.GET('/api/v1/payments/{id}/receipt', {
           params: { path: { id: paymentId } },
-        })
+          signal,
+        }),
       );
       if (res && typeof res === 'object' && 'data' in res && res.data) {
-        return res.data;
+        return {
+          ...res.data,
+          receiptNumber: res.data.receiptNumber || res.receiptNumber || 'KC-REC-00000',
+          issuedAt: res.data.issuedAt || res.issuedAt || new Date().toISOString(),
+          isReversed: Boolean(res.data.isReversed ?? res.isReversed),
+        };
       }
       return res as ReceiptData;
     },
@@ -68,10 +81,10 @@ export default function PrintReceiptPage() {
     subscriberTamilName: data.subscriberTamilName,
     subscriberAddress: data.subscriberAddress,
     subscriberMobile: data.subscriberMobile || '',
-    baseInstallment: data.baseInstallment || 0,
-    dividendDeduction: data.dividendDeduction || 0,
-    netPayableAmount: data.netPayableAmount || 0,
-    amountPaid: data.amountPaid || 0,
+    baseInstallment: data.baseInstallment ?? 0,
+    dividendDeduction: data.dividendDeduction ?? 0,
+    netPayableAmount: data.netPayableAmount ?? 0,
+    amountPaid: data.amountPaid ?? 0,
     paymentMethod: data.paymentMethod || 'CASH',
     transactionRef: data.transactionRef,
     collectorName: data.collectorName || 'Cashier',

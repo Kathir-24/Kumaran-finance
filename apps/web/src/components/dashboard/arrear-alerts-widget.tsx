@@ -15,14 +15,15 @@ import { formatRupee } from '@/lib/currency';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toSafeBigInt, type WholeRupeeValue } from '@/components/reports/report-bigint';
 
 interface ArrearAlertsWidgetProps {
   arrearsAging?: {
-    bucket1Month?: { count: number; totalAmount: number | bigint | string };
-    bucket2Months?: { count: number; totalAmount: number | bigint | string };
+    bucket1Month?: { count: number; totalAmount: WholeRupeeValue };
+    bucket2Months?: { count: number; totalAmount: WholeRupeeValue };
     bucket3MonthsAndAbove?: {
       count: number;
-      totalAmount: number | bigint | string;
+      totalAmount: WholeRupeeValue;
       note?: string;
     };
   };
@@ -54,9 +55,9 @@ export function ArrearAlertsWidget({ arrearsAging, isLoading }: ArrearAlertsWidg
 
   const totalCount = b1.count + b2.count + b3.count;
   const totalAmount =
-    BigInt(b1.totalAmount || 0) +
-    BigInt(b2.totalAmount || 0) +
-    BigInt(b3.totalAmount || 0);
+    toSafeBigInt(b1.totalAmount) +
+    toSafeBigInt(b2.totalAmount) +
+    toSafeBigInt(b3.totalAmount);
 
   return (
     <Card className="border-slate-800 bg-slate-900/60 shadow-sm flex flex-col justify-between">
@@ -164,7 +165,7 @@ export function ArrearAlertsWidget({ arrearsAging, isLoading }: ArrearAlertsWidg
             Total Arrears: <strong className="text-white">{formatRupee(totalAmount)}</strong>
           </span>
           <Button asChild variant="ghost" size="sm" className="text-xs text-amber-400 hover:text-amber-300 p-0 h-auto">
-            <Link href="/reports" className="flex items-center gap-1">
+            <Link href="/reports/defaulters" className="flex items-center gap-1">
               <span>{t('viewDefaulters')}</span>
               <ArrowRight className="h-3 w-3" />
             </Link>

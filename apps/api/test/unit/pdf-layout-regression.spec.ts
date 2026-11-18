@@ -361,5 +361,196 @@ describe('PDF Layout Regression & Defect Fix Tests (5 Confirmed Invariants)', ()
         jest.restoreAllMocks();
       }
     });
+
+    it('Fix 6: should paginate long 30-month passbook schedules onto multiple pages and redraw table header', async () => {
+      const addPageSpy = jest.spyOn(PDFDocument.prototype, 'addPage');
+      const headerCalls: number[] = [];
+      const origText = PDFDocument.prototype.text;
+      jest.spyOn(PDFDocument.prototype, 'text').mockImplementation(function (
+        this: any,
+        text: any,
+        x?: any,
+        y?: any,
+      ) {
+        if (String(text) === 'தவணை தேதி / Due Date' && typeof y === 'number') {
+          headerCalls.push(y);
+        }
+        return origText.apply(this, arguments as any);
+      });
+
+      try {
+        const schedule = Array.from({ length: 30 }, (_, i) => ({
+          installmentMonth: i + 1,
+          dueDate: new Date(2026, i % 12, 15),
+          grossAmount: 5000n,
+          dividendDeduction: 1000n,
+          netPayableAmount: 4000n,
+          paidAmount: 4000n,
+          paymentDate: new Date(2026, i % 12, 14),
+          receiptNumber: `KC-REC-PRD-2026-${String(i + 1).padStart(5, '0')}`,
+          status: 'PAID' as const,
+        }));
+
+        const buffer = await FormXxiPassbookTemplate.generate({
+          groupCode: 'KCA-15L-30M-01',
+          groupName: 'Kumaran 30-Month Scheme',
+          chitValue: 150000n,
+          durationMonths: 30,
+          baseInstallment: 5000n,
+          ticketNumber: 4,
+          isPrized: false,
+          customerCode: 'KC-CUST-00004',
+          customerName: 'S. Sundaram',
+          phone: '9842143210',
+          totalGrossDue: 150000n,
+          totalDividendCredit: 30000n,
+          totalNetPayable: 120000n,
+          totalPaid: 120000n,
+          totalOutstandingArrears: 0n,
+          schedule,
+        });
+
+        expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+        // Must add at least 1 continuation page and redraw table headers
+        expect(addPageSpy.mock.calls.length).toBeGreaterThanOrEqual(2); // initial page + continuation page
+        expect(headerCalls.length).toBeGreaterThanOrEqual(2);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+  });
+
+  describe('Fix 7 — Payout Voucher Arrears Offset Layout Invariants', () => {
+    it('Fix 7: should preserve Mode/Ref separation and full-width Words/Checklist when arrears offset row is rendered', async () => {
+      const textCalls: { text: string; x?: number; y?: number; options?: any }[] = [];
+      const origText = PDFDocument.prototype.text;
+      jest.spyOn(PDFDocument.prototype, 'text').mockImplementation(function (
+        this: any,
+        text: any,
+        x?: any,
+        y?: any,
+        options?: any,
+      ) {
+        textCalls.push({
+          text: String(text),
+          x: typeof x === 'number' ? x : undefined,
+          y: typeof y === 'number' ? y : undefined,
+          options: typeof x === 'object' ? x : typeof y === 'object' ? y : options,
+        });
+        return origText.apply(this, arguments as any);
+      });
+
+      try {
+        const buffer = await PayoutVoucherTemplate.generate({
+          voucherNumber: 'KC-VOU-PRD-2026-KCA-1L-20M-01-00004',
+          disbursedAt: new Date('2026-10-18T16:00:00Z'),
+          groupCode: 'KCA-1L-20M-01',
+          chitValue: 100000n,
+          installmentMonth: 4,
+          auctionDate: new Date('2026-10-18T10:00:00Z'),
+          ticketNumber: 7,
+          winnerCode: 'KC-CUST-00007',
+          winnerName: 'S. Sundaram',
+          phone: '9842143210',
+          bidDiscount: 25000n,
+          grossPrizeMoney: 75000n,
+          arrearsDeducted: 10000n,
+          netPrizeMoney: 65000n,
+          disbursementMode: 'BANK_TRANSFER_NEFT',
+          paymentReference: 'UTR-SBIN0029384910',
+          agreementSigned: true,
+          nomineeSigned: true,
+          isSecurityRequired: false,
+          verifiedByUserName: 'Staff Maker',
+          authorizedByUserName: 'Partner Checker',
+        });
+
+        expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+        const modeCall = textCalls.find((c) => c.text.includes('முறை / Mode:'));
+        const refCall = textCalls.find((c) => c.text.includes('குறிப்பு எண் / Ref:'));
+        const arrearsCall = textCalls.find((c) => c.text.includes('Arrears Offset'));
+        const grossCall = textCalls.find((c) => c.text.includes('Gross Prize'));
+        const wordsCall = textCalls.find((c) => c.text.includes('தொகை (சொற்களில்):'));
+
+        expect(arrearsCall).toBeDefined();
+        expect(grossCall).toBeDefined();
+        expect(refCall!.y!).toBeGreaterThan(modeCall!.y!);
+        expect(grossCall!.y!).toBeGreaterThan(refCall!.y!);
+        expect(wordsCall?.x).toBe(25);
+        expect(wordsCall?.options?.width).toBeGreaterThanOrEqual(500);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    it('Fix 8 (XR-M7-PDF-03): should render BOTH Foreman Commission and Arrears Offset independently when both are positive (e.g. Month N or arrears-offset payout)', async () => {
+      const textCalls: { text: string; x?: number; y?: number; options?: any }[] = [];
+      const rectCalls: { x: number; y: number; w: number; h: number }[] = [];
+      const origText = PDFDocument.prototype.text;
+      const origRect = PDFDocument.prototype.rect;
+      jest.spyOn(PDFDocument.prototype, 'text').mockImplementation(function (
+        this: any,
+        text: any,
+        x?: any,
+        y?: any,
+        options?: any,
+      ) {
+        textCalls.push({
+          text: String(text),
+          x: typeof x === 'number' ? x : undefined,
+          y: typeof y === 'number' ? y : undefined,
+          options: typeof x === 'object' ? x : typeof y === 'object' ? y : options,
+        });
+        return origText.apply(this, arguments as any);
+      });
+      jest.spyOn(PDFDocument.prototype, 'rect').mockImplementation(function (
+        this: any,
+        x?: any,
+        y?: any,
+        w?: any,
+        h?: any,
+      ) {
+        rectCalls.push({ x: Number(x), y: Number(y), w: Number(w), h: Number(h) });
+        return origRect.apply(this, arguments as any);
+      });
+
+      try {
+        const buffer = await PayoutVoucherTemplate.generate({
+          voucherNumber: 'KC-VOU-PRD-2026-KCA-1L-20M-01-00020',
+          disbursedAt: new Date('2026-10-18T16:00:00Z'),
+          groupCode: 'KCA-1L-20M-01',
+          chitValue: 100000n,
+          installmentMonth: 20,
+          auctionDate: new Date('2026-10-18T10:00:00Z'),
+          ticketNumber: 12,
+          winnerCode: 'KC-CUST-00012',
+          winnerName: 'K. Velusamy',
+          phone: '9842143219',
+          bidDiscount: 4000n,
+          grossPrizeMoney: 96000n,
+          arrearsDeducted: 5000n,
+          foremanCommissionRate: '5.000',
+          foremanCommissionAmount: 5000n,
+          netPrizeMoney: 91000n,
+          disbursementMode: 'BANK_TRANSFER_NEFT',
+          paymentReference: 'UTR-MONTHN-001',
+          agreementSigned: true,
+          nomineeSigned: true,
+          isSecurityRequired: false,
+          verifiedByUserName: 'Staff Maker',
+          authorizedByUserName: 'Partner Checker',
+        });
+
+        expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+        const commCall = textCalls.find((c) => c.text.includes('Commission (5.00%): ₹ 5,000'));
+        const arrearsCall = textCalls.find((c) => c.text.includes('Arrears Offset: - ₹ 5,000'));
+        expect(commCall).toBeDefined();
+        expect(arrearsCall).toBeDefined();
+        expect(arrearsCall!.y!).toBeGreaterThan(commCall!.y!);
+        expect(rectCalls.some((r) => r.h === 94)).toBe(true);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
   });
 });

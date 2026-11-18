@@ -8,6 +8,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isRoleAuthorizedForPath } from '../src/lib/route-permissions.ts';
+import { escapeCsvCell } from '../src/lib/csv-export.ts';
+import { buildAuditLogsQueryParams, isInvertedDateRange } from '../src/components/reports/report-access.ts';
 
 // ------------------------------------------------------------------------------
 // Invariant 1: Statutory Immutability Guarantee
@@ -71,48 +74,16 @@ test('2. RBAC Persona Authorization: Restricts audit register strictly to SUPER_
 });
 
 // ------------------------------------------------------------------------------
-// Invariant 3: Customer Self-Isolation Invariant (Anti-IDOR / Anti-BOLA)
+// Invariant 3: Guardrail 11 Route-Level RBAC Enforcement for /reports/audit-logs
 // ------------------------------------------------------------------------------
-test('3. Customer Self-Isolation Invariant: Restricts Customer queries strictly to own userId', () => {
-  interface UserContext {
-    sub: string;
-    roles: string[];
-    branchId?: string;
-  }
-
-  const buildAuditWhereClause = (user: UserContext, requestedUserId?: string) => {
-    const where: Record<string, unknown> = {};
-
-    if (user.roles.includes('CUSTOMER') && !user.roles.includes('SUPER_ADMIN')) {
-      // Customer self-isolation: strictly bound to requesting user UUID
-      where.userId = user.sub;
-    } else {
-      if (requestedUserId && requestedUserId !== 'ALL') {
-        where.userId = requestedUserId;
-      }
-      if (user.roles.includes('BRANCH_MANAGER') && !user.roles.includes('SUPER_ADMIN') && user.branchId) {
-        where.user = { branchId: user.branchId };
-      }
-    }
-
-    return where;
-  };
-
-  const customerUser: UserContext = { sub: 'cust-uuid-111', roles: ['CUSTOMER'] };
-  const auditorUser: UserContext = { sub: 'auditor-uuid-222', roles: ['AUDITOR'] };
-  const managerUser: UserContext = { sub: 'mgr-uuid-333', roles: ['BRANCH_MANAGER'], branchId: 'branch-prd' };
-
-  // Customer cannot view arbitrary other user records even if requested in query
-  const customerWhere = buildAuditWhereClause(customerUser, 'other-user-uuid');
-  assert.equal(customerWhere.userId, 'cust-uuid-111');
-
-  // Auditor can query across all staff or specific staff
-  const auditorWhere = buildAuditWhereClause(auditorUser, 'staff-uuid-444');
-  assert.equal(auditorWhere.userId, 'staff-uuid-444');
-
-  // Branch Manager has branch-scoping applied
-  const managerWhere = buildAuditWhereClause(managerUser);
-  assert.deepEqual(managerWhere.user, { branchId: 'branch-prd' });
+test('3. Guardrail 11 Route Enforcement: /reports/audit-logs strictly allows SUPER_ADMIN only', () => {
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['SUPER_ADMIN']), true);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['AUDITOR']), false);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['BRANCH_MANAGER']), false);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['ACCOUNTANT']), false);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['COLLECTION_AGENT']), false);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['CUSTOMER']), false);
+  assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', []), false);
 });
 
 // ------------------------------------------------------------------------------
@@ -147,30 +118,10 @@ test('4. Dual-Control Classification: Accurately classifies Maker-Checker dual c
 });
 
 // ------------------------------------------------------------------------------
-// Invariant 5: Filter Criteria Query Construction
+// Invariant 5: Filter Criteria Query Construction (IST plain YYYY-MM-DD bounds)
 // ------------------------------------------------------------------------------
-test('5. Filter Criteria Mapping: Correctly constructs API query parameters', () => {
-  const buildQueryParams = (params: {
-    selectedAction: string;
-    selectedEntity: string;
-    selectedUserId: string;
-    fromDate: string;
-    toDate: string;
-    page: number;
-    limit: number;
-  }) => {
-    return {
-      action: params.selectedAction === 'ALL' ? undefined : params.selectedAction,
-      entityType: params.selectedEntity === 'ALL' ? undefined : params.selectedEntity,
-      userId: params.selectedUserId === 'ALL' ? undefined : params.selectedUserId,
-      fromDate: params.fromDate ? new Date(params.fromDate).toISOString() : undefined,
-      toDate: params.toDate ? new Date(`${params.toDate}T23:59:59.999Z`).toISOString() : undefined,
-      page: params.page,
-      limit: params.limit,
-    };
-  };
-
-  const query = buildQueryParams({
+test('5. Filter Criteria Mapping: Sends plain IST YYYY-MM-DD dates and detects inverted ranges', () => {
+  const query = buildAuditLogsQueryParams({
     selectedAction: 'AUCTION_FINALIZED',
     selectedEntity: 'Auction',
     selectedUserId: 'ALL',
@@ -185,8 +136,10 @@ test('5. Filter Criteria Mapping: Correctly constructs API query parameters', ()
   assert.equal(query.userId, undefined);
   assert.equal(query.page, 2);
   assert.equal(query.limit, 50);
-  assert.ok(query.fromDate?.includes('2026-10-01'));
-  assert.ok(query.toDate?.includes('2026-10-31'));
+  assert.equal(query.fromDate, '2026-10-01');
+  assert.equal(query.toDate, '2026-10-31');
+  assert.equal(isInvertedDateRange('2026-10-01', '2026-10-31'), false);
+  assert.equal(isInvertedDateRange('2026-10-31', '2026-10-01'), true);
 });
 
 // ------------------------------------------------------------------------------
@@ -220,26 +173,19 @@ test('6. State Diff Serialization: Preserves JSON diff structure without truncat
 });
 
 // ------------------------------------------------------------------------------
-// Invariant 7: RFC 4180 CSV Export Serialization
+// Invariant 7: RFC 4180 CSV Export Serialization & Formula Injection Guard
 // ------------------------------------------------------------------------------
-test('7. RFC 4180 CSV Export: Correctly escapes fields and serializes audit records', () => {
-  const escapeCsvCell = (val: string | number | null | undefined): string => {
-    if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
+test('7. RFC 4180 CSV Export: Escapes special characters and neutralizes formula injection via csv-export.ts', () => {
   // Cell with comma
   assert.equal(escapeCsvCell('AUCTION_FINALIZED, DUAL_CONTROL'), '"AUCTION_FINALIZED, DUAL_CONTROL"');
   // Cell with double quotes
   assert.equal(escapeCsvCell('Notes with "important" info'), '"Notes with ""important"" info"');
   // Clean cell
   assert.equal(escapeCsvCell('Payment'), 'Payment');
+  // Formula injection neutralized
+  assert.equal(escapeCsvCell('=CMD()'), "'=CMD()");
+  assert.equal(escapeCsvCell('  +1+1'), "'  +1+1");
 
-  const headers = ['Timestamp', 'Action', 'Entity', 'Actor', 'IP'];
   const row = ['2026-10-24 15:00:00', 'PAYMENT_REVERSED', 'Payment', 'Ramesh (Accountant)', '192.168.1.10'];
   const csvLine = row.map(escapeCsvCell).join(',');
 

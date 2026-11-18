@@ -14,6 +14,7 @@ import {
 import { formatRupee } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { toSafeBigInt, type WholeRupeeValue } from '@/components/reports/report-bigint';
 
 export interface DashboardKpiData {
   scope?: string;
@@ -21,24 +22,24 @@ export interface DashboardKpiData {
   totalSubscribersCount?: number;
   activeTicketsCount?: number;
   todayCollections?: {
-    total: number | string | bigint;
-    cash: number | string | bigint;
-    upi: number | string | bigint;
-    bankTransfer: number | string | bigint;
-    cheque: number | string | bigint;
+    total: WholeRupeeValue;
+    cash: WholeRupeeValue;
+    upi: WholeRupeeValue;
+    bankTransfer: WholeRupeeValue;
+    cheque: WholeRupeeValue;
   };
   todayDisbursements?: {
-    total: number | string | bigint;
+    total: WholeRupeeValue;
   };
   branchVault?: {
-    currentCashInSafe: number | string | bigint;
+    currentCashInSafe: WholeRupeeValue;
   };
   arrearsAging?: {
-    bucket1Month?: { count: number; totalAmount: number | string | bigint };
-    bucket2Months?: { count: number; totalAmount: number | string | bigint };
+    bucket1Month?: { count: number; totalAmount: WholeRupeeValue };
+    bucket2Months?: { count: number; totalAmount: WholeRupeeValue };
     bucket3MonthsAndAbove?: {
       count: number;
-      totalAmount: number | string | bigint;
+      totalAmount: WholeRupeeValue;
       note?: string;
     };
   };
@@ -75,22 +76,22 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
   const activeTickets = data?.activeTicketsCount ?? 0;
   const totalSubscribers = data?.totalSubscribersCount ?? 0;
 
-  const todayTotal = data?.todayCollections?.total ?? 0;
-  const todayCash = data?.todayCollections?.cash ?? 0;
-  const todayUpi = data?.todayCollections?.upi ?? 0;
-  const todayBank = data?.todayCollections?.bankTransfer ?? 0;
-  const todayCheque = data?.todayCollections?.cheque ?? 0;
+  const todayTotal = toSafeBigInt(data?.todayCollections?.total);
+  const todayCash = toSafeBigInt(data?.todayCollections?.cash);
+  const todayUpi = toSafeBigInt(data?.todayCollections?.upi);
+  const todayBank = toSafeBigInt(data?.todayCollections?.bankTransfer);
+  const todayCheque = toSafeBigInt(data?.todayCollections?.cheque);
 
-  const vaultBalance = data?.branchVault?.currentCashInSafe ?? 0;
+  const vaultBalance = toSafeBigInt(data?.branchVault?.currentCashInSafe);
 
   const b1Count = data?.arrearsAging?.bucket1Month?.count ?? 0;
   const b2Count = data?.arrearsAging?.bucket2Months?.count ?? 0;
   const b3Count = data?.arrearsAging?.bucket3MonthsAndAbove?.count ?? 0;
   const totalDefaulters = b1Count + b2Count + b3Count;
 
-  const b1Total = BigInt(data?.arrearsAging?.bucket1Month?.totalAmount ?? 0);
-  const b2Total = BigInt(data?.arrearsAging?.bucket2Months?.totalAmount ?? 0);
-  const b3Total = BigInt(data?.arrearsAging?.bucket3MonthsAndAbove?.totalAmount ?? 0);
+  const b1Total = toSafeBigInt(data?.arrearsAging?.bucket1Month?.totalAmount);
+  const b2Total = toSafeBigInt(data?.arrearsAging?.bucket2Months?.totalAmount);
+  const b3Total = toSafeBigInt(data?.arrearsAging?.bucket3MonthsAndAbove?.totalAmount);
   const totalArrearsAmount = b1Total + b2Total + b3Total;
 
   return (
@@ -150,9 +151,14 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
               <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 font-mono">
                 {t('modeUpi')}: {formatRupee(todayUpi)}
               </span>
-              {(BigInt(todayBank) > 0n || BigInt(todayCheque) > 0n) && (
+              {todayBank > 0n && (
                 <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono">
                   {t('modeBank')}: {formatRupee(todayBank)}
+                </span>
+              )}
+              {todayCheque > 0n && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 font-mono">
+                  {t('modeCheque')}: {formatRupee(todayCheque)}
                 </span>
               )}
             </div>
@@ -161,7 +167,7 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
       </Link>
 
       {/* 3. Branch Safe Vault Balance */}
-      <Link href="/reports" className="group block focus:outline-none">
+      <Link href="/reports/cash-book" className="group block focus:outline-none">
         <Card className="h-full border-slate-800 bg-slate-900/70 backdrop-blur-sm transition-all duration-200 hover:border-purple-500/40 hover:bg-slate-900 shadow-sm">
           <CardContent className="p-5 flex flex-col justify-between h-full">
             <div>
@@ -189,7 +195,7 @@ export function KpiSummaryCards({ data, isLoading }: KpiSummaryCardsProps) {
       </Link>
 
       {/* 4. Arrears & Defaulters Card */}
-      <Link href="/reports" className="group block focus:outline-none">
+      <Link href="/reports/defaulters" className="group block focus:outline-none">
         <Card className={`h-full border transition-all duration-200 hover:bg-slate-900 shadow-sm ${
           b3Count > 0
             ? 'border-rose-500/40 bg-rose-950/10 hover:border-rose-500/60'

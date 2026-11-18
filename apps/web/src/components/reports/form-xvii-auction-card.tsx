@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
 import { FormXviiAuctionRecord } from './form-xvii-viewer';
+import { resolveFormXviiFilingCountdown } from './report-access';
 
 interface FormXviiAuctionCardProps {
   auction: FormXviiAuctionRecord;
@@ -40,10 +41,7 @@ export function FormXviiAuctionCard({
   const [isExpanded, setIsExpanded] = React.useState(false);
 
   const auctionDate = new Date(auction.auctionDate);
-  const deadlineDate = new Date(auctionDate.getTime() + 21 * 24 * 60 * 60 * 1000);
-  const daysRemaining = Math.ceil((deadlineDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-  const isOverdue = !auction.filedAtRegistrar && daysRemaining < 0;
-  const isUrgent = !auction.filedAtRegistrar && daysRemaining >= 0 && daysRemaining <= 5;
+  const { daysRemaining, isOverdue, isUrgent } = resolveFormXviiFilingCountdown(auction);
 
   return (
     <Card
@@ -73,13 +71,16 @@ export function FormXviiAuctionCard({
               </div>
               <p className="text-xs text-slate-400 print:text-slate-600 flex items-center gap-1.5 mt-0.5">
                 <Calendar className="h-3.5 w-3.5" />
-                {auctionDate.toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {Number.isNaN(auctionDate.getTime())
+                  ? '—'
+                  : auctionDate.toLocaleDateString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
               </p>
             </div>
           </div>

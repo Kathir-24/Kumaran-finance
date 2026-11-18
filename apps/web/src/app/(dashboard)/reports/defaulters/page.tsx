@@ -13,9 +13,11 @@ import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/query-keys';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { useAuthStore, type AuthState } from '@/stores/auth-store';
-import { downloadCsv } from '@/lib/csv-export';
+import { downloadCsv, type CsvCellValue } from '@/lib/csv-export';
 import { DefaulterItem, DefaulterKpiBar } from '@/components/reports/defaulter-kpi-bar';
 import { DefaulterAnalysisTable } from '@/components/reports/defaulter-analysis-table';
+import { formatIstDateString } from '@/components/reports/report-bigint';
+import { resolveDefaultersInitialBranchId } from '@/components/reports/report-access';
 import { cn } from '@/lib/utils';
 
 type SchemeFilterOption = { id: string; groupCode: string; groupName: string };
@@ -41,15 +43,23 @@ export default function DefaultersRegisterPage() {
     ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT', 'AUDITOR'].includes(r)
   );
   const isSuperAdminOrAccountant = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'ACCOUNTANT'].includes(r)
+    ['SUPER_ADMIN', 'ACCOUNTANT', 'AUDITOR'].includes(r)
   );
 
-  // Filter States
+  // Filter States (XR-M7-WEB-01: non-global roles locked strictly to user.branchId)
   const [minArrears, setMinArrears] = React.useState<number>(1);
   const [selectedGroupId, setSelectedGroupId] = React.useState<string>('');
-  const [selectedBranchId, setSelectedBranchId] = React.useState<string>(activeBranchId || '');
+  const [selectedBranchId, setSelectedBranchId] = React.useState<string>(() =>
+    resolveDefaultersInitialBranchId(user, activeBranchId),
+  );
   const [page, setPage] = React.useState<number>(1);
   const limit = 20;
+
+  React.useEffect(() => {
+    if (!isSuperAdminOrAccountant) {
+      setSelectedBranchId(user?.branchId || '');
+    }
+  }, [isSuperAdminOrAccountant, user?.branchId]);
 
   // 1. Fetch Company Branches for Filter
   const { data: branches = [] } = useQuery({
@@ -108,11 +118,19 @@ export default function DefaultersRegisterPage() {
   const defaulters: DefaulterItem[] = reportData?.defaulters || [];
   const pagination = reportData?.pagination || { page: 1, totalPages: 1, totalRecords: 0 };
 
+  const groupIdByCode = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const s of schemes) {
+      map[s.groupCode] = s.id;
+    }
+    return map;
+  }, [schemes]);
+
   // Handle CSV Export
   const handleExportCsv = () => {
     if (defaulters.length === 0) return;
 
-    const rows: (string | number)[][] = defaulters.map((d) => [
+    const rows: CsvCellValue[][] = defaulters.map((d) => [
       d.customerCode,
       d.customerName,
       d.phone,
@@ -126,7 +144,7 @@ export default function DefaultersRegisterPage() {
     ]);
 
     downloadCsv({
-      filename: `${t('exportFilename')}_${new Date().toISOString().split('T')[0]}`,
+      filename: `${t('exportFilename')}_${formatIstDateString()}`,
       headers: [
         'Customer Code',
         'Customer Name',
@@ -304,7 +322,7 @@ export default function DefaultersRegisterPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <DefaulterAnalysisTable defaulters={defaulters} />
+          <DefaulterAnalysisTable defaulters={defaulters} groupIdByCode={groupIdByCode} />
 
           {/* Pagination Controls */}
           {pagination.totalPages > 1 && (

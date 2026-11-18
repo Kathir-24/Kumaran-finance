@@ -3895,17 +3895,17 @@ class DefaulterItemResponseDto {
   /// Ticket ID
   final String ticketId;
   /// Ticket number 1..N
-  final double ticketNumber;
+  final int ticketNumber;
   /// Prized status
   final bool isPrized;
   /// Ticket status
   final String status;
   /// Consecutive unpaid months count
-  final double consecutiveUnpaidMonths;
+  final int consecutiveUnpaidMonths;
   /// Whether subscriber is eligible for 3M removal
   final bool isEligibleForRemoval;
-  /// Cumulative unpaid arrears in whole Rupees
-  final double totalArrears;
+  /// Cumulative unpaid arrears in whole Rupees (Guardrail 2: 64-bit int)
+  final int totalArrears;
   /// Subscriber details
   final dynamic customer;
   /// Chit group details
@@ -3926,12 +3926,14 @@ class DefaulterItemResponseDto {
   factory DefaulterItemResponseDto.fromJson(Map<String, dynamic> json) {
     return DefaulterItemResponseDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       isPrized: json['isPrized'] as bool? ?? false,
-      status: json['status']?.toString() ?? '',
-      consecutiveUnpaidMonths: (json['consecutiveUnpaidMonths'] != null ? (json['consecutiveUnpaidMonths'] as num).toDouble() : null) ?? 0.0,
-      isEligibleForRemoval: json['isEligibleForRemoval'] as bool? ?? false,
-      totalArrears: (json['totalArrears'] != null ? (json['totalArrears'] as num).toDouble() : null) ?? 0.0,
+      status: json['status']?.toString() ?? json['riskCategory']?.toString() ?? '',
+      consecutiveUnpaidMonths: _parseWholeRupeeInt(json['consecutiveUnpaidMonths']),
+      isEligibleForRemoval: (json['isEligibleForRemoval'] as bool?) ??
+          (json['eligibleForRemovalRights'] as bool?) ??
+          false,
+      totalArrears: _parseWholeRupeeInt(json['totalArrears'] ?? json['totalArrearsAmount']),
       customer: json['customer'],
       chitGroup: json['chitGroup'],
     );
@@ -6210,9 +6212,9 @@ class ExecutiveDashboardKpiResponseDto {
   /// Reporting scope
   final String scope;
   /// Active chit schemes count
-  final double activeChitsCount;
+  final int activeChitsCount;
   /// Active subscriber count
-  final double activeSubscribersCount;
+  final int activeSubscribersCount;
   /// Today collection totals breakdown
   final dynamic todayCollections;
   /// Today disbursement totals
@@ -6222,7 +6224,7 @@ class ExecutiveDashboardKpiResponseDto {
   /// Arrears aging summary
   final dynamic arrearsSummary;
   /// Maker-checker pending signoffs count
-  final double pendingApprovalsCount;
+  final int pendingApprovalsCount;
 
   const ExecutiveDashboardKpiResponseDto({
     required this.scope,
@@ -6236,15 +6238,27 @@ class ExecutiveDashboardKpiResponseDto {
   });
 
   factory ExecutiveDashboardKpiResponseDto.fromJson(Map<String, dynamic> json) {
+    final pendingActions = json['pendingActions'] is Map<String, dynamic>
+        ? json['pendingActions'] as Map<String, dynamic>
+        : null;
+    final derivedPending = pendingActions != null
+        ? _parseWholeRupeeInt(pendingActions['cashHandoversPendingSignoff']) +
+            _parseWholeRupeeInt(pendingActions['winnersPendingSafetyProof']) +
+            _parseWholeRupeeInt(pendingActions['disbursementsPendingAuthorization'])
+        : 0;
     return ExecutiveDashboardKpiResponseDto(
       scope: json['scope']?.toString() ?? '',
-      activeChitsCount: (json['activeChitsCount'] != null ? (json['activeChitsCount'] as num).toDouble() : null) ?? 0.0,
-      activeSubscribersCount: (json['activeSubscribersCount'] != null ? (json['activeSubscribersCount'] as num).toDouble() : null) ?? 0.0,
+      activeChitsCount: _parseWholeRupeeInt(json['activeChitsCount']),
+      activeSubscribersCount: _parseWholeRupeeInt(
+        json['activeSubscribersCount'] ?? json['totalSubscribersCount'],
+      ),
       todayCollections: json['todayCollections'],
       todayDisbursements: json['todayDisbursements'],
-      vaultBalance: json['vaultBalance'],
-      arrearsSummary: json['arrearsSummary'],
-      pendingApprovalsCount: (json['pendingApprovalsCount'] != null ? (json['pendingApprovalsCount'] as num).toDouble() : null) ?? 0.0,
+      vaultBalance: json['vaultBalance'] ?? json['branchVault'],
+      arrearsSummary: json['arrearsSummary'] ?? json['arrearsAging'],
+      pendingApprovalsCount: json['pendingApprovalsCount'] != null
+          ? _parseWholeRupeeInt(json['pendingApprovalsCount'])
+          : derivedPending,
     );
   }
 
@@ -6264,15 +6278,15 @@ class ExecutiveDashboardKpiResponseDto {
 
 class PendingApprovalsSummaryDto {
   /// Unacknowledged field handovers count
-  final double unacknowledgedHandoversCount;
+  final int unacknowledgedHandoversCount;
   /// Pending payment reversal requests count
-  final double pendingReversalsCount;
+  final int pendingReversalsCount;
   /// Pending prize payout authorizations count
-  final double pendingAuthorizationsCount;
+  final int pendingAuthorizationsCount;
   /// Pending safety proof verifications count
-  final double pendingSafetyVerificationsCount;
+  final int pendingSafetyVerificationsCount;
   /// Total pending dual control items
-  final double totalPendingCount;
+  final int totalPendingCount;
 
   const PendingApprovalsSummaryDto({
     required this.unacknowledgedHandoversCount,
@@ -6284,11 +6298,19 @@ class PendingApprovalsSummaryDto {
 
   factory PendingApprovalsSummaryDto.fromJson(Map<String, dynamic> json) {
     return PendingApprovalsSummaryDto(
-      unacknowledgedHandoversCount: (json['unacknowledgedHandoversCount'] != null ? (json['unacknowledgedHandoversCount'] as num).toDouble() : null) ?? 0.0,
-      pendingReversalsCount: (json['pendingReversalsCount'] != null ? (json['pendingReversalsCount'] as num).toDouble() : null) ?? 0.0,
-      pendingAuthorizationsCount: (json['pendingAuthorizationsCount'] != null ? (json['pendingAuthorizationsCount'] as num).toDouble() : null) ?? 0.0,
-      pendingSafetyVerificationsCount: (json['pendingSafetyVerificationsCount'] != null ? (json['pendingSafetyVerificationsCount'] as num).toDouble() : null) ?? 0.0,
-      totalPendingCount: (json['totalPendingCount'] != null ? (json['totalPendingCount'] as num).toDouble() : null) ?? 0.0,
+      unacknowledgedHandoversCount: _parseWholeRupeeInt(
+        json['unacknowledgedHandoversCount'] ?? json['cashHandoversCount'],
+      ),
+      pendingReversalsCount: _parseWholeRupeeInt(
+        json['pendingReversalsCount'] ?? json['paymentReversalsCount'],
+      ),
+      pendingAuthorizationsCount: _parseWholeRupeeInt(
+        json['pendingAuthorizationsCount'] ?? json['disbursementAuthorizationsCount'],
+      ),
+      pendingSafetyVerificationsCount: _parseWholeRupeeInt(
+        json['pendingSafetyVerificationsCount'] ?? json['safetyProofVerificationsCount'],
+      ),
+      totalPendingCount: _parseWholeRupeeInt(json['totalPendingCount']),
     );
   }
 
@@ -6330,17 +6352,27 @@ class PendingApprovalsResponseDto {
     return PendingApprovalsResponseDto(
       scope: json['scope']?.toString() ?? '',
       summary: json['summary'],
-      handovers: (json['handovers'] as List<dynamic>?) ?? [],
-      reversals: (json['reversals'] as List<dynamic>?) ?? [],
-      authorizations: (json['authorizations'] as List<dynamic>?) ?? [],
-      safetyProofs: (json['safetyProofs'] as List<dynamic>?) ?? [],
+      handovers: (json['handovers'] as List<dynamic>?) ??
+          (json['cashHandovers'] as List<dynamic>?) ??
+          [],
+      reversals: (json['reversals'] as List<dynamic>?) ??
+          (json['paymentReversals'] as List<dynamic>?) ??
+          [],
+      authorizations: (json['authorizations'] as List<dynamic>?) ??
+          (json['disbursementAuthorizations'] as List<dynamic>?) ??
+          [],
+      safetyProofs: (json['safetyProofs'] as List<dynamic>?) ??
+          (json['safetyProofVerifications'] as List<dynamic>?) ??
+          [],
     );
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['scope'] = scope;
-    data['summary'] = summary;
+    data['summary'] = summary is PendingApprovalsSummaryDto
+        ? (summary as PendingApprovalsSummaryDto).toJson()
+        : summary;
     data['handovers'] = handovers;
     data['reversals'] = reversals;
     data['authorizations'] = authorizations;
@@ -6376,14 +6408,23 @@ class DayBookReportResponseDto {
   });
 
   factory DayBookReportResponseDto.fromJson(Map<String, dynamic> json) {
+    final summary = json['summary'] is Map<String, dynamic>
+        ? json['summary'] as Map<String, dynamic>
+        : null;
+    final rawEntries = json['entries'] as List<dynamic>?;
+    final fallbackEntries = rawEntries ??
+        <dynamic>[
+          ...((json['inflows'] as List<dynamic>?) ?? const []),
+          ...((json['outflows'] as List<dynamic>?) ?? const []),
+        ];
     return DayBookReportResponseDto(
       date: json['date']?.toString() ?? '',
-      scope: json['scope']?.toString() ?? '',
+      scope: json['scope']?.toString() ?? json['branchId']?.toString() ?? '',
       openingCash: json['openingCash'],
-      totalCollections: json['totalCollections'],
-      totalDisbursements: json['totalDisbursements'],
-      closingCash: json['closingCash'],
-      entries: (json['entries'] as List<dynamic>?) ?? [],
+      totalCollections: json['totalCollections'] ?? summary?['totalInflows'],
+      totalDisbursements: json['totalDisbursements'] ?? summary?['totalOutflows'],
+      closingCash: json['closingCash'] ?? summary?['netCashFlow'],
+      entries: fallbackEntries,
     );
   }
 
@@ -6405,14 +6446,14 @@ class FormXxiiReportResponseDto {
   final String date;
   /// Operating branch
   final String scope;
-  /// Opening vault balance in whole Rupees
-  final double openingBalance;
-  /// Total physical cash receipts today
-  final double cashInflows;
-  /// Total physical cash disbursements today
-  final double cashOutflows;
-  /// Closing physical cash in safe in whole Rupees
-  final double closingBalance;
+  /// Opening vault balance in whole Rupees (Guardrail 2: 64-bit int)
+  final int openingBalance;
+  /// Total physical cash receipts today in whole Rupees (Guardrail 2: 64-bit int)
+  final int cashInflows;
+  /// Total physical cash disbursements today in whole Rupees (Guardrail 2: 64-bit int)
+  final int cashOutflows;
+  /// Closing physical cash in safe in whole Rupees (Guardrail 2: 64-bit int)
+  final int closingBalance;
   /// Chronological cash ledger entries
   final List<dynamic> entries;
 
@@ -6427,14 +6468,23 @@ class FormXxiiReportResponseDto {
   });
 
   factory FormXxiiReportResponseDto.fromJson(Map<String, dynamic> json) {
+    final recon = json['reconciliation'] is Map<String, dynamic>
+        ? json['reconciliation'] as Map<String, dynamic>
+        : null;
+    final rawEntries = json['entries'] as List<dynamic>?;
+    final fallbackEntries = rawEntries ??
+        <dynamic>[
+          ...((json['inflows'] as List<dynamic>?) ?? const []),
+          ...((json['outflows'] as List<dynamic>?) ?? const []),
+        ];
     return FormXxiiReportResponseDto(
       date: json['date']?.toString() ?? '',
-      scope: json['scope']?.toString() ?? '',
-      openingBalance: (json['openingBalance'] != null ? (json['openingBalance'] as num).toDouble() : null) ?? 0.0,
-      cashInflows: (json['cashInflows'] != null ? (json['cashInflows'] as num).toDouble() : null) ?? 0.0,
-      cashOutflows: (json['cashOutflows'] != null ? (json['cashOutflows'] as num).toDouble() : null) ?? 0.0,
-      closingBalance: (json['closingBalance'] != null ? (json['closingBalance'] as num).toDouble() : null) ?? 0.0,
-      entries: (json['entries'] as List<dynamic>?) ?? [],
+      scope: json['scope']?.toString() ?? json['branchId']?.toString() ?? '',
+      openingBalance: _parseWholeRupeeInt(json['openingBalance'] ?? recon?['openingCashInSafe']),
+      cashInflows: _parseWholeRupeeInt(json['cashInflows'] ?? recon?['todayCashInflows']),
+      cashOutflows: _parseWholeRupeeInt(json['cashOutflows'] ?? recon?['todayCashOutflows']),
+      closingBalance: _parseWholeRupeeInt(json['closingBalance'] ?? recon?['closingCashInSafe']),
+      entries: fallbackEntries,
     );
   }
 
@@ -6457,7 +6507,7 @@ class FormXviiReportResponseDto {
   /// Chit group code
   final String groupCode;
   /// Duration in months
-  final double durationMonths;
+  final int durationMonths;
   /// Chronological list of all auctions and minutes proceedings
   final List<dynamic> auctions;
 
@@ -6469,10 +6519,13 @@ class FormXviiReportResponseDto {
   });
 
   factory FormXviiReportResponseDto.fromJson(Map<String, dynamic> json) {
+    final chitGroup = json['chitGroup'] is Map<String, dynamic>
+        ? json['chitGroup'] as Map<String, dynamic>
+        : null;
     return FormXviiReportResponseDto(
-      chitGroupId: json['chitGroupId']?.toString() ?? '',
-      groupCode: json['groupCode']?.toString() ?? '',
-      durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
+      chitGroupId: json['chitGroupId']?.toString() ?? chitGroup?['id']?.toString() ?? '',
+      groupCode: json['groupCode']?.toString() ?? chitGroup?['groupCode']?.toString() ?? '',
+      durationMonths: _parseWholeRupeeInt(json['durationMonths'] ?? chitGroup?['durationMonths']),
       auctions: (json['auctions'] as List<dynamic>?) ?? [],
     );
   }
@@ -6491,7 +6544,7 @@ class FormXxiReportResponseDto {
   /// Subscriber ticket ID
   final String ticketId;
   /// Ticket number 1..N
-  final double ticketNumber;
+  final int ticketNumber;
   /// Subscriber details
   final dynamic customer;
   /// Chit scheme parameters
@@ -6508,12 +6561,20 @@ class FormXxiReportResponseDto {
   });
 
   factory FormXxiReportResponseDto.fromJson(Map<String, dynamic> json) {
+    final ledgers = json['ledgers'] as List<dynamic>?;
+    final firstLedger =
+        ledgers != null && ledgers.isNotEmpty && ledgers.first is Map<String, dynamic>
+            ? ledgers.first as Map<String, dynamic>
+            : null;
     return FormXxiReportResponseDto(
-      ticketId: json['ticketId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
-      customer: json['customer'],
+      ticketId: json['ticketId']?.toString() ?? firstLedger?['ticketId']?.toString() ?? '',
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber'] ?? firstLedger?['ticketNumber']),
+      customer: json['customer'] ?? firstLedger?['customer'],
       chitGroup: json['chitGroup'],
-      schedule: (json['schedule'] as List<dynamic>?) ?? [],
+      schedule: (json['schedule'] as List<dynamic>?) ??
+          (firstLedger?['monthlySchedule'] as List<dynamic>?) ??
+          ledgers ??
+          [],
     );
   }
 
@@ -6530,13 +6591,13 @@ class FormXxiReportResponseDto {
 
 class ReportPaginationDto {
   /// Current page number
-  final double page;
+  final int page;
   /// Maximum records per page
-  final double limit;
+  final int limit;
   /// Total matching records
-  final double totalRecords;
+  final int totalRecords;
   /// Total available pages
-  final double totalPages;
+  final int totalPages;
 
   const ReportPaginationDto({
     required this.page,
@@ -6547,10 +6608,10 @@ class ReportPaginationDto {
 
   factory ReportPaginationDto.fromJson(Map<String, dynamic> json) {
     return ReportPaginationDto(
-      page: (json['page'] != null ? (json['page'] as num).toDouble() : null) ?? 0.0,
-      limit: (json['limit'] != null ? (json['limit'] as num).toDouble() : null) ?? 0.0,
-      totalRecords: (json['totalRecords'] != null ? (json['totalRecords'] as num).toDouble() : null) ?? 0.0,
-      totalPages: (json['totalPages'] != null ? (json['totalPages'] as num).toDouble() : null) ?? 0.0,
+      page: _parseWholeRupeeInt(json['page']),
+      limit: _parseWholeRupeeInt(json['limit']),
+      totalRecords: _parseWholeRupeeInt(json['totalRecords']),
+      totalPages: _parseWholeRupeeInt(json['totalPages']),
     );
   }
 

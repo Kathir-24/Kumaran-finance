@@ -346,7 +346,7 @@ flowchart TD
   - Dart `AuthSessionManager` implements a single-flight refresh mutex (`_inFlightRefresh`), ensuring multiple concurrent 401 responses coalesce into exactly one `/auth/refresh` request with `clientType: 'MOBILE'`.
   - `KumaranMobileApiClient.request` automatically triggers single-flight rotation on 401, invokes `onTokenRefreshed` to persist updated tokens, and replays the original HTTP request transparently with re-entrancy prevention (`isRetry: true`).
 - **F15 (SSE Approvals Stream Authorization Lifecycle Guard)**:
-  - `/reports/pending-approvals/stream` executes `ReportService.assertStreamAuthorization` on each 15-second interval tick before serving approval summaries.
-  - Validates that `now < exp`, verifies fast-path Redis revocation cutoffs, checks database `user.isActive`, and confirms active `SUPER_ADMIN` or `BRANCH_MANAGER` roles.
-  - Throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the SSE connection on token expiry, logout, or permission changes, eliminating zombie data leaks.
+  - `/reports/approvals-stream` executes `ReportService.assertStreamAuthorization` on each 15-second interval tick before serving approval summaries.
+  - Validates that `now < exp`, verifies fast-path Redis & PostgreSQL revocation cutoffs, verifies persisted multi-device `Session` identity (`sid`, `revokedAt`, `expiresAt` per F04), checks database `user.isActive`, confirms active `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, or `AUDITOR` roles, and enforces fail-closed non-empty & unchanged `branchId` (`BRANCH_SCOPE_CHANGED`) for pure `BRANCH_MANAGER` subscribers.
+  - Throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the SSE connection on token expiry, logout, role revocation, or branch reassignment, eliminating zombie data leaks.
 

@@ -1,20 +1,50 @@
 /**
  * Kumaran Chits — Client-Side CSV Export Utility
- * Generates RFC 4180 compliant CSV files with UTF-8 BOM for Microsoft Excel compatibility.
+ * Generates RFC 4180 compliant CSV files with UTF-8 BOM for Microsoft Excel (Tamil Unicode)
+ * and OWASP CSV/DDE Formula Injection neutralization.
  */
+
+export type CsvCellValue = string | number | bigint | null | undefined;
 
 export interface CsvExportOptions {
   filename: string;
   headers: string[];
-  rows: (string | number | null | undefined)[][];
+  rows: CsvCellValue[][];
+}
+
+// Neutralize cells starting with =, +, -, @, \t, or \r — including after leading whitespace
+const FORMULA_INJECTION_PATTERN = /^[\t\r]|^\s*[=+\-@]/;
+
+/**
+ * Sanitizes a download filename by stripping path traversal, control chars,
+ * and unsafe filesystem characters while ensuring a `.csv` extension.
+ */
+export function sanitizeCsvFilename(filename: string, fallback = 'kumaran-chits-export'): string {
+  const base = (filename ?? '')
+    .replace(/[\r\n\t\0]/g, '')
+    .replace(/(?:\.\.[\\/])+/g, '')
+    .replace(/[\\/]+/g, '_')
+    .replace(/\.\.+/g, '.')
+    .replace(/[<>:"|?*]/g, '_')
+    .replace(/^[_.\s]+|[_.\s]+$/g, '')
+    .trim();
+
+  const safe = base || fallback;
+  return safe.toLowerCase().endsWith('.csv') ? safe : `${safe}.csv`;
 }
 
 /**
- * Escapes a single CSV field value according to RFC 4180 standards.
+ * Escapes a single CSV field value according to RFC 4180 standards and neutralizes
+ * Excel/Calc formula injection payloads (=, +, -, @, \t, \r, including after leading whitespace).
  */
-function escapeCsvCell(value: string | number | null | undefined): string {
+export function escapeCsvCell(value: CsvCellValue): string {
   if (value === null || value === undefined) return '';
-  const str = String(value);
+  let str = String(value);
+
+  if (FORMULA_INJECTION_PATTERN.test(str)) {
+    str = `'${str}`;
+  }
+
   // If string contains comma, double quote, or newline, wrap in quotes and escape internal quotes
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
@@ -23,29 +53,42 @@ function escapeCsvCell(value: string | number | null | undefined): string {
 }
 
 /**
+ * Serializes headers and rows into an RFC 4180 CSV string prefixed with UTF-8 BOM (\uFEFF)
+ * so Microsoft Excel on Windows renders Tamil Unicode scripts accurately.
+ */
+export function serializeCsv(headers: string[], rows: CsvCellValue[][]): string {
+  const headerLine = headers.map(escapeCsvCell).join(',');
+  const rowLines = rows.map((row) => row.map(escapeCsvCell).join(','));
+  return '\uFEFF' + [headerLine, ...rowLines].join('\r\n');
+}
+
+function triggerCsvBlobDownload(csvWithBom: string, filename: string): void {
+  const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  try {
+    link.setAttribute('href', url);
+    link.setAttribute('download', sanitizeCsvFilename(filename));
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    if (link.parentNode) {
+      link.parentNode.removeChild(link);
+    }
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
  * Triggers a browser download of a CSV file (synchronous for small datasets).
  */
 export function downloadCsv({ filename, headers, rows }: CsvExportOptions): void {
   if (typeof window === 'undefined') return;
-
-  const headerLine = headers.map(escapeCsvCell).join(',');
-  const rowLines = rows.map((row) => row.map(escapeCsvCell).join(','));
-  const csvContent = [headerLine, ...rowLines].join('\r\n');
-
-  // Prefix with UTF-8 BOM (\uFEFF) so Excel on Windows detects UTF-8 correctly (Tamil scripts)
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
-  link.style.visibility = 'hidden';
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
+  const csvWithBom = serializeCsv(headers, rows);
+  triggerCsvBlobDownload(csvWithBom, filename);
 }
 
 /**
@@ -74,18 +117,6 @@ export async function downloadCsvAsync({
     }
   }
 
-  const csvContent = [headerLine, ...rowLines].join('\r\n');
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
-  link.style.visibility = 'hidden';
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
+  const csvWithBom = '\uFEFF' + [headerLine, ...rowLines].join('\r\n');
+  triggerCsvBlobDownload(csvWithBom, filename);
 }

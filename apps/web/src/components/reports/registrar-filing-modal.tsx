@@ -11,6 +11,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiClient, unwrapApiResponse, getErrorMessage } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
+import { formatIstDateString } from './report-bigint';
+import { canUserRecordRegistrarFiling } from './report-access';
+
+export { canUserRecordRegistrarFiling };
 
 interface RegistrarFilingModalProps {
   isOpen: boolean;
@@ -30,9 +35,11 @@ export function RegistrarFilingModal({
   onSuccess,
 }: RegistrarFilingModalProps) {
   const t = useTranslations('reports.minutes');
+  const user = useAuthStore((s) => s.user);
+  const canRecordFiling = canUserRecordRegistrarFiling(user);
 
   const [filingReference, setFilingReference] = React.useState('');
-  const [filedDate, setFiledDate] = React.useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [filedDate, setFiledDate] = React.useState<string>(() => formatIstDateString());
   const [notes, setNotes] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
@@ -41,7 +48,7 @@ export function RegistrarFilingModal({
   React.useEffect(() => {
     if (isOpen) {
       setFilingReference('');
-      setFiledDate(new Date().toISOString().split('T')[0]);
+      setFiledDate(formatIstDateString());
       setNotes('');
       setErrorMsg(null);
     }
@@ -51,8 +58,21 @@ export function RegistrarFilingModal({
     e.preventDefault();
     setErrorMsg(null);
 
+    if (!canRecordFiling) {
+      setErrorMsg(
+        'Verified Partner (isPartner: true), Branch Manager, or Accountant authority is required to record Registrar filings (Guardrail 11).',
+      );
+      return;
+    }
+
     if (!filingReference.trim()) {
       setErrorMsg('Government challan or acknowledgement reference number is required');
+      return;
+    }
+
+    const parsedDate = filedDate ? new Date(`${filedDate}T00:00:00.000+05:30`) : null;
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+      setErrorMsg('A valid Registrar filing date is required');
       return;
     }
 
@@ -63,7 +83,7 @@ export function RegistrarFilingModal({
           params: { path: { auctionId } },
           body: {
             filingReference: filingReference.trim(),
-            filedDate: new Date(filedDate).toISOString(),
+            filedDate: parsedDate.toISOString(),
             notes: notes.trim() || undefined,
           },
         })
@@ -173,7 +193,7 @@ export function RegistrarFilingModal({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canRecordFiling}
               className="bg-purple-600 hover:bg-purple-500 text-white gap-2 font-medium"
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}

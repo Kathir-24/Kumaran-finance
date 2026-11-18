@@ -7,19 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { FormXviiAuctionCard } from './form-xvii-auction-card';
+import {
+  calculateCommissionRupees,
+  formatCommissionRateLabel,
+  type WholeRupeeValue,
+} from './report-bigint';
 
 export interface FormXviiAuctionRecord {
   auctionId: string;
   installmentMonth: number;
   auctionDate: string;
-  chitValue: number;
-  bidDiscount: number;
-  foremanCommissionAmount: number;
+  chitValue: WholeRupeeValue;
+  bidDiscount: WholeRupeeValue;
+  foremanCommissionAmount: WholeRupeeValue;
   foremanCommissionRate?: string;
-  totalDividend: number;
-  dividendPerTicket: number;
-  nextMonthNetInstallment: number;
-  prizeMoney: number;
+  totalDividend: WholeRupeeValue;
+  dividendPerTicket: WholeRupeeValue;
+  nextMonthNetInstallment: WholeRupeeValue;
+  prizeMoney: WholeRupeeValue;
   winner: {
     ticketNumber?: number;
     customerCode: string;
@@ -43,6 +48,16 @@ export interface FormXviiAuctionRecord {
   filedDate?: string | null;
   filingReference?: string | null;
   filingNotes?: string | null;
+  filingDaysRemaining?: number | null;
+  isFilingOverdue?: boolean;
+  filingStatus?: string;
+}
+
+export interface FormXviiFilingSummary {
+  totalFinalized?: number;
+  filedCount: number;
+  pendingCount: number;
+  overdueCount: number;
 }
 
 export interface FormXviiReportData {
@@ -52,13 +67,15 @@ export interface FormXviiReportData {
     id: string;
     groupCode: string;
     groupName: string;
-    chitValue: number;
+    chitValue: WholeRupeeValue;
     durationMonths: number;
-    baseInstallment: number;
+    baseInstallment: WholeRupeeValue;
+    foremanCommissionRate?: string | number;
     branchName: string;
     branchNameTamil?: string;
   };
   totalAuctionsFinalized: number;
+  filingSummary?: FormXviiFilingSummary;
   auctions: FormXviiAuctionRecord[];
 }
 
@@ -79,6 +96,9 @@ export function FormXviiViewer({
 
   const chit = data.chitGroup;
   const auctions = data.auctions || [];
+  const frozenRate = chit.foremanCommissionRate ?? auctions[0]?.foremanCommissionRate;
+  const commissionRupees = calculateCommissionRupees(chit.chitValue, frozenRate);
+  const commissionRateLabel = formatCommissionRateLabel(frozenRate);
 
   return (
     <div className="space-y-6">
@@ -116,7 +136,7 @@ export function FormXviiViewer({
             <div>
               <span className="text-slate-400 print:text-slate-600 block">{t('commission')}</span>
               <span className="text-sm font-semibold text-purple-400 print:text-purple-700 font-mono">
-                {formatRupee(Number(BigInt(chit.chitValue) * 4n / 100n))} (4.00%)
+                {formatRupee(commissionRupees)} ({commissionRateLabel})
               </span>
             </div>
             <div>

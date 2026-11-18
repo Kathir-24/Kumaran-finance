@@ -16,17 +16,36 @@ import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatIstDateString } from '@/components/reports/report-bigint';
 
 interface ActiveChitGroupForFiling {
   id: string;
   groupCode: string;
-  currentInstallmentMonth: number;
-  lastAuctionDate?: string | null;
-  lastAuctionId?: string | null;
-  minutesFiledAtRegistrar?: boolean;
+  branchId?: string;
+  currentInstallmentMonth?: number;
 }
 
-interface FilingCountdownItem {
+interface FormXviiAuctionSummary {
+  auctionId: string;
+  installmentMonth: number;
+  auctionDate: string;
+  filedAtRegistrar: boolean;
+  filedDate?: string | null;
+  filingReference?: string | null;
+  filingDaysRemaining?: number | null;
+  isFilingOverdue?: boolean;
+  filingStatus?: string;
+}
+
+interface FormXviiCountdownPayload {
+  chitGroup?: {
+    id: string;
+    groupCode: string;
+  };
+  auctions?: FormXviiAuctionSummary[];
+}
+
+export interface FilingCountdownItem {
   auctionId: string;
   chitGroupId: string;
   groupCode: string;
@@ -42,67 +61,112 @@ interface FilingCountdownItem {
 
 interface FilingCountdownWidgetProps {
   branchId?: string;
+  enabled?: boolean;
 }
 
-export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) {
+export function FilingCountdownWidget({ branchId, enabled = true }: FilingCountdownWidgetProps) {
   const t = useTranslations('dashboard');
 
-  // Query active chit groups to inspect recent auctions
-  const { data: chitsData, isLoading: chitsLoading } = useQuery<ActiveChitGroupForFiling[]>({
+  // Query active chit groups and load real Form XVII auction records (zero fabricated dates)
+  const { data: filingDeadlines = [], isLoading: chitsLoading } = useQuery<FilingCountdownItem[]>({
     queryKey: ['dashboard', 'chits-filing-countdown', { branchId }],
-    queryFn: async () => {
-      const res = await unwrapApiResponse<
+    queryFn: async ({ signal }) => {
+      const chitsRes = await unwrapApiResponse<
         { data?: ActiveChitGroupForFiling[]; items?: ActiveChitGroupForFiling[] } | ActiveChitGroupForFiling[]
       >(
         apiClient.GET('/api/v1/chits', {
-          params: { query: { status: 'ACTIVE', limit: 5 } },
+          params: { query: { status: 'ACTIVE', limit: 50 } },
+          signal,
         }),
       );
-      if (Array.isArray(res)) return res;
-      if (res && Array.isArray(res.data)) return res.data;
-      if (res && Array.isArray(res.items)) return res.items;
-      return [];
+
+      const rawGroups: ActiveChitGroupForFiling[] = Array.isArray(chitsRes)
+        ? chitsRes
+        : Array.isArray(chitsRes?.data)
+          ? chitsRes.data
+          : Array.isArray(chitsRes?.items)
+            ? chitsRes.items
+            : [];
+
+      const scopedGroups = (
+        branchId
+          ? rawGroups.filter((g) => g.branchId === branchId)
+          : rawGroups
+      ).slice(0, 5);
+
+      if (scopedGroups.length === 0) return [];
+
+      const formXviiResults = await Promise.allSettled(
+        scopedGroups.map((group) =>
+          unwrapApiResponse<FormXviiCountdownPayload>(
+            apiClient.GET('/api/v1/reports/form-xvii', {
+              params: { query: { chitGroupId: group.id } },
+              signal,
+            }),
+          ).then((payload) => ({ group, payload })),
+        ),
+      );
+
+      const nowMs = Date.now();
+      const items: FilingCountdownItem[] = [];
+
+      for (const settled of formXviiResults) {
+        if (settled.status !== 'fulfilled') continue;
+        const { group, payload } = settled.value;
+        const auctions = payload?.auctions ?? [];
+        if (auctions.length === 0) continue;
+
+        // Prioritize the most urgent unfiled finalized auction, otherwise latest finalized auction
+        const unfiled = auctions.filter((a) => !a.filedAtRegistrar);
+        const targetAuction =
+          unfiled.length > 0
+            ? unfiled.sort((a, b) => new Date(a.auctionDate).getTime() - new Date(b.auctionDate).getTime())[0]
+            : auctions[auctions.length - 1];
+
+        const auctionDateObj = new Date(targetAuction.auctionDate);
+        if (Number.isNaN(auctionDateObj.getTime())) continue;
+
+        const deadlineMs = auctionDateObj.getTime() + 21 * 24 * 60 * 60 * 1000;
+        const fallbackDaysRemaining = Math.ceil((deadlineMs - nowMs) / (24 * 60 * 60 * 1000));
+        const filedAtRegistrar = Boolean(targetAuction.filedAtRegistrar);
+        const daysRemaining =
+          typeof targetAuction.filingDaysRemaining === 'number' &&
+          Number.isFinite(targetAuction.filingDaysRemaining)
+            ? targetAuction.filingDaysRemaining
+            : fallbackDaysRemaining;
+        const isOverdue =
+          !filedAtRegistrar &&
+          (typeof targetAuction.isFilingOverdue === 'boolean'
+            ? targetAuction.isFilingOverdue
+            : daysRemaining < 0);
+
+        items.push({
+          auctionId: targetAuction.auctionId,
+          chitGroupId: group.id,
+          groupCode: payload?.chitGroup?.groupCode || group.groupCode,
+          installmentMonth: targetAuction.installmentMonth,
+          auctionDate: formatIstDateString(auctionDateObj),
+          daysRemaining,
+          isOverdue,
+          isUrgent: !filedAtRegistrar && !isOverdue && daysRemaining >= 0 && daysRemaining <= 5,
+          filedAtRegistrar,
+          filedDate: targetAuction.filedDate,
+          filingReference: targetAuction.filingReference,
+        });
+      }
+
+      return items.sort((a, b) => {
+        if (a.filedAtRegistrar !== b.filedAtRegistrar) return a.filedAtRegistrar ? 1 : -1;
+        return a.daysRemaining - b.daysRemaining;
+      });
     },
+    enabled,
     staleTime: 60 * 1000,
   });
 
-  // Calculate Form XVII filing deadlines (21 calendar days from auction date)
-  const filingDeadlines = React.useMemo<FilingCountdownItem[]>(() => {
-    if (!chitsData || chitsData.length === 0) return [];
-
-    const now = new Date();
-    const items: FilingCountdownItem[] = [];
-
-    for (const group of chitsData) {
-      // Check current installment auctions
-      if (group.currentInstallmentMonth > 1) {
-        // Synthesize recent auction estimation if auction list is nested
-        // In full flow, auction date is on the 10th-15th of the month
-        const recentAuctionDate = group.lastAuctionDate
-          ? new Date(group.lastAuctionDate)
-          : new Date(now.getTime() - (group.currentInstallmentMonth % 10) * 86400000 * 2);
-
-        const diffDays = Math.floor(
-          (now.getTime() - recentAuctionDate.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        const daysRemaining = 21 - diffDays;
-
-        items.push({
-          auctionId: group.lastAuctionId || group.id,
-          chitGroupId: group.id,
-          groupCode: group.groupCode,
-          installmentMonth: group.currentInstallmentMonth,
-          auctionDate: recentAuctionDate.toISOString().split('T')[0],
-          daysRemaining,
-          isOverdue: daysRemaining < 0,
-          isUrgent: daysRemaining >= 0 && daysRemaining <= 5,
-          filedAtRegistrar: Boolean(group.minutesFiledAtRegistrar),
-        });
-      }
-    }
-
-    return items;
-  }, [chitsData]);
+  if (!enabled) {
+    return null;
+  }
 
   if (chitsLoading) {
     return (
@@ -120,7 +184,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
     );
   }
 
-  const urgentCount = filingDeadlines.filter((f) => f.isUrgent || f.isOverdue).length;
+  const urgentCount = filingDeadlines.filter((f) => !f.filedAtRegistrar && (f.isUrgent || f.isOverdue)).length;
 
   return (
     <Card className="border-slate-800 bg-slate-900/60 shadow-sm">
@@ -134,7 +198,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
               </CardTitle>
             </div>
             <CardDescription className="text-xs text-slate-400 mt-1">
-              Chit Funds Act 1982 Section 17: Statutory filing with Deputy Registrar of Chits within 21 days
+              Chit Funds Act 1982 Section 24: Statutory Form XVII filing with Deputy Registrar of Chits within 21 days
             </CardDescription>
           </div>
 
@@ -161,7 +225,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
           <div className="divide-y divide-slate-800/80">
             {filingDeadlines.map((item) => (
               <div
-                key={item.chitGroupId}
+                key={`${item.chitGroupId}-${item.auctionId}`}
                 className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="space-y-1">
@@ -205,7 +269,7 @@ export function FilingCountdownWidget({ branchId }: FilingCountdownWidgetProps) 
                   )}
 
                   <Button asChild variant="outline" size="sm" className="h-7 text-xs border-slate-700 hover:bg-slate-800">
-                    <Link href={`/schemes/${item.chitGroupId}`}>
+                    <Link href={`/reports/minutes?chitGroupId=${encodeURIComponent(item.chitGroupId)}`}>
                       <span>View</span>
                       <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>

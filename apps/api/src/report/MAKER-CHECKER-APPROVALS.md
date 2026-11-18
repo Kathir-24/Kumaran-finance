@@ -1,14 +1,15 @@
 # Real-Time Maker-Checker Actions & Pending Approvals Stream (`apps/api/src/report`)
 
 ## 1. Context & Business Need
-In **Kumaran Chits** (Kumaran Finance), strict dual control is an invariant architectural guardrail (Guardrail #10: Maker $\ne$ Checker). Sensitive actions cannot be finalized by a single individual:
-1. **Cash Handover**: Field collection agents collect physical cash door-to-door, but only an authorized partner or branch manager (who did not collect the money) can count and sign off the cash into the branch vault (`POST /collections/cash-handover/acknowledge`).
-2. **Payment Reversals**: Staff or collection agents initiate a reversal request with a business reason, but only a Super Admin (Partner) can commit the reversal (`POST /payments/:id/approve-reversal`).
-3. **Prize Disbursements**: Desk staff verifies the physical safety proof documents (agreements, cheques, promissory notes), but only an authorized Checker can authorize releasing the funds (`POST /disbursements/auction/:auctionId/authorize-payout`).
-
-To empower Partners (Super Admin) and Branch Managers to act promptly without navigating between 4 separate screens or repeatedly refreshing browser tabs, this module provides:
-- A unified, actionable pending approvals endpoint (`GET /reports/pending-approvals`).
-- A real-time Server-Sent Events (SSE) stream (`GET /reports/approvals-stream`) that pushes live counter updates and alerts to the React/Next.js Web Admin Portal and Flutter Mobile App.
+In **Kumaran Chits** (Kumaran Finance), strict dual control is an invariant architectural guardrail (Guardrail #10: Maker $\ne$ Checker) reinforced by Verified Partner Identity (Guardrail #11 / ADR-21: `isPartner: true`). Sensitive financial mutations cannot be finalized by a single individual or by administrative IT Super Admins (`isPartner: false`):
+1. **Cash Handovers**: Field agents submit collected cash (`PENDING_HANDOVER`); an independent staff/partner (`collector != acknowledger`) counts and signs off into the vault.
+2. **Payment Reversals**: Partner A initiates a reversal (`REQUESTED`); an independent verified Partner B approves (`POST /payments/:id/approve-reversal`).
+3. **Safety Proof Verifications**: Desk staff verifies safety proof documents on finalized auctions (`COMPLETED` / `MINUTES_FILED`, `PENDING_VERIFICATION`).
+4. **Prize Disbursement Authorizations**: Verified Partner B authorizes payouts verified by Maker (`VERIFIED_BY_MAKER`, `maker != checker`).
+5. **Auction Finalizations**: Verified Partner B finalizes offline auction results recorded by Maker (`SCHEDULED` Months 2..N-1 with winner recorded, `maker != checker`).
+6. **Finalized Auction Corrections**: Verified Partner B approves post-finalization correction requests (`AUCTION_CORRECTION_REQUESTED` without subsequent approval, `maker != checker`).
+7. **Defaulter Removals**: Verified Partner B approves 3-month consecutive defaulter removal requests (`PENDING_REMOVAL_APPROVAL`, `maker != checker`).
+8. **Month N Final Settlements**: Verified Partner B authorizes prepared Month N maturity settlement vouchers (`VERIFIED_BY_MAKER` on Month N `SCHEDULED` auction, `maker != checker`).
 
 ---
 
@@ -16,148 +17,35 @@ To empower Partners (Super Admin) and Branch Managers to act promptly without na
 
 ### 2.1 Aggregated Pending Approvals (`GET /reports/pending-approvals`)
 - **Route**: `GET /reports/pending-approvals`
-- **Query Parameters**: `branchId?: string` (Optional; Super Admin & Auditor only)
+- **Query Parameters**:
+  - `branchId?: string` (Optional; `SUPER_ADMIN`, `ACCOUNTANT`, `AUDITOR` only — rejected with `403 Forbidden` if a `BRANCH_MANAGER` specifies a foreign branch)
+  - `actionableOnly?: boolean` (Optional; when `true`, filters each queue strictly to items where `canCurrentUserApprove === true` for the authenticated caller under Guardrails 10 & 11)
 - **Authorized Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`
-- **Branch Scoping**:
-  - `BRANCH_MANAGER`: Automatically restricted to items belonging to their assigned branch.
-  - `SUPER_ADMIN` & `ACCOUNTANT`: Full company-wide visibility across all branches.
-
-#### Response Structure
-```json
-{
-  "summary": {
-    "totalPendingCount": 4,
-    "cashHandoversCount": 1,
-    "disbursementAuthorizationsCount": 1,
-    "paymentReversalsCount": 1,
-    "safetyProofVerificationsCount": 1,
-    "cashHandoversTotalAmount": "7900",
-    "disbursementsTotalAmount": "75000",
-    "reversalsTotalAmount": "3950"
-  },
-  "cashHandovers": [
-    {
-      "collectorId": "collector-uuid-001",
-      "collectorName": "K. Senthil",
-      "collectorPhone": "9842111111",
-      "branchId": "branch-prd-001",
-      "totalAmount": "7900",
-      "paymentCount": 2,
-      "oldestCollectionAt": "2026-10-21T09:00:00.000Z",
-      "paymentIds": ["pmt-01", "pmt-02"]
-    }
-  ],
-  "disbursementAuthorizations": [
-    {
-      "id": "winner-uuid-001",
-      "auctionId": "auc-uuid-001",
-      "chitGroupCode": "KCA-1L-20M-01",
-      "chitGroupName": "Perundurai 1L Scheme",
-      "installmentMonth": 4,
-      "customerCode": "KC-CUST-00005",
-      "customerName": "M. Duraisamy",
-      "customerPhone": "9842155555",
-      "ticketNumber": 5,
-      "netPayableAmount": "75000",
-      "disbursementMode": "NEFT",
-      "verifiedByUserId": "staff-maker-01",
-      "agreementSigned": true,
-      "nomineeSigned": true,
-      "hasSecurityDoc": true
-    }
-  ],
-  "paymentReversals": [
-    {
-      "id": "rev-uuid-001",
-      "paymentId": "pmt-wrong-001",
-      "receiptNumber": "KC-REC-PRD-2026-00010",
-      "amount": "3950",
-      "customerCode": "KC-CUST-00003",
-      "customerName": "Ramasamy K",
-      "reason": "Duplicate entry by field agent",
-      "notes": "Customer already paid at counter",
-      "initiatedByUserId": "agent-maker-01",
-      "createdAt": "2026-10-21T08:00:00.000Z"
-    }
-  ],
-  "safetyProofVerifications": [
-    {
-      "id": "winner-uuid-002",
-      "auctionId": "auc-uuid-002",
-      "chitGroupCode": "KCA-1L-20M-02",
-      "chitGroupName": "Perundurai 1L Scheme 2",
-      "installmentMonth": 5,
-      "customerCode": "KC-CUST-00008",
-      "customerName": "P. Shanmugam",
-      "customerPhone": "9842188888",
-      "ticketNumber": 8,
-      "netPayableAmount": "80000",
-      "auctionDate": "2026-10-21T11:00:00.000Z"
-    }
-  ]
-}
-```
-
----
+- **Branch Scoping (Fail-Closed Anti-BOLA)**:
+  - `BRANCH_MANAGER`: Strictly restricted to their assigned `branchId`. Fails closed with `403 Forbidden` (`BRANCH_SCOPE_REQUIRED`) if `branchId` is null/empty or if a foreign `branchId` is requested.
+  - `SUPER_ADMIN`, `ACCOUNTANT`, `AUDITOR`: Company-wide visibility across all branches (or optional `branchId` filter).
+- **Caching & Stampede Protection**:
+  - Branch-scoped base snapshot cached in Redis (`report:approvals:<branchId|ALL>`, TTL `15s` with $\pm 15\%$ jitter) behind a tokenized mutex lock (`DistributedLockService` / atomic Lua release).
+  - Caller-specific flags (`isOwnRequest`, `canCurrentUserApprove`, `summary.actionableByCurrentUserCount`) are computed **post-cache** per caller to prevent cross-user cache contamination.
 
 ### 2.2 Real-Time Server-Sent Events (SSE) Stream (`GET /reports/approvals-stream`)
 - **Route**: `GET /reports/approvals-stream`
 - **Protocol**: HTTP/1.1 or HTTP/2 Server-Sent Events (`text/event-stream`)
 - **Authorized Roles**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`
 - **Emission Cadence**: Emits an `APPROVALS_UPDATE` event immediately upon connection, and subsequently every 15 seconds.
-- **Mid-Flight Session & Token Expiry Assertion (F15)**: On each 15-second tick before emitting summary data, `ReportService.assertStreamAuthorization` executes a real-time validation:
-  - Asserts token validity (`now < exp`).
-  - Checks fast-path Redis revocation cutoff (`auth:revoked:${sub}`).
-  - Verifies database user active status (`user.isActive`).
-  - Asserts continued authorization for required staff roles.
-  - If token expires, user logs out, or permissions change mid-stream, throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the connection and close the SSE pipe.
-- **Client Handling (Next.js / Flutter)**:
-  ```ts
-  const eventSource = new EventSource('/api/reports/approvals-stream', {
-    headers: { Authorization: `Bearer ${jwtToken}` }
-  });
-
-  eventSource.onmessage = (event) => {
-    const payload = JSON.parse(event.data);
-    if (payload.type === 'APPROVALS_UPDATE') {
-      updateApprovalBadgeCounter(payload.summary.totalPendingCount);
-      updateDashboardSummary(payload.summary);
-    }
-  };
-  ```
+- **Mid-Flight Session & Token Expiry Assertion (F15 + F04)**: On each 15-second tick before emitting summary data, `ReportService.assertStreamAuthorization` validates:
+  - Access token expiration (`now < exp`).
+  - Fast-path Redis revocation cutoff (`auth:revoked:${sub}`).
+  - Database active status (`user.isActive`) and durable `tokenRevokedBefore`.
+  - Persisted multi-device `Session` identity (`sid`, non-revoked, non-expired) when present.
+  - Live role membership (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, or `AUDITOR`) and non-empty `branchId` for `BRANCH_MANAGER`.
+  - Any failure throws `UnauthorizedException` or `ForbiddenException`, immediately closing the SSE pipe.
 
 ---
 
-## 3. Maker-Checker Invariant Matrix
-
-```mermaid
-flowchart TD
-    subgraph Cash Handover Dual Control
-        A1[Field Agent collects cash] --> A2[Agent submits handover: PENDING_HANDOVER]
-        A2 --> A3{Checker acknowledges into vault}
-        A3 -->|collector == acknowledger| A4[Strict 403 Forbidden]
-        A3 -->|collector != acknowledger| A5[ACKNOWLEDGED into Vault]
-    end
-
-    subgraph Payment Reversal Dual Control
-        B1[Staff initiates reversal] --> B2[Reversal Status: REQUESTED]
-        B2 --> B3{Checker approves reversal}
-        B3 -->|maker == checker| B4[Strict 403 Forbidden]
-        B3 -->|maker != checker| B5[Payment REVERSED & Ledgers Adjusted]
-    end
-
-    subgraph Prize Disbursement Dual Control
-        C1[Staff verifies safety proofs] --> C2[Disbursement Status: VERIFIED_BY_MAKER]
-        C2 --> C3{Checker authorizes payout}
-        C3 -->|maker == checker| C4[Strict 403 Forbidden]
-        C3 -->|maker != checker| C5[AUTHORIZED_BY_CHECKER & Voucher Generated]
-    end
-```
-
----
-
-## 4. Verification & Testing
-- Unit tests in `apps/api/test/report.spec.ts` verify:
-  1. Complete aggregation across all 4 operational approval queues with whole rupee calculations.
-  2. Branch scoping restrictions preventing Branch Managers from accessing other branches' pending handovers or payouts.
-  3. Clean serialization with integer strings to preserve whole rupee invariant accuracy.
+## 3. Verification & Testing
+- Unit tests in `apps/api/test/unit/report.spec.ts` and `apps/api/test/unit/report-etag.spec.ts` verify:
+  1. Complete aggregation across all 8 Maker-Checker queues with pure 64-bit `BigInt` whole-rupee math.
+  2. Fail-closed branch scoping (rejecting null `branchId` and cross-branch attempts).
+  3. Post-cache per-caller Maker-Checker (`maker != checker`) and Partner Identity (`isPartner: true`) actionability flags and `?actionableOnly=true` filtering.
+  4. Strict `Asia/Kolkata` (IST) day boundaries, dynamic frozen commission rates, 21-day Form XVII Registrar countdown, Audit Log secret redaction, and caller-scoped HTTP 304 ETag isolation.

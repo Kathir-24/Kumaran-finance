@@ -13,12 +13,12 @@ export class QueryFormXxiDto {
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Filter ledger by ticket number (1 to 20). If omitted, returns all tickets in group.',
+    description: 'Filter ledger by ticket number (1 to N). If omitted, returns all tickets in group.',
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(20)
+  @Max(120)
   ticketNumber?: number;
 }

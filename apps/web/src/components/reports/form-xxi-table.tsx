@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  AlertCircle,
   Award,
   Download,
   Loader2,
@@ -13,15 +14,17 @@ import { Button } from '@/components/ui/button';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
 import { downloadPassbookPdf } from '@/lib/pdf-download';
+import { getErrorMessage } from '@/lib/api-client';
 import { FormXxiKpiBar } from './form-xxi-kpi-bar';
+import { toSafeBigInt, type WholeRupeeValue } from './report-bigint';
 
 export interface FormXxiMonthlyScheduleItem {
   installmentMonth: number;
   dueDate: string;
-  grossAmount: number;
-  dividendDeduction: number;
-  netPayableAmount: number;
-  paidAmount: number;
+  grossAmount: WholeRupeeValue;
+  dividendDeduction: WholeRupeeValue;
+  netPayableAmount: WholeRupeeValue;
+  paidAmount: WholeRupeeValue;
   status: 'PAID' | 'UNPAID' | 'OVERDUE' | string;
   paymentDate: string | null;
   receiptNumber: string | null;
@@ -42,11 +45,11 @@ export interface FormXxiTicketLedger {
     phone: string;
   };
   summary: {
-    totalGrossDue: number;
-    totalDividendCredit: number;
-    totalNetPayable: number;
-    totalPaid: number;
-    totalOutstandingArrears: number;
+    totalGrossDue: WholeRupeeValue;
+    totalDividendCredit: WholeRupeeValue;
+    totalNetPayable: WholeRupeeValue;
+    totalPaid: WholeRupeeValue;
+    totalOutstandingArrears: WholeRupeeValue;
   };
   monthlySchedule: FormXxiMonthlyScheduleItem[];
 }
@@ -58,18 +61,20 @@ interface FormXxiTableProps {
 export function FormXxiTable({ ledger }: FormXxiTableProps) {
   const t = useTranslations('reports.ledger');
   const [isDownloading, setIsDownloading] = React.useState(false);
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
 
   const { customer, summary, monthlySchedule } = ledger;
 
   const handleDownloadPdf = async () => {
     setIsDownloading(true);
+    setDownloadError(null);
     try {
       await downloadPassbookPdf(
         ledger.ticketId,
         `form-xxi-passbook-t${ledger.ticketNumber}-${customer.customerCode}.pdf`,
       );
-    } catch (err) {
-      console.error('Failed to download Form XXI PDF', err);
+    } catch (err: unknown) {
+      setDownloadError(getErrorMessage(err, 'Failed to download Form XXI PDF'));
     } finally {
       setIsDownloading(false);
     }
@@ -138,13 +143,20 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 space-y-4">
-          {/* Cumulative KPI Bar */}
+          {downloadError && (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3 text-xs text-rose-300 flex items-center gap-2 print:hidden">
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+              <span>{downloadError}</span>
+            </div>
+          )}
+
+          {/* Cumulative KPI Bar (Exact BigInt passthrough — zero Number() truncation) */}
           <FormXxiKpiBar
-            totalGrossDue={Number(summary.totalGrossDue)}
-            totalDividendCredit={Number(summary.totalDividendCredit)}
-            totalNetPayable={Number(summary.totalNetPayable)}
-            totalPaid={Number(summary.totalPaid)}
-            totalOutstandingArrears={Number(summary.totalOutstandingArrears)}
+            totalGrossDue={summary.totalGrossDue}
+            totalDividendCredit={summary.totalDividendCredit}
+            totalNetPayable={summary.totalNetPayable}
+            totalPaid={summary.totalPaid}
+            totalOutstandingArrears={summary.totalOutstandingArrears}
           />
 
           {/* 20-Month Schedule Table */}
@@ -166,7 +178,8 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
               </thead>
               <tbody className="divide-y divide-slate-800/60 print:divide-slate-200">
                 {monthlySchedule.map((row) => {
-                  const unpaid = row.status !== 'PAID' ? Math.max(0, row.netPayableAmount - row.paidAmount) : 0;
+                  const netDiff = toSafeBigInt(row.netPayableAmount) - toSafeBigInt(row.paidAmount);
+                  const unpaid = row.status !== 'PAID' && netDiff > 0n ? netDiff : 0n;
                   const isPaid = row.status === 'PAID';
                   const isOverdue = row.status === 'OVERDUE';
 
@@ -182,11 +195,14 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
                         M{row.installmentMonth}
                       </td>
                       <td className="py-2.5 px-3 text-slate-400 print:text-slate-600">
-                        {new Date(row.dueDate).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {Number.isNaN(new Date(row.dueDate).getTime())
+                          ? '—'
+                          : new Date(row.dueDate).toLocaleDateString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-300 print:text-black">
                         {formatRupee(row.grossAmount)}
@@ -201,7 +217,7 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
                         {formatRupee(row.paidAmount)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-semibold">
-                        <span className={unpaid > 0 ? "text-rose-400 print:text-rose-700" : "text-slate-500"}>
+                        <span className={unpaid > 0n ? "text-rose-400 print:text-rose-700" : "text-slate-500"}>
                           {formatRupee(unpaid)}
                         </span>
                       </td>

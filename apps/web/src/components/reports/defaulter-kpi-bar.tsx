@@ -13,9 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRupee } from '@kumaran/api-client';
 import { cn } from '@/lib/utils';
+import { toSafeBigInt, type WholeRupeeValue } from './report-bigint';
 
 export interface DefaulterItem {
   ticketId: string;
+  chitGroupId?: string;
   groupCode: string;
   ticketNumber: number;
   customerCode: string;
@@ -25,13 +27,13 @@ export interface DefaulterItem {
   consecutiveUnpaidMonths: number;
   riskCategory: 'ATTENTION_1M' | 'MEDIUM_RISK_2M' | 'HIGH_RISK_3M_REMOVAL' | string;
   eligibleForRemovalRights: boolean;
-  totalArrearsAmount: number;
+  totalArrearsAmount: WholeRupeeValue;
   unpaidDues: Array<{
     installmentMonth: number;
     dueDate: string;
-    netPayableAmount: number;
-    paidAmount: number;
-    outstandingDue: number;
+    netPayableAmount: WholeRupeeValue;
+    paidAmount: WholeRupeeValue;
+    outstandingDue: WholeRupeeValue;
     status: string;
   }>;
 }
@@ -44,15 +46,15 @@ export function DefaulterKpiBar({ defaulters }: DefaulterKpiBarProps) {
   const t = useTranslations('reports.defaulters');
 
   let count1M = 0;
-  let amount1M = 0;
+  let amount1M = 0n;
   let count2M = 0;
-  let amount2M = 0;
+  let amount2M = 0n;
   let count3M = 0;
-  let amount3M = 0;
-  let grandTotal = 0;
+  let amount3M = 0n;
+  let grandTotal = 0n;
 
   defaulters.forEach((d) => {
-    const amt = Number(d.totalArrearsAmount);
+    const amt = toSafeBigInt(d.totalArrearsAmount);
     grandTotal += amt;
     if (d.consecutiveUnpaidMonths === 1) {
       count1M += 1;
