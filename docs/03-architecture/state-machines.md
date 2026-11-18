@@ -11,14 +11,17 @@
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT : Create Scheme
+    DRAFT --> CANCELLED : Draft Cancelled (Super Admin)
     DRAFT --> REGISTERED : Sanction Order Entered
     REGISTERED --> ACTIVE : All Tickets Enrolled & Month 1 Started
     ACTIVE --> COMPLETED : Month 1 Pool Taken, Months 2 to N-1 Auctions Done, Month N Settled
     COMPLETED --> CLOSED : Audit & Partner Reconciliation
+    CANCELLED --> [*]
     CLOSED --> [*]
 ```
 
 ### Transition Guards:
+- **`DRAFT` $\to$ `CANCELLED`**: Executed via `POST /chits/:id/cancel` (`@Roles(Role.SUPER_ADMIN)`). Strictly limited to unactivated `DRAFT` schemes; records immutable `CHIT_GROUP_CANCELLED` audit event. Terminal state.
 - **`DRAFT` $\to$ `REGISTERED`**: Requires valid `sanctionOrderNumber` and `sanctionDate` from the Chit Registrar.
 - **`REGISTERED` $\to$ `ACTIVE`**: Requires that all $N$ tickets are assigned to verified subscribers (including 1 company representative ticket).
 - **`ACTIVE` $\to$ `COMPLETED`**:
@@ -53,16 +56,22 @@ stateDiagram-v2
 - **`IN_PROGRESS` $\to$ `BID_RECORDED`**:
   - Guard 1: Winning discount $D \le \frac{V}{4}$ (validates against fixed 1/4 ceiling of total chit value).
   - Guard 2: Winning discount $D \ge \text{Foreman Commission}$ ($4.00\%$).
-  - Guard 3: Winner ticket must be active and non-prized.
-  - Guard 4: **Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**: The bidding ticket must have paid its installment due for the current month (`due.status == PAID`). Unpaid subscribers are strictly blocked from participating or bidding in that month's auction.
+  - Guard 3 (**`KFC-FIN-002` Exact Divisibility**): $(D - C_f) \bmod N = 0$. Any bid producing a non-divisible remainder is rejected with HTTP 400 `NON_DIVISIBLE_DIVIDEND` (`auction-math.helper.ts`).
+  - Guard 4: Winner ticket must be `ACTIVE`, non-prized, and must NOT have a pending removal request (`removalRequestedByUserId === null`, `DEF-M9-ENG-01`).
+  - Guard 5 (**Auction Ineligibility for Unpaid Dues (`CONFIRMED-BY-DEVELOPER`)**): The bidding ticket must have paid its installment due for the current month (`due.status == PAID`). Unpaid subscribers are strictly blocked from participating or bidding in that month's auction.
 - **`TIE_PENDING` $\to$ `BID_RECORDED` (Physical Paper Token Tie-Break)**:
   - Foreman conducts physical paper token/lot draw live at the branch in front of attending subscribers (`CONFIRMED-BY-DEVELOPER`).
   - Branch staff enters the physically drawn winning ticket number into the software.
   - Software logs all tied bidders and records the physical draw outcome without running an electronic random lottery.
-- **`BID_RECORDED` $\to$ `FINALIZED`**:
-  - Requires **Partner-to-Partner Maker-Checker dual approval**: The partner or staff member who conducted the auction and entered the result cannot finalize it (`maker_user_id != checker_user_id`). Partner A records $\to$ Partner B, C, or D reviews and commits.
+- **`BID_RECORDED` $\to$ `FINALIZED` (`COMPLETED`)**:
+  - **Partner Exclusivity (`KFC-SEC-003`)**: Strictly gated to `Role.SUPER_ADMIN` with verified Partner identity (`isPartner: true`); `BRANCH_MANAGER` is strictly blocked (`403 Forbidden`).
+  - **Maker $\neq$ Checker Dual Approval (`chk_auction_maker_checker`)**: The user who conducted/recorded the auction (`conductedByUserId`) cannot finalize it (`finalizedByUserId`). Enforced across both `COMPLETED` and `MINUTES_FILED` states at application and PostgreSQL levels.
   - Automatically calculates Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members (including auction winners).
   - Generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$) uniformly for all members.
+- **Finalized Auction Correction Workflow (`KFC-FIN-005`)**:
+  - Two-Partner dual-control endpoints: `POST /auctions/:id/correction/request` (Partner A) $\to$ `POST /auctions/:id/correction/approve` or `reject` (Partner B, `maker != checker`).
+  - Strictly blocked if prize money is already `DISBURSED` or if any subscriber has already paid next month's installment (`ALREADY_PAID_DUES_EXIST`).
+  - While a correction request is pending, all downstream disbursement stages on that auction fail closed with `PENDING_CORRECTION_LOCKOUT`. On approval, sub-ceiling tie-bidder records are purged and next-month dues are atomically recalculated.
 
 ---
 
@@ -88,15 +97,19 @@ stateDiagram-v2
     5. Promissory note / personal guarantee submitted? [Yes / No]
     6. Scanned copies uploaded to secure storage.
 - **`VERIFIED_BY_MAKER` $\to$ `AUTHORIZED_BY_CHECKER`**:
-  - Super Admin / Partner B authorizes the payout voucher.
-  - Enforces `maker_user_id != checker_user_id` (Partner A cannot self-approve; Partner B, C, or D must authorize).
+  - Super Admin / Partner B (`isPartner: true`) authorizes the payout voucher.
+  - Enforces `maker_user_id != checker_user_id` (`chk_winner_maker_checker` enforced on `VERIFIED_BY_MAKER`, `AUTHORIZED_BY_CHECKER`, and `DISBURSED`).
+  - **Correction Lockout (`M9-DUAL-DEF-02`)**: Blocked with `PENDING_CORRECTION_LOCKOUT` across all 3 disbursement stages (`verifySafetyProof`, `authorizePayout`, `releasePayout`) if an unapproved finalized auction correction is pending.
+  - **Strict Override Prohibition (`KFC-FIN-004`)**: Payout amount must exactly equal `grossPrizeMoney - totalArrears`; arbitrary manual overrides are strictly prohibited (`400 Bad Request`).
 - **`AUTHORIZED_BY_CHECKER` $\to$ `DISBURSED`**:
-  - Funds released via selected mode: Cheque, Bank Transfer (NEFT/RTGS/IMPS), or Cash.
-  - Voucher number and payment reference recorded.
-- **Month $N$ Final Maturity Settlement (Two-Stage Workflow / F05)**:
-  - Month $N$ final payout has no auction. It executes via two-stage dual control:
+  - **TOCTOU Arrears Guard (`FIN-D`)**: Re-validates live outstanding arrears against the authorized arrears offset; throws `ARREARS_STATE_CHANGED` if arrears mutated post-authorization.
+  - Funds released via selected mode: `ACCOUNT_PAYEE_CHEQUE`, `BANK_TRANSFER_NEFT`, `BANK_TRANSFER_RTGS`, `BANK_TRANSFER_IMPS`, or `CASH`.
+  - Enforces `chk_winner_positive_disbursed_amount` (`disbursedAmount > 0`) and case-insensitive partial unique index `uq_auction_winner_non_cash_payment_ref` (`UPPER(BTRIM("paymentReference"))`) preventing duplicate non-cash UTR/cheque numbers.
+  - Canonical voucher number (`KC-VOU-{branchCode}-{year}-{sanitizedGroupCode}-{sequence}`) and payment reference recorded.
+- **Month $N$ Final Maturity Settlement (Two-Stage Workflow / F05 & `CR-DISB-02`)**:
+  - Month $N$ final payout has no auction. All HTTP settlement paths enforce `requirePreparedSettlement: true` under two-stage dual control:
     1. `prepareFinalSettlement` (Maker Staff): Computes Month $N$ deductions, prior arrears, 4% commission, and creates a pending settlement record with `disbursementStatus = 'VERIFIED_BY_MAKER'` stamping `conductedByUserId = makerUserId` and `verifiedByUserId = makerUserId`.
-    2. `approveFinalSettlement` (Checker Partner): Verifies the prepared snapshot, enforces `makerUserId != checkerUserId` and `isPartner: true`, transitions status to `DISBURSED`, marks Month $N$ due `PAID`, stamps `finalizedByUserId` and `authorizedByUserId`, and completes the chit group.
+    2. `approveFinalSettlement` (Checker Partner): Verifies the prepared snapshot (throwing `ARREARS_STATE_CHANGED` if arrears mutated post-preparation), enforces `makerUserId != checkerUserId` and `isPartner: true`, transitions status to `DISBURSED`, marks Month $N$ due `PAID`, stamps `finalizedByUserId` and `authorizedByUserId`, and completes the chit group.
     3. Enforced at both application and database levels via PostgreSQL engine constraint `chk_winner_maker_checker`.
 
 ---
@@ -105,7 +118,7 @@ stateDiagram-v2
 
 > [!NOTE]
 > **Database Column Mapping**: In PostgreSQL, `Payment.paymentStatus` is an enum (`INITIATED`, `SUCCESS`, `FAILED`, `REVERSED`), while cash custody during field collections is tracked via `Payment.cashHandoverStatus` (`PENDING_HANDOVER` $\to$ `ACKNOWLEDGED`).
-> - **Doorstep & Counter Cash**: When an agent or cashier records cash, `paymentStatus` is immediately `SUCCESS` (crediting the subscriber's passbook and satisfying the monthly due), and `cashHandoverStatus` remains `PENDING_HANDOVER` until acknowledged by a Partner into the vault.
+> - **Doorstep & Counter Cash**: When an agent or cashier records cash, `paymentStatus` is immediately `SUCCESS` (crediting the subscriber's passbook and satisfying the monthly due). Counter cash sets `cashHandoverStatus: null` (direct vault entry); field collections remain `PENDING_HANDOVER` until acknowledged into the vault by an independent `SUPER_ADMIN`, `BRANCH_MANAGER`, or `ACCOUNTANT` (`collector_user_id != acknowledger_user_id`).
 > - **Native 1-Tap UPI Intent Claims (ADR-19)**: When a customer launches UPI, transfers directly to KVB, and submits their 12-digit Bank UTR claim (`POST /payments/upi-claim`), a `Payment` record is created in `INITIATED` status with unique `transactionRef`. Upon Desk Accountant verification against the KVB bank statement (`POST /payments/:id/verify-upi-claim`), `paymentStatus` transitions to `SUCCESS` under strict Maker != Checker dual control.
 
 ```mermaid
@@ -114,9 +127,10 @@ stateDiagram-v2
     [*] --> INITIATED : Customer Submits UPI Bank UTR Claim (ADR-19)
     INITIATED --> SUCCESS_ONLINE : Desk Accountant Verifies Bank Statement (Maker != Checker)
     INITIATED --> FAILED : Bank Statement Mismatch / Bounced
-    SUCCESS_CASH --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
-    SUCCESS_ONLINE --> REVERSAL_REQUESTED : Mistake Reported by Staff (Maker)
-    REVERSAL_REQUESTED --> REVERSED : Partner Approves Reversal (Checker, Maker != Checker)
+    SUCCESS_CASH --> REVERSAL_REQUESTED : Partner A Requests Reversal (KFC-SEC-001)
+    SUCCESS_ONLINE --> REVERSAL_REQUESTED : Partner A Requests Reversal (KFC-SEC-001)
+    REVERSAL_REQUESTED --> REVERSED : Partner B Approves Reversal (Checker, Maker != Checker)
+    REVERSAL_REQUESTED --> SUCCESS_CASH : Partner B Rejects Reversal (Payment Stays SUCCESS)
 ```
 
 ### Transition Guards:
@@ -131,9 +145,9 @@ stateDiagram-v2
 - **`[*] ` $\to$ `PENDING_HANDOVER` $\to$ `ACKNOWLEDGED` (Field Cash Handover Guard)**:
   - Agent records physical cash collected in the field, creating a payment batch in `PENDING_HANDOVER`.
   - At end-of-day, the agent submits cash to the branch.
-  - **Dual-Role Cash Handover Guard**: Since field agents also perform desk accounting duties, the software strictly enforces:
+  - **Dual-Role Cash Handover Guard (`chk_payment_cash_handover_maker_checker`)**: Since field agents may also hold desk accounting duties, `POST /collections/cash-handover/acknowledge` (`@Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)`) strictly enforces:
     $$\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$$
-    An agent who collected the cash can **never** acknowledge their own handover. An independent Partner (Super Admin) must physically verify and sign off the cash into the branch vault.
+    An agent who collected the cash can **never** acknowledge their own handover. An independent Partner, Branch Manager, or Desk Accountant must physically verify and sign off the cash into the branch vault.
 - **`INITIATED` $\to$ `SUCCESS`**:
   - Issues sequential bilingual receipt (English + Tamil) in whole integer Rupees.
   - **Single Discrete Payment & Zero Partial Payments (`CONFIRMED-BY-DEVELOPER`)**:
@@ -141,10 +155,10 @@ stateDiagram-v2
     - Partial payments and overpayments are strictly prohibited; floating allocations across multiple dues do not exist.
     - Zero double payments and zero advance balances exist in the system.
     - Marks that specific month's `InstallmentDue` status as `PAID`.
-- **`SUCCESS` $\to$ `REVERSED`**:
+- **`SUCCESS` $\to$ `REVERSED` (Two-Partner Dual Control — `KFC-SEC-001`)**:
   - Never deletes the original payment record.
-  - Reverses the payment, restores the corresponding `InstallmentDue` strictly to `UNPAID`, and marks receipt as `VOID / CANCELED`.
-  - Requires maker justification and checker authorization by Super Admin (`maker_user_id != checker_user_id`).
+  - **Initiation**: Strictly gated to Partner A (`POST /payments/:id/request-reversal`, `@Roles(Role.SUPER_ADMIN)` with `isPartner: true`; `ACCOUNTANT` & `BRANCH_MANAGER` blocked with `403 Forbidden`).
+  - **Resolution**: Independent Partner B (`maker != checker`, enforced by `chk_reversal_maker_checker`) either approves (`POST /payments/:id/approve-reversal`, transitioning `PaymentReversal` to `APPROVED`, `Payment` to `REVERSED`, restoring `InstallmentDue` to `UNPAID`, and dynamically stamping the receipt PDF with **`ரத்து செய்யப்பட்டது / CANCELLED`** at `0.28` opacity per `KFC-PDF-001`) or rejects (`POST /payments/:id/reject-reversal`, leaving `Payment` in `SUCCESS`).
 
 ---
 
@@ -201,15 +215,15 @@ stateDiagram-v2
 - **`ARREARS_2_MONTHS` $\to$ `DEFAULT_3_MONTHS`**:
   - Triggered when `consecutiveUnpaidMonths == 3`. Ticket is flagged for default removal.
 - **`DEFAULT_3_MONTHS` $\to$ `PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M` (SEC-B Two-Partner Dual Control)**:
-  - **Step 1 (Maker Request)**: Partner A (`SUPER_ADMIN` with `isPartner: true`) submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Status transitions to `PENDING_REMOVAL_APPROVAL`.
-  - **Step 2 (Checker Approval)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`) reviews justification: `POST /tickets/:id/remove-defaulter/approve`. Backend enforces `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
-  - Sets `status: REMOVED_DEF_3M` and vacates ticket for customer substitution.
-  - Generates immutable audit event `DEFAULTER_REMOVAL_APPROVED`.
+  - **Prized Immutability Guard (`KFC-SEC-004`)**: Prized subscriber tickets (`isPrized: true`) can never be removed or substituted; attempts throw `400 Bad Request` (`PRIZED_TICKET_IMMUTABLE`).
+  - **Step 1 (Maker Request)**: Partner A (`SUPER_ADMIN` with `isPartner: true`) submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Status transitions to `PENDING_REMOVAL_APPROVAL` (and immediately bars the ticket from bidding via `removalRequestedByUserId != null`, `DEF-M9-ENG-01`).
+  - **Step 2 (Checker Resolution)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`) either approves (`POST /tickets/:id/remove-defaulter/approve`) or rejects (`POST /tickets/:id/remove-defaulter/reject`, reverting status to `DEFAULT_3_MONTHS`). Backend and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker` (`20261117170000`) enforce `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
+  - On approval, sets `status: REMOVED_DEF_3M`, vacates ticket for customer substitution, and logs immutable `DEFAULTER_REMOVAL_APPROVED`.
   - **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 
 ---
 
-## 7. Full-Product $N \times N$ Status Transition Matrices (113 Transitions across 9 Lifecycles)
+## 7. Full-Product $N \times N$ Status Transition Matrices (133 Transitions across 9 Lifecycles)
 
 > **Architectural Invariant**: Every operational model in Kumaran Chits that possesses a status field is mathematically bounded by an exhaustive $N \times N$ transition matrix. Any transition not explicitly registered as **Allowed** is strictly **Fail-Closed** on the server, throwing an immediate HTTP 400 `BadRequestException`. Client applications (Web, Mobile) cannot force state bypasses.
 >
@@ -218,7 +232,7 @@ stateDiagram-v2
 ### Comprehensive Transition Census Summary
 | # | Entity & Status Column | Number of States ($N$) | Total Transitions ($N \times N$) | Legally Allowed | Strictly Fail-Closed |
 |---|---|:---:|:---:|:---:|:---:|
-| 1 | `ChitGroup.status` | 5 | 25 | 5 | 20 |
+| 1 | `ChitGroup.status` | 6 | 36 | 6 | 30 |
 | 2 | `SubscriberTicket.status` | 5 | 25 | 7 | 18 |
 | 3 | `Auction.status` | 3 | 9 | 2 | 7 |
 | 4 | `AuctionWinner.disbursementStatus` | 4 | 16 | 3 | 13 |
@@ -227,23 +241,24 @@ stateDiagram-v2
 | 7 | `PaymentReversal.status` | 3 | 9 | 2 | 7 |
 | 8 | `Payment.cashHandoverStatus` | 2 | 4 | 1 | 3 |
 | 9 | `Payment.chequeStatus` | 3 | 9 | 2 | 7 |
-| **TOTAL** | **9 Status Lifecycles** | — | **122** | **29** | **93** |
+| **TOTAL** | **9 Status Lifecycles** | — | **133** | **30** | **103** |
 
 ---
 
-### Matrix 1: `ChitGroup.status` ($5 \times 5 = 25$)
-- **States**: `DRAFT`, `REGISTERED`, `ACTIVE`, `COMPLETED`, `CLOSED`
+### Matrix 1: `ChitGroup.status` ($6 \times 6 = 36$)
+- **States**: `DRAFT`, `REGISTERED`, `ACTIVE`, `COMPLETED`, `CLOSED`, `CANCELLED`
 
-| From \ To | `DRAFT` | `REGISTERED` | `ACTIVE` | `COMPLETED` | `CLOSED` |
-|---|:---:|:---:|:---:|:---:|:---:|
-| **`DRAFT`** | ❌ 400 | ✅ Allowed (Order entered) | ✅ Allowed (Fast-track) | ❌ 400 | ❌ 400 |
-| **`REGISTERED`** | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ filled) | ❌ 400 | ❌ 400 |
-| **`ACTIVE`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ months done) | ❌ 400 |
-| **`COMPLETED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Reconciled & signed) |
-| **`CLOSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+| From \ To | `DRAFT` | `REGISTERED` | `ACTIVE` | `COMPLETED` | `CLOSED` | `CANCELLED` |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **`DRAFT`** | ❌ 400 | ✅ Allowed (Order entered) | ✅ Allowed (Fast-track) | ❌ 400 | ❌ 400 | ✅ Allowed (`POST /chits/:id/cancel`) |
+| **`REGISTERED`** | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ filled) | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`ACTIVE`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (All $N$ months done) | ❌ 400 | ❌ 400 |
+| **`COMPLETED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Reconciled & signed) | ❌ 400 |
+| **`CLOSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
+| **`CANCELLED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
 
-*Allowed (5)*: `DRAFT -> REGISTERED`, `DRAFT -> ACTIVE`, `REGISTERED -> ACTIVE`, `ACTIVE -> COMPLETED`, `COMPLETED -> CLOSED`.  
-*Fail-Closed (20)*: All other 20 transitions throw HTTP 400.
+*Allowed (6)*: `DRAFT -> REGISTERED`, `DRAFT -> ACTIVE`, `DRAFT -> CANCELLED`, `REGISTERED -> ACTIVE`, `ACTIVE -> COMPLETED`, `COMPLETED -> CLOSED`.  
+*Fail-Closed (30)*: All other 30 transitions throw HTTP 400.
 
 ---
 
@@ -311,7 +326,7 @@ stateDiagram-v2
 
 | From \ To | `INITIATED` | `SUCCESS` | `FAILED` | `REVERSED` |
 |---|:---:|:---:|:---:|:---:|
-| **`INITIATED`** | ❌ 400 | ✅ Allowed (Bank verified / Gateway confirmed) | ✅ Allowed (UTR reject / Gateway fail) | ❌ 400 |
+| **`INITIATED`** | ❌ 400 | ✅ Allowed (Bank UTR verified per ADR-19) | ✅ Allowed (UTR rejected / Cheque bounced) | ❌ 400 |
 | **`SUCCESS`** | ❌ 400 | ❌ 400 | ❌ 400 | ✅ Allowed (Dual-control reversal) |
 | **`FAILED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |
 | **`REVERSED`** | ❌ 400 | ❌ 400 | ❌ 400 | ❌ 400 |

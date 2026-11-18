@@ -21,10 +21,16 @@ erDiagram
     BRANCH ||--o{ USER : employs
     BRANCH ||--o{ CHIT_GROUP : manages
     BRANCH ||--o{ CUSTOMER : registers
+    BRANCH ||--o{ RECEIPT : issues
+
+    USER ||--o{ PAYMENT : records
+    USER ||--o{ AUDIT_LOG : authors
+    USER ||--o{ SESSION : owns_device_family
 
     CUSTOMER ||--o{ NOMINEE : designates
     CUSTOMER ||--o{ CUSTOMER_DOCUMENT : uploads
     CUSTOMER ||--o{ SUBSCRIBER_TICKET : owns
+    CUSTOMER ||--o{ SESSION : owns_device_family
 
     CHIT_GROUP ||--o{ SUBSCRIBER_TICKET : contains
     CHIT_GROUP ||--o{ AUCTION : conducts
@@ -33,6 +39,7 @@ erDiagram
     SUBSCRIBER_TICKET ||--o{ INSTALLMENT_DUE : owes
     SUBSCRIBER_TICKET ||--o{ PAYMENT_ALLOCATION : credited_via
     SUBSCRIBER_TICKET ||--o{ AUCTION_WINNER : wins
+    SUBSCRIBER_TICKET ||--o{ AUCTION_TIE_BIDDER : competes_in
 
     AUCTION ||--o| AUCTION_WINNER : determines
     AUCTION ||--o| AUCTION_MINUTES : records
@@ -122,31 +129,35 @@ model User {
 // -------------------------------------------------------------
 
 model Customer {
-  id           String             @id @default(uuid())
-  branchId     String
-  branch       Branch             @relation(fields: [branchId], references: [id])
-  customerCode String             @unique // e.g., "KC-CUST-00101"
-  fullName     String
-  fullNameTamil String?
-  phone        String             @unique
-  altPhone     String?
-  addressLine1 String
-  addressLine2 String?
-  city         String
-  pincode      String
-  panNumber    String?
-  aadhaarLast4 String?            // Storing only masked last 4 digits for data minimization
-  fcmToken     String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
-  isKycVerified Boolean           @default(false)
-  version      Int                @default(1) // Optimistic concurrency control
-  tokenRevokedBefore DateTime?    // Authoritative revocation cutoff timestamp (F02)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id                 String             @id @default(uuid())
+  branchId           String
+  branch             Branch             @relation(fields: [branchId], references: [id])
+  customerCode       String             @unique // e.g., "KC-CUST-00101"
+  fullName           String
+  fullNameTamil      String?
+  phone              String             @unique
+  altPhone           String?
+  addressLine1       String
+  addressLine2       String?
+  city               String
+  pincode            String
+  panNumber          String?
+  aadhaarLast4       String?            // Storing only masked last 4 digits for data minimization
+  fcmToken           String?            // Firebase Cloud Messaging device push token for mobile passbook alerts
+  refreshTokenHash   String?            // Hashed refresh token for active session revocation (RFC 6819)
+  lastLoginAt        DateTime?          // Timestamp of most recent customer authentication
+  tokenRevokedBefore DateTime?          // Durable PostgreSQL timestamp for invalidating subscriber sessions
+  isKycVerified      Boolean            @default(false)
+  version            Int                @default(1) // Optimistic concurrency control
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  nominees     Nominee[]
-  documents    CustomerDocument[]
-  tickets      SubscriberTicket[]
-  sessions     Session[]
+  nominees           Nominee[]
+  documents          CustomerDocument[]
+  tickets            SubscriberTicket[]
+  sessions           Session[]
+
+  @@index([branchId])
 }
 
 model Session {
@@ -155,17 +166,16 @@ model Session {
   user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   customerId       String?
   customer         Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  clientType       String    // "WEB" | "MOBILE" | "DESKTOP" (F04 Multi-Device Isolation)
+  clientType       String    // 'WEB', 'MOBILE', 'DESKTOP' (F04 Multi-Device Isolation)
   refreshTokenHash String?   // Device-family specific refresh token bcrypt hash
-  expiresAt        DateTime
   revokedAt        DateTime?
+  expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   @@unique([userId, clientType])
   @@unique([customerId, clientType])
-  @@index([userId])
-  @@index([customerId])
+  @@index([expiresAt])
 }
 
 model Nominee {
@@ -177,6 +187,8 @@ model Nominee {
   phone        String
   aadhaarLast4 String?
   createdAt    DateTime  @default(now())
+
+  @@index([customerId])
 }
 
 model CustomerDocument {
@@ -188,6 +200,8 @@ model CustomerDocument {
   fileName     String
   verified     Boolean   @default(false)
   uploadedAt   DateTime  @default(now())
+
+  @@index([customerId])
 }
 
 // -------------------------------------------------------------
@@ -200,6 +214,7 @@ enum ChitStatus {
   ACTIVE     // In progress
   COMPLETED  // All installments finished
   CLOSED     // Accounts reconciled and closed
+  CANCELLED  // Cancelled draft scheme
 }
 
 enum InitializationMode {
@@ -230,6 +245,8 @@ model ChitGroup {
   onboardedAtMonth       Int                     @default(1) // e.g., 7 if onboarded at Month 7
   
   status                 ChitStatus              @default(DRAFT)
+  createdByUserId        String?                 // User ID who created or onboarded the scheme (Maker)
+  activatedByUserId      String?                 // Partner User ID who approved and activated scheme (Checker)
   sanctionOrderNumber    String?                 // Regulatory reference from Chit Registrar
   sanctionDate           DateTime?
   startDate              DateTime
@@ -444,6 +461,11 @@ model Payment {
   allocations        PaymentAllocation[]
   receipt            Receipt?
   reversal           PaymentReversal?
+
+  @@index([createdAt])
+  @@index([recordedByUserId, cashHandoverStatus])
+  @@index([branchId, createdAt])
+  @@index([paymentStatus])
 }
 
 model PaymentAllocation {
@@ -471,6 +493,9 @@ model Receipt {
   issuedAt           DateTime @default(now())
   isBilingual        Boolean  @default(true) // Generates English + Tamil receipt
   pdfS3Key           String?
+
+  @@index([issuedAt])
+  @@index([branchId, issuedAt])
 }
 
 model PaymentReversal {
@@ -510,21 +535,63 @@ model AuditLog {
 
 ---
 
-## 7. PostgreSQL Engine-Level CHECK Constraints (`CONFIRMED-BY-DEVELOPER` / Invariant 10 & F12)
+## 7. PostgreSQL 17 Engine-Level CHECK Constraints & Partial Unique Indexes (`CONFIRMED-BY-DEVELOPER` / Invariant 10 & F12)
 
-To enforce Invariant 10 (Maker $\neq$ Checker Dual Control) at both application and physical database storage levels, PostgreSQL 17 engine-level `CHECK` constraints are deployed via migration `20261115060000_complete_maker_checker_constraints`. These constraints execute inside PostgreSQL transactions and reject self-approval or unapproved completions regardless of the calling application, script, or migration tool:
+To enforce Invariant 2 (Whole Rupee non-negativity) and Invariant 10 (Maker $\neq$ Checker Dual Control) at both application and physical database storage levels, **8 PostgreSQL 17 engine-level `CHECK` constraints** and **1 case-insensitive partial unique index** are deployed across migrations:
+- `20261115060000_complete_maker_checker_constraints`
+- `20261117170000_add_ticket_removal_maker_checker`
+- `20261118110000_harden_auction_disbursement_constraints`
+- `20261118124500_case_insensitive_payout_ref_index`
 
-### 7.1 Table Constraint Matrix
+These constraints execute inside PostgreSQL transactions and reject self-approval, invalid states, negative amounts, or duplicate bank UTR references regardless of the calling application, script, or migration tool (PostgreSQL SQLSTATE `23514` / `23505`):
 
-| Table | Constraint Name | Enforcement Scope | Business Rule & Invariant |
-|---|---|---|---|
-| `Payment` | `chk_payment_cash_handover_maker_checker` | `("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")` | Cashier collecting payment cannot acknowledge their own handover (ADR-09). |
-| `Auction` | `chk_auction_maker_checker` | State-aware dual-control on auction entry vs partner finalization (`conductedByUserId != finalizedByUserId`). Month 1 statutory company pool allows null maker; historical entries exempt. | Invariant 10 / ADR-09. |
-| `AuctionWinner` | `chk_winner_maker_checker` | State-aware dual-control on verification vs disbursement authorization (`verifiedByUserId != authorizedByUserId`). Hardened against SQL ternary NULL trap with explicit null checks. | Invariant 10 / Invariant 9 / F12. |
-| `PaymentReversal` | `chk_reversal_maker_checker` | Dual-control on reversal request vs partner approval (`initiatedByUserId != approvedByUserId`). | Invariant 10 / SEC-A. |
+### 7.1 Complete 8-Constraint & Partial Unique Index Matrix
+
+| # | Table | Constraint / Index Name | Enforcement Scope | Business Rule & Invariant |
+| :---: |---|---|---|---|
+| **1** | `Payment` | `chk_payment_cash_handover_maker_checker` | `("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")` | Collector cannot acknowledge their own physical cash handover (`ADR-25` / Invariant 10). |
+| **2** | `Auction` | `chk_auction_maker_checker` | State-aware dual-control on **both** `COMPLETED` and `MINUTES_FILED` states (`conductedByUserId <> finalizedByUserId`, non-null Maker & Checker for `installmentMonth > 1`; Month 1 company pool allows null Maker; `isHistoricalEntry = true` exempt). | Invariant 5, Invariant 10, `ADR-25` (`20261118110000`). |
+| **3** | `Auction` | `chk_auction_non_negative_amounts` | `bidDiscount`, `foremanCommissionAmount`, `totalDividend`, `dividendPerTicket`, `prizeMoney` must each be `NULL` or `>= 0`. | Invariant 2 Whole Rupee non-negativity (`20261118110000`). |
+| **4** | `AuctionMinutes` | `chk_auction_minutes_attendees` | `CHECK ("subscribersPresent" >= 1)` | Statutory Form XVII requires at least 1 attendee recorded (`20261118110000`). |
+| **5** | `AuctionWinner` | `chk_winner_maker_checker` | State-aware dual-control across `VERIFIED_BY_MAKER` (non-null `verifiedByUserId`) and **both** `AUTHORIZED_BY_CHECKER` and `DISBURSED` (`verifiedByUserId <> authorizedByUserId` + non-null identities; Month 1 `COMPANY_POOL_MONTH_1` and `isHistoricalEntry = true` exempt). | Invariant 10, `ADR-15`, `ADR-25`, `F12` (`20261118110000`). |
+| **6** | `AuctionWinner` | `chk_winner_positive_disbursed_amount` | `CHECK ("disbursedAmount" IS NULL OR "disbursedAmount" > 0)` | Disbursed prize money must be strictly positive (`20261118110000`). |
+| **7** | `PaymentReversal` | `chk_reversal_maker_checker` | State-aware dual-control on `APPROVED` reversal (`initiatedByUserId != approvedByUserId`). | Invariant 10 / `KFC-SEC-001` (`20261115060000`). |
+| **8** | `SubscriberTicket` | `chk_ticket_removal_maker_checker` | `("removalRequestedByUserId" IS NULL OR "removedByUserId" IS NULL OR "removalRequestedByUserId" != "removedByUserId")` | Two-Partner defaulter removal (`SEC-B`, `20261117170000`). |
+| **9** | `AuctionWinner` | `uq_auction_winner_non_cash_payment_ref` *(Partial Unique Index)* | `UNIQUE ON "AuctionWinner" (UPPER(BTRIM("paymentReference")))` where `isHistoricalEntry = false`, `disbursementStatus = 'DISBURSED'`, `disbursementMode IN (ACCOUNT_PAYEE_CHEQUE, BANK_TRANSFER_NEFT, BANK_TRANSFER_RTGS, BANK_TRANSFER_IMPS)`, excluding statutory sentinel refs (`COMPANY_POOL_MONTH_1`, `FINAL_SETTLEMENT_*`). | Eliminates duplicate & case-variant (`utr-123` vs `UTR-123`) bank UTR / cheque references on prize payouts (`CR-DISB-05`, `20261118124500`). |
 
 ### 7.2 Ternary Logic NULL-Trap Protection
-In standard SQL three-valued logic (`TRUE`, `FALSE`, `UNKNOWN`/`NULL`), PostgreSQL `CHECK` constraints pass if the predicate evaluates to `TRUE` or `NULL` (it only fails if strictly `FALSE`). Expressions like `(status != 'DISBURSED' OR paymentReference = 'COMPANY_POOL_MONTH_1')` evaluate to `NULL` when `paymentReference` is null, causing unapproved `DISBURSED` rows to pass unchecked!
+In standard SQL three-valued logic (`TRUE`, `FALSE`, `UNKNOWN`/`NULL`), PostgreSQL `CHECK` constraints pass if the predicate evaluates to `TRUE` or `NULL` (it only fails if strictly `FALSE`). Expressions like `(status != 'DISBURSED' OR paymentReference = 'COMPANY_POOL_MONTH_1')` evaluate to `NULL` when `paymentReference` is null, causing unapproved `DISBURSED` rows to pass unchecked.
 To ensure zero bypass:
-- All conditional branches in `chk_winner_maker_checker` and `chk_auction_maker_checker` explicitly enforce `("paymentReference" IS NOT NULL AND ...)` and explicit conjunctions.
+- All conditional branches in `chk_winner_maker_checker` and `chk_auction_maker_checker` explicitly enforce `("paymentReference" IS NOT NULL AND ...)` and explicit non-null conjunctions.
 - `isHistoricalEntry = true` is explicitly tracked for legacy notebook imports, eliminating synthetic fake makers on historical records while strictly enforcing dual control on all live business operations.
+
+---
+
+## 8. Foreign Key Integrity, Deletion Safety & AuditLog Immutability Triggers
+
+The live schema comprises **18 relational models** and **8 enum types** dedicated solely to Kumaran Finance (`ADR-01`). Referential integrity is engineered so financial history can **never** be cascade-deleted:
+
+### 8.1 Foreign Key Deletion Behavior Policy
+1. **Strict Financial History Preservation (`ON DELETE RESTRICT`)**:
+   - `Branch` $\to$ `Customer`, `ChitGroup`, `Receipt`
+   - `User` $\to$ `Payment` (`recordedByUserId`) — staff accounts that ever recorded a payment cannot be deleted.
+   - `Customer` $\to$ `SubscriberTicket` — customers who joined any chit group cannot be deleted (which also prevents cascading their `Nominee` or `CustomerDocument` rows).
+   - `ChitGroup` $\to$ `SubscriberTicket`, `InstallmentDue`, `Auction`
+   - `SubscriberTicket` $\to$ `InstallmentDue`, `PaymentAllocation`, `AuctionWinner`, `AuctionTieBidder`
+   - `Auction` $\to$ `AuctionWinner`, `AuctionMinutes`
+   - `Payment` $\to$ `PaymentAllocation`, `Receipt`, `PaymentReversal`
+   - Raw SQL `DELETE` attempts on any active financial record fail at PostgreSQL with SQLSTATE `23503` (`foreign_key_violation`).
+2. **Bounded Safe Cascades (`ON DELETE CASCADE`, 5 edges only)**:
+   - `Nominee.customerId` $\to$ `Customer(id)` (blocked if customer holds any `SubscriberTicket`)
+   - `CustomerDocument.customerId` $\to$ `Customer(id)` (blocked if customer holds any `SubscriberTicket`)
+   - `AuctionTieBidder.auctionId` $\to$ `Auction(id)` (blocked if `AuctionWinner` or `AuctionMinutes` exists)
+   - `Session.userId` $\to$ `User(id)` and `Session.customerId` $\to$ `Customer(id)` (ephemeral refresh vault cleanup only)
+3. **Audit Preservation (`ON DELETE SET NULL`)**:
+   - `User.branchId` $\to$ `Branch(id)` and `AuditLog.userId` $\to$ `User(id)` preserve historical audit entries (`oldValue`/`newValue` JSONB intact) even if a user record were removed.
+
+### 8.2 Complete Database-Level `AuditLog` Immutability (`20261114010000_audit_log_complete_immutability`)
+`AuditLog` is strictly append-only at the PostgreSQL kernel level — even for superuser or replication-role sessions:
+- **Row-Level Trigger (`trg_prevent_audit_log_mutation`)**: `BEFORE UPDATE OR DELETE ON "AuditLog" FOR EACH ROW` executes `prevent_audit_log_mutation()`, raising an exception on any `UPDATE` or `DELETE`, hardened with `ALTER TABLE "AuditLog" ENABLE ALWAYS TRIGGER`.
+- **Statement-Level Trigger (`trg_prevent_audit_log_truncate`)**: `BEFORE TRUNCATE ON "AuditLog" FOR EACH STATEMENT` executes `prevent_audit_log_truncate()`, rejecting `TRUNCATE`, hardened with `ENABLE ALWAYS TRIGGER`.
+- **Privilege Revocation**: `REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog" FROM PUBLIC;`.
+- **Application Guarantee**: Zero `auditLog.update` or `auditLog.delete` calls exist anywhere in `apps/api/src/`.

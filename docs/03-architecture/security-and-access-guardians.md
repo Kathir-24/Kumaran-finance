@@ -68,16 +68,16 @@ Before resolving any storage key, [`StorageKeyHelper.sanitizeKey()`](file:///u:/
 - Prevents escaping the `./storage/uploads` root sandbox or accessing foreign S3 buckets.
 
 ### 2.3 Storage Key Ownership Rules (`assertStorageKeyAccess`)
-At [`StorageController.streamFile()`](file:///u:/Kumaran-finance/apps/api/src/storage/storage.controller.ts#L27-L52), requests pass directly through `DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser)`:
+At [`StorageController.streamFile()`](file:///u:/Kumaran-finance/apps/api/src/storage/storage.controller.ts#L254-L322), requests pass directly through `DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser, this.prisma)`. Strict **Default-Deny** rejects any prefix outside `APPROVED_PREFIXES` (`kyc/`, `passbooks/`, `minutes/`, `safety-proof/`, `safety-proofs/`, `receipts/`, `vouchers/`):
 
-| Key Category | Customer | Collection Agent | Branch Manager | Accountant | Auditor | Super Admin |
+| Key Category (Raw `/storage/file/*key`) | Customer | Collection Agent | Branch Manager | Accountant | Auditor | Super Admin |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `kyc/{customerId}/*` | **Own folder only** (`sub` or `phone` match) | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
-| `safety-proof/*` | ❌ **Blocked (HTTP 403)** | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
+| `safety-proof/*` / `safety-proofs/*` | ❌ **Blocked (HTTP 403)** | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
 | `minutes/*` | ❌ **Blocked (HTTP 403)** | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
-| `receipts/*` | Own receipts | Collected receipts | Branch scope | Global | Global | Global |
-| `vouchers/*` | Winning voucher | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
-| `passbooks/*` | Own passbook | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
+| `receipts/*` | ❌ **Blocked (HTTP 403)** *(use `/pdf/receipt/:paymentId`)* | ❌ **Blocked (HTTP 403)** *(use `/pdf/receipt/:paymentId`)* | Branch scope | Global | Global | Global |
+| `vouchers/*` | ❌ **Blocked (HTTP 403)** *(use `/pdf/voucher/:auctionId`)* | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
+| `passbooks/*` | **Own ticket only** (`chitGroupId` + `ticketNumber` + `customerId` match) | ❌ **Blocked (HTTP 403)** | Branch scope | Global | Global | Global |
 
 ### 2.4 Customer KYC Document Upload & 15-Minute Presigned Viewing URLs
 Direct document interactions at [`CustomerController`](file:///u:/Kumaran-finance/apps/api/src/customer/customer.controller.ts) enforce anti-IDOR checks:
@@ -152,13 +152,14 @@ flowchart LR
     end
 ```
 
-### 4.1 Administrative Route Restrictions
+### 4.1 Administrative Route Restrictions ([`JobsController`](file:///u:/Kumaran-finance/apps/api/src/jobs/jobs.controller.ts))
 - **Trigger Endpoints**:
-  - `POST /jobs/run-daily-arrears` & `POST /jobs/enqueue-daily-arrears`: Restricted strictly to `SUPER_ADMIN` and `BRANCH_MANAGER`. Customers and collection agents receive `403 Forbidden`.
+  - `POST /jobs/run-daily-arrears` & `POST /jobs/run-pre-auction-scan`: Restricted strictly to `SUPER_ADMIN` and `BRANCH_MANAGER`. Customers, accountants, auditors, and collection agents receive `403 Forbidden`.
+  - `POST /jobs/enqueue-daily-arrears`: Restricted strictly to `SUPER_ADMIN` only (`jobs.controller.ts:94-95`).
   - `POST /jobs/run-reconciliation` & `POST /jobs/enqueue-reconciliation`: Restricted strictly to `SUPER_ADMIN` and `ACCOUNTANT`.
-  - `POST /jobs/send-auction-reminder/:chitGroupId/:month`: Restricted to `SUPER_ADMIN` and `BRANCH_MANAGER`.
-- **Health & Audit Endpoints**:
-  - `GET /jobs/queue-status`: Restricted strictly to `SUPER_ADMIN` only.
+  - `POST /jobs/send-auction-reminder/:chitGroupId/:month`: Restricted to `SUPER_ADMIN` and `BRANCH_MANAGER` (enforces `assertAuctionBranchAccess` + `ACTIVE` scheme + Months `2..N-1`).
+- **Health & Audit Endpoints (Guardrail 11 — `SUPER_ADMIN` Strictly)**:
+  - `GET /jobs/queue-status`: Restricted strictly to `SUPER_ADMIN` only (`403 Forbidden` to all other roles including `AUDITOR`).
   - `GET /jobs/notification-audit-logs`: Restricted strictly to `SUPER_ADMIN` only.
   - `GET /jobs/repeatable-schedules`: Restricted strictly to `SUPER_ADMIN` only.
 
@@ -178,9 +179,9 @@ flowchart LR
 | **Component 2: Payout Voucher PDF** | Global | Branch | Global | ❌ Blocked | Winner only | Read-only |
 | **Component 2: Form XVII Minutes PDF** | Global | Branch | Global | ❌ Blocked | ❌ Blocked | Read-only |
 | **Component 2: Form XXI Passbook PDF**| Global | Branch | Global | ❌ Blocked | Own ticket | Read-only |
-| **Component 3: Trigger Daily Arrears** | Yes | Yes (Branch) | No | No | No | No |
-| **Component 3: Trigger Reconciliation** | Yes | No | Yes | No | No | No |
-| **Component 3: Queue Health & Logs** | Full | Status only | Status only | No | No | Read-only |
+| **Component 3: Trigger Daily Arrears** | Run & Enqueue | Run only | ❌ Blocked | ❌ Blocked | ❌ Blocked | ❌ Blocked |
+| **Component 3: Trigger Reconciliation** | Run & Enqueue | ❌ Blocked | Run & Enqueue | ❌ Blocked | ❌ Blocked | ❌ Blocked |
+| **Component 3: Queue Health & Logs** | Full | ❌ Blocked | ❌ Blocked | ❌ Blocked | ❌ Blocked | ❌ Blocked |
 
 ---
 
@@ -212,19 +213,20 @@ Every rule documented above is backed by automated negative and positive test as
 
 ```mermaid
 flowchart TD
-    subgraph JWT_VALIDATION ["1. High-Throughput JWT Validation Path"]
-        Req["API Request + Bearer JWT"] --> Strategy["JwtStrategy.validate(payload)"]
-        Strategy --> RedisCache{"Redis Key:\nuser:status:{id}?"}
-        RedisCache -->|HIT: 'ACTIVE'| Pass["Valid Session (0ms DB Query)"]
-        RedisCache -->|HIT: 'INACTIVE'| Reject["HTTP 401 Unauthorized\n(Instant Revocation)"]
-        RedisCache -->|MISS| QueryDB["Query PostgreSQL (user/customer)\nCache 'ACTIVE' / 'INACTIVE' with 120s TTL"]
+    subgraph JWT_VALIDATION ["1. High-Throughput JWT Validation Path (F03 & F04)"]
+        Req["API Request + Bearer JWT (with sid & clientType)"] --> Strategy["JwtStrategy.validate(payload)"]
+        Strategy --> RedisCache{"Redis Key:\nuser:status:{sub}:{clientType}?"}
+        RedisCache -->|HIT: Structured JSON Valid| CheckRev{"tokenRevokedBefore &\nsid Match?"}
+        CheckRev -->|Yes| Pass["Valid Session (0ms DB Query)"]
+        CheckRev -->|No / Inactive| Reject["HTTP 401 Unauthorized\n(Instant Revocation)"]
+        RedisCache -->|MISS or Legacy Plain String| QueryDB["Query PostgreSQL User/Customer + Session\nCache Structured JSON (120s TTL)"]
     end
 
-    subgraph MULTI_DEVICE ["2. Multi-Device Session Isolation"]
+    subgraph MULTI_DEVICE ["2. Multi-Device PostgreSQL Session Vault (ADR-24 / F04)"]
         WebClient["Web Portal\n(clientType = 'WEB')"] --> RedisFamily1["auth:session:{userId}:WEB\n(7d TTL)"]
-        MobileClient["Flutter Mobile\n(clientType = 'MOBILE')"] --> RedisFamily2["auth:session:{userId}:MOBILE\n(7d TTL)"]
-        RedisFamily1 -.-> DBFallback["PostgreSQL refreshTokenHash\n(Zero-Downtime Fallback)"]
-        RedisFamily2 -.-> DBFallback
+        MobileClient["Mobile Client\n(clientType = 'MOBILE')"] --> RedisFamily2["auth:session:{userId}:MOBILE\n(7d TTL)"]
+        RedisFamily1 --> DBVault["PostgreSQL Session Table\n@@unique(userId, clientType) + sid\n(Zero Global Fallback Resurrection)"]
+        RedisFamily2 --> DBVault
     end
 
     subgraph CLIENT_DEFENSE ["3. Client-Side Inactivity & Zero Password Reset Abuse"]
@@ -283,34 +285,43 @@ flowchart TD
   - [`apps/web/src/lib/bff-forward-headers.ts`](file:///u:/Kumaran-finance/apps/web/src/lib/bff-forward-headers.ts) (`buildBffForwardHeaders`) preserves `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto`, `X-Forwarded-Host`, `User-Agent`, and `X-Request-ID` across all 6 Next.js BFF → NestJS callers (`/bff/api/v1/*`, `/api/v1/*`, `/api/auth/login`, `/api/auth/verify-totp`, `/api/auth/logout`, `/api/auth/session`, and `executeBffRefresh`). On the API side, Express binds `TRUST_PROXY` (`parseTrustProxySetting`, defaulting to `['loopback', 'linklocal', 'uniquelocal']`) so both 1-hop (`Mobile -> Nginx -> API`) and 2-hop (`Browser -> Nginx -> BFF -> API`) chains resolve the real public client IP while ignoring left-injected spoofed `X-Forwarded-For` headers (`DEF-FE-06`).
   - Sequential token replays continue to trigger immediate RFC 6819 session family revocation, while permanent 401 expiry clears dead browser cookies cleanly to avoid redirect loops.
 
-### 7.6 Verified Partner Identity & Two-Partner Dual Control (SEC-A & SEC-B)
+### 7.6 Verified Partner Identity & Two-Partner Dual Control (SEC-A, SEC-B & `KFC-SEC-001..004`)
 - **Problem Solved**: Previously, any administrative account holding `Role.SUPER_ADMIN` could act as maker or checker on high-risk financial endpoints (payment reversals, auction finalization, prize payouts, defaulter removals). This failed to distinguish true equity business partners from technical administrators or branch managers granted temporary administrative roles.
 - **SEC-A Implementation**: Added `isPartner Boolean @default(false)` to `User` entity in PostgreSQL 17 (`20261113200000_add_partner_identity_and_removal_approval`). High-liability financial mutations strictly verify `user.isPartner === true`. Non-partner administrative accounts are blocked from financial authorizations.
-- **SEC-B Two-Partner Dual Control**: Defaulter removal enforces strict two-partner separation:
-  1. **Maker Request**: Partner A initiates removal (`POST /tickets/:id/remove-defaulter/request`), placing ticket in `PENDING_REMOVAL_APPROVAL`.
-  2. **Checker Approval**: Partner B reviews and approves (`POST /tickets/:id/remove-defaulter/approve`).
-  3. **Hard Guard**: Server enforces `ticket.removalRequestedByUserId !== approvingPartnerUserId` (`maker != checker`), rejecting self-approvals with `HTTP 403 Forbidden`.
+- **Strict Partner Exclusivity Controls**:
+  - **`KFC-SEC-001` (Payment Reversal Initiation)**: `POST /payments/:id/request-reversal` is restricted strictly to `@Roles(Role.SUPER_ADMIN)` with `isPartner: true` (`payment.controller.ts:220-222`). `ACCOUNTANT` and `BRANCH_MANAGER` receive `403 Forbidden`.
+  - **`KFC-SEC-003` (Auction Finalization)**: `POST /auctions/:id/finalize` is restricted strictly to `@Roles(Role.SUPER_ADMIN)` with `isPartner: true`; `BRANCH_MANAGER` is strictly blocked (`403 Forbidden`).
+  - **`KFC-SEC-004` (Prized Ticket Immutability)**: `InstallmentService` blocks defaulter removal and subscriber substitution on any prized ticket (`isPrized: true`) with `400 Bad Request` (`PRIZED_TICKET_IMMUTABLE`).
+- **SEC-B Two-Partner Defaulter Removal Dual Control**:
+  1. **Maker Request**: Partner A initiates removal (`POST /tickets/:id/remove-defaulter/request`), placing ticket in `PENDING_REMOVAL_APPROVAL` and barring it from auction bids (`removalRequestedByUserId != null`).
+  2. **Checker Resolution**: Independent Partner B either approves (`POST /tickets/:id/remove-defaulter/approve`) or rejects (`POST /tickets/:id/remove-defaulter/reject`, reverting status to `DEFAULT_3_MONTHS`).
+  3. **Hard Guard**: Both service logic and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker` (`20261117170000`) enforce `ticket.removalRequestedByUserId !== approvingPartnerUserId` (`maker != checker`), rejecting self-approvals with `HTTP 403 Forbidden` / SQLSTATE `23514`.
   4. **Exit Settlement Fail-Closed**: Under Q25, financial exit settlement calculation fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` until the exact statutory damages formula is confirmed in writing by the business owner.
 
-### 7.7 Month N Maturity Settlement Dual-Control & Database Check Constraints (F05 & F12)
+### 7.7 Month N Maturity Settlement Dual-Control & Database Check Constraints (F05, F12 & `CR-DISB-02/05`)
 - **Problem Solved**: Month N maturity payouts previously relied on a single-stage execution where the caller was simultaneously recorded as Maker and Checker. Furthermore, migrations lacked database-level check constraints enforcing `maker_user_id != checker_user_id`.
 - **Implementation**:
-  1. **Two-Stage Settlement Lifecycle**:
+  1. **Two-Stage Settlement Lifecycle (`requirePreparedSettlement: true`, `CR-DISB-02`)**:
      - **Stage 1 (Maker Preparation)**: `POST /disbursements/group/:id/prepare-final-settlement` (Roles: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`). Calculates Month N arrears, base installment deduction, 4.00% commission, and net prize payable. Creates pending settlement record with `conductedByUserId = makerUserId` and winner `disbursementStatus = 'VERIFIED_BY_MAKER'`.
-     - **Stage 2 (Checker Approval)**: `POST /disbursements/group/:id/approve-final-settlement` (Roles: `SUPER_ADMIN` with verified partner identity `isPartner: true`). Strictly enforces **`maker_user_id != checker_user_id`** (rejects with HTTP 403 `MAKER_CHECKER_VIOLATION` if checker is the user who prepared it). Commits the payout, marks Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`.
-  2. **PostgreSQL Database-Level CHECK Constraints**:
-     - Applied and hardened via migration `20261115060000_complete_maker_checker_constraints`:
-       - `chk_payment_cash_handover_maker_checker`: `CHECK ("cashHandoverAcknowledgedByUserId" IS NULL OR "recordedByUserId" != "cashHandoverAcknowledgedByUserId")`
-       - `chk_auction_maker_checker`: State-aware constraint enforcing `conductedByUserId != finalizedByUserId` on completed auctions, with Month 1 statutory company pool support and `isHistoricalEntry = true` exemption.
-       - `chk_winner_maker_checker`: State-aware constraint enforcing `verifiedByUserId != authorizedByUserId` on disbursed payouts, with strict SQL ternary NULL-trap protection.
-       - `chk_reversal_maker_checker`: State-aware constraint enforcing `initiatedByUserId != approvedByUserId` on approved reversals.
-     - Ensures that even if an application bug or maintenance script attempts a self-approval, PostgreSQL rejects the mutation at the database engine level with SQLSTATE `23514`.
+     - **Stage 2 (Checker Approval)**: `POST /disbursements/group/:id/approve-final-settlement` (Roles: `SUPER_ADMIN` with verified partner identity `isPartner: true`). All HTTP settlement paths pass `requirePreparedSettlement: true`, reading authoritative Maker identity from the prepared record, re-verifying live arrears (`ARREARS_STATE_CHANGED` on drift), enforcing **`maker_user_id != checker_user_id`** (`HTTP 403 MAKER_CHECKER_VIOLATION`), and committing payout, Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`.
+  2. **All 8 Live PostgreSQL 17 Engine-Level `CHECK` Constraints + Case-Insensitive UTR Index**:
+     - Deployed across migrations `20261115060000`, `20261117170000`, `20261118110000`, and `20261118124500`:
+       1. `chk_payment_cash_handover_maker_checker`: `recordedByUserId != cashHandoverAcknowledgedByUserId`.
+       2. `chk_auction_maker_checker`: State-aware `conductedByUserId <> finalizedByUserId` across **both** `COMPLETED` and `MINUTES_FILED` states (Month 1 company pool & `isHistoricalEntry = true` exempt).
+       3. `chk_auction_non_negative_amounts`: All 5 auction BigInt monetary snapshots `>= 0`.
+       4. `chk_auction_minutes_attendees`: `subscribersPresent >= 1`.
+       5. `chk_winner_maker_checker`: State-aware Maker presence on `VERIFIED_BY_MAKER` and `verifiedByUserId <> authorizedByUserId` across **both** `AUTHORIZED_BY_CHECKER` and `DISBURSED` (ternary NULL-trap protected).
+       6. `chk_winner_positive_disbursed_amount`: `disbursedAmount IS NULL OR disbursedAmount > 0`.
+       7. `chk_reversal_maker_checker`: `initiatedByUserId != approvedByUserId` on `APPROVED` reversals.
+       8. `chk_ticket_removal_maker_checker`: `removalRequestedByUserId != removedByUserId` on `SubscriberTicket`.
+       9. `uq_auction_winner_non_cash_payment_ref` *(Partial Unique Index)*: `UNIQUE (UPPER(BTRIM("paymentReference")))` across all live `DISBURSED` Cheque/NEFT/RTGS/IMPS payouts (`CR-DISB-05`).
+     - Even if an application bug or maintenance script attempts a self-approval or duplicate UTR, PostgreSQL rejects the mutation at the database engine level with SQLSTATE `23514` / `23505`.
 
 ### 7.8 Passbook Ownership, Customer Scoping & Domain Branch Derivation (F06, F07, F08, F09)
 - **F06 (Storage Guardians & Passbook Ownership)**:
   - `DocumentAccessHelper.assertStorageKeyAccess` explicitly parses `passbooks/{chitGroupId}/ticket-{ticketNumber}.pdf` keys. Customers are restricted strictly to tickets they own in PostgreSQL (`where: { chitGroupId, ticketNumber, customerId: user.sub }`).
   - Branch Managers accessing `passbooks/`, `kyc/`, `minutes/`, `safety-proof/`, `receipts/`, or `vouchers/` must match the branch assigned to the chit scheme or customer profile by resolving the owning record in PostgreSQL.
-  - Direct presigned upload generation (`POST /storage/presigned-url` for `kyc/` and `safety-proof/`) verifies branch ownership before issuing upload credentials.
+  - Direct presigned upload generation (`POST /storage/presigned-upload-url` for `kyc/` and `safety-proof/`, plus local fallback `PUT /storage/upload/*key` with 120s timeout and 10 MB ceiling) verifies branch ownership before issuing upload credentials or accepting writes.
   - Strict **Default-Deny**: Any unapproved storage key prefix (e.g. `temp/`, `exports/`, unrecognized categories) triggers immediate `HTTP 403 Forbidden`.
 - **F07 (Customer Scoping & Response Allowlists)**:
   - Customer listing (`findAll`) and detail (`findOne`) pass caller context:
@@ -335,9 +346,8 @@ flowchart TD
 
 ### 7.10 Concurrency, Queues & Mobile Client Resilience (F11, F13, F14, F15)
 - **F11 (Bull Board Super Admin Session Authentication & Metrics Hardening)**:
-  - Mounted under `/admin/queues`, `BullBoardAuthMiddleware` requires an active `Role.SUPER_ADMIN` JWT session (supporting Authorization Bearer header, `?token=` query param, or `access_token` cookie).
-  - Validates active account status and fast-path Redis/PostgreSQL revocation cutoffs (`auth:revoked:${sub}`) on every dashboard navigation.
-  - The insecure default credentials fallback (`admin:chitflow_secret`) has been completely eliminated. Production startup and `MetricsAuthGuard` enforce strict rejection of default credentials.
+  - Mounted under `/admin/queues`, [`BullBoardAuthMiddleware`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/bull-board-auth.middleware.ts) primarily requires an active `Role.SUPER_ADMIN` JWT access token (extracted from `Authorization: Bearer`, `?token=` query param, or `access_token` / `jwt` cookies) and verifies live account activity plus fast-path Redis (`auth:revoked:${sub}`) & PostgreSQL (`tokenRevokedBefore`) revocation cutoffs.
+  - Optional secondary Basic Auth fallback is allowed **only** if `BULL_BOARD_USER` and `BULL_BOARD_PASSWORD` are explicitly configured to non-default values (strictly rejecting `'chitflow_secret'`), verified via SHA-256 + `crypto.timingSafeEqual`. `MetricsAuthGuard` similarly enforces explicit non-default credentials.
 - **F13 (Atomic Concurrency-Safe OTP Verification via Redis Lua Script)**:
   - In `AuthService.verifyOtp`, the non-atomic read-modify-write sequence has been replaced with an atomic Redis Lua script (`verifyOtpLua`).
   - Evaluates lockout status, existence, expiration, SHA-256 hash comparison, attempt increment, 3-attempt lockout trigger (`auth:otp:lockout:<phone>`, 300s TTL), and single-use session consumption in 1 single atomic Redis execution.
@@ -345,8 +355,43 @@ flowchart TD
 - **F14 (Mobile Client Single-Flight Refresh Mutex & Transparent 401 Replay)**:
   - Dart `AuthSessionManager` implements a single-flight refresh mutex (`_inFlightRefresh`), ensuring multiple concurrent 401 responses coalesce into exactly one `/auth/refresh` request with `clientType: 'MOBILE'`.
   - `KumaranMobileApiClient.request` automatically triggers single-flight rotation on 401, invokes `onTokenRefreshed` to persist updated tokens, and replays the original HTTP request transparently with re-entrancy prevention (`isRetry: true`).
-- **F15 (SSE Approvals Stream Authorization Lifecycle Guard)**:
-  - `/reports/approvals-stream` executes `ReportService.assertStreamAuthorization` on each 15-second interval tick before serving approval summaries.
-  - Validates that `now < exp`, verifies fast-path Redis & PostgreSQL revocation cutoffs, verifies persisted multi-device `Session` identity (`sid`, `revokedAt`, `expiresAt` per F04), checks database `user.isActive`, confirms active `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, or `AUDITOR` roles, and enforces fail-closed non-empty & unchanged `branchId` (`BRANCH_SCOPE_CHANGED`) for pure `BRANCH_MANAGER` subscribers.
-  - Throws `UnauthorizedException` or `ForbiddenException` to immediately terminate the SSE connection on token expiry, logout, role revocation, or branch reassignment, eliminating zombie data leaks.
+- **F15 (SSE Approvals Stream Authorization Lifecycle Guard & Module 10 Hardening)**:
+  - `GET /reports/approvals-stream` ([`ReportController.streamPendingApprovals`](file:///u:/Kumaran-finance/apps/api/src/report/report.controller.ts#L97-L161)) carries `@BypassEnvelope()` (`DEF-M10-SSE-01`), `@SetTimeout(0)`, `@Header('X-Accel-Buffering', 'no')`, and `@Header('Cache-Control', 'no-cache, no-transform')`.
+  - On each 15-second tick, `ReportService.resolveLiveStreamUser(currentUser)` runs inside `try/catch` (`DEF-M10-SSE-02`): it validates `now < exp`, fast-path Redis & PostgreSQL revocation cutoffs, persisted multi-device `Session` identity (`sid`, `revokedAt`, `expiresAt`), live `user.isActive`, current RBAC roles (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR`), live `isPartner`, and fail-closed non-empty & unchanged `branchId` (`BRANCH_SCOPE_CHANGED`) for pure `BRANCH_MANAGER` subscribers.
+  - Auth/scope failures (`UnauthorizedException` / `ForbiddenException`) are rethrown immediately to terminate the stream (eliminating zombie data leaks), whereas transient query errors log a warning and emit a safe `{ type: 'HEARTBEAT' }` keepalive frame.
+
+---
+
+## 8. Complete F01–F16 Security Hardening Ledger, AuditLog IP Propagation & Verification Evidence
+
+All 16 findings from the November 2026 Security & Authorization Audit (**1 Critical, 12 High, 3 Medium**) are **100% resolved and regression-tested**:
+
+| Finding | Severity | Root Cause Eliminated | Permanent Hardening Control |
+|:---:|:---:|---|---|
+| **F01** | Critical | `totp_pending` token bypassing 2FA via `mobile/set-mpin` | `validateAuthenticatedAccessToken` enforces `tokenType: 'access'`, `tokenRevokedBefore`, `mustChangePassword`, and single-use `mpin_setup` consumption. |
+| **F02** | High | Admin password reset leaving Redis sessions active | Single transactional `$transaction` in `UserService.resetPassword`/`updateRoles` revoking PostgreSQL `Session` rows, stamping `tokenRevokedBefore`, and evicting Redis keys. |
+| **F03** | High | Role demotion retaining old JWT privileges until 15m expiry | Structured family-scoped Redis cache (`user:status:{sub}:{clientType}`) synchronizing live roles & `isPartner`; legacy `'ACTIVE'` string treated as cache miss. |
+| **F04** | High | Scoped logout resurrecting refresh session via global DB hash | Dedicated PostgreSQL `Session` Vault (`(userId, clientType)` / `(customerId, clientType)` + `sid`); global `user.refreshTokenHash` fallback completely removed. |
+| **F05** | High | Single-partner Month $N$ final settlement (`maker == checker`) | Two-stage `prepare-final-settlement` + `approve-final-settlement` (`requirePreparedSettlement: true`, `maker != checker` in code & DB). |
+| **F06** | High | Raw `/storage/file/*key` bypassing passbook ownership & branch scope | Strict `APPROVED_PREFIXES` default-deny, PostgreSQL passbook ticket ownership & branch resolution, and `403` on raw `receipts/*`/`vouchers/*` for customers & agents. |
+| **F07** | High | Unscoped customer list/detail exposing `refreshTokenHash`/`fcmToken`/PAN | Caller-scoped queries (`branchId` / active-ticket branch), explicit field allowlists stripping auth hashes & push tokens, PAN omitted for agents & masked for non-admin staff. |
+| **F08** | High | Alternate ticket/auction views exposing fellow subscribers' phones | Group membership & branch scoping across `GET /auctions/*` & `GET /chits/:id/tickets` + phone masking (`+91 ******0000`) for non-admin viewers. |
+| **F09** | High | Payment/collection writes accepting caller branch & cross-user replay | Domain accounting branch derived strictly from `ticket.chitGroup.branchId` (`CROSS_BRANCH_FORBIDDEN`); same-branch idempotency bound strictly to `recordedByUserId`. |
+| **F10** | High | Replacing active TOTP secret with access token alone | Atomic Redis Lua compare-and-delete TOTP enrollment claim + bounded 3 retries + password verification required for factor replacement. |
+| **F11** | High | Bull Board detached from Super Admin identity + default credentials | `BullBoardAuthMiddleware` enforces live `SUPER_ADMIN` JWT + revocation checks; default credentials (`admin:chitflow_secret`) permanently rejected. |
+| **F12** | High | Absent DB-level maker-checker `CHECK` constraints | 8 PostgreSQL 17 `CHECK` constraints + case-insensitive partial unique payout UTR index (`20261115060000`–`20261118124500`). |
+| **F13** | Medium | Non-atomic OTP verification race condition | Atomic Redis Lua `verifyOtpLua` script combining lockout check, hash compare, attempt increment, 3-fail 5m lockout, and single-use consumption. |
+| **F14** | Medium | Mobile client 401 refresh cascade | Single-flight `_inFlightRefresh` mutex in Dart `AuthSessionManager` (`clientType: 'MOBILE'`) with transparent request replay. |
+| **F15** | Medium | Open SSE stream outliving logout/demotion/expiry | `resolveLiveStreamUser` per 15s tick inside `try/catch` + `@BypassEnvelope()` (`ReportController.streamPendingApprovals`). |
+| **F16** | High | Shared default staff password without forced change | Cryptographically random temp password + `mustChangePassword: true` + `kc_onboarding_token` (`15m`) + `/onboarding` Edge route gate. |
+
+### 8.1 Automatic Non-Repudiation & `AsyncLocalStorage` IP Propagation
+- [`RequestContextMiddleware`](file:///u:/Kumaran-finance/apps/api/src/common/context/request-context.middleware.ts) binds `requestId`, resolved proxy client `ipAddress` (via Express `TRUST_PROXY` + `buildBffForwardHeaders`), and `userAgent` into Node.js `AsyncLocalStorage`.
+- [`PrismaService`](file:///u:/Kumaran-finance/apps/api/src/prisma/prisma.service.ts) Prisma Client extension automatically injects the verified `ipAddress` into every `auditLog.create` / `auditLog.createMany` write; PostgreSQL triggers (`20261114010000`) block `UPDATE`, `DELETE`, and `TRUNCATE` permanently.
+
+### 8.2 Verified Security Regression Suites
+- [`adversarial-security-invariants.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/adversarial-security-invariants.spec.ts): 20/20 adversarial tests (all dual-control pairs, `KFC-SEC-003` Branch Manager block, `ADR-13` ticket limit, RFC 6819 token replay, 3-attempt OTP lockout, Anti-BOLA boundaries).
+- [`phase1-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase1-security-remediation.spec.ts), [`phase2-security-remediation.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase2-security-remediation.spec.ts), [`phase4-concurrency-queues-sse.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/phase4-concurrency-queues-sse.spec.ts): 100% passing.
+- [`08-maker-checker-db-constraints.e2e-spec.ts`](file:///u:/Kumaran-finance/apps/api/test/e2e/08-maker-checker-db-constraints.e2e-spec.ts) & [`07-postgres-redis-lifecycle.e2e-spec.ts`](file:///u:/Kumaran-finance/apps/api/test/e2e/07-postgres-redis-lifecycle.e2e-spec.ts): Live PostgreSQL 17 & Redis 7 verification passing.
+- [`apps/mobile/test/auth_refresh_test.dart`](file:///u:/Kumaran-finance/apps/mobile/test/auth_refresh_test.dart) & [`apps/web/test/rbac-navigation.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/rbac-navigation.spec.ts): 100% passing within the verified monorepo baseline (**1,226 API** + **376 Web** + **10 SDK** + **6 Dart suites**).
 
