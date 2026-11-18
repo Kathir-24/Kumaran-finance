@@ -5,7 +5,13 @@
 > **Live Server**: `http://127.0.0.1:3000` (NestJS 12, Port 3000)  
 > **Live Database**: PostgreSQL 17 (`chitflow_dev` via Docker on Port `5433`)  
 > **Timestamp**: 2026-10-23T22:03:55+05:30  
-> **Status**: **100% PASSED (ALL 24 ENDPOINTS VERIFIED WITH LIVE HTTP & SQL PROOFS)**  
+> **Status**: **100% PASSED — HISTORICAL EXECUTION SNAPSHOT (ALL 24 OCT 2026 ENDPOINTS VERIFIED WITH LIVE HTTP & SQL PROOFS)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 22–24, 2026 live-server verification log verbatim. Subsequent architectural upgrades hardened the live contract as follows:
+> 1. **Phone-Only Identity (`ADR-18`)**: The `email` column shown in the Oct 2026 SQL output was 100% eliminated from `User`; `POST /api/v1/auth/web/login` now accepts `{ phone, password }` (replacing legacy `{ identifier }`).
+> 2. **Multi-Device Session Vault (`ADR-24`)**: Refresh token hashes moved from `User.refreshTokenHash` into dedicated `Session` table records with `WEB` / `MOBILE` / `DESKTOP` client-family isolation and 7-day `tokenRevokedBefore` cutoffs.
+> 3. **Verified Partner Identity (`ADR-21` / Guardrail 11)**: `User` now carries `isPartner: boolean`; `AuthController` expanded to **15 routes** (adding `POST /api/v1/auth/complete-onboarding`) and `BranchController` expanded to **4 routes** (adding `PATCH /api/v1/branches/:id`).
 
 ---
 
@@ -493,16 +499,7 @@ flowchart TD
   # Replay attack attempt:
   POST /auth/mobile/verify-otp with same OTP "676423" -> Rejection Status 400 (Bad Request)
   ```
-- **Verification**: ✅ Valid OTP grants `setupToken`; Redis key atomically deleted upon verification; replay attacks rejected.
-    "timestamp": "2026-10-23T16:33:53.856Z",
-    "data": {
-      "verified": true,
-      "setupToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYmY2Nzc1OS1iZjA1LTRmYTYtYjY1My01NzdiM2YxNDQ5MDAiLCJwaG9uZSI6Ijk4NzY1NDMyMTAiLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJicmFuY2hJZCI6IjA3YzcwZDlkLWE4YWEtNDVkMy1iMzRlLTE1YTJkZDBjYzg4YyIsInRva2VuVHlwZSI6Im1waW5fc2V0dXAiLCJpYXQiOjE3OTI3NzMyMzMsImV4cCI6MTc5Mjc3MzgzM30.h1XjaDb0SB2gskjHdUnJEgnF2dEZg5eFWfaPB5yo7zI",
-      "message": "OTP verified successfully. Please configure your 6-digit MPIN."
-    }
-  }
-  ```
-- **Verification**: ✅ `setupToken` issued with `tokenType: "mpin_setup"`; staff is directed to set MPIN.
+- **Verification**: ✅ Valid OTP grants `setupToken` (`tokenType: "mpin_setup"`); Redis key atomically deleted upon verification; replay attacks rejected.
 
 ---
 
@@ -756,7 +753,7 @@ flowchart TD
 ---
 
 ### Endpoint 20: `GET /api/v1/users` & `GET /api/v1/users/:id`
-- **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`
+- **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER` *(own branch scoped)*, `AUDITOR`
 - **Purpose**: Search and filter staff user directory by search query, role, branch, and status; fetch staff details by ID.
 - **Live HTTP Request**:
   ```text

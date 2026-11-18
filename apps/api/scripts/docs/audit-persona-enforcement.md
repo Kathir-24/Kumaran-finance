@@ -1,38 +1,23 @@
-# Kumaran Chits — Automated AST Persona Enforcement Audit Tool
+# Kumaran Chits — Automated AST Persona Enforcement Audit Tool & Security Closure Summary
 
 > **Script**: [`apps/api/scripts/audit/audit-persona-enforcement.ts`](../audit/audit-persona-enforcement.ts)  
 > **Companion Printer**: [`apps/api/scripts/audit/print-detailed-audit.ts`](../audit/print-detailed-audit.ts)  
 > **Generated Audit Artifact**: [`apps/api/scripts/audit/endpoint-audit-report.json`](../audit/endpoint-audit-report.json)  
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
-> **Compliance References**: [`docs/01-business/permissions-matrix.md`](../../../docs/01-business/permissions-matrix.md), [`docs/03-architecture/completed-modules-api-registry.md`](../../../docs/03-architecture/completed-modules-api-registry.md), [`docs/03-architecture/security-and-access-guardians.md`](../../../docs/03-architecture/security-and-access-guardians.md)  
-> **Status**: ✅ **100% Complete & Verified** across all 111 Operations / 18 Controllers / 6 Personas.
+> **Compliance References**: [`docs/01-business/permissions-matrix.md`](../../../../docs/01-business/permissions-matrix.md), [`docs/03-architecture/completed-modules-api-registry.md`](../../../../docs/03-architecture/completed-modules-api-registry.md), [`docs/03-architecture/security-and-access-guardians.md`](../../../../docs/03-architecture/security-and-access-guardians.md)  
+> **Live API Surface**: **18 NestJS Controllers** / **134 Live HTTP & SSE Operations** (`+1` Bull Board UI `/admin/queues`) / **6 Personas** *(Oct 2026 baseline snapshot: 111 operations / 600 persona decisions)*
 
 ---
 
 ## 1. Why This Tool Exists (The Problem & Motivation)
 
-In financial applications managing subscriber funds and statutory ledgers, **Role-Based Access Control (RBAC)** is not just a software feature — it is a statutory and fiduciary guarantee. 
+In financial applications managing subscriber funds and statutory ledgers, **Role-Based Access Control (RBAC)** and **Attribute-Based Access Control (ABAC)** are fiduciary guarantees. Across **18 NestJS controllers** and **134 live HTTP/SSE operations** spanning **6 user personas** (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`, `AUDITOR`), manual code review risks blind spots, permissive copy-paste errors, and documentation drift.
 
-As the backend grew across **10 modules, 3 system components, branch administration, staff user management, and foundation infrastructure**, the surface area expanded to:
-- **18 NestJS Controllers**
-- **105 Physical REST Paths**
-- **111 Class Methods & Operations** (including Server-Sent Events and Bull Board visual queues)
-- **6 Discrete User Personas** (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`, `AUDITOR`)
-
-### The Failure of Manual Code Review:
-Manual code inspection of 111 endpoints across 6 personas requires evaluating **600 distinct authorization decisions**. Manual review inevitably suffers from:
-1. **Blind Spots**: Overlooking an endpoint where `@UseGuards(JwtAuthGuard, RolesGuard)` was declared at the class level but `@Roles(...)` was omitted on a new method.
-2. **Copy-Paste Errors**: Inheriting permissive roles from adjacent routes without checking if field agents or auditors should have access.
-3. **Documentation Drift**: Discrepancies between what is documented in Markdown tables and what is actually decorated in TypeScript controllers.
-4. **Linter Limitations**: Standard linters (`eslint`, `oxlint`) enforce syntax and formatting, but have zero semantic understanding of NestJS authorization decorators or business roles.
-
-`audit-persona-enforcement.ts` eliminates human error by using the **TypeScript Compiler API** to deterministically parse the source code Abstract Syntax Tree (AST), extract all route decorators, evaluate RBAC/ABAC guards, and output an unassailable audit report.
+`audit-persona-enforcement.ts` eliminates human error by using the **TypeScript Compiler API** to deterministically parse `apps/api/src/**/*.controller.ts`, extract all route/guard/role decorators, and emit a machine-verifiable JSON audit report (`endpoint-audit-report.json`).
 
 ---
 
 ## 2. Technical Architecture & How It Works
-
-The script operates directly on raw TypeScript source files in `apps/api/src/` without requiring the NestJS application to boot up:
 
 ```mermaid
 flowchart TD
@@ -58,13 +43,13 @@ flowchart TD
         RouteBuilder["Resolve Full REST Path (e.g. /auctions/:id/record-bid)"]
         PublicCheck{"Has JwtAuthGuard?"}
         RolesCheck{"Has @Roles(...)?"}
-        Cat_Public["Classify as PUBLIC\n(Rate limit / OTP / Health / Basic Auth)"]
+        Cat_Public["Classify as PUBLIC\n(Rate limit / OTP / Health / MetricsAuthGuard)"]
         Cat_RBAC["Classify as RBAC GUARDED\n(Evaluate 6 Persona Permissions)"]
         Cat_ABAC["Classify as ABAC GUARDED\n(Self-Identity / Storage Scoped)"]
     end
 
     subgraph Outputs ["5. Audit Artifacts & Reports"]
-        JSON["apps/api/scripts/audit/endpoint-audit-report.json\nFull structured dump of all 111 operations"]
+        JSON["apps/api/scripts/audit/endpoint-audit-report.json"]
         CLI["CLI Console Metrics & Summary Table"]
     end
 
@@ -81,111 +66,92 @@ flowchart TD
     Cat_ABAC --> Outputs
 ```
 
-### Key Technical Details of the Parser:
-- **TypeScript AST Engine**: Uses `ts.canHaveDecorators(node)` and `ts.getDecorators(node)` to remain compatible with TypeScript 5+ decorator AST specifications.
-- **Full HTTP Verb Coverage**: Captures `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@Options`, `@Head`, and Server-Sent Events (`@Sse`).
-- **Path Resolution**: Handles version-neutral routes (`{ path: 'health', version: VERSION_NEUTRAL }`), clean route prefixes, parameters (`:id`, `:ticketId`), and wildcard catch-all routes (`*key`).
-- **Role Normalization**: Strips `Role.` enum prefixes to produce clean role arrays (`SUPER_ADMIN`, `BRANCH_MANAGER`, etc.).
+### Key Technical Details of the Parser
+- **TypeScript AST Engine**: Uses `ts.canHaveDecorators(node)` and `ts.getDecorators(node)` for TypeScript 5+ compatibility.
+- **Full HTTP Verb Coverage**: Captures `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@Options`, `@Head`, and `@Sse`.
+- **Path Resolution**: Handles version-neutral routes (`health`, `metrics`), multi-prefix controllers (`['installments', 'installment-dues']`, `['tickets', 'installments/tickets']`), parameters (`:id`, `:ticketId`), and wildcards (`*key`).
+- **Role Normalization**: Strips `Role.` enum prefixes into clean arrays (`SUPER_ADMIN`, `BRANCH_MANAGER`, etc.).
 
 ---
 
-## 3. High-Level Audit Metrics
+## 3. Audit Surface Metrics (Historical Baseline vs Live Surface)
 
-Running the tool against the active codebase produces the following verified baseline:
-
-```
-================================================================
-AUDIT METRICS ACROSS ALL 18 CONTROLLERS & 105 PATHS:
-Total Operations (Endpoints)     : 111
-  • Public Endpoints (No JWT)    : 11
-  • Guarded Endpoints            : 100
-      - Enforced with @Roles(...) : 92 (Strict RolesGuard RBAC)
-      - Guarded with JwtAuthGuard : 8  (Contextual ABAC / Identity Scoped)
-================================================================
-```
+- **Oct 2026 Initial AST Baseline**: `18` Controllers · `105` Paths · `111` Operations (`11` Public, `92` `@Roles`, `8` Contextual ABAC `JwtAuthGuard`-only) $\to$ `600` Persona Decisions evaluated (`0` gaps).
+- **Current Live Surface (Post-Hardening Expansion)**: **`18` Controllers · `134` Live HTTP/SSE Route Decorators** (`+1` Bull Board UI `/admin/queues`) — incorporating `PATCH /branches/:id`, `POST /auth/complete-onboarding`, `POST /customers/:id/documents/confirm`, `POST /chits/:id/cancel`, 3 auction correction endpoints (`request`/`approve`/`reject`), 3 two-partner defaulter removal endpoints, NPCI UPI intent & claims (`upi-intent`, `upi-claim`, `verify-upi-claim`), Month $N$ two-stage settlement (`prepare`/`approve`), and `GET /health/{readiness,liveness}`.
 
 ---
 
-## 4. The 600-Decision Persona Evaluation Matrix
+## 4. Persona Authorization Boundaries (Enforcing Guardrails 10 & 11)
 
-Across all **100 non-public endpoints**, each of the 6 roles was evaluated against business rules and statutory requirements:
-
-$$100 \text{ non-public operations} \times 6 \text{ personas} = \mathbf{600 \text{ granular access decisions evaluated}}$$
-
-| Persona Role | Allowed Operations | Blocked Operations | Total Evaluated | Scope & Enforcement Boundaries |
-|---|:---:|:---:|:---:|---|
-| **`SUPER_ADMIN`** | **100** | **0** | **100** | Full global administrative and financial authority on Web & Mobile. Maker-Checker dual control (`maker != checker`) strictly asserted in services. |
-| **`BRANCH_MANAGER`** | **78** | **22** | **100** | Branch-scoped intake, auction facilitation, staff management. **Strictly blocked from 22 operations**: creating branches, activating schemes, authoring user resets, approving ledger reversals, and releasing final prize payouts. |
-| **`ACCOUNTANT`** | **63** | **37** | **100** | Company-wide financial ledger entries, voucher preparation, day books, cash books, collections. **Strictly blocked from 37 operations**: user management, branch creation, scheme creation/activation, auction bidding, reversal approvals, and payout releases. |
-| **`COLLECTION_AGENT`** | **35** | **65** | **100** | Scoped strictly to assigned customers. Doorstep collections, offline sync, handover submit, viewing assigned dues. **Strictly blocked from 65 operations**: prize vouchers, auction minutes, member passbooks, administrative defaulter lists, user administration, scheme management, and financial ledgers. |
-| **`CUSTOMER`** | **31** | **69** | **100** | Scoped strictly to own account (`user.phone === customer.phone` or `user.sub === customerId`). Digital passbook, own dues, dividend tracking, own receipts/vouchers. **Strictly blocked from 69 operations**: all staff actions, branch data, auction administration, and other customers' financial records. |
-| **`AUDITOR`** | **53** | **47** | **100** | Read-only forensic general ledgers, Form XXII Cash Book, Form XXI Ledgers, staff directory, audit trails, repeatable cron schedules. **Strictly blocked from ALL 47 mutation/write operations**: cannot create, modify, delete, or file any record. |
-| **TOTALS** | **360** | **240** | **600** | **100% Verified Match between Controller Decorators and Registry Specification** |
+| Persona Role | Live Scope & Enforcement Boundaries |
+|---|---|
+| **`SUPER_ADMIN` (`isPartner: true` — Verified Statutory Partner)** | Full administrative, telemetry, audit log, and financial authority. Maker $\ne$ Checker dual control (`maker_user_id != checker_user_id`) strictly enforced in services (`assertVerifiedPartner`) and **8 PostgreSQL `CHECK` constraints** (`Guardrails 10 & 11`). |
+| **`SUPER_ADMIN` (`isPartner: false` — Administrative IT Super Admin)** | IT administration (user onboarding, branches, settings), immutable Audit Logs (`GET /api/v1/reports/audit-logs`), and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`). **Strictly barred (`HTTP 403 PARTNER_IDENTITY_REQUIRED`)** from financial authorizations (reversals, auction finalizations/corrections, prize payouts, defaulter removals/substitutions, `isPartner` flag mutations) per **Guardrail 11 (`ADR-21` / `SEC-A`)**. |
+| **`BRANCH_MANAGER`** | Branch-scoped (`currentUser.branchId`, fail-closed Anti-BOLA) intake, staff directory reads, auction bid Maker, and branch reminder triggers. Blocked from creating/editing branches, activating schemes, user password resets, reversal approvals, prize payouts, `/reports/audit-logs`, and `/admin/jobs` telemetry. |
+| **`ACCOUNTANT`** | Counter collections, cash handover acknowledgment (`collector != acknowledger`), UPI claim verification (`submitter != verifier`), safety proof uploads/verification, Day Book / Form XXII / Form XXI / Form XVII reads. Blocked from user/branch/scheme admin, reversal mutations (`KFC-SEC-001`), prize payout release authorization, `/reports/audit-logs`, and `/admin/jobs`. |
+| **`COLLECTION_AGENT`** | Strictly scoped to assigned branch/route dues, doorstep collections, offline queue sync, evening handover submission, and **upload-only** doorstep KYC scans. Strictly barred from viewing KYC scans / presigned URLs, `/reports/pending-approvals` & SSE stream, Form XVII/XXI/XXII registers, `/reports/audit-logs`, and admin endpoints. |
+| **`CUSTOMER`** | Strictly self-isolated (`currentUser.sub === id` / `phone` match): digital passbook, own dues, NPCI UPI intent & claim submission, own bilingual receipts/vouchers, and own KYC documents. Blocked from all staff endpoints and all other subscribers' records. |
+| **`AUDITOR`** | **Strictly read-only** across statutory books (Form XVII, Form XXI, Form XXII, Day Book, Defaulters, Pending Approvals read, branches, staff/customer directories). **Strictly blocked (`HTTP 403`)** from ALL mutation endpoints AND from **`/api/v1/reports/audit-logs`** and **`/api/v1/jobs/*` / `/admin/queues`** per **Guardrail 11 (`ADR-21`)**. |
 
 ---
 
-## 5. Breakdown of the 11 Public Operations & Defense Layers
+## 5. Breakdown of Public & Infrastructure Operations and Defense Layers
 
-The 11 endpoints that do not require a JWT Bearer token serve as the **Front Entrance** (onboarding and authentication) and **Infrastructure Probes** (Docker/load balancer health checks). None of them expose sensitive financial or customer data:
-
-| # | Endpoint & Method | Purpose & Target | Non-RBAC Security & Hardening Layers | Automated Test Proof |
-|:---:|---|---|---|---|
-| **1** | `GET /` | Root server liveness check | Zero sensitive data returned (`"Kumaran Chits API is running"`). | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
-| **2** | `GET /health` | Container & cloud health probe | Checks Postgres, Redis, and MinIO connectivity. `@SkipThrottle()` enabled for Docker/load balancer probes to prevent false positives. | [`apps/api/test/app.e2e-spec.ts`](../test/app.e2e-spec.ts) |
-| **3** | `GET /health/sentry-test` | Crash diagnostic validation | Triggers an intentional 500 exception to verify Sentry APM error logging without leaking stack traces. | [`apps/api/test/client-contract.spec.ts`](../test/client-contract.spec.ts) |
-| **4** | `POST /auth/web/login` | Staff office web portal login | Rate-limited via `@Throttle(5, 60)` (max 5 requests/min); verifies password with `bcrypt.compare` (salt 10-12); challenges for TOTP if 2FA active. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
-| **5** | `POST /auth/web/verify-totp` | Staff 2FA authentication | Validates cryptographic `tempToken` issued during Step 1 login + RFC 6238 6-digit authenticator code. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
-| **6** | `POST /auth/refresh-token` | Session token pair rotation | Rotates 15-minute access JWT; validates 7-day refresh token against SHA-256 salted hash stored in DB; revokes old tokens. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
-| **7** | `POST /auth/mobile/request-otp` | Mobile SMS OTP onboarding | Rate-limited; generates cryptographically random 6-digit OTP; stores in Redis with strict **300-second (5 min) TTL**; dispatches via Indian DLT SMS gateway. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
-| **8** | `POST /auth/mobile/verify-otp` | Mobile SMS OTP validation | Verifies code against Redis; decrements attempts on mismatch and **locks out after 3 failed attempts**; deletes OTP key on success; returns `setupToken` or full session. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
-| **9** | `POST /auth/mobile/login-mpin` | Mobile quick unlock | Validates 6-digit MPIN against bcrypt hash; **auto-locks account after 5 consecutive failures** with exponential backoff. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts), [`apps/api/test/evidence/01-auth-security.e2e-spec.ts`](../test/evidence/01-auth-security.e2e-spec.ts) |
-| **10**| `POST /auth/mobile/set-mpin` | Initial MPIN configuration | Enforces either the cryptographic `setupToken` issued by `verify-otp` during onboarding or an active Bearer JWT in settings; hashes MPIN via bcrypt. | [`apps/api/test/auth.spec.ts`](../test/auth.spec.ts) |
-| **11**| `GET /metrics` | Prometheus telemetry scraper | Protected by `MetricsAuthGuard` using **HTTP Basic Authentication** (`METRICS_USER` / `METRICS_PASSWORD`). Blocks unauthorized public access. | [`apps/api/test/metrics.spec.ts`](../test/metrics.spec.ts) |
+| Endpoint & Method | Purpose & Target | Non-RBAC Security & Hardening Layers | Automated Test Proof |
+|---|---|---|---|
+| `GET /` | Root server liveness | Zero sensitive data returned (`"Kumaran Chits API is running"`). | [`test/e2e/app.e2e-spec.ts`](../../../test/e2e/app.e2e-spec.ts) |
+| `GET /health`, `/health/readiness`, `/health/liveness` | Container & VPS orchestrator health probes | Checks PostgreSQL, Redis, MinIO, and `sentryActive`. `@SkipThrottle()` enabled for probe stability. | [`test/e2e/app.e2e-spec.ts`](../../../test/e2e/app.e2e-spec.ts) |
+| `GET /health/sentry-test` | Staging Sentry diagnostic | Intentional `500` exception verifying PII-scrubbed Sentry capture. | [`test/unit/sentry.spec.ts`](../../../test/unit/sentry.spec.ts) |
+| `POST /api/v1/auth/web/login` | Staff web login (`ADR-18` phone-only) | Edge + NestJS throttled; bcrypt-12 verification; branches into onboarding (`mustChangePassword`) or TOTP challenge. | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts), [`test/e2e/01-auth-security.e2e-spec.ts`](../../../test/e2e/01-auth-security.e2e-spec.ts) |
+| `POST /api/v1/auth/web/verify-totp` | Staff 2FA verification | Scoped `totp_pending` token + RFC 6238 6-digit TOTP check. | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts) |
+| `POST /api/v1/auth/complete-onboarding` | Mandatory first-login onboarding (`F16`) | Single-use `onboarding_restricted` token; atomic password rotation (`mustChangePassword: false`). | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts) |
+| `POST /api/v1/auth/refresh-token` | Client-family session rotation (`ADR-24`) | Validates 7-day refresh token against SHA-256 + bcrypt hash in `Session` table; detects RFC 6819 reuse. | [`test/unit/auth-token-lifecycle.spec.ts`](../../../test/unit/auth-token-lifecycle.spec.ts) |
+| `POST /api/v1/auth/mobile/request-otp` | TRAI DLT SMS OTP request (`F13`) | Throttled + daily quota (`MAX_DAILY_OTP_REQUESTS=5`); 300s Redis TTL; SHA-256 hashed OTP. | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts) |
+| `POST /api/v1/auth/mobile/verify-otp` | Atomic Redis Lua OTP verification (`F13`) | Single-call Lua check enforcing 3-attempt lockout (`auth:otp:lockout:<phone>`) & atomic delete. | [`test/unit/auth-redis-live.spec.ts`](../../../test/unit/auth-redis-live.spec.ts) |
+| `POST /api/v1/auth/mobile/login-mpin` | Mobile 6-digit MPIN quick unlock (`F01`) | Bcrypt-12 verification + lockout + mandatory TOTP challenge when `isTotpEnabled = true`. | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts), [`test/e2e/01-auth-security.e2e-spec.ts`](../../../test/e2e/01-auth-security.e2e-spec.ts) |
+| `POST /api/v1/auth/mobile/set-mpin` | Initial/updated MPIN setup | Requires single-use `setupToken` or active `JwtAuthGuard` staff session. | [`test/unit/auth.spec.ts`](../../../test/unit/auth.spec.ts) |
+| `GET /metrics` | Prometheus telemetry exporter | Protected by `MetricsAuthGuard`: constant-time SHA-256 `timingSafeEqual` **Bearer (`METRICS_BEARER_TOKEN`)** OR **RFC 7617 Basic Auth**; strict-by-default fail-closed outside `development`/`test` (`XR-M7-MET-01`). | [`test/unit/metrics.spec.ts`](../../../test/unit/metrics.spec.ts) |
 
 ---
 
-## 6. Breakdown of the 8 "JwtAuthGuard Only" Endpoints (Contextual ABAC)
+## 6. Contextual ABAC Endpoints (`JwtAuthGuard` Without Static `@Roles`)
 
-These 8 operations require a valid cryptographically signed JWT, but do not use a static `@Roles(...)` whitelist because they operate on the caller's own identity or enforce dynamic Attribute-Based Access Control (ABAC):
-
-1. **`POST /auth/logout`**: Revokes active session and clears the refresh token hash for whoever is authenticated.
-2. **`PATCH /auth/fcm-token`**: Registers/clears the push token for the calling authenticated staff/customer.
-3. **`GET /auth/me`**: Returns caller's own profile and permissions (`Dual Staff & Customer`).
-4. **`POST /auth/change-password`**: Self-service password change; in `auth.service.ts`, queries `prisma.user.findUnique({ where: { id: user.id } })` and throws `404 ("Staff user not found")` if invoked by a customer token.
-5. **`POST /auth/totp/setup`**: Generates RFC 6238 Base32 secret for staff account 2FA.
-6. **`POST /auth/totp/enable`**: Activates 2FA after verifying a 6-digit authenticator code.
-7. **`POST /auth/totp/disable`**: Disables 2FA; requires caller's current password.
-8. **`GET /storage/file/*key`**: Presigned file streaming fallback. Guarded by `DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser)`:
-   - `CUSTOMER`: strictly restricted to their own KYC folder (`key.startsWith('kyc/{customerId}')`); blocked from internal minutes, safety proof, and vouchers.
-   - `COLLECTION_AGENT`: blocked from customer KYC scans, statutory minutes, and safety proofs.
-   - `BRANCH_MANAGER`: restricted to their own branch files.
-   - `SUPER_ADMIN` / `AUDITOR`: full oversight.
+1. `POST /api/v1/auth/logout`: Scoped (`?clientType=WEB|MOBILE|DESKTOP`) or global (`ALL`) session revocation + clears `fcmToken = null`.
+2. `PATCH /api/v1/auth/fcm-token`: Registers or clears the authenticated user's FCM token (Phase 2 push readiness).
+3. `GET /api/v1/auth/me`: Returns caller's own profile, `roles`, `isPartner`, and branch (dual Staff & Customer support).
+4. `POST /api/v1/auth/change-password`: Self-service staff password change with current-password verification and 7-day global revocation cutoff (`F02`).
+5. `POST /api/v1/auth/totp/setup`: Generates Base32 TOTP secret & QR URI.
+6. `POST /api/v1/auth/totp/enable`: Locks 2FA (`password` required when replacing active TOTP per `F10`).
+7. `POST /api/v1/auth/totp/disable`: Disables 2FA with current-password confirmation.
+8. `GET /api/v1/storage/file/*key`: Guarded by `DocumentAccessHelper.assertStorageKeyAccess(sanitizedKey, currentUser)` — `CUSTOMER` own `kyc/{customerId}/` only; `COLLECTION_AGENT` strictly blocked from viewing KYC scans, minutes, and safety proofs; `BRANCH_MANAGER` own branch only; `SUPER_ADMIN` / `AUDITOR` oversight.
 
 ---
 
 ## 7. How to Execute the Tooling
 
-### 1. Run Full AST Controller Audit:
 ```bash
-# From workspace root:
+# Run full AST controller audit (generates endpoint-audit-report.json)
 pnpm --filter api exec ts-node scripts/audit/audit-persona-enforcement.ts
-```
-*Outputs parsed results to console and writes full structured JSON to `apps/api/scripts/audit/endpoint-audit-report.json`.*
 
-### 2. Print Detailed Controller-by-Controller Inventory:
-```bash
-# From workspace root:
+# Print formatted controller-by-controller inventory
 pnpm --filter api exec ts-node scripts/audit/print-detailed-audit.ts
 ```
-*Prints a formatted list of all 18 controllers with exact HTTP verbs, handler names, effective guards, and active `@Roles` lists.*
 
 ---
 
 ## 8. Developer Guidelines: Adding or Modifying Endpoints
 
-When implementing a new API route in `apps/api/src/`, developers must follow these 4 rules to satisfy the AST audit:
+1. **Class-Level Guards**: Every domain controller must declare `@UseGuards(JwtAuthGuard, RolesGuard)` at class level.
+2. **Explicit Roles on Methods**: Every operational route must explicitly declare `@Roles(...)` matching [`docs/01-business/permissions-matrix.md`](../../../../docs/01-business/permissions-matrix.md) and enforce `assertVerifiedPartner` on financial mutations.
+3. **Strict Zero-Write for Auditors**: `Role.AUDITOR` must **NEVER** appear on `@Post`, `@Patch`, or `@Delete` routes, nor on `/reports/audit-logs` or `/jobs/*`.
+4. **Re-Run AST Audit**: Re-run `audit-persona-enforcement.ts` and `audit-route-shadowing.ts` before committing controller changes.
 
-1. **Class-Level Guards**: Every domain controller must declare `@UseGuards(JwtAuthGuard, RolesGuard)` at the class level.
-2. **Explicit Roles on Methods**: Every operational method must explicitly declare `@Roles(...)` with the exact roles permitted per [`permissions-matrix.md`](../../../docs/01-business/permissions-matrix.md). Do not rely on inherited roles.
-3. **Strict Zero-Write for Auditors**: `Role.AUDITOR` must **NEVER** be included on `@Post`, `@Patch`, or `@Delete` endpoints. Auditors are strictly read-only.
-4. **Run AST Audit Before Committing**: Run `pnpm --filter api exec ts-node scripts/audit/audit-persona-enforcement.ts` to ensure the generated `endpoint-audit-report.json` reflects zero unauthorized gaps.
+---
+
+## 9. Two-Layer Security, RBAC & Anti-IDOR Audit Closure Summary
+
+All findings from the comprehensive Stage 03 Security, RBAC & Anti-IDOR Audit (`F01`–`F16`, `KFC-SEC-001`–`004`) are permanently closed and verified across the full stack:
+
+- **Two-Layer Defense**: Layer 1 (`JwtAuthGuard` + `RolesGuard` across all 18 controllers / 134 live operations) paired with Layer 2 service-level Anti-BOLA/IDOR branch & customer isolation (`DocumentAccessHelper`, `resolveScopedBranchId`, `assertVerifiedPartner`, `ParseUUIDPipe`).
+- **Session, Edge & BFF Hardening**: Zero browser `localStorage` JWTs (`HttpOnly` BFF cookies), Next.js Edge Middleware `jose` HS256 cryptographic verification, multi-device `Session` vault isolation (`ADR-24`), atomic Lua OTP verification (`F13`), single-flight mobile refresh (`F14`), and mid-stream SSE session/branch validation (`F15`).
+- **Database-Engine Dual Control & Forensic Audit Immutability**: **8 PostgreSQL `CHECK` constraints** enforcing `maker_user_id != checker_user_id` (`08-maker-checker-db-constraints.e2e-spec.ts` — 24/24 passing), `AuditLog` `ENABLE ALWAYS` mutation/truncate block triggers + `REVOKE ... FROM PUBLIC`, AsyncLocalStorage real client IP attribution (`TRUST_PROXY`), and OWASP API3 payload secret redaction.
