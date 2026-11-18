@@ -4,8 +4,8 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Target Persona**: **Desk Accountant / Office Cashier**  
 > **Primary Platform**: **Web Portal (`apps/web/`)** (High-Density Ledgers, Day Book, Cash Counter)  
-> **Secondary Platform**: **Android Mobile App (`apps/mobile/`)** (Dual-Role Collections)  
-> **Core Role in Governance**: **Primary Operational Maker** for ongoing scheme drafts, payment receipts, and payout vouchers.
+> **Secondary Platform (`ADR-26`)**: Responsive Web Portal in Phase 1; Android Mobile App (`apps/mobile/`) rolls out in Phase 2 (Q2 2027) for dual-role field collections.  
+> **Core Role in Governance**: **Primary Operational Maker** for ongoing scheme drafts, payment receipts, and payout vouchers. *(Note: Payment reversal initiation is Partner-exclusive per `KFC-SEC-001` — see §10.)*
 
 ---
 
@@ -49,7 +49,7 @@ In our local operating reality, staff members frequently collect cash in the fie
 | **§7** | Preparing Prize Payout Vouchers & Safety Proof | Maker Role | Web Portal (`POST /disbursements/...`) |
 | **§8** | Releasing Authorized Disbursement Funds | Fund Release | Web Portal (`POST /disbursements/.../disburse`) |
 | **§9** | Receiving & Acknowledging Agent Cash Handovers | Checker Role | Web Portal (`POST /collections/.../acknowledge`) |
-| **§10** | Requesting Payment Reversals with Justification | Maker Role | Web Portal (`POST /payments/.../request-reversal`) |
+| **§10** | Escalating Payment Reversals to Verified Partners | Escalation (`KFC-SEC-001`) | Physical Receipt + Partner Portal |
 | **§11** | Daily Form XXII Balancing & 6:00 PM Closure | Reconciliation | Web Portal (`GET /reports/form-xxii`) |
 | **§12** | Cashier Counter Error Handling & Traps | Operational Guide | Web Portal |
 
@@ -84,7 +84,7 @@ flowchart TD
     Display --> Cash["3. Sundaram hands 7 x ₹500 + 1 x ₹200 = ₹3,700 cash"]
     Cash --> Machine["4. Run notes through sorting machine (Verify genuine & count)"]
     Machine --> Record["5. Click 'Record Payment':\n• Amount: ₹3,700 (Discrete Net Installment)\n• Method: CASH"]
-    Record --> Receipt["6. Click 'Submit & Issue Receipt'\n• Prints Bilingual Digital Receipt\n• Dispatches Push Notification to Customer Phone\n• Status = PAID immediately"]
+    Record --> Receipt["6. Click 'Submit & Issue Receipt'\n• Prints Bilingual Digital Receipt\n• Dispatches TRAI DLT SMS (Phase 2: FCM Push)\n• Status = PAID immediately"]
 ```
 
 ### Step-by-Step Instructions:
@@ -99,10 +99,9 @@ flowchart TD
    - The customer must pay the full net amount (`₹3,700`).
    - The system **strictly rejects partial payments** (e.g., ₹2,000) and **advance balances**.
 6. Select Payment Mode: **`CASH`** (or `UPI` if scanned via office counter QR).
-7. Click **"Submit & Issue Receipt"** (`POST /payments`).
-8. Click **"Submit & Issue Receipt"** (`POST /payments`).
-9. The system instantly generates the official sequential receipt number (e.g., `KC-REC-PRD-2026-00124`) and sends a free push notification to the customer's mobile app.
-10. **Receipt Printing & Passbook PDF Download**:
+7. Click **"Submit & Issue Receipt"** (`POST /api/v1/payments`).
+8. The system instantly generates the official sequential receipt number (e.g., `KC-REC-PRD-2026-00124`) and dispatches a bilingual TRAI DLT SMS confirmation (Phase 1 primary per ADR-23; plus Android FCM push alert in Phase 2 per ADR-26).
+9. **Receipt Printing & Passbook PDF Download**:
     - Click **"Print A5 Receipt"** to print the official bilingual counter receipt slip formatted exactly for A5 paper.
     - Click **"Download PDF"** to save an offline copy (`downloadReceiptPdf`) delivered directly as an authenticated binary blob via the BFF proxy.
     - If the customer requests their 20-month continuous statement, open their profile, navigate to the **Form XXI Passbook** tab, and click **"Download Passbook PDF"** (`downloadPassbookPdf`) to hand them an official signed ledger copy.
@@ -111,19 +110,19 @@ flowchart TD
 
 ## 4B. Verifying Customer UPI Payment Claims against Bank Statement
 
-When subscribers pay online via deep-link from the mobile app (GPay / PhonePe / Paytm), they submit their 12-digit Bank UTR reference number. These claims sit in `INITIATED` status awaiting accounting verification.
+When subscribers pay online via NPCI Native UPI Intent (GPay / PhonePe / Paytm) via the Web Portal or Phase 2 Android Mobile App (`ADR-19`, `ADR-26`), they submit their 12-digit Bank UTR reference number. These claims sit in `INITIATED` status awaiting accounting verification.
 
 ```mermaid
 flowchart TD
     Queue["1. Open Web Portal: 'Payments -> Pending UPI Claims'"] --> List["2. Table displays pending subscriber claims:\n• Subscriber: K. Kathirvel\n• Scheme: KCA-1L-20M-01 (Ticket #4)\n• Installment Month: 3\n• Expected Net Due: ₹3,950\n• Claimed Bank UTR: 429188123456"]
     List --> CheckBank["3. Open Karur Vysya Bank (KVB) NetBanking:\nVerify ₹3,950 credit received with UTR #429188123456"]
     CheckBank --> Decision{"Did the money arrive in KVB account?"}
-    Decision -- "YES" --> Verify["4. Click 'Verify & Issue Receipt'\n• Enforces Maker != Checker\n• Payment marked SUCCESS\n• Generates Sequential Bilingual Receipt\n• Due updated to PAID\n• Push alert sent to subscriber"]
+    Decision -- "YES" --> Verify["4. Click 'Verify & Issue Receipt'\n• Enforces Maker != Checker\n• Payment marked SUCCESS\n• Generates Sequential Bilingual Receipt\n• Due updated to PAID\n• TRAI DLT SMS sent (Phase 2: FCM Push)"]
     Decision -- "NO / Incorrect" --> Hold["Hold claim, contact subscriber, or flag invalid"]
 ```
 
 ### Step-by-Step Instructions:
-1. In the Web Portal navigation menu, click **Payments $\to$ Pending UPI Claims** (`GET /payments/pending-upi-claims`).
+1. In the Web Portal navigation menu, click **Payments $\to$ Pending UPI Claims** (`GET /api/v1/payments/pending-upi-claims`).
 2. Review the pending claim details:
    - **Subscriber**: `K. Kathirvel (9842100001)`
    - **Scheme / Ticket**: `KCA-1L-20M-01, Ticket #4`
@@ -132,14 +131,14 @@ flowchart TD
    - **Bank UTR Number**: `429188123456`
 3. On your desk computer, open Karur Vysya Bank (KVB) NetBanking or mobile banking app.
 4. Verify that the exact whole-rupee amount (`₹3,950`) has credited to Kumaran Finance's current account under UTR `429188123456`.
-5. In the Web Portal, click **"Verify & Issue Receipt"** (`POST /payments/:id/verify-upi-claim`). Enter optional verification notes (e.g., `"Verified in KVB NetBanking at 15:30"`).
+5. In the Web Portal, click **"Verify & Issue Receipt"** (`POST /api/v1/payments/:id/verify-upi-claim`). Enter optional verification notes (e.g., `"Verified in KVB NetBanking at 15:30"`).
 6. **Dual-Control Safety Invariant (`maker_user_id != checker_user_id`)**:
    - If you submitted the claim on the customer's behalf, you **cannot** verify it. An independent Partner or colleague must confirm the bank credit.
 7. Upon clicking verify:
    - The payment transitions from `INITIATED` $\to$ **`SUCCESS`**.
    - The official bilingual receipt (`KC-REC-PRD-2026-XXXXX`) is generated immediately.
    - The customer's due status updates to **`PAID`**.
-   - An instant mobile Push Notification is delivered to the subscriber's phone with the receipt number.
+   - A bilingual TRAI DLT SMS receipt confirmation is dispatched to the subscriber's mobile number (Phase 1 primary per ADR-23; plus Android FCM Push in Phase 2 per ADR-26).
 
 ---
 
@@ -197,8 +196,8 @@ flowchart TD
     Winner["Prize Winner Arrives: Kandasamy (Ticket #5)"] --> Nav["Navigate: Disbursements -> Pending Verification -> Ticket #5"]
     Nav --> Checklist["Fill Company Safety Proof Checklist (ADR-15):\n• Winner agreement signed? [Yes]\n• Nominee signed agreement? [Yes]\n• Signed blank cheques collected? [Yes, Cheque #004128]\n• Promissory note collected? [Yes]"]
     Checklist --> Upload["Upload Scanned Photos of signed papers & cheques"]
-    Upload --> Prepare["Prepare Voucher:\n• Gross Pool: ₹1,00,000\n• Less Winning Discount: -₹25,000\n• Net Prize Payable: ₹75,000\n• Payment Mode: Cheque / NEFT / Cash"]
-    Prepare --> Submit["Click 'Submit Payout Voucher' (Maker)\nStatus = VERIFIED_BY_MAKER\nPush notification sent to Partner B (Checker)"]
+    Upload --> Prepare["Prepare Voucher (Server-Computed, Zero Override - KFC-FIN-004):\n• Gross Pool: ₹1,00,000\n• Less Winning Discount: -₹25,000\n• Less Any Unpaid Arrears Auto-Offset (KFC-FIN-003): -₹0\n• Net Prize Payable: ₹75,000\n• Payment Mode: Cheque / NEFT / Cash"]
+    Prepare --> Submit["Click 'Submit Payout Voucher' (Maker)\nStatus = VERIFIED_BY_MAKER\nQueued for Verified Partner B (Checker) Approval"]
 ```
 
 ### Step-by-Step Instructions:
@@ -208,8 +207,10 @@ flowchart TD
    - Check off each submitted item (agreement, nominee signature, blank cheques, promissory note).
    - Enter bank name and cheque numbers.
    - Upload scanned copies or mobile camera captures to encrypted S3 storage.
-4. Select the requested payout mode (**Account Payee Cheque**, **NEFT/RTGS**, or **Cash**).
-5. Click **"Submit Payout Voucher"** (`POST /disbursements/auction/:id/verify-safety-proof`). Status transitions to `VERIFIED_BY_MAKER`.
+4. **Server-Computed Payout & Automatic Arrears Offset (`KFC-FIN-003` / `KFC-FIN-004`)**:
+   - The server automatically computes net prize money (`Gross Pool - Winning Discount - Unpaid Arrears`). Manual net-payout overrides are strictly prohibited (`KFC-FIN-004`); any unpaid dues on the winning ticket are automatically deducted (`KFC-FIN-003`) before disbursement.
+5. Select the requested payout mode (**Account Payee Cheque**, **NEFT/RTGS**, or **Cash**).
+6. Click **"Submit Payout Voucher"** (`POST /api/v1/disbursements/auction/:id/verify-safety-proof`). Status transitions to `VERIFIED_BY_MAKER`, awaiting Verified Partner (`isPartner: true`) authorization.
 
 ---
 
@@ -240,44 +241,48 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    AgentReturn["5:00 PM: Field Agent Murugan returns with cash collection bag"] --> HandoverSubmit["Murugan submits batch on phone: ₹42,500 (10 collections)"]
-    HandoverSubmit --> MachineVerify["Desk Accountant runs notes through counter note-sorting machine:\n42 x ₹1,000 + 1 x ₹500 = ₹42,500"]
+    AgentReturn["5:00 PM: Field Agent Murugan returns with cash collection bag"] --> HandoverSubmit["Murugan submits handover batch: ₹42,500 (10 collections)"]
+    HandoverSubmit --> MachineVerify["Desk Accountant runs notes through counter note-sorting machine:\n85 x ₹500 = ₹42,500"]
     MachineVerify --> OpenQueue["Open: Collections -> Pending Handovers -> Select Batch"]
     OpenQueue --> DualRoleCheck{"Anti-Self-Acknowledgment Assertion:\nDid Desk Accountant personally collect this cash?"}
     DualRoleCheck -- "Yes (Accountant collected)" --> Block["BLOCKED! collector_user_id != acknowledger_user_id\nMust be counted & acknowledged by a Partner"]
-    DualRoleCheck -- "No (Murugan collected)" --> ConfirmAck["Click 'Acknowledge Cash Received'\n(POST /collections/cash-handover/acknowledge)\n• Cash transferred into counter custody\n• Agent liability drops to ₹0\n• Prints Handover Clearance Slip #HO-YYYY-XXXXX"]
+    DualRoleCheck -- "No (Murugan collected)" --> ConfirmAck["Click 'Acknowledge Cash Received'\n(POST /api/v1/collections/cash-handover/acknowledge)\n• Cash transferred into counter custody\n• Agent liability drops to ₹0\n• Prints Handover Clearance Slip #HO-YYYY-XXXXX"]
 ```
 
 ### Step-by-Step Instructions:
-1. At 5:00 PM, motorcyclist field agents return to the Head Office.
-2. The agent taps **"Submit Cash Handover"** on their mobile app and places the cash bag on your counter.
+1. At 5:00 PM, field agents return to the Head Office.
+2. The agent submits their cash handover batch in the portal (or Android mobile app in Phase 2 per ADR-26) and places the cash bag on your counter.
 3. Place the currency notes through the counter note-sorting machine to verify the physical count against counterfeits and note quality.
 4. Navigate to **Collections $\to$ Pending Handovers** on the Web Portal.
-5. Verify that the machine count matches the submitted mobile batch total (e.g., `₹42,500`).
+5. Verify that the machine count matches the submitted batch total (e.g., `₹42,500`).
 6. **The Anti-Self-Acknowledgment Guard (`CONFIRMED-BY-DEVELOPER`)**:
    - If **you (the accountant)** collected this cash during morning rounds, the system **blocks you** from clicking Acknowledge (`collector_user_id != acknowledger_user_id`). A Partner or Branch Manager must acknowledge your handover.
    - If **Field Agent Murugan** collected the cash, you are fully authorized to acknowledge his batch.
-7. Click **"Acknowledge Cash Received"** (`POST /collections/cash-handover/acknowledge`).
-8. The cash is formally transferred into counter custody, Agent Murugan's mobile liability is cleared to `₹0`, and a printed Clearance Slip `#HO-YYYY-XXXXX` is issued to the agent.
+7. Click **"Acknowledge Cash Received"** (`POST /api/v1/collections/cash-handover/acknowledge`).
+8. The cash is formally transferred into counter custody, Agent Murugan's cash-in-hand liability is cleared to `₹0`, and a printed Clearance Slip `#HO-YYYY-XXXXX` is issued to the agent.
 
 ---
 
-## 10. Requesting Payment Reversals with Written Justification (Maker Role)
+## 10. Escalating Payment Reversals to Verified Partners (`KFC-SEC-001`)
+
+> [!IMPORTANT]
+> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21)**: Under live backend enforcement (`payment.controller.ts`), the `ACCOUNTANT` role is **strictly blocked (`HTTP 403 Forbidden`)** from calling `POST /api/v1/payments/:id/request-reversal` or `POST /api/v1/payments/:id/approve-reversal`. Both Maker and Checker steps for payment reversals must be executed by two distinct **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)**.
 
 ```mermaid
 flowchart TD
-    Mistake["Mistake Identified:\nRecorded ₹4,100 to Ticket #8 instead of Ticket #9"] --> Locate["Locate Payment Receipt: KC-REC-PRD-2026-00412"]
-    Locate --> ClickReq["Click 'Request Payment Reversal' (Maker)"]
-    ClickReq --> Prompt["System Prompts Mandatory Justification:\nType detailed reason explaining error\nAttach photo of counter paper receipt"]
-    Prompt --> SubmitReq["Click 'Submit Reversal Request'\n• Status = REVERSAL_PENDING\n• Money is NOT yet reversed!\n• Partner B receives approval notification"]
+    Mistake["Mistake Identified at Counter:\nRecorded ₹4,100 to Ticket #8 instead of Ticket #9"] --> Prep["Desk Accountant gathers physical receipt KC-REC-PRD-2026-00412\n& writes signed discrepancy note"]
+    Prep --> Escalate["Escalate to Verified Partner A (isPartner: true)"]
+    Escalate --> PartnerA["Verified Partner A submits reversal request\n(POST /api/v1/payments/:id/request-reversal)\n• PaymentReversal created: Status = REQUESTED\n• Payment remains SUCCESS until approved"]
+    PartnerA --> PartnerB["Independent Verified Partner B (isPartner: true) approves\n(POST /api/v1/payments/:id/approve-reversal)\n• Payment transitions: SUCCESS -> REVERSED\n• Ticket due reverts to UNPAID\n• PDF stamped 'ரத்து செய்யப்பட்டது / CANCELLED'"]
 ```
 
 ### Step-by-Step Instructions:
-1. Locate the erroneous payment under **Payments $\to$ Recent Collections**.
-2. Click **"Request Payment Reversal"** (`POST /payments/:id/request-reversal`).
-3. You must provide a **Mandatory Written Reason** (e.g., *"Cashier error: Member Mani (Ticket #9) paid ₹4,100 cash, but was entered against Ticket #8 (Kannan). Signed receipt attached."*).
-4. Upload a photo of the counter receipt.
-5. Click **"Submit Reversal Request"**. The payment status changes to `REVERSAL_PENDING`. It remains pending until a Partner signs off as Checker.
+1. Locate the erroneous payment under **Payments $\to$ Recent Collections** and note the exact receipt number (e.g., `KC-REC-PRD-2026-00412`).
+2. Do **not** attempt to cancel or reverse the entry directly from an `ACCOUNTANT` login — the API returns `HTTP 403 Forbidden` by design (`KFC-SEC-001`).
+3. Print or retrieve the physical counter receipt and write a clear discrepancy memo (e.g., *"Cashier error: Member Mani (Ticket #9) paid ₹4,100 cash, but was entered against Ticket #8 (Kannan)."*).
+4. Hand the physical receipt and memo to **Verified Partner A (`isPartner: true`)** to submit the Maker reversal request (`POST /api/v1/payments/:id/request-reversal`, creating a `PaymentReversal` record in **`REQUESTED`** status while the original `Payment` stays **`SUCCESS`**).
+5. **Independent Verified Partner B (`isPartner: true`)** then approves the reversal (`POST /api/v1/payments/:id/approve-reversal`, enforcing `maker != checker`), transitioning the payment to **`REVERSED`**, reverting the ticket due to `UNPAID`, and stamping future PDF downloads with the bold red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
+6. Once reversed, record the payment cleanly against the correct subscriber ticket (`Ticket #9`) and issue the new official receipt.
 
 ---
 
@@ -311,6 +316,6 @@ flowchart TD
 | Common Trap / Mistake | Software Behavior | Proper Resolution by Cashier |
 |---|---|---|
 | **Member insists on paying ₹2,000 partial installment** | Input rejected; system enforces discrete binary amount ($I_{net} = \text{₹}3,700$). | Politely explain: *"Under company policy, full monthly installment must be paid at once."* Hold physical cash in customer envelope until full balance is ready. |
-| **Cashier tries to approve their own reversal request** | Software throws `HTTP 403 Forbidden: Maker cannot be Checker`. | Request Partner B or C to log in and approve the pending reversal. |
+| **Cashier tries to request or approve a payment reversal** | Software throws `HTTP 403 Forbidden` (`KFC-SEC-001`: reversals are strictly restricted to Verified Partners with `isPartner: true`). | Escalate physical receipt + written discrepancy memo to Verified Partner A (Maker) and Verified Partner B (Checker). |
 | **Member brings soiled / counterfeit currency note** | Note-sorting machine rejects note. | Hand note back to subscriber immediately; request clean replacement note before issuing receipt. |
-| **Customer forgot physical paper passbook** | Digital receipt prints normally and push alert is sent. | Issue printed paper slip; inform member to bring passbook next month for pen endorsement. |
+| **Customer forgot physical paper passbook** | Digital receipt prints normally and TRAI DLT SMS alert is sent (Phase 2: FCM Push). | Issue printed paper slip; inform member to bring passbook next month for pen endorsement. |

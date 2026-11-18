@@ -132,9 +132,9 @@ flowchart TD
     CeilingCheck -- No --> TieCheck{"Did 2+ Members Bid Ceiling?"}
     TieCheck -- Yes --> Draw["Physical Token Tie-Break (Option A):\n1. Place competing tokens in lot bowl\n2. Child draws Token #5 in front of members\n3. Click 'Record Tie-Breaker Draw'"]
     TieCheck -- No --> Single["Winning Bid Identified"]
-    Draw --> EnterResult["Branch Manager enters Ticket #5 & Discount ₹25,000 (Maker)\nClicks 'Submit Auction Result' (POST /auctions/:id/record-bid)"]
+    Draw --> EnterResult["Branch Manager enters Ticket #5 & Discount ₹25,000 (Maker)\nClicks 'Submit Auction Result' (POST /api/v1/auctions/:id/record-bid)"]
     Single --> EnterResult
-    EnterResult --> AwaitingChecker["Status = PENDING_VERIFICATION\nQueued for Partner B Finalization"]
+    EnterResult --> AwaitingChecker["Auction stays SCHEDULED\nQueued for Verified Partner Finalization (isPartner: true -> COMPLETED)"]
 ```
 
 ### Step-by-Step Instructions:
@@ -142,10 +142,10 @@ flowchart TD
 2. Open **Auctions $\to$ Active Auctions** on the branch PC.
 3. Verify attendee eligibility: any member with unpaid dues for the month is automatically disabled from bidding.
 4. Oversee the bidding:
-   - Ensure bids do not exceed the **one-fourth (1/4) ceiling** ($D \le \text{₹}25,000$).
+   - Ensure bids do not exceed the **one-fourth (1/4) ceiling** ($D \le \text{₹}25,000$), stay at or above the 4% commission floor ($D \ge C_f$), and satisfy whole-rupee dividend divisibility ($(D - C_f) \pmod N == 0$, `KFC-FIN-002`).
    - If multiple members bid the ceiling, conduct the **Option A Physical Paper Token Draw** live in the room.
-5. In the portal, select the winning ticket number, enter the winning bid discount, and click **"Submit Auction Result"** (`POST /auctions/:id/record-bid`).
-6. The result enters `PENDING_VERIFICATION` status, ready for Partner Checker finalization.
+5. In the portal, select the winning ticket number, enter the winning bid discount, and click **"Submit Auction Result"** (`POST /api/v1/auctions/:id/record-bid`).
+6. The auction remains in **`SCHEDULED`** status with the winning bid recorded, ready for an independent **Verified Partner (`SUPER_ADMIN` with `isPartner: true`, `KFC-SEC-003`)** to finalize it to **`COMPLETED`** (Branch Managers are strictly blocked from calling `/finalize`).
 
 ---
 
@@ -154,12 +154,12 @@ flowchart TD
 ```mermaid
 flowchart TD
     AgentReturn["5:00 PM: Field Agent Murugan returns with cash bag"] --> OpenHandover["Open: Collections -> Pending Handovers -> Agent Murugan"]
-    OpenHandover --> MachineCount["Physically count notes on desktop note-sorting machine:\n42 x ₹1,000 + 1 x ₹500 = ₹42,500"]
+    OpenHandover --> MachineCount["Physically count notes on desktop note-sorting machine:\n85 x ₹500 = ₹42,500"]
     MachineCount --> MatchCheck{"Does physical note count match\nAgent Mobile Batch Total?"}
     MatchCheck -- "Mismatch" --> Shortage["Record discrepancy on system voucher"]
     MatchCheck -- "Exact Match" --> DualRoleGuard{"Anti-Self-Acknowledgment Check:\nDid Branch Manager collect this cash?"}
     DualRoleGuard -- "Yes" --> Block["BLOCKED! Must be acknowledged by an independent Partner"]
-    DualRoleGuard -- "No" --> Acknowledge["Click 'Acknowledge Cash Handover' (POST /collections/.../acknowledge)\n• Cash deposited into Branch Safe Vault\n• Agent Cash-in-Hand liability cleared to ₹0\n• Prints Handover Slip #HO-YYYY-XXXXX"]
+    DualRoleGuard -- "No" --> Acknowledge["Click 'Acknowledge Cash Handover' (POST /api/v1/collections/cash-handover/acknowledge)\n• Cash deposited into Branch Safe Vault\n• Agent Cash-in-Hand liability cleared to ₹0\n• Prints Handover Slip #HO-YYYY-XXXXX"]
 ```
 
 ### Step-by-Step Instructions:
@@ -202,20 +202,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Finalized["Partner Finalizes Auction:\nStatus = FINALIZED"] --> PrintMinutes["Click 'Download Form XVII Statutory Minutes PDF'"]
+    Finalized["Verified Partner Finalizes Auction:\nStatus = COMPLETED"] --> PrintMinutes["Click 'Download Form XVII Statutory Minutes PDF'"]
     PrintMinutes --> PhysicalSign["Print 2 copies on bond paper:\n• Foreman / Branch Manager signs\n• Attending subscribers sign physical sheet"]
     PhysicalSign --> Registrar["Courier / Hand-deliver signed copy to Chit Registrar Office"]
     Registrar --> AckSlip["Receive Chit Registrar Filing Acknowledgment Slip"]
-    AckSlip --> MarkFiled["In Web Portal: Auctions -> Group KCA-1L -> Month 4\nEnter Registrar Filing Ref & Date\nClick 'Mark Filed with Registrar' (PATCH /auctions/:id/mark-filed...)"]
+    AckSlip --> MarkFiled["In Web Portal: Auctions -> Group KCA-1L -> Month 4\nEnter Registrar Filing Ref & Date\nClick 'Mark Filed with Registrar' (PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar)\nStatus transitions: COMPLETED -> MINUTES_FILED"]
 ```
 
 ### Step-by-Step Instructions:
-1. Once Partner B finalizes the auction, navigate to **Auctions $\to$ Auction Minutes**.
+1. Once Verified Partner B (`isPartner: true`) finalizes the auction (status `COMPLETED`), navigate to **Auctions $\to$ Auction Minutes**.
 2. Click **"Download Form XVII Minutes PDF"**.
 3. Print two copies on official paper.
 4. Affix your branch manager signature and collect signatures from the attending subscribers.
 5. Submit one signed original copy to the **Chit Registrar** (Government of Tamil Nadu) in compliance with the Chit Funds Act, 1982.
-6. When the registrar issues the acknowledgment stamp, open the auction screen and click **"Mark Filed with Registrar"** (`PATCH /auctions/:auctionId/mark-filed-with-registrar`), entering the filing reference number and filing date.
+6. When the registrar issues the acknowledgment stamp, open the auction screen and click **"Mark Filed with Registrar"** (`PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`), entering the filing reference number and filing date. The auction transitions from `COMPLETED` $\to$ **`MINUTES_FILED`**.
 
 ---
 
@@ -246,14 +246,18 @@ flowchart TD
     Midday["1:00 PM: Midday Operational Inspection"] --> LiveDash["Open Branch Live Collections Monitor:\n• Murugan: ₹24,000 collected (6/12 customers)\n• Selvam: ₹18,500 collected (5/10 customers)"]
     LiveDash --> CheckDefaulters["Review 3-Month Arrears Alert Queue"]
     CheckDefaulters --> Escalation{"Is subscriber in 3M Arrears?"}
-    Escalation -- "Yes (Murugesan - Ticket #14)" --> IssueNotice["1. Issue Formal Form XXIV Default Notice by Registered Post\n2. Dispatch agent with physical legal clearance copy\n3. Inform Partners for substitution approval"]
+    Escalation -- "Yes (Murugesan - Ticket #14)" --> IssueNotice["1. Issue Formal Form XXIV Default Notice by Registered Post\n2. Dispatch agent with physical legal clearance copy\n3. Escalate to Verified Partners (isPartner: true) for\n   2-Partner Dual-Control Removal (SEC-B) & Substitution"]
     Escalation -- "No" --> Routine["Continue Routine Route Monitoring"]
 ```
 
 ### Step-by-Step Instructions:
-1. Open **Collections $\to$ Live Branch Supervisor Dashboard** at 1:00 PM to view the real-time progress of all motorcycle agents on the road.
-2. If an agent’s collections appear delayed, check their connectivity status and battery indicator.
-3. **Defaulter Legal Escalation**:
-   - Filter tickets flagged with **`hasDefaulterNotice: true`** (subscribers with 3 consecutive unpaid installments).
+1. Open **Collections $\to$ Live Branch Supervisor Dashboard** at 1:00 PM to view the real-time progress of all field agents on the road.
+2. If an agent’s collections appear delayed, check their sync status and pending batch queue.
+3. **Defaulter Legal Escalation & Two-Partner Dual-Control Removal (`SEC-B` / `KFC-SEC-004`)**:
+   - Filter tickets with **`status === 'DEFAULT_3_MONTHS'`** (automatically tagged by the 00:01 AM IST maintenance cron after 3 consecutive unpaid installments).
    - Prepare the formal 14-day statutory notice in accordance with Section 30 of the Chit Funds Act, 1982.
-   - If payment is not cleared within 14 days, forward the file to the Partners to execute formal ticket substitution (`POST /tickets/:id/substitute`).
+   - **Prized Subscriber Immutability (`KFC-SEC-004`)**: Prized subscribers who have already received their chit prize cannot be removed or substituted (`PRIZED_TICKET_IMMUTABLE`); escalate prized arrears for legal recovery / safety-proof enforcement instead.
+   - If a **non-prized** defaulter does not clear arrears within 14 days, forward the file to the **Verified Partners (`isPartner: true`)** to execute two-partner dual-control removal:
+     1. Partner A submits removal request (`POST /api/v1/installments/tickets/:id/remove-defaulter/request` $\to$ `PENDING_REMOVAL_APPROVAL`).
+     2. Independent Partner B approves removal (`POST /api/v1/installments/tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`, `maker != checker`).
+     3. Once removed, a Verified Partner assigns the replacement subscriber via `POST /api/v1/installments/tickets/:id/substitute`.

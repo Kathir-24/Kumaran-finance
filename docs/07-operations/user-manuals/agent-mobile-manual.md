@@ -3,9 +3,13 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Target Persona**: **Field Collection Agents (Motorcycle Collection Staff)**  
-> **Primary Platform**: **Android Mobile App (Flutter in `apps/mobile/`)**  
-> **Hardware Support**: Android 10+, Biometric Fingerprint Sensor, Offline Local SQLite Database  
-> **Core Operating Standard**: Single discrete payments, instant bilingual digital receipts, zero cash retention overnight.
+> **Platform Rollout (`ADR-26` — Deferred Phase 2 Scope)**:
+> - **Phase 1 (Current Production)**: Field agents operate via the **mobile-responsive Next.js Web Portal (`apps/web/`)** on Android Chrome, backed by the rural dead-zone paper-slip fallback SOP (`docs/03-architecture/offline-architecture.md` §5.1). The typed Dart Client Core & offline SQLite sync engine (`apps/mobile/lib/core/`) is built and verified in Phase 1.
+> - **Phase 2 (Q2 2027)**: Native Flutter Android UI screens, biometric fingerprint unlock, and signed APK distribution roll out using the workflows documented below.  
+> **Core Operating Standard**: Single discrete payments, instant bilingual digital receipts (TRAI DLT SMS in Phase 1 per `ADR-23`; FCM Push in Phase 2), zero cash retention overnight.
+
+> [!IMPORTANT]
+> **Phase 1 vs. Phase 2 Field Operations Notice (`ADR-26`)**: Until the Phase 2 Flutter Android APK is released in Q2 2027, field agents access Kumaran Chits through Chrome on their Android smartphone (`https://admin.kumaranfinance.in`) using the exact same backend collection and handover endpoints (`POST /api/v1/collections/record`, `/cash-handover/submit`). Offline SQLite queue flows in §§3–6 represent the Phase 2 native Android experience built atop the already-tested `apps/mobile/lib/core/offline/` engine.
 
 ---
 
@@ -100,7 +104,7 @@ flowchart TD
     Search --> CheckDue["2. App Displays Discrete Installment Due:\nKCA-1L-20M-01: Net Due = ₹3,700"]
     CheckDue --> TakeCash["3. Collect Physical Currency Notes from Customer (₹3,700)"]
     TakeCash --> Record["4. Select Method: CASH -> Tap 'Confirm Collection'"]
-    Record --> Receipt["5. App Generates Bilingual Digital Receipt Instantly:\n• Receipt No: KC-REC-PRD-2026-00124\n• Dispatches Push Notification to Customer\n• Hand-write date, amount & sign customer paper passbook"]
+    Record --> Receipt["5. App Generates Bilingual Digital Receipt Instantly:\n• Receipt No: KC-REC-PRD-2026-00124\n• Dispatches TRAI DLT SMS (Phase 2: FCM Push)\n• Hand-write date, amount & sign customer paper passbook"]
 ```
 
 ### Step-by-Step Instructions:
@@ -110,7 +114,7 @@ flowchart TD
    - You must collect the exact net installment in full (`₹3,700`).
    - The app **strictly rejects partial payments** (e.g., ₹1,500) and advance balances.
 4. Count the physical currency notes.
-5. Tap **"Record Collection"**, select **`CASH`**, and tap **"Confirm & Issue Receipt"** (`POST /collections/record`).
+5. Tap **"Record Collection"**, select **`CASH`**, and tap **"Confirm & Issue Receipt"** (`POST /api/v1/collections/record`).
 6. The app instantly issues the **Bilingual Digital Receipt (English + தமிழ்)**:
    - *"ரசீது எண் / Receipt No: KC-REC-PRD-2026-00124"*
    - *"சந்தாதாரர் பெயர் / Subscriber Name: S. Sundaram"*
@@ -128,9 +132,9 @@ flowchart TD
     CollectOffline --> LocalStorage["App generates tamper-proof UUID tracking key\nSaves record to local SQLite with physical timestamp (collectedAt)"]
     LocalStorage --> IssueLocalReceipt["App renders offline digital receipt on screen\nAgent signs customer physical passbook"]
     IssueLocalReceipt --> MoveToNetwork["Return to 4G Coverage Area or Head Office Wi-Fi"]
-    MoveToNetwork --> BatchSync["App automatically triggers Batch Sync:\nPOST /collections/sync-offline-queue (Up to 100 items)"]
+    MoveToNetwork --> BatchSync["App automatically triggers Batch Sync:\nPOST /api/v1/collections/sync-offline-queue (Up to 100 items)"]
     BatchSync --> ServerResponse{"Server Processes Batch"}
-    ServerResponse -- "Normal Items" --> Success["Official sequential receipt numbers generated\nPush notifications dispatched to customers"]
+    ServerResponse -- "Normal Items" --> Success["Official sequential receipt numbers generated\nTRAI DLT SMS alerts dispatched (Phase 2: FCM Push)"]
     ServerResponse -- "Conflict: Member paid at counter" --> Conflict["Flagged as INSTALLMENT_ALREADY_PAID\nAll other items succeed (Partial Success Isolation)\nAgent returns cash to customer or adjusts with accountant"]
 ```
 
@@ -183,46 +187,47 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    ReturnOffice["5:00 PM: Return to Head Office in Perundurai"] --> OpenSummary["Open 'Daily Summary & Cash Handover' in App"]
-    OpenSummary --> Tally["App displays exact physical cash collected:\ne.g., Total Cash Collected: ₹42,500 (10 collections)"]
-    Tally --> SubmitHandover["Tap 'Submit Cash Handover Batch' (POST /collections/cash-handover/submit)\nStatus = PENDING_HANDOVER"]
-    SubmitHandover --> HandBag["Hand physical leather cash bag to Partner A"]
-    HandBag --> PartnerCount["Partner counts notes on counter machine (₹42,500)"]
-    PartnerCount --> PartnerAck["Partner clicks 'Acknowledge Cash Received'\n(Asserts: collector_user_id != acknowledger_user_id)"]
-    PartnerAck --> Cleared["App instantly updates:\n• Cash Handover Status = CONFIRMED\n• Cash-in-Hand Liability = ₹0\n• Clearance Slip #HO-2026-0089 issued"]
+    ReturnOffice["5:00 PM: Return to Head Office in Perundurai"] --> OpenSummary["Open 'Daily Summary & Cash Handover'"]
+    OpenSummary --> Tally["Screen displays exact physical cash collected:\ne.g., Total Cash Collected: ₹42,500 (10 collections)"]
+    Tally --> SubmitHandover["Tap 'Submit Cash Handover Batch' (POST /api/v1/collections/cash-handover/submit)\nStatus = PENDING_HANDOVER"]
+    SubmitHandover --> HandBag["Hand physical leather cash bag to Partner / Branch Manager / Desk Accountant"]
+    HandBag --> PartnerCount["Checker counts notes on counter machine (85 x ₹500 = ₹42,500)"]
+    PartnerCount --> PartnerAck["Checker clicks 'Acknowledge Cash Received'\n(POST /api/v1/collections/cash-handover/acknowledge)\nAsserts: collector_user_id != acknowledger_user_id"]
+    PartnerAck --> Cleared["System instantly updates:\n• Cash Handover Status = ACKNOWLEDGED\n• Cash-in-Hand Liability = ₹0\n• Clearance Slip #HO-2026-0089 issued"]
 ```
 
 ### Step-by-Step Instructions:
 1. Return to the Perundurai branch office before 5:00 PM closing.
-2. Tap **"Daily Summary & Cash Handover"** in the app.
+2. Tap **"Daily Summary & Cash Handover"**.
 3. Verify your day's total: e.g., `Total Cash Collected: ₹42,500`.
-4. Tap **"Submit Cash Handover Batch"** (`POST /collections/cash-handover/submit`).
-5. Hand your physical currency notes to an authorized Partner at the counter.
-6. The Partner runs the notes through the currency counting machine and acknowledges receipt in the software.
-7. **The Anti-Self-Acknowledgment Guard**: If you also hold accountant permissions, you cannot acknowledge your own cash. A Partner must sign off (`collector_user_id != acknowledger_user_id`).
-8. Your mobile app screen turns green: **`Handover Cleared — Status: CONFIRMED`**.
+4. Tap **"Submit Cash Handover Batch"** (`POST /api/v1/collections/cash-handover/submit`). The batch enters **`PENDING_HANDOVER`** status.
+5. Hand your physical currency notes to an independent Partner, Branch Manager, or Desk Accountant at the counter.
+6. The counter checker runs the notes through the currency counting machine and acknowledges receipt in the software (`POST /api/v1/collections/cash-handover/acknowledge`).
+7. **The Anti-Self-Acknowledgment Guard**: If you also hold accountant permissions, you cannot acknowledge your own cash. An independent Partner, Branch Manager, or colleague must sign off (`collector_user_id != acknowledger_user_id`).
+8. Your handover screen turns green: **`Handover Cleared — Status: ACKNOWLEDGED`** (`CashHandoverStatus`: `PENDING_HANDOVER` $\to$ `ACKNOWLEDGED`).
 9. **Strict Company Rule**: Never take company cash home overnight.
 
 ---
 
-## 10. Field Troubleshooting, Dynamic UPI & Operational Traps
+## 10. Field Troubleshooting, Native UPI Intent (ADR-19) & Operational Traps
 
 ```mermaid
 flowchart TD
     Issue["Field Challenge on Road"] --> Type{"What Happened?"}
-    Type -- "Customer wants to pay UPI on road" --> QR["1. Tap 'Show Dynamic UPI QR' on App\nDisplays QR with exact net due (₹3,700)\nCustomer scans via GPay/PhonePe -> Confirmed instantly"]
+    Type -- "Customer wants to pay UPI on road" --> QR["1. Open Native UPI Intent (GET /api/v1/installments/:dueId/upi-intent)\nCustomer pays exact ₹3,700 directly to KVB account (₹0 gateway fee)\nRecord 12-digit Bank UTR via POST /api/v1/payments/upi-claim (INITIATED)\nAccounting Desk verifies KVB statement -> SUCCESS + Receipt"]
     Type -- "Phone battery critically low (3%)" --> Bat["2. SQLite commits atomically before rendering receipt\nPlug into bike 12V USB charger; zero data loss"]
     Type -- "Customer paid yesterday at office" --> Conflict["3. Conflict isolated: INSTALLMENT_ALREADY_PAID\nDo NOT collect cash; inspect customer stamped passbook"]
     Type -- "Subscriber hands torn / tape-joined note" --> Note["4. Politely refuse torn note; ask for clean replacement\n(Office note-sorting machine will reject it)"]
 ```
 
 ### Practical Field Guidance:
-1. **Dynamic On-the-Road UPI QR**:
-   - If a subscriber says, *"I don't have currency notes today, can I scan your phone?"*
-   - Tap **"Collect via UPI QR"**. The app renders a dynamic Bharat UPI QR code embedded with the exact net installment (`₹3,700`) and ticket number.
-   - The subscriber scans it using Google Pay or PhonePe. The app receives the payment webhook within 3 seconds, displays green confirmation, and issues the digital receipt.
+1. **Zero-Fee Native UPI Intent & Bank UTR Verification (`ADR-19`)**:
+   - Kumaran Finance does **not** use a commercial third-party payment gateway or instant payment webhooks. Instead, UPI payments use **NPCI Native UPI Intent** directly into Kumaran Finance's Karur Vysya Bank (KVB) current account at **₹0 transaction fees**.
+   - If a subscriber says, *"I don't have currency notes today, can I pay by UPI?"*, generate the UPI intent link/QR (`GET /api/v1/installments/:dueId/upi-intent`) pre-filled with the exact whole-rupee net installment (`₹3,700`) and ticket reference.
+   - After the subscriber completes the transfer in Google Pay, PhonePe, or Paytm, record the **12-digit Bank UTR reference** via `POST /api/v1/payments/upi-claim`. The claim enters **`INITIATED`** status (no instant receipt yet).
+   - Once the Desk Accountant or an independent Partner confirms the matching credit in the KVB NetBanking statement and approves `POST /api/v1/payments/:id/verify-upi-claim` (`maker != checker`), the payment moves to **`SUCCESS`**, the due updates to `PAID`, and the official bilingual receipt & TRAI DLT SMS are issued.
 2. **Battery & Device Resilience**:
-   - The app uses an atomic local SQLite database. Even if the phone powers off mid-collection, all stored offline collections remain safely saved.
+   - The Dart Core SQLite engine commits collections atomically. Even if the phone powers off mid-collection (Phase 2 Android offline mode), all stored offline collections remain safely saved.
 3. **Double-Payment Defense**:
    - If a subscriber claims they already cleared their due at the office counter yesterday, check their paper passbook. If stamped with the branch seal, do not collect cash. When you batch sync, the server automatically updates their ticket status to `PAID`.
 4. **Torn Note Protocol**:

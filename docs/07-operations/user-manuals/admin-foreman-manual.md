@@ -2,10 +2,10 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Target Persona**: **Company Partners (Super Admin) & Foremen**  
-> **Platform Parity**: **100% Full Feature Parity across Web Portal (`apps/web/`) AND Partner Android Mobile App (`apps/mobile/`)**  
+> **Target Persona**: **Verified Business Partners (`SUPER_ADMIN` with `isPartner: true`) & Foremen**  
+> **Platform Rollout (`ADR-26`)**: **Phase 1 Primary: Web Operations Portal (`apps/web/`, mobile-responsive)**; Partner Native Android Mobile App (`apps/mobile/`) UI & biometric push approvals roll out in **Phase 2 (Q2 2027)** over the existing Dart Client Core (`apps/mobile/lib/core/`).  
 > **Currency Standard**: Strictly whole integer Rupees (**`BigInt`**); zero paise, zero decimals.  
-> **Governance Model**: The 4 equal partners share executive oversight with strict **Maker-Checker Dual Control** (`maker_user_id != checker_user_id`).
+> **Governance Model (Guardrails 10–11 / `ADR-21`)**: The 4 equal verified Partners (`isPartner: true`) share executive oversight with strict **Maker-Checker Dual Control** (`maker_user_id != checker_user_id`, enforced in app + 8 PostgreSQL `CHECK` constraints). Non-Partner IT Super Admins (`isPartner: false`) can manage users/settings and inspect audit logs/Bull Board, but are strictly barred from financial authorizations.
 
 ---
 
@@ -19,9 +19,9 @@ Kumaran Finance is operated by **4 equal partners** based at the Head Office in 
 
 ```mermaid
 flowchart TD
-    subgraph DUAL_PLATFORM ["The Partner Dual-Platform Console"]
-        Web["Web Portal (Desktop PC at Head Office)\n• High-Density Ledgers & Notebook Transcription\n• Form XVII, XXI, XXII Statutory Registers\n• Bull Board Background Queue Monitoring"]
-        Mobile["Android Mobile App (Executive Pocket Console)\n• 1-Second Biometric Fingerprint Unlock\n• 1-Tap Push Notification Approvals\n• In-Field Auction Bidding & Live Business Pulse"]
+    subgraph DUAL_PLATFORM ["The Partner Console (ADR-26 Phase 1 Web / Phase 2 Android)"]
+        Web["Phase 1 Primary: Web Portal (Desktop & Mobile Browser)\n• High-Density Ledgers & Notebook Transcription\n• Form XVII, XXI, XXII Statutory Registers\n• Real-Time Maker-Checker Approvals & Bull Board (/admin/queues)"]
+        Mobile["Phase 2 (Q2 2027): Partner Android Mobile App\n• 1-Second Biometric Fingerprint Unlock\n• 1-Tap Push Notification Approvals\n• In-Field Auction Bidding & Live Business Pulse"]
     end
     Web <-->|Real-Time Cloud Sync| Mobile
 ```
@@ -30,7 +30,7 @@ flowchart TD
 
 ## 2. Daily Workflow Index & Action Diagrams
 
-The following table summarizes all 10 core partner actions, each documented with a dedicated flow diagram and step-by-step instructions:
+The following table summarizes all **15** core partner workflows, each documented with a dedicated flow diagram and step-by-step instructions:
 
 | Section | Operational Action | Role / Dual-Control | Primary Platform |
 |---|---|:---:|:---:|
@@ -146,18 +146,18 @@ flowchart TD
     CheckTie -- No --> Single["Single Highest Bidder Identified"]
     LotDraw --> Record["Partner A Enters Winning Ticket & Discount (Maker)\nClicks 'Submit Auction Result'"]
     Single --> Record
-    Record --> Queue["Status = PENDING_VERIFICATION\nQueued for Partner B Approval"]
+    Record --> Queue["Auction stays SCHEDULED (recordedByUserId set)\nQueued for Verified Partner B Approval"]
 ```
 
 ### Step-by-Step Instructions:
 1. **Auction Scope**: In-office auctions occur strictly in **Months 2 through $N-1$**. Month 1 is the company pool (no auction); Month $N$ is the final member direct settlement (no auction).
 2. **Defaulter Check**: The software automatically evaluates member payment status. Any subscriber with an unpaid installment for the current month is **strictly inoperable on screen** and cannot participate or bid.
-3. **Bidding & Statutory Ceiling**: The discount ceiling is fixed at $\frac{V}{4}$ (`₹25,000` for a ₹1L chit). The minimum floor is the 4% commission (`₹4,000`). Bids outside this range are rejected by validation guards.
+3. **Bidding, Statutory Ceiling & Whole-Rupee Divisibility (`KFC-FIN-002`)**: The discount ceiling is fixed at $\frac{V}{4}$ (`₹25,000` for a ₹1L chit). The minimum floor is the 4% commission (`₹4,000`). The net dividend pool $(D - \text{Commission})$ must divide evenly across all $N$ tickets in whole rupees (`NON_DIVISIBLE_DIVIDEND` guard). Bids outside these bounds are rejected by validation guards.
 4. **Option A Physical Tie-Breaker**: If multiple attendees shout the ceiling discount:
    - Fold paper slips bearing the competing ticket numbers and place them in the brass/steel lot bowl.
    - Have an independent attendee or child draw one token in front of all members.
    - In the app, click **"Record Tie-Breaker Draw"** and select the drawn ticket number.
-5. Click **"Submit Auction Result"** (Maker: Partner A).
+5. Click **"Submit Auction Result"** (Maker: Partner A). The auction remains in `SCHEDULED` status until an independent Verified Partner finalizes it.
 
 ---
 
@@ -165,21 +165,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Push["Partner B Receives Mobile Push Alert:\n'Auction Finalization Required: KCA-1L Month 4'"] --> Open["Open Approval Queue on Phone or PC"]
-    Open --> Guard{"Dual-Control Guard Check:\nIs Partner B != Partner A (Maker)?"}
-    Guard -- No --> Deny["HTTP 403 Forbidden: Maker cannot be Checker!"]
-    Guard -- Yes --> Commit["Click 'Finalize Auction & Commit Results'\n• Commits 4% Commission: ₹4,000\n• Calculates Total Dividend: D - ₹4,000\n• Divides Equally: Div_ticket = Div_total / 20\n• Generates Next Month Net Dues: Inet = Ibase - Div_ticket\n• Generates Form XVII Minutes PDF"]
+    Push["Verified Partner B (isPartner: true) Alerted:\n'Auction Finalization Required: KCA-1L Month 4'"] --> Open["Open Pending Approvals on Web Portal\n(Phase 2: Android Push Alert)"]
+    Open --> Guard{"Dual-Control & Partner Guard:\nIs Partner B (isPartner: true) != Partner A?"}
+    Guard -- No --> Deny["HTTP 403 Forbidden: Maker cannot be Checker\nor non-partner Super Admin blocked!"]
+    Guard -- Yes --> Commit["Click 'Finalize Auction & Commit Results'\n• Status transitions: SCHEDULED -> COMPLETED\n• Commits 4% Commission: ₹4,000\n• Calculates Total Dividend: D - ₹4,000\n• Divides Equally: Div_ticket = Div_total / 20\n• Generates Next Month Net Dues: Inet = Ibase - Div_ticket\n• Generates Form XVII Minutes PDF"]
 ```
 
 ### Step-by-Step Instructions:
-1. Partner B receives a push notification on their Android phone.
-2. Tap the alert to open the **Auction Verification Screen**.
+1. Verified Partner B (`SUPER_ADMIN` with `isPartner: true`) opens **Pending Approvals** on the Web Portal (and receives an Android FCM push alert in Phase 2 per ADR-26).
+2. Open the **Auction Verification Screen** (`POST /api/v1/auctions/:id/finalize`).
 3. Verify the winning ticket number, bid discount, and attendee list.
-4. Click **"Finalize Auction & Commit Results"** (`POST /auctions/:id/finalize`).
-   - The software commits the 4.00% Foreman Commission.
+4. Click **"Finalize Auction & Commit Results"** (`POST /api/v1/auctions/:id/finalize`).
+   - Transitions auction status from `SCHEDULED` $\to$ **`COMPLETED`** (`schema.prisma`).
+   - Commits the 4.00% Foreman Commission.
    - Calculates the **Universal Equal Dividend**: allocated equally across **all members in the chit group, INCLUDING the auction winner**.
    - Uniformly sets next month's net installment: $I_{net} = I_{base} - Div_{ticket}$.
-   - Publishes the statutory **Form XVII Minutes** ready for printing, physical signatures, and filing with the Chit Registrar.
+   - Publishes the statutory **Form XVII Minutes** ready for printing, physical signatures, and filing with the Chit Registrar (which subsequently transitions the auction to `MINUTES_FILED`).
 5. **Downloading & Printing Form XVII Minutes**:
    - Navigate to `/reports/minutes` or open the auction card on Web.
    - Click **"Download PDF"**: Instantly downloads the official Form XVII statutory PDF (`application/pdf`) streamed securely via the BFF pipeline without pop-up blockers or raw JSON display bugs.
@@ -227,9 +228,9 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Return["5:00 PM: Field Agent Returns to Head Office Counter"] --> Hand["Agent hands physical cash bag & submits App Handover"]
-    Hand --> Count["Partner Counts Currency Notes on Office Machine:\ne.g., 42 x ₹1,000 + 1 x ₹500 = ₹42,500"]
-    Count --> Compare{"Does Physical Note Count Match\nAgent App Batch Total?"}
+    Return["5:00 PM: Field Agent Returns to Head Office Counter"] --> Hand["Agent hands physical cash bag & submits Handover Batch"]
+    Hand --> Count["Partner Counts Currency Notes on Office Machine:\ne.g., 85 x ₹500 = ₹42,500"]
+    Count --> Compare{"Does Physical Note Count Match\nAgent Batch Total?"}
     Compare -- "Mismatch" --> Shortage["Record Shortage / Discrepancy Voucher"]
     Compare -- "Exact Match" --> SelfGuard{"Anti-Self-Acknowledgment Check:\nDid Partner personally collect this cash?"}
     SelfGuard -- "Yes" --> Block["BLOCKED! Partner cannot acknowledge self.\nAnother partner must count & sign off."]
@@ -237,62 +238,66 @@ flowchart TD
 ```
 
 ### Step-by-Step Instructions:
-1. When a field collection agent finishes their rounds, they submit their batch on their mobile app and place their leather cash bag on the counter.
+1. When a field collection agent finishes their rounds, they submit their handover batch via the portal (or Android mobile app in Phase 2 per ADR-26) and place their leather cash bag on the counter.
 2. Put the notes through the counter currency note-sorting machine to verify the total count.
-3. Open **Collections $\to$ Pending Handovers** on your phone or PC.
+3. Open **Collections $\to$ Pending Handovers** on the Web Portal.
 4. Verify that the machine count matches the software batch total.
 5. **Anti-Self-Acknowledgment Guard**: If you personally collected cash under your user account, you cannot acknowledge it. One of the other 3 partners must verify and acknowledge.
-6. Click **"Acknowledge Cash Received"** (`POST /collections/cash-handover/acknowledge`).
+6. Click **"Acknowledge Cash Received"** (`POST /api/v1/collections/cash-handover/acknowledge`).
    - Cash custody moves into the **Branch Safe Vault**.
    - Agent liability drops to `₹0`.
    - Generates official Handover Clearance Slip `#HO-YYYY-XXXXX`.
 
 ---
 
-## 10. Approving Erroneous Payment Reversals (Checker Role)
+## 10. Requesting & Approving Erroneous Payment Reversals (Two-Partner Dual Control)
+
+> [!IMPORTANT]
+> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21)**: Both requesting (`POST /api/v1/payments/:id/request-reversal`) and approving (`POST /api/v1/payments/:id/approve-reversal`) a payment reversal are restricted strictly to **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)**. Desk Accountants and Branch Managers must escalate erroneous counter entries with the physical receipt to Partner A; they cannot submit reversal requests in software (`HTTP 403`).
 
 ```mermaid
 flowchart TD
-    Error["Cashier or Partner A records payment to wrong ticket"] --> Req["Partner A clicks 'Request Payment Reversal'\n• Enters mandatory written justification\n• Attaches photo of physical counter receipt\n• Payment status = REVERSAL_PENDING"]
-    Req --> Push["Partner B receives Push Notification on Phone"]
-    Push --> Review["Partner B opens Reversals Queue\nReads reason & inspects receipt photo"]
-    Review --> Dual{"maker_user_id != checker_user_id?"}
-    Dual -- No --> Deny["HTTP 403: Maker cannot approve own reversal!"]
-    Dual -- Yes --> Approve["Partner B clicks 'Approve Reversal'\n• Ticket status reverts to UNPAID\n• Offsetting cash entry in Form XXII\n• Immutable audit trail logged"]
+    Error["Erroneous payment entry reported by Cashier\n(escalated with physical counter receipt)"] --> Req["Verified Partner A (isPartner: true) clicks 'Request Payment Reversal'\n• Enters mandatory written justification\n• PaymentReversal record created: Status = REQUESTED\n• Original Payment stays SUCCESS until approved"]
+    Req --> Queue["Queued in Pending Approvals -> Payment Reversals\n(Phase 2: Partner B Android Push Alert)"]
+    Queue --> Review["Verified Partner B (isPartner: true) opens Reversals Queue\nReads reason & inspects physical receipt"]
+    Review --> Dual{"Verified Partner B != Verified Partner A?"}
+    Dual -- No --> Deny["HTTP 403: Maker cannot approve own reversal\nor non-partner Super Admin blocked!"]
+    Dual -- Yes --> Approve["Partner B clicks 'Approve Reversal'\n• Payment transitions: SUCCESS -> REVERSED\n• PaymentReversal transitions: REQUESTED -> APPROVED\n• Ticket due reverts to UNPAID\n• Receipt PDF stamped 'ரத்து செய்யப்பட்டது / CANCELLED'\n• Offsetting cash entry in Form XXII + immutable audit trail"]
 ```
 
 ### Step-by-Step Instructions:
-1. When an erroneous payment entry is identified, the cashier or Partner A initiates a reversal request with a written explanation (Maker).
-2. Partner B opens **Pending Approvals $\to$ Payment Reversals**.
-3. Review the reason and inspect the physical counter receipt.
-4. Click **"Approve Payment Reversal"** (`POST /payments/:id/approve-reversal`).
-   - The ticket due reverts to `UNPAID`.
-   - An offsetting reversal line is stamped into the Form XXII Daily Cash Book.
-   - An immutable audit trail entry is permanently recorded.
+1. When an erroneous payment entry is identified at the counter, the Desk Accountant hands the physical counter receipt and written discrepancy note to **Verified Partner A (`isPartner: true`)**, who submits the reversal request (`POST /api/v1/payments/:id/request-reversal`) with a mandatory written justification (Maker). A `PaymentReversal` record is created with status **`REQUESTED`** while the underlying `Payment` remains **`SUCCESS`** until Checker approval.
+2. Independent **Verified Partner B (`isPartner: true`)** opens **Pending Approvals $\to$ Payment Reversals** on the Web Portal.
+3. Review the written reason and inspect the physical counter receipt.
+4. Click **"Approve Payment Reversal"** (`POST /api/v1/payments/:id/approve-reversal`).
+   - The `Payment` transitions from `SUCCESS` $\to$ **`REVERSED`** and the `PaymentReversal` record transitions to **`APPROVED`**.
+   - The ticket installment due reverts to `UNPAID`.
+   - Any subsequent receipt PDF download renders a bold diagonal red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
+   - An offsetting reversal line is stamped into the Form XXII Daily Cash Book and permanently recorded in the immutable `AuditLog`.
 
 ---
 
 ## 10B. Verifying Customer Online UPI Claims against Bank Statement (Checker Role)
 
-Subscribers paying online via the Android Mobile App utilize NPCI 1-Tap UPI Intent deep-linking directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **₹0 gateway fees** (ADR-19). Subscribers self-report their 12-digit Bank UTR reference, entering the approvals queue:
+Subscribers paying online via the Web Portal (or Phase 2 Android Mobile App per ADR-26) utilize NPCI Native UPI Intent deep-linking directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **₹0 gateway fees** (ADR-19). Subscribers self-report their 12-digit Bank UTR reference, entering the approvals queue:
 
 ```mermaid
 flowchart TD
-    Cust["Customer Submits UPI Claim with 12-digit UTR\nStatus = INITIATED"] --> Queue["Partner opens 'Pending Approvals -> UPI Claims'\n(GET /payments/pending-upi-claims)"]
+    Cust["Customer Submits UPI Claim with 12-digit UTR\nStatus = INITIATED"] --> Queue["Partner opens 'Pending Approvals -> UPI Claims'\n(GET /api/v1/payments/pending-upi-claims)"]
     Queue --> KVB["Partner checks Karur Vysya Bank (KVB) Current Account Portal"]
     KVB --> Match{"Does Bank Statement show credit\nmatching UTR & exact whole-rupee amount?"}
     Match -- No --> Reject["Leave pending or flag discrepancy to customer"]
     Match -- Yes --> DualGuard{"maker_user_id != checker_user_id?"}
     DualGuard -- No --> Deny["HTTP 403 Forbidden: Staff who entered claim cannot verify!"]
-    DualGuard -- Yes --> Approve["Partner clicks 'Verify Credit & Issue Receipt'\n• Payment status = SUCCESS\n• Installment marked PAID\n• Bilingual receipt generated\n• Free Push Notification sent to customer"]
+    DualGuard -- Yes --> Approve["Partner clicks 'Verify Credit & Issue Receipt'\n• Payment status = SUCCESS\n• Installment marked PAID\n• Bilingual receipt generated\n• TRAI DLT SMS sent (Phase 2: FCM Push)"]
 ```
 
 ### Step-by-Step Instructions:
-1. In the Web Portal or Mobile App, navigate to **Pending Approvals $\to$ UPI Claims**.
+1. In the Web Portal (or Phase 2 Mobile App), navigate to **Pending Approvals $\to$ UPI Claims**.
 2. View the pending list: Subscriber Name, Chit Group Code, Ticket Number, Net Amount ($I_{net}$), and 12-digit UTR.
 3. Cross-reference the UTR against the incoming credits on the KVB corporate net banking statement.
-4. Click **"Verify Credit & Issue Receipt"** (`POST /payments/:id/verify-upi-claim`).
-5. **Maker != Checker Enforcement**: If a partner recorded the claim on behalf of a walk-in or phone customer, another partner or accountant must verify it.
+4. Click **"Verify Credit & Issue Receipt"** (`POST /api/v1/payments/:id/verify-upi-claim`).
+5. **Maker != Checker Enforcement**: If a partner recorded the claim on behalf of a walk-in or phone customer, another partner or accountant must verify it. Upon verification, a bilingual TRAI DLT SMS receipt alert is dispatched (Phase 1 primary per ADR-23; plus FCM Push in Phase 2 per ADR-26).
 
 ---
 
@@ -373,8 +378,8 @@ flowchart TD
     Browser["Open Browser: http://localhost:3000/admin/queues"] --> Auth["Authenticate via active Super Admin Session\n(or configured BULL_BOARD_USER Basic Auth)"]
     Auth --> Board["Bull Board Live Monitoring Dashboard"]
     Board --> Q1["1. daily-maintenance-queue\n• Daily arrears calculation at 00:01 AM IST\n• 3-month continuous defaulter tagging"]
-    Board --> Q2["2. notification-queue\n• Bilingual push receipts & DLT SMS dispatches\n• Pre-auction reminders & dividend broadcasts\n• Maker-Checker push alerts"]
-    Board --> Q3["3. reconciliation-queue\n• 06:00 AM IST payment gateway audit\n• Ghost drop reconciliation"]
+    Board --> Q2["2. notification-queue\n• Bilingual TRAI DLT SMS receipts (Phase 1 primary)\n• Pre-auction reminders & dividend broadcasts\n• Phase 2: Android FCM push alerts"]
+    Board --> Q3["3. reconciliation-queue\n• 06:00 AM IST KVB settlement & pending UPI claim audit (ADR-19)\n• Stale INITIATED claim reconciliation"]
     Board --> Fail["Handling Failures:\nClick 'Failed' tab -> Inspect Stack Trace -> Click 'Retry'"]
 ```
 
@@ -383,8 +388,8 @@ flowchart TD
 2. If already logged into the Web Admin Portal as Super Admin, the dashboard opens automatically. Alternatively, supply an active Super Admin access token via `?token=<token>` or enter configured administrative credentials.
 3. Verify live queue health:
    - **`daily-maintenance-queue`**: Runs nightly at **00:01 AM IST (`1 0 * * *`)** to recompute arrears balances and tag defaulters.
-   - **`notification-queue`**: Dispatches push notifications and fallback DLT SMS messages.
-   - **`reconciliation-queue`**: Verifies morning bank gateway settlements.
+   - **`notification-queue`**: Dispatches bilingual TRAI DLT SMS receipts/alerts via MSG91 (Phase 1 primary per ADR-23) and Android FCM push notifications (Phase 2 per ADR-26).
+   - **`reconciliation-queue`**: Runs the 06:00 AM IST reconciliation sweep against pending direct KVB UPI claims (`ADR-19` — no third-party payment gateway).
 4. **Retry Failed Jobs**: If an external telecom SMS timeout causes a job to fail, open the **"Failed"** tab, review the error, and click **"Retry"** to re-dispatch the job instantly without restarting the server.
 
 ---
