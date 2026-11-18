@@ -4,7 +4,7 @@
 > **Phase**: Phase 9 — Staff Administration, Branches & Operations Control  
 > **Task**: Task 9.1 — Branch Offices Administration  
 > **Route**: `/branches` (Directory) & `/branches/new` (Registration Form)  
-> **Authority**: Viewing allowed for all Staff & Auditor; Registration strictly restricted to `SUPER_ADMIN` (Partners)
+> **Authority**: Web administration routes `/branches` & `/branches/new` are strictly restricted to **`SUPER_ADMIN`** (`apps/web/src/lib/route-permissions.ts`); backend read APIs `GET /api/v1/branches*` allow all Staff & Auditor (backing the Topbar branch switcher), while mutations (`POST`, `PATCH`) are strictly `SUPER_ADMIN` only
 
 ---
 
@@ -27,25 +27,27 @@ Per **ADR-01** (Single-Company Tenancy) and **ADR-02** (Branch Scope):
 | **`GET`** | `/api/v1/branches` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `AUDITOR` | Query: `activeOnly?: string` (`'true'` / `'false'`) | `BranchResponseDto[]` | `401 Unauthorized` |
 | **`GET`** | `/api/v1/branches/:id` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `AUDITOR` | Param: `id: string` | `BranchResponseDto` | `404 Not Found` |
 | **`POST`** | `/api/v1/branches` | `SUPER_ADMIN` only | Body: `CreateBranchDto` (`code`, `name`, `nameTamil?`, `address`, `phone`) | `201 Created` (`BranchResponseDto`) | `400 Bad Request`, `403 Forbidden`, `409 Conflict` |
+| **`PATCH`** | `/api/v1/branches/:id` | `SUPER_ADMIN` only | Param: `id: string`<br>Body: `UpdateBranchDto` (`name?`, `nameTamil?`, `address?`, `phone?`, `isActive?`) | `200 OK` (`BranchResponseDto`) | `400 Bad Request`, `403 Forbidden`, `404 Not Found` |
 
 ---
 
 ## 3. Web UI Architecture
 
 ```
-apps/web/src/
-├── app/(dashboard)/
-│   ├── branches/
-│   │   ├── page.tsx               # Master directory route with 4 KPI cards & filter tabs (253 lines)
-│   │   └── new/
-│   │       └── page.tsx           # Create route with Super Admin RBAC gate & Guardrail 1 banner (79 lines)
-├── components/branches/
-│   ├── branch-form.tsx            # Form with real-time validation & live official preview card (260 lines)
-│   └── branch-table.tsx           # Directory table with HO badges, tel link, and copy feedback (214 lines)
-├── lib/query-keys.ts              # queryKeys.branches (all, list, detail)
+apps/web/
+├── src/
+│   ├── app/(dashboard)/
+│   │   └── branches/
+│   │       ├── page.tsx           # Master directory route with 4 KPI cards & filter tabs
+│   │       └── new/
+│   │           └── page.tsx       # Create route with Super Admin RBAC gate & Guardrail 1 banner
+│   ├── components/branches/
+│   │   ├── branch-form.tsx        # Form with real-time validation & live official preview card
+│   │   └── branch-table.tsx       # Directory table with HO badges, tel link, and copy feedback
+│   └── lib/query-keys.ts          # queryKeys.branches (all, list, detail)
 └── messages/
-    ├── en.json                    # 64 English localization keys under 'branches'
-    └── ta.json                    # 64 Tamil localization keys under 'branches' (100% dictionary parity)
+    ├── en.json                    # 72 English localization leaf keys under 'branches'
+    └── ta.json                    # 72 Tamil localization leaf keys under 'branches' (100% dictionary parity)
 ```
 
 ---
@@ -54,17 +56,17 @@ apps/web/src/
 
 1. **Guardrail 1 / ADR-01 (Single Company)**: Payloads and schemas omit `company_id`.
 2. **ADR-02 (Branch Scope)**: `PRD` (Head Office) serves as default anchor with multi-branch capability.
-3. **Super Admin Exclusivity**: Accessing `/branches/new` or calling `POST /api/v1/branches` without `SUPER_ADMIN` role renders a prominent access denied alert.
+3. **Super Admin Exclusivity**: Edge Middleware (`route-permissions.ts`) restricts `/branches` & `/branches/new` to `SUPER_ADMIN`, and `BranchController` restricts `POST` / `PATCH` to `Role.SUPER_ADMIN`.
 4. **Code Uppercase Normalization**: Input code is sanitized and converted to uppercase alphanumeric (e.g., `ERD`). Duplicate codes return clean 409 Conflict alerts.
 5. **ADR-18 Phone Regex**: Strictly requires 10-digit Indian mobile number (`^[6-9]\d{9}$`).
 6. **Bilingual Typography**: Form and table support both English and Tamil names across all views.
-7. **File Sizing Discipline**: All source files strictly $\le 200\text{--}280$ lines per AGENTS.md Rule 4.
+7. **File Sizing Discipline**: All source files strictly adhere to AGENTS.md Rule 4 modularity limits.
 
 ---
 
 ## 5. Automated Test Coverage
 
-Verified with 8 unit tests in `apps/web/test/branch-management.spec.ts` (208/208 web suite tests passing):
+Verified in `apps/web/test/branch-management.spec.ts` as part of the full verified Web suite (**376/376 passing tests across 52 spec files / 14 suites** via `pnpm --filter web test`):
 - Single-company zero `company_id` assertion.
 - Default HO and search/filter logic.
 - Super Admin role restriction and rejection of unauthorized roles.
@@ -72,4 +74,4 @@ Verified with 8 unit tests in `apps/web/test/branch-management.spec.ts` (208/208
 - ADR-18 10-digit Indian phone validation.
 - Mandatory English name & optional Tamil name rendering.
 - Address non-empty integrity.
-- 100% bilingual dictionary parity between `en.json` and `ta.json`.
+- 100% bilingual dictionary parity between `en.json` and `ta.json` (`72` `'branches'` keys).
