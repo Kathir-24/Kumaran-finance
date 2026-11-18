@@ -162,7 +162,7 @@ flowchart TD
 - **Symptoms**: Navigating to `http://localhost:3000/admin/queues` returns `401 Unauthorized` or prompts for credentials.
 - **Root Cause**: Missing active Super Admin session or invalid Basic Auth credentials.
 - **Remedy**:
-  - **Primary Access (Super Admin Session)**: Log into the Web Operations Portal (`http://localhost:3001`) as Super Admin (`9876543210`). The browser session cookie (`access_token`) or passing `?token=<access_token>` in the URL grants immediate access.
+  - **Primary Access (Super Admin Session)**: Log into the Web Operations Portal (`http://localhost:3001`) as Super Admin (`9876543210`). The browser session cookie (`access_token` or `jwt`, [`bull-board-auth.middleware.ts:101-108`](file:///u:/Kumaran-finance/apps/api/src/jobs/bull-board/bull-board-auth.middleware.ts#L101-L108)) or passing `?token=<access_token>` in the URL grants immediate access.
   - **Secondary Access (Basic Auth)**: If using Basic Auth, ensure non-default credentials are set in `.env` (`BULL_BOARD_USER` and `BULL_BOARD_PASSWORD`). Note that the insecure default `chitflow_secret` is strictly rejected by the server under F11.
 
 ### D.3. Inspecting Active Redis OTP Sessions & Background Queues
@@ -187,12 +187,14 @@ flowchart TD
 
 ## Category E: Financial Invariants & Domain Guardrail Rejections
 
-The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transactions by design:
+The **11 Invariant Architectural Guardrails** (`AGENTS.md`) reject invalid transactions by design:
 
 | Guardrail Rejected | HTTP Status & Error Message | Root Cause | Legitimate Operator Action |
 |---|---|---|---|
-| **Maker $\ne$ Checker** | `403 Forbidden`<br>`Maker and checker cannot be the same user` | The user approving a reversal, payout, or auction is the same user who initiated it. | Have a different Partner or Super Admin review and approve the request. |
+| **Maker $\ne$ Checker** | `403 Forbidden`<br>`Maker and checker cannot be the same user` | The user approving a reversal, payout, removal, or auction is the same user who initiated it (enforced in app + 8 DB `CHECK` constraints). | Have a different verified Partner (`isPartner: true`) review and approve the request. |
+| **Verified Partner Identity (Guardrail 11 / ADR-21)** | `403 Forbidden`<br>`PARTNER_ONLY_ACTION` / `SUPER_ADMIN_REQUIRED` | Non-Partner IT Super Admin (`isPartner: false`) attempted a financial authorization, or non-Super-Admin queried audit logs / BullMQ telemetry. | Only verified Partners (`isPartner: true`) can authorize financial mutations; audit logs & queue status are strictly `SUPER_ADMIN`. |
 | **1/4 Discount Ceiling** | `400 Bad Request`<br>`Maximum auction discount cannot exceed 25% of chit value` | Bid exceeds $\frac{V}{4}$ (e.g. ₹25,000 for a ₹1,00,000 chit). | Enter bid at or below the 25% ceiling ($D \le \frac{V}{4}$). |
+| **Whole-Rupee Divisibility (`KFC-FIN-002`)** | `400 Bad Request`<br>`NON_DIVISIBLE_DIVIDEND` | Bid produces fractional dividend remainder: $(D - C_f) \pmod N \ne 0$. | Enter a clean bid discount where $(D - C_f)$ divides evenly by $N$. |
 | **Defaulter Ineligible** | `400 Bad Request`<br>`Subscriber ineligible due to unpaid dues` | Customer attempted to bid in month $M$'s auction while their installment for month $M$ is `UNPAID`. | Record payment receipt for current month due before bidding. |
 | **Month 1 & N Auction** | `400 Bad Request`<br>`Auctions strictly forbidden in Month 1 and Month N` | Attempted to schedule/conduct auction in month 1 (foreman pool) or month $N$ (final settlement). | Month 1 belongs to company ticket; Month $N$ is settled directly with 4% commission. |
 | **Paise / Float Rejection** | `400 Bad Request`<br>`Floating point or fractional amounts prohibited` | API payload submitted decimal numbers (e.g. `2500.50`). | Submit whole integer Rupees (`BigInt`). All chit math is strictly integer Rupees. |
@@ -235,13 +237,14 @@ The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transacti
   ```
 
 ### G.3. `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT`
-- **Symptoms**: `None of the selected packages has a "db:backup:s3" script` when running `pnpm --filter api run db:backup:s3`.
-- **Root Cause**: The script is defined in the root monorepo `package.json`, not in `apps/api/package.json`.
-- **Remedy**: Run directly from root:
+- **Symptoms**: `None of the selected packages has a "db:backups:list" script` when running a root-only script with `--filter api`.
+- **Root Cause**: Scripts `db:backups:list` and `db:drp:drill` (colon syntax) are defined in the root monorepo [`package.json:34-38`](file:///u:/Kumaran-finance/package.json#L34-L38), whereas `apps/api/package.json:30-33` defines `db:backup:s3`, `db:backup:health`, `db:restore:s3`, and `db:drp-drill` (hyphenated).
+- **Remedy**: Run backup/DRP scripts directly from the repository root:
   ```powershell
   pnpm run db:backup:s3
   pnpm run db:backups:list
   pnpm run db:restore:s3
+  pnpm run db:drp:drill
   ```
 
 ---
@@ -250,14 +253,14 @@ The 10 Invariant Architectural Guardrails (`AGENTS.md`) reject invalid transacti
 
 ### H.1. `502 Bad Gateway`
 - **Symptoms**: Visiting `http://localhost/api` returns `502 Bad Gateway`.
-- **Root Cause**: Ingress container `chitflow-ingress` is running, but the upstream `api` container is stopped or still starting.
+- **Root Cause**: Ingress container `chitflow-nginx` ([`infra/docker/docker-compose.fullstack.yml:216`](file:///u:/Kumaran-finance/infra/docker/docker-compose.fullstack.yml#L216)) is running, but the upstream `chitflow-api` container is stopped or still starting.
 - **Remedy**:
   ```powershell
   # Check if API is healthy
   docker logs chitflow-api
 
-  # Verify API is listening on port 3000
-  curl http://localhost:3000/api/health
+  # Verify API is listening on port 3000 (deep readiness probe at /health or /health/readiness)
+  curl http://localhost:3000/health
   ```
 
 ### H.2. `413 Request Entity Too Large`

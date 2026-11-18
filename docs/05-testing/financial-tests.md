@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)  
 > **Mandate**: Financial tests must run in the CI/CD pipeline and achieve 100% pass rate. No release is allowed if any financial invariant fails.  
 > **Currency Standard**: All monetary values are tested as **whole integer Rupees (`BigInt`)**. Paise and floating-point math are strictly prohibited (`CONFIRMED-BY-DEVELOPER`).  
-> **Test Suite Status**: **52/52 API Test Suites Passed (843/843 Tests, 0 Failures) + 14 Web Test Suites Passed (353/353 Tests) = 1,196 Passing Tests** | Real-DB Concurrency: 25/25 Scenarios Passed | Execution Time: ~18s
+> **Test Suite Status**: **63 API Unit Suites (1,226 Tests, 0 Failures) + 14 Web Node `--test` Suites (376 Tests) + 10 `@kumaran/api-client` Tests + 14 API E2E Suites (187 Tests)** | Real-DB Concurrency: **26/26 Scenarios Passed (`CONCURR-INV-1..26`)** | DB `CHECK` Constraints E2E: **25/25 Passed**
 
 ---
 
@@ -152,20 +152,20 @@ it('should restore original installment due amount with zero penny difference up
   expect(paidDue.paidAmount).toBe(3750n);
   expect(paidDue.status).toBe('PAID');
 
-  // Maker initiates reversal request (Accountant or Partner 1)
+  // Verified Partner Maker initiates reversal request (SUPER_ADMIN with isPartner: true per KFC-SEC-001 / payment.controller.ts:220-222)
   const reversalRequest = await requestPaymentReversal({
     paymentId: payment.id,
     reason: 'Wrong customer ticket entered',
-    makerUserId: 'accountant-anand'
+    makerUserId: 'partner-senthil'
   });
 
   // Enforce Maker != Checker: Reversal cannot be approved by same user
   await expect(approvePaymentReversal({
     reversalId: reversalRequest.id,
-    checkerUserId: 'accountant-anand'
+    checkerUserId: 'partner-senthil'
   })).rejects.toThrow('Maker and Checker must be different users');
 
-  // Partner / Super Admin (Checker) approves reversal
+  // Independent Verified Partner (Checker) approves reversal
   await approvePaymentReversal({
     reversalId: reversalRequest.id,
     checkerUserId: 'partner-kumaran'
@@ -264,17 +264,17 @@ describe('Financial Boundary & Negative Fuzzing Suite (Zero-Paise Enforcement)',
 ```
 
 ### Verification Assertions
-1. **Zero-Paise Integrity**: Submitting fractional paise (`3950.50` or `22000.25`) to `POST /payments`, `POST /collections`, or `POST /auctions/:id/record-bid` fails closed at the NestJS `ValidationPipe` boundary with HTTP 400 `BadRequestException`, eliminating silent `Math.floor()` paise truncation.
+1. **Zero-Paise Integrity**: Submitting fractional paise (`3950.50` or `22000.25`) to `POST /api/v1/payments`, `POST /api/v1/collections/record`, or `POST /api/v1/auctions/:id/record-bid` fails closed at the NestJS `ValidationPipe` boundary with HTTP 400 `BadRequestException`, eliminating silent `Math.floor()` paise truncation.
 2. **Negative Amount Shielding**: Negative monetary values on any payment, collection, handover, or chit creation endpoint fail closed with HTTP 400 `BadRequestException`.
 3. **Statutory 1/4 Ceiling & 4% Floor Invariants**: Auction bids below 4.00% Foreman Commission ($D < C_f$) or above the 1/4 ceiling ($D > V/4$) fail closed with HTTP 400 `BadRequestException`.
 
 ---
 
-## 8. Extended Concurrency & Row-Locking Test Suite (5 Scenarios)
+## 8. Extended Concurrency & Row-Locking Test Suite (26 Real PostgreSQL 17 Scenarios: `CONCURR-INV-1..26`)
 
-> **Mandate**: In high-velocity financial operations (installment payments, auction closing, prize payout release, desk cash handover, and defaulter ticket reassignment), race conditions and stampedes MUST be serialized at the database row level via PostgreSQL pessimistic row locks (`SELECT ... FOR UPDATE`). In all race condition scenarios, strictly 1 concurrent worker succeeds and all competing workers are cleanly rejected.
+> **Mandate**: In high-velocity financial operations (installment payments, auction closing, prize payout release, desk cash handover, scheme activation, and defaulter ticket reassignment), race conditions and stampedes MUST be serialized at the database row level via PostgreSQL pessimistic row locks (`SELECT ... FOR UPDATE`). In all race condition scenarios, strictly 1 concurrent worker succeeds and all competing workers are cleanly rejected.
 
-- **Test Harness File**: [`apps/api/test/unit/concurrency-postgres.spec.ts`](../../apps/api/test/unit/concurrency-postgres.spec.ts)
+- **Test Harness File**: [`apps/api/test/unit/concurrency-postgres.spec.ts`](../../apps/api/test/unit/concurrency-postgres.spec.ts) (**26/26 scenarios passing against live PostgreSQL 17**, including `CONCURR-INV-1..5` highlighted below, `CONCURR-INV-6..25` covering receipts, UPI/recon, safety proofs, reversals, activation races & `EXPLAIN` index scans, and `CONCURR-INV-26` verifying PostgreSQL `AuditLog` append-only immutability triggers).
 - **Live Container Probe**: [`scripts/probes/verify-extended-concurrency.ps1`](../../scripts/probes/verify-extended-concurrency.ps1)
 
 ### Concurrency Invariant Scenarios Tested
@@ -320,15 +320,15 @@ describe('Ambiguous Failure & Network Disconnect Chaos Integration Tests (Real D
 2. **Cheque Collateral Upload Disconnect Guard (`CHAOS-S3-2`)**: When blank cheque S3 upload drops mid-stream, `AuctionWinner.securityDocS3Key` remains strictly `null` and `AuditLog` records 0 orphan events.
 3. **Financial Payment Non-Blocking Telecom Isolation (`CHAOS-SMS-1`)**: Downstream Indian telecom 504 Gateway Timeouts or BullMQ queue delays do NOT block teller response times (<500ms) or roll back committed financial ledgers (`Payment`, `InstallmentDue: PAID`, `Receipt`).
 4. **Driver Exponential Backoff (`CHAOS-SMS-2`)**: `Msg91SmsDriver` catches HTTP 504 as `isRetryable`, applying exponential backoff delay ($\text{delay} = \text{base} \times 2^{\text{attempt}}$) across 3 attempts.
-5. **Mobile Push Primary Routing (`CHAOS-SMS-3`)**: When telecom SMS routes are partitioned, customers with active smartphones receive receipt alerts via free FCM Mobile App Push, completely bypassing carrier SMS outages.
+5. **Mobile Push Continuity (`CHAOS-SMS-3`, `ADR-23/26`)**: While TRAI DLT SMS is the active Phase 1 primary channel, whenever a subscriber has a registered `fcmToken` (Phase 2 mobile app), receipt alerts route cleanly via free FCM push even if carrier SMS routes are partitioned.
 
 ---
 
-## 10. SMS OTP Request Cooldown & Distributed Brute-Force Lockout Suite (Redis & In-Memory)
+## 10. SMS OTP Request Cooldown, Daily Quota & Distributed Brute-Force Lockout Suite (`10 / 10 PASS`)
 
-> **Mandate**: To protect Kumaran Finance's paid MSG91 commercial SMS credits from bot flooding and prevent endless-cycling brute-force attacks against 6-digit OTP codes, the authentication system must enforce a 60-second request cooldown and a 5-minute (300s) brute-force lockout on the 3rd failed attempt across distributed Redis 7 instances with in-memory fallback.
+> **Mandate**: To protect Kumaran Finance's paid MSG91 commercial SMS credits from bot flooding and prevent endless-cycling brute-force attacks against 6-digit OTP codes, the authentication system must enforce a 60-second request cooldown, a 24-hour rolling daily cap (max 5 OTPs/day with carrier-failure decrement rollback), and a 5-minute (300s) brute-force lockout on the 3rd failed attempt across distributed Redis 7 instances with in-memory fallback.
 
-- **Test Harness File**: [`apps/api/test/unit/otp-cooldown-lockout.spec.ts`](../../apps/api/test/unit/otp-cooldown-lockout.spec.ts)
+- **Test Harness File**: [`apps/api/test/unit/otp-cooldown-lockout.spec.ts`](../../apps/api/test/unit/otp-cooldown-lockout.spec.ts) (**10/10 unit tests passing**)
 - **Live Container Probe**: [`scripts/probes/verify-otp-cooldown-lockout.ps1`](../../scripts/probes/verify-otp-cooldown-lockout.ps1)
 
 ### Scenarios Tested
@@ -341,9 +341,10 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
   //   OTP-RATE-4: Calling requestOtp while actively locked out MUST fail closed with HTTP 429 without sending SMS
   //   OTP-RATE-5: Calling verifyOtp while actively locked out MUST fail closed with HTTP 429
   //   OTP-RATE-6: Correct OTP verification MUST atomically clear active OTP, cooldown, and lockout states
-  // Part 2: Distributed Redis 7 Architecture
+  // Part 2: Distributed Redis 7 Architecture & 24h Rolling Quota (10 tests total)
   //   OTP-REDIS-1: Writes auth:otp:cooldown:<phone> with EX 60 and rejects subsequent requests
   //   OTP-REDIS-2: 3rd failed attempt writes auth:otp:lockout:<phone> with EX 300 and deletes auth:otp:<phone>
+  //   OTP-DAILY-1..2: Enforces 5 requests / 24h cap (auth:otp:daily:<phone>) & decrements on carrier failure
 });
 ```
 
@@ -353,14 +354,25 @@ describe('Auth Security: SMS OTP Request Cooldown & Brute-Force Lockout (Redis &
 3. **3-Attempt Lockout Penalty (`OTP-RATE-3`)**: The 3rd consecutive incorrect OTP submission in `verifyOtp` triggers an immediate 300-second (5-minute) lockout with `HTTP 429 Too Many Requests` and purges the active OTP session.
 4. **Lockout Shielding on All Endpoints (`OTP-RATE-4` & `OTP-RATE-5`)**: While `auth:otp:lockout:<phone>` is active, any attempt to request a new OTP or guess an OTP is rejected with `HTTP 429 Too Many Requests`.
 5. **Atomic Cleanup on Success (`OTP-RATE-6`)**: Successful verification with the correct 6-digit code atomically purges the active session, cooldown, and lockout keys (`clearOtpSession(phone, true)`).
-6. **Distributed Redis TTL Enforcement (`OTP-REDIS-1` & `OTP-REDIS-2`)**: Live Redis key inspection verifies `auth:otp:cooldown:<phone>` is written with `EX 60` and `auth:otp:lockout:<phone>` is written with `EX 300`.
+6. **Distributed Redis TTL & 24h Quota Enforcement (`OTP-REDIS-1`, `OTP-REDIS-2`, `OTP-DAILY`)**: Live Redis key inspection verifies `auth:otp:cooldown:<phone>` (`EX 60`), `auth:otp:lockout:<phone>` (`EX 300`), and `auth:otp:daily:<phone>` (`EX 86400`, max 5/day with failure decrement).
 
 ---
 
-## 11. Whole-Rupee Dividend Divisibility Suite (`KFC-FIN-002`)
+## 11. Whole-Rupee Dividend Divisibility Suite (`KFC-FIN-002` / `FIN-C`)
 
 - **Harness**: [`apps/api/test/unit/auction.spec.ts`](../../apps/api/test/unit/auction.spec.ts)
-- **Invariant**: $(D - C_f) \pmod M == 0$. Any bid where total dividend is not cleanly divisible across all subscriber tickets must fail closed.
+- **Invariant**: $(D - C_f) \pmod M == 0$. Any bid where total dividend is not cleanly divisible across all subscriber tickets must fail closed with `BadRequestException('NON_DIVISIBLE_DIVIDEND')`.
+
+#### Verified Divisibility Grid (₹1,00,000 / 20-Ticket Scheme, $C_f = ₹4,000$)
+| Bid Discount ($D$) | Commission ($C_f$) | Total Dividend ($D - C_f$) | $(D - C_f) \pmod{20}$ | Universal Div / Ticket | Outcome |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| **₹3,000** (< Floor) | ₹4,000 | — | Floor Breach | — | **REJECTED (`BID_BELOW_COMMISSION_FLOOR`)** |
+| **₹4,000** (Floor) | ₹4,000 | ₹0 | `0` | **₹0** | **ALLOWED** |
+| **₹10,000** | ₹4,000 | ₹6,000 | `0` | **₹300** | **ALLOWED** |
+| **₹20,000** | ₹4,000 | ₹16,000 | `0` | **₹800** | **ALLOWED** |
+| **₹20,005** | ₹4,000 | ₹16,005 | `5 != 0` | Remainder ₹5 | **REJECTED (`NON_DIVISIBLE_DIVIDEND`, HTTP 400)** |
+| **₹25,000** (1/4 Ceiling) | ₹4,000 | ₹21,000 | `0` | **₹1,050** | **ALLOWED** |
+| **₹25,001** (> Ceiling) | ₹4,000 | — | Ceiling Breach | — | **REJECTED (`BID_EXCEEDS_CEILING`, HTTP 400)** |
 
 ```typescript
 it('should reject auction bid when dividend is not cleanly divisible across tickets', async () => {
@@ -395,14 +407,15 @@ it('should deduct Month N base installment and prior arrears from final month se
 
 ---
 
-## 13. Arrears Auto-Offset Against Prize Money & Payout Override Suite (`KFC-FIN-003`, `KFC-FIN-004`)
+## 13. Arrears Auto-Offset Against Prize Money, TOCTOU Guard & Payout Override Suite (`KFC-FIN-003`, `KFC-FIN-004`, `FIN-A`, `FIN-D`)
 
 - **Harness**: [`apps/api/test/unit/disbursement.spec.ts`](../../apps/api/test/unit/disbursement.spec.ts)
 - **Verification Assertions**:
-  1. Unpaid installments up to auction month are automatically queried and deducted from the gross prize snapshot during `authorizePayout`.
-  2. If arrears $\ge$ prize money, authorization fails closed.
-  3. `releasePayout` verifies caller-supplied `disbursedAmount == authorizedNetPayout`; rejecting deviations with `PAYOUT_OVERRIDE_NOT_PERMITTED`.
-  4. Upon release, deducted arrears dues are atomically transitioned to `PAID`.
+  1. Unpaid installments up to auction month are automatically queried and deducted from the gross prize snapshot during `authorizePayout` (e.g., Prize ₹80,000 − Arrears ₹8,600 = ₹71,400 net payout).
+  2. If arrears $\ge$ prize money, authorization fails closed (`OUTSTANDING_ARREARS_EXCEED_PRIZE`).
+  3. `releasePayout` verifies caller-supplied `disbursedAmount == authorizedNetPayout`, rejecting arbitrary deviations with `PAYOUT_OVERRIDE_NOT_PERMITTED`.
+  4. **TOCTOU Stale Arrears Race Guard (`FIN-D`)**: If a subscriber pays an overdue installment at the branch counter *between* `authorizePayout` (arrears snapshot ₹8,600) and `releasePayout` (live arrears now ₹4,400), the locked transaction detects `currentArrears !== expectedArrears` and fails closed with `BadRequestException('ARREARS_STATE_CHANGED')` until re-authorized — eliminating double collection.
+  5. Upon valid release, deducted arrears dues are atomically transitioned to `PAID` and logged via `PRIZE_ARREARS_OFFSET_ALLOCATED`.
 
 ---
 

@@ -3,10 +3,10 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Target Subsystem**: NestJS 12 Modular Monolith (`apps/api/`)  
-> **Execution Status**: ✅ **100% PASS (10/10 Test Suites, 92/92 Tests Passing, Exit Code 0)**  
+> **Execution Status**: ✅ **100% PASS (14/14 E2E Test Suites, 187/187 E2E Tests Passing, Exit Code 0)**  
 > **Execution Mode**: In-Process Harness via Supertest 7 + NestJS TestingModule (`--runInBand`)  
 > **Verified Database**: Isolated Test Sandbox `chitflow_test` on `127.0.0.1:5433` (PostgreSQL 17)  
-> **Generated At**: 2026-11-11T14:28:35Z  
+> **Monorepo Companion Baselines**: **63 API Unit Suites (1,226 tests)** + **14 Web Node `--test` Suites (376 tests)** + **10 `@kumaran/api-client` tests** + **26/26 Real PostgreSQL 17 Concurrency Tests (`CONCURR-INV-1..26`)**
 
 ---
 
@@ -17,7 +17,7 @@
 # Step 1: Re-seed isolated test database with deterministic fixtures
 pnpm --filter api run test:db:seed
 
-# Step 2: Execute all 10 E2E test suites sequentially
+# Step 2: Execute all 14 E2E test suites sequentially
 pnpm --filter api run test:e2e -- --runInBand
 ```
 
@@ -31,21 +31,25 @@ pnpm --filter api run test:e2e:fresh
 
 ---
 
-## 2. Test Suite Execution Summary
+## 2. Test Suite Execution Summary (All 14 Live E2E Suites — 187 Tests)
 
-| # | Test Suite | Path | Tests | Passing | Failing | Duration | Status |
-|---|---|---|:---:|:---:|:---:|:---:|:---:|
-| 1 | API Versioning & Routing | `test/e2e/app.e2e-spec.ts` | 3 | 3 | 0 | 2.46s | ✅ PASS |
-| 2 | Standardized Response Envelope | `test/e2e/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | 2.89s | ✅ PASS |
-| 3 | Security Headers & Strict CORS | `test/e2e/security-headers.e2e-spec.ts` | 7 | 7 | 0 | 2.28s | ✅ PASS |
-| 4 | Throttler & Rate Limiting | `test/e2e/throttler.e2e-spec.ts` | 4 | 4 | 0 | 2.73s | ✅ PASS |
-| 5 | Authentication & Session Protocol | `test/e2e/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | 7.88s | ✅ PASS |
-| 6 | Customer Intake, KYC & Anti-BOLA | `test/e2e/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | 6.32s | ✅ PASS |
-| 7 | Chits, 1/4 Ceiling & Tie-Breaks | `test/e2e/03-chits-auctions.e2e-spec.ts` | 10 | 10 | 0 | 5.92s | ✅ PASS |
-| 8 | Payments, Discrete Math & UPI | `test/e2e/04-payments-reversals.e2e-spec.ts` | 14 | 14 | 0 | 11.71s | ✅ PASS |
-| 9 | Disbursements, Safety & Jobs | `test/e2e/05-disbursements-jobs.e2e-spec.ts` | 15 | 15 | 0 | 7.62s | ✅ PASS |
-| 10 | Storage & Document Streaming | `test/e2e/06-storage-documents.e2e-spec.ts` | 6 | 6 | 0 | 6.42s | ✅ PASS |
-| **TOTAL** | **Full Backend Test Harness** | **10 Suites** | **92** | **92** | **0** | **32.59s** *(fresh)* | ✅ **100% PASS** |
+| # | Test Suite | Path | Tests | Passing | Failing | Status |
+|---|---|---|:---:|:---:|:---:|:---:|
+| 1 | API Versioning & Routing | `test/e2e/app.e2e-spec.ts` | 3 | 3 | 0 | ✅ PASS |
+| 2 | Standardized Response Envelope | `test/e2e/response-envelope.e2e-spec.ts` | 6 | 6 | 0 | ✅ PASS |
+| 3 | Security Headers & Strict CORS | `test/e2e/security-headers.e2e-spec.ts` | 7 | 7 | 0 | ✅ PASS |
+| 4 | Throttler & Rate Limiting | `test/e2e/throttler.e2e-spec.ts` | 4 | 4 | 0 | ✅ PASS |
+| 5 | Proxy Client IP & AsyncLocalStorage | `test/e2e/proxy-client-ip.e2e-spec.ts` | 7 | 7 | 0 | ✅ PASS |
+| 6 | Authentication & Session Protocol | `test/e2e/01-auth-security.e2e-spec.ts` | 15 | 15 | 0 | ✅ PASS |
+| 7 | Customer Intake, KYC & Anti-BOLA | `test/e2e/02-customer-kyc.e2e-spec.ts` | 12 | 12 | 0 | ✅ PASS |
+| 8 | Chits, 1/4 Ceiling & Tie-Breaks | `test/e2e/03-chits-auctions.e2e-spec.ts` | 13 | 13 | 0 | ✅ PASS |
+| 9 | Module 4 Chit Schemes Full Lifecycle | `test/e2e/04-module4-chit-schemes.e2e-spec.ts` | 49 | 49 | 0 | ✅ PASS |
+| 10 | Payments, Discrete Math & UPI | `test/e2e/04-payments-reversals.e2e-spec.ts` | 16 | 16 | 0 | ✅ PASS |
+| 11 | Disbursements, Safety & Jobs | `test/e2e/05-disbursements-jobs.e2e-spec.ts` | 18 | 18 | 0 | ✅ PASS |
+| 12 | Storage & Document Streaming | `test/e2e/06-storage-documents.e2e-spec.ts` | 6 | 6 | 0 | ✅ PASS |
+| 13 | PostgreSQL & Redis Auth/Session Lifecycle | `test/e2e/07-postgres-redis-lifecycle.e2e-spec.ts` | 6 | 6 | 0 | ✅ PASS |
+| 14 | Engine-Level Maker-Checker DB `CHECK` Constraints | `test/e2e/08-maker-checker-db-constraints.e2e-spec.ts` | 25 | 25 | 0 | ✅ PASS |
+| **TOTAL** | **Full Backend E2E Harness** | **14 Suites** | **187** | **187** | **0** | ✅ **100% PASS** |
 
 ---
 
@@ -77,13 +81,13 @@ Validates standard business workflows across all primary backend controllers:
   - Customer self-service UPI UTR reference claim submission (`POST /api/v1/payments/upi-claim`)
   - Verification of customer UPI claims by Accounting Desk Checker (`POST /api/v1/payments/:id/verify-upi-claim`)
 - **Disbursements & Background Jobs**:
-  - Dual-control prize money disbursement authorization and release (`POST /api/v1/disbursements/auction/:id/authorize-payout`, `/release-payout`)
+  - Dual-control prize money disbursement authorization and release (`POST /api/v1/disbursements/auction/:id/authorize-payout`, `/disburse`)
   - Month N final settlement payout without auction (`POST /api/v1/disbursements/group/:id/final-settlement`)
   - BullMQ queue health inspect (`GET /api/v1/jobs/queue-status`)
   - Dispatched notification audit logs (`GET /api/v1/jobs/notification-audit-logs`)
   - Repeatable cron schedules inspection (`GET /api/v1/jobs/repeatable-schedules`)
   - Manual trigger for pre-auction scan (`POST /api/v1/jobs/run-pre-auction-scan`)
-  - Enqueuing daily arrears check and gateway reconciliation (`POST /api/v1/jobs/enqueue-daily-arrears`, `/enqueue-reconciliation`)
+  - Enqueuing daily arrears check and Karur Vysya Bank settlement reconciliation (`POST /api/v1/jobs/enqueue-daily-arrears`, `/enqueue-reconciliation` — ADR-19)
 - **Storage & Documents**:
   - Super Admin streaming multi-segment KYC documents with binary headers (`GET /api/v1/storage/file/kyc/*`)
 - **Platform Infrastructure**:
@@ -161,12 +165,12 @@ Exercises complex end-to-end multi-step operational journeys:
    - Unpaid due lookup $\to$ NPCI `upi://pay` URI generation locking exact net installment $\to$ Customer transfers via Google Pay and self-reports 12-digit Bank UTR $\to$ Payment created in `INITIATED` status with due remaining unchanged $\to$ Duplicate UTR submission blocked (HTTP 409) $\to$ Accounting Desk queries pending claims $\to$ Maker self-verification blocked (HTTP 403) $\to$ Checker verifies bank statement credit $\to$ Payment transitions to `SUCCESS`, due marks `PAID`, bilingual receipt issued (`04-payments-reversals.e2e-spec.ts`).
 6. **Scenario 6: Prize Money Disbursement with Safety Proofs & Dual Control (ADR-10 & ADR-15)**
    - Pre-auction winner record in `PENDING_VERIFICATION` $\to$ Safety checklist verification (agreement signed, blank cheques details recorded, nominee signed) with remarks persisted $\to$ Maker self-authorization blocked $\to$ Branch Manager authorization blocked $\to$ Partner B Checker authorizes payout $\to$ Money release recorded with cheque/bank reference $\to$ Bilingual voucher issued (`05-disbursements-jobs.e2e-spec.ts`).
-7. **Scenario 7: Month N Final Settlement Execution**
-   - Final month settlement to the single non-prized subscriber without auction $\to$ Payout = $V - (V \times 0.04)$ with Foreman Commission deducted $\to$ Group transitions to `COMPLETED` (`05-disbursements-jobs.e2e-spec.ts`).
+7. **Scenario 7: Month N Final Settlement Execution (`KFC-FIN-001` / `FIN-B`)**
+   - Final month settlement to the single non-prized subscriber without auction $\to$ Net Payout = $V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$ (**₹91,000** on ₹1L scheme if Month $N$ unpaid, atomically marking Month $N$ `PAID`; **₹96,000** if Month $N$ was already paid at desk) $\to$ Group transitions to `COMPLETED` (`05-disbursements-jobs.e2e-spec.ts`).
 
 ---
 
-## 4. Complete Test Inventory (92 E2E Tests + Unit Rate Checks)
+## 4. Core E2E Test Case Inventory (Representative Core Cases Across 14 Suites / 187 Live Tests)
 
 | Test ID | Test Suite | Description | Tier | Status |
 |---|---|---|:---:|:---:|
@@ -268,23 +272,24 @@ Exercises complex end-to-end multi-step operational journeys:
 
 ## 5. Invariant Architectural Guardrails Verification Status
 
-All 10 Invariant Architectural Guardrails confirmed by developer in `AGENTS.md` have been verified with 100% compliance:
+All **11 Invariant Architectural Guardrails** confirmed by developer in `AGENTS.md` have been verified with 100% compliance:
 
 | # | Architectural Guardrail | Implementation & Verification Status | Verified By |
 |---|---|---|---|
-| **1** | **Single-Company Tenancy (ADR-01)** | Strictly zero `company_id` columns exist across all 17 Prisma models. Head Office PRD branch serves as the company anchor. | Data Model & Prisma Schema |
+| **1** | **Single-Company Tenancy (ADR-01)** | Strictly zero `company_id` columns exist across all **18 Prisma models** (including `Session`). Head Office PRD branch serves as the company anchor. | Data Model & Prisma Schema |
 | **2** | **Pure Whole Rupee Math (`BigInt`)** | All monetary amounts stored as `BigInt`. Input DTOs enforce `@IsInt()` and `@IsPositive()`. BigIntInterceptor serializes to safe numbers. | `TC-ENV-02`, `TC-VAL-01`, `TC-VAL-02` |
 | **3** | **Commission Freeze (ADR-04)** | 4.00% Foreman Commission copied and locked permanently per chit scheme upon activation. | `TC-HP-01` in Chits (`foremanCommissionRate = 4.00`) |
-| **4** | **Universal Equal Dividend Deduction** | Universal dividend ($Div_{ticket} = Div_{total} / M$) deducted equally from next month's payable installment for all members. | `TC-BIZ-02` in Auctions ($16,000 / 20 = 800$) |
-| **5** | **Month 1 & Month N Rules** | Month 1 full pool to company ticket (no auction); Month N settled directly to final non-prized subscriber without auction ($V - 4\%$). | `TC-HP-02` in Disbursements |
+| **4** | **Universal Equal Dividend Deduction** | Universal dividend ($Div_{ticket} = Div_{total} / M$) deducted equally from next month's payable installment for all members; $(D - C_f) \pmod M == 0$ enforced (`NON_DIVISIBLE_DIVIDEND`). | `TC-BIZ-02` in Auctions ($16,000 / 20 = 800$) |
+| **5** | **Month 1 & Month N Rules (`KFC-FIN-001` / `FIN-B`)** | Month 1 full pool to company ticket (no auction); Month $N$ settled directly to final non-prized subscriber without auction: $V - C_f - I_{\text{base}}$ (**₹91,000** if Month $N$ unpaid, marking due `PAID`; **₹96,000** if already paid at desk). | `TC-HP-02` in Disbursements |
 | **6** | **Fixed 1/4 Ceiling & Physical Tie-Break (ADR-06 & Option A)** | Bids exceeding 25% ceiling strictly rejected. Multiple ceiling bids recorded via physical token draw at branch (Option A). Software RNG prohibited. | `TC-BIZ-01` & `TC-BIZ-03` in Auctions |
 | **7** | **Ticket Limit Constraint (ADR-13)** | Max 1 ticket per customer in the same chit group (`@@unique([chitGroupId, customerId])`). 2nd ticket assignment rejected with 409 Conflict. | `TC-DB-01` in Chits |
 | **8** | **Defaulter & Single Discrete Payment (ADR-07)** | Zero double payments, zero partial payments, zero advance balances. Unpaid due must be paid with exact discrete amount. | `TC-BIZ-01` & `TC-BIZ-02` in Payments |
 | **9** | **Company Safety Proof Checklist (ADR-15)** | Property documents eliminated. Flexible checklist (signed agreement, cheques, promissory note) recorded and verified before payout. | `TC-HP-01` & `TC-VAL-01` in Disbursements |
-| **10** | **Maker != Checker Separation of Duties** | Enforced across Payment Reversals, Prize Disbursements, and UPI Claim Verifications. Branch Manager blocked from reversals/payouts. | `TC-BIZ-03`, `TC-UPI-05`, `TC-AUTHZ-01`, `TC-AUTHZ-02` |
+| **10** | **Maker != Checker Separation of Duties** | Enforced across Payment Reversals, Auctions, Prize Disbursements, Defaulter Removals, Cash Handover, and UPI Claims in both app + **8 PostgreSQL 17 `CHECK` constraints**. | `TC-BIZ-03`, `TC-UPI-05`, `TC-AUTHZ-01`, `08-maker-checker-db-constraints.e2e-spec.ts` (25/25) |
+| **11** | **Verified Partner Identity (ADR-21 / SEC-A)** | Non-Partner IT Super Admins (`isPartner: false`) are strictly barred from financial authorizations; audit logs & BullMQ telemetry are restricted strictly to `SUPER_ADMIN`. | `05-disbursements-jobs.e2e-spec.ts`, `adversarial-security-invariants.spec.ts` |
 
 ---
 
 ## 6. Conclusion
 
-The full backend E2E verification test suite is complete, reproducible (verified on both `test:e2e:fresh` and repeat warm-cache `test:e2e`), and green with **100% pass rate (92/92 test cases across 10 test suites)**. All 10 Invariant Architectural Guardrails and all operational personas (Super Admin Maker/Checker, Branch Manager, Desk Accountant, Field Agents, Customers, Auditor) are comprehensively verified.
+The full backend E2E verification test suite is complete, reproducible (verified on both `test:e2e:fresh` and repeat warm-cache `test:e2e`), and green with **100% pass rate (187/187 E2E tests across 14 suites)** alongside **1,226 API unit tests (63 suites)**, **376 Web Node `--test` tests (14 suites)**, **10 `@kumaran/api-client` tests**, and **26/26 real PostgreSQL 17 concurrency tests**. All **11 Invariant Architectural Guardrails** and all operational personas are comprehensively verified.

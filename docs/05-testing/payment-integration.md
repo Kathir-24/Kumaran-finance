@@ -12,7 +12,7 @@ In place of costly aggregator gateways that charge 1.5%–2% + GST per transacti
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Customer as Subscriber (Flutter Android App)
+    actor Customer as Subscriber (Phase 1 Web/UPI Link & Dart Core / Phase 2 Flutter App — ADR-26)
     participant UPIApp as GPay / PhonePe / Paytm / BHIM
     participant Backend as NestJS API (apps/api)
     participant DB as PostgreSQL 17 (chitflow_dev)
@@ -42,9 +42,9 @@ sequenceDiagram
     Backend->>Backend: Enforces Maker != Checker (Submitter != Accountant)
     Backend->>DB: Transaction: Payment -> SUCCESS, Issue Sequential Receipt, Mark Due -> PAID
     DB-->>Backend: Commit Successful
-    Backend->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (Push/SMS)
+    Backend->>Queue: Enqueue JOB_DISPATCH_PAYMENT_RECEIPT (TRAI DLT SMS Phase 1 / FCM Push Phase 2)
     Backend-->>Accountant: HTTP 200 OK (Receipt KC-REC-PRD-YYYY-XXXXX issued)
-    Queue-->>Customer: Instant Push Notification & Digital Passbook updated to PAID!
+    Queue-->>Customer: Bilingual TRAI DLT SMS (Phase 1 primary, ADR-23) / FCM Push (Phase 2) & Passbook updated to PAID!
 ```
 
 ---
@@ -58,12 +58,13 @@ upi://pay?pa=kumaranfinance@kvb&pn=Kumaran+Finance&am=3950&cu=INR&tn=KCA-1L-20M-
 ```
 When launched on Android, the payment app does not allow the subscriber to edit or change the amount, preventing underpayments or overpayments.
 
-### 2.2 Bank UTR Anti-Duplication Constraint (PostgreSQL 17)
+### 2.2 Bank UTR & Payout Reference Anti-Duplication Constraints (PostgreSQL 17)
 - In [`apps/api/prisma/schema.prisma`](file:///u:/Kumaran-finance/apps/api/prisma/schema.prisma):
   ```prisma
   transactionRef String? @unique // UPI Ref, Cheque number, Bank UTR
   ```
 - Migration [`20261027094809_add_transaction_ref_unique_constraint`](file:///u:/Kumaran-finance/apps/api/prisma/migrations/20261027094809_add_transaction_ref_unique_constraint/migration.sql) establishes a B-tree unique index in PostgreSQL (`Payment_transactionRef_key`).
+- In addition, migration [`20261118124500_case_insensitive_payout_ref_index`](file:///u:/Kumaran-finance/apps/api/prisma/migrations/20261118124500_case_insensitive_payout_ref_index/migration.sql) enforces case-insensitive partial unique index **`uq_auction_winner_non_cash_payment_ref`** preventing duplicate non-cash prize payout cheque/NEFT/UPI references.
 - Standard SQL rule: `NULL` entries are permitted infinitely for physical cash transactions, but any non-null 12-digit UTR string can only be entered once across the lifetime of the database.
 - Collision attempts return `HTTP 409 Conflict` (`DUPLICATE_TRANSACTION_REF`).
 
@@ -76,12 +77,12 @@ When launched on Android, the payment app does not allow the subscriber to edit 
 
 ## 3. Endpoints & API Contract Reference
 
-| Method & Path | Primary Role | Description |
+| Method & Path | Exact Live `@Roles(...)` | Description |
 |---|---|---|
-| `GET /installments/:dueId/upi-intent` | `CUSTOMER`, All Staff | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
-| `POST /payments/upi-claim` | `CUSTOMER`, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
-| `GET /payments/pending-upi-claims` | `ACCOUNTANT`, `SUPER_ADMIN` | Lists paginated (`?page=1&limit=20`, max `100`) pending UPI claims via `ApiPaginatedResponseEnvelope` for Accounting Desk statement matching. |
-| `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
+| `GET /api/v1/installments/:dueId/upi-intent` | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` ([`installment.controller.ts:132-138`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.controller.ts#L132-L138); excludes `AUDITOR`) | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
+| `POST /api/v1/payments/upi-claim` | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:309`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L309); excludes `COLLECTION_AGENT` & `AUDITOR`) | Customer/staff submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
+| `GET /api/v1/payments/pending-upi-claims` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:140`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L140)) | Lists paginated (`?page=1&limit=20`, max `100`) pending UPI claims via `ApiPaginatedResponseEnvelope` for Accounting Desk statement matching. |
+| `POST /api/v1/payments/:id/verify-upi-claim` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:330`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L330)) | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
 
 ---
 
