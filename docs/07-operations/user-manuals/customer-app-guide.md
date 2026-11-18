@@ -3,27 +3,30 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Target Audience**: **Chit Subscribers / Members (சந்தாதாரர்கள்)**  
-> **Primary Platform**: **Android Mobile App (Flutter in `apps/mobile/`)**  
+> **Platform Delivery (`ADR-26`)**: **Phase 1 (Live 2026)**: Bilingual A5 Counter Receipts, Form XXI PDF Passbooks (issued at Perundurai branch desk), Bilingual TRAI DLT SMS Alerts (`ADR-23`), & Direct Zero-Fee KVB UPI (`ADR-19`) | **Phase 2 (Q2 2027)**: Native Android Mobile App (Flutter UI + Google Play APK, built atop the already-implemented Dart Core SDK in `apps/mobile/lib/core/`)  
 > **Languages Supported**: **Bilingual (English & தமிழ்)**  
-> **Core Value**: Complete financial transparency, digital passbook access, 1-tap UPI payments, and zero surprise fees.
+> **Core Value**: Complete financial transparency, digital passbook access, zero-fee NPCI UPI payments, and zero surprise fees.
+
+> [!IMPORTANT]
+> **Phase 1 vs. Phase 2 Rollout Notice (`ADR-26`)**: Per Kumaran Finance's authoritative Phase 1 launch directive, the native **Flutter Android UI and Google Play Store APK are deferred to Phase 2 (Q2 2027)** (`apps/mobile/lib/core/` already contains the typed Dart API models and offline synchronization layer). During **Phase 1 (2026)**, subscribers receive official printed bilingual A5 receipts, signed Form XXI PDF passbooks from the Perundurai Head Office desk, instant **bilingual TRAI DLT SMS confirmations (`ADR-23`)**, and direct Karur Vysya Bank UPI payment links (`ADR-19`). The mobile app workflows below describe the canonical Phase 2 Android subscriber experience backed by the live Phase 1 REST APIs.
 
 ---
 
 ## 1. Operating Overview & Member Welcome
 
-Welcome to **Kumaran Chits**, the official mobile self-service app of Kumaran Finance. Built specifically for our subscribers in Perundurai and across Tamil Nadu, this app puts your chit passbook directly into your pocket:
+Welcome to **Kumaran Chits**, the official member service experience of Kumaran Finance. Built specifically for our subscribers in Perundurai and across Tamil Nadu, the Phase 2 Android app (backed by live Phase 1 APIs) puts your chit passbook directly into your pocket:
 - Check your monthly installment dues and dividend savings 24/7.
-- Pay your monthly dues in seconds using Google Pay, PhonePe, Paytm, or BHIM UPI.
+- Pay your monthly dues directly to Kumaran Finance's Karur Vysya Bank account with **₹0 gateway fees** via Google Pay, PhonePe, Paytm, or BHIM UPI (`ADR-19`).
 - View live auction results, winning discounts, and next month's discounted dues.
 - Access bilingual digital receipts and Form XXI 20-month passbooks anytime without visiting the branch.
 
 ```mermaid
 flowchart TD
-    subgraph CUSTOMER_APP ["The Kumaran Chits Member Mobile Experience"]
+    subgraph CUSTOMER_APP ["The Kumaran Chits Member Experience (Phase 1 APIs / Phase 2 Android UI)"]
         Passbook["1. Digital Passbook\nView 20-month payment history & dividend savings"]
-        Pay["2. 1-Tap UPI Payment\nPay instantly via Google Pay, PhonePe, Paytm"]
+        Pay["2. Zero-Fee Direct UPI (ADR-19)\nPay to KVB via GPay/PhonePe & submit 12-digit UTR"]
         Auction["3. Auction Transparency\nTrack winning bids, ceiling caps, and dividends"]
-        Receipt["4. Digital Receipts\nDownload official bilingual PDF receipts"]
+        Receipt["4. Digital Receipts & DLT SMS\nOfficial bilingual PDF receipts & TRAI DLT SMS alerts"]
     end
 ```
 
@@ -33,24 +36,24 @@ flowchart TD
 
 | Section | Member Action | Languages | Primary Feature |
 |---|---|:---:|:---:|
-| **§3** | First-Time Setup, OTP & Language Selection | English & தமிழ் | Mobile App Registration |
-| **§4** | Digital Passbook & 20-Month Ledger Inspection | English & தமிழ் | Passbook Screen |
-| **§5** | 1-Tap Online Installment Payment via UPI | English & தமிழ் | UPI Intent Gateway |
-| **§6** | Doorstep Cash Payment & Push Notification Receipt | English & தமிழ் | Cash Collection Alert |
+| **§3** | First-Time Setup, OTP & Language Selection *(Phase 2 App)* | English & தமிழ் | Mobile App Registration |
+| **§4** | Digital Passbook & 20-Month Ledger Inspection | English & தமிழ் | Form XXI Passbook |
+| **§5** | Direct Zero-Fee UPI Payment & Bank UTR Claim (`ADR-19`) | English & தமிழ் | NPCI Native UPI Intent |
+| **§6** | Doorstep Cash Payment & Bilingual Receipt Alerts (`ADR-23/26`) | English & தமிழ் | TRAI DLT SMS / Push Alert |
 | **§7** | Auction Eligibility Check & Live Results Tracker | English & தமிழ் | Auction Tracker |
-| **§8** | Prize Winner Claim & Company Safety Proof | English & தமிழ் | Payout Status Screen |
-| **§9** | Managing Nominee Details & Profile Updates | English & தமிழ் | Profile Settings |
+| **§8** | Prize Winner Claim & Company Safety Proof (`ADR-15`) | English & தமிழ் | Payout Status Screen |
+| **§9** | Viewing & Submitting Nominee Details | English & தமிழ் | Profile Settings |
 | **§10** | Branch Office Direct Phone Contact & Support | English & தமிழ் | Help Desk |
-| **§11** | Member FAQs, WhatsApp Sharing & Troubleshooting | English & தமிழ் | Member Self-Service |
+| **§11** | Member FAQs, PDF Export & Troubleshooting | English & தமிழ் | Member Self-Service |
 
 ---
 
-## 3. First-Time Setup, OTP & Language Selection
+## 3. First-Time Setup, OTP & Language Selection *(Phase 2 Android Rollout)*
 
 ```mermaid
 flowchart TD
-    Download["1. Download 'Kumaran Chits' from Google Play Store"] --> Open["2. Open App -> Enter 10-Digit Mobile Number"]
-    Open --> OTP["3. Enter 6-Digit SMS Verification OTP"]
+    Download["1. Install 'Kumaran Chits' Android App (Phase 2 - Q2 2027)"] --> Open["2. Open App -> Enter 10-Digit Mobile Number"]
+    Open --> OTP["3. Enter 6-Digit TRAI DLT SMS Verification OTP"]
     OTP --> MPIN["4. Set Secret 6-Digit MPIN (or enable Fingerprint)"]
     MPIN --> LangChoice{"5. Select Preferred Display Language:\nEnglish or தமிழ் (Tamil)?"}
     LangChoice -- "English" --> EnglishHome["App configured in English"]
@@ -60,10 +63,10 @@ flowchart TD
 ```
 
 ### Step-by-Step Instructions:
-1. Download and install **Kumaran Chits** from the Google Play Store on your Android phone.
+1. *(Phase 2 — Q2 2027)* Install **Kumaran Chits** on your Android phone once published for Phase 2 rollout. *(In Phase 1, branch staff manage your passbook and issue instant bilingual A5 receipts & TRAI DLT SMS confirmations.)*
 2. Enter your 10-digit mobile phone number registered with Kumaran Finance.
-3. Enter the 6-digit SMS verification code sent to your phone.
-4. Set a memorable **6-digit MPIN** (e.g., `482195`) or scan your fingerprint to enable 1-second biometric login.
+3. Enter the 6-digit TRAI DLT SMS verification code (`POST /api/v1/auth/mobile/request-otp` $\to$ `verify-otp`) sent to your phone.
+4. Set a memorable **6-digit MPIN** (e.g., `482195`) or enable biometric unlock.
 5. Choose your preferred display language: **English** or **தமிழ் (Tamil)**.
    *(You can switch languages anytime from the settings menu).*
 
@@ -122,20 +125,20 @@ flowchart TD
 
 ---
 
-## 6. Doorstep Cash Payment & Push Notification Receipt
+## 6. Doorstep Cash Payment & Bilingual Receipt Alerts (`ADR-23` / `ADR-26`)
 
 ```mermaid
 flowchart TD
-    AgentVisit["Field Agent visits your doorstep on motorcycle"] --> CashHand["You pay ₹3,700 cash to Agent Murugan"]
-    CashHand --> AgentEnters["Agent records collection on his phone"]
-    AgentEnters --> InstantPush["Your phone receives an INSTANT Push Notification:\n'Kumaran Finance: Payment Received! ₹3,700 for Ticket #7. Receipt #KC-REC-PRD-2026-00124'"]
-    InstantPush --> PassbookCheck["Agent signs your physical paper passbook booklet with pen\nYour app passbook balance updates to PAID"]
+    AgentVisit["Field Agent visits your doorstep"] --> CashHand["You pay ₹3,700 cash to Agent Murugan"]
+    CashHand --> AgentEnters["Agent records collection in Kumaran Chits"]
+    AgentEnters --> InstantAlert["Your phone receives an instant Bilingual Receipt Alert:\n• Phase 1 Primary: TRAI DLT SMS (MSG91)\n• Phase 2 Android App: FCM Push Notification\n'Kumaran Finance: Payment Received! ₹3,700 for Ticket #7. Receipt #KC-REC-PRD-2026-00124'"]
+    InstantAlert --> PassbookCheck["Agent signs your physical paper passbook booklet with pen\nYour ledger balance updates to PAID"]
 ```
 
 ### Step-by-Step Instructions:
 1. When our collection agent visits your premises, hand the exact net installment in cash.
-2. The agent records the payment on his mobile phone.
-3. Within 3 seconds, your smartphone will chime with an official **Push Notification**:
+2. The agent records the payment via the responsive web portal (or Phase 2 Android app).
+3. Your mobile phone receives an official bilingual **TRAI DLT SMS receipt confirmation** (Phase 1 primary per `ADR-23`; plus Android FCM Push Notification in Phase 2 per `ADR-26`):
    - *"குமரன் பைனான்ஸ்: ரசீது எண் KC-REC-PRD-2026-00124. தொகை ₹3,700 பெறப்பட்டது."*
 4. Ensure the agent writes the receipt number and signs your physical paper passbook booklet.
 
@@ -162,40 +165,40 @@ flowchart TD
 
 ---
 
-## 8. Prize Winner Claim & Company Safety Proof
+## 8. Prize Winner Claim & Company Safety Proof (`ADR-15`)
 
 ```mermaid
 flowchart TD
-    Win["You win the auction at Month 4! (Winning Discount: ₹25,000)"] --> PrizeCalc["Prize Money Breakdown:\nChit Value: ₹1,00,000\nLess Winning Discount: -₹25,000\nNet Prize Money: ₹75,000"]
+    Win["You win the auction at Month 4! (Winning Discount: ₹25,000)"] --> PrizeCalc["Server-Computed Prize Money Breakdown (KFC-FIN-003/004):\nChit Value: ₹1,00,000\nLess Winning Discount: -₹25,000\nLess Unpaid Arrears Auto-Offset (if any): -₹0\nNet Prize Money: ₹75,000 (Zero manual overrides)"]
     PrizeCalc --> Checklist["Visit Head Office with Safety Proof Papers (ADR-15):\n1. Sign Member Chit Agreement (with Nominee)\n2. Submit signed blank bank cheque(s)\n3. Submit promissory note / personal guarantee\n(No property deeds required!)"]
-    Checklist --> Tracking["Track Disbursement on Mobile App:\nStatus: VERIFIED_BY_MAKER -> AUTHORIZED_BY_CHECKER -> DISBURSED\nReceive Cheque or Direct Bank Transfer (NEFT)"]
+    Checklist --> Tracking["Track Disbursement Status:\nVERIFIED_BY_MAKER -> AUTHORIZED_BY_CHECKER -> DISBURSED\nReceive Cheque, NEFT/RTGS, or Cash"]
 ```
 
 ### Step-by-Step Instructions:
-1. When you win the in-office auction, your prize money is calculated as $V - D$ (e.g., `₹1,00,000 - ₹25,000 = ₹75,000`).
+1. When you win the in-office auction, your net prize money is automatically computed by the server as $V - D - \text{Unpaid Arrears Offset}$ (e.g., `₹1,00,000 - ₹25,000 = ₹75,000`). Manual payout overrides are strictly disallowed (`KFC-FIN-004`), and any pending unpaid installments on the winning ticket are automatically offset before release (`KFC-FIN-003`).
 2. Visit the Perundurai Head Office with your nominee to complete the standard **Company Safety Proof Checklist**:
    - Sign the Winner Chit Agreement alongside your registered nominee.
    - Provide signed blank bank cheques with bank details.
    - Provide a standard promissory note / personal guarantee.
    - *(Note: Property deeds are completely eliminated).*
-3. Track the status on your mobile app: as soon as the Partner authorizes your voucher, funds are disbursed via Cheque, NEFT, or Cash.
+3. Once Verified Partner B authorizes your voucher (`AUTHORIZED_BY_CHECKER`), funds are disbursed via Account Payee Cheque, NEFT/RTGS, or Cash (`DISBURSED`).
 
 ---
 
-## 9. Managing Nominee Details & Profile Updates
+## 9. Viewing & Submitting Nominee Details
 
 ```mermaid
 flowchart TD
     Profile["Tap 'Profile / சுயவிவரம்'"] --> Nominee["Tap 'Nominee Details / வாரிசுதாரர் விவரங்கள்'"]
-    Nominee --> Edit["View / Update Nominee Information:\n• Nominee Full Name\n• Relationship (Spouse, Child, Parent)\n• 10-Digit Mobile Number"]
-    Edit --> Save["Tap 'Update Nominee' -> Branch verifies and confirms"]
+    Nominee --> ViewOrAdd["View Registered Nominees or Add New Nominee:\n(POST /api/v1/customers/:id/nominees)\n• Nominee Full Name\n• Relationship (Spouse, Child, Parent)\n• 10-Digit Mobile Number & Optional Masked Aadhaar"]
+    ViewOrAdd --> StaffEdit["Need to edit or remove an existing nominee?\nVisit Perundurai Head Office (Branch Manager / Partner only)"]
 ```
 
 ### Step-by-Step Instructions:
-1. Tap **"Profile"** in the bottom menu.
-2. Open **"Nominee Details"**.
-3. Confirm that your nominee’s legal name, relationship, and contact mobile number are accurate.
-4. If an update is required, submit the changes for branch verification.
+1. Tap **"Profile"** in the menu and open **"Nominee Details"** (`GET /api/v1/customers/:id`).
+2. Confirm that your nominee’s legal name, relationship, and contact mobile number are accurate.
+3. To register a new nominee on your own profile, submit the details (`POST /api/v1/customers/:id/nominees`, strictly scoped to self).
+4. To **modify or remove** an existing nominee or update core KYC/contact details (`PATCH /api/v1/customers/:id`, `DELETE /api/v1/customers/:id/nominees/:nomineeId`), visit the Perundurai Head Office so a Branch Manager or Managing Partner can verify and process the change.
 
 ---
 
@@ -216,26 +219,25 @@ flowchart TD
 
 ---
 
-## 11. Member FAQs, WhatsApp Sharing & Troubleshooting
+## 11. Member FAQs, PDF Export & Troubleshooting
 
 ```mermaid
 flowchart TD
     MemberQ["Common Member Questions"] --> AnsType{"Select Topic"}
-    AnsType -- "Bank debited but app pending?" --> Recon["1. UPI Webhook Delay:\nMoney is safe in escrow; auto-reconciles at 06:00 AM IST\nOr tap 'Check Payment Status' for instant refresh"]
-    AnsType -- "Need loan statement proof?" --> SharePDF["2. Export Passbook PDF:\nTap 'Share Passbook' -> Sends certified PDF statement\ndirectly via WhatsApp to bank officer"]
+    AnsType -- "Bank debited but claim still INITIATED?" --> Recon["1. Direct KVB UPI Verification (ADR-19):\nNo third-party gateway or auto-webhook!\nAccounting Desk verifies your 12-digit UTR in KVB NetBanking\nOnce verified -> Status = PAID + Official Receipt & DLT SMS"]
+    AnsType -- "Need loan statement proof?" --> SharePDF["2. Export Form XXI Passbook PDF:\nDownload bilingual A4 Landscape PDF passbook\n(Zero automated WhatsApp API per Q34; share PDF file manually if desired)"]
     AnsType -- "Can I join with 2 tickets in same chit?" --> LimitRule["3. Single Ticket Limit:\nMax 1 ticket per customer in same group (Risk Protection)\nYou are welcome to join a second ticket in a different group"]
     AnsType -- "How do I watch the auction tie-break?" --> AttendLot["4. Live Paper Token Draw:\nVisit Perundurai branch office at 4:00 PM on 15th\nForeman folds paper tokens & a member draws live!"]
 ```
 
 ### Frequently Asked Questions:
-1. **My bank account was debited via Google Pay, but the app still says "UNPAID"?**
-   - Don't worry, your money is completely safe. Occasionally, Indian UPI bank servers experience 30-to-60 second delays in notifying our system.
-   - Tap **"Refresh Payment Status"** on your due screen. The system queries the payment gateway directly.
-   - If a temporary network drop occurred, our automated background reconciler at **06:00 AM IST** matches bank settlement credits and issues your receipt automatically.
-2. **How can I share my 20-month payment record for a bank loan or visa application?**
-   - Open **"My Chits" $\to$ "Form XXI Passbook"**.
-   - Tap **"Export PDF"** or the WhatsApp share icon.
-   - The app generates an official digitally signed PDF passbook that you can share with your bank manager or accountant.
+1. **My bank account was debited via Google Pay / PhonePe, but my due still shows "INITIATED / Pending Verification"?**
+   - Don't worry — your money went directly into Kumaran Finance's Karur Vysya Bank (KVB) current account with **₹0 gateway fees (`ADR-19`)**. Because we do not use a commercial third-party payment gateway or automated webhooks, receipts are not auto-issued on bank debit.
+   - Make sure you submitted your exact **12-digit Bank UTR reference number** (`POST /api/v1/payments/upi-claim`).
+   - Our Accounting Desk verifies incoming KVB credits during branch hours (`POST /api/v1/payments/:id/verify-upi-claim`), after which your due immediately updates to **`PAID`** and your bilingual receipt & TRAI DLT SMS are issued. If your claim remains `INITIATED` after business hours, call the Perundurai office with your 12-digit UTR (and our 06:00 AM IST sweep flags stale claims for staff follow-up).
+2. **How can I obtain my 20-month payment record for a bank loan or verification?**
+   - Request a printed/PDF **Form XXI Passbook** (A4 Landscape) from the Perundurai branch desk during Phase 1, or download it directly under **"My Chits" $\to$ "Form XXI Passbook"** in Phase 2 (`GET /api/v1/reports/form-xxi`).
+   - *(Note: Kumaran Finance does not send automated WhatsApp Business API messages per `Q34` / `KFC-NOT-001`; you may manually save and share your downloaded PDF passbook file with your bank officer using your phone's standard file share sheet.)*
 3. **Can I buy two tickets in the same ₹1,00,000 group?**
    - No. Under Kumaran Finance's risk-management rules, a subscriber can hold a maximum of 1 ticket in any single group (`@@unique([chitGroupId, customerId])`).
    - If you want to save more, our staff can enroll you in a second chit group running on a different monthly cycle.

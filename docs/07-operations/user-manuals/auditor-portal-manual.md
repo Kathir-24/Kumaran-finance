@@ -26,9 +26,9 @@ flowchart TD
         CA["Chartered Accountant (CA)\nAssigned Role: AUDITOR"]
         CA --> T1["1. Mathematical Invariant Verification\n(D = Cf + Div_total to the exact rupee)"]
         CA --> T2["2. Statutory Registers\n(Form XVII Minutes, Form XXI Passbooks, Form XXII Cash Book)"]
-        CA --> T3["3. Maker-Checker Segregation Audit\n(Asserts maker_user_id != checker_user_id)"]
-        CA --> T4["4. Document Scrutiny via Presigned S3\n(Inspects signed agreements & blank cheques)"]
-        CA --> T5["5. Background Job & Cron Verification\n(BullMQ schedules & notification audit logs)"]
+        CA --> T3["3. Maker-Checker Segregation Audit\n(Form XXII/Day Book offsets, pending-approvals & CA-certified AuditLog extracts)"]
+        CA --> T4["4. Document Scrutiny via Presigned S3\n(Inspects signed agreements & blank cheques via read-only API / vouchers)"]
+        CA --> T5["5. Statutory Boundary Verification\n(Guardrail 11: Audit Logs & BullMQ queues strictly Super Admin isolated)"]
     end
 ```
 
@@ -38,14 +38,14 @@ flowchart TD
 
 | Section | Audit Procedure | Statutory Scope | Primary Interface |
 |---|---|:---:|:---:|
-| **§3** | Auditor 2FA Web Login & Workspace Orientation | Access Control | Web Portal (`POST /auth/web/login`) |
-| **§4** | Forensic Verification of the Conservation Invariant | Chit Math Invariant | Web Portal (`GET /auctions/:id`) |
-| **§5** | Form XXII Daily Cash Book Audit Against Bank Statements | Cash & Banking | Web Portal (`GET /reports/form-xxii`) |
-| **§6** | Sampling Prize Disbursements & Presigned S3 Cheques | Safety Proofs | Web Portal (`GET /disbursements/...`) |
-| **§7** | Inspecting Immutable Audit Trail for Reversals | Dual Control | Web Portal (`GET /reports/audit-trail`) |
-| **§8** | Exporting Statutory Filing Packets for Chit Registrar | Compliance Packets | Web Portal (`GET /reports/form-xvii`) |
-| **§9** | Auditing BullMQ Background Cron Schedules & Logs | Operational Resilience | Web Portal (`GET /jobs/...`) |
-| **§10** | Statutory Audit Certification & DPDP Act Checklist | Compliance Sign-off | Web Portal |
+| **§3** | Auditor 2FA Web Login & Workspace Orientation | Access Control | Web Portal (`POST /api/v1/auth/web/login`) |
+| **§4** | Forensic Verification of the Conservation Invariant | Chit Math Invariant | Web Portal (`GET /api/v1/auctions/:id`) |
+| **§5** | Form XXII Daily Cash Book Audit Against Bank Statements | Cash & Banking | Web Portal (`GET /api/v1/reports/form-xxii`) |
+| **§6** | Sampling Prize Disbursements & Presigned S3 Cheques | Safety Proofs | Read-Only API (`GET /api/v1/disbursements/...`) & `/print/voucher/[id]` |
+| **§7** | Auditing Payment Reversals & Maker-Checker Segregation | Dual Control | Form XXII / Day Book + Super Admin AuditLog Extract |
+| **§8** | Exporting Statutory Filing Packets for Chit Registrar | Compliance Packets | Web Portal (`GET /api/v1/reports/form-xvii`, `form-xxi`, `form-xxii`) |
+| **§9** | System Infrastructure & Super Admin Telemetry Boundary | Guardrail 11 Isolation | Super Admin Only (`GET /api/v1/jobs/*`, `audit-logs`) |
+| **§10** | Statutory Audit Certification & DPDP Act Checklist | Compliance Sign-off | 11-Guardrail Statutory Checklist |
 
 ---
 
@@ -120,47 +120,50 @@ flowchart TD
 
 ## 6. Sampling Prize Disbursements & Presigned S3 Cheques
 
+> [!NOTE]
+> **Web Desk vs. Read-Only API Boundary**: In `apps/web/src/lib/route-permissions.ts`, the interactive `/disbursements` operational desk is scoped to staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`), whereas the backend read-only disbursement endpoints (`GET /api/v1/disbursements`, `GET /api/v1/disbursements/auction/:auctionId`, `GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`) and printable `/print/voucher/[id]` view explicitly grant read-only access to `Role.AUDITOR`.
+
 ```mermaid
 flowchart TD
-    OpenDisb["Navigate: Disbursements -> Completed Payouts"] --> Sample["Select Sample Payout: Ticket #5 (M. Kandasamy - ₹75,000)"]
-    Sample --> ReviewVoucher["1. Verify Net Payout Math: V (₹1L) - D (₹25,000) = ₹75,000"]
+    OpenDisb["Inspect Disbursement Sample via\nGET /api/v1/disbursements & /print/voucher/[id]"] --> Sample["Select Sample Payout: Ticket #5 (M. Kandasamy - ₹75,000)"]
+    Sample --> ReviewVoucher["1. Verify Server-Computed Net Payout Math (KFC-FIN-003/004):\nV (₹1L) - D (₹25,000) - Unpaid Arrears Offset (₹0) = ₹75,000"]
     ReviewVoucher --> InspectSafety["2. Inspect Company Safety Proof Checklist (ADR-15):\n• Winner Agreement signed with nominee?\n• Blank bank cheques collected?"]
-    InspectSafety --> ViewS3["3. Click 'Inspect Scanned Documents'\nSystem generates temporary 15-minute presigned S3 URL"]
+    InspectSafety --> ViewS3["3. Request Presigned URL\n(GET /api/v1/disbursements/auction/:auctionId/safety-proof-url)\nGenerates temporary 15-minute presigned S3 URL"]
     ViewS3 --> VerifyScans["4. Auditor visually verifies scanned cheque & agreement\nConfirms Canara Bank Cheque #004128 on file"]
 ```
 
 ### Step-by-Step Instructions:
-1. Open **Disbursements $\to$ Completed Payouts**.
-2. Pull a random sample of disbursed prize vouchers (e.g., Ticket #5, Kandasamy, ₹75,000).
-3. Verify the net prize calculation: $V - D = \text{₹}1,00,000 - \text{₹}25,000 = \text{₹}75,000$.
-4. Review the attached **Company Safety Proof Checklist (ADR-15)**.
-5. Click **"Inspect Scanned Documents"** (`GET /disbursements/auction/:auctionId/safety-proof-url`).
-   - The portal generates an encrypted, 15-minute presigned S3 URL.
+1. Pull a random sample of disbursed prize vouchers via read-only `GET /api/v1/disbursements` and inspect printable voucher packets at `/print/voucher/[id]` (e.g., Ticket #5, Kandasamy, ₹75,000).
+2. Verify the server-computed net prize calculation (`KFC-FIN-003` / `KFC-FIN-004`): $V - D - \text{Arrears Auto-Offset} = \text{₹}1,00,000 - \text{₹}25,000 - \text{₹}0 = \text{₹}75,000$ (with zero manual payout overrides permitted).
+3. Review the attached **Company Safety Proof Checklist (ADR-15)** (signed agreement with nominee, signed blank cheques, promissory note; zero property deeds).
+4. Fetch the temporary 15-minute presigned viewing URL via **`GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`**.
    - Visually inspect the high-resolution scanned copy of the winner's agreement, nominee signature, and signed blank cheque.
-   - Confirm that bank details match disbursement records.
+   - Confirm that bank details match disbursement records and Form XXII cash/bank outflows.
 
 ---
 
-## 7. Inspecting Immutable Audit Trail for Reversals
+## 7. Auditing Payment Reversals & Maker-Checker Segregation
+
+> [!IMPORTANT]
+> **Guardrail 11 (`ADR-21` / `report.controller.ts`) — `AuditLog` Access Boundary**: Direct access to `/reports/audit-logs` (`GET /api/v1/reports/audit-logs`) is restricted strictly to **`Role.SUPER_ADMIN`** (`HTTP 403 Forbidden` for `AUDITOR`). Independent CA Auditors verify reversal integrity and dual-control segregation through the statutory financial books (`Form XXII`, `Day Book`, `Form XXI`, `Form XVII`, and `GET /api/v1/reports/pending-approvals`), supplemented by signed `AuditLog` exports supplied by a Managing Partner (`SUPER_ADMIN`) during statutory audit reviews.
 
 ```mermaid
 flowchart TD
-    OpenAudit["Navigate: Reports -> Forensic Audit Trail"] --> Filter["Filter Actions: 'PAYMENT_REVERSAL'"]
-    Filter --> Locate["Locate Reversal Event: Receipt #KC-REC-PRD-2026-00412"]
-    Locate --> InspectDual["Examine Dual-Control Signatures:\n• maker_user_id: usr-partner-001 (Partner A)\n• checker_user_id: usr-partner-002 (Partner B)\n• Timestamp: 2026-05-15T16:30:12Z\n• Reason: 'Cashier error: Member Mani paid cash...'"]
-    InspectDual --> AssertDual{"Maker != Checker Assertion:\nIs maker_user_id !== checker_user_id?"}
-    AssertDual -- No --> Violation["CRITICAL COMPLIANCE VIOLATION:\nSelf-Approval Detected!"]
-    AssertDual -- Yes --> Certified["Dual-Control Compliance Verified"]
+    OpenBooks["Auditor Opens Statutory Books:\nForm XXII Cash Book, Day Book & Form XXI Ledger"] --> Locate["Locate Reversal Offsetting Entry:\nReceipt #KC-REC-PRD-2026-00412 (REVERSED)"]
+    Locate --> CheckPDF["Verify Cancelled Receipt PDF:\nDiagonal red 'ரத்து செய்யப்பட்டது / CANCELLED' watermark (KFC-PDF-001)"]
+    CheckPDF --> ReqExtract["Obtain Super Admin Certified AuditLog Export\n(GET /api/v1/reports/audit-logs is SUPER_ADMIN-only)"]
+    ReqExtract --> AssertDual{"Verify Verified Partner Dual Control:\n• initiatedByUserId (Partner A, isPartner: true)\n• approvedByUserId (Partner B, isPartner: true)\n• maker != checker enforced by DB CHECK constraint?"}
+    AssertDual -- No --> Violation["CRITICAL COMPLIANCE VIOLATION"]
+    AssertDual -- Yes --> Certified["Dual-Control & Ledger Reconciliation Verified"]
 ```
 
 ### Step-by-Step Instructions:
-1. Navigate to **Reports $\to$ Forensic Audit Trail**.
-2. Filter the log for high-risk mutations: `PAYMENT_REVERSAL`, `AUCTION_FINALIZATION`, and `PRIZE_DISBURSEMENT`.
-3. Open a sample payment reversal event.
-4. **The Maker-Checker Dual-Control Verification (`CONFIRMED-BY-DEVELOPER`)**:
-   - Verify that `maker_user_id` and `checker_user_id` are two distinct, non-identical users.
-   - Verify that a mandatory written justification is documented.
-   - Verify that the reversal created an offsetting balancing entry in the Form XXII Cash Book.
+1. Open **Reports $\to$ Form XXII Cash Book** (`/reports/cash-book`) and **Day Book** (`GET /api/v1/reports/day-book`) to identify offsetting reversal entries for the audit period.
+2. Verify that reversed payments reverted the subscriber's Form XXI installment due to `UNPAID` and that any receipt PDF download renders the mandatory diagonal red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
+3. Request a period-filtered certified `AuditLog` export from a Managing Partner (`SUPER_ADMIN` via `/reports/audit-logs`) covering `PAYMENT_REVERSAL`, `AUCTION_FINALIZATION`, `PRIZE_DISBURSEMENT`, and `DEFAULTER_REMOVAL`.
+4. **The Maker-Checker & Verified Partner Verification (Guardrails 10 & 11)**:
+   - Verify that `maker_user_id` and `checker_user_id` are two distinct, non-identical **Verified Partners (`isPartner: true`)**, backed by PostgreSQL engine-level `CHECK` constraints.
+   - Verify that a mandatory written justification is documented and that an offsetting balancing entry appears in the Form XXII Cash Book.
 
 ---
 
@@ -173,7 +176,7 @@ flowchart TD
     Packets --> Form17["1. Form XVII (Auction Minutes & Attendance)\nFiling with Registrar within statutory period"]
     Packets --> Form21["2. Form XXI (Subscriber 20-Month Ledger)\nAnnual ledger filing"]
     Packets --> Form22["3. Form XXII (Daily Cash Book Balance Sheet)"]
-    Form17 --> ExportPDF["Click 'Export Certified PDF / Excel'\nSystem compiles certified statutory filing packet with digital hash"]
+    Form17 --> ExportPDF["Click 'Export Certified PDF / CSV'\nSystem compiles certified statutory filing packet"]
     Form21 --> ExportPDF
     Form22 --> ExportPDF
 ```
@@ -182,7 +185,7 @@ flowchart TD
 1. Open **Reports $\to$ Statutory Registers** (or directly access `/reports/minutes`, `/reports/ledger`, or `/reports/cash-book`).
 2. Select the chit group and export the required statutory forms:
    - **Form XVII (Auction Minutes Register)**: Navigate to `/reports/minutes`. For any finalized auction month, click **"Download PDF"** to receive the official Form XVII statutory PDF (`application/pdf`) streamed securely as an authenticated blob via the Next.js BFF proxy. Click **"Print Sheet"** for high-contrast print layout without dashboard chrome.
-   - **Form XXI (Subscriber Ledgers & Passbook)**: Navigate to `/reports/ledger`. Filter by subscriber ticket number and click the **"PDF"** button on any subscriber ledger card (`downloadPassbookPdf`) to download their continuous 20-month schedule. Alternatively, click **"Print Passbook"** to print directly or **"Export CSV"** for external spreadsheet import.
+   - **Form XXI (Subscriber Ledgers & Passbook)**: Navigate to `/reports/ledger`. Filter by subscriber ticket number and click the **"PDF"** button on any subscriber ledger card (`downloadPassbookPdf`) to download their continuous 20-month schedule (A4 Landscape). Alternatively, click **"Print Passbook"** to print directly or **"Export CSV"** for external spreadsheet import.
    - **Form XXII (Day Book / Cash Book)**: Navigate to `/reports/cash-book`. Review the 12-column ledger for any operational date and click **"Print Sheet"** or **"Export CSV"** to reconcile against physical bank statements.
 3. All statutory PDFs are delivered directly to the browser as binary blobs with zero pop-up blocker warnings, zero CORS headers, and zero internal Docker DNS resolution errors.
 
@@ -191,18 +194,18 @@ flowchart TD
 ## 9. System Infrastructure Administration & Telemetry Boundary
 
 > [!NOTE]
-> **Super Admin Infrastructure Boundary**:  
-> In accordance with Kumaran Finance's zero-trust security policy, background queue telemetry (`GET /jobs/*`) and internal system audit logs (`GET /reports/audit-logs`) are restricted strictly to **Super Admin** users (IT Administrators & Managing Partners).  
-> The CA Auditor portal focuses exclusively on **independent financial books and statutory registers** (Form XXII Cash Book, Form XXI Subscriber Ledgers, Form XVII Minutes, Day Book, and Trial Balance), ensuring forensic audit separation from internal IT operations.
+> **Super Admin Infrastructure Boundary (Guardrail 11 / `ADR-21`)**:  
+> In accordance with Kumaran Finance's zero-trust security policy, background queue telemetry (`GET /api/v1/jobs/*`, `/admin/queues`, `/admin/jobs`) and internal system audit logs (`GET /api/v1/reports/audit-logs`, `/reports/audit-logs`) are restricted strictly to **`SUPER_ADMIN`** users (IT Administrators & Managing Partners).  
+> The CA Auditor portal focuses exclusively on **independent financial books and statutory registers** (Form XXII Cash Book, Day Book, Form XXI Subscriber Ledgers, Form XVII Minutes, and Defaulters Aging), ensuring forensic audit separation from internal IT operations.
 
 ### Super Admin Maintenance Scrutiny:
 Super Admin administrators oversee background queues and automated schedules directly:
-1. Verify active cron schedules via **System $\to$ Background Jobs & Schedules** (`GET /jobs/repeatable-schedules`):
-   - **Daily Arrears Calculation**: Stamped at **00:01 AM IST (`1 0 * * *`)** to prevent arrears accumulation errors.
-   - **Payment Gateway Reconciliation**: Stamped at **06:00 AM IST (`0 6 * * *`)**.
-2. Inspect **Notification Delivery Audit Logs** (`GET /jobs/notification-audit-logs`):
-   - Review push notification delivery success rates.
-   - Verify that fallback SMS was dispatched for keypad-phone subscribers.
+1. Verify active cron schedules via **System $\to$ Background Jobs & Schedules** (`GET /api/v1/jobs/repeatable-schedules`):
+   - **Daily Arrears Calculation**: Stamped at **00:01 AM IST (`1 0 * * *`)** to recompute arrears balances and tag 3-month defaulters (`DEFAULT_3_MONTHS`).
+   - **Direct KVB UPI Claim Reconciliation (`ADR-19`)**: Stamped at **06:00 AM IST (`0 6 * * *`)** to sweep stale `INITIATED` UPI claims against direct Karur Vysya Bank settlement expectations (zero third-party payment gateway).
+2. Inspect **Notification Delivery Audit Logs** (`GET /api/v1/jobs/notification-audit-logs`):
+   - Verify bilingual **TRAI DLT SMS** delivery logs via MSG91 (Phase 1 primary channel per `ADR-23`; zero automated WhatsApp API per `Q34` / `KFC-NOT-001`).
+   - Review Android FCM push notification delivery logs once Phase 2 mobile rollout activates (`ADR-26`).
 3. Auditors verify financial ledger entries produced by these jobs directly within Form XXII and Form XXI without requiring direct infrastructure-level queue access.
 
 ---
@@ -211,23 +214,24 @@ Super Admin administrators oversee background queues and automated schedules dir
 
 ```mermaid
 flowchart TD
-    AuditComplete["Forensic Scrutiny Complete"] --> Checklist["CA Signs 10-Point Statutory Audit Certificate:"]
+    AuditComplete["Forensic Scrutiny Complete"] --> Checklist["CA Signs 11-Guardrail Statutory Audit Certificate:"]
     Checklist --> C1["1. Single Company Tenancy: 0 external company_id columns"]
-    Checklist --> C2["2. Whole Rupee Precision: 0 floating-point or paise drift"]
+    Checklist --> C2["2. Whole Rupee Precision: BigInt only; 0 paise drift; whole-rupee dividend divisibility (KFC-FIN-002)"]
     Checklist --> C3["3. Commission Freeze: All active chits locked at 4.00%"]
     Checklist --> C4["4. Universal Dividends: All members received equal deductions"]
-    Checklist --> C5["5. 25% Ceiling: 0 auction bids exceeded V / 4"]
-    Checklist --> C6["6. Option A Tie-Break: Physical lot draws verified"]
+    Checklist --> C5["5. Month 1 & Month N Rules: No auctions in Month 1 & Month N (FIN-B)"]
+    Checklist --> C6["6. 25% Ceiling & Option A Tie-Break: D <= V/4; physical lot draws verified"]
     Checklist --> C7["7. Ticket Limit: 0 duplicate tickets held in same group"]
-    Checklist --> C8["8. Binary Dues: Dues are UNPAID or PAID (0 partial dues)"]
-    Checklist --> C9["9. Safety Proofs: Scans of agreements & blank cheques verified"]
-    Checklist --> C10["10. Dual Control: Asserted maker_user_id != checker_user_id"]
-    C10 --> DPDP["DPDP Act Verification: Aadhaar masked to last 4 digits (XXXXXXXX1234)"]
+    Checklist --> C8["8. Binary Dues: UNPAID / PAID / OVERDUE (0 partial dues or late fees)"]
+    Checklist --> C9["9. Safety Proofs: Agreements & blank cheques verified (no property deeds)"]
+    Checklist --> C10["10. Dual Control: Asserted maker_user_id != checker_user_id (8 DB CHECK constraints)"]
+    Checklist --> C11["11. Verified Partner Exclusivity: isPartner: true on financial approvals; SUPER_ADMIN-only audit/queues"]
+    C11 --> DPDP["DPDP Act Verification: Aadhaar masked to last 4 digits (XXXXXXXX1234)"]
     DPDP --> SignCert["Certify Audit Report for Chit Registrar & Partners"]
 ```
 
 ### Statutory Auditor Formal Sign-Off:
-1. **Mathematical Conservation Invariant**: Confirmed $D = C_f + Div_{total}$ across all completed auctions without a single rupee variance.
-2. **Whole Rupee Arithmetic (`BigInt`)**: Confirmed all ledger values in the database are 64-bit integer Rupees (`BigInt`).
-3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private S3 storage with 15-minute presigned access.
-4. **Dual-Control Enforcement**: Certified that all high-risk mutations (reversals, activations, payouts, handovers) enforced non-identical Maker and Checker signatures.
+1. **Mathematical Conservation Invariant**: Confirmed $D = C_f + Div_{total}$ and exact whole-rupee dividend divisibility (`KFC-FIN-002`) across all completed auctions without a single rupee variance.
+2. **Whole Rupee Arithmetic (`BigInt`)**: Confirmed all ledger values in PostgreSQL are 64-bit integer Rupees (`BigInt`) with server-computed prize payouts and automatic arrears offsets (`KFC-FIN-003` / `KFC-FIN-004`).
+3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private S3/R2 storage with 15-minute presigned access.
+4. **Dual-Control & Partner Exclusivity Enforcement (Guardrails 10 & 11)**: Certified that all high-risk financial mutations (reversals, activations, auction finalizations, prize payouts, defaulter removals, handovers) enforced non-identical Maker and Checker signatures and Verified Partner (`isPartner: true`) identity where mandated.

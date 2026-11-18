@@ -21,60 +21,75 @@ The Authentication & Identity module governs office staff access to the **Kumara
 
 ## 2. API Contract & Endpoint Integration Dossier
 
-| Operation | Method & Path | Authorization | Request Body | Response Payload (200 OK) | Error Codes |
+| Operation | Method & Path | Authorization | Request Body / Query | Response Payload (200 OK) | Error Codes |
 |---|---|---|---|---|:---:|
-| **Staff Web Login** | `POST /api/v1/auth/web/login` | Public | `{ phone: string, password: string }` | • **2FA Challenge**: `{ requireTotp: true, tempToken: string }`<br>• **Direct Auth**: `{ accessToken, refreshToken, user }` | `401` Invalid credentials<br>`429` Rate limited |
+| **Staff Web Login** | `POST /api/v1/auth/web/login` | Public | `{ phone: string, password: string, clientType?: 'WEB' }` | • **First-Login Onboarding (`F16`)**: `{ mustChangePassword: true, tempToken }` (15m `onboarding_restricted`)<br>• **2FA Challenge**: `{ requireTotp: true, tempToken }` (5m `totp_pending`)<br>• **Direct Auth**: `{ accessToken, refreshToken, user }` | `401` Invalid credentials<br>`429` Rate limited |
 | **Verify Staff TOTP** | `POST /api/v1/auth/web/verify-totp` | Public | `{ tempToken: string, totpCode: string }` | `{ accessToken, refreshToken, user }` | `401` Invalid/expired code<br>`429` Rate limited |
-| **Initiate TOTP Setup** | `POST /api/v1/auth/totp/setup` | `Bearer <JWT>` | *None* | `{ secret: string, otpauthUri: string, issuer: string, account: string }` | `401` Unauthorized |
-| **Enable 2FA** | `POST /api/v1/auth/totp/enable` | `Bearer <JWT>` | `{ secret: string, code: string }` | `{ success: true, message: string }` | `400` Invalid code<br>`401` Unauthorized<br>`429` Rate limited |
-| **Disable 2FA** | `POST /api/v1/auth/totp/disable` | `Bearer <JWT>` | `{ password: string }` | `{ success: true, message: string }` | `401` Invalid password |
-| **Change Password** | `POST /api/v1/auth/change-password` | `Bearer <JWT>` | `{ currentPassword: string, newPassword: string }` | `{ success: true, message: string }` | `400` New pass <8 chars<br>`401` Incorrect current pass |
-| **Get Staff Profile** | `GET /api/v1/auth/me` | `Bearer <JWT>` | *None* | `AuthUser` object with assigned branch | `401` Unauthorized |
-| **Staff Logout** | `POST /api/v1/auth/logout` | `Bearer <JWT>` | *None* | `{ success: true, message: string }` | `401` Unauthorized |
+| **Complete First-Login Onboarding** | `POST /api/v1/auth/complete-onboarding` | Public (tempToken) | `{ tempToken: string, newPassword: string }` | `{ accessToken, refreshToken, user }` (or `{ requireTotp: true, tempToken }` if 2FA enabled; atomic Redis `SET NX` single-use consumption) | `400` Weak password<br>`401` Invalid/replayed token |
+| **Rotate Session Tokens** | `POST /api/v1/auth/refresh-token` | Public (Refresh JWT) | `{ refreshToken: string, clientType?: 'WEB'\|'MOBILE'\|'DESKTOP' }` | `{ accessToken, refreshToken, user }` (client-scoped `Session` vault, `ADR-24` & RFC 6819 reuse trap) | `401` Invalid/revoked token |
+| **Initiate TOTP Setup** | `POST /api/v1/auth/totp/setup` | `Bearer <JWT>` (via BFF) | *None* | `{ secret: string, otpauthUri: string, issuer: string, account: string }` | `401` Unauthorized |
+| **Enable / Replace 2FA** | `POST /api/v1/auth/totp/enable` | `Bearer <JWT>` (via BFF) | `{ secret: string, code: string, password?: string }` *(current `password` required strictly when replacing an existing factor — `F10`)* | `{ success: true, message: string }` | `400` Invalid code<br>`401` Unauthorized<br>`429` Rate limited |
+| **Disable 2FA** | `POST /api/v1/auth/totp/disable` | `Bearer <JWT>` (via BFF) | `{ password: string }` | `{ success: true, message: string }` | `401` Invalid password<br>`429` Rate limited |
+| **Change Password** | `POST /api/v1/auth/change-password` | `Bearer <JWT>` (via BFF) | `{ currentPassword: string, newPassword: string }` | `{ success: true, message: string }` (stamps `tokenRevokedBefore` & revokes active sessions) | `400` New pass <8 chars<br>`401` Incorrect current pass |
+| **Get Staff Profile** | `GET /api/v1/auth/me` | `Bearer <JWT>` (via BFF) | *None* | `AuthUser` object with `roles`, `isPartner`, `isTotpEnabled`, and assigned branch | `401` Unauthorized |
+| **Staff Logout** | `POST /api/v1/auth/logout?clientType=WEB\|MOBILE\|DESKTOP\|ALL` | `Bearer <JWT>` (via BFF) | Query `clientType` (defaults to `ALL`; Web BFF passes `WEB` to preserve mobile field rounds per `ADR-24`) | `{ success: true, message: string }` | `401` Unauthorized |
+
+> [!NOTE]
+> **Hardened Cryptographic & Session Guarantees (`F04` / `F10` / `F16` / `ADR-24`)**:
+> - **Password & Token Hashing**: Passwords, MPINs, and SHA-256 pre-hashed refresh tokens use `bcrypt` cost factor 12 (`BCRYPT_SALT_ROUNDS = 12`), avoiding bcrypt's 72-byte truncation limit on JWTs.
+> - **Zero Shared Default Passwords (`F16`)**: Newly provisioned staff without an explicit password receive a 12-character `crypto.randomBytes(9).toString('base64url')` temporary password with `mustChangePassword = true`, restricting login exclusively to `/onboarding`.
+> - **Session Identity (`sid`) & Epoch Revocation (`F04`)**: Every access/refresh JWT embeds PostgreSQL `Session.id` (`sid`) and is validated against both the active `Session` row and durable `User.tokenRevokedBefore`, preventing session resurrection across Redis restarts.
 
 ---
 
-## 3. Screen & Component Catalog
+## 3. Screen, BFF & Test Catalog
 
 ```
-apps/web/src/
-├── middleware.ts                                 # Next.js Edge JWT (jose HS256) & canonical RBAC route barrier
-├── app/(auth)/
-│   ├── layout.tsx                              # Auth workstation layout with monograms & locale switch
-│   ├── login/page.tsx                          # /login entrypoint wrapped in Suspense boundary
-│   ├── 2fa/page.tsx                            # /2fa entrypoint wrapped in Suspense boundary
-│   └── onboarding/page.tsx                     # /onboarding entrypoint for first-time password setup (F16)
-├── app/
-│   ├── api/auth/
-│   │   ├── login/route.ts                      # BFF login handler setting HttpOnly session cookies
-│   │   ├── verify-totp/route.ts                # BFF 2FA TOTP verification handler setting HttpOnly cookies
-│   │   ├── onboarding/route.ts                 # BFF onboarding handler consuming kc_onboarding_token
-│   │   ├── session/route.ts                    # BFF session hydration sharing coalesced refresh & symmetric cookie clearing
-│   │   └── logout/route.ts                     # BFF logout handler invalidating Redis/BFF caches & cookies
-│   └── bff/api/v1/[...path]/route.ts           # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
-├── lib/
-│   ├── auth-cookies.ts                         # Dynamic Secure flag resolution & kc_totp_pending_token / kc_onboarding_token options
-│   ├── bff-auth-handlers.ts                    # Shared BFF login, HttpOnly verify-totp, session, and logout route cores (DEF-FE-08)
-│   ├── bff-api-proxy.ts                        # Shared BFF proxy handler with unbuffered SSE pass-through
-│   ├── bff-token-refresh.ts                    # Unified single-flight BFF refresh coalescing & cookie utils
-│   ├── edge-auth.ts                            # Cryptographic HS256 Edge JWT, /2fa & /onboarding route verifiers
-│   └── route-permissions.ts                    # Single canonical RBAC route permissions source of truth
-├── stores/
-│   └── auth-store.ts                           # Re-entrancy-guarded logout, non-secret pendingTotp flag & zero-storage hydration
-├── components/auth/
-│   ├── login-form.tsx                          # Phone+Password form, 2FA fork, onboarding redirect & active session redirect
-│   ├── onboarding-form.tsx                     # First-login password setup form with confirmation & strength validation
-│   ├── totp-form.tsx                           # 6-cell RFC 6238 TOTP form with clipboard paste, cookie-backed guards & Back-to-Login purge
-│   ├── totp-enrollment-modal.tsx               # 3-step setup modal with SVG QR code & 1-click Base32 copy
-│   ├── totp-disable-modal.tsx                  # Password-verified 2FA deactivation modal
-│   └── change-password-modal.tsx               # Self-service password change modal with min-8 char validation
+apps/web/
+├── src/
+│   ├── middleware.ts                                 # Next.js Edge JWT (jose HS256), /2fa & /onboarding gates & canonical RBAC barrier
+│   ├── app/(auth)/
+│   │   ├── layout.tsx                                # Auth workstation layout with monograms & locale switch
+│   │   ├── login/page.tsx                            # /login entrypoint wrapped in Suspense boundary
+│   │   ├── 2fa/page.tsx                              # /2fa entrypoint wrapped in Suspense boundary
+│   │   └── onboarding/page.tsx                       # /onboarding entrypoint for first-time password setup (F16)
+│   ├── app/
+│   │   ├── api/auth/
+│   │   │   ├── login/route.ts                        # BFF login handler setting HttpOnly session / pending cookies
+│   │   │   ├── verify-totp/route.ts                  # BFF 2FA TOTP verification handler consuming kc_totp_pending_token
+│   │   │   ├── complete-onboarding/route.ts          # BFF onboarding handler consuming kc_onboarding_token -> /api/v1/auth/complete-onboarding
+│   │   │   ├── session/route.ts                      # BFF session hydration sharing coalesced refresh & symmetric cookie clearing
+│   │   │   └── logout/route.ts                       # BFF logout handler invalidating Redis/BFF caches & cookies
+│   │   └── bff/api/v1/[...path]/route.ts             # Dedicated Web BFF proxy route (isolated from Nginx /api/v1/*)
+│   ├── lib/
+│   │   ├── auth-cookies.ts                           # Dynamic Secure flag resolution & HttpOnly cookie options
+│   │   ├── bff-auth-handlers.ts                      # Shared BFF login, verify-totp, complete-onboarding, session & logout cores (DEF-FE-08)
+│   │   ├── bff-api-proxy.ts                          # Shared BFF proxy handler with unbuffered SSE pass-through
+│   │   ├── bff-forward-headers.ts                    # X-Forwarded-For & client IP forwarding helpers
+│   │   ├── bff-token-refresh.ts                      # Unified server-side single-flight BFF refresh coalescing & cookie utils
+│   │   ├── edge-auth.ts                              # Cryptographic HS256 Edge JWT, /2fa & /onboarding route verifiers
+│   │   └── route-permissions.ts                      # Single canonical RBAC route permissions source of truth
+│   ├── stores/
+│   │   └── auth-store.ts                             # Re-entrancy-guarded logout, non-secret pendingTotp flag & zero-storage hydration
+│   └── components/auth/
+│       ├── login-form.tsx                            # Phone+Password form, 2FA fork, onboarding redirect & active session redirect
+│       ├── onboarding-form.tsx                       # First-login password setup form with confirmation & strength validation
+│       ├── totp-form.tsx                             # 6-cell RFC 6238 TOTP form with clipboard paste, cookie-backed guards & Back-to-Login purge
+│       ├── totp-enrollment-modal.tsx                 # 3-step setup modal with SVG QR code & 1-click Base32 copy
+│       ├── totp-disable-modal.tsx                    # Password-verified 2FA deactivation modal
+│       └── change-password-modal.tsx                 # Self-service password change modal with min-8 char validation
 └── test/
-    ├── login-validation.spec.ts                # ADR-18 10-digit regex, password length & BFF 2FA fork tests
-    ├── totp-validation.spec.ts                 # RFC 6238 6-digit validation, paste extraction & guard tests
-    ├── totp-enrollment.spec.ts                 # Base32 formatting, SVG QR, enable/disable & store sync tests
-    ├── change-password.spec.ts                 # Current/new password validation, DTO matching & i18n parity tests
-    ├── edge-auth-middleware.spec.ts            # Edge jose HS256, tokenType, /2fa pending guard, fail-closed secret & RBAC gate tests
-    └── bff-totp-routes.spec.ts                 # HttpOnly kc_totp_pending_token login/verify-totp/session/logout route handler & static regression tests
+    ├── login-validation.spec.ts                      # ADR-18 10-digit regex, password length & BFF 2FA fork tests
+    ├── totp-validation.spec.ts                       # RFC 6238 6-digit validation, paste extraction & guard tests
+    ├── totp-enrollment.spec.ts                       # Base32 formatting, SVG QR, enable/disable & store sync tests
+    ├── change-password.spec.ts                       # Current/new password validation, DTO matching & i18n parity tests
+    ├── edge-auth-middleware.spec.ts                  # Edge jose HS256, tokenType, /2fa & /onboarding gates, fail-closed secret & RBAC tests
+    ├── bff-totp-routes.spec.ts                       # HttpOnly kc_totp_pending_token login/verify-totp/session/logout handler tests
+    ├── bff-onboarding-routes.spec.ts                 # HttpOnly kc_onboarding_token complete-onboarding handler tests
+    ├── bff-auth-cookies.spec.ts                      # Dynamic Secure cookie & HttpOnly attribute tests
+    ├── bff-token-refresh.spec.ts                     # Server-side single-flight refresh coalescing tests
+    ├── bff-api-proxy.spec.ts                         # BFF proxy Bearer injection & SSE streaming tests
+    └── bff-forward-headers.spec.ts                   # Client IP forwarding hygiene tests
 ```
 
 ---
@@ -105,27 +120,27 @@ sequenceDiagram
         BFF->>API: POST /api/v1/auth/web/verify-totp { tempToken: cookie, totpCode }
         API-->>BFF: 200 OK { accessToken, refreshToken, user }
         BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + Clear kc_totp_pending_token + { user }
-        Web->>Staff: setAuth(user) & Navigate to /dashboard
+        Web->>Staff: setAuth(user) & Navigate to /
     else Staff requires onboarding (mustChangePassword: true)
         API-->>BFF: 200 OK { mustChangePassword: true, tempToken: "jwt..." }
         BFF-->>Web: Set-Cookie HttpOnly (kc_onboarding_token, 15m) + { success: true, mustChangePassword: true }
         Web->>Web: Navigate to /onboarding (Edge verifies kc_onboarding_token)
         Staff->>Web: Enter new strong password
-        Web->>BFF: POST /api/auth/onboarding { newPassword } (+ HttpOnly cookie)
-        BFF->>API: POST /api/v1/auth/onboarding/complete-web { newPassword }
-        alt Staff also requires 2FA enrollment
+        Web->>BFF: POST /api/auth/complete-onboarding { newPassword } (+ HttpOnly cookie)
+        BFF->>API: POST /api/v1/auth/complete-onboarding { tempToken: cookie, newPassword }
+        alt Staff also requires 2FA verification
             API-->>BFF: 200 OK { requireTotp: true, tempToken }
             BFF-->>Web: Set-Cookie HttpOnly (kc_totp_pending_token) + Clear kc_onboarding_token
             Web->>Web: Navigate to /2fa
         else Direct Session Completion
             API-->>BFF: 200 OK { accessToken, refreshToken, user }
             BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + Clear kc_onboarding_token + { user }
-            Web->>Staff: setAuth(user) & Navigate to /dashboard
+            Web->>Staff: setAuth(user) & Navigate to /
         end
     else Direct Authentication (2FA not required)
         API-->>BFF: 200 OK { accessToken, refreshToken, user }
         BFF-->>Web: Set-Cookie HttpOnly (kc_access_token, kc_refresh_token) + { user }
-        Web->>Staff: setAuth(user) & Navigate to /dashboard
+        Web->>Staff: setAuth(user) & Navigate to /
     end
 ```
 
@@ -136,16 +151,19 @@ sequenceDiagram
     autonumber
     actor Staff as Staff / Partner
     participant Modal as TotpEnrollmentModal
+    participant BFF as Next.js 15 BFF (/bff/api/v1)
     participant API as NestJS 12 API
     participant DB as PostgreSQL 17
 
     Staff->>Modal: Open "Set Up 2FA" Modal
-    Modal->>API: POST /api/v1/auth/totp/setup (Bearer Token)
+    Modal->>BFF: POST /bff/api/v1/auth/totp/setup (HttpOnly kc_access_token cookie)
+    BFF->>API: POST /api/v1/auth/totp/setup (Injected Bearer Header)
     API-->>Modal: 200 OK { secret, otpauthUri, account }
     Modal->>Modal: Render vector SVG QR Code & Formatted Base32 Key
-    Staff->>Modal: Scan QR in Microsoft Authenticator & enter 6-digit code
-    Modal->>API: POST /api/v1/auth/totp/enable { secret, code }
-    API->>DB: Encrypt secret (AES-GCM) & SET isTotpEnabled = true
+    Staff->>Modal: Scan QR in Microsoft Authenticator & enter 6-digit code (+ current password if replacing existing 2FA per F10)
+    Modal->>BFF: POST /bff/api/v1/auth/totp/enable { secret, code, password? }
+    BFF->>API: POST /api/v1/auth/totp/enable (Injected Bearer Header)
+    API->>DB: Encrypt secret (AES-256-GCM) & SET isTotpEnabled = true
     API-->>Modal: 200 OK { success: true }
     Modal->>Modal: useAuthStore.updateUser({ isTotpEnabled: true })
     Modal->>Staff: Show success alert & auto-close modal
@@ -153,26 +171,25 @@ sequenceDiagram
 
 ---
 
-## 5. Verification Proofs & Test Results
+## 5. Verification Proofs & Live Test Results
 
 ```
-✔ ADR-18 Phone Validation: Accepts valid 10-digit Indian mobile numbers (4.89ms)
-✔ ADR-18 Phone Validation: Rejects invalid phone numbers (1.68ms)
-✔ Login Validation: Password requires at least 6 characters (0.72ms)
-✔ AuthStore: setTempToken securely stores 2FA temporary token and clears on session establishment (77.20ms)
-✔ Login Flow: Discerning 2FA challenge response vs full token response (0.64ms)
-✔ Base32 Secret Formatting: Correctly chunks keys into 4-character blocks for readability (2.21ms)
-✔ SVG QR Code Generation: Generates valid vector SVG from RFC 6238 otpauth URI (27.94ms)
-✔ TOTP Code Validation: Strictly validates 6-digit numeric confirmation code (0.82ms)
-✔ Disable 2FA Validation: Requires non-empty password (0.55ms)
-✔ AuthStore 2FA Lifecycle: Synchronizes isTotpEnabled state on enrollment and deactivation (0.96ms)
-✔ Backend Contract Invariants: Payload schemas match NestJS DTO definitions (0.34ms)
-✔ RFC 6238 TOTP Validation: Accepts valid 6-digit numeric codes (2.79ms)
-✔ RFC 6238 TOTP Validation: Rejects invalid codes (0.67ms)
-✔ Clipboard Paste Extraction: Cleans dirty inputs and limits to 6 digits (0.83ms)
-✔ 2FA State Guard: Verification requires valid tempToken (0.61ms)
+Live Command: pnpm --filter web test (node --experimental-strip-types --test test/*.spec.ts)
 -----------------------------------------------------------------------------------------
-Authentication Tests: 16 passing + 9 Edge JWT/RBAC tests passing (`edge-auth-middleware.spec.ts`), 0 failing
-TypeScript:           tsc --noEmit passed with 0 errors
-Next.js Build:        Dynamic /login, /2fa, and Edge Middleware routes generated cleanly
+Verified Auth, BFF & Edge Test Suites:
+  ✔ login-validation.spec.ts       (ADR-18 10-digit regex, password rules, 2FA & onboarding forks)
+  ✔ totp-validation.spec.ts        (RFC 6238 6-digit validation, clipboard paste cleaning & DEF-FE-08 pendingTotp guard)
+  ✔ totp-enrollment.spec.ts        (Base32 4-char chunking, vector SVG QR, enable/disable & store sync)
+  ✔ change-password.spec.ts        (current/new password validation, NestJS DTO parity & EN/TA i18n parity)
+  ✔ edge-auth-middleware.spec.ts   (Edge jose HS256, tokenType, /2fa & /onboarding cookie gates, fail-closed secret & RBAC)
+  ✔ bff-totp-routes.spec.ts        (HttpOnly kc_totp_pending_token login/verify-totp/session/logout — zero client tempToken)
+  ✔ bff-onboarding-routes.spec.ts  (HttpOnly kc_onboarding_token complete-onboarding handler & cookie cleanup)
+  ✔ bff-auth-cookies.spec.ts       (HttpOnly, SameSite=Lax & dynamic Secure cookie attributes)
+  ✔ bff-token-refresh.spec.ts      (server-side single-flight refresh coalescing)
+  ✔ bff-api-proxy.spec.ts          (Bearer header injection & unbuffered SSE pass-through)
+  ✔ bff-forward-headers.spec.ts    (client IP forwarding integrity)
+-----------------------------------------------------------------------------------------
+Full Web Unit Suite:  376 passing / 0 failing across 52 spec files (14 top-level suites)
+TypeScript / Lint:    pnpm --filter web typecheck & lint — 0 errors / 0 warnings
+Next.js Build:        Dynamic /login, /2fa, /onboarding, BFF routes & Edge Middleware verified
 ```
