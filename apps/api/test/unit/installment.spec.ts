@@ -722,4 +722,190 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('6. Module 5 Defense-in-Depth Hardening (DEF-15 & DEF-16)', () => {
+    it('DEF-15: should fail closed on null user or deactivated partner across defaulter removal & substitution', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        installmentService.requestDefaulterRemoval(mockTicketId1, 'missing-partner', {
+          reason: 'Missing user test',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        installmentService.approveDefaulterRemoval(mockTicketId1, 'missing-partner'),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        installmentService.rejectDefaulterRemoval(mockTicketId1, 'missing-partner'),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        installmentService.substituteSubscriber(mockTicketId1, 'missing-partner', {
+          newCustomerId: 'new-cust-uuid',
+          reason: 'Missing user test',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockAdminId,
+        isPartner: true,
+        isActive: false,
+      });
+
+      await expect(
+        installmentService.approveDefaulterRemoval(mockTicketId1, mockAdminId),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        installmentService.substituteSubscriber(mockTicketId1, mockAdminId, {
+          newCustomerId: 'new-cust-uuid',
+          reason: 'Deactivated partner test',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('DEF-16: approveDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent payment drops arrears below 3', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'partner-checker-02',
+        isPartner: true,
+        isActive: true,
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        isPrized: false,
+        consecutiveUnpaidMonths: 3,
+        removalRequestedByUserId: 'partner-maker-01',
+        customer: { fullName: 'M. Arumugam' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      // Simulate concurrent payment settling an overdue month before row lock is acquired
+      prismaMock.$queryRaw = jest.fn().mockResolvedValue([
+        {
+          id: mockTicketId1,
+          status: 'PENDING_REMOVAL_APPROVAL',
+          isPrized: false,
+          consecutiveUnpaidMonths: 2,
+          removalRequestedByUserId: 'partner-maker-01',
+        },
+      ]);
+
+      await expect(
+        installmentService.approveDefaulterRemoval(mockTicketId1, 'partner-checker-02'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prismaMock.subscriberTicket.update).not.toHaveBeenCalled();
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('DEF-16: approveDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent auction prized the ticket', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'partner-checker-02',
+        isPartner: true,
+        isActive: true,
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        isPrized: false,
+        consecutiveUnpaidMonths: 3,
+        removalRequestedByUserId: 'partner-maker-01',
+        customer: { fullName: 'M. Arumugam' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      prismaMock.$queryRaw = jest.fn().mockResolvedValue([
+        {
+          id: mockTicketId1,
+          status: 'PENDING_REMOVAL_APPROVAL',
+          isPrized: true,
+          consecutiveUnpaidMonths: 3,
+          removalRequestedByUserId: 'partner-maker-01',
+        },
+      ]);
+
+      await expect(
+        installmentService.approveDefaulterRemoval(mockTicketId1, 'partner-checker-02'),
+      ).rejects.toThrow('PRIZED_TICKET_IMMUTABLE');
+
+      expect(prismaMock.subscriberTicket.update).not.toHaveBeenCalled();
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('DEF-16: rejectDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent approval already removed ticket', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'partner-checker-03',
+        isPartner: true,
+        isActive: true,
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        status: 'PENDING_REMOVAL_APPROVAL',
+        isPrized: false,
+        consecutiveUnpaidMonths: 3,
+        removalRequestedByUserId: 'partner-maker-01',
+        customer: { fullName: 'M. Arumugam' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      prismaMock.$queryRaw = jest.fn().mockResolvedValue([
+        {
+          id: mockTicketId1,
+          status: 'REMOVED_DEF_3M',
+          isPrized: false,
+          consecutiveUnpaidMonths: 3,
+          removalRequestedByUserId: 'partner-maker-01',
+        },
+      ]);
+
+      await expect(
+        installmentService.rejectDefaulterRemoval(mockTicketId1, 'partner-checker-03', 'Too late'),
+      ).rejects.toThrow('NO_PENDING_REMOVAL');
+
+      expect(prismaMock.subscriberTicket.update).not.toHaveBeenCalled();
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('DEF-16: requestDefaulterRemoval MUST reject duplicate request when locked row is already PENDING_REMOVAL_APPROVAL', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'partner-maker-02',
+        isPartner: true,
+        isActive: true,
+      });
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue({
+        id: mockTicketId1,
+        ticketNumber: 5,
+        status: 'DEFAULT_3_MONTHS',
+        isPrized: false,
+        consecutiveUnpaidMonths: 3,
+        customer: { fullName: 'M. Arumugam' },
+        chitGroup: { groupCode: 'KCA-1L-20M-01' },
+      });
+
+      prismaMock.$queryRaw = jest.fn().mockResolvedValue([
+        {
+          id: mockTicketId1,
+          status: 'PENDING_REMOVAL_APPROVAL',
+          isPrized: false,
+          consecutiveUnpaidMonths: 3,
+          removalRequestedByUserId: 'partner-maker-01',
+        },
+      ]);
+
+      await expect(
+        installmentService.requestDefaulterRemoval(mockTicketId1, 'partner-maker-02', {
+          reason: 'Duplicate request race',
+        }),
+      ).rejects.toThrow('REMOVAL_ALREADY_PENDING');
+
+      expect(prismaMock.subscriberTicket.update).not.toHaveBeenCalled();
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+  });
 });

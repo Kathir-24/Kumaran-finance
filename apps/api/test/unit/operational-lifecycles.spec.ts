@@ -248,6 +248,11 @@ describe('Operational Lifecycles & Maintenance Workflows', () => {
   // =========================================================================
   describe('Cluster 3: 3-Month Defaulter Substitution & Exit Settlement', () => {
     it('6. POST /tickets/:id/substitute: assigns verified replacement customer to REMOVED_DEF_3M ticket', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        isPartner: true,
+        isActive: true,
+      });
       mockPrisma.subscriberTicket.findUnique
         .mockResolvedValueOnce({
           id: 'ticket-5',
@@ -286,6 +291,11 @@ describe('Operational Lifecycles & Maintenance Workflows', () => {
     });
 
     it('6b. POST /tickets/:id/substitute: enforces ADR-13 single ticket rule', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        isPartner: true,
+        isActive: true,
+      });
       mockPrisma.subscriberTicket.findUnique
         .mockResolvedValueOnce({
           id: 'ticket-5',

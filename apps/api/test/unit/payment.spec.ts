@@ -792,6 +792,70 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('SEC-A / DEF-15: should fail closed when partner user record is null/missing on request, approve, and reject reversal', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        paymentService.requestReversal(
+          mockPaymentId,
+          { reason: 'DATA_ENTRY_ERROR' as any },
+          mockMakerId,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        paymentService.approveReversal(
+          mockPaymentId,
+          { notes: 'Attempt with deleted partner' },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        paymentService.rejectReversal(
+          mockPaymentId,
+          { rejectionReason: 'Attempt with deleted partner' },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('SEC-A / DEF-15: should fail closed when partner user is deactivated (isPartner: true, isActive: false)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: mockCheckerId,
+        isPartner: true,
+        isActive: false,
+      });
+
+      await expect(
+        paymentService.requestReversal(
+          mockPaymentId,
+          { reason: 'DATA_ENTRY_ERROR' as any },
+          mockCheckerId,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        paymentService.approveReversal(
+          mockPaymentId,
+          { notes: 'Deactivated partner within 120s Redis cache window' },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        paymentService.rejectReversal(
+          mockPaymentId,
+          { rejectionReason: 'Deactivated partner' },
+          mockCheckerId,
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe('4. Persona Scoping & Ownership Guards', () => {

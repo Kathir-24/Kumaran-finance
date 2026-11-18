@@ -30,6 +30,8 @@ export interface LockedTicketRow {
   id: string;
   status: string;
   isPrized: boolean;
+  consecutiveUnpaidMonths?: number;
+  removalRequestedByUserId?: string | null;
 }
 
 export interface LockedPaymentAndReversal {
@@ -87,7 +89,7 @@ export async function lockSubscriberTicketRow(
 ): Promise<LockedTicketRow | null> {
   if (typeof tx?.$queryRaw !== 'function') return null;
   const rows = await tx.$queryRaw<LockedTicketRow[]>`
-    SELECT id, status, "isPrized" FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE
+    SELECT id, status, "isPrized", "consecutiveUnpaidMonths", "removalRequestedByUserId" FROM "SubscriberTicket" WHERE id = ${ticketId} FOR UPDATE
   `;
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }

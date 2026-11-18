@@ -23,6 +23,7 @@ import {
   computeMaxConsecutiveUnpaidMonths,
   deriveTicketArrearsStatus,
 } from '../common/utils/arrears.util';
+import { assertVerifiedPartner } from '../common/utils/partner-identity.util';
 import {
   acquirePaymentConcurrencyLocks,
   generateNextReceiptNumber,
@@ -635,17 +636,12 @@ export class PaymentService {
     dto: RequestReversalDto,
     makerUserId: string,
   ) {
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const maker = await this.prisma.user.findUnique({
-        where: { id: makerUserId },
-        select: { isPartner: true },
-      });
-      if (maker && !maker.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to request payment reversals',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      makerUserId,
+      'request payment reversals',
+      'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to request payment reversals',
+    );
 
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -779,17 +775,12 @@ export class PaymentService {
       );
     }
 
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const checker = await this.prisma.user.findUnique({
-        where: { id: checkerUserId },
-        select: { isPartner: true },
-      });
-      if (checker && !checker.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to approve payment reversals',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      checkerUserId,
+      'approve payment reversals',
+      'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to approve payment reversals',
+    );
 
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -935,17 +926,12 @@ export class PaymentService {
       );
     }
 
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const checker = await this.prisma.user.findUnique({
-        where: { id: checkerUserId },
-        select: { isPartner: true },
-      });
-      if (checker && !checker.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to reject payment reversals',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      checkerUserId,
+      'reject payment reversals',
+      'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess financial authority to reject payment reversals',
+    );
 
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },

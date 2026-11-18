@@ -11,6 +11,7 @@ import {
   CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS,
 } from '../common/constants';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { assertVerifiedPartner } from '../common/utils/partner-identity.util';
 import {
   lockChitGroupRow,
   lockSubscriberTicketRow,
@@ -603,17 +604,11 @@ export class InstallmentService {
     partnerUserId: string,
     dto: RemoveDefaulterDto,
   ) {
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const partner = await this.prisma.user.findUnique({
-        where: { id: partnerUserId },
-        select: { isPartner: true },
-      });
-      if (partner && !partner.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to request defaulter removal.',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      partnerUserId,
+      'request defaulter removal',
+    );
 
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
@@ -635,6 +630,12 @@ export class InstallmentService {
       throw new BadRequestException('Subscriber ticket is already removed from this chit scheme');
     }
 
+    if (ticket.status === 'PENDING_REMOVAL_APPROVAL') {
+      throw new BadRequestException(
+        'REMOVAL_ALREADY_PENDING: A defaulter removal request is already pending approval for this subscriber ticket.',
+      );
+    }
+
     // ADR-07 & ADR-12 Enforcement: Must have at least 3 consecutive unpaid months
     if (ticket.consecutiveUnpaidMonths < CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS) {
       throw new BadRequestException(
@@ -644,32 +645,63 @@ export class InstallmentService {
 
     const requestedAt = new Date();
 
-    const updated = await this.prisma.subscriberTicket.update({
-      where: { id: ticketId },
-      data: {
-        status: 'PENDING_REMOVAL_APPROVAL',
-        removalRequestedAt: requestedAt,
-        removalRequestedByUserId: partnerUserId,
-        removalReason: dto.reason,
-      },
-      include: { customer: true, chitGroup: true },
-    });
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      // Pessimistic Tier-2 row lock on SubscriberTicket to prevent TOCTOU races with
+      // concurrent payments, auction finalization, or duplicate removal requests.
+      const locked = await lockSubscriberTicketRow(tx, ticketId);
+      if (locked) {
+        if (locked.isPrized) {
+          throw new BadRequestException(
+            'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be removed under defaulter rules. Prize money has already been disbursed; company recovery must proceed via security documents/legal instruments.',
+          );
+        }
+        if (locked.status === 'REMOVED_DEF_3M') {
+          throw new BadRequestException('Subscriber ticket is already removed from this chit scheme');
+        }
+        if (locked.status === 'PENDING_REMOVAL_APPROVAL') {
+          throw new BadRequestException(
+            'REMOVAL_ALREADY_PENDING: A defaulter removal request is already pending approval for this subscriber ticket.',
+          );
+        }
+        if (
+          typeof locked.consecutiveUnpaidMonths === 'number' &&
+          locked.consecutiveUnpaidMonths < CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS
+        ) {
+          throw new BadRequestException(
+            `ADR-07 Violation: Company default removal rights can only be exercised after at least ${CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS} consecutive unpaid months. Ticket #${ticket.ticketNumber} currently has ${locked.consecutiveUnpaidMonths} consecutive unpaid months.`,
+          );
+        }
+      }
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: partnerUserId,
-        action: 'DEFAULTER_REMOVAL_REQUESTED',
-        entityType: 'SubscriberTicket',
-        entityId: ticketId,
-        newValue: {
-          ticketNumber: updated.ticketNumber,
-          customerName: updated.customer.fullName,
-          groupCode: updated.chitGroup.groupCode,
-          consecutiveUnpaidMonths: updated.consecutiveUnpaidMonths,
-          removalReason: dto.reason,
+      const nextTicket = await tx.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
           status: 'PENDING_REMOVAL_APPROVAL',
+          removalRequestedAt: requestedAt,
+          removalRequestedByUserId: partnerUserId,
+          removalReason: dto.reason,
         },
-      },
+        include: { customer: true, chitGroup: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: partnerUserId,
+          action: 'DEFAULTER_REMOVAL_REQUESTED',
+          entityType: 'SubscriberTicket',
+          entityId: ticketId,
+          newValue: {
+            ticketNumber: nextTicket.ticketNumber,
+            customerName: nextTicket.customer.fullName,
+            groupCode: nextTicket.chitGroup.groupCode,
+            consecutiveUnpaidMonths: nextTicket.consecutiveUnpaidMonths,
+            removalReason: dto.reason,
+            status: 'PENDING_REMOVAL_APPROVAL',
+          },
+        },
+      });
+
+      return nextTicket;
     });
 
     return {
@@ -697,17 +729,11 @@ export class InstallmentService {
     checkerPartnerUserId: string,
     dto?: { notes?: string },
   ) {
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const checker = await this.prisma.user.findUnique({
-        where: { id: checkerPartnerUserId },
-        select: { isPartner: true },
-      });
-      if (checker && !checker.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to approve defaulter removal.',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      checkerPartnerUserId,
+      'approve defaulter removal',
+    );
 
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
@@ -745,33 +771,66 @@ export class InstallmentService {
 
     const removedAt = new Date();
 
-    const updated = await this.prisma.subscriberTicket.update({
-      where: { id: ticketId },
-      data: {
-        status: 'REMOVED_DEF_3M',
-        removedAt,
-        removedByUserId: checkerPartnerUserId,
-      },
-      include: { customer: true, chitGroup: true },
-    });
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      // Pessimistic Tier-2 row lock on SubscriberTicket to prevent TOCTOU races with
+      // concurrent payment clearance, auction prizing, or approve-vs-reject split-brain.
+      const locked = await lockSubscriberTicketRow(tx, ticketId);
+      if (locked) {
+        if (locked.status !== 'PENDING_REMOVAL_APPROVAL') {
+          throw new BadRequestException(
+            `NO_PENDING_REMOVAL: Ticket is not pending removal approval (current status: ${locked.status})`,
+          );
+        }
+        if (locked.removalRequestedByUserId === checkerPartnerUserId) {
+          throw new ForbiddenException(
+            'MAKER_CHECKER_VIOLATION: The Partner who requested defaulter removal cannot approve it. An independent Partner must review and commit.',
+          );
+        }
+        if (locked.isPrized) {
+          throw new BadRequestException(
+            'PRIZED_TICKET_IMMUTABLE: Prized subscriber tickets cannot be removed under defaulter rules.',
+          );
+        }
+        if (
+          typeof locked.consecutiveUnpaidMonths === 'number' &&
+          locked.consecutiveUnpaidMonths < CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS
+        ) {
+          throw new BadRequestException(
+            `ADR-07 Violation: Company default removal rights require at least ${CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS} consecutive unpaid months.`,
+          );
+        }
+      }
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: checkerPartnerUserId,
-        action: 'DEFAULTER_REMOVAL_APPROVED',
-        entityType: 'SubscriberTicket',
-        entityId: ticketId,
-        newValue: {
-          ticketNumber: updated.ticketNumber,
-          customerName: updated.customer.fullName,
-          groupCode: updated.chitGroup.groupCode,
-          removedByUserId: checkerPartnerUserId,
-          requestedByUserId: ticket.removalRequestedByUserId,
-          removedAt: removedAt.toISOString(),
+      const nextTicket = await tx.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
           status: 'REMOVED_DEF_3M',
-          notes: dto?.notes || null,
+          removedAt,
+          removedByUserId: checkerPartnerUserId,
         },
-      },
+        include: { customer: true, chitGroup: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: checkerPartnerUserId,
+          action: 'DEFAULTER_REMOVAL_APPROVED',
+          entityType: 'SubscriberTicket',
+          entityId: ticketId,
+          newValue: {
+            ticketNumber: nextTicket.ticketNumber,
+            customerName: nextTicket.customer.fullName,
+            groupCode: nextTicket.chitGroup.groupCode,
+            removedByUserId: checkerPartnerUserId,
+            requestedByUserId: locked?.removalRequestedByUserId ?? ticket.removalRequestedByUserId,
+            removedAt: removedAt.toISOString(),
+            status: 'REMOVED_DEF_3M',
+            notes: dto?.notes || null,
+          },
+        },
+      });
+
+      return nextTicket;
     });
 
     return {
@@ -798,17 +857,11 @@ export class InstallmentService {
     checkerPartnerUserId: string,
     reason?: string,
   ) {
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const checker = await this.prisma.user.findUnique({
-        where: { id: checkerPartnerUserId },
-        select: { isPartner: true },
-      });
-      if (checker && !checker.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to reject defaulter removal.',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      checkerPartnerUserId,
+      'reject defaulter removal',
+    );
 
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
@@ -825,32 +878,43 @@ export class InstallmentService {
       );
     }
 
-    const updated = await this.prisma.subscriberTicket.update({
-      where: { id: ticketId },
-      data: {
-        status: 'DEFAULT_3_MONTHS',
-        removalRequestedAt: null,
-        removalRequestedByUserId: null,
-        removalReason: null,
-      },
-      include: { customer: true, chitGroup: true },
-    });
+    const updated = await withTransactionRetry(this.prisma, async (tx) => {
+      const locked = await lockSubscriberTicketRow(tx, ticketId);
+      if (locked && locked.status !== 'PENDING_REMOVAL_APPROVAL') {
+        throw new BadRequestException(
+          `NO_PENDING_REMOVAL: Ticket is not pending removal approval (current status: ${locked.status})`,
+        );
+      }
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: checkerPartnerUserId,
-        action: 'DEFAULTER_REMOVAL_REJECTED',
-        entityType: 'SubscriberTicket',
-        entityId: ticketId,
-        newValue: {
-          ticketNumber: updated.ticketNumber,
-          customerName: updated.customer.fullName,
-          groupCode: updated.chitGroup.groupCode,
-          rejectedByUserId: checkerPartnerUserId,
-          rejectionReason: reason || null,
+      const nextTicket = await tx.subscriberTicket.update({
+        where: { id: ticketId },
+        data: {
           status: 'DEFAULT_3_MONTHS',
+          removalRequestedAt: null,
+          removalRequestedByUserId: null,
+          removalReason: null,
         },
-      },
+        include: { customer: true, chitGroup: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: checkerPartnerUserId,
+          action: 'DEFAULTER_REMOVAL_REJECTED',
+          entityType: 'SubscriberTicket',
+          entityId: ticketId,
+          newValue: {
+            ticketNumber: nextTicket.ticketNumber,
+            customerName: nextTicket.customer.fullName,
+            groupCode: nextTicket.chitGroup.groupCode,
+            rejectedByUserId: checkerPartnerUserId,
+            rejectionReason: reason || null,
+            status: 'DEFAULT_3_MONTHS',
+          },
+        },
+      });
+
+      return nextTicket;
     });
 
     return {
@@ -887,17 +951,11 @@ export class InstallmentService {
     adminUserId: string,
     dto: SubstituteSubscriberDto,
   ) {
-    if (typeof this.prisma.user?.findUnique === 'function') {
-      const admin = await this.prisma.user.findUnique({
-        where: { id: adminUserId },
-        select: { isPartner: true },
-      });
-      if (admin && !admin.isPartner) {
-        throw new ForbiddenException(
-          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to substitute removed subscriber tickets.',
-        );
-      }
-    }
+    await assertVerifiedPartner(
+      this.prisma,
+      adminUserId,
+      'substitute removed subscriber tickets',
+    );
 
     const ticket = await this.prisma.subscriberTicket.findUnique({
       where: { id: ticketId },
