@@ -5,7 +5,13 @@
 > **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
 > **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-5.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-5.ts)  
-> **Result**: **All Endpoints & Invariants Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+> **Result**: **9 / 9 Endpoints Passed — HISTORICAL EXECUTION SNAPSHOT (100% Live Oct 2026 Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 4 & Module 5 hardening evolved the live contract as follows:
+> 1. **Two-Partner Defaulter Removal (`ADR-22` / `DEF-05` / `DEF-16`)**: Unilateral `remove-defaulter` evolved into strict two-partner Maker–Checker (`POST /api/v1/tickets/:id/{request-removal,approve-removal,reject-removal}`), backed by `SELECT FOR UPDATE` TOCTOU locks, `PRIZED_TICKET_IMMUTABLE`, `assertVerifiedPartner`, and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker`.
+> 2. **Early Exit Settlement Fail-Closed (`Q25`)**: `POST /api/v1/tickets/:id/settle-removal` (shown running a 4% damages deduction during the Oct 2026 run) now **fails closed with `UNAPPROVED_SETTLEMENT_POLICY`** pending business owner / legal confirmation of `Q25`.
+> 3. **Dual Route Aliases & Verified Partner Substitution (`DEF-M4-05`, `DEF-04`, `DEF-07`)**: Mounted on `@Controller(['installments', 'installment-dues'])` and `@Controller(['tickets', 'installments/tickets'])`; `substituteSubscriber` strictly requires Verified Partner `isPartner: true`.
 
 ---
 
@@ -148,62 +154,6 @@ flowchart TD
 
 ---
 
-### [3/7] `GET /api/v1/installments/group/:chitGroupId/month/3` (List Monthly Dues)
-- **Role Required**: Staff, Auditor
-- **HTTP Status**: `200 OK`
-- **API Response**: Returns all 20 subscriber dues for Month 3.
-  - Every single member — including Ticket #1 (Month 1 pool holder) and Ticket #4 (Month 2 auction winner) — pays identical net payable amount ₹3,950, proving Universal Dividend Allocation.
-
----
-
-### [4/7] `GET /api/v1/tickets/:ticketId/dues` (Schedule of Dues for Single Ticket)
-- **Role Required**: Staff, Member (Self)
-- **HTTP Status**: `200 OK`
-- **API Response for Ticket #3**:
-  - Month 2: Gross ₹5,000 | Dividend ₹0 | Net ₹5,000 | Status: `UNPAID`
-  - Month 3: Gross ₹5,000 | Dividend ₹1,050 | Net ₹3,950 | Status: `UNPAID`
-
----
-
-### [5/7] `GET /api/v1/tickets/:ticketId/passbook` (Digital Passbook Statement)
-- **Role Required**: Staff, Member (Self)
-- **HTTP Status**: `200 OK`
-- **API Response for Ticket #3**:
-  - Customer: `S. Ramasamy (KC-CUST-00103)`
-  - `ticketNumber`: `3`
-  - `totalGrossDue`: `₹10,000` (Months 2 + 3)
-  - `totalDividend`: `₹1,050` (Earned from Month 2 auction)
-  - `totalNetDue`: `₹8,950`
-  - `outstandingBalance`: `₹8,950`
-  - `ledgerEntries`: 2 continuous chronological entries.
-
----
-
-### [6/7] `GET /api/v1/tickets/defaulters` & `GET /api/v1/installments/defaulters`
-- **Role Required**: Staff, Auditor
-- **HTTP Status**: `200 OK`
-- **API Response**: Returns active arrears reports filtered by `minConsecutiveMonths=1` across the branch.
-
----
-
-### [7/7] `POST /api/v1/tickets/:id/remove-defaulter` (Company 3-Month Arrears Removal Rights)
-- **Role Required**: `SUPER_ADMIN`
-- **Step 7A (Guard Test: Premature Removal Rejection)**:
-  - Attempted default removal for Ticket #19 with `consecutiveUnpaidMonths = 0`.
-  - Server rejected with **`HTTP 400 Bad Request`**:  
-    `"ADR-07 Violation: Company default removal rights can only be exercised after at least 3 consecutive unpaid months. Ticket #19 currently has 0 consecutive unpaid months."`
-- **Step 7B (Valid 3-Month Arrears Removal)**:
-  - Simulated 3 consecutive unpaid months in database.
-  - Super Admin executed company removal rights $\to$ **`HTTP 200 OK`**.
-- **PostgreSQL 17 Database Proof (`public."SubscriberTicket"`)**:
-  ```sql
-  SELECT status, "consecutiveUnpaidMonths", "removedByUserId" FROM public."SubscriberTicket" WHERE id = '<Ticket 19 UUID>';
-  ```
-  **Output**: `REMOVED_DEF_3M|3|ebf67759-bf05-4fa6-b653-577b3f144900`  
-  *(Ticket status permanently transitioned to `REMOVED_DEF_3M` with audit trail of removing Partner)*.
-
----
-
 ### [8/9] `POST /api/v1/tickets/:id/settle-removal` (Defaulter Exit Account Settlement)
 - **Role Required**: `SUPER_ADMIN`, `ACCOUNTANT`
 - **HTTP Status**: `200 OK`
@@ -327,4 +277,4 @@ flowchart TD
 
 - **Lifecycle 5 Scope**: **All 9 Endpoints Passed** ✅
 - **Database Verified**: Direct PostgreSQL 17 Docker `chitflow-db` queries confirmed all schema constraints, foreign keys, and cryptographic hashes.
-- **Next Lifecycle Target**: **Lifecycle 8 — Prize Money Disbursement & Safety Proof Document Pipeline**!
+- **Next Lifecycle Target**: **Lifecycle 6 — Doorstep Field Collections & Evening Cash Handover**!

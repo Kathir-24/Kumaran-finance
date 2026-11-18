@@ -5,7 +5,13 @@
 > **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
 > **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-3.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-3.ts)  
-> **Result**: **9 / 9 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+> **Result**: **9 / 9 Endpoints Passed — HISTORICAL EXECUTION SNAPSHOT (100% Live Oct 2026 Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 4 hardening (`DEF-M4-01..04`, verified in `04-module4-chit-schemes.e2e-spec.ts` — 49/49 passing) added:
+> 1. **Draft Cancellation State (`DEF-M4-01`)**: `POST /api/v1/chits/:id/cancel` transitioning `DRAFT -> CANCELLED` (terminal state).
+> 2. **Whole-Rupee Divisibility Gate (`DEF-M4-02`)**: Strict pre-insert rejection when $V \pmod N \ne 0$.
+> 3. **Verified Partner Dual-Control Activation (`DEF-M4-03`, Guardrails 10 & 11)**: `POST /api/v1/chits/:id/activate` strictly enforces `makerUserId != checkerUserId` and Verified Partner `isPartner: true`.
 
 ---
 
@@ -15,8 +21,8 @@ Lifecycle 3 verifies the core financial scheme engine, ticket allocation, ADR-13
 
 ```mermaid
 flowchart TD
-    A["1. POST /chits/new\n(Create Fresh Scheme - DRAFT)"] --> B["2. POST /chits/:id/tickets/assign\n(Assign 20 Tickets & ADR-13 Test)"]
-    B --> C["3. GET /chits/:id/tickets\n(View 20 Assigned Tickets)"]
+    A["1. POST /chits/new\n(Create Fresh Scheme - DRAFT)"] --> B["2. PATCH /chits/:id\n(Update Draft Parameters)"]
+    B --> C["3. POST /chits/:id/tickets/assign\n(Assign Tickets & ADR-13 Test)"]
     C --> D["4. DELETE /chits/:id/tickets/:ticketNumber\n(Unassign Ticket in DRAFT)"]
     D --> E["5. GET /chits/:id/tickets\n(View Assigned Tickets)"]
     E --> F["6. POST /chits/:id/activate\n(Month 1 Rule & Freeze 4% Commission)"]

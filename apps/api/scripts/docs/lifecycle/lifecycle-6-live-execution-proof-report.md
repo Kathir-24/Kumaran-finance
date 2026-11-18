@@ -5,7 +5,14 @@
 > **Execution Date**: October 24, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
 > **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-6.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-6.ts)  
-> **Result**: **6 / 6 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+> **Result**: **6 / 6 Endpoints Passed — HISTORICAL EXECUTION SNAPSHOT (100% Live Oct 2026 Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 5 & Module 8 hardening added:
+> 1. **Sequential Payment Order & Canonical Arrears (`DEF-08`, `DEF-10`)**: Enforces `PRIOR_INSTALLMENT_UNPAID` (blocking out-of-order months) and unifies arrears streaks via `computeMaxConsecutiveUnpaidMonths` (`arrears.util.ts`).
+> 2. **Strict Offline Sync Comparator & 9 Explicit Error Codes (`DEF-12`, `DEF-M8-REV-02/07`)**: Sorts multi-ticket batches deterministically by `(ticketId, installmentMonth)` and maps all 9 error codes explicitly (`DUPLICATE_TRANSACTION_REF`, `CROSS_BRANCH_FORBIDDEN`, `PRIOR_INSTALLMENT_UNPAID`, etc.).
+> 3. **Hardened Vault Cash Handover (`DEF-11`, `DEF-M8-REV-03/05`, `ADR-25`)**: `acknowledgeHandover` deduplicates `paymentIds` via `Set`, requires `paymentStatus === SUCCESS`, enforces branch isolation (`CROSS_BRANCH_FORBIDDEN`), and is backed by PostgreSQL `CHECK` constraint `chk_payment_cash_handover_maker_checker`.
+> 4. **Receipt PDF Pre-Render & Channel Scope (`XR-M8-PAY-01`, `ADR-23`, `ADR-26`)**: `JOB_DISPATCH_PAYMENT_RECEIPT` passes `paymentId` for async S3 receipt PDF pre-rendering; Phase 1 dispatches bilingual **MSG91 TRAI DLT SMS (`KMRCHT`)** while Flutter Android UI/FCM activates in Phase 2 (Q2 2027).
 
 ---
 

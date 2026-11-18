@@ -5,7 +5,14 @@
 > **Execution Date**: October 23, 2026  
 > **Environment**: Live NestJS Server (`http://127.0.0.1:3000/api/v1`) $\longleftrightarrow$ PostgreSQL 17 Docker (`chitflow_dev` on Port 5433)  
 > **Test Script**: [`apps/api/scripts/lifecycle/verify-lifecycle-2.ts`](file:///u:/Kumaran-finance/apps/api/scripts/lifecycle/verify-lifecycle-2.ts)  
-> **Result**: **11 / 11 Endpoints Passed (100% Live Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+> **Result**: **11 / 11 Endpoints Passed — HISTORICAL EXECUTION SNAPSHOT (100% Live Oct 2026 Request $\to$ Server $\to$ Database $\to$ Response Verified)**
+
+> [!NOTE]
+> **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 23, 2026 live-server run verbatim. Subsequent hardening upgrades expanded the live `CustomerController` contract as follows:
+> 1. **12th Live Route (`DEF-FE-07`)**: Added `POST /api/v1/customers/:id/documents/confirm` confirming direct-to-S3/R2 presigned PUT uploads via `HeadObject` existence verification.
+> 2. **Strict Validation & Normalization (`ISSUE-M3-01..03`)**: Enforced `REGEX_INDIAN_PHONE` (`/^[6-9]\d{9}$/`), masked 4-digit Aadhaar (`^\d{4}$`), and auto-uppercase PAN normalization (`[A-Z]{5}[0-9]{4}[A-Z]{1}`).
+> 3. **Layer 2 Anti-BOLA & Collection Agent Boundary (`ISSUE-M3-04/05/12`)**: Non-Super-Admin staff are branch-scoped on customer creation & FCM updates (`403 BOLA_VIOLATION`); `COLLECTION_AGENT` is upload-only for doorstep KYC scans and strictly barred from viewing scans / presigned URLs (with `documents` redacted in listings).
+> 4. **Phase 2 Push Activation (`ADR-26`)**: `PATCH /customers/:id/fcm-token` is live; Android app FCM push delivery activates in Phase 2 (Q2 2027).
 
 ---
 
@@ -24,13 +31,14 @@ flowchart TD
     G --> H["8. DELETE /customers/:id/nominees/:nomineeId\n(Remove Nominee)"]
     H --> I["9. POST /customers/:id/documents\n(Upload KYC Scan to S3)"]
     I --> J["10. GET /customers/:id/documents/:docId/url\n(15-min Presigned Viewing URL)"]
+    J --> K["11. DELETE /customers/:id/documents/:docId\n(Delete KYC Scan from S3 & DB)"]
 ```
 
 ---
 
 ## 2. Endpoint-by-Endpoint Live Verification Log
 
-### [1/10] `POST /api/v1/customers` (Customer Intake)
+### [1/11] `POST /api/v1/customers` (Customer Intake)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `COLLECTION_AGENT`
 - **HTTP Status**: `201 Created`
 - **Request Payload**:
@@ -82,7 +90,7 @@ flowchart TD
 
 ---
 
-### [2/10] `GET /api/v1/customers` (List & Search Customers)
+### [2/11] `GET /api/v1/customers` (List & Search Customers)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `AUDITOR`
 - **HTTP Status**: `200 OK`
 - **Query Params**: `?search=Sundaram&page=1&limit=10`
@@ -107,7 +115,7 @@ flowchart TD
 
 ---
 
-### [3/10] `GET /api/v1/customers/:id` (Customer 360 Profile)
+### [3/11] `GET /api/v1/customers/:id` (Customer 360 Profile)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`, `AUDITOR`
 - **HTTP Status**: `200 OK`
 - **API Response**:
@@ -119,7 +127,7 @@ flowchart TD
 
 ---
 
-### [4/10] `PATCH /api/v1/customers/:id` (Update Customer Details)
+### [4/11] `PATCH /api/v1/customers/:id` (Update Customer Details)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`
 - **HTTP Status**: `200 OK`
 - **Request Payload**:
@@ -142,7 +150,7 @@ flowchart TD
 
 ---
 
-### [5/10] `POST /api/v1/customers/:id/nominees` (Add Nominee)
+### [5/11] `POST /api/v1/customers/:id/nominees` (Add Nominee)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `CUSTOMER`
 - **HTTP Status**: `201 Created`
 - **Request Payload**:
@@ -174,7 +182,7 @@ flowchart TD
 
 ---
 
-### [6/10] `PATCH /api/v1/customers/:id/kyc-status` (Approve KYC Verification)
+### [6/11] `PATCH /api/v1/customers/:id/kyc-status` (Approve KYC Verification)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`
 - **HTTP Status**: `200 OK`
 - **Request Payload**:
@@ -193,7 +201,7 @@ flowchart TD
 
 ---
 
-### [7/10] `PATCH /api/v1/customers/:id/fcm-token` (Register Device Push Token)
+### [7/11] `PATCH /api/v1/customers/:id/fcm-token` (Register Device Push Token)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `COLLECTION_AGENT`, `CUSTOMER`
 - **HTTP Status**: `200 OK`
 - **Request Payload**:
@@ -219,7 +227,7 @@ flowchart TD
 
 ---
 
-### [8/10] `DELETE /api/v1/customers/:id/nominees/:nomineeId` (Remove Nominee)
+### [8/11] `DELETE /api/v1/customers/:id/nominees/:nomineeId` (Remove Nominee)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`
 - **HTTP Status**: `200 OK`
 - **API Response**:
@@ -237,7 +245,7 @@ flowchart TD
 
 ---
 
-### [9/10] `POST /api/v1/customers/:id/documents` (Upload KYC Scan)
+### [9/11] `POST /api/v1/customers/:id/documents` (Upload KYC Scan)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT`, `CUSTOMER`
 - **HTTP Status**: `201 Created`
 - **Multipart Form Payload**:
@@ -266,7 +274,7 @@ flowchart TD
 
 ---
 
-### [10/10] `GET /api/v1/customers/:id/documents/:docId/url` (15-Minute Presigned Viewing URL)
+### [10/11] `GET /api/v1/customers/:id/documents/:docId/url` (15-Minute Presigned Viewing URL)
 - **Role Required**: `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `CUSTOMER`, `AUDITOR`
 - **HTTP Status**: `200 OK`
 - **API Response**:
