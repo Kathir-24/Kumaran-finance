@@ -11,15 +11,15 @@
 
 As a solo developer working with AI:
 1. **Small Increments Only**: Never generate massive 500-line code dumps across multiple files at once. Build one function, one endpoint, or one test at a time.
-2. **Search for PoC (Proof of Concept) First**: Before writing any new module or integration, inspect existing codebase patterns, Prisma schemas, or standard NestJS/Flutter reference implementations to avoid inventing unnecessary architectures.
+2. **Search for PoC (Proof of Concept) First**: Before writing any new module or integration, inspect existing codebase patterns, Prisma schemas, or standard NestJS / Next.js / Dart Core (`ADR-26`, Phase 2 Flutter UI) reference implementations to avoid inventing unnecessary architectures.
 3. **Stop & Ask (Zero Hallucination Policy)**: If a business rule, calculation formula, or legal condition is not 100% explicitly documented in `docs/`, the AI assistant **MUST STOP and ask the developer** before making assumptions.
 4. **Modularity & File Sizing**: Keep files clean and focused (ideally under 300–400 lines). If a service or controller grows too large, propose separating it into modular sub-services or helper files and link them cleanly.
 
 ---
 
-## 2. The 10 Non-Negotiable Invariant Guardrails
+## 2. The 11 Non-Negotiable Invariant Guardrails
 
-Every AI coding assistant working in this repository must strictly adhere to these 10 guardrails:
+Every AI coding assistant working in this repository must strictly adhere to these 11 guardrails:
 
 | # | Guardrail | Technical Rule | What to Check Before Approving |
 |---|---|---|---|
@@ -32,7 +32,8 @@ Every AI coding assistant working in this repository must strictly adhere to the
 | **7** | **Ticket Limit** | Maximum 1 ticket per customer in the same chit group. | Enforce database constraint: `@@unique([chitGroupId, customerId])`. |
 | **8** | **Defaulter & Payment Rules** | (1) Unpaid for current month = ineligible to bid. (2) 3 consecutive unpaid months = removal rights. (3) Zero partial payment, zero double payment, zero advance balance (`DueStatus`: `UNPAID`, `PAID`, `OVERDUE`). | Backend transition guards reject unpaid bidders and enforce single discrete payment per month. |
 | **9** | **Company Safety Proof** | Flexible checklist recordkeeper (signed agreement [Yes/No], nominee signed [Yes/No], blank cheques [Yes/No], scans). | Property documents eliminated; security is **not mandatory** across the board and requested only for company safety. |
-| **10** | **Maker $\ne$ Checker** | Dual authorization enforced on reversals, auctions, and payouts. | Reject any transaction where `maker_user_id == checker_user_id`. |
+| **10** | **Maker $\ne$ Checker** | Dual authorization enforced on reversals, auctions, payouts, and defaulter removals. | Reject any transaction where `maker_user_id == checker_user_id` (enforced in app + 8 PostgreSQL `CHECK` constraints). |
+| **11** | **Verified Partner Identity (`ADR-21`)** | Not all Super Admins are statutory business partners (`isPartner: true`). | Non-Partner IT Super Admins (`isPartner: false`) are strictly barred from financial authorizations; audit logs & BullMQ telemetry are restricted strictly to `SUPER_ADMIN`. |
 
 ---
 
@@ -57,8 +58,8 @@ Ongoing notebook intake wizard      -->   docs/07-operations/manual-onboarding-s
 Cash handovers & field collections  -->   docs/07-operations/operations-sop.md
 Web Admin & Partner operations      -->   docs/07-operations/user-manuals/admin-foreman-manual.md
 Desk Accountant & Cashier operations -->   docs/07-operations/user-manuals/accountant-desk-manual.md
-Android Agent mobile app operations  -->   docs/07-operations/user-manuals/agent-mobile-manual.md
-Customer mobile app operations       -->   docs/07-operations/user-manuals/customer-app-guide.md
+Android Agent mobile app (Phase 2)   -->   docs/07-operations/user-manuals/agent-mobile-manual.md
+Customer mobile app (Phase 2)        -->   docs/07-operations/user-manuals/customer-app-guide.md
 Branch Manager facility operations   -->   docs/07-operations/user-manuals/branch-manager-manual.md
 Independent CA Auditor portal        -->   docs/07-operations/user-manuals/auditor-portal-manual.md
 ```
@@ -114,6 +115,8 @@ Mandatory Rules:
 Before accepting any AI-generated code or committing to Git, ask the AI (or verify yourself):
 - [ ] *Did you use any `number` or floating-point types for monetary values?* (Must be `BigInt`).
 - [ ] *Does this transaction verify that `maker_user_id != checker_user_id`?*
+- [ ] *Is verified Partner identity (`isPartner: true`, Guardrail 11) enforced on financial authorizations, and are audit logs / BullMQ queues restricted strictly to `SUPER_ADMIN`?*
+- [ ] *Do financial write paths enforce row-level locking (`SELECT FOR UPDATE`) inside `withTransactionRetry`?*
 - [ ] *Are unpaid subscribers prevented from bidding in this auction?*
 - [ ] *Did you prevent a customer from holding 2 tickets in the same group?*
 - [ ] *Are all illegal status transitions fail-closed with HTTP 400 (`BadRequestException`) per the 9 lifecycle matrices?*

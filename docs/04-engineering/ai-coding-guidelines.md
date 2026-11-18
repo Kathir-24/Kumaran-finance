@@ -20,11 +20,12 @@
    - Client clocks (Android/Web) are never trusted for auction cutoffs, bid acceptance, or payment confirmation.
 
 3. **Append-Only Financial Ledger**:
-   - Never run `DELETE` or `UPDATE` on posted financial transactions.
+   - Never run `DELETE` or `UPDATE` on posted financial transactions or `AuditLog` entries (enforced at the PostgreSQL 17 storage engine level by `ENABLE ALWAYS` triggers `trg_prevent_audit_log_mutation` & `trg_prevent_audit_log_truncate`).
    - Adjustments and cancellations must use auditable **reversal records** with an authorized reason and user ID.
 
-4. **Maker-Checker Separation of Duties**:
-   - Critical actions (payment reversals, auction finalization, prize disbursements) strictly enforce **`maker_user_id != checker_user_id`** at application and database levels (`CONFIRMED-BY-DEVELOPER`).
+4. **Maker-Checker Separation of Duties & Verified Partner Identity (Guardrails 10–11 / `ADR-21`)**:
+   - Critical actions (payment reversals, auction finalization/corrections, prize disbursements, defaulter removals) strictly enforce **`maker_user_id != checker_user_id`** at application and PostgreSQL engine levels (**8 `CHECK` constraints**, `CONFIRMED-BY-DEVELOPER`).
+   - Only verified statutory business partners (`isPartner: true`) may authorize financial mutations; non-Partner IT Super Admins (`isPartner: false`) are strictly barred, and audit logs / BullMQ telemetry remain strictly `SUPER_ADMIN`-only.
    - Under no circumstances may a user approve their own entry.
 
 5. **No AI Features in Operational Scope**:
@@ -67,11 +68,11 @@ You are helping me build Kumaran Chits, an operations platform for
 Kumaran Finance in Tamil Nadu, India.
 
 Stack:
-- Flutter + Dart mobile app (Android first)
-- React + TypeScript web dashboard
-- NestJS + TypeScript backend (Modular Monolith)
-- PostgreSQL 17 + Prisma ORM
-- Redis + BullMQ (background jobs only, not source of truth)
+- Next.js 15 + React + TypeScript web dashboard (Phase 1 primary UI)
+- NestJS 12 + TypeScript backend (Modular Monolith)
+- Shared TypeScript Client SDK (@kumaran/api-client) & Dart Client Core (apps/mobile/lib/core/; Flutter Android UI deferred to Phase 2 Q2 2027 per ADR-26)
+- PostgreSQL 17 + Prisma ORM (18 models, 23 migrations, 8 engine CHECK constraints)
+- Redis 7 + BullMQ (background jobs only, not source of truth)
 
 I am learning and want guided coding, not a giant code dump.
 

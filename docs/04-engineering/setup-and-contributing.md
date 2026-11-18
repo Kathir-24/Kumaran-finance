@@ -3,11 +3,12 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance)
 
 ## 1. Prerequisites
-- **Node.js**: v20 LTS or v22 LTS (Active LTS recommended for NestJS 12).
-- **Docker & Docker Compose**: For local PostgreSQL 17 database.
+- **Node.js**: v22 LTS or v24 LTS (`node:24-alpine` is used in production Dockerfiles for NestJS 12 & Next.js 15).
+- **Package Manager**: `pnpm 12.14+` (`packageManager: "pnpm@12.14.0"` in root `package.json`).
+- **Docker & Docker Compose**: For local PostgreSQL 17, Redis 7, and MinIO S3 containers.
 - **Git**: Version control.
-- **Flutter SDK**: v3.24+ (for Android mobile app development).
-- **Editor**: VS Code / Antigravity with Prisma and Flutter extensions.
+- **Dart / Flutter SDK** *(Optional in Phase 1)*: Dart SDK 3.x for `apps/mobile/lib/core/` typed client & offline sync tests; Flutter Android UI/APK packaging is deferred to Phase 2 (Q2 2027, `ADR-26`).
+- **Editor**: VS Code / Antigravity with Prisma extensions.
 
 ---
 
@@ -17,14 +18,17 @@
 Kumaran-finance/
 ├── apps/
 │   ├── api/                 # NestJS 12 Backend (Modular Monolith)
-│   ├── mobile/              # Flutter Android-first application (In development)
+│   ├── mobile/              # Dart Client Core SDK (Phase 1); Flutter Android UI deferred to Phase 2 (ADR-26)
 │   └── web/                 # Next.js 15 Web Operations Portal (Admin, Accountant, Partners, Auditor)
+├── packages/
+│   └── api-client/          # Shared typed TypeScript Client SDK (@kumaran/api-client)
 ├── infra/
-│   ├── docker/              # Docker Compose (PostgreSQL 17)
-│   └── scripts/             # Database backup & restore automation scripts
+│   ├── docker/              # Docker Compose (PostgreSQL 17, Redis 7, MinIO, Nginx, Certbot, Backup Cron)
+│   └── scripts/             # Database backup, restore, DRP, deploy & monitoring scripts
+├── scripts/                 # OpenAPI-to-Dart codegen & chaos verification probes
 ├── docs/                    # Complete Project Documentation Suite
-├── .github/workflows/       # CI/CD pipelines (ephemeral Postgres, lint, test, build)
-├── package.json             # Root monorepo workspace orchestration
+├── .github/workflows/       # CI/CD pipelines (ephemeral Postgres 17 + Redis 7, lint, test, build)
+├── package.json             # Root monorepo workspace orchestration (pnpm@12.14.0)
 ├── .editorconfig            # Monorepo code style formatting rules
 ├── .prettierrc              # Monorepo Prettier configuration
 ├── .gitignore
@@ -78,11 +82,11 @@ pnpm run prisma:seed
 # 1. Run Oxlint linter (0 errors, 0 warnings expected)
 pnpm run lint
 
-# 2. Run backend unit & integration tests (100% pass expected)
+# 2. Run all workspace tests (SDK + API 1,226 unit tests + Web 376 unit tests) & API E2E
 pnpm test
-pnpm run test:e2e:fresh
+pnpm --filter api run test:e2e:fresh
 
-# 3. Run frontend unit tests (100% pass expected, 97 tests)
+# 3. Run frontend unit tests individually (376 tests across 14 suites)
 pnpm --filter web test
 
 # 4. Strict frontend typecheck
@@ -104,9 +108,9 @@ Open your browser to test the built-in administrative & observability portals:
 | Portal / Tool | URL | Default Credentials | Description |
 |---|---|---|---|
 | **Web Operations Portal** | [http://localhost:3001](http://localhost:3001) | Phone: `9876543210`<br>Pass: `Admin@Kumaran2026` | Next.js 15 bilingual operations portal (Schemes, Onboarding, Dues, Auctions). |
-| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | None (Public) | Interactive testing for all 112 physical paths (118 operations). |
+| **Swagger OpenAPI Explorer** | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) | Non-production only (`NODE_ENV !== 'production'`, `main.ts:123`) | Interactive testing for **123 OpenAPI paths (129 operations)** across **18 NestJS controllers** (**134 live HTTP routes**). |
 | **Bull Board Queue Monitor** | [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) | Active Super Admin JWT Session<br>(or non-default `BULL_BOARD_USER` Basic Auth) | Visual dashboard for `daily-maintenance-queue`, `notification-queue`, and `reconciliation-queue`. Requires Super Admin session. |
-| **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | `METRICS_USER` / `METRICS_PASSWORD`<br>(Insecure defaults rejected in production) | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues & chit fund KPIs. |
+| **Prometheus Metrics Exporter** | [http://localhost:3000/metrics](http://localhost:3000/metrics) | `METRICS_BEARER_TOKEN` or `METRICS_USER` / `METRICS_PASSWORD`<br>(Insecure defaults rejected in production) | Standard Prometheus telemetry: HTTP p95 latencies, BullMQ queues, SMS APM & chit fund KPIs. |
 | **MinIO S3 Storage Console** | [http://localhost:9001](http://localhost:9001) | User: `chitflow_admin`<br>Pass: `chitflow_storage_secret` | Web file browser showing the `kumaran-chits-private` bucket. |
 | **Prisma Studio (DB GUI)** | Run `pnpm run prisma:studio` | Opens [http://localhost:5555](http://localhost:5555) | Visual database table browser and editor. |
 

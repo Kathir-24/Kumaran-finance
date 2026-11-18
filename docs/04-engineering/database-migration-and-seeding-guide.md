@@ -83,26 +83,32 @@ pnpm exec prisma studio
 ```
 Opens in your browser at `http://localhost:5555`.
 
-### 3.4 Applied Migrations & Verification Log
+### 3.4 Applied Migrations & Verification Log (All 23 Linear Migrations)
 | Migration Name | Applied At | Description | Verification Status |
 |---|---|---|:---:|
-| `20261018110459_init_kumaran_schema` | 2026-10-18 | Initial schema creation: 10 models, 8 enums, `roles Role[]`, `BigInt` currency fields, `@@unique([chitGroupId, customerId])` ticket limit. | **Applied & Verified** |
+| `20261018110459_init_kumaran_schema` | 2026-10-18 | Initial schema creation: core models, 8 enums, `roles Role[]`, `BigInt` currency fields, `@@unique([chitGroupId, customerId])` ticket limit. | **Applied & Verified** |
 | `20261018125155_add_auth_credentials_to_user` | 2026-10-18 | Added password authentication, TOTP secrets, MPIN bcrypt hash, and refresh token hashes to `User`. | **Applied & Verified** |
 | `20261018171620_payment_reversal_maker_checker` | 2026-10-18 | Added PaymentReversal table enforcing dual control (`requestedByUserId != reviewedByUserId`). | **Applied & Verified** |
 | `20261019120630_add_registrar_filing_to_auction_minutes` | 2026-10-19 | Added Form XVII filing reference and statutory filing date fields to `AuctionMinutes`. | **Applied & Verified** |
 | `20261021142000_add_fcm_token_to_user_and_customer` | 2026-10-21 | Added nullable `fcmToken` column to both `User` and `Customer` tables for Firebase Cloud Messaging push dispatch. | **Applied & Verified** |
 | `20261021170132_add_payment_notes` | 2026-10-21 | Added optional `notes` column to `Payment` for cashier remarks and collection logs. | **Applied & Verified** |
 | `20261022205000_remove_user_email` | 2026-10-22 | Dropped `email` column from `User` table to enforce strict phone-only identity (ADR-18). | **Applied & Verified** |
-| `20261023095606_add_cycle_date_windows` | 2026-10-23 | Added `cycleStartDate` and `cycleEndDate` to `InstallmentDue` for physical 6-column passbook ledger alignment. | **Applied & Verified** (`289/289` unit tests, `82/82` E2E tests passing) |
+| `20261023095606_add_cycle_date_windows` | 2026-10-23 | Added `cycleStartDate` and `cycleEndDate` to `InstallmentDue` for physical 6-column passbook ledger alignment. | **Applied & Verified** |
 | `20261027065614_add_financial_reporting_indexes` | 2026-10-27 | Added compound B-tree indexes on `Payment`, `Receipt`, and `Customer` for sub-millisecond Day Book & Form XXII Cash Book queries. | **Applied & Verified** |
-| `20261027094809_add_transaction_ref_unique_constraint` | 2026-10-27 | Added `CREATE UNIQUE INDEX "Payment_transactionRef_key"` to enforce bank UTR and cheque reference uniqueness (ADR-19). | **Applied & Verified** (`367/367` unit tests, `88/88` E2E tests passing) |
-| `20261112115900_add_allocation_and_tie_bidder_indexes` | 2026-11-12 | Added `PaymentAllocation` FK B-Tree indexes (`paymentId`, `ticketId`, `installmentDueId`), `AuctionTieBidder` `@@unique([auctionId, ticketId])`, and `@@index([ticketId])` (`DEF-DB-05`). | **Applied & Verified** (`CONCURR-INV-20`–`23` live Postgres `EXPLAIN`, `P2002`, and append-only multiplicity verified) |
+| `20261027094809_add_transaction_ref_unique_constraint` | 2026-10-27 | Added `CREATE UNIQUE INDEX "Payment_transactionRef_key"` to enforce bank UTR and cheque reference uniqueness (ADR-19). | **Applied & Verified** |
+| `20261029140029_add_customer_refresh_token_hash` | 2026-10-29 | Added `refreshTokenHash` to `Customer` for mobile subscriber session continuity. | **Applied & Verified** |
+| `20261106170415_add_concurrency_and_performance_indexes` | 2026-11-06 | Added composite B-tree concurrency & reporting indexes across dues, payments, and receipts. | **Applied & Verified** |
+| `20261106175923_add_optimistic_locking_version_columns` | 2026-11-06 | Added `version Int @default(1)` optimistic concurrency columns on `Customer` and `Branch`. | **Applied & Verified** |
+| `20261112115900_add_allocation_and_tie_bidder_indexes` | 2026-11-12 | Added `PaymentAllocation` FK B-Tree indexes (`paymentId`, `ticketId`, `installmentDueId`), `AuctionTieBidder` `@@unique([auctionId, ticketId])`, and `@@index([ticketId])` (`DEF-DB-05`). | **Applied & Verified** (`CONCURR-INV-20`–`23`) |
 | `20261113200000_add_partner_identity_and_removal_approval` | 2026-11-13 | Added `isPartner` boolean on `User` (ADR-21 / SEC-A) and two-partner dual control removal approval fields on `SubscriberTicket` (ADR-22 / SEC-B). | **Applied & Verified** |
-| `20261113233000_audit_log_immutability_trigger` | 2026-11-13 | Created PostgreSQL engine-level triggers preventing `UPDATE` and `DELETE` on `AuditLog` table. | **Applied & Verified** |
-| `20261114010000_audit_log_complete_immutability` | 2026-11-14 | Hardened PostgreSQL immutable triggers on `AuditLog` table for complete statutory compliance. | **Applied & Verified** |
-| `20261115030000_auth_revocation_and_session_vault` | 2026-11-15 | Added dedicated PostgreSQL `Session` vault model (`[userId, clientType]`, `[customerId, clientType]`) and authoritative `tokenRevokedBefore` cutoffs on `User` and `Customer` (F02, F04). | **Applied & Verified** (39/39 Phase 1 unit, 25/25 token lifecycle, 6/6 DB lifecycle tests passing) |
+| `20261113233000_audit_log_immutability_trigger` | 2026-11-13 | Created initial PostgreSQL engine-level triggers preventing `UPDATE` and `DELETE` on `AuditLog` table. | **Applied & Verified** |
+| `20261114010000_audit_log_complete_immutability` | 2026-11-14 | Hardened `ENABLE ALWAYS` triggers (`trg_prevent_audit_log_mutation`, `trg_prevent_audit_log_truncate`) + `REVOKE UPDATE, DELETE, TRUNCATE FROM PUBLIC`. | **Applied & Verified** (`CONCURR-INV-26`) |
+| `20261115030000_auth_revocation_and_session_vault` | 2026-11-15 | Added dedicated PostgreSQL `Session` vault model (`[userId, clientType]`, `[customerId, clientType]`) and authoritative `tokenRevokedBefore` cutoffs on `User` and `Customer` (F02, F04). | **Applied & Verified** |
 | `20261115040000_maker_checker_check_constraints` | 2026-11-15 | Initial PostgreSQL engine-level `CHECK` constraints enforcing `maker != checker` on `Auction`, `AuctionWinner`, and `PaymentReversal`. | **Superseded by 20261115060000** |
-| `20261115060000_complete_maker_checker_constraints` | 2026-11-15 | Complete and hardened PostgreSQL engine-level `CHECK` constraints: `chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, and `chk_reversal_maker_checker`. Added `isHistoricalEntry` on `AuctionWinner` and eliminated SQL ternary logic NULL traps. | **Applied & Verified** (15/15 real PostgreSQL 17 DB engine constraint tests passing) |
+| `20261115060000_complete_maker_checker_constraints` | 2026-11-15 | Complete PostgreSQL engine-level `CHECK` constraints (`chk_payment_cash_handover_maker_checker`, `chk_auction_maker_checker`, `chk_winner_maker_checker`, `chk_reversal_maker_checker`) + `AuctionWinner.isHistoricalEntry`. | **Applied & Verified** (`15/15` DB constraint E2E tests) |
+| `20261117170000_add_ticket_removal_maker_checker` | 2026-11-17 | Added ticket removal Maker-Checker constraint columns and DB `CHECK` guard (`chk_ticket_removal_maker_checker`). | **Applied & Verified** |
+| `20261118110000_harden_auction_disbursement_constraints` | 2026-11-18 | Hardened monetary & disbursement `CHECK` constraints (`DB-001`..`DB-005` closure, bringing engine-level `CHECK` constraints to 8). | **Applied & Verified** |
+| `20261118124500_case_insensitive_payout_ref_index` | 2026-11-18 | Added case-insensitive partial unique index `uq_auction_winner_non_cash_payment_ref` blocking duplicate non-cash prize payout references. | **Applied & Verified** |
 
 ---
 
@@ -114,45 +120,29 @@ JavaScript's built-in `JSON.stringify()` cannot serialize native `BigInt` number
 TypeError: Do not know how to serialize a BigInt
 ```
 
-### 4.2 The NestJS Solution
-We implement a global **`BigIntInterceptor`** in `apps/api/src/common/interceptors/bigint.interceptor.ts`. This interceptor automatically transforms all `bigint` properties into numbers (or strings) before HTTP responses leave the server, preventing API crashes while preserving database integer integrity:
+### 4.2 The NestJS Solution (Zero-Allocation In-Place `BigInt` & `Decimal` Serialization)
+We implement a global **`BigIntInterceptor`** in [`apps/api/src/common/interceptors/bigint.interceptor.ts`](file:///u:/Kumaran-finance/apps/api/src/common/interceptors/bigint.interceptor.ts). Rather than deep-cloning payloads, `serializePrismaPrimitives()` mutates response trees **in-place** with a `WeakSet` circular-reference guard, preserving `Date` & `Buffer` instances while safely converting both 64-bit `bigint` rupee values and `Prisma.Decimal` rate columns (`Decimal(5,2)`) into finite JSON numbers:
 
 ```typescript
-// apps/api/src/common/interceptors/bigint.interceptor.ts
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+// apps/api/src/common/interceptors/bigint.interceptor.ts (summary)
+export function serializePrismaPrimitives<T>(
+  value: T,
+  seen: WeakSet<object> = new WeakSet(),
+): T {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'bigint') return Number(value) as unknown as T;
+  if (isPrismaDecimal(value)) return value.toNumber() as unknown as T;
+  if (typeof value !== 'object' || value instanceof Date || Buffer.isBuffer(value)) return value;
+  if (seen.has(value as object)) return value;
+  seen.add(value as object);
+  // In-place array & object traversal converting bigint & Prisma.Decimal...
+  return value;
+}
 
 @Injectable()
 export class BigIntInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next.handle().pipe(map((data) => this.transform(data)));
-  }
-
-  private transform(value: any): any {
-    if (value === null || value === undefined) {
-      return value;
-    }
-    if (typeof value === 'bigint') {
-      // Safe conversion for whole Rupees (amounts under ₹90,000 Crore fit safely in JS Number)
-      return Number(value);
-    }
-    if (Array.isArray(value)) {
-      return value.map((item) => this.transform(item));
-    }
-    if (typeof value === 'object' && !(value instanceof Date)) {
-      const transformed: Record<string, any> = {};
-      for (const [key, val] of Object.entries(value)) {
-        transformed[key] = this.transform(val);
-      }
-      return transformed;
-    }
-    return value;
+    return next.handle().pipe(map((data) => serializePrismaPrimitives(data)));
   }
 }
 ```
@@ -167,7 +157,7 @@ app.useGlobalInterceptors(new BigIntInterceptor());
 
 ## 5. Comprehensive Database Seeding Runbook (`prisma/seed.ts`)
 
-Seeding guarantees that every developer and test environment starts with comprehensive, realistic operational records covering all 17 Prisma models and 10 canonical $N$-scenarios.
+Seeding guarantees that every developer and test environment starts with comprehensive, realistic operational records covering all **18 Prisma models** and 10 canonical $N$-scenarios.
 
 ### 5.1 Modular Seeder Architecture
 The seeder is organized into specialized modules under `apps/api/prisma/seeders/`:
@@ -177,7 +167,7 @@ apps/api/prisma/
 ├── schema.prisma
 ├── seed.ts                                  # Orchestrator
 └── seeders/
-    ├── 01-branch-users.seeder.ts           # Branch & 7 Staff accounts across 6 RBAC roles
+    ├── 01-branch-users.seeder.ts           # Branch & 9 Staff accounts across all 6 RBAC roles (4 isPartner: true)
     ├── 02-customers.seeder.ts              # 25 Verified Tamil Nadu customers, Nominees & KYC
     ├── 03-schemes-groups.seeder.ts         # 5 Schemes/ChitGroups & unique SubscriberTickets (ADR-13)
     └── 04-scenarios.seeder.ts              # All 10 operational edge cases & N scenarios
@@ -186,7 +176,7 @@ apps/api/prisma/
 ### 5.2 The 10 Seeded $N$-Scenarios
 | Scenario # | Scenario / Model Target | Seeded Characteristics |
 |---|---|---|
-| **Scenario 1** | **Staff Hierarchy & Personas** | 4 Partners (`SUPER_ADMIN`), 1 Branch Manager, 1 Accountant, 2 Field Agents, 1 Auditor. |
+| **Scenario 1** | **Staff Hierarchy & Personas** | 4 Equal Partners (`SUPER_ADMIN`, `isPartner: true`), 1 Branch Manager, 1 Accountant, 2 Field Agents, 1 Auditor (9 staff total, phone-only per ADR-18). |
 | **Scenario 2** | **Month 1 Company Pool Invariant** | `KCA-1L-20M-01`: Ticket #1 takes full pool without auction (₹0 dividend). 12 tickets paid at counter. |
 | **Scenario 3** | **Active Competitive Bidding Group** | `KCB-2L-20M-01` (Month 4): Past auctions at ₹30k and ₹40k discounts with universal dividends. |
 | **Scenario 4** | **Fixed 25% Ceiling Tie-Break (ADR-06)**| `KCA-1L-20M-02`: 3 subscribers bid max ceiling (₹25,000); physical token draw recorded with Ticket #7 drawn. |
@@ -197,15 +187,17 @@ apps/api/prisma/
 | **Scenario 9** | **Prize Settlement & Safety Proof (ADR-15)**| Prize disbursement with signed blank cheques, promissory notes recorded, and voucher issued. |
 | **Scenario 10**| **Mature Group Final Settlement (Month N)**| `KCA-1L-20M-MATURE`: Final non-prized subscriber awarded chit pool directly with 4% commission (no auction). |
 
-### 5.3 Test Credentials
-All seeded staff members use password `Admin@Kumaran2026` and mobile MPIN `123456`:
-- **Managing Partner / Super Admin**: `9876543210` (`kumaran@kumaranfinance.in`)
-- **Operations Partner / Checker**: `9876543211` (`senthil@kumaranfinance.in`)
-- **Branch Manager (Maker)**: `9876543212` (`manager.prd@kumaranfinance.in`)
-- **Desk Accountant (Maker)**: `9876543213` (`accounts@kumaranfinance.in`)
-- **Field Agent 1 (Perundurai Route)**: `9876543214` (`murugan.agent@kumaranfinance.in`)
-- **Field Agent 2 (Erode Route)**: `9876543215` (`karthik.agent@kumaranfinance.in`)
-- **Statutory Auditor**: `9876543216` (`auditor@natarajanca.com`)
+### 5.3 Test Credentials (Phone-Only Identity — ADR-18, [`01-branch-users.seeder.ts`](file:///u:/Kumaran-finance/apps/api/prisma/seeders/01-branch-users.seeder.ts))
+All 9 seeded staff members authenticate strictly by 10-digit Indian phone number (zero `email` column per migration `20261022205000_remove_user_email`), using password `Admin@Kumaran2026` and mobile MPIN `123456`:
+- **Partner 1 — P. Kumaran (Managing Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543210`
+- **Partner 2 — K. Senthil (Operations Partner / Checker / `SUPER_ADMIN`, `isPartner: true`)**: `9876543211`
+- **Partner 3 — A. Velusamy (Finance Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543217`
+- **Partner 4 — R. Selvaraj (Compliance Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543218`
+- **Branch Manager — M. Rajendran (`BRANCH_MANAGER`, `isPartner: false`)**: `9876543212`
+- **Desk Accountant — S. Priya (`ACCOUNTANT`, `isPartner: false`)**: `9876543213`
+- **Field Agent 1 — R. Murugan (Perundurai Route / `COLLECTION_AGENT`, `isPartner: false`)**: `9876543214`
+- **Field Agent 2 — V. Karthik (Erode Route / `COLLECTION_AGENT`, `isPartner: false`)**: `9876543215`
+- **Statutory Auditor — CA V. Natarajan (`AUDITOR`, `isPartner: false`)**: `9876543216`
 
 ### 5.4 Executing the Seed
 ```powershell
