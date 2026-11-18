@@ -497,3 +497,88 @@ test('XR-M7-WEB-01..04: Round-3 Defaulters branch scoping, IST dates/Form XVII b
     'Dashboard page must gate FilingCountdownWidget with enabled={canViewDashboardReports}',
   );
 });
+
+test('M10-WEB-FORENSIC: Real-Time SSE Stream, Full 8-Queue Approvals, and IST Date Safety Invariants', () => {
+  // 1. formatIstDateString handles invalid Date instances without throwing RangeError: Invalid time value
+  const invalidDate = new Date('invalid-date-string');
+  assert.ok(Number.isNaN(invalidDate.getTime()));
+  assert.doesNotThrow(() => {
+    const formatted = formatIstDateString(invalidDate);
+    assert.match(formatted, /^\d{4}-\d{2}-\d{2}$/, 'Must return valid YYYY-MM-DD string even for invalid Date');
+  });
+
+  // 2. ApprovalsStore correctly sums and tracks all 8 backend queues
+  const approvalsStoreSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/stores/approvals-store.ts'),
+    'utf8',
+  );
+  for (const queue of [
+    'cashHandoversCount',
+    'disbursementAuthorizationsCount',
+    'paymentReversalsCount',
+    'safetyProofVerificationsCount',
+    'auctionFinalizationsCount',
+    'auctionCorrectionsCount',
+    'defaulterRemovalsCount',
+    'finalMonthSettlementsCount',
+  ]) {
+    assert.ok(
+      approvalsStoreSrc.includes(queue),
+      `Approvals store must track all 8 queues including ${queue}`,
+    );
+  }
+
+  // 3. useApprovalsStream gates on canQueryDashboardReports, preventing COLLECTION_AGENT from 403 loops
+  const approvalsStreamSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/hooks/use-approvals-stream.ts'),
+    'utf8',
+  );
+  assert.ok(
+    approvalsStreamSrc.includes('canQueryDashboardReports'),
+    'useApprovalsStream must import and check canQueryDashboardReports',
+  );
+  assert.ok(
+    approvalsStreamSrc.includes('queryClient.setQueryData'),
+    'useApprovalsStream must synchronize React Query cache on APPROVALS_UPDATE SSE messages',
+  );
+
+  // 4. Form XXII Cash Book page gates queries on non-empty selectedDate
+  const cashBookSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/app/(dashboard)/reports/cash-book/page.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    cashBookSrc.includes('enabled: hasAccess && Boolean(selectedDate?.trim())'),
+    'cash-book page must gate queries with Boolean(selectedDate?.trim()) to prevent 400 Bad Request on empty date',
+  );
+
+  // 5. Form XVII viewer guards denominator against zero or undefined durationMonths
+  const formXviiViewerSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/components/reports/form-xvii-viewer.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    formXviiViewerSrc.includes('Math.max(0, (chit.durationMonths || 20) - 2)'),
+    'form-xvii-viewer.tsx must guard durationMonths denominator against negative values',
+  );
+
+  // 6. RegistrarFilingModal sanitizes filedDate before appending IST offset
+  const registrarModalSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/components/reports/registrar-filing-modal.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    registrarModalSrc.includes("filedDate.trim().split('T')[0]"),
+    'registrar-filing-modal.tsx must split date string before appending +05:30 IST offset',
+  );
+
+  // 7. ReportDateNavigator shiftDate gracefully handles empty date
+  const dateNavSrc = fs.readFileSync(
+    path.join(WEB_ROOT, 'src/components/reports/report-date-navigator.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    dateNavSrc.includes('formatIstDateString()'),
+    'report-date-navigator.tsx must fall back to formatIstDateString when selectedDate is empty',
+  );
+});

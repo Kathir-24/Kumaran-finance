@@ -119,14 +119,16 @@ export function formatCommissionRateLabel(
  */
 export function formatIstDateString(date: Date = new Date()): string {
   try {
+    const validDate =
+      date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).format(date);
+    }).format(validDate);
   } catch {
-    return date.toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
   }
 }
 

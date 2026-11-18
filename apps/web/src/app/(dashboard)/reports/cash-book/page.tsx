@@ -89,7 +89,7 @@ export default function FormXxiiCashBookPage() {
       );
       return res;
     },
-    enabled: hasAccess,
+    enabled: hasAccess && Boolean(selectedDate?.trim()),
   });
 
   // 2. Fetch Day Book
@@ -103,7 +103,7 @@ export default function FormXxiiCashBookPage() {
       );
       return res;
     },
-    enabled: hasAccess,
+    enabled: hasAccess && Boolean(selectedDate?.trim()),
   });
 
   // Handle Export to CSV
@@ -142,7 +142,7 @@ export default function FormXxiiCashBookPage() {
       });
 
       downloadCsv({
-        filename: `${t('export.filenameFormXxii')}_${selectedDate}`,
+        filename: `${t('export.filenameFormXxii')}_${selectedDate || formatIstDateString()}`,
         headers: ['Date', 'Type', 'Doc Number', 'Source', 'Party Code', 'Party Name', 'Chit / Ticket', 'Amount (INR)', 'Staff'],
         rows,
       });
@@ -153,7 +153,7 @@ export default function FormXxiiCashBookPage() {
       const rows: CsvCellValue[][] = [];
       inflows.forEach((item) => {
         rows.push([
-          selectedDate,
+          selectedDate || formatIstDateString(),
           'INFLOW',
           item.receiptNumber,
           item.paymentMethod,
@@ -168,7 +168,7 @@ export default function FormXxiiCashBookPage() {
 
       outflows.forEach((item) => {
         rows.push([
-          selectedDate,
+          selectedDate || formatIstDateString(),
           'OUTFLOW',
           item.voucherNumber,
           item.disbursementMode || 'CASH',
@@ -182,7 +182,7 @@ export default function FormXxiiCashBookPage() {
       });
 
       downloadCsv({
-        filename: `${t('export.filenameDayBook')}_${selectedDate}`,
+        filename: `${t('export.filenameDayBook')}_${selectedDate || formatIstDateString()}`,
         headers: ['Date', 'Type', 'Doc Number', 'Method', 'UTR / Ref', 'Party Code', 'Party Name', 'Chit / Ticket', 'Amount (INR)', 'Actor'],
         rows,
       });

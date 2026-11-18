@@ -7,6 +7,10 @@ export interface ApprovalsSummary {
   disbursementAuthorizationsCount: number;
   paymentReversalsCount: number;
   safetyProofVerificationsCount: number;
+  auctionFinalizationsCount?: number;
+  auctionCorrectionsCount?: number;
+  defaulterRemovalsCount?: number;
+  finalMonthSettlementsCount?: number;
 }
 
 export interface ApprovalsState {
@@ -15,6 +19,10 @@ export interface ApprovalsState {
   disbursementAuthorizationsCount: number;
   paymentReversalsCount: number;
   safetyProofVerificationsCount: number;
+  auctionFinalizationsCount: number;
+  auctionCorrectionsCount: number;
+  defaulterRemovalsCount: number;
+  finalMonthSettlementsCount: number;
   isConnected: boolean;
   lastUpdated: number | null;
   setSummary: (summary: Partial<ApprovalsSummary>) => void;
@@ -28,6 +36,10 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
   disbursementAuthorizationsCount: 0,
   paymentReversalsCount: 0,
   safetyProofVerificationsCount: 0,
+  auctionFinalizationsCount: 0,
+  auctionCorrectionsCount: 0,
+  defaulterRemovalsCount: 0,
+  finalMonthSettlementsCount: 0,
   isConnected: false,
   lastUpdated: null,
 
@@ -37,8 +49,20 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
       const disbursements = summary.disbursementAuthorizationsCount ?? state.disbursementAuthorizationsCount;
       const reversals = summary.paymentReversalsCount ?? state.paymentReversalsCount;
       const safetyProofs = summary.safetyProofVerificationsCount ?? state.safetyProofVerificationsCount;
+      const auctionFinalizations = summary.auctionFinalizationsCount ?? state.auctionFinalizationsCount;
+      const auctionCorrections = summary.auctionCorrectionsCount ?? state.auctionCorrectionsCount;
+      const defaulterRemovals = summary.defaulterRemovalsCount ?? state.defaulterRemovalsCount;
+      const finalMonthSettlements = summary.finalMonthSettlementsCount ?? state.finalMonthSettlementsCount;
       const total =
-        summary.totalPendingCount ?? (cashHandovers + disbursements + reversals + safetyProofs);
+        summary.totalPendingCount ??
+        (cashHandovers +
+          disbursements +
+          reversals +
+          safetyProofs +
+          auctionFinalizations +
+          auctionCorrections +
+          defaulterRemovals +
+          finalMonthSettlements);
 
       // Play subtle chime strictly when new approvals arrive while the session is live
       if (state.lastUpdated !== null && total > state.totalPendingCount) {
@@ -50,6 +74,10 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
         disbursementAuthorizationsCount: disbursements,
         paymentReversalsCount: reversals,
         safetyProofVerificationsCount: safetyProofs,
+        auctionFinalizationsCount: auctionFinalizations,
+        auctionCorrectionsCount: auctionCorrections,
+        defaulterRemovalsCount: defaulterRemovals,
+        finalMonthSettlementsCount: finalMonthSettlements,
         totalPendingCount: total,
         lastUpdated: Date.now(),
       };
@@ -64,6 +92,10 @@ export const useApprovalsStore = create<ApprovalsState>((set) => ({
       disbursementAuthorizationsCount: 0,
       paymentReversalsCount: 0,
       safetyProofVerificationsCount: 0,
+      auctionFinalizationsCount: 0,
+      auctionCorrectionsCount: 0,
+      defaulterRemovalsCount: 0,
+      finalMonthSettlementsCount: 0,
       isConnected: false,
       lastUpdated: null,
     }),

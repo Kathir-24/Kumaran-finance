@@ -6680,83 +6680,232 @@ export interface components {
         };
         FormXxiiReportResponseDto: {
             /**
-             * @description Record date (YYYY-MM-DD)
+             * @description Statutory review status tag
+             * @example UNVERIFIED-LEGAL
+             */
+            statutoryStatus: string;
+            /**
+             * @description Statutory register title
+             * @example Form XXII: Cash Book Register
+             */
+            registerName: string;
+            /**
+             * @description Register description
+             * @example Daily register of physical currency notes and coins held in the branch safe / vault.
+             */
+            description: string;
+            /**
+             * @description Record date in IST (YYYY-MM-DD)
              * @example 2026-10-22
              */
             date: string;
             /**
-             * @description Operating branch
-             * @example HEAD_OFFICE_PERUNDURAI
+             * @description Operating branch ID or ALL_BRANCHES
+             * @example ALL_BRANCHES
              */
-            scope: string;
-            /**
-             * @description Opening vault balance in whole Rupees
-             * @example 50000
-             */
-            openingBalance: number;
-            /**
-             * @description Total physical cash receipts today
-             * @example 35000
-             */
-            cashInflows: number;
-            /**
-             * @description Total physical cash disbursements today
-             * @example 20000
-             */
-            cashOutflows: number;
-            /**
-             * @description Closing physical cash in safe in whole Rupees
-             * @example 65000
-             */
-            closingBalance: number;
-            /** @description Chronological cash ledger entries */
-            entries: {
-                [key: string]: unknown;
+            branchId: string;
+            /** @description Physical safe cash reconciliation in whole Rupees */
+            reconciliation: {
+                openingCashInSafe: number | string;
+                todayCashInflows: number | string;
+                todayCashOutflows: number | string;
+                closingCashInSafe: number | string;
+            };
+            /** @description Chronological physical cash receipt inflows */
+            inflows: {
+                paymentId: string;
+                receiptNumber: string;
+                time: string;
+                collectedAt?: string;
+                acknowledgedAt?: string | null;
+                amount: number | string;
+                customerCode: string;
+                customerName: string;
+                groupCode: string;
+                ticketNumber: number | null;
+                receivedBy: string;
+                source: "FIELD_HANDOVER" | "COUNTER_CASH" | string;
+            }[];
+            /** @description Chronological physical cash outflows (prize disbursements & approved cash payment reversals) */
+            outflows: {
+                outflowType: "PRIZE_DISBURSEMENT" | "CASH_PAYMENT_REVERSAL" | string;
+                winnerId: string | null;
+                reversalId: string | null;
+                paymentId?: string;
+                voucherNumber: string;
+                time: string | null;
+                amount: number | string;
+                groupCode: string;
+                installmentMonth: number | null;
+                ticketNumber: number | null;
+                winnerCode: string;
+                winnerName: string;
+                reason?: string;
             }[];
         };
         FormXviiReportResponseDto: {
             /**
-             * @description Chit group ID
-             * @example chit-uuid-001
+             * @description Statutory review status tag
+             * @example UNVERIFIED-LEGAL
              */
-            chitGroupId: string;
+            statutoryStatus: string;
             /**
-             * @description Chit group code
-             * @example KCA-1L-20M-01
+             * @description Statutory register title
+             * @example Form XVII: Auction Minutes Consolidated Register
              */
-            groupCode: string;
-            /**
-             * @description Duration in months
-             * @example 20
-             */
-            durationMonths: number;
+            registerName: string;
+            /** @description Chit scheme parameters including dynamic frozen commission rate */
+            chitGroup: {
+                id: string;
+                groupCode: string;
+                groupName: string;
+                chitValue: number | string;
+                durationMonths: number;
+                baseInstallment: number | string;
+                foremanCommissionRate: string;
+                branchName: string;
+                branchNameTamil: string | null;
+            };
+            /** @description Total finalized auctions in Months 2..N-1 */
+            totalAuctionsFinalized: number;
+            /** @description 21-day Deputy Registrar filing compliance summary */
+            filingSummary: {
+                totalAuctions: number;
+                filedCount: number;
+                pendingCount: number;
+                overdueCount: number;
+            };
             /** @description Chronological list of all auctions and minutes proceedings */
             auctions: {
-                [key: string]: unknown;
+                auctionId: string;
+                installmentMonth: number;
+                auctionDate: string;
+                chitValue: number | string;
+                bidDiscount: number | string;
+                foremanCommissionAmount: number | string;
+                foremanCommissionRate: string;
+                totalDividend: number | string;
+                dividendPerTicket: number | string;
+                nextMonthNetInstallment: number | string;
+                prizeMoney: number | string;
+                winner: {
+                    ticketNumber?: number;
+                    customerCode: string;
+                    fullName: string;
+                    fullNameTamil: string | null;
+                    phone: string;
+                    wasTieBreakWinner: boolean;
+                } | null;
+                tiedBiddersCount: number;
+                winningTokenNumber: number | null;
+                tiedDiscountAmount: number | string | null;
+                tiedBidders: {
+                    ticketNumber: number;
+                    customerCode: string;
+                    customerName: string;
+                    bidDiscount: number | string;
+                    tokenNumberDrawn: number | null;
+                    isWinner: boolean;
+                }[];
+                conductedByUserId: string | null;
+                finalizedByUserId: string | null;
+                subscribersPresent: number;
+                minutesProceedingsText: string;
+                signedByForeman: boolean;
+                filedAtRegistrar: boolean;
+                filedDate: string | null;
+                filingReference: string | null;
+                filingNotes: string | null;
+                filingDeadline: string;
+                filingDeadlineDate: string;
+                filingDaysRemaining: number | null;
+                isFilingOverdue: boolean;
+                filingStatus: "FILED" | "FILED_LATE" | "OVERDUE" | "DUE_SOON" | "PENDING";
             }[];
         };
         FormXxiReportResponseDto: {
             /**
-             * @description Subscriber ticket ID
-             * @example ticket-uuid-001
+             * @description Statutory review status tag
+             * @example UNVERIFIED-LEGAL
              */
-            ticketId: string;
+            statutoryStatus: string;
             /**
-             * @description Ticket number 1..N
-             * @example 4
+             * @description Statutory register title
+             * @example Form XXI: Subscriber Ledger Register
              */
-            ticketNumber: number;
-            /** @description Subscriber details */
-            customer: {
-                [key: string]: unknown;
-            };
+            registerName: string;
             /** @description Chit scheme parameters */
             chitGroup: {
-                [key: string]: unknown;
+                id: string;
+                groupCode: string;
+                groupName: string;
+                chitValue: number | string;
+                durationMonths: number;
+                baseInstallment: number | string;
+                foremanCommissionRate: string;
             };
-            /** @description 20-month schedule of dues, dividend credits, payments, and arrears */
-            schedule: {
-                [key: string]: unknown;
+            /** @description Number of subscriber ticket ledgers returned */
+            totalTicketsReturned: number;
+            /** @description Per-ticket continuous N-month schedule of dues, dividends, payments, running cumulative totals, and arrears */
+            ledgers: {
+                ticketId: string;
+                ticketNumber: number;
+                isPrized: boolean;
+                consecutiveUnpaidMonths: number;
+                ticketStatus: string;
+                customer: {
+                    id: string;
+                    customerCode: string;
+                    fullName: string;
+                    fullNameTamil: string | null;
+                    phone: string;
+                };
+                summary: {
+                    totalGrossDue: number | string;
+                    totalDividendCredit: number | string;
+                    totalNetPayable: number | string;
+                    totalPaid: number | string;
+                    totalOutstandingArrears: number | string;
+                };
+                passbookPrintMeta: {
+                    totalDurationMonths: number;
+                    scheduledMonthsCount: number;
+                    isContiguous: boolean;
+                };
+                monthlySchedule: {
+                    installmentMonth: number;
+                    dueDate: string | null;
+                    grossAmount: number | string;
+                    dividendDeduction: number | string;
+                    netPayableAmount: number | string;
+                    paidAmount: number | string;
+                    cumulativeGrossDue: number | string;
+                    cumulativeDividendCredit: number | string;
+                    cumulativeNetPayable: number | string;
+                    cumulativePaid: number | string;
+                    runningBalance: number | string;
+                    status: string;
+                    paymentDate: string | null;
+                    receiptNumber: string | null;
+                    paymentMethod: string | null;
+                }[];
+                contiguousSchedule: {
+                    installmentMonth: number;
+                    dueDate: string | null;
+                    grossAmount: number | string;
+                    dividendDeduction: number | string;
+                    netPayableAmount: number | string;
+                    paidAmount: number | string;
+                    cumulativeGrossDue: number | string;
+                    cumulativeDividendCredit: number | string;
+                    cumulativeNetPayable: number | string;
+                    cumulativePaid: number | string;
+                    runningBalance: number | string;
+                    status: string;
+                    paymentDate: string | null;
+                    receiptNumber: string | null;
+                    paymentMethod: string | null;
+                }[];
             }[];
         };
         ReportPaginationDto: {

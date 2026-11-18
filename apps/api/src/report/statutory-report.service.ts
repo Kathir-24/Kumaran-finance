@@ -38,14 +38,32 @@ export class StatutoryReportService {
     const branchId = resolveScopedBranchId(requestingUser, query.branchId);
 
     // 1. Calculate Opening Safe Cash: Cash Inflows prior to IST startOfDay - Cash Outflows prior to IST startOfDay
+    // DEF-M10-STAT-01 & DEF-M10-STAT-02:
+    // - Physical cash enters the vault at `cashHandoverAcknowledgedAt` (for field handovers) or `createdAt` (for counter cash).
+    //   Since `createdAt <= cashHandoverAcknowledgedAt` always holds, `createdAt < startOfDay` combined with the OR clause
+    //   is an exact partition with today's inflows and guarantees Opening Safe Cash(T) === Closing Safe Cash(T-1).
+    // - Historical cash receipts that were later reversed remain recorded as inflows on their vault-entry date; their cash
+    //   refund is accounted as an explicit cash outflow on `paymentReversal.reversedAt`.
+    const vaultEntryEligibilityWhere = [
+      { cashHandoverStatus: 'ACKNOWLEDGED' },
+      { cashHandoverStatus: null },
+    ];
+
     const priorCashInflows = await this.prisma.payment.aggregate({
       where: {
         paymentMethod: 'CASH',
-        paymentStatus: 'SUCCESS',
+        paymentStatus: { in: ['SUCCESS', 'REVERSED'] },
         createdAt: { lt: startOfDay },
         ...(branchId ? { branchId } : {}),
         OR: [
-          { cashHandoverStatus: 'ACKNOWLEDGED' },
+          {
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            cashHandoverAcknowledgedAt: { lt: startOfDay },
+          },
+          {
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            cashHandoverAcknowledgedAt: null,
+          },
           { cashHandoverStatus: null },
         ],
       },
@@ -62,20 +80,55 @@ export class StatutoryReportService {
       _sum: { disbursedAmount: true },
     });
 
+    // Prior approved physical cash payment reversals (refunded out of branch safe prior to startOfDay)
+    const priorCashReversals =
+      typeof this.prisma.paymentReversal?.findMany === 'function'
+        ? (await this.prisma.paymentReversal.findMany({
+            where: {
+              status: 'APPROVED',
+              reversedAt: { lt: startOfDay },
+              payment: {
+                paymentMethod: 'CASH',
+                ...(branchId ? { branchId } : {}),
+                OR: vaultEntryEligibilityWhere,
+              },
+            },
+            select: {
+              payment: { select: { amount: true } },
+            },
+          })) || []
+        : [];
+
+    let priorCashReversalsTotal = 0n;
+    for (const rev of priorCashReversals) {
+      priorCashReversalsTotal += rev.payment?.amount || 0n;
+    }
+
     const openingCash =
       (priorCashInflows._sum.amount || 0n) -
-      (priorCashOutflows._sum.disbursedAmount || 0n);
+      (priorCashOutflows._sum.disbursedAmount || 0n) -
+      priorCashReversalsTotal;
 
-    // 2. Query Target IST Day Cash Inflows
+    // 2. Query Target IST Day Cash Inflows (keyed on vault entry time: cashHandoverAcknowledgedAt ?? createdAt)
     const todayPayments = await this.prisma.payment.findMany({
       where: {
         paymentMethod: 'CASH',
-        paymentStatus: 'SUCCESS',
-        createdAt: { gte: startOfDay, lte: endOfDay },
+        paymentStatus: { in: ['SUCCESS', 'REVERSED'] },
         ...(branchId ? { branchId } : {}),
         OR: [
-          { cashHandoverStatus: 'ACKNOWLEDGED' },
-          { cashHandoverStatus: null },
+          {
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            cashHandoverAcknowledgedAt: { gte: startOfDay, lte: endOfDay },
+          },
+          {
+            cashHandoverStatus: 'ACKNOWLEDGED',
+            cashHandoverAcknowledgedAt: null,
+            createdAt: { gte: startOfDay, lte: endOfDay },
+          },
+          {
+            cashHandoverStatus: null,
+            createdAt: { gte: startOfDay, lte: endOfDay },
+          },
         ],
       },
       include: {
@@ -96,7 +149,7 @@ export class StatutoryReportService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // 3. Query Target IST Day Cash Outflows
+    // 3. Query Target IST Day Cash Outflows (Physical Cash Prize Disbursements + Approved Cash Payment Reversals)
     const todayDisbursements = await this.prisma.auctionWinner.findMany({
       where: {
         disbursementMode: 'CASH',
@@ -121,33 +174,88 @@ export class StatutoryReportService {
       orderBy: { disbursedAt: 'asc' },
     });
 
+    const todayCashReversals =
+      typeof this.prisma.paymentReversal?.findMany === 'function'
+        ? (await this.prisma.paymentReversal.findMany({
+            where: {
+              status: 'APPROVED',
+              reversedAt: { gte: startOfDay, lte: endOfDay },
+              payment: {
+                paymentMethod: 'CASH',
+                ...(branchId ? { branchId } : {}),
+                OR: vaultEntryEligibilityWhere,
+              },
+            },
+            include: {
+              payment: {
+                select: {
+                  id: true,
+                  amount: true,
+                  receipt: { select: { receiptNumber: true } },
+                  allocations: {
+                    include: {
+                      ticket: {
+                        select: {
+                          ticketNumber: true,
+                          chitGroup: { select: { groupCode: true } },
+                          customer: {
+                            select: { customerCode: true, fullName: true },
+                          },
+                        },
+                      },
+                      due: {
+                        select: { installmentMonth: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { reversedAt: 'asc' },
+          })) || []
+        : [];
+
     let todayInflowsTotal = 0n;
-    const inflows = todayPayments.map((p) => {
-      todayInflowsTotal += p.amount;
-      const firstAlloc = p.allocations[0];
-      return {
-        paymentId: p.id,
-        receiptNumber: p.receipt?.receiptNumber || 'N/A',
-        time: p.createdAt,
-        amount: p.amount,
-        customerCode: firstAlloc?.ticket.customer.customerCode || 'N/A',
-        customerName: firstAlloc?.ticket.customer.fullName || 'N/A',
-        groupCode: firstAlloc?.ticket.chitGroup.groupCode || 'N/A',
-        ticketNumber: firstAlloc?.ticket.ticketNumber || null,
-        receivedBy: p.recordedByUser?.name || 'Unknown',
-        source:
-          p.cashHandoverStatus === 'ACKNOWLEDGED'
-            ? 'FIELD_HANDOVER'
-            : 'COUNTER_CASH',
-      };
-    });
+    const inflows = todayPayments
+      .map((p) => {
+        todayInflowsTotal += p.amount;
+        const firstAlloc = p.allocations[0];
+        const vaultArrivalTime =
+          p.cashHandoverStatus === 'ACKNOWLEDGED' && p.cashHandoverAcknowledgedAt
+            ? p.cashHandoverAcknowledgedAt
+            : p.createdAt;
+        return {
+          paymentId: p.id,
+          receiptNumber: p.receipt?.receiptNumber || 'N/A',
+          time: vaultArrivalTime,
+          collectedAt: p.createdAt,
+          acknowledgedAt: p.cashHandoverAcknowledgedAt || null,
+          amount: p.amount,
+          customerCode: firstAlloc?.ticket.customer.customerCode || 'N/A',
+          customerName: firstAlloc?.ticket.customer.fullName || 'N/A',
+          groupCode: firstAlloc?.ticket.chitGroup.groupCode || 'N/A',
+          ticketNumber: firstAlloc?.ticket.ticketNumber || null,
+          receivedBy: p.recordedByUser?.name || 'Unknown',
+          source:
+            p.cashHandoverStatus === 'ACKNOWLEDGED'
+              ? 'FIELD_HANDOVER'
+              : 'COUNTER_CASH',
+        };
+      })
+      .sort(
+        (a, b) =>
+          (a.time ? new Date(a.time).getTime() : 0) -
+          (b.time ? new Date(b.time).getTime() : 0),
+      );
 
     let todayOutflowsTotal = 0n;
-    const outflows = todayDisbursements.map((d) => {
+    const disbursementOutflows = todayDisbursements.map((d) => {
       const amount = d.disbursedAmount || 0n;
       todayOutflowsTotal += amount;
       return {
+        outflowType: 'PRIZE_DISBURSEMENT' as const,
         winnerId: d.id,
+        reversalId: null as string | null,
         voucherNumber: d.paymentReference || 'N/A',
         time: d.disbursedAt,
         amount,
@@ -158,6 +266,34 @@ export class StatutoryReportService {
         winnerName: d.ticket.customer.fullName,
       };
     });
+
+    const reversalOutflows = todayCashReversals.map((rev) => {
+      const amount = rev.payment?.amount || 0n;
+      todayOutflowsTotal += amount;
+      const firstAlloc = rev.payment?.allocations?.[0];
+      const origReceipt = rev.payment?.receipt?.receiptNumber;
+      return {
+        outflowType: 'CASH_PAYMENT_REVERSAL' as const,
+        winnerId: null as string | null,
+        reversalId: rev.id,
+        paymentId: rev.paymentId,
+        voucherNumber: origReceipt ? `REV-${origReceipt}` : `REV-${rev.id}`,
+        time: rev.reversedAt,
+        amount,
+        groupCode: firstAlloc?.ticket?.chitGroup?.groupCode || 'N/A',
+        installmentMonth: firstAlloc?.due?.installmentMonth ?? null,
+        ticketNumber: firstAlloc?.ticket?.ticketNumber ?? null,
+        winnerCode: firstAlloc?.ticket?.customer?.customerCode || 'N/A',
+        winnerName: firstAlloc?.ticket?.customer?.fullName || 'N/A',
+        reason: rev.reason,
+      };
+    });
+
+    const outflows = [...disbursementOutflows, ...reversalOutflows].sort(
+      (a, b) =>
+        (a.time ? new Date(a.time).getTime() : 0) -
+        (b.time ? new Date(b.time).getTime() : 0),
+    );
 
     const closingCash = openingCash + todayInflowsTotal - todayOutflowsTotal;
 
@@ -288,6 +424,13 @@ export class StatutoryReportService {
         pendingCount += 1;
       }
 
+      const winningTieBidder = a.tieBidders.find((tb) => tb.isWinner);
+      const winningTokenNumber = winningTieBidder?.tokenNumber ?? null;
+      const tiedDiscountAmount =
+        a.tieBidders.length > 0
+          ? (a.tieBidders[0].bidDiscount ?? a.bidDiscount ?? 0n)
+          : null;
+
       return {
         auctionId: a.id,
         installmentMonth: a.installmentMonth,
@@ -315,10 +458,13 @@ export class StatutoryReportService {
             }
           : null,
         tiedBiddersCount: a.tieBidders.length,
+        winningTokenNumber,
+        tiedDiscountAmount,
         tiedBidders: a.tieBidders.map((tb) => ({
           ticketNumber: tb.ticket.ticketNumber,
           customerCode: tb.ticket.customer.customerCode,
           customerName: tb.ticket.customer.fullName,
+          bidDiscount: tb.bidDiscount ?? a.bidDiscount ?? 0n,
           tokenNumberDrawn: tb.tokenNumber,
           isWinner: tb.isWinner,
         })),
@@ -547,10 +693,56 @@ export class StatutoryReportService {
           dividendDeduction: d.dividendDeduction,
           netPayableAmount: d.netPayableAmount,
           paidAmount: d.paidAmount,
+          cumulativeGrossDue: totalGrossDue,
+          cumulativeDividendCredit: totalDividendCredit,
+          cumulativeNetPayable: totalNetPayable,
+          cumulativePaid: totalPaid,
+          runningBalance: totalNetPayable - totalPaid,
           status: d.status,
           paymentDate,
           receiptNumber,
           paymentMethod,
+        };
+      });
+
+      // DEF-M10-STAT-03: Build contiguous 1..N passbook print slots with running cumulative totals
+      const scheduleByMonth = new Map(
+        schedule.map((row) => [row.installmentMonth, row]),
+      );
+      const totalMonths = Math.max(chit.durationMonths || 0, schedule.length);
+      let lastCumGross = 0n;
+      let lastCumDividend = 0n;
+      let lastCumNet = 0n;
+      let lastCumPaid = 0n;
+      let lastRunningBalance = 0n;
+
+      const contiguousSchedule = Array.from({ length: totalMonths }, (_, idx) => {
+        const monthNum = idx + 1;
+        const existing = scheduleByMonth.get(monthNum);
+        if (existing) {
+          lastCumGross = existing.cumulativeGrossDue;
+          lastCumDividend = existing.cumulativeDividendCredit;
+          lastCumNet = existing.cumulativeNetPayable;
+          lastCumPaid = existing.cumulativePaid;
+          lastRunningBalance = existing.runningBalance;
+          return existing;
+        }
+        return {
+          installmentMonth: monthNum,
+          dueDate: null as Date | null,
+          grossAmount: chit.baseInstallment,
+          dividendDeduction: 0n,
+          netPayableAmount: chit.baseInstallment,
+          paidAmount: 0n,
+          cumulativeGrossDue: lastCumGross,
+          cumulativeDividendCredit: lastCumDividend,
+          cumulativeNetPayable: lastCumNet,
+          cumulativePaid: lastCumPaid,
+          runningBalance: lastRunningBalance,
+          status: 'SCHEDULED' as const,
+          paymentDate: null as Date | null,
+          receiptNumber: null as string | null,
+          paymentMethod: null as string | null,
         };
       });
 
@@ -568,7 +760,13 @@ export class StatutoryReportService {
           totalPaid,
           totalOutstandingArrears,
         },
+        passbookPrintMeta: {
+          totalDurationMonths: totalMonths,
+          scheduledMonthsCount: schedule.length,
+          isContiguous: contiguousSchedule.length === totalMonths,
+        },
         monthlySchedule: schedule,
+        contiguousSchedule,
       };
     });
 

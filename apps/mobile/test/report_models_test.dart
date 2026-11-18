@@ -179,5 +179,66 @@ void main() {
     assertTrue(jsonEncode(auditLogs.toJson()).contains('AUCTION_FINALIZED'), 'auditLogs encodes cleanly');
   }
 
+  // Test 6 (DEF-M10-MOB-01): PassbookEntryDto, InstallmentDueResponseDto, AgentDueItemResponseDto & SettleRemovalResponseDto
+  // parse 64-bit whole-Rupee int safely from BigInt strings with zero double/num crashes
+  {
+    final passbookEntry = PassbookEntryDto.fromJson({
+      'installmentMonth': 2,
+      'dueDate': '2026-11-18',
+      'grossAmount': '$largeWholeRupee',
+      'dividendDeduction': '1050',
+      'netPayableAmount': '${largeWholeRupee - 1050}',
+      'paidAmount': '${largeWholeRupee - 1050}',
+      'status': 'PAID',
+      'paidAt': '2026-11-15T10:00:00.000Z',
+      'receiptNumber': 'KC-REC-PRD-2026-00012',
+    });
+    assertEqual(passbookEntry.installmentMonth, 2, 'passbook installmentMonth is int 2');
+    assertEqual(passbookEntry.grossAmount, largeWholeRupee, 'passbook grossAmount preserves 64-bit BigInt string');
+    assertEqual(passbookEntry.dividendDeduction, 1050, 'passbook dividendDeduction is int 1050');
+    assertEqual(passbookEntry.netPayableAmount, largeWholeRupee - 1050, 'passbook netPayableAmount preserves 64-bit int');
+    assertEqual(passbookEntry.paidAmount, largeWholeRupee - 1050, 'passbook paidAmount preserves 64-bit int');
+
+    final passbookResp = PassbookResponseDto.fromJson({
+      'ticket': {'id': 'tkt-1'},
+      'chitGroup': {'groupCode': 'KCA-1L-20M-01'},
+      'customer': {'fullName': 'M. Murugan'},
+      'summary': {'totalPaid': '$largeWholeRupee'},
+      'passbook': [passbookEntry.toJson()],
+    });
+    assertEqual(passbookResp.passbook.length, 1, 'passbook response contains 1 entry');
+    assertEqual(passbookResp.passbook.first.grossAmount, largeWholeRupee, 'passbook round-trip preserves 64-bit int');
+
+    final due = InstallmentDueResponseDto.fromJson({
+      'id': 'due-1',
+      'chitGroupId': 'grp-1',
+      'ticketId': 'tkt-1',
+      'installmentMonth': 3,
+      'dueDate': '2026-12-18',
+      'grossAmount': '5000',
+      'dividendDeduction': '1050',
+      'netPayableAmount': '3950',
+      'paidAmount': '0',
+      'status': 'UNPAID',
+    });
+    assertEqual(due.installmentMonth, 3, 'due installmentMonth is int');
+    assertEqual(due.grossAmount, 5000, 'due grossAmount parses from string to int');
+    assertEqual(due.netPayableAmount, 3950, 'due netPayableAmount parses from string to int');
+
+    final settlement = SettleRemovalResponseDto.fromJson({
+      'message': 'Settled',
+      'ticketId': 'tkt-9',
+      'ticketNumber': '9',
+      'totalPaid': '$largeWholeRupee',
+      'damagesDeducted': '4000',
+      'refundAmount': '${largeWholeRupee - 4000}',
+      'status': 'REMOVED_DEF_3M',
+    });
+    assertEqual(settlement.ticketNumber, 9, 'settlement ticketNumber is int 9');
+    assertEqual(settlement.totalPaid, largeWholeRupee, 'settlement totalPaid preserves 64-bit int');
+    assertEqual(settlement.damagesDeducted, 4000, 'settlement damagesDeducted is int 4000');
+    assertEqual(settlement.refundAmount, largeWholeRupee - 4000, 'settlement refundAmount preserves 64-bit int');
+  }
+
   print('All Module 7 Dart Model Tests PASSED!');
 }

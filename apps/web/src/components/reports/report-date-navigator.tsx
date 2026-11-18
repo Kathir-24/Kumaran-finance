@@ -28,8 +28,11 @@ export function ReportDateNavigator({
 
   const shiftDate = (days: number) => {
     try {
-      const current = new Date(`${selectedDate}T00:00:00.000Z`);
-      if (isNaN(current.getTime())) return;
+      const baseDate =
+        selectedDate && !isNaN(new Date(`${selectedDate}T00:00:00.000Z`).getTime())
+          ? selectedDate
+          : formatIstDateString();
+      const current = new Date(`${baseDate}T00:00:00.000Z`);
       current.setUTCDate(current.getUTCDate() + days);
       onDateChange(current.toISOString().split('T')[0]);
     } catch {
@@ -38,11 +41,12 @@ export function ReportDateNavigator({
   };
 
   const setToday = () => {
-    onDateChange(formatIstDateString(new Date()));
+    onDateChange(formatIstDateString());
   };
 
   const setYesterday = () => {
-    const todayIst = new Date(`${formatIstDateString(new Date())}T00:00:00.000Z`);
+    const todayIstStr = formatIstDateString();
+    const todayIst = new Date(`${todayIstStr}T00:00:00.000Z`);
     todayIst.setUTCDate(todayIst.getUTCDate() - 1);
     onDateChange(todayIst.toISOString().split('T')[0]);
   };

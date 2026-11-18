@@ -43,13 +43,41 @@ void main() {
     final group = ChitGroupResponseDto.fromJson(json);
     assertEqual(group.id, 'chit-group-001', 'id should match');
     assertEqual(group.groupCode, 'KCA-1L-20M-01', 'groupCode should match');
-    assertEqual(group.chitValue, 100000.0, 'chitValue should match');
-    assertEqual(group.baseInstallment, 5000.0, 'baseInstallment should match (V / N)');
+    assertEqual(group.chitValue, 100000, 'chitValue should be 64-bit int');
+    assertEqual(group.chitValue.runtimeType, int, 'chitValue runtimeType must be int (Guardrail 2)');
+    assertEqual(group.baseInstallment, 5000, 'baseInstallment should match (V / N)');
     assertEqual(group.foremanCommissionRate, 4.0, 'foremanCommissionRate should be 4.0%');
-    assertEqual(group.maxDiscountCeiling, 25000.0, 'maxDiscountCeiling should be V / 4');
+    assertEqual(group.maxDiscountCeiling, 25000, 'maxDiscountCeiling should be V / 4');
     assertEqual(group.status, 'ACTIVE', 'status should match');
-    assertEqual(group.durationMonths, 20.0, 'durationMonths should match');
-    assertEqual(group.totalTickets, 20.0, 'totalTickets should match');
+    assertEqual(group.durationMonths, 20, 'durationMonths should be int 20');
+    assertEqual(group.totalTickets, 20, 'totalTickets should be int 20');
+  }
+
+  // Test 1b: ChitGroupResponseDto parses BigInt-serialized strings (> 2^53 - 1) without double truncation
+  {
+    const largeWholeRupee = 9007199254740993;
+    final bigGroup = ChitGroupResponseDto.fromJson({
+      'id': 'chit-group-big',
+      'groupCode': 'KCA-BIG-20M-01',
+      'groupName': 'Large Test Scheme',
+      'chitValue': '$largeWholeRupee',
+      'durationMonths': '20',
+      'totalTickets': '20',
+      'baseInstallment': '5000',
+      'foremanCommissionRate': '4.00',
+      'maxDiscountCeiling': '25000',
+      'initMode': 'NEW_GROUP',
+      'onboardedAtMonth': '1',
+      'status': 'ACTIVE',
+      'startDate': '2026-11-01T00:00:00.000Z',
+      'endDate': '2028-06-01T00:00:00.000Z',
+      'branchId': 'branch-prd-001',
+      'createdAt': '2026-11-01T00:00:00.000Z',
+      'updatedAt': '2026-11-01T00:00:00.000Z',
+    });
+    assertEqual(bigGroup.chitValue, largeWholeRupee, 'chitValue preserves exact 64-bit int from string');
+    assertEqual(bigGroup.foremanCommissionRate, 4.0, 'foremanCommissionRate parses from string "4.00"');
+    assertEqual(bigGroup.durationMonths, 20, 'durationMonths parses from string');
   }
 
   // Test 2: TicketResponseDto parses assigned customer and prized status

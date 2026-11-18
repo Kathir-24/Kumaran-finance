@@ -118,7 +118,7 @@ function FormXviiMinutesContent() {
     if (!formXviiData || !formXviiData.auctions) return;
 
     const rows: CsvCellValue[][] = formXviiData.auctions.map((a) => {
-      const auctionDate = formatIstDateString(new Date(a.auctionDate));
+      const auctionDate = a.auctionDate ? formatIstDateString(new Date(a.auctionDate)) : 'N/A';
       const filedDate = a.filedDate ? formatIstDateString(new Date(a.filedDate)) : 'N/A';
       return [
         `Month ${a.installmentMonth}`,

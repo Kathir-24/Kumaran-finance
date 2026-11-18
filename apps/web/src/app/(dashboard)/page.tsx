@@ -76,6 +76,10 @@ export default function DashboardRootPage() {
       disbursementAuthorizationsCount: s.disbursementAuthorizationsCount,
       paymentReversalsCount: s.paymentReversalsCount,
       safetyProofVerificationsCount: s.safetyProofVerificationsCount,
+      auctionFinalizationsCount: s.auctionFinalizationsCount,
+      auctionCorrectionsCount: s.auctionCorrectionsCount,
+      defaulterRemovalsCount: s.defaulterRemovalsCount,
+      finalMonthSettlementsCount: s.finalMonthSettlementsCount,
     }))
   );
 
@@ -121,10 +125,18 @@ export default function DashboardRootPage() {
     safetyProofVerificationsCount:
       pendingApprovalsData?.summary?.safetyProofVerificationsCount ??
       approvalsFromStore.safetyProofVerificationsCount,
-    auctionFinalizationsCount: pendingApprovalsData?.summary?.auctionFinalizationsCount ?? 0,
-    auctionCorrectionsCount: pendingApprovalsData?.summary?.auctionCorrectionsCount ?? 0,
-    defaulterRemovalsCount: pendingApprovalsData?.summary?.defaulterRemovalsCount ?? 0,
-    finalMonthSettlementsCount: pendingApprovalsData?.summary?.finalMonthSettlementsCount ?? 0,
+    auctionFinalizationsCount:
+      pendingApprovalsData?.summary?.auctionFinalizationsCount ??
+      approvalsFromStore.auctionFinalizationsCount,
+    auctionCorrectionsCount:
+      pendingApprovalsData?.summary?.auctionCorrectionsCount ??
+      approvalsFromStore.auctionCorrectionsCount,
+    defaulterRemovalsCount:
+      pendingApprovalsData?.summary?.defaulterRemovalsCount ??
+      approvalsFromStore.defaulterRemovalsCount,
+    finalMonthSettlementsCount:
+      pendingApprovalsData?.summary?.finalMonthSettlementsCount ??
+      approvalsFromStore.finalMonthSettlementsCount,
   };
 
   const currentDate = new Intl.DateTimeFormat('en-IN', {

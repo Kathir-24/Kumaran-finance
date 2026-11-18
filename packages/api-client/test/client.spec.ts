@@ -321,3 +321,198 @@ test('DEF-WM-01: BigInt-exact currency formatting, Module 6 Maker-Checker fields
     'Idempotency-Key must be auto-injected on auction mutations',
   );
 });
+
+test('DEF-M10-SDK-01: Statutory Form XXII, Form XVII, and Form XXI SDK types match NestJS runtime contracts', () => {
+  type Schema<T extends keyof import('../src/generated/api-types.js').components['schemas']> =
+    import('../src/index.js').Schema<T>;
+
+  type FormXxii = Schema<'FormXxiiReportResponseDto'>;
+  type FormXvii = Schema<'FormXviiReportResponseDto'>;
+  type FormXxi = Schema<'FormXxiReportResponseDto'>;
+
+  const sampleXxii: FormXxii = {
+    statutoryStatus: 'UNVERIFIED-LEGAL',
+    registerName: 'Form XXII: Cash Book Register',
+    description: 'Daily physical cash register',
+    date: '2026-11-18',
+    branchId: 'branch-prd-001',
+    reconciliation: {
+      openingCashInSafe: 30000,
+      todayCashInflows: 5000,
+      todayCashOutflows: 2000,
+      closingCashInSafe: 33000,
+    },
+    inflows: [
+      {
+        paymentId: 'pay-1',
+        receiptNumber: 'KC-REC-PRD-2026-00001',
+        time: '2026-11-18T10:00:00.000Z',
+        amount: 5000,
+        customerCode: 'KC-CUST-00001',
+        customerName: 'M. Murugan',
+        groupCode: 'KCA-1L-20M-01',
+        ticketNumber: 1,
+        receivedBy: 'Cashier',
+        source: 'FIELD_HANDOVER',
+      },
+    ],
+    outflows: [
+      {
+        outflowType: 'CASH_PAYMENT_REVERSAL',
+        winnerId: null,
+        reversalId: 'rev-1',
+        voucherNumber: 'REV-KC-REC-PRD-2026-00001',
+        time: '2026-11-18T12:00:00.000Z',
+        amount: 2000,
+        groupCode: 'KCA-1L-20M-01',
+        installmentMonth: 2,
+        ticketNumber: 1,
+        winnerCode: 'KC-CUST-00001',
+        winnerName: 'M. Murugan',
+      },
+    ],
+  };
+
+  const sampleXvii: FormXvii = {
+    statutoryStatus: 'UNVERIFIED-LEGAL',
+    registerName: 'Form XVII: Auction Minutes Consolidated Register',
+    chitGroup: {
+      id: 'grp-1',
+      groupCode: 'KCA-1L-20M-01',
+      groupName: 'Perundurai 1 Lakh Scheme',
+      chitValue: 100000,
+      durationMonths: 20,
+      baseInstallment: 5000,
+      foremanCommissionRate: '4.00%',
+      branchName: 'Head Office - Perundurai',
+      branchNameTamil: 'தலைமை கிளை, பெருந்துறை',
+    },
+    totalAuctionsFinalized: 1,
+    filingSummary: {
+      totalAuctions: 1,
+      filedCount: 1,
+      pendingCount: 0,
+      overdueCount: 0,
+    },
+    auctions: [
+      {
+        auctionId: 'auc-2',
+        installmentMonth: 2,
+        auctionDate: '2026-11-01T10:00:00.000Z',
+        chitValue: 100000,
+        bidDiscount: 25000,
+        foremanCommissionAmount: 4000,
+        foremanCommissionRate: '4.00%',
+        totalDividend: 21000,
+        dividendPerTicket: 1050,
+        nextMonthNetInstallment: 3950,
+        prizeMoney: 75000,
+        winner: {
+          ticketNumber: 4,
+          customerCode: 'KC-CUST-00004',
+          fullName: 'D. Durai',
+          fullNameTamil: null,
+          phone: '9842100004',
+          wasTieBreakWinner: true,
+        },
+        tiedBiddersCount: 2,
+        winningTokenNumber: 1,
+        tiedDiscountAmount: 25000,
+        tiedBidders: [
+          {
+            ticketNumber: 4,
+            customerCode: 'KC-CUST-00004',
+            customerName: 'D. Durai',
+            bidDiscount: 25000,
+            tokenNumberDrawn: 1,
+            isWinner: true,
+          },
+        ],
+        conductedByUserId: 'maker-1',
+        finalizedByUserId: 'checker-2',
+        subscribersPresent: 18,
+        minutesProceedingsText: 'Minutes text',
+        signedByForeman: true,
+        filedAtRegistrar: true,
+        filedDate: '2026-11-10T10:00:00.000Z',
+        filingReference: 'REG-2026-001',
+        filingNotes: null,
+        filingDeadline: '2026-11-22T18:29:59.999Z',
+        filingDeadlineDate: '2026-11-22',
+        filingDaysRemaining: null,
+        isFilingOverdue: false,
+        filingStatus: 'FILED',
+      },
+    ],
+  };
+
+  const sampleXxi: FormXxi = {
+    statutoryStatus: 'UNVERIFIED-LEGAL',
+    registerName: 'Form XXI: Subscriber Ledger Register',
+    chitGroup: {
+      id: 'grp-1',
+      groupCode: 'KCA-1L-20M-01',
+      groupName: 'Perundurai 1 Lakh Scheme',
+      chitValue: 100000,
+      durationMonths: 20,
+      baseInstallment: 5000,
+      foremanCommissionRate: '4.00%',
+    },
+    totalTicketsReturned: 1,
+    ledgers: [
+      {
+        ticketId: 'tkt-1',
+        ticketNumber: 1,
+        isPrized: false,
+        consecutiveUnpaidMonths: 0,
+        ticketStatus: 'ACTIVE',
+        customer: {
+          id: 'cust-1',
+          customerCode: 'KC-CUST-00001',
+          fullName: 'A. Arumugam',
+          fullNameTamil: null,
+          phone: '9842143210',
+        },
+        summary: {
+          totalGrossDue: 5000,
+          totalDividendCredit: 0,
+          totalNetPayable: 5000,
+          totalPaid: 5000,
+          totalOutstandingArrears: 0,
+        },
+        passbookPrintMeta: {
+          totalDurationMonths: 20,
+          scheduledMonthsCount: 1,
+          isContiguous: true,
+        },
+        monthlySchedule: [
+          {
+            installmentMonth: 1,
+            dueDate: '2026-11-18',
+            grossAmount: 5000,
+            dividendDeduction: 0,
+            netPayableAmount: 5000,
+            paidAmount: 5000,
+            cumulativeGrossDue: 5000,
+            cumulativeDividendCredit: 0,
+            cumulativeNetPayable: 5000,
+            cumulativePaid: 5000,
+            runningBalance: 0,
+            status: 'PAID',
+            paymentDate: '2026-11-15',
+            receiptNumber: 'KC-REC-PRD-2026-00001',
+            paymentMethod: 'CASH',
+          },
+        ],
+        contiguousSchedule: [],
+      },
+    ],
+  };
+
+  assert.equal(sampleXxii.reconciliation.closingCashInSafe, 33000);
+  assert.equal(sampleXxii.outflows[0].outflowType, 'CASH_PAYMENT_REVERSAL');
+  assert.equal(sampleXvii.auctions[0].winningTokenNumber, 1);
+  assert.equal(sampleXvii.filingSummary.filedCount, 1);
+  assert.equal(sampleXxi.ledgers[0].passbookPrintMeta.isContiguous, true);
+  assert.equal(sampleXxi.ledgers[0].monthlySchedule[0].runningBalance, 0);
+});

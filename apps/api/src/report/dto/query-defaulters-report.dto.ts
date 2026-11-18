@@ -33,12 +33,13 @@ export class QueryDefaultersReportDto {
   @ApiPropertyOptional({
     example: 1,
     default: 1,
-    description: 'Page number for pagination',
+    description: 'Page number for pagination (1 to 10000)',
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(10000)
   page: number = 1;
 
   @ApiPropertyOptional({

@@ -377,20 +377,21 @@ export function parseStrictIstDateRange(
 }
 
 /**
- * Enforces strict service-level pagination bounds (`page >= 1`, `1 <= limit <= 100`).
+ * Enforces strict service-level pagination bounds (`1 <= page <= 10000`, `1 <= limit <= 100`).
  */
 export function validatePagination(
   pageInput: number | undefined,
   limitInput: number | undefined,
   defaultLimit: number,
   maxLimit: number = 100,
+  maxPage: number = 10000,
 ): { page: number; limit: number; skip: number } {
   const page = pageInput ?? 1;
   const limit = limitInput ?? defaultLimit;
 
-  if (!Number.isInteger(page) || page < 1) {
+  if (!Number.isInteger(page) || page < 1 || page > maxPage) {
     throw new BadRequestException(
-      'INVALID_PAGINATION: page must be a positive integer (>= 1)',
+      `INVALID_PAGINATION: page must be an integer between 1 and ${maxPage}`,
     );
   }
 

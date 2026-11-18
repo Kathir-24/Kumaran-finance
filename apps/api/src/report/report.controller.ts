@@ -28,6 +28,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   ApiOkResponseEnvelope,
 } from '../common/decorators/api-response-envelope.decorator';
+import { BypassEnvelope } from '../common/decorators/bypass-envelope.decorator';
 import { SetTimeout } from '../common/decorators/set-timeout.decorator';
 import { ReportEtagInterceptor } from '../common/interceptors/report-etag.interceptor';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
@@ -94,6 +95,7 @@ export class ReportController {
   }
 
   @Sse('approvals-stream')
+  @BypassEnvelope()
   @SetTimeout(0)
   @Header('X-Accel-Buffering', 'no')
   @Header('Cache-Control', 'no-cache, no-transform')
@@ -122,11 +124,11 @@ export class ReportController {
     return interval(15000).pipe(
       startWith(0),
       switchMap(async () => {
-        // Mid-flight authentication, session validity & live DB role/branch/partner refresh (F15 + XR-M7-RPT-01)
-        const effectiveUser =
-          await this.reportService.resolveLiveStreamUser(currentUser);
-
         try {
+          // Mid-flight authentication, session validity & live DB role/branch/partner refresh (F15 + XR-M7-RPT-01 + DEF-M10-SSE-02)
+          const effectiveUser =
+            await this.reportService.resolveLiveStreamUser(currentUser);
+
           const approvals = await this.reportService.getPendingApprovals(
             effectiveUser,
             query,

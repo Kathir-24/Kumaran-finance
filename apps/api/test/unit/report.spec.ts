@@ -1,8 +1,15 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { firstValueFrom } from 'rxjs';
 import type { JwtPayload } from '../../src/auth/interfaces/jwt-payload.interface';
+import { BYPASS_ENVELOPE_KEY } from '../../src/common/decorators/bypass-envelope.decorator';
 import { REDIS_RELEASE_LOCK_LUA } from '../../src/common/utils/redis-lock.util';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { QueryAuditLogsDto } from '../../src/report/dto/query-audit-logs.dto';
+import { QueryDefaultersReportDto } from '../../src/report/dto/query-defaulters-report.dto';
+import { ReportController } from '../../src/report/report.controller';
 import { ReportService } from '../../src/report/report.service';
 import { StatutoryReportService } from '../../src/report/statutory-report.service';
 
@@ -2474,6 +2481,130 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
             }),
           }),
         );
+      });
+    });
+
+    describe('11. Module 10 Forensic Audit Remediations (DEF-M10-SSE-01..02, PERF-01, DEF-01, DTO-01)', () => {
+      it('DEF-M10-SSE-01: applies @BypassEnvelope() metadata on @Sse("approvals-stream") to prevent response envelope wrapping', () => {
+        const bypassMeta = Reflect.getMetadata(
+          BYPASS_ENVELOPE_KEY,
+          ReportController.prototype.streamPendingApprovals,
+        );
+        expect(bypassMeta).toBe(true);
+      });
+
+      it('DEF-M10-SSE-02: emits HEARTBEAT on transient DB errors in resolveLiveStreamUser while terminating stream fail-closed on auth errors', async () => {
+        const controller = new ReportController(reportService);
+
+        // 1. Transient DB error during resolveLiveStreamUser -> emits HEARTBEAT instead of killing SSE stream
+        jest
+          .spyOn(reportService, 'resolveLiveStreamUser')
+          .mockRejectedValueOnce(new Error('ETIMEDOUT: Postgres pool temporarily busy'));
+
+        const event = await firstValueFrom(
+          controller.streamPendingApprovals({}, superAdminUser),
+        );
+        expect((event.data as any).type).toBe('HEARTBEAT');
+        expect((event.data as any).timestamp).toBeDefined();
+
+        // 2. UnauthorizedException during resolveLiveStreamUser -> fails closed and terminates SSE stream
+        jest
+          .spyOn(reportService, 'resolveLiveStreamUser')
+          .mockRejectedValueOnce(new UnauthorizedException('Session revoked'));
+
+        await expect(
+          firstValueFrom(controller.streamPendingApprovals({}, superAdminUser)),
+        ).rejects.toThrow(UnauthorizedException);
+
+        // 3. ForbiddenException during resolveLiveStreamUser -> fails closed and terminates SSE stream
+        jest
+          .spyOn(reportService, 'resolveLiveStreamUser')
+          .mockRejectedValueOnce(new ForbiddenException('Branch scope changed'));
+
+        await expect(
+          firstValueFrom(controller.streamPendingApprovals({}, branchManagerUser)),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('DEF-M10-PERF-01: bounds Queue 6 auction correction auditLog scan with take: 200', async () => {
+        prismaMock.payment.findMany.mockResolvedValue([]);
+        prismaMock.auctionWinner.findMany.mockResolvedValue([]);
+        prismaMock.paymentReversal.findMany.mockResolvedValue([]);
+        prismaMock.auction.findMany.mockResolvedValue([]);
+        prismaMock.auditLog.findMany.mockResolvedValue([]);
+        prismaMock.subscriberTicket.findMany.mockResolvedValue([]);
+
+        await reportService.getPendingApprovals(superAdminUser);
+
+        expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            take: 200,
+            orderBy: { timestamp: 'desc' },
+          }),
+        );
+      });
+
+      it('DEF-M10-DEF-01: excludes both REMOVED_DEF_3M and SURRENDERED tickets in dashboard arrears and defaulters aging reports', async () => {
+        prismaMock.chitGroup.count.mockResolvedValue(1);
+        prismaMock.customer.count.mockResolvedValue(20);
+        prismaMock.subscriberTicket.count.mockResolvedValue(20);
+        prismaMock.payment.findMany.mockResolvedValue([]);
+        prismaMock.auctionWinner.findMany.mockResolvedValue([]);
+        prismaMock.payment.aggregate.mockResolvedValue({ _sum: { amount: 0n } });
+        prismaMock.auctionWinner.aggregate.mockResolvedValue({ _sum: { disbursedAmount: 0n } });
+        prismaMock.payment.count.mockResolvedValue(0);
+        prismaMock.auctionWinner.count.mockResolvedValue(0);
+        prismaMock.subscriberTicket.findMany.mockResolvedValue([]);
+
+        await reportService.getExecutiveDashboard({}, superAdminUser);
+        expect(prismaMock.subscriberTicket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: { notIn: ['REMOVED_DEF_3M', 'SURRENDERED'] },
+            }),
+          }),
+        );
+
+        prismaMock.subscriberTicket.findMany.mockClear();
+        prismaMock.subscriberTicket.count.mockResolvedValue(0);
+        await reportService.getDefaultersAgingReport({ page: 1, limit: 20 }, superAdminUser);
+        expect(prismaMock.subscriberTicket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: { notIn: ['REMOVED_DEF_3M', 'SURRENDERED'] },
+            }),
+          }),
+        );
+      });
+
+      it('DEF-M10-DTO-01: enforces @MaxLength(100) on audit string filters and @Max(10000) page bounds at DTO and service layers', async () => {
+        const longStr = 'A'.repeat(101);
+        const invalidAuditDto = plainToInstance(QueryAuditLogsDto, {
+          entityType: longStr,
+          action: longStr,
+          page: 10001,
+          limit: 50,
+        });
+        const auditErrors = await validate(invalidAuditDto);
+        const auditProps = auditErrors.map((e) => e.property);
+        expect(auditProps).toContain('entityType');
+        expect(auditProps).toContain('action');
+        expect(auditProps).toContain('page');
+
+        const invalidDefaultersDto = plainToInstance(QueryDefaultersReportDto, {
+          page: 10001,
+          limit: 20,
+        });
+        const defaultersErrors = await validate(invalidDefaultersDto);
+        expect(defaultersErrors.map((e) => e.property)).toContain('page');
+
+        // Service-level validatePagination guard against page > 10000
+        await expect(
+          reportService.getAuditLogs({ page: 10001, limit: 50 }, superAdminUser),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+          reportService.getDefaultersAgingReport({ page: 10001, limit: 20 }, superAdminUser),
+        ).rejects.toThrow(BadRequestException);
       });
     });
   });

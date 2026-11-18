@@ -114,7 +114,7 @@ function FormXxiLedgerContent() {
 
     ledgers.forEach((l) => {
       l.monthlySchedule.forEach((row) => {
-        const dueDate = formatIstDateString(new Date(row.dueDate));
+        const dueDate = row.dueDate ? formatIstDateString(new Date(row.dueDate)) : 'N/A';
         const netDiff = toSafeBigInt(row.netPayableAmount) - toSafeBigInt(row.paidAmount);
         const unpaid = row.status !== 'PAID' && netDiff > 0n ? netDiff : 0n;
         rows.push([

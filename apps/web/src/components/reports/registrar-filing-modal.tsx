@@ -70,7 +70,8 @@ export function RegistrarFilingModal({
       return;
     }
 
-    const parsedDate = filedDate ? new Date(`${filedDate}T00:00:00.000+05:30`) : null;
+    const cleanDateStr = filedDate.trim().split('T')[0];
+    const parsedDate = cleanDateStr ? new Date(`${cleanDateStr}T00:00:00.000+05:30`) : null;
     if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
       setErrorMsg('A valid Registrar filing date is required');
       return;

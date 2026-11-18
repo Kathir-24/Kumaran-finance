@@ -349,7 +349,7 @@ export class ReportService {
       const overdueDues = await this.prisma.subscriberTicket.findMany({
         where: {
           consecutiveUnpaidMonths: { gte: 1 },
-          status: { not: 'REMOVED_DEF_3M' },
+          status: { notIn: ['REMOVED_DEF_3M', 'SURRENDERED'] },
           ...(branchId ? { chitGroup: { branchId } } : {}),
         },
         select: {
@@ -679,7 +679,7 @@ export class ReportService {
 
     const where: any = {
       consecutiveUnpaidMonths: { gte: minArrearsMonths },
-      status: { not: 'REMOVED_DEF_3M' },
+      status: { notIn: ['REMOVED_DEF_3M', 'SURRENDERED'] },
     };
 
     if (query.chitGroupId) {

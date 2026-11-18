@@ -497,6 +497,7 @@ export async function buildBranchPendingApprovalsSnapshot(
           },
         },
         orderBy: { timestamp: 'desc' },
+        take: 200,
         select: {
           id: true,
           entityId: true,

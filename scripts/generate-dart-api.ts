@@ -33,6 +33,8 @@ interface SchemaDefinition {
   enum?: string[];
 }
 
+const DECIMAL_RATE_FIELD_PATTERN = /(?:Rate|Percentage|Percent)$/i;
+
 function resolveTypeName(prop: SchemaProperty, propName: string): { dartType: string; isComplex: boolean } {
   if (prop.$ref) {
     const refName = prop.$ref.split('/').pop() || 'dynamic';
@@ -60,7 +62,16 @@ function resolveTypeName(prop: SchemaProperty, propName: string): { dartType: st
   }
 
   if (prop.type === 'number') {
-    return { dartType: 'double', isComplex: false };
+    // Guardrail 2: Only percentage/rate fields (e.g., foremanCommissionRate) use double;
+    // all monetary values, ticket numbers, months, and counts MUST be 64-bit int.
+    if (
+      prop.format === 'float' ||
+      prop.format === 'double' ||
+      DECIMAL_RATE_FIELD_PATTERN.test(propName)
+    ) {
+      return { dartType: 'double', isComplex: false };
+    }
+    return { dartType: 'int', isComplex: false };
   }
 
   if (prop.type === 'boolean') {
@@ -157,10 +168,10 @@ function generateDartClass(className: string, schema: SchemaDefinition): string 
     if (f.isList) {
       if (f.innerType && ['int', 'double', 'String', 'bool'].includes(f.innerType)) {
         if (f.innerType === 'int') {
-          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList()`;
+          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => _parseWholeRupeeInt(e)).toList()`;
           lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
         } else if (f.innerType === 'double') {
-          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList()`;
+          const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => _parseDecimalRate(e)).toList()`;
           lines.push(`      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? []`},`);
         } else if (f.innerType === 'String') {
           const mapper = `(json['${key}'] as List<dynamic>?)?.map((e) => e.toString()).toList()`;
@@ -182,11 +193,13 @@ function generateDartClass(className: string, schema: SchemaDefinition): string 
         `      ${f.fieldName}: ${isNullable ? mapper : `(${mapper}) ?? ${f.dartType}.fromJson(const {})`},`,
       );
     } else if (f.dartType === 'int') {
-      const val = `json['${key}'] != null ? (json['${key}'] as num).toInt() : null`;
-      lines.push(`      ${f.fieldName}: ${isNullable ? val : `(${val}) ?? 0`},`);
+      lines.push(
+        `      ${f.fieldName}: ${isNullable ? `_parseWholeRupeeIntOrNull(json['${key}'])` : `_parseWholeRupeeInt(json['${key}'])`},`,
+      );
     } else if (f.dartType === 'double') {
-      const val = `json['${key}'] != null ? (json['${key}'] as num).toDouble() : null`;
-      lines.push(`      ${f.fieldName}: ${isNullable ? val : `(${val}) ?? 0.0`},`);
+      lines.push(
+        `      ${f.fieldName}: ${isNullable ? `_parseDecimalRateOrNull(json['${key}'])` : `_parseDecimalRate(json['${key}'])`},`,
+      );
     } else if (f.dartType === 'bool') {
       lines.push(`      ${f.fieldName}: ${isNullable ? `json['${key}'] as bool?` : `json['${key}'] as bool? ?? false`},`);
     } else if (f.dartType === 'String') {
@@ -266,6 +279,42 @@ export function runGenerator() {
     '// ==============================================================================',
     '',
     '// ignore_for_file: unused_import, non_constant_identifier_names, unnecessary_null_comparison, unnecessary_non_null_assertion',
+    '',
+    '/// Guardrail 2: Parses whole-Rupee 64-bit integers safely from JSON int, num,',
+    '/// or BigInt-serialized decimal string without IEEE-754 double precision loss.',
+    'int? _parseWholeRupeeIntOrNull(dynamic value) {',
+    '  if (value == null) return null;',
+    '  if (value is int) return value;',
+    '  if (value is num) return value.toInt();',
+    '  if (value is String) {',
+    '    final trimmed = value.trim();',
+    '    if (trimmed.isEmpty) return null;',
+    '    final direct = int.tryParse(trimmed);',
+    '    if (direct != null) return direct;',
+    '    final intPart = trimmed.split(\'.\').first.replaceAll(RegExp(r\'[^0-9-]\'), \'\');',
+    '    return int.tryParse(intPart);',
+    '  }',
+    '  return null;',
+    '}',
+    '',
+    'int _parseWholeRupeeInt(dynamic value, [int fallback = 0]) {',
+    '  return _parseWholeRupeeIntOrNull(value) ?? fallback;',
+    '}',
+    '',
+    '/// Parses decimal percentage rates (e.g. frozen foremanCommissionRate 4.00%) safely.',
+    'double? _parseDecimalRateOrNull(dynamic value) {',
+    '  if (value == null) return null;',
+    '  if (value is num) return value.toDouble();',
+    '  if (value is String) {',
+    '    final cleaned = value.trim().replaceAll(\'%\', \'\');',
+    '    return double.tryParse(cleaned);',
+    '  }',
+    '  return null;',
+    '}',
+    '',
+    'double _parseDecimalRate(dynamic value, [double fallback = 0.0]) {',
+    '  return _parseDecimalRateOrNull(value) ?? fallback;',
+    '}',
     '',
   ];
 

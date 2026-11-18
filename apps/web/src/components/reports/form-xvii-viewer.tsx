@@ -142,7 +142,7 @@ export function FormXviiViewer({
             <div>
               <span className="text-slate-400 print:text-slate-600 block">{t('totalFinalized')}</span>
               <span className="text-sm font-semibold text-emerald-400 print:text-emerald-700 font-mono">
-                {data.totalAuctionsFinalized} / {chit.durationMonths - 2}
+                {data.totalAuctionsFinalized} / {Math.max(0, (chit.durationMonths || 20) - 2)}
               </span>
             </div>
           </div>

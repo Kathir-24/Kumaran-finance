@@ -69,9 +69,10 @@ export function FormXxiTable({ ledger }: FormXxiTableProps) {
     setIsDownloading(true);
     setDownloadError(null);
     try {
+      const safeCustomerCode = (customer.customerCode || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
       await downloadPassbookPdf(
         ledger.ticketId,
-        `form-xxi-passbook-t${ledger.ticketNumber}-${customer.customerCode}.pdf`,
+        `form-xxi-passbook-t${ledger.ticketNumber}-${safeCustomerCode}.pdf`,
       );
     } catch (err: unknown) {
       setDownloadError(getErrorMessage(err, 'Failed to download Form XXI PDF'));

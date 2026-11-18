@@ -28,19 +28,34 @@ int _parseWholeRupeeInt(dynamic value, [int fallback = 0]) {
   return _parseWholeRupeeIntOrNull(value) ?? fallback;
 }
 
+/// Parses decimal percentage rates (e.g. frozen foremanCommissionRate 4.00%) safely.
+double? _parseDecimalRateOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final cleaned = value.trim().replaceAll('%', '');
+    return double.tryParse(cleaned);
+  }
+  return null;
+}
+
+double _parseDecimalRate(dynamic value, [double fallback = 0.0]) {
+  return _parseDecimalRateOrNull(value) ?? fallback;
+}
+
 class DailyArrearsExecutionResultDto {
   /// Total installment dues checked
-  final double totalDuesChecked;
+  final int totalDuesChecked;
   /// Total overdue dues count
-  final double overdueCount;
+  final int overdueCount;
   /// Dues that turned overdue today
-  final double newlyOverdueCount;
+  final int newlyOverdueCount;
   /// Subscribers reaching 3-month default
-  final double defaults3MonthsCount;
+  final int defaults3MonthsCount;
   /// Active arrears count
-  final double arrearsCount;
+  final int arrearsCount;
   /// Execution duration in milliseconds
-  final double executionTimeMs;
+  final int executionTimeMs;
 
   const DailyArrearsExecutionResultDto({
     required this.totalDuesChecked,
@@ -53,12 +68,12 @@ class DailyArrearsExecutionResultDto {
 
   factory DailyArrearsExecutionResultDto.fromJson(Map<String, dynamic> json) {
     return DailyArrearsExecutionResultDto(
-      totalDuesChecked: (json['totalDuesChecked'] != null ? (json['totalDuesChecked'] as num).toDouble() : null) ?? 0.0,
-      overdueCount: (json['overdueCount'] != null ? (json['overdueCount'] as num).toDouble() : null) ?? 0.0,
-      newlyOverdueCount: (json['newlyOverdueCount'] != null ? (json['newlyOverdueCount'] as num).toDouble() : null) ?? 0.0,
-      defaults3MonthsCount: (json['defaults3MonthsCount'] != null ? (json['defaults3MonthsCount'] as num).toDouble() : null) ?? 0.0,
-      arrearsCount: (json['arrearsCount'] != null ? (json['arrearsCount'] as num).toDouble() : null) ?? 0.0,
-      executionTimeMs: (json['executionTimeMs'] != null ? (json['executionTimeMs'] as num).toDouble() : null) ?? 0.0,
+      totalDuesChecked: _parseWholeRupeeInt(json['totalDuesChecked']),
+      overdueCount: _parseWholeRupeeInt(json['overdueCount']),
+      newlyOverdueCount: _parseWholeRupeeInt(json['newlyOverdueCount']),
+      defaults3MonthsCount: _parseWholeRupeeInt(json['defaults3MonthsCount']),
+      arrearsCount: _parseWholeRupeeInt(json['arrearsCount']),
+      executionTimeMs: _parseWholeRupeeInt(json['executionTimeMs']),
     );
   }
 
@@ -112,11 +127,11 @@ class EnqueuedJobResponseDto {
 
 class ReconciliationResultDto {
   /// Count of matched settlements
-  final double matchedCount;
+  final int matchedCount;
   /// Count of resolved ghost drop transactions
-  final double ghostDropsResolvedCount;
+  final int ghostDropsResolvedCount;
   /// Count of settlement discrepancies
-  final double exceptionsCount;
+  final int exceptionsCount;
   /// Matched orders details
   final List<dynamic> matchedOrders;
   /// Ghost drop orders details
@@ -135,9 +150,9 @@ class ReconciliationResultDto {
 
   factory ReconciliationResultDto.fromJson(Map<String, dynamic> json) {
     return ReconciliationResultDto(
-      matchedCount: (json['matchedCount'] != null ? (json['matchedCount'] as num).toDouble() : null) ?? 0.0,
-      ghostDropsResolvedCount: (json['ghostDropsResolvedCount'] != null ? (json['ghostDropsResolvedCount'] as num).toDouble() : null) ?? 0.0,
-      exceptionsCount: (json['exceptionsCount'] != null ? (json['exceptionsCount'] as num).toDouble() : null) ?? 0.0,
+      matchedCount: _parseWholeRupeeInt(json['matchedCount']),
+      ghostDropsResolvedCount: _parseWholeRupeeInt(json['ghostDropsResolvedCount']),
+      exceptionsCount: _parseWholeRupeeInt(json['exceptionsCount']),
       matchedOrders: (json['matchedOrders'] as List<dynamic>?) ?? [],
       ghostDropOrders: (json['ghostDropOrders'] as List<dynamic>?) ?? [],
       exceptionOrders: (json['exceptionOrders'] as List<dynamic>?) ?? [],
@@ -180,7 +195,7 @@ class SettlementRecordDto {
     return SettlementRecordDto(
       gatewayOrderId: json['gatewayOrderId']?.toString() ?? '',
       gatewayPaymentId: json['gatewayPaymentId']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       status: json['status']?.toString() ?? '',
       settledAt: json['settledAt']?.toString() ?? '',
     );
@@ -306,15 +321,15 @@ class QueueStatusReportDto {
   /// Whether Redis/BullMQ is operational
   final bool isAvailable;
   /// Active running jobs
-  final double active;
+  final int active;
   /// Waiting queued jobs
-  final double waiting;
+  final int waiting;
   /// Completed jobs count
-  final double completed;
+  final int completed;
   /// Failed jobs count
-  final double failed;
+  final int failed;
   /// Delayed jobs count
-  final double delayed;
+  final int delayed;
   /// Whether queue is paused
   final bool paused;
 
@@ -333,11 +348,11 @@ class QueueStatusReportDto {
     return QueueStatusReportDto(
       queueName: json['queueName']?.toString() ?? '',
       isAvailable: json['isAvailable'] as bool? ?? false,
-      active: (json['active'] != null ? (json['active'] as num).toDouble() : null) ?? 0.0,
-      waiting: (json['waiting'] != null ? (json['waiting'] as num).toDouble() : null) ?? 0.0,
-      completed: (json['completed'] != null ? (json['completed'] as num).toDouble() : null) ?? 0.0,
-      failed: (json['failed'] != null ? (json['failed'] as num).toDouble() : null) ?? 0.0,
-      delayed: (json['delayed'] != null ? (json['delayed'] as num).toDouble() : null) ?? 0.0,
+      active: _parseWholeRupeeInt(json['active']),
+      waiting: _parseWholeRupeeInt(json['waiting']),
+      completed: _parseWholeRupeeInt(json['completed']),
+      failed: _parseWholeRupeeInt(json['failed']),
+      delayed: _parseWholeRupeeInt(json['delayed']),
       paused: json['paused'] as bool? ?? false,
     );
   }
@@ -446,7 +461,7 @@ class RepeatableScheduleDto {
   /// Cron expression
   final String cron;
   /// Next scheduled timestamp
-  final double? next;
+  final int? next;
 
   const RepeatableScheduleDto({
     required this.key,
@@ -460,7 +475,7 @@ class RepeatableScheduleDto {
       key: json['key']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       cron: json['cron']?.toString() ?? '',
-      next: json['next'] != null ? (json['next'] as num).toDouble() : null,
+      next: _parseWholeRupeeIntOrNull(json['next']),
     );
   }
 
@@ -528,7 +543,7 @@ class PresignedUploadResponseDto {
   /// HTTP method to use for direct upload
   final String method;
   /// URL expiry duration in seconds
-  final double expiresInSeconds;
+  final int expiresInSeconds;
   /// Required HTTP headers to pass in the PUT request
   final dynamic headers;
 
@@ -545,7 +560,7 @@ class PresignedUploadResponseDto {
       uploadUrl: json['uploadUrl']?.toString() ?? '',
       key: json['key']?.toString() ?? '',
       method: json['method']?.toString() ?? '',
-      expiresInSeconds: (json['expiresInSeconds'] != null ? (json['expiresInSeconds'] as num).toDouble() : null) ?? 0.0,
+      expiresInSeconds: _parseWholeRupeeInt(json['expiresInSeconds']),
       headers: json['headers'],
     );
   }
@@ -567,7 +582,7 @@ class LocalUploadResponseDto {
   /// Verified MIME type of uploaded file
   final String mimeType;
   /// Stored byte size of uploaded file
-  final double sizeBytes;
+  final int sizeBytes;
 
   const LocalUploadResponseDto({
     required this.key,
@@ -579,7 +594,7 @@ class LocalUploadResponseDto {
     return LocalUploadResponseDto(
       key: json['key']?.toString() ?? '',
       mimeType: json['mimeType']?.toString() ?? '',
-      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toDouble() : null) ?? 0.0,
+      sizeBytes: _parseWholeRupeeInt(json['sizeBytes']),
     );
   }
 
@@ -1113,7 +1128,7 @@ class RequestOtpResponseDto {
   /// Status message
   final String message;
   /// OTP expiration period in seconds
-  final double expiresInSeconds;
+  final int expiresInSeconds;
   /// Generated OTP for automated local testing (only returned when NODE_ENV !== production)
   final String? debugOtp;
 
@@ -1128,7 +1143,7 @@ class RequestOtpResponseDto {
     return RequestOtpResponseDto(
       success: json['success'] as bool? ?? false,
       message: json['message']?.toString() ?? '',
-      expiresInSeconds: (json['expiresInSeconds'] != null ? (json['expiresInSeconds'] as num).toDouble() : null) ?? 0.0,
+      expiresInSeconds: _parseWholeRupeeInt(json['expiresInSeconds']),
       debugOtp: json['debugOtp']?.toString(),
     );
   }
@@ -1716,7 +1731,7 @@ class CustomerResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toInt() : null,
+      version: _parseWholeRupeeIntOrNull(json['version']),
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -1835,9 +1850,9 @@ class CustomerCountsDto {
 
   factory CustomerCountsDto.fromJson(Map<String, dynamic> json) {
     return CustomerCountsDto(
-      tickets: (json['tickets'] != null ? (json['tickets'] as num).toInt() : null) ?? 0,
-      nominees: (json['nominees'] != null ? (json['nominees'] as num).toInt() : null) ?? 0,
-      documents: (json['documents'] != null ? (json['documents'] as num).toInt() : null) ?? 0,
+      tickets: _parseWholeRupeeInt(json['tickets']),
+      nominees: _parseWholeRupeeInt(json['nominees']),
+      documents: _parseWholeRupeeInt(json['documents']),
     );
   }
 
@@ -1927,7 +1942,7 @@ class CustomerListItemDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toInt() : null,
+      version: _parseWholeRupeeIntOrNull(json['version']),
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -2105,7 +2120,7 @@ class CustomerDetailResponseDto {
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
-      version: json['version'] != null ? (json['version'] as num).toInt() : null,
+      version: _parseWholeRupeeIntOrNull(json['version']),
       branchId: json['branchId']?.toString(),
       branch: json['branch'],
       createdAt: json['createdAt']?.toString() ?? '',
@@ -2193,7 +2208,7 @@ class UpdateCustomerDto {
       pincode: json['pincode']?.toString(),
       panNumber: json['panNumber']?.toString(),
       aadhaarLast4: json['aadhaarLast4']?.toString(),
-      version: json['version'] != null ? (json['version'] as num).toInt() : null,
+      version: _parseWholeRupeeIntOrNull(json['version']),
     );
   }
 
@@ -2405,7 +2420,7 @@ class ConfirmCustomerDocumentDto {
       docType: json['docType']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
       mimeType: json['mimeType']?.toString() ?? '',
-      sizeBytes: (json['sizeBytes'] != null ? (json['sizeBytes'] as num).toInt() : null) ?? 0,
+      sizeBytes: _parseWholeRupeeInt(json['sizeBytes']),
     );
   }
 
@@ -2424,7 +2439,7 @@ class DocumentPresignedUrlResponseDto {
   /// Time-limited 15-minute viewing URL
   final String url;
   /// URL expiration duration in seconds (15 minutes)
-  final double expiresInSeconds;
+  final int expiresInSeconds;
 
   const DocumentPresignedUrlResponseDto({
     required this.url,
@@ -2434,7 +2449,7 @@ class DocumentPresignedUrlResponseDto {
   factory DocumentPresignedUrlResponseDto.fromJson(Map<String, dynamic> json) {
     return DocumentPresignedUrlResponseDto(
       url: json['url']?.toString() ?? '',
-      expiresInSeconds: (json['expiresInSeconds'] != null ? (json['expiresInSeconds'] as num).toDouble() : null) ?? 0.0,
+      expiresInSeconds: _parseWholeRupeeInt(json['expiresInSeconds']),
     );
   }
 
@@ -2456,21 +2471,21 @@ class ChitGroupResponseDto {
   /// Chit group name in Tamil
   final String? groupNameTamil;
   /// Chit total value in whole Rupees
-  final double chitValue;
+  final int chitValue;
   /// Duration in months
-  final double durationMonths;
+  final int durationMonths;
   /// Total number of subscriber tickets
-  final double totalTickets;
+  final int totalTickets;
   /// Base installment amount per month in whole Rupees
-  final double baseInstallment;
+  final int baseInstallment;
   /// Foreman commission rate permanently frozen for group
   final double foremanCommissionRate;
   /// Maximum allowable 1/4 (25%) auction bid discount ceiling in whole Rupees
-  final double maxDiscountCeiling;
+  final int maxDiscountCeiling;
   /// Initialization mode
   final String initMode;
   /// Month chit was onboarded at
-  final double onboardedAtMonth;
+  final int onboardedAtMonth;
   /// Chit scheme lifecycle status
   final String status;
   /// Registrar sanction order number
@@ -2517,14 +2532,14 @@ class ChitGroupResponseDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
-      durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
-      totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
-      baseInstallment: (json['baseInstallment'] != null ? (json['baseInstallment'] as num).toDouble() : null) ?? 0.0,
-      foremanCommissionRate: (json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null) ?? 0.0,
-      maxDiscountCeiling: (json['maxDiscountCeiling'] != null ? (json['maxDiscountCeiling'] as num).toDouble() : null) ?? 0.0,
+      chitValue: _parseWholeRupeeInt(json['chitValue']),
+      durationMonths: _parseWholeRupeeInt(json['durationMonths']),
+      totalTickets: _parseWholeRupeeInt(json['totalTickets']),
+      baseInstallment: _parseWholeRupeeInt(json['baseInstallment']),
+      foremanCommissionRate: _parseDecimalRate(json['foremanCommissionRate']),
+      maxDiscountCeiling: _parseWholeRupeeInt(json['maxDiscountCeiling']),
       initMode: json['initMode']?.toString() ?? '',
-      onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
+      onboardedAtMonth: _parseWholeRupeeInt(json['onboardedAtMonth']),
       status: json['status']?.toString() ?? '',
       sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
       startDate: json['startDate']?.toString() ?? '',
@@ -2572,9 +2587,9 @@ class CreateChitGroupDto {
   /// Total chit value in whole integer Rupees (e.g., 100000 for ₹1 Lakh)
   final int chitValue;
   /// Duration of the chit scheme in months (e.g., 20, 25, 40)
-  final double durationMonths;
+  final int durationMonths;
   /// Total number of subscriber tickets (must match durationMonths in standard chits)
-  final double totalTickets;
+  final int totalTickets;
   /// Prior sanction order number issued by Chit Registrar
   final String? sanctionOrderNumber;
   /// Date of prior sanction order
@@ -2605,9 +2620,9 @@ class CreateChitGroupDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toInt() : null) ?? 0,
-      durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
-      totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
+      chitValue: _parseWholeRupeeInt(json['chitValue']),
+      durationMonths: _parseWholeRupeeInt(json['durationMonths']),
+      totalTickets: _parseWholeRupeeInt(json['totalTickets']),
       sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
       sanctionDate: json['sanctionDate']?.toString(),
       startDate: json['startDate']?.toString() ?? '',
@@ -2635,9 +2650,9 @@ class CreateChitGroupDto {
 
 class HistoricalWinnerDto {
   /// Installment month of past auction (e.g., Months 2 to onboardedAtMonth - 1)
-  final double month;
+  final int month;
   /// Ticket number that won the past auction
-  final double ticketNumber;
+  final int ticketNumber;
   /// Winning bid discount in whole integer Rupees (must be <= chitValue / 4)
   final int bidDiscount;
   /// Date the past physical auction took place
@@ -2652,9 +2667,9 @@ class HistoricalWinnerDto {
 
   factory HistoricalWinnerDto.fromJson(Map<String, dynamic> json) {
     return HistoricalWinnerDto(
-      month: (json['month'] != null ? (json['month'] as num).toDouble() : null) ?? 0.0,
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
-      bidDiscount: (json['bidDiscount'] != null ? (json['bidDiscount'] as num).toInt() : null) ?? 0,
+      month: _parseWholeRupeeInt(json['month']),
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
+      bidDiscount: _parseWholeRupeeInt(json['bidDiscount']),
       auctionDate: json['auctionDate']?.toString() ?? '',
     );
   }
@@ -2671,7 +2686,7 @@ class HistoricalWinnerDto {
 
 class OngoingMemberAllocationDto {
   /// Ticket number (1 to totalTickets)
-  final double ticketNumber;
+  final int ticketNumber;
   /// Customer ID for this ticket
   final String customerId;
   /// Opening balance in whole Rupees transcribed from paper notebook
@@ -2685,9 +2700,9 @@ class OngoingMemberAllocationDto {
 
   factory OngoingMemberAllocationDto.fromJson(Map<String, dynamic> json) {
     return OngoingMemberAllocationDto(
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       customerId: json['customerId']?.toString() ?? '',
-      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toInt() : null,
+      openingBalance: _parseWholeRupeeIntOrNull(json['openingBalance']),
     );
   }
 
@@ -2709,11 +2724,11 @@ class OnboardOngoingChitDto {
   /// Total chit value in whole integer Rupees
   final int chitValue;
   /// Total scheme duration in months
-  final double durationMonths;
+  final int durationMonths;
   /// Total tickets in the scheme
-  final double totalTickets;
+  final int totalTickets;
   /// Current active month where digital tracking starts (e.g. Month 7)
-  final double onboardedAtMonth;
+  final int onboardedAtMonth;
   final String? sanctionOrderNumber;
   final String? sanctionDate;
   /// Original start date of Month 1 from physical notebook
@@ -2747,10 +2762,10 @@ class OnboardOngoingChitDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toInt() : null) ?? 0,
-      durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
-      totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
-      onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
+      chitValue: _parseWholeRupeeInt(json['chitValue']),
+      durationMonths: _parseWholeRupeeInt(json['durationMonths']),
+      totalTickets: _parseWholeRupeeInt(json['totalTickets']),
+      onboardedAtMonth: _parseWholeRupeeInt(json['onboardedAtMonth']),
       sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
       sanctionDate: json['sanctionDate']?.toString(),
       startDate: json['startDate']?.toString() ?? '',
@@ -2789,13 +2804,13 @@ class TicketResponseDto {
   /// Subscriber customer ID
   final String customerId;
   /// Ticket number 1..N
-  final double ticketNumber;
+  final int ticketNumber;
   /// Whether ticket has won an auction
   final bool isPrized;
   /// Prized auction ID if won
   final String? prizedAuctionId;
   /// Consecutive unpaid installment months count
-  final double consecutiveUnpaidMonths;
+  final int consecutiveUnpaidMonths;
   /// Ticket enrollment status
   final String status;
   /// Enrollment joining date
@@ -2821,10 +2836,10 @@ class TicketResponseDto {
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
       customerId: json['customerId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       isPrized: json['isPrized'] as bool? ?? false,
       prizedAuctionId: json['prizedAuctionId']?.toString(),
-      consecutiveUnpaidMonths: (json['consecutiveUnpaidMonths'] != null ? (json['consecutiveUnpaidMonths'] as num).toDouble() : null) ?? 0.0,
+      consecutiveUnpaidMonths: _parseWholeRupeeInt(json['consecutiveUnpaidMonths']),
       status: json['status']?.toString() ?? '',
       joiningDate: json['joiningDate']?.toString() ?? '',
       customer: json['customer'],
@@ -2857,21 +2872,21 @@ class ChitGroupDetailResponseDto {
   /// Chit group name in Tamil
   final String? groupNameTamil;
   /// Chit total value in whole Rupees
-  final double chitValue;
+  final int chitValue;
   /// Duration in months
-  final double durationMonths;
+  final int durationMonths;
   /// Total number of subscriber tickets
-  final double totalTickets;
+  final int totalTickets;
   /// Base installment amount per month in whole Rupees
-  final double baseInstallment;
+  final int baseInstallment;
   /// Foreman commission rate permanently frozen for group
   final double foremanCommissionRate;
   /// Maximum allowable 1/4 (25%) auction bid discount ceiling in whole Rupees
-  final double maxDiscountCeiling;
+  final int maxDiscountCeiling;
   /// Initialization mode
   final String initMode;
   /// Month chit was onboarded at
-  final double onboardedAtMonth;
+  final int onboardedAtMonth;
   /// Chit scheme lifecycle status
   final String status;
   /// Registrar sanction order number
@@ -2924,14 +2939,14 @@ class ChitGroupDetailResponseDto {
       groupCode: json['groupCode']?.toString() ?? '',
       groupName: json['groupName']?.toString() ?? '',
       groupNameTamil: json['groupNameTamil']?.toString(),
-      chitValue: (json['chitValue'] != null ? (json['chitValue'] as num).toDouble() : null) ?? 0.0,
-      durationMonths: (json['durationMonths'] != null ? (json['durationMonths'] as num).toDouble() : null) ?? 0.0,
-      totalTickets: (json['totalTickets'] != null ? (json['totalTickets'] as num).toDouble() : null) ?? 0.0,
-      baseInstallment: (json['baseInstallment'] != null ? (json['baseInstallment'] as num).toDouble() : null) ?? 0.0,
-      foremanCommissionRate: (json['foremanCommissionRate'] != null ? (json['foremanCommissionRate'] as num).toDouble() : null) ?? 0.0,
-      maxDiscountCeiling: (json['maxDiscountCeiling'] != null ? (json['maxDiscountCeiling'] as num).toDouble() : null) ?? 0.0,
+      chitValue: _parseWholeRupeeInt(json['chitValue']),
+      durationMonths: _parseWholeRupeeInt(json['durationMonths']),
+      totalTickets: _parseWholeRupeeInt(json['totalTickets']),
+      baseInstallment: _parseWholeRupeeInt(json['baseInstallment']),
+      foremanCommissionRate: _parseDecimalRate(json['foremanCommissionRate']),
+      maxDiscountCeiling: _parseWholeRupeeInt(json['maxDiscountCeiling']),
       initMode: json['initMode']?.toString() ?? '',
-      onboardedAtMonth: (json['onboardedAtMonth'] != null ? (json['onboardedAtMonth'] as num).toDouble() : null) ?? 0.0,
+      onboardedAtMonth: _parseWholeRupeeInt(json['onboardedAtMonth']),
       status: json['status']?.toString() ?? '',
       sanctionOrderNumber: json['sanctionOrderNumber']?.toString(),
       startDate: json['startDate']?.toString() ?? '',
@@ -3021,7 +3036,7 @@ class UpdateChitGroupDto {
 
 class AssignTicketDto {
   /// Ticket number to assign (between 1 and totalTickets)
-  final double ticketNumber;
+  final int ticketNumber;
   /// Verified customer UUID (Enforces ADR-13: max 1 ticket per customer in this group)
   final String customerId;
   /// Opening balance in whole Rupees (used for mid-cycle intake adjustments)
@@ -3035,9 +3050,9 @@ class AssignTicketDto {
 
   factory AssignTicketDto.fromJson(Map<String, dynamic> json) {
     return AssignTicketDto(
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       customerId: json['customerId']?.toString() ?? '',
-      openingBalance: json['openingBalance'] != null ? (json['openingBalance'] as num).toInt() : null,
+      openingBalance: _parseWholeRupeeIntOrNull(json['openingBalance']),
     );
   }
 
@@ -3814,17 +3829,17 @@ class InstallmentDueResponseDto {
   /// Subscriber ticket ID
   final String ticketId;
   /// Installment month 1..N
-  final double installmentMonth;
+  final int installmentMonth;
   /// Due payment cutoff date
   final String dueDate;
   /// Base monthly installment gross in whole Rupees
-  final double grossAmount;
+  final int grossAmount;
   /// Universal dividend deduction in whole Rupees
-  final double dividendDeduction;
+  final int dividendDeduction;
   /// Net payable installment amount in whole Rupees (gross - dividend)
-  final double netPayableAmount;
+  final int netPayableAmount;
   /// Amount collected in whole Rupees
-  final double paidAmount;
+  final int paidAmount;
   /// Payment status
   final String status;
   /// Subscriber ticket details
@@ -3849,12 +3864,12 @@ class InstallmentDueResponseDto {
       id: json['id']?.toString() ?? '',
       chitGroupId: json['chitGroupId']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       dueDate: json['dueDate']?.toString() ?? '',
-      grossAmount: (json['grossAmount'] != null ? (json['grossAmount'] as num).toDouble() : null) ?? 0.0,
-      dividendDeduction: (json['dividendDeduction'] != null ? (json['dividendDeduction'] as num).toDouble() : null) ?? 0.0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
-      paidAmount: (json['paidAmount'] != null ? (json['paidAmount'] as num).toDouble() : null) ?? 0.0,
+      grossAmount: _parseWholeRupeeInt(json['grossAmount']),
+      dividendDeduction: _parseWholeRupeeInt(json['dividendDeduction']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
+      paidAmount: _parseWholeRupeeInt(json['paidAmount']),
       status: json['status']?.toString() ?? '',
       ticket: json['ticket'],
     );
@@ -3881,15 +3896,15 @@ class GenerateDuesResultResponseDto {
   /// Chit group ID
   final String chitGroupId;
   /// Installment month
-  final double installmentMonth;
+  final int installmentMonth;
   /// Gross installment amount
-  final double grossAmount;
+  final int grossAmount;
   /// Dividend deduction per ticket
-  final double dividendDeduction;
+  final int dividendDeduction;
   /// Net payable amount
-  final double netPayableAmount;
+  final int netPayableAmount;
   /// Number of dues created or synced
-  final double duesCount;
+  final int duesCount;
 
   const GenerateDuesResultResponseDto({
     required this.chitGroupId,
@@ -3903,11 +3918,11 @@ class GenerateDuesResultResponseDto {
   factory GenerateDuesResultResponseDto.fromJson(Map<String, dynamic> json) {
     return GenerateDuesResultResponseDto(
       chitGroupId: json['chitGroupId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      grossAmount: (json['grossAmount'] != null ? (json['grossAmount'] as num).toDouble() : null) ?? 0.0,
-      dividendDeduction: (json['dividendDeduction'] != null ? (json['dividendDeduction'] as num).toDouble() : null) ?? 0.0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
-      duesCount: (json['duesCount'] != null ? (json['duesCount'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      grossAmount: _parseWholeRupeeInt(json['grossAmount']),
+      dividendDeduction: _parseWholeRupeeInt(json['dividendDeduction']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
+      duesCount: _parseWholeRupeeInt(json['duesCount']),
     );
   }
 
@@ -4025,11 +4040,11 @@ class UpiIntentResponseDto {
   /// Chit group code
   final String groupCode;
   /// Ticket number in chit group
-  final double ticketNumber;
+  final int ticketNumber;
   /// Installment month 1..N
-  final double installmentMonth;
+  final int installmentMonth;
   /// Net payable amount in whole Rupees (Inet)
-  final double netPayableAmount;
+  final int netPayableAmount;
   /// Company payee UPI VPA
   final String payeeVpa;
   /// Company payee legal entity name
@@ -4057,9 +4072,9 @@ class UpiIntentResponseDto {
       dueId: json['dueId']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
       groupCode: json['groupCode']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
       payeeVpa: json['payeeVpa']?.toString() ?? '',
       payeeName: json['payeeName']?.toString() ?? '',
       transactionNote: json['transactionNote']?.toString() ?? '',
@@ -4085,17 +4100,17 @@ class UpiIntentResponseDto {
 
 class PassbookEntryDto {
   /// Installment month
-  final double installmentMonth;
+  final int installmentMonth;
   /// Due cutoff date
   final String dueDate;
   /// Gross installment in whole Rupees
-  final double grossAmount;
+  final int grossAmount;
   /// Universal dividend in whole Rupees
-  final double dividendDeduction;
+  final int dividendDeduction;
   /// Net payable in whole Rupees
-  final double netPayableAmount;
+  final int netPayableAmount;
   /// Paid amount in whole Rupees
-  final double paidAmount;
+  final int paidAmount;
   /// Payment status
   final String status;
   /// Payment date
@@ -4117,12 +4132,12 @@ class PassbookEntryDto {
 
   factory PassbookEntryDto.fromJson(Map<String, dynamic> json) {
     return PassbookEntryDto(
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toDouble() : null) ?? 0.0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       dueDate: json['dueDate']?.toString() ?? '',
-      grossAmount: (json['grossAmount'] != null ? (json['grossAmount'] as num).toDouble() : null) ?? 0.0,
-      dividendDeduction: (json['dividendDeduction'] != null ? (json['dividendDeduction'] as num).toDouble() : null) ?? 0.0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toDouble() : null) ?? 0.0,
-      paidAmount: (json['paidAmount'] != null ? (json['paidAmount'] as num).toDouble() : null) ?? 0.0,
+      grossAmount: _parseWholeRupeeInt(json['grossAmount']),
+      dividendDeduction: _parseWholeRupeeInt(json['dividendDeduction']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
+      paidAmount: _parseWholeRupeeInt(json['paidAmount']),
       status: json['status']?.toString() ?? '',
       paidAt: json['paidAt']?.toString(),
       receiptNumber: json['receiptNumber']?.toString(),
@@ -4302,17 +4317,17 @@ class SettleRemovalResponseDto {
   /// Settled ticket ID
   final String ticketId;
   /// Ticket number
-  final double ticketNumber;
+  final int ticketNumber;
   /// Removed subscriber full name
   final String customerName;
   /// Chit group code
   final String groupCode;
   /// Total installments paid by removed subscriber in Rupees
-  final double totalPaid;
+  final int totalPaid;
   /// 4% Foreman Commission damages deducted in Rupees
-  final double damagesDeducted;
+  final int damagesDeducted;
   /// Net refund amount disbursed in Rupees
-  final double refundAmount;
+  final int refundAmount;
   /// Exit settlement refund voucher number
   final String voucherNumber;
   /// Settlement timestamp
@@ -4337,12 +4352,12 @@ class SettleRemovalResponseDto {
       success: json['success'] as bool? ?? false,
       message: json['message']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toDouble() : null) ?? 0.0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       customerName: json['customerName']?.toString() ?? '',
       groupCode: json['groupCode']?.toString() ?? '',
-      totalPaid: (json['totalPaid'] != null ? (json['totalPaid'] as num).toDouble() : null) ?? 0.0,
-      damagesDeducted: (json['damagesDeducted'] != null ? (json['damagesDeducted'] as num).toDouble() : null) ?? 0.0,
-      refundAmount: (json['refundAmount'] != null ? (json['refundAmount'] as num).toDouble() : null) ?? 0.0,
+      totalPaid: _parseWholeRupeeInt(json['totalPaid']),
+      damagesDeducted: _parseWholeRupeeInt(json['damagesDeducted']),
+      refundAmount: _parseWholeRupeeInt(json['refundAmount']),
       voucherNumber: json['voucherNumber']?.toString() ?? '',
       settledAt: json['settledAt']?.toString() ?? '',
     );
@@ -4430,10 +4445,10 @@ class AgentDueItemResponseDto {
     return AgentDueItemResponseDto(
       id: json['id']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toInt() : null) ?? 0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
       chitGroupCode: json['chitGroupCode']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toInt() : null) ?? 0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
       customerCode: json['customerCode']?.toString() ?? '',
       customerName: json['customerName']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
@@ -4499,14 +4514,14 @@ class CollectionRecordResponseDto {
     return CollectionRecordResponseDto(
       paymentId: json['paymentId']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       cashHandoverStatus: json['cashHandoverStatus']?.toString() ?? '',
       customerCode: json['customerCode']?.toString() ?? '',
       customerName: json['customerName']?.toString() ?? '',
       chitGroupCode: json['chitGroupCode']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toInt() : null) ?? 0,
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       paidAt: json['paidAt']?.toString() ?? '',
     );
   }
@@ -4557,8 +4572,8 @@ class RecordCollectionDto {
   factory RecordCollectionDto.fromJson(Map<String, dynamic> json) {
     return RecordCollectionDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       idempotencyKey: json['idempotencyKey']?.toString(),
       transactionRef: json['transactionRef']?.toString(),
@@ -4601,7 +4616,7 @@ class OfflineSyncSuccessItemDto {
       clientQueueId: json['clientQueueId']?.toString() ?? '',
       paymentId: json['paymentId']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
     );
   }
 
@@ -4668,9 +4683,9 @@ class SyncOfflineQueueResponseDto {
 
   factory SyncOfflineQueueResponseDto.fromJson(Map<String, dynamic> json) {
     return SyncOfflineQueueResponseDto(
-      totalSubmitted: (json['totalSubmitted'] != null ? (json['totalSubmitted'] as num).toInt() : null) ?? 0,
-      successCount: (json['successCount'] != null ? (json['successCount'] as num).toInt() : null) ?? 0,
-      failureCount: (json['failureCount'] != null ? (json['failureCount'] as num).toInt() : null) ?? 0,
+      totalSubmitted: _parseWholeRupeeInt(json['totalSubmitted']),
+      successCount: _parseWholeRupeeInt(json['successCount']),
+      failureCount: _parseWholeRupeeInt(json['failureCount']),
       synced: ((json['synced'] as List<dynamic>?)?.map((e) => OfflineSyncSuccessItemDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
       failed: ((json['failed'] as List<dynamic>?)?.map((e) => OfflineSyncFailedItemDto.fromJson(e as Map<String, dynamic>)).toList()) ?? [],
     );
@@ -4717,8 +4732,8 @@ class SyncOfflineCollectionItemDto {
     return SyncOfflineCollectionItemDto(
       idempotencyKey: json['idempotencyKey']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       collectedAt: json['collectedAt']?.toString() ?? '',
       transactionRef: json['transactionRef']?.toString(),
@@ -4781,11 +4796,11 @@ class DailyCollectionTotalsDto {
 
   factory DailyCollectionTotalsDto.fromJson(Map<String, dynamic> json) {
     return DailyCollectionTotalsDto(
-      totalCollected: (json['totalCollected'] != null ? (json['totalCollected'] as num).toInt() : null) ?? 0,
-      cashCollected: (json['cashCollected'] != null ? (json['cashCollected'] as num).toInt() : null) ?? 0,
-      cashPendingHandover: (json['cashPendingHandover'] != null ? (json['cashPendingHandover'] as num).toInt() : null) ?? 0,
-      cashHandedOver: (json['cashHandedOver'] != null ? (json['cashHandedOver'] as num).toInt() : null) ?? 0,
-      digitalCollected: (json['digitalCollected'] != null ? (json['digitalCollected'] as num).toInt() : null) ?? 0,
+      totalCollected: _parseWholeRupeeInt(json['totalCollected']),
+      cashCollected: _parseWholeRupeeInt(json['cashCollected']),
+      cashPendingHandover: _parseWholeRupeeInt(json['cashPendingHandover']),
+      cashHandedOver: _parseWholeRupeeInt(json['cashHandedOver']),
+      digitalCollected: _parseWholeRupeeInt(json['digitalCollected']),
     );
   }
 
@@ -4820,7 +4835,7 @@ class DailyCollectionSummaryResponseDto {
   factory DailyCollectionSummaryResponseDto.fromJson(Map<String, dynamic> json) {
     return DailyCollectionSummaryResponseDto(
       date: json['date']?.toString() ?? '',
-      totalPaymentsCount: (json['totalPaymentsCount'] != null ? (json['totalPaymentsCount'] as num).toInt() : null) ?? 0,
+      totalPaymentsCount: _parseWholeRupeeInt(json['totalPaymentsCount']),
       totals: json['totals'],
       payments: (json['payments'] as List<dynamic>?) ?? [],
     );
@@ -4859,8 +4874,8 @@ class CashHandoverBatchResponseDto {
   factory CashHandoverBatchResponseDto.fromJson(Map<String, dynamic> json) {
     return CashHandoverBatchResponseDto(
       collectorUserId: json['collectorUserId']?.toString() ?? '',
-      totalPendingAmount: (json['totalPendingAmount'] != null ? (json['totalPendingAmount'] as num).toInt() : null) ?? 0,
-      paymentsCount: (json['paymentsCount'] != null ? (json['paymentsCount'] as num).toInt() : null) ?? 0,
+      totalPendingAmount: _parseWholeRupeeInt(json['totalPendingAmount']),
+      paymentsCount: _parseWholeRupeeInt(json['paymentsCount']),
       paymentIds: ((json['paymentIds'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       collections: (json['collections'] as List<dynamic>?) ?? [],
     );
@@ -4927,8 +4942,8 @@ class HandoverAcknowledgementResponseDto {
       message: json['message']?.toString() ?? '',
       collectorUserId: json['collectorUserId']?.toString() ?? '',
       acknowledgedByUserId: json['acknowledgedByUserId']?.toString() ?? '',
-      acknowledgedAmount: (json['acknowledgedAmount'] != null ? (json['acknowledgedAmount'] as num).toInt() : null) ?? 0,
-      totalPaymentsAcknowledged: (json['totalPaymentsAcknowledged'] != null ? (json['totalPaymentsAcknowledged'] as num).toInt() : null) ?? 0,
+      acknowledgedAmount: _parseWholeRupeeInt(json['acknowledgedAmount']),
+      totalPaymentsAcknowledged: _parseWholeRupeeInt(json['totalPaymentsAcknowledged']),
     );
   }
 
@@ -4964,7 +4979,7 @@ class AcknowledgeHandoverDto {
   factory AcknowledgeHandoverDto.fromJson(Map<String, dynamic> json) {
     return AcknowledgeHandoverDto(
       collectorUserId: json['collectorUserId']?.toString() ?? '',
-      acknowledgedAmount: (json['acknowledgedAmount'] != null ? (json['acknowledgedAmount'] as num).toInt() : null) ?? 0,
+      acknowledgedAmount: _parseWholeRupeeInt(json['acknowledgedAmount']),
       paymentIds: ((json['paymentIds'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       notes: json['notes']?.toString(),
     );
@@ -5022,7 +5037,7 @@ class PaymentRecordDto {
     return PaymentRecordDto(
       id: json['id']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       paymentStatus: json['paymentStatus']?.toString() ?? '',
       paidAt: json['paidAt']?.toString() ?? '',
@@ -5072,7 +5087,7 @@ class ReceiptDto {
     return ReceiptDto(
       id: json['id']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       issuedAt: json['issuedAt']?.toString() ?? '',
     );
   }
@@ -5112,8 +5127,8 @@ class RecordPaymentResponseDto {
       payment: json['payment'],
       receipt: json['receipt'],
       dueStatus: json['dueStatus']?.toString() ?? '',
-      paidAmount: (json['paidAmount'] != null ? (json['paidAmount'] as num).toInt() : null) ?? 0,
-      netPayableAmount: (json['netPayableAmount'] != null ? (json['netPayableAmount'] as num).toInt() : null) ?? 0,
+      paidAmount: _parseWholeRupeeInt(json['paidAmount']),
+      netPayableAmount: _parseWholeRupeeInt(json['netPayableAmount']),
     );
   }
 
@@ -5160,8 +5175,8 @@ class CreatePaymentDto {
   factory CreatePaymentDto.fromJson(Map<String, dynamic> json) {
     return CreatePaymentDto(
       ticketId: json['ticketId']?.toString() ?? '',
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       transactionRef: json['transactionRef']?.toString(),
       idempotencyKey: json['idempotencyKey']?.toString(),
@@ -5214,7 +5229,7 @@ class PendingUpiClaimItemDto {
   factory PendingUpiClaimItemDto.fromJson(Map<String, dynamic> json) {
     return PendingUpiClaimItemDto(
       claimId: json['claimId']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       utrNumber: json['utrNumber']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       createdAt: json['createdAt']?.toString() ?? '',
@@ -5291,7 +5306,7 @@ class PaymentDetailResponseDto {
     return PaymentDetailResponseDto(
       id: json['id']?.toString() ?? '',
       receiptNumber: json['receiptNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       paymentMethod: json['paymentMethod']?.toString() ?? '',
       paymentStatus: json['paymentStatus']?.toString() ?? '',
       paidAt: json['paidAt']?.toString() ?? '',
@@ -5584,10 +5599,10 @@ class SubmitUpiClaimResponseDto {
       dueId: json['dueId']?.toString() ?? '',
       ticketId: json['ticketId']?.toString() ?? '',
       groupCode: json['groupCode']?.toString() ?? '',
-      ticketNumber: (json['ticketNumber'] != null ? (json['ticketNumber'] as num).toInt() : null) ?? 0,
-      installmentMonth: (json['installmentMonth'] != null ? (json['installmentMonth'] as num).toInt() : null) ?? 0,
+      ticketNumber: _parseWholeRupeeInt(json['ticketNumber']),
+      installmentMonth: _parseWholeRupeeInt(json['installmentMonth']),
       utrNumber: json['utrNumber']?.toString() ?? '',
-      amount: (json['amount'] != null ? (json['amount'] as num).toInt() : null) ?? 0,
+      amount: _parseWholeRupeeInt(json['amount']),
       status: json['status']?.toString() ?? '',
       submittedAt: json['submittedAt']?.toString() ?? '',
     );

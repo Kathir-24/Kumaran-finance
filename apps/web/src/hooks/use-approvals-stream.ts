@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApprovalsStore, type ApprovalsSummary } from '@/stores/approvals-store';
 import { apiClient, getApiBaseUrl, unwrapApiResponse } from '@/lib/api-client';
+import { canQueryDashboardReports } from '@/components/reports/report-access';
 
 interface SseApprovalsMessage {
   type: string;
@@ -18,11 +19,15 @@ const BASE_BACKOFF_MS = 1_000;
 
 export function useApprovalsStream() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
   const isConnected = useApprovalsStore((s) => s.isConnected);
   const setSummary = useApprovalsStore((s) => s.setSummary);
   const setConnected = useApprovalsStore((s) => s.setConnected);
+
+  // XR-M7-WEB-04 / Guardrail 11: Block COLLECTION_AGENT from firing 403 queries on approvals stream
+  const canAccessApprovals = isAuthenticated && canQueryDashboardReports(user);
 
   const isConnectedRef = useRef(isConnected);
   useEffect(() => {
@@ -48,7 +53,7 @@ export function useApprovalsStream() {
       );
       return response;
     },
-    enabled: isAuthenticated,
+    enabled: canAccessApprovals,
     staleTime: 15_000,
     // Cease background polling immediately when SSE stream is healthy
     refetchInterval: isConnected ? false : 30_000,
@@ -63,7 +68,7 @@ export function useApprovalsStream() {
 
   // Connect to SSE stream
   useEffect(() => {
-    if (!isAuthenticated || typeof window === 'undefined') {
+    if (!canAccessApprovals || typeof window === 'undefined') {
       setConnected(false);
       return;
     }
@@ -206,6 +211,10 @@ export function useApprovalsStream() {
                 const message: SseApprovalsMessage = JSON.parse(rawJson);
                 if (message?.type === 'APPROVALS_UPDATE' && message.summary) {
                   setSummary(message.summary);
+                  queryClient.setQueryData(
+                    ['approvals', 'pending', { branchId: activeBranchId }],
+                    { summary: message.summary },
+                  );
                 }
               } catch {
                 // Silently ignore malformed non-JSON frames
@@ -258,5 +267,5 @@ export function useApprovalsStream() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
     };
-  }, [isAuthenticated, activeBranchId, setSummary, setConnected, queryClient]);
+  }, [canAccessApprovals, activeBranchId, setSummary, setConnected, queryClient]);
 }
