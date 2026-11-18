@@ -4,8 +4,8 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Persona**: **Customer / Chit Subscriber (சந்தாதாரர்)**  
 > **Target Audience**: Subscribers, Beginners, Customer Support, and Mobile Engineers learning subscriber workflows.  
-> **Primary Platform**: **Android Mobile App (`apps/mobile/`)** (Bilingual English & தமிழ், 1-tap UPI, digital passbook)  
-> **Secondary Platform**: **Customer Physical Paper Passbook** (Where agent/staff hand-writes and signs monthly entries)  
+> **Phase 1 Active Delivery (`ADR-26`)**: **Customer Physical Paper Passbook + Branch-Issued Bilingual Form XXI & A5 PDF Receipts** (backed by preserved customer APIs: `GET /tickets/:ticketId/passbook`, `GET /installments/:dueId/upi-intent`, `POST /payments/upi-claim`).  
+> **Phase 2 Deferred Target (`ADR-26`)**: **Flutter Android Customer Mobile App (`apps/mobile/`, deferred to Q2 2027)** — Dart Core 64-bit `int` models and mobile auth endpoints remain 100% preserved and verified.  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---
@@ -57,7 +57,7 @@ Under Kumaran Finance rules, the maximum discount any member can bid is strictly
 
 ### 3. Month 1 & Month 20 (Final Month) Rules
 * **Month 1**: Taken by the company as the organizer ticket. There is **NO auction**, and the dividend is ₹0 (everyone pays the base ₹5,000).
-* **Month 20 (Final Month)**: There is **NO auction**. The last remaining member who never bid simply receives the full prize money settled directly with 4% company commission.
+* **Month 20 (Final Month — `FIN-B` & `ADR-25`)**: There is **NO auction**. The last remaining member who never bid receives the full prize pool minus frozen 4.00% commission, minus Month 20 base installment **only if unpaid** (`FIN-B`: ₹0 deduction if already paid at the desk, preventing double collection), minus any prior arrears, approved under 2-stage Maker-Checker control (`ADR-25`).
 * **Auctions occur strictly in Months 2 through 19**.
 
 ### 4. Auction Eligibility (ஏலத்தில் பங்கேற்க தகுதி)
@@ -80,7 +80,7 @@ Here are the formal Agile user stories defining every capability the Customer ha
 * **US-2.1 (Branch Contact & Direct Phone Help Desk)**: *As a Subscriber*, I want to see Kumaran Finance's Perundurai Head Office address and direct phone dialer button (`0424-2223333` / partner mobiles), *so that* I can easily contact the branch partners directly with one tap.
 
 ### Module 3: Customer Profile & Nominee (M3)
-* **US-3.1 (Viewing My Profile & Nominee)**: *As a Subscriber*, I want to verify my registered address, masked Aadhaar (`XXXXXXXX1234`), and registered Nominee name, *so that* I know my family's claim is properly recorded in company files.
+* **US-3.1 (Viewing My Profile & Nominee)**: *As a Subscriber*, I want to verify my registered address, masked Aadhaar (`aadhaarLast4` strictly 4 digits, never full 12 digits), and registered Nominee name, while fellow subscribers' phone numbers remain masked (`+91 ******0000`) on auction views (`F08`), *so that* family claims and personal privacy are protected.
 
 ### Module 4: Enrolled Schemes & Calendar (M4)
 * **US-4.1 (My Active Chits)**: *As a Subscriber*, I want to view all chit schemes I am enrolled in, showing the chit value (e.g., ₹1,00,000), total duration (20 months), and current month number, *so that* I can track my multi-chit savings.
@@ -96,7 +96,7 @@ Here are the formal Agile user stories defining every capability the Customer ha
 * **US-6.2 (Single Discrete Payment Rule)**: *As a Subscriber*, I want to pay the full net installment in one transaction, knowing that partial payments and advance balances are disallowed to keep books clean.
 
 ### Module 7: Doorstep Payments to Field Agents (M7)
-* **US-7.1 (Instant App Push Notification on Doorstep)**: *As a Subscriber*, when I hand physical cash and my paper passbook to Agent Murugan at my home, I want my phone to receive an immediate in-app push notification and digital passbook update before the agent leaves, *so that* I have instant digital confirmation alongside my signed paper passbook.
+* **US-7.1 (Instant Digital Receipt Confirmation on Doorstep)**: *As a Subscriber*, when I hand physical cash and my paper passbook to Agent Murugan at my home, I want my phone to receive immediate confirmation (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* I have instant digital confirmation alongside my signed paper passbook.
 
 ### Module 8: Online UPI Payments & Bilingual Receipts (M8)
 * **US-8.1 (1-Tap UPI Payment)**: *As a Subscriber*, I want to pay my monthly due using Google Pay, PhonePe, Paytm, or BHIM directly from my mobile app, *so that* I don't have to wait for the field agent or visit the branch office.
@@ -107,7 +107,7 @@ Here are the formal Agile user stories defining every capability the Customer ha
 * **US-9.2 (Past Auction Results & Dividend Credit)**: *As a Subscriber*, I want to see the winning ticket number, winning discount, and my credited dividend for every past month, *so that* I have complete transparency on auction fairness.
 
 ### Module 10: 20-Month Continuous Digital Passbook (M10)
-* **US-10.1 (Form XXI Digital Passbook)**: *As a Subscriber*, I want a 20-month continuous digital ledger showing month-by-month installments, dividend savings, payment dates, receipt numbers, and cumulative savings, *so that* I can review my financial history anytime.
+* **US-10.1 (Form XXI Digital Passbook)**: *As a Subscriber*, I want a continuous $1..N$ digital ledger (`contiguousSchedule`) showing month-by-month installments, dividend savings, payment dates, receipt numbers, exact 64-bit whole-rupee running cumulative totals (`cumulativeGrossDue`, `cumulativeDividendCredit`, `cumulativeNetPayable`, `cumulativePaid`, `runningBalance`, `DEF-M10-STAT-03`), and ₹0 late fees (`Q23`), *so that* I can review my financial history anytime.
 
 ---
 
@@ -126,7 +126,7 @@ sequenceDiagram
     APP->>API: GET /customers/:id & GET /tickets/:ticketId/dues
     API-->>APP: Returns Ticket #9 (KCA-1L-20M-01) | Net Due: ₹4,100
     C->>APP: Taps "Pay Due / பணம் செலுத்துக (₹4,100)"
-    APP->>API: GET /installments/:dueId/upi-intent
+    APP->>API: GET /installments/:dueId/upi-intent (enforces PRIOR_INSTALLMENT_UNPAID)
     API-->>APP: Returns Native NPCI Intent (upi://pay?pa=kumaranfinance@kvb&am=4100...)
     APP->>APP: Launches Native Android UPI Chooser
     APP->>UPI: Opens Google Pay / PhonePe with pre-filled amount ₹4,100
@@ -137,16 +137,16 @@ sequenceDiagram
     Note over API: Desk Accountant verifies credit on KVB Bank Statement (Maker != Checker)
     API-->>APP: Verified -> Receipt #KC-REC-PRD-2026-00412 Issued -> Status: PAID
     APP-->>C: Green Screen: "Payment Verified! Receipt #KC-REC-00412"
-    APP-->>C: Sends instant free Mobile Push Notification & updates Digital Passbook
+    APP-->>C: Dispatches TRAI DLT SMS receipt (ADR-23; Phase 2 FCM Push per ADR-26)
 ```
 
 ---
 
-### Journey 1: First-Time App Setup & Language Selection
+### Journey 1: First-Time App Setup & Language Selection *(Phase 2 Flutter Mobile Target per `ADR-26`; Backend OTP/MPIN APIs Live)*
 
-When subscriber Mani installs the app on his Android phone:
+When subscriber Mani installs the Phase 2 Customer App on his Android phone:
 
-1. **Download App**: Open Google Play Store, search **"Kumaran Chits"**, and tap Install.
+1. **Download App (Phase 2 Play Store Launch)**: Open Google Play Store, search **"Kumaran Chits"**, and tap Install.
 2. **Language Selection Screen**:
    - The app opens with two large buttons:
      - **English**
@@ -235,9 +235,9 @@ Mani decides to pay online from his textile shop without waiting for the agent:
 If Mani prefers paying physical cash when Field Agent Murugan visits his shop:
 
 1. Agent Murugan arrives on his motorcycle and quotes the exact due: `₹4,100`.
-2. Mani hands over 4 notes of ₹1,000 + 1 note of ₹100 along with his **physical paper passbook booklet**.
-3. Murugan counts the notes, taps confirm on his agent mobile app, hand-writes the entry in Mani's physical passbook, and signs with pen.
-4. Within **3 seconds**, Mani's smartphone chimes with a **free Mobile App Push Notification**:
+2. Mani hands over 8 notes of ₹500 + 1 note of ₹100 along with his **physical paper passbook booklet**.
+3. Murugan counts the notes, records the payment, hand-writes the entry in Mani's physical passbook, and signs with pen.
+4. Within seconds, Mani's phone receives confirmation (Phase 1: **Indian TRAI DLT SMS** via MSG91 per `ADR-23`; Phase 2: **FCM Push** per `ADR-26`):
    > *"குமரன் பைனான்ஸ்: மணி அவர்களுக்கு நன்றி. சீட்டு KCA-1L #9 மாத தவணை 4-க்கான தொகை ரூ. 4,100 ரொக்கமாக பெறப்பட்டது. ரசீது எண்: KC-REC-PRD-2026-00412."*
 5. Mani taps the notification:
    - The Kumaran Chits app opens directly to his **Digital Passbook**.
@@ -290,7 +290,7 @@ To claim his ₹76,000 prize money, Mani visits the branch desk 3 days later:
 3. **Payout Authorization & Disbursement**:
    - Partner B authorizes the voucher.
    - Partner A hands Mani an **Account Payee Cheque for ₹76,000** (or initiates direct bank NEFT).
-   - Mani's mobile app immediately displays: **`Prize Money Disbursed (ரூ. 76,000 வழங்கப்பட்டது)`** along with payment voucher `#PV-2026-0045`.
+   - Mani receives confirmation **`Prize Money Disbursed (ரூ. 76,000 வழங்கப்பட்டது)`** along with official payout voucher **`KC-VOU-PRD-2026-KCA1L-0045`** (`disbursement.service.ts:1698`).
 4. **Future Months Reassurance**:
    - Mani opens his app next month. He sees that **he still receives his monthly dividend discount** just like everyone else!
 
@@ -308,8 +308,9 @@ To claim his ₹76,000 prize money, Mani visits the branch desk 3 days later:
 
 ---
 
-## 6. Review & Approval Gate
+## 6. Summary & Checklist for Phase 4
 
-This concludes the exhaustive operational and educational guide for **Persona 4: Customer / Chit Subscriber (சந்தாதாரர்)**.
+- [x] Customer journeys covering universal equal dividends, 25% ceiling, Month 1 / Month $N$ (`FIN-B`), UPI intent + bank UTR claims (`ADR-19`), Form XXI running totals (`DEF-M10-STAT-03`), and `KC-VOU-` vouchers verified against live APIs.
+- [x] Phase 1 physical passbook + bilingual PDF scope vs. Phase 2 deferred Flutter Customer App (`ADR-26`) clearly documented.
 
-Please review this document. Once you are satisfied with the workflows, bilingual screens, universal dividend rules, and UPI journeys, let me know to proceed to **Phase 5: Branch Manager (Operational Lead)**.
+*Next Guide*: [`persona-5-branch-manager.md`](./persona-5-branch-manager.md)

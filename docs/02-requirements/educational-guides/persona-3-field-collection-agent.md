@@ -4,8 +4,8 @@
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Persona**: **Field Collection Agent** (Doorstep Cash Collector)  
 > **Target Audience**: Beginners, Field Staff, Route Coordinators, and Mobile Engineers learning Kumaran Chits field operations.  
-> **Primary Platform**: **Android Mobile App (`apps/mobile/`)** (Offline-first, 1-second biometric unlock, 30-second doorstep collection)  
-> **Secondary Platform**: **Web Portal (Dual Role Only)** (For agents who also perform desk accounting tasks in the afternoon)  
+> **Primary Platform (`ADR-26`)**: **Phase 1 Active = Web Portal (`apps/web/`) + Preserved Backend Collection APIs**; **Phase 2 Target (Deferred Q2 2027) = Flutter Android Mobile App UI (`apps/mobile/`)** *(Dart Core SQLite offline sync queue & typed 64-bit `int` models are 100% preserved and tested)*.  
+> **Secondary Platform**: **Web Portal (Dual Role)** (For agents who also perform desk accounting tasks in the afternoon)  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---
@@ -19,9 +19,9 @@ Their day-to-day reality is entirely mobile and on the road:
 - They ride 100cc/125cc motorcycles carrying a durable **leather cash-collection shoulder pouch**.
 - They visit power-loom weavers, textile printing workshops, tea-stall owners, grocery merchants, and agricultural households at their doorsteps.
 - In their bag, they carry their **Android smartphone**, a ballpoint pen, an official Kumaran Finance rubber seal, and subscribers' physical passbooks.
-- **The 30-Second Doorstep Imperative**: When an agent pulls up to a busy weaver's shed or tea stall, the merchant cannot stop work for 10 minutes. The agent must unlock their phone, select the subscriber, count the cash, record the payment in the app, write the date and sign the customer's physical paper passbook, triggering an instant mobile push notification confirmation—all in **under 30 seconds**.
+- **The 30-Second Doorstep Imperative**: When an agent pulls up to a busy weaver's shed or tea stall, the merchant cannot stop work for 10 minutes. The agent unlocks their device, selects the subscriber, counts the cash, records the payment, writes the date and signs the customer's physical paper passbook, triggering an asynchronous receipt confirmation (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`)—all in **under 30 seconds**.
 
-### Why Rural Offline Architecture Is Vital
+### Why Rural Offline Architecture Is Vital *(Backend Sync API & Dart Core Preserved; Mobile UI Deferred to Phase 2 per `ADR-26`)*
 In the agricultural belt between Perundurai and Chennimalai, cellular 4G/5G signals frequently drop into dead zones:
 - An agent **cannot tell a customer**: *"The internet is down, I can't take your cash."* In financial operations, turning away cash harms collections and destroys subscriber trust.
 - The **Kumaran Chits Android App** is engineered with an **Offline SQLite Vault**. If the agent is in a cell-dead area, the app seamlessly records the collection locally, encrypts it, generates an offline timestamped receipt, and automatically syncs with the Head Office server the moment cellular signal returns.
@@ -78,8 +78,8 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 * **US-7.4 (Evening Cash Handover Batch Submission)**: *As a Field Agent*, when I return to the Head Office at 5:00 PM, I want to tap "Submit Cash Handover" to present my daily tally (e.g., `₹42,500`) to the branch cashier/partner for physical counting and sign-off.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (Immediate Bilingual Digital Receipt & App Alert)**: *As a Field Agent*, immediately upon confirming a collection, I want the app to show a clean bilingual receipt and trigger a push notification to the customer's mobile app (or fallback SMS if non-smartphone), *so that* the customer receives instant digital confirmation alongside their physical passbook entry.
-* **US-8.2 (Payment Reversal Restriction)**: *As a Field Agent*, I want the system to block me from reversing or deleting any payment, *so that* if a cash mistake happens, I must report it to the office accountant to initiate a formal Maker-Checker reversal.
+* **US-8.1 (Immediate Bilingual Digital Receipt & Confirmation)**: *As a Field Agent*, immediately upon confirming a collection, I want the system to generate a bilingual receipt (`KC-REC-PRD-...`), asynchronously pre-render the PDF (`XR-M8-PAY-01`), and dispatch confirmation (Phase 1: Indian TRAI DLT SMS per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* the customer receives instant digital confirmation alongside their physical passbook entry.
+* **US-8.2 (Payment Reversal Restriction — `KFC-SEC-001`)**: *As a Field Agent*, I want the system to block me from reversing or deleting any payment, *so that* if a cash mistake happens, I must escalate it to **Partner A (`isPartner: true`)** to initiate a formal Maker-Checker reversal (`POST /payments/:id/request-reversal`) and independent **Partner B** to approve or reject it. *(Note: Accountants and Branch Managers are also strictly blocked from initiating reversals under `KFC-SEC-001`.)*
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
 * **US-9.1 (Strict Auction & Prize Isolation)**: *As a Field Agent*, I want to have zero access to auction bidding screens, tie-breaker forms, safety proof checklists, or prize payout releases, *so that* field staff are completely isolated from high-risk prize money disbursements. *(Field agents never disburse prize money).*
@@ -109,13 +109,13 @@ sequenceDiagram
     Note over A,C: 11:30 AM: Doorstep at Mani's Textile Shop
     A->>APP: Searches "Mani" -> Opens Ticket #9 (KCA-1L)
     APP-->>A: Displays Net Due: ₹4,100 (Month 4)
-    C->>A: Hands over ₹4,100 cash (4 x ₹1000 + 1 x ₹100)
+    C->>A: Hands over ₹4,100 cash (8 x ₹500 + 1 x ₹100)
     A->>A: Counts notes & inspects security threads
     A->>APP: Taps "Collect Cash" -> Clicks "Confirm & Issue Receipt"
     APP->>DB: Stores locally (Status: CACHED_OFFLINE)
     APP->>API: POST /collections/record (Live sync)
     API-->>APP: 200 OK -> Generates Receipt #KC-REC-PRD-2026-00412
-    APP-->>C: Sends instant free Mobile Push Notification to Mani's phone (App updates to PAID)
+    APP-->>C: Dispatches TRAI DLT SMS receipt (ADR-23; Phase 2 FCM Push per ADR-26)
     A->>C: Writes date, ₹4,100, receipt #, and signs Mani's physical passbook booklet
 ```
 
@@ -153,9 +153,9 @@ At 11:15 AM, Agent Murugan arrives at subscriber Mani's power-loom weaving unit 
 ```mermaid
 flowchart TD
     S1["1. Tap 'Search' -> Type 'Mani' or 'Ticket 9'"] --> S2["2. Screen shows: Net Due: ₹4,100 (Month 4)"]
-    S2 --> S3["3. Receive 4 x ₹1000 + 1 x ₹100 notes from Mani"]
+    S2 --> S3["3. Receive 8 x ₹500 + 1 x ₹100 notes from Mani"]
     S3 --> S4["4. Tap 'Cash' -> Tap 'Confirm Collection'"]
-    S4 --> S5["5. Server commits Receipt #KC-REC-PRD-2026-00412\nPush notification sent to Mani's phone!"]
+    S4 --> S5["5. Server commits Receipt #KC-REC-PRD-2026-00412\nTRAI DLT SMS sent (Phase 2: FCM Push)!"]
     S5 --> S6["6. Murugan hand-writes entry in Mani's paper passbook, signs & departs\n(Total time: 24 seconds)"]
 ```
 
@@ -175,9 +175,9 @@ flowchart TD
    - Tap **"Record Cash Collection"**.
    - Amount is auto-locked to `₹4,100` (Discrete single payment).
    - Tap **"Confirm & Record Collection"**.
-5. **Instant App Push Notification & Passbook Entry (5 seconds)**:
+5. **Instant Receipt Confirmation & Passbook Entry (5 seconds)**:
    - The app shows a green checkmark: *"Payment Confirmed — Receipt #KC-REC-PRD-2026-00412"*.
-   - Mani's phone chimes with a free **Mobile App Push Notification**:
+   - Mani's phone receives confirmation (Phase 1: **Indian TRAI DLT SMS** via MSG91 per `ADR-23`; Phase 2: **FCM Push** per `ADR-26`):
      > *"குமரன் பைனான்ஸ்: மணி அவர்களுக்கு நன்றி. சீட்டு KCA-1L #9 மாத தவணை 4-க்கான தொகை ரூ. 4,100 ரொக்கமாக பெறப்பட்டது. ரசீது எண்: KC-REC-PRD-2026-00412."*
    - Murugan opens Mani's physical paper passbook, writes `21/10/2026`, `Month 4`, `₹4,100`, `KC-REC-00412`, signs his initials with pen, and hands it back.
    - Murugan places the ₹4,100 into his leather pouch.
@@ -205,9 +205,9 @@ At 1:30 PM, Murugan visits farmer Ramasamy whose farm is in a hollow with zero c
 5. **Automatic Reconnection Sync (2:15 PM)**:
    - Murugan rides 3 kilometers out to the Thingalur junction. His phone reconnects to 4G LTE.
    - The app detects internet connectivity in the background and silently triggers the sync queue.
-   - An HTTP POST to `POST /collections/sync-offline-queue` with the unique `idempotencyKey` uploads Ramasamy's collection to the server.
+   - An HTTP POST to `POST /collections/sync-offline-queue` with the unique `idempotencyKey` uploads Ramasamy's collection to the server (sorting multi-ticket batches strictly by `ticketId` then `installmentMonth` per `DEF-M8-REV-02` to prevent false `PRIOR_INSTALLMENT_UNPAID` rejections, and passing `paymentId` for async S3 receipt PDF pre-rendering per `XR-M8-PAY-01`).
    - The server converts the offline record into permanent official receipt `KC-REC-PRD-2026-00413`.
-   - Ramasamy's phone immediately receives the in-app push notification (or fallback SMS if non-smartphone).
+   - Ramasamy's phone immediately receives TRAI DLT SMS confirmation (`ADR-23`; Phase 2: FCM Push).
    - Murugan's app shows: *"1 offline transaction successfully synchronized with Head Office!"*
 
 ---
@@ -279,9 +279,9 @@ Suppose Agent Murugan also performs desk accounting duties on Saturdays. At 5:00
 
 1. Murugan sits at the Head Office PC, opens the Web Portal under his staff login, and navigates to **"Pending Handovers"**.
 2. He locates his own batch: `Batch #HO-2026-0092 (Collector: Murugan, ₹42,500)`.
-3. If Murugan clicks the "Acknowledge" button, the system **instantly rejects the action**:
+3. If Murugan clicks the "Acknowledge" button, the system **instantly rejects the action** (enforced by application guard, PostgreSQL constraint `chk_payment_cash_handover_maker_checker`, and cross-branch Anti-BOLA):
    > ⛔ **Dual-Role Guard Violation (HTTP 403)**:  
-   > *"Access Denied: You collected this cash batch. Under Kumaran Finance financial guardrails, an independent Partner or Cashier must physically count the money and sign off."*
+   > *"Access Denied: You collected this cash batch. Under Kumaran Finance financial guardrails, an independent Partner, Branch Manager, or another Desk Accountant must physically count the money and sign off."*
 4. Murugan calls Partner B over to the desk. Partner B logs in, counts the physical notes, and completes the acknowledgment.
 
 ---
@@ -298,8 +298,9 @@ Suppose Agent Murugan also performs desk accounting duties on Saturdays. At 5:00
 
 ---
 
-## 5. Review & Approval Gate
+## 5. Summary & Checklist for Phase 3
 
-This concludes the exhaustive operational and educational guide for **Persona 3: Field Collection Agent (Doorstep Cash Collector)**.
+- [x] Field Collection Agent operational workflows, offline SQLite queue (`POST /collections/sync-offline-queue`), and `ADR-26` Phase 2 UI deferral clearly documented.
+- [x] Partner-only reversal escalation (`KFC-SEC-001`) and cash handover self-acknowledgement block (`chk_payment_cash_handover_maker_checker`) verified against live controllers.
 
-Please review this document. Once you are satisfied with the workflows, offline sync mechanisms, and doorstep rules, let me know to proceed to **Phase 4: Customer / Chit Subscriber**.
+*Next Guide*: [`persona-4-customer.md`](./persona-4-customer.md)

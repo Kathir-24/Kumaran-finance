@@ -2,9 +2,10 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Persona**: **Super Admin / Owner (The 4 Equal Partners)**  
+> **Persona**: **Super Admin / Owner (The 4 Equal Partners — `isPartner: true`)**  
 > **Target Audience**: Beginners, Business Partners, Staff, and Engineers learning Kumaran Chits operations.  
-> **Platform Parity**: **100% Full Feature Parity across BOTH Web Portal (`apps/web/`) and Android Mobile App (`apps/mobile/`)**.  
+> **Platform Scope (`ADR-26`)**: **Phase 1 Active Production = Web Portal (`apps/web/`) + NestJS API (`apps/api/`)**; Flutter Android Mobile UI (`apps/mobile/`) is **deferred to Phase 2 (Q2 2027)** while Dart Core models (`apps/mobile/lib/core/`) and cross-device backend Maker $\ne$ Checker APIs remain 100% preserved.  
+> **Partner Identity Guard (`ADR-21` / Guardrail 11)**: Verified business partners (`isPartner: true`) hold financial authorization rights; Administrative IT Super Admins (`isPartner: false`) manage users, settings, immutable audit logs, and BullMQ telemetry, but are strictly barred from financial mutations (`assertVerifiedPartner`).  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---
@@ -18,9 +19,9 @@ Kumaran Finance is owned and actively run by **4 equal partners** based in Perun
 - They conduct monthly in-office auctions in person where members gather to bid.
 - They physically count cash, inspect signed blank cheques and promissory notes before releasing lakhs of rupees in prize money.
 
-### Why Do They Need 100% Parity on Both Web and Mobile?
-- **At the Desk (Web Portal)**: When sitting at the Head Office PC, a partner needs a full-screen view for high-density tasks—transcribing 20-month physical notebooks into the system, reviewing Form XXII 12-column daily cash books, and issuing bilingual digital receipts.
-- **On the Move (Android Mobile App)**: When a partner is at home, in the field, or visiting subscribers, they cannot wait to get back to the office to approve transactions. The Android app provides **1-second fingerprint unlock** and **1-tap push notification approvals** for prize disbursements, payment reversals, and evening cash handovers.
+### Why the Platform Supports Both Web (Phase 1) and Mobile Parity (Phase 2 — `ADR-26`)
+- **At the Desk (Web Portal — Phase 1 Production)**: When sitting at the Head Office PC, a partner needs a full-screen view for high-density tasks—transcribing 20-month physical notebooks into the system, reviewing Form XXII daily cash books, approving all 8 Maker-Checker queues via real-time SSE, and issuing bilingual digital receipts.
+- **On the Move (Android Mobile App — Phase 2 Target per `ADR-26`)**: Once Flutter Android UI launches in Phase 2, partners will also have **1-second fingerprint unlock** and **1-tap push notification approvals** with 100% cross-device Maker $\ne$ Checker parity.
 
 ### Core Chit Fund Concepts Explained for Beginners
 
@@ -47,7 +48,7 @@ flowchart TD
 8. **Prize Money ($P$)**: The actual cash the winner takes home ($V - D = ₹1,00,000 - ₹22,000 = ₹78,000$).
 9. **Total Dividend ($Div_{total}$)**: The savings returned to the subscribers ($D - C_f = ₹22,000 - ₹4,000 = ₹18,000$).
 10. **Per-Ticket Dividend ($Div_{ticket}$)**: The total dividend divided equally among all 20 tickets ($₹18,000 / 20 = ₹900$).
-11. **Net Installment ($I_{net}$)**: The discounted amount members actually pay next month ($I_{base} - Div_{ticket} = ₹5,00,000 / 20 - ₹900 = ₹4,100$).
+11. **Net Installment ($I_{net}$)**: The discounted amount members actually pay next month ($I_{base} - Div_{ticket} = ₹1,00,000 / 20 - ₹900 = ₹5,000 - ₹900 = ₹4,100$).
 12. **Maker-Checker Rule**: The partner who enters a transaction (Maker) **can never approve it** (Checker). A second partner must verify and click approve (`maker_user_id != checker_user_id`).
 
 ---
@@ -67,7 +68,7 @@ Here are the formal Agile user stories defining every capability the Super Admin
 
 ### Module 3: Customer Intake & Lightweight KYC (M3)
 * **US-3.1 (Notebook-Style Intake)**: *As a Partner*, I want to register a new customer with minimal fields (Full Name in English/Tamil, Mobile, Address, Nominee) without forced identity paperwork, *so that* known local village subscribers can be onboarded in under 60 seconds.
-* **US-3.2 (Masked Identity Scans)**: *As a Partner*, I want the option to enter the last 4 digits of Aadhaar (`XXXXXXXX1234`), PAN, and upload optional document photos to private S3, *so that* legal proof is stored safely without violating DPDP Act regulations.
+* **US-3.2 (Masked Identity Scans)**: *As a Partner*, I want the option to enter strictly the last 4 digits of Aadhaar (`aadhaarLast4`, e.g., `1234`), optional PAN, mandatory guardian for minor nominees, and optional document photos in private S3, *so that* legal proof is stored safely without violating DPDP Act 2023 regulations.
 
 ### Module 4: Chit Scheme Management (M4)
 * **US-4.1 (Fresh Chit Launch)**: *As a Partner*, I want to create a new chit scheme where the Foreman Commission is permanently locked at 4.00% and the discount ceiling is locked at 25% (1/4), *so that* company revenue and statutory caps are safeguarded from day 1.
@@ -76,7 +77,7 @@ Here are the formal Agile user stories defining every capability the Super Admin
 
 ### Module 5: Ticket Enrollment & Defaulter Removal (M5)
 * **US-5.1 (Single Ticket Enforcement)**: *As a Partner*, I want the system to prevent any customer from holding 2 or more tickets in the same chit scheme, *so that* concentration risk is eliminated and local guidelines are respected.
-* **US-5.2 (3-Month Defaulter Removal)**: *As a Partner*, I want the system to alert me when a subscriber has missed 3 consecutive monthly payments and allow me to execute the two-partner removal workflow (`PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M`), *so that* an independent partner reviews the case before the ticket is freed for a replacement subscriber.
+* **US-5.2 (3-Month Defaulter Removal)**: *As a Partner*, I want the system to alert me when a subscriber has missed 3 consecutive monthly payments and allow Partner A to request removal (`PENDING_REMOVAL_APPROVAL`) and independent Partner B to approve (`REMOVED_DEF_3M`) or reject (`POST /tickets/:id/remove-defaulter/reject` $\to$ `DEFAULT_3_MONTHS`, backed by `chk_ticket_removal_maker_checker`), while prized tickets remain strictly immutable (`PRIZED_TICKET_IMMUTABLE`), *so that* an independent partner reviews every removal before substitution.
 
 ### Module 6: Installments & Due Schedules (M6)
 * **US-6.1 (Universal Equal Dividend Schedule)**: *As a Partner*, I want the system to calculate next month's net installment in whole integer Rupees and deduct the exact same dividend for **all 20 members (including the auction winner)**, *so that* accounting remains simple and transparent.
@@ -88,16 +89,17 @@ Here are the formal Agile user stories defining every capability the Super Admin
 * **US-7.3 (Anti-Self-Acknowledgment Guard)**: *As a Partner*, if I personally collected cash in the field, I want the software to block me from acknowledging my own handover, requiring one of the other 3 partners to sign off, *so that* dual-control integrity is maintained.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and trigger an instant mobile app push notification (or optional fallback SMS for non-app users), *so that* customers get instant proof of payment without incurring unnecessary telecom SMS costs.
-* **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A to initiate a reversal with a written reason and Partner B to verify and approve it, *so that* no single person can manipulate cash entries.
+* **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and enqueue an asynchronous receipt notification (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* customers get instant proof of payment.
+* **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A (`isPartner: true`) to initiate a reversal (`POST /payments/:id/request-reversal`) with a written reason and independent Partner B (`isPartner: true`) to approve (`POST /payments/:id/approve-reversal`) or reject (`POST /payments/:id/reject-reversal`), rendering a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (`0.28` opacity, `KFC-PDF-001`) on cancelled receipts, *so that* no single person can manipulate cash entries.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
-* **US-9.1 (Defaulter Auction Block)**: *As a Partner*, I want the software to strictly prevent any subscriber who has unpaid dues for the month from bidding or winning the auction, *so that* defaulters cannot take company prize money.
-* **US-9.2 (Recording Auction Result - Maker)**: *As a Partner (Maker)*, I want to enter the winning ticket and bid discount (up to 25% ceiling) after conducting the in-person branch auction, *so that* the result is queued for verification.
-* **US-9.3 (Physical Paper Token Tie-Break)**: *As a Partner*, if multiple members bid the maximum 25% ceiling, I want to conduct a physical paper lot draw in front of members and type the drawn winning ticket into the system, *so that* the draw is completely transparent and verified by subscribers.
-* **US-9.4 (Auction Finalization - Checker)**: *As a Partner (Checker)*, I want to review the entered auction bid and click finalize (`maker != checker`), *so that* dividends and next month's due schedules are committed.
+* **US-9.1 (Defaulter Auction Block)**: *As a Partner*, I want the software to strictly prevent any subscriber who has unpaid dues for the month (`consecutiveUnpaidMonths > 0`) or a pending removal (`removalRequestedByUserId != null`) from bidding or winning the auction, *so that* defaulters cannot take company prize money.
+* **US-9.2 (Recording Auction Result - Maker)**: *As a Partner (Maker)*, I want to enter the winning ticket and bid discount (between 4% commission and 25% ceiling, enforcing `KFC-FIN-002` whole-rupee divisibility `(D - C_f) % M === 0`) after conducting the in-person branch auction, *so that* the result is queued for verification.
+* **US-9.3 (Physical Paper Token Tie-Break)**: *As a Partner*, if multiple members bid the maximum 25% ceiling, I want to conduct a physical paper lot draw in front of members and enter the unique paper token numbers and drawn winning ticket into the system, *so that* the draw is completely transparent and verified by subscribers.
+* **US-9.4 (Auction Finalization - Checker)**: *As a Partner (Checker, `isPartner: true`)*, I want to review the entered auction bid and click finalize (`maker != checker`, `chk_auction_maker_checker`), *so that* dividends and next month's due schedules are committed.
 * **US-9.5 (Company Safety Proof Verification - Maker)**: *As a Partner (Maker)*, I want to inspect the winner's agreement, nominee signature, signed blank cheques, and promissory notes, check off the items, and prepare the payout voucher.
-* **US-9.6 (Prize Payout Authorization - Checker)**: *As a Partner (Checker)*, I want to review the safety proof and authorize releasing the prize money via Cash, Cheque, or NEFT (`maker != checker`), *so that* funds are safely disbursed.
+* **US-9.6 (Prize Payout Authorization - Checker)**: *As a Partner (Checker, `isPartner: true`)*, I want to review the safety proof and authorize releasing the prize money via `CASH`, `ACCOUNT_PAYEE_CHEQUE`, or NEFT/RTGS/IMPS (`maker != checker`, `chk_winner_maker_checker`), *so that* funds are safely disbursed with automated arrears offset (`KFC-FIN-003`).
+* **US-9.7 (Finalized Auction Correction — `KFC-FIN-005`, `M9-DUAL-DEF-01..05`)**: *As a Partner*, if a clerical error occurs before prize disbursement and before any Month $N+1$ due is paid (`ALREADY_PAID_DUES_EXIST`), I want Partner A to request correction (`POST /auctions/:id/correction/request`, locking disbursements with `PENDING_CORRECTION_LOCKOUT`) and Partner B to approve (`POST /auctions/:id/correction/approve`) or reject (`POST /auctions/:id/correction/reject`), *so that* clerical mistakes are corrected safely under dual control.
 
 ### Module 10: Dashboards & Statutory Reports (M10)
 * **US-10.1 (Executive Business Pulse)**: *As a Partner*, I want to see today's cash in vault, pending customer dues, and upcoming auctions at a glance, *so that* I can steer company operations effectively.
@@ -123,7 +125,7 @@ sequenceDiagram
     Note over P1,UI: Action: Recording Month 4 Auction
     P1->>UI: Selects Ticket #7, Enters Bid Discount ₹22,000
     UI->>API: POST /auctions/:id/record-bid
-    API->>DB: Stores status = PENDING_VERIFICATION (maker_user_id = Partner A)
+    API->>DB: Stores status = SCHEDULED (conductedByUserId = Partner A)
     DB-->>UI: 200 OK (Queued for approval)
 
     Note over P2,UI: Action: Finalizing Auction (Dual Control)
@@ -150,7 +152,7 @@ sequenceDiagram
    - **Overdue Installments**: Displays `14 Subscribers` (Total ₹57,400 overdue).
    - **Upcoming Auctions**: Highlights `KCA-1L-20M-01: Month 4 Auction today at 4:00 PM`.
 
-#### On Android Mobile App:
+#### On Android Mobile App *(Phase 2 Deferred Target per `ADR-26`)*:
 1. Pull phone out of pocket. Tap **Kumaran Chits** app icon.
 2. System presents **Native Biometric Prompt**: Touch your thumb to the fingerprint sensor. (Takes $<0.5$ seconds to unlock).
 3. Alternatively, enter your **6-digit MPIN** (e.g., `749201`).
@@ -201,10 +203,10 @@ flowchart TD
     Bidding --> CheckTie{"Did 2+ members bid\n₹25,000 ceiling?"}
     CheckTie -- Yes --> Draw["3. Physical Token Draw (Option A):\nForeman puts tokens #5 & #9 in a bowl.\nA child draws Token #5 live!"]
     CheckTie -- No --> SingleWinner["Winner identified: Ticket #5"]
-    Draw --> Record["4. Partner A enters Ticket #5, Discount ₹25,000\nStatus: PENDING_VERIFICATION"]
+    Draw --> Record["4. Partner A enters Ticket #5, Discount ₹25,000\nStatus: SCHEDULED (conductedByUserId: Partner A)"]
     SingleWinner --> Record
     Record --> Approve["5. Partner B reviews and clicks\n'Finalize Auction' (maker != checker)"]
-    Approve --> Finish["6. System generates ₹4,100 net dues for Month 5\nPrints Form XVII Minutes"]
+    Approve --> Finish["6. System generates ₹3,950 net dues for Month 5\nPrints Form XVII Minutes"]
 ```
 
 #### Detailed Actions:
@@ -228,7 +230,7 @@ flowchart TD
    - Partner A clicks **"Submit Auction Result"**.
    - System displays: `Auction recorded. Awaiting Partner approval (Maker: Partner A)`.
 5. **Finalizing Auction (Checker)**:
-   - Partner B receives a push notification on his mobile app: *"Auction Finalization required for KCA-1L Month 4"*.
+   - Partner B sees the live approval alert in the Web Portal Pending Approvals banner (SSE stream `/reports/approvals-stream`; Phase 2 also dispatches mobile push): *"Auction Finalization required for KCA-1L Month 4"*.
    - Partner B opens the approval screen, verifies the bid (`₹25,000`), and clicks **"Finalize Auction"**.
    - *Backend Guard*: If Partner A tries to click Finalize on his own phone, the system rejects it with: **`Access Denied: Maker and Checker cannot be the same user`**.
    - Upon Partner B's click:
@@ -255,21 +257,19 @@ Kandasamy (Ticket `#5`) comes to the office 3 days later to collect his prize mo
      - **Signed blank cheques collected?** [x] Yes. (Partner A enters: *Canara Bank, Cheque #004128*).
      - **Promissory note collected?** [x] Yes.
      - **Upload Scans**: Partner A taps **"Capture / Upload"** on the mobile app or uploads PDFs from desktop.
-3. **Step 3: Prepare Payout Voucher (Maker)**:
-   - Payout Amount: `₹75,000` (Whole integer Rupees).
-   - Payment Mode: Select **`Cheque`** (or `Cash` / `NEFT`).
-   - Click **"Submit Payout Voucher"** (Maker: Partner A). Status updates to `PENDING_AUTHORIZATION`.
+3. **Step 3: Verify Safety Proof & Prepare Payout Voucher (Maker)**:
+   - Payout Amount: `₹75,000` (Whole integer Rupees, minus any unpaid arrears offset via `KFC-FIN-003`).
+   - Click **"Verify Safety Proof"** (`POST /disbursements/auction/:auctionId/verify-safety-proof`, Maker: Partner A). Status updates to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`).
 4. **Step 4: Authorize Prize Payout Voucher (Checker)**:
-   - Partner C (or Partner B/D) opens the approval queue on their mobile phone or PC.
-   - They inspect the attached cheque scan and signed agreement via 15-minute presigned URL (`GET /disbursements/auction/:auctionId/safety-proof-url`).
-   - Partner C clicks **"Authorize Payout Voucher"** (`POST /disbursements/auction/:auctionId/authorize-payout`).
+   - Partner C (or Partner B/D, `isPartner: true`) opens the approval queue on the Web Portal.
+   - They inspect the attached cheque scan and signed agreement via 15-minute presigned URL (`GET /disbursements/auction/:auctionId/safety-proof-url`), select `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` (or `CASH` / `BANK_TRANSFER_NEFT`), and click **"Authorize Payout Voucher"** (`POST /disbursements/auction/:auctionId/authorize-payout`).
    - System asserts `verifiedByUserId != checkerUserId` and sets status to **`AUTHORIZED_BY_CHECKER`**.
 5. **Step 5: Release Prize Money Disbursement**:
    - Partner A or Desk Accountant opens the authorized voucher.
-   - Enters the final payment release details: Cheque No `904121` (or Bank UTR), drawn on Kumaran Finance Current Account.
-   - Clicks **"Release Disbursement"** (`POST /disbursements/auction/:auctionId/disburse`).
+   - Enters `paymentReference: 'CHQ-904121'` (or Bank UTR), drawn on Kumaran Finance Current Account.
+   - Clicks **"Release Disbursement"** (`POST /disbursements/auction/:auctionId/disburse`), triggering TOCTOU arrears verification (`FIN-D`).
    - The status updates to **`DISBURSED`**.
-   - A bilingual Tamil/English payout voucher and SMS receipt are dispatched to Kandasamy.
+   - A bilingual Tamil/English payout voucher (`KC-VOU-...`) and TRAI DLT SMS confirmation (`ADR-23`) are dispatched to Kandasamy.
 
 ---
 
@@ -287,7 +287,7 @@ sequenceDiagram
 
     Note over A,P: 5:00 PM: End of Day Cash Counting
     A->>P: Hands over leather bag containing ₹42,500 cash
-    P->>P: Physically counts notes (42 x ₹1000 + 1 x ₹500)
+    P->>P: Physically counts notes (85 x ₹500)
     P->>UI: Opens "Pending Handovers" -> Agent Murugan
     UI-->>P: Displays App Total: ₹42,500 (10 collections)
     Note over P: Physical cash matches app total exactly!
@@ -317,21 +317,21 @@ Suppose an accountant accidentally recorded a cash payment of ₹4,100 to Ticket
    - Clicks **"Request Payment Reversal"**.
    - Form prompts: **Mandatory Reason for Reversal**.
    - Partner A types: *"Cashier error: Member Mani (Ticket #9) paid ₹4,100 cash, but payment was accidentally recorded against Ticket #8 (Kannan). Physical counter receipt attached."*
-   - Partner A clicks **"Submit Reversal Request"**.
-   - Payment status changes to **`REVERSAL_PENDING`**. The money is NOT yet reversed.
+   - Partner A clicks **"Submit Reversal Request"** (`POST /payments/:id/request-reversal`).
+   - `PaymentReversal` is created with status **`REQUESTED`** while `Payment.paymentStatus` remains **`SUCCESS`** (`schema.prisma:388-393`). The money is NOT yet reversed.
 2. **Step 2: Checker Approval (Partner B)**:
    - Partner B opens the **Reversals Approval Queue**.
    - Reads Partner A's explanation and inspects the physical receipt photo.
-   - Partner B clicks **"Approve Reversal"**.
+   - Partner B clicks **"Approve Reversal"** (`POST /payments/:id/approve-reversal`; or **"Reject Reversal"** via `/reject-reversal`).
    - System commits the reversal:
-     - Ticket `#8` due reverts to `UNPAID`.
-     - An offsetting entry is recorded in the Form XXII Cash Book.
-     - An audit log entry is written with both `maker_user_id` (Partner A) and `checker_user_id` (Partner B).
+     - `Payment.paymentStatus` transitions to **`REVERSED`**, and Ticket `#8` due reverts to `UNPAID`.
+     - Form XXII Cash Book logs the approved physical cash reversal as an explicit cash outflow (`REV-`) on `reversedAt` (`DEF-M10-STAT-01`), while the receipt PDF dynamically renders the red diagonal **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
+     - An audit log entry is written with both `maker_user_id` (Partner A) and `checker_user_id` (Partner B) enforced by `chk_reversal_maker_checker`.
    - Partner A can now record the correct payment against Ticket `#9`.
 
 ---
 
-### Journey 7: Executing Month 1 Company Pool & Month $N$ Final Member Settlement
+### Journey 7: Executing Month 1 Company Pool & Month $N$ Two-Stage Final Member Settlement (`ADR-25`, `FIN-B`)
 
 The standard statutory chit lifecycle requires specialized handling for the first and final months where auctions do not occur:
 
@@ -340,13 +340,12 @@ The standard statutory chit lifecycle requires specialized handling for the firs
 - The Month 1 gross pool (`₹1,00,000`) is collected and taken by the company customer ticket.
 - **Strict Rule**: There is **NO auction** in Month 1, and the dividend is **₹0**. All members pay the base installment ($I_{base} = \text{₹}5,000$) for Month 1.
 
-#### 2. Month $N$ (Final Month 20) Direct Settlement:
+#### 2. Month $N$ (Final Month 20) Two-Stage Direct Settlement:
 - When the chit group reaches Month 20, there is only 1 non-prized subscriber remaining (e.g. Ticket #18, Marimuthu).
 - There is **NO auction** in Month 20.
-- Partner B navigates to **Disbursements $\to$ Group KCA-1L-20M-01 $\to$ "Month 20 Final Settlement"**.
-- Partner B clicks **"Execute Final Settlement"** (`POST /disbursements/group/:chitGroupId/final-settlement`):
-  - Company retains 4.00% foreman commission (`₹4,000`) and the final month's payable installment (`₹5,000`).
-  - Net prize money (`₹91,000`) is settled directly to Marimuthu with a formal payout voucher.
+- **Stage 1 (Maker Preparation)**: Accountant, Branch Manager, or Partner A calls `POST /disbursements/group/:chitGroupId/prepare-final-settlement` to compute the settlement voucher snapshot (frozen 4.00% commission `₹4,000`, prior arrears, and `FIN-B` Month 20 check: deducts `₹5,000` **only if Month 20 due is unpaid** $\to$ net payout `₹91,000`; or `₹0` deduction if already paid at desk $\to$ net payout `₹96,000`).
+- **Stage 2 (Checker Partner Approval)**: Independent Partner B (`isPartner: true`, `maker != checker`) calls `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`):
+  - Net prize money is settled directly to Marimuthu with a formal payout voucher (`KC-VOU-...`).
   - The chit scheme transitions automatically to `COMPLETED`.
 
 ---
@@ -371,7 +370,7 @@ When provisioning a field agent to assist with office counter duties during the 
 | Potential Trap / Mistake | What Happens in the Software | How the Partner Resolves It |
 |---|---|---|
 | **Partner tries to approve their own auction or reversal** | System throws `HTTP 403: Forbidden - Maker and Checker cannot be the same user`. | Ask any of the other 3 partners to log in on Web or Mobile and click Approve. |
-| **Subscriber wants to pay ₹2,00,0 now and ₹2,100 next week** | Software rejects entering ₹2,000. Dues are strictly discrete (`UNPAID` or `PAID`). | Inform customer: *"Under company policy, full monthly installment must be paid at once."* Hold cash in office drawer until full balance is ready, or use customer savings. |
+| **Subscriber wants to pay ₹2,000 now and ₹2,100 next week** | Software rejects entering ₹2,000. Dues are strictly discrete (`UNPAID` or `PAID`). | Inform customer: *"Under company policy, full monthly installment must be paid at once."* Hold cash in office drawer until full balance is ready, or use customer savings. |
 | **Bidding discount entered as ₹27,000 on a ₹1L chit** | Software rejects bid with red validation error: `Discount cannot exceed 1/4 ceiling (₹25,000)`. | Re-enter bid discount $\le \text{₹}25,000$. Remind bidders of statutory ceiling. |
 | **Subscriber missed 3 consecutive months** | System triggers Defaulter Alert: `Ticket #14 has 3 consecutive unpaid dues`. | Partner A initiates **"Request Removal"** (`PENDING_REMOVAL_APPROVAL`), and Partner B approves removal (`REMOVED_DEF_3M`) under two-partner dual control (`SEC-B`). Exit financial settlement fails closed under Q25. |
 | **Internet goes down during in-office auction** | Partners conduct the physical auction offline on paper slips as usual. | Once broadband/mobile 4G resumes, enter the winning ticket and finalize results. |
@@ -380,9 +379,11 @@ When provisioning a field agent to assist with office counter duties during the 
 
 ## 5. Summary & Checklist for Phase 1
 
-- [x] Full operational context of the 4 equal partners established.
+- [x] Full operational context of the 4 equal partners (`isPartner: true` vs. `isPartner: false`) established.
 - [x] Basic chit-fund mathematics and vocabulary explained in simple terms.
-- [x] 10 granular user stories spanning all 10 modules authored.
-- [x] 6 detailed, click-by-click operational journeys with Mermaid diagrams documented.
-- [x] 100% full feature parity on Web and Mobile clearly illustrated.
-- [x] All 10 invariant guardrails and common operational traps documented.
+- [x] 23 granular user stories spanning all 10 modules authored.
+- [x] 8 detailed, click-by-click operational journeys with Mermaid diagrams documented.
+- [x] Phase 1 Web Portal production scope and Phase 2 Mobile Parity architecture (`ADR-26`) clearly illustrated.
+- [x] All 11 invariant guardrails and common operational traps documented.
+
+*Next Guide*: [`persona-2-desk-accountant.md`](./persona-2-desk-accountant.md)

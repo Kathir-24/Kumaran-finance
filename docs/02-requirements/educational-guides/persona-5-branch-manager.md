@@ -53,7 +53,8 @@ To maintain strict financial governance, the Branch Manager's powers are deliber
 | **Conducting Auctions** | ✅ Conducts physical auction; records winning bid as **Maker**. | **The 4 Partners (Checker Finalization)** |
 | **Prize Money Release** | ✅ Verifies safety proof checklist; prepares payout voucher as **Maker**. | **The 4 Partners (Checker Authorization)** |
 | **Cash Handover** | ✅ Acknowledges evening field agent cash batches into the branch safe vault. | Branch Manager / Partner |
-| **Payment Reversals** | ✅ Submits reversal request with documented justification as **Maker**. | **The 4 Partners (Checker Approval)** |
+| **Payment Reversals (`KFC-SEC-001`)** | ❌ **STRICTLY BLOCKED (`403 Forbidden`)** — Cannot initiate OR approve payment reversals (`payment.controller.ts:220-278`). Must escalate to Partners. | **The 4 Partners (`Partner A` Maker $\to$ `Partner B` Checker)** |
+| **Defaulter Removal (`KFC-SEC-002`)** | ❌ **STRICTLY BLOCKED (`403 Forbidden`)** — Can view defaulters (`GET /reports/defaulters`), cannot invoke removal/substitution endpoints (`ticket.controller.ts:168-248`). | **The 4 Partners (`Partner A` Maker $\to$ `Partner B` Checker)** |
 
 ---
 
@@ -78,7 +79,7 @@ Here are the formal Agile user stories defining every capability of the Branch M
 
 ### Module 5: Ticket Enrollment & Arrears Monitoring (M5)
 * **US-5.1 (Enrolling Subscribers into Tickets)**: *As a Branch Manager*, I want to allocate tickets (1 to $N$) to approved subscribers, with the system strictly preventing any customer from holding 2 or more tickets in the same scheme, *so that* concentration risk is avoided.
-* **US-5.2 (Managing 3-Month Defaulters)**: *As a Branch Manager*, I want to review subscribers who have missed 3 consecutive monthly installments and submit removal recommendations (`REMOVED_DEF_3M`) to the Partners, *so that* inactive tickets can be reassigned.
+* **US-5.2 (Monitoring 3-Month Defaulters)**: *As a Branch Manager*, I want to review subscribers who have missed 3 consecutive monthly installments via `GET /reports/defaulters` and escalate them offline to the Partners (who execute 2-partner removal `POST /tickets/:id/remove-defaulter/{request,approve,reject}` strictly as `SUPER_ADMIN` with `isPartner: true`), *so that* delinquent tickets are tracked within RBAC boundaries.
 
 ### Module 6: Due Schedules & Dividend Allocations (M6)
 * **US-6.1 (Branch Dues Schedule Lookup)**: *As a Branch Manager*, I want to view the active due schedule for my branch showing the net installment payable ($I_{net} = I_{base} - Div$) for all tickets, *so that* I can resolve customer billing inquiries accurately.
@@ -89,8 +90,8 @@ Here are the formal Agile user stories defining every capability of the Branch M
 * **US-7.3 (Anti-Self-Acknowledgment Assertion)**: *As a Branch Manager*, if I personally collected cash in the field, I want the software to prevent me from acknowledging my own handover, requiring an independent Partner to sign off, *so that* dual control is maintained.
 
 ### Module 8: Payments, Digital Receipts & Reversals (M8)
-* **US-8.1 (Branch Counter Payment Handling)**: *As a Branch Manager*, I want to assist at the counter during peak morning hours by recording walk-in payments, signing customer physical passbooks, and triggering free in-app mobile push notifications (with fallback SMS if non-smartphone), *so that* subscriber wait times are minimized without wasteful SMS gateway costs.
-* **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Branch Manager*, if a counter cashier makes a posting mistake, I want to submit a formal reversal request with the attached physical receipt photo and reason, *so that* a Partner can review and approve the correction.
+* **US-8.1 (Branch Counter Payment Handling)**: *As a Branch Manager*, I want to assist at the counter during peak morning hours by recording walk-in payments, signing customer physical passbooks, and enqueuing automated receipt confirmations (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* subscriber wait times are minimized.
+* **US-8.2 (Escalating Erroneous Postings to Partners — `KFC-SEC-001`)**: *As a Branch Manager*, if a counter cashier makes a posting mistake, I understand the system strictly blocks me (`403 Forbidden`) from initiating or approving payment reversals (`POST /payments/:id/request-reversal`), *so that* I immediately escalate the receipt to **Partner A (`isPartner: true`)** to initiate and **Partner B** to approve/reject.
 
 ### Module 9: Conducting Branch Auctions & Payout Prep (M9)
 * **US-9.1 (Conducting In-Person Branch Auction — Maker)**: *As a Branch Manager*, I want to conduct the physical monthly auction at the branch counter, verify that unpaid members are blocked from bidding, record the winning ticket and bid discount (up to the 25% ceiling), and submit the result for Partner finalization.
@@ -99,7 +100,7 @@ Here are the formal Agile user stories defining every capability of the Branch M
 
 ### Module 10: Branch Dashboards & Form XXII Cash Book (M10)
 * **US-10.1 (Branch Executive Dashboard)**: *As a Branch Manager*, I want to view my branch's daily collection targets, overdue subscriber lists, upcoming auction dates, and vault cash position at a glance.
-* **US-10.2 (Form XXII Daily Cash Book Balancing)**: *As a Branch Manager*, I want to inspect the branch 12-column daily cash register at 6:00 PM, ensuring that the physical cash in the safe matches the system closing balance to the last rupee before locking the vault.
+* **US-10.2 (Form XXII Physical Cash Book Balancing)**: *As a Branch Manager*, I want to inspect the branch Form XXII physical cash-only register (`GET /reports/form-xxii` — including approved cash reversal outflows on `reversedAt` and acknowledged field cash handovers keyed on `cashHandoverAcknowledgedAt ?? createdAt`, `DEF-M10-STAT-01/02`) at 6:00 PM, ensuring physical safe cash matches the system closing balance to the last rupee before locking the vault.
 
 ---
 
@@ -121,7 +122,7 @@ sequenceDiagram
     BM->>UI: Enters Ticket #9, Bid Discount ₹25,000
     BM->>UI: Clicks "Submit Auction Results" (Maker)
     UI->>API: POST /auctions/:id/record-bid
-    API-->>UI: Status: PENDING_VERIFICATION (maker: Kandasamy)
+    API-->>UI: Status: SCHEDULED (conductedByUserId: Kandasamy)
 
     Note over P,UI: 4:30 PM: Partner Reviews & Finalizes
     P->>UI: Opens Pending Approvals -> Reviews Bid ₹25,000
@@ -161,8 +162,8 @@ At 10:30 AM, local merchant Chinnasamy visits the branch to enroll in Kumaran Ch
 flowchart TD
     S1["1. Open Customers -> '+ New Customer'"] --> S2["2. Enter Full Name: C. Chinnasamy (சின்னசாமி)\nPhone: 9842177441 | Address: Perundurai Bazaar"]
     S2 --> S3["3. Enter Nominee: C. Valli (Wife)"]
-    S3 --> S4["4. Enter Masked Aadhaar: XXXXXXXX4821\nPAN: ABCPC1234F (Optional)"]
-    S4 --> S5["5. Click 'Save Customer'\nGenerates Code: KC-CUST-PRD-00105"]
+    S3 --> S4["4. Enter Masked Aadhaar Last 4: 4821\nPAN: ABCPC1234F (Optional)"]
+    S4 --> S5["5. Click 'Save Customer'\nGenerates Code: KC-CUST-00105"]
 ```
 
 #### Detailed Actions:
@@ -175,10 +176,10 @@ flowchart TD
    - Nominee Details: `C. Valli (வள்ளி)` — Relationship: `Wife`
 3. **Identity & KYC Scans**:
    - Chinnasamy presents his physical Aadhaar card.
-   - The Branch Manager inspects the original card and enters only the **last 4 digits**: `4821`. Full 12 digits are never typed.
+   - The Branch Manager inspects the original card and enters strictly the **last 4 digits** (`aadhaarLast4`: `4821`). Full 12 digits are never stored (`schema.prisma:115`).
    - Place card on the counter flatbed scanner and click **"Capture Attachment"**. Scanned image uploads to private encrypted S3 (`kyc/cust-105/*`).
 4. **Click "Save Customer Profile"**:
-   - The system generates unique code: **`KC-CUST-PRD-00105`**.
+   - The system generates sequential code: **`KC-CUST-00105`** (`customer.service.ts:25,42`).
    - Profile is now verified and eligible for ticket assignment.
 
 ---
@@ -195,7 +196,7 @@ Chinnasamy wants to join the upcoming ₹1,00,000 (20-Month) chit group `KCA-1L-
 3. **Allocate Ticket #12**:
    - Click **"Assign Ticket #12"**.
    - Search subscriber: Type `Chinnasamy` or `9842177441`.
-   - Select `KC-CUST-PRD-00105 (C. Chinnasamy)`.
+   - Select `KC-CUST-00105 (C. Chinnasamy)`.
    - Click **"Confirm Ticket Allocation"**.
 4. **The Single Ticket Constraint Guard Check (ADR-13)**:
    - If Chinnasamy already held Ticket `#4` in this exact same chit group, the database constraint `@@unique([chitGroupId, customerId])` triggers.
@@ -219,7 +220,7 @@ flowchart TD
     A4 -- No --> A6["Single highest bidder identified"]
     A5 --> A7["Enter Ticket #9, Discount ₹25,000\nClick 'Submit Auction Result' (Maker)"]
     A6 --> A7
-    A7 --> A8["System queues for Partner B Checker Approval\n(Status: PENDING_VERIFICATION)"]
+    A7 --> A8["System queues for Partner B Checker Approval\n(Status: SCHEDULED, conductedByUserId: BM)"]
 ```
 
 #### Detailed Actions:
@@ -236,10 +237,10 @@ flowchart TD
    - Winning Bid Discount: `₹25,000`.
    - Tie-Breaker Mode: Select **`Physical Paper Token Draw`**.
    - Click **`"Submit Auction Results for Partner Finalization"`** (Maker: Branch Manager).
-   - Status changes to `PENDING_VERIFICATION`. The Branch Manager **cannot finalize the auction**; Partner B will finalize it from their phone or desk.
+   - Auction remains in status **`SCHEDULED`** (`schema.prisma:248-252`, tagged with `conductedByUserId = Branch Manager`). The Branch Manager **cannot finalize the auction** (`403 Forbidden`); Partner B will finalize it (`COMPLETED`).
 6. **Record Physical Filing with Registrar**:
    - Once Partner B finalizes the auction, the Branch Manager prints Form XVII minutes, collects Foreman and subscriber signatures, and submits the hard copy to the Registrar of Chits office in Erode.
-   - The Branch Manager navigates to the auction record and clicks **"Mark Filed with Registrar"** (`PATCH /auctions/:auctionId/mark-filed-with-registrar`), recording the filing date and reference order. The auction transitions to status **`MINUTES_FILED`**.
+   - The Branch Manager navigates to the auction record and clicks **"Mark Filed with Registrar"** (`PATCH /auctions/:auctionId/mark-filed-with-registrar`), submitting `filedDate` (`auctionDate <= filedDate <= now` in IST), mandatory `filingReference`, and optional `filingNotes` (`M9-DUAL-DEF-03`). The auction transitions to status **`MINUTES_FILED`**.
 
 ---
 
@@ -272,11 +273,10 @@ Auction winner Mani visits the branch 3 days later to claim his ₹75,000 prize 
    - [x] Signed blank cheques collected? Yes (*Canara Bank, Cheque #004128*).
    - [x] Promissory note signed? Yes.
 3. Upload scanned copies of the cheques and agreement into the private S3 vault.
-4. Prepare the Payout Voucher:
-   - Mode: **`Cheque`** (Kumaran Finance Current A/c Cheque No: `904125`).
-   - Amount: **`₹75,000`** (Whole integer Rupees).
-   - Click **`"Submit Payout Voucher for Partner Authorization"`** (Maker: Branch Manager).
-5. The voucher enters state `PENDING_AUTHORIZATION`. Partner B receives a push notification on their phone to authorize the payout.
+4. Submit Safety Proof Verification (`POST /disbursements/auction/:auctionId/verify-safety-proof`, Maker: Branch Manager):
+   - Net Prize Amount: **`₹75,000`** (Whole integer Rupees, minus any unpaid arrears offset via `KFC-FIN-003`).
+   - Click **`"Submit Safety Proof Verification"`**.
+5. The disbursement record transitions to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`). Partner B (`isPartner: true`) then selects `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` (or `CASH` / `BANK_TRANSFER_*`) and authorizes payout (`AUTHORIZED_BY_CHECKER`), followed by cashier release (`POST /disbursements/auction/:auctionId/disburse` $\to$ `DISBURSED`).
 
 ---
 
@@ -292,8 +292,9 @@ Auction winner Mani visits the branch 3 days later to claim his ₹75,000 prize 
 
 ---
 
-## 6. Review & Approval Gate
+## 6. Summary & Checklist for Phase 5
 
-This concludes the exhaustive operational and educational guide for **Persona 5: Branch Manager (Operational Lead)**.
+- [x] Branch Manager operational boundaries (`BRANCH_MANAGER` vs. Partner-only `KFC-SEC-001` reversals, `KFC-SEC-002` removals, and `KFC-SEC-003` finalizations) verified against live controllers.
+- [x] Exact `AuctionStatus` (`SCHEDULED`), `disbursementStatus` (`VERIFIED_BY_MAKER`), `KC-CUST-` code prefix, and Form XVII filing DTO (`filedDate`, `filingReference`) synchronized with live code.
 
-Please review this document. Once you are satisfied with the branch workflows, scoping rules, and Maker-Checker boundaries, let me know to proceed to **Phase 6: Independent Auditor (Chartered Accountant)**.
+*Next Guide*: [`persona-6-auditor.md`](./persona-6-auditor.md)

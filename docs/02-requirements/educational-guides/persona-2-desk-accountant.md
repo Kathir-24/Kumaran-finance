@@ -5,7 +5,7 @@
 > **Persona**: **Desk Accountant / Office Cashier**  
 > **Target Audience**: Beginners, Accounting Staff, and Engineers learning Kumaran Chits accounting operations.  
 > **Primary Platform**: **Web Portal (`apps/web/`)** (High-density spreadsheets, Form XXII Cash Book, notebook transcription)  
-> **Secondary Platform**: **Android Mobile App (`apps/mobile/`)** (Mobile ledger viewing & dual-role collection)  
+> **Secondary Platform**: **Android Mobile App (`apps/mobile/`) — Phase 2 Deferred per `ADR-26`** (Dart Core & backend mobile APIs preserved)  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---
@@ -22,35 +22,34 @@ In the Perundurai Head Office, the **Desk Accountant** (often assisted by senior
 
 ### The Dual-Role Reality (Field Agent + Accountant)
 In local Tamil Nadu chit funds, staffing is lean and practical. A staff member might ride a motorcycle in the morning collecting subscriptions (`COLLECTION_AGENT`), and then sit at the office desk from 2:00 PM to 6:00 PM managing the accounts (`ACCOUNTANT`).
-- **The Golden Safety Guard**: Even if an accountant also collects cash in the field, **they can NEVER acknowledge or sign off on their own collected cash**. The software enforces `collector_user_id != acknowledger_user_id`. An independent partner must physically count the money and sign it into the vault.
+- **The Golden Safety Guard**: Even if an accountant also collects cash in the field, **they can NEVER acknowledge or sign off on their own collected cash**. The software enforces `collector_user_id != acknowledger_user_id` (`chk_payment_cash_handover_maker_checker`, `collection.controller.ts:174`). An independent Partner, Branch Manager, or another Desk Accountant must physically count the money and sign it into the vault.
 
 ### Core Chit Fund Accounting Concepts Explained for Beginners
 
 ```mermaid
 flowchart TD
-    subgraph INFLOW ["1. Money Coming IN (Receipts)"]
-        C1["Subscriber Walk-in Cash: ₹4,100"] --> DayBook["Daily Day Book / Cash Inward"]
-        C2["Field Agent Handover: ₹42,500"] --> DayBook
-        C3["Direct Bank NEFT: ₹10,000"] --> DayBook
+    subgraph INFLOW ["1. Physical Cash Coming IN (Form XXII Vault)"]
+        C1["Subscriber Walk-in Cash: ₹4,100"] --> CashBook["Form XXII Physical Cash Book\n(CASH Only; NEFT/UPI live in Day Book)"]
+        C2["Acknowledged Field Cash Handover: ₹42,500"] --> CashBook
     end
 
-    subgraph OUTFLOW ["2. Money Going OUT (Vouchers)"]
-        DayBook --> V1["Prize Payout to Winner: ₹75,000"]
-        DayBook --> V2["Foreman Commission: ₹4,000 (Locked 4%)"]
+    subgraph OUTFLOW ["2. Physical Cash Going OUT (Vouchers & Reversals)"]
+        CashBook --> V1["Cash Prize Payout to Winner: ₹75,000"]
+        CashBook --> V2["Approved Physical Cash Payment Reversals (REV-)"]
     end
 
-    subgraph RECONCILIATION ["3. Form XXII Cash Book"]
-        DayBook --> Bal["Opening Vault + Total IN - Total OUT = Closing Vault"]
+    subgraph RECONCILIATION ["3. Form XXII Physical Vault Partition"]
+        CashBook --> Bal["Opening Vault + Cash IN - Cash OUT = Closing Vault"]
         Bal --> PhysicalCount["Physical Note Count MUST match Closing Vault to the exact Rupee!"]
     end
 ```
 
-1. **Form XXII Daily Cash Book**: The statutory 12-column daily register mandated by chit fund regulations. It records every rupee received (installments, penalties, interest) and disbursed (prize payouts, foreman commission, company expenses) each business day.
-2. **Day Book**: The daily running journal of all counter and field collections.
+1. **Form XXII Daily Cash Book (`GET /reports/form-xxii`)**: Strictly isolates **physical `CASH` movements** in the branch vault (cash collections, acknowledged field cash handovers keyed at `cashHandoverAcknowledgedAt ?? createdAt`, cash prize disbursements, and approved physical cash payment reversals keyed on `reversedAt`, `statutory-report.service.ts:28-216`). Digital UPI, NEFT/RTGS/IMPS, and Cheques are tracked in the **Day Book** (`/reports/day-book`). Kumaran Finance charges strictly **₹0 late fees or penalties** (`Q23`).
+2. **Day Book (`GET /reports/day-book`)**: The daily running journal of all cash and digital (UPI/NEFT/Cheque) collections and disbursements.
 3. **Receipt vs. Voucher**:
-   * **Receipt (Money IN)**: Generated when a subscriber pays their monthly installment.
-   * **Voucher (Money OUT)**: Prepared when the company releases prize money or pays business expenses.
-4. **Maker Role for Accountant**: The accountant prepares prize vouchers, enters notebook transcriptions, and requests payment reversals (Maker). However, the accountant **CANNOT authorize payouts or finalize reversals**—only a Partner / Super Admin can act as the Checker.
+   * **Receipt (Money IN)**: Generated when a subscriber pays their monthly installment (`KC-REC-PRD-YYYY-XXXXX`).
+   * **Voucher (Money OUT)**: Prepared when the company releases prize money (`KC-VOU-...`).
+4. **Maker vs. Partner-Only Boundaries (`KFC-SEC-001`)**: The accountant prepares prize vouchers (`verify-safety-proof`), enters notebook transcriptions, verifies UPI bank UTR claims (`verify-upi-claim`), and acknowledges other collectors' cash handovers. However, the accountant **CANNOT authorize prize payouts, finalize auctions, OR initiate/approve payment reversals** (`POST /payments/:id/request-reversal` is strictly restricted to verified Partner A under `KFC-SEC-001`, returning `403 Forbidden` to Accountants).
 
 ---
 
@@ -60,14 +59,14 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 
 ### Module 1: Authentication & Security (M1)
 * **US-1.1 (Secure Staff Web Login)**: *As a Desk Accountant*, I want to log in using my staff credentials and Microsoft Authenticator TOTP on the desktop PC, *so that* sensitive financial ledgers cannot be accessed by unauthorized persons.
-* **US-1.2 (Automatic Inactivity Lock)**: *As a Desk Accountant*, I want the portal to lock automatically after 15 minutes of counter inactivity, *so that* walk-in subscribers cannot see company books if I step away to count cash.
+* **US-1.2 (Automatic Inactivity Lock)**: *As a Desk Accountant*, I want the portal to display a warning after **18 minutes** and auto-logout after **20 minutes** of counter inactivity (`SessionInactivityGuard`), *so that* walk-in subscribers cannot see company books if I step away to count cash.
 
 ### Module 2: Branch & Staff Management (M2)
 * **US-2.1 (Branch Scoped View)**: *As a Desk Accountant*, I want to view branch metadata (Perundurai Head Office, branch code `PRD`, contact numbers), *so that* all receipts print with correct header information. *(Accountant has read-only access to branch settings and cannot create/delete other staff).*
 
-### Module 3: Customer Intake & Lightweight KYC (M3)
-* **US-3.1 (Walk-In Customer Intake)**: *As a Desk Accountant*, I want to quickly register a new walk-in customer with their name (English and Tamil), phone number, physical address, and nominee details, *so that* they can be enrolled in upcoming schemes without paper delays.
-* **US-3.2 (KYC Document Verification)**: *As a Desk Accountant*, I want to inspect customer Aadhaar cards (recording only the last 4 digits `XXXXXXXX1234`) and PAN details, *so that* customer identity records are verified before ticket allocation.
+### Module 3: Customer Lookup & Lightweight KYC Verification (M3)
+* **US-3.1 (Walk-In Customer Profile Lookup)**: *As a Desk Accountant*, I want to quickly search and inspect customer profiles (`GET /customers`, `GET /customers/:id`) and escalate new customer registration to a Partner, Branch Manager, or Collection Agent (`POST /customers` requires `SUPER_ADMIN`, `BRANCH_MANAGER`, or `COLLECTION_AGENT` per `customer.controller.ts:74`), *so that* role boundaries stay clean.
+* **US-3.2 (KYC Document Verification)**: *As a Desk Accountant*, I want to inspect optional customer KYC documents (`aadhaarLast4` strictly 4 digits, optional PAN) via 15-minute presigned URLs and mark KYC verified (`PATCH /customers/:id/kyc-status`), *so that* customer identity records are verified before ticket allocation.
 
 ### Module 4: Chit Scheme Management (M4)
 * **US-4.1 (Reviewing Active Schemes)**: *As a Desk Accountant*, I want to view all active, draft, and completed chit schemes with their locked 4% foreman commission and 25% discount ceilings, *so that* I know which groups are active for collections.
@@ -86,8 +85,8 @@ Here are the formal Agile user stories defining the exact permissions, boundarie
 * **US-7.2 (Anti-Self-Acknowledgment Defense)**: *As a Staff Member with dual roles*, if I personally collected money in the field, I want the software to strictly block me from acknowledging my own cash handover, *so that* cash is always verified by an independent second pair of eyes.
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
-* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and trigger an automated free mobile app push notification (with fallback SMS for non-app users), *so that* the customer walks away with verified proof of payment without telecom billing waste.
-* **US-8.2 (Initiating Payment Reversal — Maker)**: *As a Desk Accountant*, if I accidentally post cash to the wrong customer's ticket, I want to submit a reversal request with a mandatory reason and receipt scan, *so that* a Partner can review and approve the correction.
+* **US-8.1 (Recording Counter Walk-In Payments)**: *As a Desk Accountant*, I want to record counter payments via Cash, UPI, Cheque, or NEFT, manually enter the record into the customer's physical passbook, and enqueue an asynchronous receipt notification (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* the customer walks away with verified proof of payment.
+* **US-8.2 (Escalating Erroneous Postings to Partners — `KFC-SEC-001`)**: *As a Desk Accountant*, if I accidentally post cash to the wrong customer's ticket, I understand the system strictly blocks me (`403 Forbidden`) from initiating or approving a payment reversal (`POST /payments/:id/request-reversal`), *so that* I immediately escalate the receipt to **Partner A (`isPartner: true`)** to initiate the reversal and independent **Partner B** to approve or reject it.
 * **US-8.3 (Verifying Customer UPI Payment Claims — Checker)**: *As a Desk Accountant*, I want to inspect the queue of customer self-reported UPI claims (`GET /payments/pending-upi-claims`), cross-check the 12-digit UTR against our Karur Vysya Bank current account statement, and approve (`POST /payments/:id/verify-upi-claim`), *so that* verified online collections are officially receipted with ₹0 payment gateway fees under Maker != Checker dual control.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
@@ -108,18 +107,18 @@ sequenceDiagram
     actor C as Walk-In Customer (Mani)
     actor A as Desk Accountant (Selvi)
     participant UI as Web Admin Portal
-    participant NOTIF as Notification Service (Push/SMS)
+    participant NOTIF as Notification Service (TRAI DLT SMS / Phase 2 Push)
     participant DB as PostgreSQL 17
 
     C->>A: "I want to pay Month 4 for Ticket #9 (KCA-1L)" & hands physical passbook
     A->>UI: Searches "Mani" / Phone "9842143210"
     UI-->>A: Shows Ticket #9 | Due: ₹4,100 (Status: UNPAID)
-    C->>A: Hands over ₹4,100 in cash (4 x ₹1000 + 1 x ₹100)
+    C->>A: Hands over ₹4,100 in cash (8 x ₹500 + 1 x ₹100)
     A->>A: Tests notes in counter sorting machine (Clean!)
     A->>UI: Selects "Cash" -> Enters Amount ₹4,100 -> Clicks "Record Payment"
     UI->>DB: Commits BigInt ₹4,100 (Status: PAID)
     DB-->>UI: Generates Receipt #KC-REC-PRD-2026-00412
-    UI->>NOTIF: Sends free Mobile App Push Notification (and fallback SMS if non-app)
+    UI->>NOTIF: Dispatches TRAI DLT SMS receipt (ADR-23; Phase 2 Push per ADR-26)
     A->>A: Writes date, amount ₹4,100, receipt #, and signs Mani's physical passbook
     A->>C: Returns signed physical passbook to Mani
 ```
@@ -202,16 +201,16 @@ At 11:30 AM, customer Velusamy walks up to the counter to pay his monthly chit i
    - Dividend Earned: `- ₹900`.
    - **Net Payable Due: `₹4,100`** (Status: `UNPAID`).
 3. **Receive & Count Cash**:
-   - Velusamy hands over 4 notes of ₹1,000 (or 8 of ₹500) + 1 note of ₹100. Total = **`₹4,100`**.
+   - Velusamy hands over 8 notes of ₹500 + 1 note of ₹100. Total = **`₹4,100`**.
    - The accountant feeds the notes into the desktop counter machine to verify genuineness and count.
 4. **Record Payment**:
    - Click **`"Record Payment"`**.
    - Payment Mode: Select **`Cash`**.
    - Amount: Auto-locked to exact net due **`₹4,100`** (No partial amounts permitted).
    - Click **`"Confirm & Record Collection"`**.
-5. **Physical Passbook Entry & In-App Notification**:
+5. **Physical Passbook Entry & Notification**:
    - The system displays the confirmed Receipt No: **`KC-REC-PRD-2026-00415`**.
-   - A free mobile push notification is instantly dispatched to Velusamy's smartphone, updating his in-app digital passbook (with fallback SMS only if the user has no smartphone).
+   - An asynchronous BullMQ job pre-renders the bilingual receipt PDF (`XR-M8-PAY-01`) and dispatches a TRAI DLT SMS confirmation (`ADR-23`; FCM push activates in Phase 2 per `ADR-26`).
    - The accountant takes Velusamy's **physical paper passbook booklet**:
      - Writes the date: `21-Oct-2026`
      - Writes the month: `Month 4`
@@ -245,7 +244,7 @@ Throughout the day, subscribers who pay via 1-tap UPI (GPay, PhonePe, Paytm, BHI
    - Payment status transitions from `INITIATED` $\to$ `SUCCESS`.
    - Installment due status transitions from `UNPAID` $\to$ `PAID`.
    - Sequential bilingual receipt `#KC-REC-PRD-2026-XXXXX` is issued.
-   - An asynchronous BullMQ notification job dispatches a free push notification to the customer's mobile app.
+   - An asynchronous BullMQ notification job pre-renders the receipt PDF and dispatches TRAI DLT SMS confirmation (`ADR-23`; Phase 2 FCM push per `ADR-26`).
 
 ---
 
@@ -299,44 +298,39 @@ Subscriber Kandasamy won the Month 4 auction (`₹1,00,000` chit, discount `₹2
 3. **Scan & Upload Documents**:
    - The accountant places the signed agreement and cheques on the flatbed scanner (or takes clear photos using the office tablet).
    - Clicks **`"Upload Safety Proof Attachments"`**. Files are uploaded to encrypted private S3 storage.
-4. **Prepare Payout Voucher (Maker)**:
-   - Select Payment Method: **`Cheque`** (or `Cash` / `NEFT`).
-   - Enter Kumaran Finance Current Account Cheque No: `904122`.
-   - Amount: `₹75,000` (Whole integer Rupees).
-   - Click **`"Submit Payout Voucher for Partner Authorization"`** (Maker: Accountant Selvi).
+4. **Verify Safety Proof & Submit for Partner Authorization (Maker)**:
+   - Click **`"Submit Safety Proof Verification"`** (`POST /disbursements/auction/:auctionId/verify-safety-proof`, Maker: Accountant Selvi).
 5. **The Hard Authorization Block**:
-   - The voucher is now in state **`PENDING_AUTHORIZATION`**.
-   - If the accountant looks for an "Authorize" button, it does **not exist** on their screen. Only a Super Admin (Partner) can authorize money release.
+   - The disbursement record transitions to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`).
+   - If the accountant looks for an "Authorize" button, it does **not exist** on their screen. Only a verified Super Admin Partner (`isPartner: true`) can select the `disbursementMode` (`ACCOUNT_PAYEE_CHEQUE`, `CASH`, or `BANK_TRANSFER_*`) and authorize money release.
 6. **Executing Fund Release Once Authorized**:
-   - Once Partner B inspects the cheques on their mobile phone and clicks Authorize (`POST /disbursements/auction/:auctionId/authorize-payout`), the voucher status updates to **`AUTHORIZED_BY_CHECKER`**.
-   - The Desk Accountant opens the authorized voucher, hands the physical account payee cheque to Kandasamy, and clicks **`"Release Disbursement"`** (`POST /disbursements/auction/:auctionId/disburse`) entering reference `CHQ-904122`.
-   - The status updates to **`DISBURSED`**, the company bank journal reflects the outflow, and a bilingual payout receipt is generated and handed to the winner.
+   - Once Partner B inspects the cheques and authorizes (`POST /disbursements/auction/:auctionId/authorize-payout` with `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'`), the voucher status updates to **`AUTHORIZED_BY_CHECKER`**.
+   - The Desk Accountant opens the authorized voucher, hands the physical account payee cheque to Kandasamy, and clicks **`"Release Disbursement"`** (`POST /disbursements/auction/:auctionId/disburse`) entering `paymentReference: 'CHQ-904122'`.
+   - The system re-verifies TOCTOU arrears (`FIN-D`), updates status to **`DISBURSED`**, updates company ledgers, and generates a bilingual payout voucher (`KC-VOU-...`).
 
 ---
 
-### Journey 6: Daily Form XXII Cash Book Balancing & 6:00 PM Office Closure
+### Journey 6: Daily Form XXII Physical Cash Book Balancing & 6:00 PM Office Closure
 
 At 6:00 PM, before locking the branch vault and leaving for the day:
 
-1. Navigate to **Accounting $\to$ Form XXII Cash Book**.
-2. **Review the 12-Column Daily Ledger**:
-   - **Receipts (Inward)**:
+1. Navigate to **Accounting $\to$ Form XXII Cash Book** (`GET /reports/form-xxii`, strictly physical `CASH` only; digital UPI/NEFT appear in Day Book `/reports/day-book`).
+2. **Review the Physical Cash Vault Ledger**:
+   - **Cash Inflows (Inward)**:
      - Opening Vault Cash: `₹3,42,500`
-     - Walk-in Counter Collections (Cash): `₹18,400`
-     - Field Agent Handovers (Murugan + Selvam): `₹81,400`
-     - Total Inward Cash: `₹4,42,300`
-   - **Disbursements (Outward)**:
-     - Cash Prize Disbursements released today: `₹75,000`
-     - Office Tea / Stationery petty cash: `₹300`
-     - Total Outward Cash: `₹75,300`
-   - **System Computed Closing Balance**:
-     $$\text{Closing Balance} = ₹4,42,300 - ₹75,300 = \text{₹}3,67,000$$
+     - Acknowledged Counter & Field Cash Handovers (keyed on `cashHandoverAcknowledgedAt ?? createdAt`): `₹99,800`
+     - Total Available Cash: `₹4,42,300`
+   - **Cash Outflows (Outward)**:
+     - Physical Cash Prize Disbursements released today (`disbursementMode === 'CASH'`): `₹75,000`
+     - Approved Physical Cash Payment Reversals refunded today (`REV-` on `reversedAt`, `DEF-M10-STAT-01`): `₹300`
+     - Total Cash Outflows: `₹75,300`
+   - **System Computed Closing Vault Cash**:
+     $$\text{Closing Safe Cash} = ₹4,42,300 - ₹75,300 = \text{₹}3,67,000$$
 3. **Physical Cash Lock-Up**:
-   - The accountant and Partner A count all physical notes in the safe: **`₹3,67,000`**.
+   - The accountant and Partner A count all physical notes in the safe: **`₹3,67,000`** (`Opening Cash(T) === Closing Cash(T-1)`).
    - Zero rupee shortage, zero rupee excess.
 4. **Sign Off & Close Day**:
-   - The accountant clicks **`"Generate Form XXII PDF & Close Day"`**.
-   - The system locks the day's records into an append-only archive. The physical safe is dual-key locked by the Accountant and Partner.
+   - The accountant prints/exports the Form XXII ledger via `@media print` or CSV. The physical safe is dual-key locked by the Accountant and Partner.
 
 ---
 
@@ -344,16 +338,18 @@ At 6:00 PM, before locking the branch vault and leaving for the day:
 
 | Potential Trap / Mistake | What Happens in the Software | How the Accountant Resolves It |
 |---|---|---|
-| **Accountant collected cash in field, then tries to acknowledge own handover** | System throws `HTTP 403: Forbidden - Collector and Acknowledger cannot be the same user`. | Ask an independent Partner or another authorized staff member to physically count the cash and click Acknowledge. |
+| **Accountant collected cash in field, then tries to acknowledge own handover** | System throws `HTTP 403: Forbidden - Collector and Acknowledger cannot be the same user` (`chk_payment_cash_handover_maker_checker`). | Ask an independent Partner, Branch Manager, or another Desk Accountant to physically count the cash and click Acknowledge. |
 | **Walk-in customer wants to pay ₹3,000 instead of ₹4,100 net due** | System rejects entering ₹3,000 (Field strictly expects exact net due). | Explain to customer: *"Chit installments cannot be accepted in partial amounts. Please pay the remaining ₹1,100 to receive your official receipt."* |
-| **Accountant tries to approve a payment reversal they initiated** | Button is disabled. System asserts `maker_user_id != checker_user_id`. | Notify a Partner to log in on desktop or mobile app to inspect the receipt and approve the reversal. |
+| **Accountant tries to initiate or approve a payment reversal** | Strictly blocked with `HTTP 403 Forbidden` (`KFC-SEC-001` — reversal initiation & approval require verified Partners `isPartner: true`). | Immediately escalate receipt details to Partner A to initiate `POST /payments/:id/request-reversal`, and Partner B to approve/reject. |
 | **Customer asks for a loan against their chit** | Software has no loan module. Kumaran Finance operations do not issue informal loans against chit balances. | Inform customer politely that Kumaran Finance is strictly a registered chit-fund company and does not issue personal loans. |
-| **Customer forgot their physical passbook booklet** | Transaction is safely committed to the database and SMS receipt is dispatched to customer's phone immediately. | Advise customer to bring passbook on next visit; cashier can enter previous month's entry by looking up receipt history in the portal. |
+| **Customer forgot their physical passbook booklet** | Transaction is safely committed to the database and TRAI DLT SMS receipt is dispatched to customer's phone immediately. | Advise customer to bring passbook on next visit; cashier can enter previous month's entry by looking up receipt history in the portal. |
 
 ---
 
-## 5. Review & Approval Gate
+## 5. Summary & Checklist for Phase 2
 
-This concludes the exhaustive operational and educational guide for **Persona 2: Desk Accountant / Office Cashier**.
+- [x] Desk Accountant operational boundaries (`ACCOUNTANT` vs. Partner-only `KFC-SEC-001` reversals & authorizations) documented.
+- [x] Form XXII physical cash-only vault equation (`DEF-M10-STAT-01/02`) cleanly separated from Day Book digital transfers.
+- [x] 18m/20m `SessionInactivityGuard`, UPI bank UTR verification, evening cash handover dual control, and safety proof Maker checklist verified against live controllers.
 
-Please review this document. Once you are satisfied with the workflows, balancing guards, and dual-role restrictions, let me know to proceed to **Phase 3: Field Collection Agent**.
+*Next Guide*: [`persona-3-field-collection-agent.md`](./persona-3-field-collection-agent.md)
