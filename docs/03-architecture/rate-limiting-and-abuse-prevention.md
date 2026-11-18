@@ -192,18 +192,19 @@ All limits are defined in [`apps/api/src/common/constants/security.constants.ts`
 
 | Route | HTTP Method | Scope / Controller | Production Limit | Dev Limit | Primary Security Purpose |
 |---|:---:|---|:---:|:---:|---|
-| `/api/v1/auth/web/login` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L55) | **5 / 15 min** | 1,000 / min | Password brute-force & credential stuffing prevention |
-| `/api/v1/auth/mobile/login-mpin` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L256) | **5 / 15 min** | 1,000 / min | 6-digit MPIN guessing & brute-force defense |
-| `/api/v1/auth/totp/disable` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L208) | **5 / 15 min** | 1,000 / min | Prevents password-guessing attempts to disable 2FA |
-| `/api/v1/auth/mobile/request-otp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L222) | **5 / 5 min** | 1,000 / min | Gateway flood protection (plus 60s Redis cooldown) |
-| `/api/v1/auth/mobile/verify-otp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L239) | **5 / 5 min** | 1,000 / min | OTP guessing defense (plus 3-attempt Redis lockout) |
-| `/api/v1/auth/web/verify-totp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L72) | **5 / 5 min** | 1,000 / min | Authenticator TOTP token guessing defense |
-| `/api/v1/auth/totp/enable` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L190) | **5 / 5 min** | 1,000 / min | 2FA setup confirmation brute-force protection |
-| `/api/v1/pdf/*` | `GET` | [`PdfController`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L33) | **15 / min** | 1,000 / min | Prevents CPU & memory exhaustion from PDFKit compilation |
-| `/api/v1/customers/:id/documents`| `POST` | [`CustomerController`](file:///u:/Kumaran-finance/apps/api/src/customer/customer.controller.ts#L249) | **5 / min** | 1,000 / min | Blocks 25MB multipart KYC file upload flooding |
-| `/api/v1/payments/upi-claim` | `POST` | [`PaymentController`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L279) | **5 / 15 min** | 1,000 / min | Prevents customer self-reported bank UTR spamming |
-| `/health` | `GET` | [`HealthController`](file:///u:/Kumaran-finance/apps/api/src/health/health.controller.ts#L9) | **`@SkipThrottle()`** | N/A | Excluded to guarantee Docker/K8s probe reliability |
-| `/metrics` | `GET` | [`MetricsController`](file:///u:/Kumaran-finance/apps/api/src/metrics/controllers/metrics.controller.ts#L18) | **`@SkipThrottle()`** | N/A | Excluded to guarantee Prometheus scraper reliability |
+| `/api/v1/auth/web/login` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L57) | **5 / 15 min** | 1,000 / min | Password brute-force & credential stuffing prevention |
+| `/api/v1/auth/mobile/login-mpin` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L269) | **5 / 15 min** | 1,000 / min | 6-digit MPIN guessing & brute-force defense |
+| `/api/v1/auth/totp/disable` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L219) | **5 / 15 min** | 1,000 / min | Prevents password-guessing attempts to disable 2FA |
+| `/api/v1/auth/mobile/request-otp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L235) | **5 / 5 min** | 1,000 / min | Gateway flood protection (plus 60s Redis cooldown & 5/24h daily cap) |
+| `/api/v1/auth/mobile/verify-otp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L252) | **5 / 5 min** | 1,000 / min | OTP guessing defense (plus 3-attempt Redis lockout) |
+| `/api/v1/auth/web/verify-totp` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L74) | **5 / 5 min** | 1,000 / min | Authenticator TOTP token guessing defense |
+| `/api/v1/auth/totp/enable` | `POST` | [`AuthController`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.controller.ts#L201) | **5 / 5 min** | 1,000 / min | 2FA setup confirmation brute-force protection |
+| `/api/v1/pdf/*` | `GET` | [`PdfController`](file:///u:/Kumaran-finance/apps/api/src/pdf/pdf.controller.ts#L37) | **15 / min** | 1,000 / min | Prevents CPU & memory exhaustion from PDFKit compilation |
+| `/api/v1/customers/:id/documents` | `POST` | [`CustomerController`](file:///u:/Kumaran-finance/apps/api/src/customer/customer.controller.ts#L256) | **5 / min** | 1,000 / min | Blocks legacy multipart KYC file upload flooding (10 MB max) |
+| `/api/v1/storage/upload/*key` | `PUT` | [`StorageController`](file:///u:/Kumaran-finance/apps/api/src/storage/storage.controller.ts#L181) | **5 / min** | 1,000 / min | Limits direct local-fallback presigned binary uploads (`THROTTLE_UPLOAD_LIMIT`, 10 MB max) |
+| `/api/v1/payments/upi-claim` | `POST` | [`PaymentController`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L308) | **5 / 15 min** | 1,000 / min | Prevents customer self-reported bank UTR spamming |
+| `/health`, `/health/readiness`, `/health/liveness`, `/health/sentry-test` | `GET` | [`HealthController`](file:///u:/Kumaran-finance/apps/api/src/health/health.controller.ts#L19) | **`@SkipThrottle()`** | N/A | Class-level exemption guaranteeing Docker/K8s probe reliability |
+| `/metrics` | `GET` | [`MetricsController`](file:///u:/Kumaran-finance/apps/api/src/metrics/controllers/metrics.controller.ts#L18) | **`@SkipThrottle()`** | N/A | Class-level exemption guaranteeing Prometheus scraper reliability |
 | *All other unannotated routes* | *Any* | Global API | **60 / min** | 10,000 / min | Baseline API protection per user/IP bucket |
 
 ---
@@ -227,7 +228,7 @@ When a rate limit is exceeded, standard HTTP 429 responses include:
 - **Client Factory (`packages/api-client/src/client/client.ts`)**:
   Exposes an `onRateLimited?: (retryAfterSeconds: number) => void` hook. Automatically parses the `Retry-After` response header and triggers notifications/countdown timers.
 
-### 7.2 Flutter Android/iOS Mobile App
+### 7.2 Dart Mobile Core SDK (Phase 1 Core / Phase 2 Flutter UI — ADR-26)
 - **Error Wrapper (`apps/mobile/lib/core/api/client/api_error.dart`)**:
   ```dart
   class KumaranApiException implements Exception {
@@ -275,7 +276,7 @@ The rate limiting architecture is validated by automated unit and E2E test suite
 - **File**: [`apps/api/test/unit/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/otp-cooldown-lockout.spec.ts)
 - **Results**:
   ```
-  PASS test/unit/otp-cooldown-lockout.spec.ts (8 tests passed)
+  PASS test/unit/otp-cooldown-lockout.spec.ts (10 tests passed — including 24-hour daily OTP quota & carrier-failure rollback)
     √ OTP-RATE-1: Immediate second requestOtp within 60s MUST fail closed with HTTP 429
     √ OTP-RATE-2: requestOtp after cooldown window expiration MUST succeed cleanly
     √ OTP-RATE-3: 3 consecutive incorrect OTP entries MUST trigger 5-minute temporary lockout

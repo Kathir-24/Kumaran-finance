@@ -14,19 +14,20 @@ In physical chit-fund operations across Perundurai and rural Erode, Tamil Nadu, 
 1. **Modern Smartphone Users**: Middle-aged and younger subscribers, field collection agents, accountants, and the 4 Partners.
 2. **Keypad Feature Phone Users**: Older rural subscribers, agricultural workers, and small traders who use basic 2G/voice feature phones with zero Android/FCM push capabilities.
 
-To guarantee **100% communication reach** while eliminating runaway telecom costs, Kumaran Chits enforces a strict **Cost-Controlled Channel Hierarchy**:
+To guarantee **100% communication reach** while eliminating runaway telecom costs, Kumaran Chits enforces a strict **Cost-Controlled Channel Hierarchy** aligned with **ADR-23** (SMS DLT Primary in Phase 1; WhatsApp permanently purged per `Q34` / `KFC-NOT-001`) and **ADR-26** (Flutter Android UI/APK deferred to Phase 2 Q2 2027):
 
 ```mermaid
 flowchart TD
     Trigger["Financial / Operational Trigger\n(Receipt, Auction, Default)"] --> Check{"Does Subscriber have\nan active FCM Token?"}
-    Check -->|YES - Smartphone App User| PUSH["1. Primary: Mobile Push (FCM)\n• Free of cost (₹0 SMS Spend)\n• Instant 1-Tap Deep Link\n• Bilingual (English + தமிழ்)"]
-    Check -->|NO - Keypad Phone User| SMS["2. Fallback: Indian DLT-Compliant SMS\n• Delivered to all 2G/4G feature phones\n• Registered TRAI DLT Templates\n• Zero Marketing Spam"]
+    Check -->|YES - Phase 2 App Enrolled| PUSH["1. Push-First Optimizer (FCM)\n• Free of cost (₹0 SMS Spend)\n• Instant 1-Tap Deep Link\n• Bilingual (English + தமிழ்)"]
+    Check -->|NO - Phase 1 Default & Keypad Phones| SMS["2. Active Phase 1 Primary / Keypad Fallback:\nIndian TRAI DLT-Compliant SMS (MSG91)\n• Delivered to all 2G/4G phones\n• Registered TRAI DLT Templates\n• Zero Marketing Spam"]
 
     Login["Authentication: Staff / Member Login"] --> OTP["Device Login OTP\n• Delivered STRICTLY via SMS\n• 300s Redis TTL, 3-Attempt Lockout"]
 ```
 
-- **Mobile App Push Notifications (FCM)** serve as the **Primary, ₹0-Cost Channel** for all smartphone subscribers.
-- **Telecom DLT SMS** serves as the **Pluggable Statutory Fallback** for keypad phones, ensuring legal receipt delivery and auction compliance.
+- **Indian TRAI DLT SMS (`MSG91`)** is the **active Phase 1 primary production channel** for all subscribers without an `fcmToken` (**ADR-23 / ADR-26**), and remains the permanent fallback for rural keypad feature phones.
+- **Mobile App Push Notifications (`FCM`)** are 100% implemented on the backend (`PushService` / `FirebasePushDriver`) and automatically become the **₹0-cost primary channel** for any subscriber once an `fcmToken` is registered in Phase 2 (Q2 2027).
+- **WhatsApp Cloud API** is permanently purged from the codebase (`Q34` / `KFC-NOT-001`).
 - **Device Login OTP** is delivered **strictly via SMS** (never via Push) for banking-grade multi-factor security.
 
 ---
@@ -73,10 +74,10 @@ flowchart TD
 | Event # | Operational Event | Trigger Source | DLT Template ID | Delivery Rule |
 |:---:|---|---|---|---|
 | **1** | **Device Login OTP** | `AuthService.requestOtp()` | `1407169823412093847` | **SMS Only** (Direct delivery to all phones; 5-min TTL in Redis). |
-| **2** | **Payment Receipt** | `PaymentService` & `CollectionService` | `1407169823412093848` | **Keypad Fallback** (Only sent if subscriber has no registered `fcmToken`). |
-| **3** | **Upcoming Auction Reminder** | Daily 09:00 AM IST Cron (`AuctionReminderSchedulerService`) | `1407169823412093849` | **Keypad Fallback** (Only sent if subscriber has no registered `fcmToken`). |
-| **4** | **Auction Results & Dividend** | `AuctionService.finalizeAuction()` post-commit | Group Broadcast Template | **Keypad Fallback** (Only sent if subscriber has no registered `fcmToken`). |
-| **5** | **3-Month Default Warning** | Midnight Arrears Cron (`DailyArrearsService`) | `1407169823412093850` | **Keypad Fallback** (Statutory notice before membership cancellation). |
+| **2** | **Payment Receipt** | `PaymentService` & `CollectionService` | `1407169823412093848` | **Active Phase 1 Primary / Keypad Fallback** (Sent whenever subscriber has no registered `fcmToken`). |
+| **3** | **Upcoming Auction Reminder** | Daily 09:00 AM IST Cron (`AuctionReminderSchedulerService`) | `1407169823412093849` | **Active Phase 1 Primary / Keypad Fallback** (Sent whenever subscriber has no registered `fcmToken`). |
+| **4** | **Auction Results & Dividend** | `AuctionService.finalizeAuction()` post-commit | Group Broadcast Template | **Active Phase 1 Primary / Keypad Fallback** (Sent whenever subscriber has no registered `fcmToken`). |
+| **5** | **3-Month Default Warning** | Midnight Arrears Cron (`DailyArrearsService`) | `1407169823412093850` | **Active Phase 1 Primary / Keypad Fallback** (Statutory notice before membership cancellation). |
 
 ---
 
@@ -156,7 +157,7 @@ SMS_DRIVER=mock                      # 'mock' (local dev & testing) or 'msg91' (
 SMS_SENDER_ID=KMRCHT                 # 6-character TRAI DLT approved header
 SMS_MAX_RETRIES=2                    # In-memory retries for transient HTTP 500 / 429
 SMS_RETRY_BASE_DELAY_MS=400          # Exponential backoff base (400ms -> 800ms)
-SMS_REQUEST_TIMEOUT_MS=15000         # Socket timeout in milliseconds
+SMS_REQUEST_TIMEOUT_MS=5000          # Socket timeout in milliseconds (default 5000ms in env.validation.ts:230 & msg91-sms.driver.ts:50)
 
 # Required when SMS_DRIVER=msg91:
 MSG91_AUTH_KEY=your_msg91_authkey_here
@@ -240,7 +241,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
 1. **Driver Level**: [`Msg91SmsDriver.postWithRetry`](file:///u:/Kumaran-finance/apps/api/src/notification/drivers/msg91-sms.driver.ts#L120) classifies HTTP 504 as `isRetryable`, applying exponential backoff:
    $$\text{delay} = \text{retryBaseDelayMs} \times 2^{\text{attempt}}$$
 2. **Queue Level**: BullMQ worker retries failed notification jobs up to **3 times** with exponential backoff (`delay: 1000ms`).
-3. **Zero-Cost Primary Channel**: Customers with registered `fcmToken` receive free Mobile App Push Notifications (`PushService`), completely bypassing external telecom SMSC routes.
+3. **Zero-Cost Push Optimizer (When `fcmToken` Is Registered)**: Customers enrolled on the Phase 2 mobile app with an active `fcmToken` receive free Mobile App Push Notifications (`PushService`), bypassing external telecom SMSC routes.
 
 ### 7.3 Chaos Test & Live Probe Proofs
 - **Automated Chaos Integration Spec ([`test/unit/chaos-network-disconnect.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/chaos-network-disconnect.spec.ts))**:
@@ -248,6 +249,7 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
   * `CHAOS-SMS-2`: Driver exponential backoff verified $\to$ 2 timeouts followed by successful 3rd attempt, returns `success: true`.
   * `CHAOS-SMS-3`: Mobile App Push fallback verified $\to$ Dispatches cleanly via FCM when SMS carrier is offline.
 - **Live Docker Container Probe ([`scripts/probes/verify-chaos-network-disconnect.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-chaos-network-disconnect.ps1))**:
+  * `CHAOS-PROBE-2`: Cash payment on live container port 3000 committed in **201ms** with consistent database ledger state (`100% Pass`).
 
 ---
 
@@ -275,22 +277,20 @@ In [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/paym
 3. **Atomic Purge on Success**: When a subscriber or staff member successfully verifies their OTP, all three keys (`auth:otp:<phone>`, `auth:otp:cooldown:<phone>`, `auth:otp:lockout:<phone>`) are atomically purged via `redis.del`.
 
 ### 8.3 Verification & Live Penetration Proofs
-- **Automated Integration Spec ([`test/unit/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/otp-cooldown-lockout.spec.ts))**:
+- **Automated Integration Spec ([`test/unit/otp-cooldown-lockout.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/otp-cooldown-lockout.spec.ts) — 10/10 unit tests PASS)**:
   * `OTP-RATE-1`: Immediate second request within 60s rejected with HTTP 429.
   * `OTP-RATE-2`: Request after 60s cooldown passes succeeds cleanly.
   * `OTP-RATE-3`: 3rd invalid attempt triggers 5-minute lockout.
   * `OTP-RATE-4`: Requesting OTP during active lockout fails closed with HTTP 429.
   * `OTP-RATE-5`: Verifying OTP during active lockout fails closed with HTTP 429.
   * `OTP-RATE-6`: Correct verification atomically wipes session, cooldown, and lockout keys.
-  * `OTP-REDIS-1` & `OTP-REDIS-2`: Distributed Redis key presence and TTL verification.
+  * `OTP-REDIS-1` & `OTP-REDIS-2`: Distributed Redis key presence and TTL verification (plus 24-hour rolling daily OTP quota & failure-compensation rollback tests).
 - **Live Docker Penetration Probe ([`scripts/probes/verify-otp-cooldown-lockout.ps1`](file:///u:/Kumaran-finance/scripts/probes/verify-otp-cooldown-lockout.ps1))**:
   * Probe 1: Cooldown HTTP 429 confirmed on port 3000.
   * Probe 2: 3-attempt lockout penalty confirmed on port 3000.
   * Probe 3: Direct Redis query confirms `ttl auth:otp:lockout:9876543210` = 300s, `auth:otp:9876543210` = nil.
   * Probe 4: Both endpoints blocked during lockout.
   * Probe 5: Clean key lifecycle verified.
-
-  * `CHAOS-PROBE-2`: Cash payment on live container port 3000 committed in **201ms** with consistent database ledger state (`100% Pass`).
 
 
 ---

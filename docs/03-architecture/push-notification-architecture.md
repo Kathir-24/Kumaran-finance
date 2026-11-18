@@ -3,8 +3,8 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Channel**: **Mobile App Push Notifications (Android & iOS)**  
 > **Engine**: **Google Firebase Cloud Messaging (FCM HTTP v1)**  
-> **Guiding Decisions**: [ADR-10, ADR-12, ADR-17](file:///u:/Kumaran-finance/docs/01-business/decision-log.md)  
-> **Core Tenet**: **Push-First Cost Optimizer**. Smartphone users receive ₹0-cost real-time push alerts, while Indian DLT SMS is strictly reserved as a fallback for non-app / keypad phone subscribers.
+> **Guiding Decisions**: [ADR-10, ADR-12, ADR-17, ADR-21, ADR-23, ADR-26](file:///u:/Kumaran-finance/docs/01-business/decision-log.md)  
+> **Phase 1 / Phase 2 Rollout Status (`ADR-23` & `ADR-26`)**: Backend FCM infrastructure (`FirebasePushDriver`, `PushService`, stale-token self-healing, and device token registration endpoints) is **100% implemented and verified** in Phase 1. Because Flutter Android mobile UI screens & APK distribution are deferred to **Phase 2 (Q2 2027)** per **ADR-26**, **Indian TRAI DLT SMS (MSG91)** serves as the active Phase 1 production delivery channel per **ADR-23**; once Phase 2 mobile app users register `fcmToken` values, delivery automatically upgrades to ₹0-cost Push-First routing.
 
 ---
 
@@ -46,12 +46,12 @@ flowchart TD
         Channel["Android Channel:\nkumaran_high_importance\n(Sound: default, Priority: high)"]
     end
 
-    subgraph SMS_FALLBACK ["Fallback Channel: SmsService (DLT Route)"]
-        SmsSvc["SmsService\n(Msg91 / DLT Gateway)\nStrictly for Keypad / Non-App Users"]
+    subgraph SMS_FALLBACK ["Active Phase 1 Primary / Keypad Fallback: SmsService (DLT Route)"]
+        SmsSvc["SmsService\n(MSG91 / TRAI DLT Gateway)\nActive Phase 1 Default & Keypad Fallback (ADR-23)"]
     end
 
-    subgraph CLIENT ["Client Mobile App (Flutter)"]
-        AndroidApp["Android Mobile App\n• Background Notification Tray\n• Deep-Link Routing\n• Biometric / MPIN Approval Screen"]
+    subgraph CLIENT ["Client Mobile App (Phase 2 Q2 2027 — ADR-26)"]
+        AndroidApp["Android Mobile App (Phase 2)\n• Background Notification Tray\n• Deep-Link Routing\n• Biometric / MPIN Approval Screen"]
     end
 
     PmtCommit --> RouterCheck
@@ -71,7 +71,7 @@ flowchart TD
 
 ---
 
-## 3. The 4 Business Notification Types & Deep-Linking Specifications
+## 3. The 6 Business Notification Types & Deep-Linking Specifications
 
 All push notifications configure Android Channel ID `kumaran_high_importance`:
 
@@ -109,7 +109,7 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
 - **App Behavior**: Opens the Auction Terms & Schedule screen.
 
 ### 3.3 Maker-Checker Prize Disbursement Approval
-- **Target Persona**: The 4 Equal Partners (`SUPER_ADMIN`, `BRANCH_MANAGER`)
+- **Target Persona**: Active `SUPER_ADMIN` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Note: `BRANCH_MANAGER` receives operational alerts only — per Guardrail 11 (**ADR-21**), **only the 4 verified statutory Partners (`SUPER_ADMIN` with `isPartner: true`)** can authorize prize payouts.
 - **Trigger**: Safety proof checklist verified by Maker ([`DisbursementService.verifySafetyProof()`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
 - **Title**: `பரிசு தொகை ஒப்புதல் தேவை / Prize Disbursement Approval Required`
 - **Body**: `குழு {chitCode} டிக்கெட் #{ticketNo} ({customerName}) பரிசு தொகை ரூ. {amount} பாதுகாப்பு சான்றிதழ் சரிபார்க்கப்பட்டது. இறுதி ஒப்புதல் தேவை. / Prize money verified. Checker authorization required.`
@@ -124,10 +124,10 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
     "amount": "75000"
   }
   ```
-- **App Behavior**: Opens Partner Executive Authorization view with cheque photos and 1-second fingerprint unlock.
+- **App Behavior**: Opens Partner Executive Authorization view with cheque photos and 1-second fingerprint unlock (Phase 2 mobile; Phase 1 approvals execute on the Web Dashboard).
 
 ### 3.4 Payment Reversal Approval
-- **Target Persona**: The 4 Equal Partners (`SUPER_ADMIN`, `BRANCH_MANAGER`)
+- **Target Persona**: Active `SUPER_ADMIN` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Per Guardrail 11 (**ADR-21**), **only verified statutory Partners (`SUPER_ADMIN` with `isPartner: true`)** can approve or reject reversals.
 - **Trigger**: Payment reversal requested by Maker ([`PaymentService.requestReversal()`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
 - **Title**: `திருப்புதல் ஒப்புதல் தேவை / Reversal Approval Required`
 - **Body**: `ரூ. {amount} கட்டண திருப்புதல் ஒப்புதலுக்கு காத்திருக்கிறது. காரணம்: {reason}. / Payment reversal pending checker approval.`
@@ -162,7 +162,7 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
 - **Target Persona**: Subscribers entering overdue arrears status
 - **Trigger**: Midnight arrears scan ([`DailyArrearsService`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/daily-arrears.service.ts)).
 - **Title**: `நிலுவை எச்சரிக்கை / Arrears Notice`
-- **Body**: `சீட்டு {chitCode} மாத தவணை நிலுவையில் உள்ளது. அபராதத்தை தவிர்க்க உடனே செலுத்தவும்.`
+- **Body**: `சீட்டு {chitCode} மாத தவணை நிலுவையில் உள்ளது. உறுப்பினர் நீக்கத்தைத் தவிர்க்க உடனே செலுத்தவும்.` *(Aligned with **ADR-07**: Kumaran Chits charges **₹0 late fees / zero penalties**; only statutory 3-consecutive-month default removal applies.)*
 - **Data Payload**:
   ```json
   {
@@ -198,14 +198,11 @@ stateDiagram-v2
    - `PATCH /api/v1/customers/:id/fcm-token`
    - Payload: `{ "fcmToken": "fcm_token_string..." }`
    - **Anti-BOLA/IDOR Guard**: Role-checked so customers can only register tokens for their own account.
-3. **Session Revocation on Logout** ([`auth.service.ts`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts#L591-L600)):
-   - Calling `POST /api/v1/auth/logout` executes:
-     ```typescript
-     await this.prisma.user.update({
-       where: { id: userId },
-       data: { refreshTokenHash: null, fcmToken: null },
-     });
-     ```
+3. **Session Revocation on Logout** ([`auth.service.ts:1947`](file:///u:/Kumaran-finance/apps/api/src/auth/auth.service.ts#L1947)):
+   - Calling `POST /api/v1/auth/logout` invokes `logout(userId, clientType?)`, which:
+     1. Revokes client-scoped PostgreSQL `Session` rows (`F04`, preserving independent Web vs Mobile device families unless full sign-out is requested).
+     2. Stamps Redis cutoff keys (`auth:revoked_before:${userId}` and scoped session revocations) and evicts cached `user:status:${userId}` & `auth:session:*` entries.
+     3. Clears `fcmToken = null` on the `User` / `Customer` record (`refreshTokenHash: null` legacy field cleared alongside `Session` revocation).
    - Eliminates notification leaks to signed-out or shared devices.
 
 ### 4.2 Automatic Stale Token Self-Healing ([`push.service.ts`](file:///u:/Kumaran-finance/apps/api/src/notification/services/push.service.ts#L25-L46))
@@ -250,9 +247,11 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFA
 
 ---
 
-## 6. Mobile Client Flutter Integration Blueprint (`apps/mobile/`)
+## 6. Mobile Client Flutter Integration Blueprint (`apps/mobile/` — Phase 2 Q2 2027, ADR-26)
 
-During the upcoming Flutter mobile client phase, the app will integrate push notifications via standard Google packages:
+> **Phase Scope (`ADR-26`)**: Phase 1 ships the typed Dart Client Core (`apps/mobile/lib/core/`). Flutter Android UI screens, FCM plugin wiring below, and APK packaging are deferred to **Phase 2 (Q2 2027)**.
+
+During the Phase 2 Flutter mobile client rollout, the app will integrate push notifications via standard Google packages:
 
 1. **Flutter Dependencies**:
    - `firebase_core`: Initializing Firebase Admin connection.
@@ -298,7 +297,7 @@ During the upcoming Flutter mobile client phase, the app will integrate push not
 
 ### 7.1 Unit & Service Test Proofs
 
-- **Dedicated Push Test Suite** ([`apps/api/test/unit/push.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/push.spec.ts)):
+- **Dedicated Push Test Suite** ([`apps/api/test/unit/push.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/push.spec.ts) — **7/7 unit tests PASS**):
   ```bash
   $ pnpm --filter api test test/unit/push.spec.ts
   PASS apps/api/test/unit/push.spec.ts

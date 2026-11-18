@@ -168,14 +168,14 @@ $$\text{Tier 1: } \texttt{"Branch"} \;\longrightarrow\; \text{Tier 2: } \texttt{
 4. **State Machine Lock Hierarchy (Scheme Activation, Auction, Disbursement & Subscriber Substitution)**:
    Shared helpers in [`state-transition-lock.util.ts`](file:///u:/Kumaran-finance/apps/api/src/common/utils/state-transition-lock.util.ts) enforce monotonic locking across critical lifecycle transitions without conflicting with payment paths:
    $$\texttt{"ChitGroup"} \;\longrightarrow\; \texttt{"Auction"} \;\longrightarrow\; \texttt{"AuctionMinutes"} \;/\; \texttt{"AuctionWinner"} \;\longrightarrow\; \texttt{"SubscriberTicket"} \;\longrightarrow\; \texttt{"InstallmentDue"}$$
-   - `ChitService.activate` / `assignTicket` / `unassignTicket` / `update` (`DEF-DB-07`): lock `"ChitGroup" FOR UPDATE` via `lockChitGroupRow` inside `withTransactionRetry` and re-verify authoritative locked `status` and `SubscriberTicket` roster (`tickets.length === totalTickets`) prior to Month 1 initialization, ticket assignment/unassignment (`P2002` mapped cleanly to `ConflictException`), or draft parameter updates.
+   - `ChitService.activate` / `assignTicket` / `unassignTicket` / `update` / `register` / `cancel` / `close` (`DEF-DB-07`): lock `"ChitGroup" FOR UPDATE` via `lockChitGroupRow` inside `withTransactionRetry` and re-verify authoritative locked `status` and `SubscriberTicket` roster (`tickets.length === totalTickets`) prior to Month 1 initialization, ticket assignment/unassignment (`P2002` mapped cleanly to `ConflictException`), registration, cancellation, or closure.
    - `AuctionService.recordBid` / `recordTieBreak`: lock `"ChitGroup" FOR UPDATE` before upserting Auction/Winner.
-   - `AuctionService.finalizeAuction`: locks `"ChitGroup" FOR UPDATE` strictly *before* `"Auction" FOR UPDATE` (monotonic `"ChitGroup" -> "Auction"` DAG alignment) and refreshes state snapshot under both locks, eliminating `COMPLETED -> SCHEDULED` regressions against concurrent bids.
-   - `AuctionService.markMinutesFiled`: locks `"AuctionMinutes" FOR UPDATE` before committing filing status (`filedAtRegistrar === true -> MINUTES_ALREADY_FILED`).
-   - `DisbursementService.verifySafetyProof` / `authorizePayout` / `releasePayout`: lock `"AuctionWinner" FOR UPDATE`.
-   - `DisbursementService.settleFinalMonth` (Month $N$ maturity): lock `"ChitGroup" FOR UPDATE` then `"SubscriberTicket" FOR UPDATE`.
+   - `AuctionService.finalizeAuction` & finalized auction correction (`correction/{request,approve,reject}`, `KFC-FIN-005`): lock `"ChitGroup" FOR UPDATE` strictly *before* `"Auction" FOR UPDATE` (monotonic `"ChitGroup" -> "Auction"` DAG alignment) and refresh state snapshot under both locks, eliminating `COMPLETED -> SCHEDULED` regressions against concurrent bids.
+   - `AuctionService.markMinutesFiled`: locks `"Auction"` then `"AuctionMinutes" FOR UPDATE` in DAG order ([`auction.service.ts:1690-1706`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts#L1690-L1706)) before committing filing status (`filedAtRegistrar === true -> MINUTES_ALREADY_FILED`).
+   - `DisbursementService.verifySafetyProof` / `authorizePayout` / `releasePayout` (route `/disburse`): lock `"AuctionWinner" FOR UPDATE`.
+   - `DisbursementService.settleFinalMonth` / `prepareFinalSettlement` / `approveFinalSettlement` (Month $N$ 2-stage dual-control maturity, `CR-DISB-02`): lock `"ChitGroup" FOR UPDATE` then `"SubscriberTicket" FOR UPDATE`.
    - `InstallmentService.generateMonthlyDues`: locks `"ChitGroup" FOR UPDATE` before querying/creating dues, serializing concurrent schedule runs and eliminating `P2002` collisions on `@@unique([ticketId, installmentMonth])`.
-   - `InstallmentService.substituteSubscriber`: lock `"SubscriberTicket" FOR UPDATE` and translate concurrent duplicate-customer `P2002` (`@@unique([chitGroupId, customerId])`) cleanly into `ConflictException` (ADR-13).
+   - `InstallmentService.substituteSubscriber` & ticket removal dual-control (`requestRemoval` / `approveRemoval` / `rejectRemoval`): lock `"SubscriberTicket" FOR UPDATE` and translate concurrent duplicate-customer `P2002` (`@@unique([chitGroupId, customerId])`) cleanly into `ConflictException` (ADR-13).
 
 ### 4.2 Automated Transaction Retry Utility
 Transient deadlocks (`40P01`), serialization failures (`40001`), Prisma write conflicts (`P2034`), or edge-case receipt number conflicts are transparently retried using exponential backoff with randomized jitter:
@@ -194,7 +194,7 @@ export async function withTransactionRetry<T>(
 - **Integration Points**:
   - **Payment, Collections & Reconciliation**: [`PaymentService.recordPayment`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.verifyUpiClaim`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`CollectionService.recordCollection`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), [`CollectionService.acknowledgeHandover`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.service.ts), and [`ReconciliationService.executeReconcileSettlement`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/reconciliation.service.ts).
   - **Reversals**: [`PaymentService.requestReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), [`PaymentService.approveReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts), and [`PaymentService.rejectReversal`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts).
-  - **Scheme Lifecycle, Auction, Disbursement & Installment State Machines**: [`ChitService`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.service.ts) (`activate`, `assignTicket`, `unassignTicket`, `update`), [`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`), [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`), and [`InstallmentService`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts) (`generateMonthlyDues`, `substituteSubscriber`).
+  - **Scheme Lifecycle, Auction, Disbursement & Installment State Machines**: [`ChitService`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.service.ts) (`activate`, `assignTicket`, `unassignTicket`, `update`, `register`, `cancel`, `close`), [`AuctionService`](file:///u:/Kumaran-finance/apps/api/src/auction/auction.service.ts) (`recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`, `correction/*`), [`DisbursementService`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts) (`verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`, `prepareFinalSettlement`, `approveFinalSettlement`), and [`InstallmentService`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.service.ts) (`generateMonthlyDues`, `substituteSubscriber`, `removal/*`).
 
 ---
 
@@ -230,16 +230,16 @@ Real-time aggregate calculations (Daybook, Daily Collections, Arrears Registers)
 
 ### 6.1 Architecture
 - **Engine**: Redis 7 `String` with 64-bit integer BigInt replacer/reviver schema.
-- **Key Pattern**: `cache:reports:daybook:${branchId}:${date}`
+- **Key Pattern** ([`report.service.ts:469,631-645`](file:///u:/Kumaran-finance/apps/api/src/report/report.service.ts#L469)): `report:daybook:${branchId || 'ALL'}:${dateStr}` (plus `report:daybook:ALL_BRANCHES:${dateStr}`).
 - **TTL**: 60 seconds (guarantees freshness even in case of missed eviction).
-- **Instant Event Invalidation**: Whenever a payment is recorded (`PaymentService.recordPayment`), synchronized (`CollectionService.syncOfflineQueue`), or reversed under dual control (`PaymentService.approveReversal`), `invalidateDaybookCache()` purges the cache key immediately.
+- **Instant Event Invalidation**: Whenever a payment is recorded (`PaymentService.recordPayment`), synchronized (`CollectionService.syncOfflineQueue`), or reversed under dual control (`PaymentService.approveReversal`), [`ReportService.invalidateReportCaches()`](file:///u:/Kumaran-finance/apps/api/src/report/report.service.ts#L631-L645) purges the branch and aggregate daybook cache keys immediately.
 
 ---
 
 ## 7. Storage, Logging & Capacity Safeguards
 
 1. **Docker Container Log Limits**:
-   All services in `docker-compose.fullstack.yml` use `json-file` logging with strict limits:
+   All services in [`infra/docker/docker-compose.fullstack.yml`](file:///u:/Kumaran-finance/infra/docker/docker-compose.fullstack.yml) use `json-file` logging with strict limits:
    ```yaml
    x-logging: &default-logging
      driver: "json-file"
@@ -250,3 +250,79 @@ Real-time aggregate calculations (Daybook, Daily Collections, Arrears Registers)
    Limits maximum host log storage per container to $250\text{MB}$.
 2. **80% Disk Capacity Monitoring**:
    Host storage is monitored by [`infra/scripts/disk-monitor.sh`](file:///u:/Kumaran-finance/infra/scripts/disk-monitor.sh) (or `.ps1`). Alerts are emitted before disk space reaches critical thresholds, ensuring zero database crashes due to `ENOSPC`.
+
+---
+
+## 8. Schema Evolution (23 Migrations), Index Inventory & Scaling Roadmap
+
+### 8.1 Complete Linear Migration History (23 PostgreSQL 17 Migrations)
+All migrations in [`apps/api/prisma/migrations/`](file:///u:/Kumaran-finance/apps/api/prisma/migrations/) are linear, additive, and forward-compatible across **18 Prisma models** and **8 enums** (zero `company_id` columns per ADR-01; all financial FKs enforce `ON DELETE RESTRICT`; cascades limited strictly to `Nominee`, `CustomerDocument`, and `AuctionTieBidder`):
+
+| # | Migration Directory | Purpose & Structural Guarantee |
+|:---:|---|---|
+| 1–7 | `20261018110459_init_kumaran_schema` .. `20261022205000_remove_user_email` | Core chit-fund schema, auth credentials, payment reversal maker-checker, Form XVII registrar filing, FCM tokens, payment notes, phone-only identity (ADR-18). |
+| 8–11 | `20261023095606_add_cycle_date_windows` .. `20261029140029_add_customer_refresh_token_hash` | Cycle date windows, financial reporting B-tree indexes, `Payment.transactionRef @unique`, customer refresh hash. |
+| 12–14 | `20261106170415_add_concurrency_and_performance_indexes` .. `20261112115900_add_allocation_and_tie_bidder_indexes` | Concurrency/reporting composite indexes, optimistic locking `version` columns (`Customer`, `Branch`), `PaymentAllocation` & `AuctionTieBidder` FK/unique indexes (`DEF-DB-05`). |
+| 15–17 | `20261113200000_add_partner_identity_and_removal_approval` .. `20261114010000_audit_log_complete_immutability` | Verified Partner flag (`User.isPartner`, ADR-21), ticket removal approval fields, PostgreSQL `AuditLog` append-only immutability triggers (`BEFORE UPDATE/DELETE/TRUNCATE`). |
+| 18–20 | `20261115030000_auth_revocation_and_session_vault` .. `20261115060000_complete_maker_checker_constraints` | PostgreSQL `Session` vault (`F04`), database-level `CHECK` constraints enforcing `maker_user_id <> checker_user_id` across reversals, auctions, disbursements, and removals. |
+| 21–23 | `20261117170000_add_ticket_removal_maker_checker` .. `20261118124500_case_insensitive_payout_ref_index` | Ticket removal maker-checker columns, hardened auction/disbursement monetary `CHECK` constraints (`DB-001..DB-005` closure), and case-insensitive partial unique index `uq_auction_winner_non_cash_payment_ref`. |
+
+### 8.2 Index Inventory & EXPLAIN Plan Verification
+- **51+ Active PostgreSQL 17 Indexes**: Primary keys on all 18 models, 19+ unique constraints (`SubscriberTicket @@unique([chitGroupId, customerId])`, `InstallmentDue @@unique([ticketId, installmentMonth])`, `Receipt.receiptNumber`, `Payment.idempotencyKey`, `Payment.transactionRef`, `AuctionWinner.auctionId/ticketId`, `AuctionTieBidder(auctionId, ticketId)`, `uq_auction_winner_non_cash_payment_ref`), plus 16+ dedicated B-tree reporting/concurrency indexes.
+- **Planner Proof (`CONCURR-INV-20` & `CONCURR-INV-23`)**: Live PostgreSQL `EXPLAIN (FORMAT JSON)` verification confirms `Index Scan` / `Bitmap Index Scan` binding across all high-frequency payment allocation, tie-bidder, customer phone, arrears, and Day Book lookups with zero forced `Seq Scan`.
+
+### 8.3 1-Branch to 50-Branch Capacity Scaling Roadmap
+| Scale Tier | Footprint | Concurrency & Storage Architecture |
+|---|---|---|
+| **1–5 Branches (Current Launch)** | 1–10k customers, <100k payments/yr | Single Flat-Fee Linux VPS + Docker PostgreSQL 17 + Redis 7 (`noeviction`) + PgBouncer (`max_client_conn=200`). Sub-10ms P95 writes. |
+| **6–20 Branches (Regional Growth)** | ~50k customers, ~600k payments/yr | Separate `chitflow-api` (`ENABLE_BULLMQ_WORKERS=false`) & `chitflow-worker` (`ENABLE_BULLMQ_WORKERS=true`) containers; PgBouncer transaction pooling; read-through Redis Day Book caching. |
+| **21–50 Branches (Enterprise Scale)** | 100k+ customers, 2M+ rows/yr | Range-partition `Payment` and `AuditLog` by calendar year (`PARTITION BY RANGE ("createdAt")`); dedicated PostgreSQL streaming read replica for Form XXI / XXII & CA Auditor exports. |
+
+---
+
+## 9. Complete Financial Transaction & 5-Tier Lock DAG Inventory
+
+All **16+ financial mutation workflows** execute inside `withTransactionRetry(this.prisma, async (tx) => ...)` at `READ COMMITTED` paired with explicit pessimistic row locks (`SELECT ... FOR UPDATE`) strictly obeying the acyclic lock DAG:
+$$\text{Tier 1: Branch} \prec \text{Tier 2: SubscriberTicket} \prec \text{Tier 3: InstallmentDue} \prec \text{Tier 4: Payment} \prec \text{Tier 5: PaymentReversal}$$
+
+| Domain | Workflows Covered | Exact Lock Acquisition Order | Atomicity & Idempotency Guard |
+|---|---|---|---|
+| **Payments & Counter** | `recordPayment`, `verifyUpiClaim`, `requestReversal`, `approveReversal`, `rejectReversal` | `Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` $\to$ `Payment` $\to$ `PaymentReversal` | `idempotencyKey @unique`, `transactionRef @unique`, `Receipt.receiptNumber @unique`, DB `CHECK (maker <> checker)`. |
+| **Field Collections & Handover** | `recordCollection`, `syncOfflineQueue`, `acknowledgeHandover` | `Branch` $\to$ `SubscriberTicket` $\to$ `InstallmentDue`; handover locks sorted `Payment` IDs (`ORDER BY id FOR UPDATE`) | Offline idempotency key deduplication; zero double vault credit (`CONCURR-INV-4`, `CONCURR-INV-7`). |
+| **Bank Reconciliation** | `executeReconcileSettlement` (ADR-19 KVB settlement matching) | `DistributedLockService` mutex (`lock:reconciliation-settlement`) + `Branch` $\to$ `InstallmentDue` | Single atomic receipt mint even racing against live `verifyUpiClaim` (`CONCURR-INV-10`). |
+| **Schemes & Tickets** | `activate`, `assignTicket`, `unassignTicket`, `update`, `register`, `cancel`, `close`, `generateMonthlyDues`, `substituteSubscriber`, `removal/*` | `ChitGroup` $\to$ `SubscriberTicket` $\to$ `InstallmentDue` | Prevents under-subscribed activations (`CONCURR-INV-24..25`) and duplicate customer tickets (`ADR-13`, `CONCURR-INV-15`). |
+| **Auctions & Minutes** | `recordBid`, `recordTieBreak`, `finalizeAuction`, `markMinutesFiled`, `correction/{request,approve,reject}` | `ChitGroup` $\to$ `Auction` $\to$ `AuctionMinutes` / `AuctionWinner` | Prevents `COMPLETED -> SCHEDULED` regression (`CONCURR-INV-16`), double finalization (`CONCURR-INV-2`), and double filing (`CONCURR-INV-17`). |
+| **Prize Payouts & Maturity** | `verifySafetyProof`, `authorizePayout`, `releasePayout`, `settleFinalMonth`, `prepareFinalSettlement`, `approveFinalSettlement` | `ChitGroup` $\to$ `AuctionWinner` / `SubscriberTicket` | Enforces `disbursedAmount <= prizeMoney`, arrears netting, unique payout ref (`uq_auction_winner_non_cash_payment_ref`), and zero double payout (`CONCURR-INV-3`, `11..13`). |
+
+---
+
+## 10. Real PostgreSQL 17 Concurrency Verification & Audit Closure (`26 / 26 PASS`)
+
+### 10.1 Critical Race Scenarios (`C01–C12`) & Live Test Matrix
+Executed directly against real PostgreSQL 17 Docker (`port 5433`) via [`apps/api/test/unit/concurrency-postgres.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/concurrency-postgres.spec.ts) (**26/26 PASS**), [`concurrency-locking.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/concurrency-locking.spec.ts) (**11/11 PASS**), [`transaction-retry.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/transaction-retry.spec.ts) (**11/11 PASS**), and [`distributed-lock.spec.ts`](file:///u:/Kumaran-finance/apps/api/test/unit/distributed-lock.spec.ts):
+
+| Scenario | Contention Pattern | Proof IDs | Verified PostgreSQL 17 Outcome |
+|:---:|---|---|---|
+| **C01** | Duplicate payment on same due | `CONCURR-INV-1` | 10 parallel workers $\to$ **1 Winner, 9 Rejected (`INSTALLMENT_ALREADY_PAID`)** |
+| **C02** | Concurrent same-branch receipt numbering | `CONCURR-INV-6, 8` | 6 parallel workers (Counter + Field + UPI) $\to$ **6 distinct sequential receipts, 0 `P2002`** |
+| **C03** | Concurrent monthly due generation | `CONCURR-INV-18` | 5 parallel workers $\to$ **0 duplicate dues, 0 `P2002` crashes** |
+| **C04** | Concurrent auction finalization & bid race | `CONCURR-INV-2, 16, 17` | 5 parallel Checkers $\to$ **1 Winner, 4 Rejected; 0 `COMPLETED -> SCHEDULED` regressions** |
+| **C05** | Concurrent prize payout / safety verification / Month $N$ maturity | `CONCURR-INV-3, 11, 12, 13` | 5 parallel callers $\to$ **1 Winner, 4 Rejected (`PRIZE_ALREADY_DISBURSED`)** |
+| **C06** | Concurrent reversal request / approve / reject | `CONCURR-INV-14, 19` | 5 parallel callers $\to$ **1 Winner, 4 Rejected; 0 split-brain ledgers** |
+| **C07** | Payment vs UPI verify vs reconciliation race | `CONCURR-INV-7, 9, 10` | **1 settlement, 0 `40P01` deadlocks, 0 `P2002` crashes** |
+| **C08** | Ticket substitution & ADR-13 duplicate-customer race | `CONCURR-INV-5, 15` | 5 parallel workers $\to$ **1 Winner, duplicates cleanly rejected (`409 Conflict`)** |
+| **C09** | Offline sync vs counter settlement race | `CONCURR-INV-7, 9` | **1 Winner, 1 flagged conflict/rejected; zero double payment** |
+| **C10** | Cash handover acknowledgment race | `CONCURR-INV-4` | 5 parallel managers $\to$ **1 Winner, 4 Rejected (`NO_PENDING_PAYMENTS`)** |
+| **C11** | Scheme activation vs roster modification race | `CONCURR-INV-24, 25` | 5 parallel admins $\to$ **1 `ACTIVE` winner, 0 under-subscribed schemes** |
+| **C12** | Overlapping midnight/morning cron batches | `distributed-lock.spec.ts` | Redis `NX PX` mutex + atomic Lua release serializes workers safely |
+| **DB-IMM** | Append-only `AuditLog` PostgreSQL trigger integrity | `CONCURR-INV-26` | Permits `INSERT`/`SELECT`; blocks `UPDATE`, `DELETE`, and `TRUNCATE` at engine level |
+| **DB-IDX** | `pg_indexes` + `EXPLAIN` index binding + tie-bidder uniqueness | `CONCURR-INV-20..23` | Confirms all `DEF-DB-05` indexes bound without `Seq Scan` |
+
+### 10.2 Prompt 04 Database Audit Gap Closure (`DB-001` through `DB-005`)
+All 5 database findings raised during Stage 04 auditing have been permanently remediated in subsequent migrations (`15`–`23`) and services:
+- **`DB-001` (Prize Disbursement Ceiling)**: Remediated — `authorizePayout` validates `amountToDisburse <= auction.prizeMoney` (net of arrears) backed by migration `20261118110000_harden_auction_disbursement_constraints` and `uq_auction_winner_non_cash_payment_ref`.
+- **`DB-002` (Reversed Receipt Cancellation Watermark)**: Remediated — `pdf.service.ts` stamps prominent bilingual `CANCELLED / REVERSED` watermarks on PDFs for reversed payments.
+- **`DB-003` (Whole-Rupee Dividend Clean-Divisibility Guard)**: Remediated — bid recording enforces `totalDividend % totalTickets === 0n` (`NON_DIVISIBLE_DIVIDEND`), preventing fractional paise truncation.
+- **`DB-004` (Dual-Control Auction Correction & Payout Cancellation)**: Remediated — partner dual-control auction correction (`correction/{request,approve,reject}`, `KFC-FIN-005`) and disbursement cancellation flows implemented.
+- **`DB-005` (PostgreSQL Engine-Level `CHECK` Constraints)**: Remediated — **8 PostgreSQL 17 `CHECK` constraints** enforce positive monetary amounts and `maker_user_id <> checker_user_id` directly at the storage engine level (`15/15` DB constraint E2E tests PASS).
+
