@@ -49,12 +49,12 @@ export function AuctionFinalizeCard({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   // Maker-Checker Dual Control Invariant Check (Guardrail 10) & Legal Partner Guard (Guardrail 11 / SEC-A)
-  // Per permissions-matrix §6 & KFC-SEC-003: ONLY Super Admin (verified Partner) can finalize; Branch Manager strictly blocked.
+  // Per permissions-matrix §6 & KFC-SEC-003: ONLY Statutory Partner can finalize; Branch Manager strictly blocked.
   const hasRecordedBid = Boolean(conductedByUserId && winnerTicketNumber !== undefined && winnerTicketNumber !== null);
   const isMaker = isSelfApproval(user?.id, { conductedByUserId });
-  const isAuthorizedRole = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
-  const canFinalize = hasRecordedBid && !isMaker && isAuthorizedRole && isPartner;
+  const isPartner = hasAnyRole(user, ['PARTNER']);
+  const isAuthorizedRole = isPartner;
+  const canFinalize = hasRecordedBid && !isMaker && isPartner;
   const checkerDisplayName = getUserDisplayName(user, 'Partner');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,14 +159,6 @@ export function AuctionFinalizeCard({
         <div className="rounded-lg border border-red-500/40 bg-red-950/30 p-3 text-xs text-red-200 flex items-start gap-2.5">
           <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
           <span>{t('unauthorizedRoleAlert')}</span>
-        </div>
-      )}
-
-      {/* Non-Partner Super Admin Warning (SEC-A) */}
-      {isAuthorizedRole && !isPartner && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 p-3 text-xs text-amber-200 flex items-start gap-2.5">
-          <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
-          <span>Only verified legal business partners (isPartner: true) possess financial authority to finalize and commit auctions.</span>
         </div>
       )}
 

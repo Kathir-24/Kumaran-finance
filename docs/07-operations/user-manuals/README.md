@@ -28,7 +28,7 @@ flowchart TD
 
 | # | Persona | Operational Role | Primary Platform (`ADR-26`) | Manual Link | Total Action Diagrams |
 |---|---|:---:|:---:|---|:---:|
-| **1** | **Super Admin / Owner (The 4 Verified Partners)** | `SUPER_ADMIN` (`isPartner: true`) | Phase 1 Web Portal / Phase 2 Android App | [`admin-foreman-manual.md`](./admin-foreman-manual.md) | **15 Flow Diagrams** |
+| **1** | **Business Partner / Owner (The 4 Statutory Partners)** | `Role.PARTNER` | Phase 1 Web Portal / Phase 2 Android App | [`admin-foreman-manual.md`](./admin-foreman-manual.md) | **15 Flow Diagrams** |
 | **2** | **Desk Accountant / Cashier** | `ACCOUNTANT` | Web Portal (High-Density Ledgers & Counter) | [`accountant-desk-manual.md`](./accountant-desk-manual.md) | **10 Flow Diagrams** |
 | **3** | **Field Collection Agent** | `COLLECTION_AGENT` | Phase 1 Responsive Web / Phase 2 Android App (`apps/mobile/lib/core/` Dart Core ready) | [`agent-mobile-manual.md`](./agent-mobile-manual.md) | **9 Flow Diagrams** |
 | **4** | **Customer / Chit Subscriber** | `CUSTOMER` | Phase 1 Responsive Web / Phase 2 Android App (English & தமிழ்) | [`customer-app-guide.md`](./customer-app-guide.md) | **10 Flow Diagrams** |
@@ -56,7 +56,7 @@ Every single manual strictly asserts and enforces all **11 invariant guardrails*
 9. **Company Safety Proof Checklist (ADR-15)**: Property deeds are completely eliminated. Flexible safety checklist (signed chit agreement with winner & nominee, signed blank cheques, promissory notes) evaluated on a case-by-case basis.
 10. **Maker-Checker Dual Control (ADR-08 / ADR-10)**: Sensitive financial actions (scheme activations, auction finalizations/corrections, payout voucher authorizations, payment reversals, defaulter removals, and cash handover sign-offs) strictly enforce **`maker_user_id != checker_user_id`** in both NestJS and **8 PostgreSQL 17 `CHECK` constraints**:
     $$\texttt{maker\_user\_id} \ne \texttt{checker\_user\_id}$$
-11. **Verified Partner Identity (ADR-21 / SEC-A)**: Not all Super Admins are business partners. Only verified statutory Partners (`SUPER_ADMIN` with `isPartner: true`) can authorize financial mutations; non-Partner IT Super Admins (`isPartner: false`) are strictly barred from financial authorizations, while audit logs (`/reports/audit-logs`) and BullMQ telemetry (`/admin/queues`, `/jobs/queue-status`) remain strictly `SUPER_ADMIN`-only.
+11. **Verified Partner Identity & Persona Separation (ADR-21 / ADR-27 / SEC-A)**: `SUPER_ADMIN` and `PARTNER` are strictly separate first-class roles (legacy `isPartner` boolean removed). Only statutory Partners (`Role.PARTNER`) can authorize financial mutations and chit operations; IT Super Admins (`Role.SUPER_ADMIN`) strictly manage IT administrative functions (`/users`, `/branches`, `/admin/jobs`, `/reports/audit-logs`) and are barred from financial operations.
 
 ---
 

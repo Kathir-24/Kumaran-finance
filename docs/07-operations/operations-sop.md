@@ -48,7 +48,7 @@ sequenceDiagram
    - Because field collection agents may also hold desk **Accountant** duties, the system strictly enforces both in NestJS and at the PostgreSQL 17 engine level (`chk_payment_cash_handover_maker_checker`):
      $$\texttt{collector\_user\_id} \ne \texttt{acknowledger\_user\_id}$$
    - An agent who collected the cash can **never** acknowledge their own handover.
-   - An independent **Partner (`SUPER_ADMIN`), Branch Manager, or Desk Accountant** must physically count the currency notes, enter their credentials, and officially acknowledge the cash deposit into the branch vault.
+   - An independent **Partner (`Role.PARTNER`), Branch Manager, or Desk Accountant** must physically count the currency notes, enter their credentials, and officially acknowledge the cash deposit into the branch vault.
    - Customer installment due is satisfied immediately (`paymentStatus: SUCCESS`), while branch vault custody is tracked via `cashHandoverStatus`. Until acknowledged, cash custody remains `PENDING_HANDOVER`. Once acknowledged by the independent checker, it transitions to `ACKNOWLEDGED`.
 
 ---
@@ -62,13 +62,13 @@ Financial transactions can never be deleted from the database. If a staff member
 - Cheque bounced or dishonored by the bank.
 - Duplicate entry created due to network timeout.
 
-### 2.2 Reversal Workflow (Strict Verified Partner Dual Control — `KFC-SEC-001` & Guardrail 11 / `ADR-21`):
-1. **Maker (Verified Partner A — `SUPER_ADMIN` with `isPartner: true` exclusively)**:
+### 2.2 Reversal Workflow (Strict Verified Partner Dual Control — `KFC-SEC-001` & Guardrail 11 / `ADR-21` / `ADR-27`):
+1. **Maker (Verified Partner A — `Role.PARTNER` exclusively)**:
    - Navigates to the payment record in the Web Dashboard.
    - Clicks **"Request Payment Reversal"** (`POST /api/v1/payments/:id/request-reversal`).
    - Selects mandatory reason code and uploads supporting proof (e.g., bank bounce slip or customer note).
-   - *Note*: Branch Managers, Accountants, and non-Partner IT Super Admins (`isPartner: false`) are strictly blocked from requesting or approving reversals.
-2. **Checker (Verified Partner B — `SUPER_ADMIN` with `isPartner: true`)**:
+   - *Note*: Branch Managers, Accountants, and IT Super Admins (`Role.SUPER_ADMIN`) are strictly blocked from requesting or approving reversals.
+2. **Checker (Verified Partner B — `Role.PARTNER`)**:
    - Receives high-priority reversal request in the Admin Dashboard.
    - Verifies the reason and clicks **"Approve Reversal"** (`POST /api/v1/payments/:id/approve-reversal`).
    - **Hard Rule**: `maker_user_id != checker_user_id` enforced in app + PostgreSQL `chk_reversal_maker_checker` (Partner A cannot approve their own reversal request; Partner B, C, or D must verify).
@@ -99,10 +99,10 @@ flowchart LR
 2. **3-Month Consecutive Default & Company Removal Rights (`CONFIRMED-BY-DEVELOPER`)**:
    - The customer who did not pay up to **3 continuous (consecutive) months**, the company has the full right and authority to **remove the customer from the chit group**.
    - The software tracks consecutive missed installments, flags the ticket with status `DEFAULT_3_MONTHS`, and prompts company management for review.
-   - Company Management / Verified Partners (`isPartner: true`) formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M` via two-partner dual control (`SEC-B`).
+   - Company Management / Verified Partners (`Role.PARTNER`) formally execute the removal workflow in the software, transitioning the ticket to `REMOVED_DEF_3M` via two-partner dual control (`SEC-B`).
    - **Dual-Partner Control on Removal & Exit Settlement (`SEC-B`, Guardrail 11, `Q25`)**:
-     - **Step 1 (Request Removal)**: Verified Partner A (`isPartner: true`) initiates removal request (`POST /api/v1/installments/tickets/:id/remove-defaulter/request`), specifying the mandatory justification. The ticket transitions from `DEFAULT_3_MONTHS` to `PENDING_REMOVAL_APPROVAL`.
-     - **Step 2 (Approve Removal)**: Verified Partner B (`isPartner: true`) reviews the 3-month arrears history and approves removal (`POST /api/v1/installments/tickets/:id/remove-defaulter/approve`). Hard Guard: `ticket.removalRequestedByUserId !== approvingPartnerId` (`MAKER_CHECKER_VIOLATION` + `chk_ticket_removal_maker_checker`). Upon approval, the ticket transitions to `REMOVED_DEF_3M`.
+     - **Step 1 (Request Removal)**: Verified Partner A (`Role.PARTNER`) initiates removal request (`POST /api/v1/installments/tickets/:id/remove-defaulter/request`), specifying the mandatory justification. The ticket transitions from `DEFAULT_3_MONTHS` to `PENDING_REMOVAL_APPROVAL`.
+     - **Step 2 (Approve Removal)**: Verified Partner B (`Role.PARTNER`) reviews the 3-month arrears history and approves removal (`POST /api/v1/installments/tickets/:id/remove-defaulter/approve`). Hard Guard: `ticket.removalRequestedByUserId !== approvingPartnerId` (`MAKER_CHECKER_VIOLATION` + `chk_ticket_removal_maker_checker`). Upon approval, the ticket transitions to `REMOVED_DEF_3M`.
      - **Step 3 (Exit Settlement Policy)**: Financial exit refund settlement under Q25 fails closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal written confirmation of the contractual/statutory damages formula by the business owner.
    - **Prized Ticket Immutability (`KFC-SEC-004`)**:
      - Prized tickets can NEVER be removed or substituted (`PRIZED_TICKET_IMMUTABLE`). The system rejects any removal attempt on a prized ticket with HTTP 400.
@@ -118,10 +118,10 @@ Because a prized subscriber has already received the pool amount:
 
 ### 3.3 Finalized Auction Correction SOP (`KFC-FIN-005` / Guardrail 11 / `CONFIRMED-BY-DEVELOPER`)
 If a clerical error occurred during physical auction recording (e.g. inverted ticket number or mistyped discount):
-1. **Maker Request**: Verified Partner A (`SUPER_ADMIN`, `isPartner: true`) enters `POST /api/v1/auctions/:id/correction/request` with corrected ticket ID or discount and documented justification.
+1. **Maker Request**: Verified Partner A (`Role.PARTNER`) enters `POST /api/v1/auctions/:id/correction/request` with corrected ticket ID or discount and documented justification.
    - **Pre-Condition**: Fails closed with `HTTP 400 Bad Request` if prize money has already been disbursed or downstream Month $m+1$ dues are already settled (`FIN-E`).
    - **Math Guard**: Enforces 25% discount ceiling and whole-rupee divisibility ($(D - C_f) \pmod N == 0$).
-2. **Checker Approval**: Verified Partner B (`SUPER_ADMIN`, `isPartner: true`) reviews physical lot draw sheet and submits `POST /api/v1/auctions/:id/correction/approve`.
+2. **Checker Approval**: Verified Partner B (`Role.PARTNER`) reviews physical lot draw sheet and submits `POST /api/v1/auctions/:id/correction/approve`.
    - **Dual Control**: Enforces `maker_user_id != checker_user_id` (`HTTP 403 Forbidden`).
    - **Ledger Re-alignment**: Atomically updates auction math, swaps prized subscriber flag if winner changed, and reconciles downstream unpaid dues.
 
@@ -238,17 +238,17 @@ The platform executes autonomous maintenance jobs scheduled strictly in Indian S
 To enforce Invariant Guardrails #10–#11 (Maker $\ne$ Checker & Verified Partner Identity) without administrative friction, the platform consolidates all pending operational sign-offs into a unified queue:
 
 ### 7.1 Unified Approvals Queue (`GET /api/v1/reports/pending-approvals`)
-- **Authorized Roles**: `SUPER_ADMIN` (Partners), `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` ([`report.controller.ts:80-81`](file:///u:/Kumaran-finance/apps/api/src/report/report.controller.ts#L80-L81)).
+- **Authorized Roles**: `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` ([`report.controller.ts:80-81`](file:///u:/Kumaran-finance/apps/api/src/report/report.controller.ts#L80-L81)).
 - **Data Categories Aggregated**:
   1. **Cash Handovers**: Field collections awaiting vault counting and confirmation (`collectorUserId != acknowledgerUserId`).
-  2. **Prize Disbursements**: Verified auction winner safety proofs awaiting Verified Partner (`isPartner: true`) payout authorization.
-  3. **Payment Reversals**: Reversal requests awaiting Verified Partner (`isPartner: true`) sign-off (`makerUserId != checkerUserId`).
+  2. **Prize Disbursements**: Verified auction winner safety proofs awaiting Verified Partner (`Role.PARTNER`) payout authorization.
+  3. **Payment Reversals**: Reversal requests awaiting Verified Partner (`Role.PARTNER`) sign-off (`makerUserId != checkerUserId`).
   4. **Safety Proof Verifications**: Auction winners awaiting desk verification of signed agreement, blank cheques, and promissory notes.
   5. **Customer UPI Claims (ADR-19)**: Pending customer 12-digit Bank UTR claims awaiting Desk Accountant / Manager / Partner verification against Karur Vysya Bank statement (`GET /api/v1/payments/pending-upi-claims`, `POST /api/v1/payments/:id/verify-upi-claim`, `makerUserId != checkerUserId`).
   6. **Two-Partner Defaulter Removals & Auction Corrections (`SEC-B` / `KFC-FIN-005`)**: Pending 3-month default removals (`PENDING_REMOVAL_APPROVAL`) and finalized auction correction requests awaiting independent Verified Partner B sign-off.
 - **Branch Scoping**:
   - `BRANCH_MANAGER` / `ACCOUNTANT` view is restricted strictly to their branch.
-  - `SUPER_ADMIN` / `AUDITOR` view encompasses all branches (note: `/reports/audit-logs` remains strictly `SUPER_ADMIN`-only per Guardrail 11).
+  - `PARTNER` / `AUDITOR` view encompasses all branches (note: `/reports/audit-logs` remains strictly `SUPER_ADMIN`-only per Guardrail 11).
 
 ### 7.2 Real-Time SSE Stream (`GET /api/v1/reports/approvals-stream`)
 - Emits live `APPROVALS_UPDATE` payloads over Server-Sent Events every 15 seconds (asserting token/session revocation on every tick under `F15`).
@@ -269,7 +269,7 @@ To enforce Invariant Guardrails #10–#11 (Maker $\ne$ Checker & Verified Partne
 ### 8.2 Monthly Auction Day & 21-Day Statutory Filing Runbook
 1. **10:00 AM — Pre-Auction Defaulter Screening**: Staff prints the eligible/ineligible subscriber roster (`ADR-07`: any subscriber with an unpaid due for the current month is strictly disqualified from bidding).
 2. **05:00 PM — In-Branch Auction & Option A Tie-Break**: Members assemble at Perundurai branch; bids run from the 4% commission floor up to the fixed 1/4 ceiling ($D \le V/4$) with real-time whole-rupee divisibility enforcement ($(D - C_f) \pmod N == 0$). If 2+ members tie at the ceiling, the Foreman conducts an **Option A physical paper token draw** in front of all attendees and records the drawn winning ticket (`POST /api/v1/auctions/:id/tie-break`).
-3. **Dual-Control Finalization & Form XVII**: An independent Verified Partner (`isPartner: true`, `conductedByUserId != finalizedByUserId`) finalizes the auction (`POST /api/v1/auctions/:id/finalize`), locking dividends and starting the 21-day statutory filing timer.
+3. **Dual-Control Finalization & Form XVII**: An independent Verified Partner (`Role.PARTNER`, `conductedByUserId != finalizedByUserId`) finalizes the auction (`POST /api/v1/auctions/:id/finalize`), locking dividends and starting the 21-day statutory filing timer.
 4. **Within 21 Days — Perundurai Sub-Registrar Filing**: Staff prepares signed Form XVII minutes (Foreman + 2 attending subscribers), pays the statutory challan at the Sub-Registrar Office, Perundurai, and records the challan reference (`POST /api/v1/auctions/:id/mark-minutes-filed`).
 
 

@@ -73,7 +73,7 @@
 
 ### Step 4: Auction Finalization & Statutory Minutes (Form XVII)
 - Independent Partner reviews bid records and clicks "Finalize Auction" (`POST /auctions/:id/finalize`).
-- Enforces `conductedByUserId !== finalizedByUserId` and `isPartner: true`.
+- Enforces `conductedByUserId !== finalizedByUserId` and `Role.PARTNER`.
 - Statutory minutes generated automatically with Form XVII details.
 - 21-day countdown to Registrar filing begins.
 

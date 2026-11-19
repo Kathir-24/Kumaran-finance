@@ -135,10 +135,8 @@ export function AuctionCorrectionCard({
     );
   }, [candidateTickets, currentWinnerTicketId]);
 
-  // Guardrail 11 (SEC-A): Strictly Super Admin + Verified Business Partner
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
-  const isVerifiedPartner = isSuperAdmin && isPartner;
+  // Guardrail 11 (SEC-A): Strictly Verified Business Partner (Role.PARTNER)
+  const isVerifiedPartner = hasAnyRole(user, ['PARTNER']);
 
   // KFC-FIN-005: Disbursed prize is immutable
   const isDisbursed = disbursementStatus === 'DISBURSED';

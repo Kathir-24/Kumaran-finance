@@ -1,7 +1,7 @@
 // ==============================================================================
 // Kumaran Chits — Statutory Reports HTTP ETag & 304 Conditional Interceptor
 // Bandwidth & CPU optimization for historical Day Books, Cash Books & Minutes.
-// Scopes every ETag by caller identity (userId/roles/branchId/isPartner) +
+// Scopes every ETag by caller identity (userId/roles/branchId/partnerStatus) +
 // canonicalized query filters and emits `Vary: Authorization, Cookie` to prevent
 // cross-branch cache poisoning. Returns RxJS `EMPTY` on 304 so global response
 // wrappers never emit a body after `res.end()`.
@@ -13,6 +13,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { EMPTY, Observable, of } from 'rxjs';
@@ -23,7 +24,6 @@ interface RequestUserScope {
   sub?: string;
   roles?: string[];
   branchId?: string | null;
-  isPartner?: boolean;
 }
 
 function canonicalizeRequestTarget(rawTarget: string): string {
@@ -59,7 +59,9 @@ function buildCanonicalScopeKey(req: Request): string {
     ? [...user.roles].sort().join(',')
     : '';
   const branchId = user?.branchId ?? '';
-  const isPartner = Boolean(user?.isPartner);
+  const isPartner = Boolean(
+    Array.isArray(user?.roles) && user.roles.includes(Role.PARTNER),
+  );
   const requestTarget = canonicalizeRequestTarget(req.originalUrl ?? req.url ?? '');
 
   return JSON.stringify({

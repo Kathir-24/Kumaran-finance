@@ -47,7 +47,7 @@ export class TicketController {
   constructor(private readonly installmentService: InstallmentService) {}
 
   @Get('defaulters')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'List subscribers with consecutive arrears',
     description:
@@ -81,7 +81,7 @@ export class TicketController {
 
   @Get(':ticketId/dues')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -110,7 +110,7 @@ export class TicketController {
 
   @Get(':ticketId/passbook')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -139,11 +139,11 @@ export class TicketController {
 
   @Post(':id/remove-defaulter')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Company 3-Month Arrears Removal Rights Request (ADR-07, ADR-12 & SEC-B)',
     description:
-      'Initiates company removal request when a subscriber has defaulted on 3 or more consecutive monthly installments. Transitions ticket status to PENDING_REMOVAL_APPROVAL. Allowed strictly: Super Admin (Partners).',
+      'Initiates company removal request when a subscriber has defaulted on 3 or more consecutive monthly installments. Transitions ticket status to PENDING_REMOVAL_APPROVAL. Allowed strictly: Partners.',
   })
   @ApiOkResponseEnvelope(RemoveDefaulterResponseDto, {
     description: 'Subscriber ticket removal request submitted for Partner B approval',
@@ -167,7 +167,7 @@ export class TicketController {
 
   @Post(':id/remove-defaulter/request')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Request Defaulter Removal (Maker Partner - SEC-B)',
     description:
@@ -193,7 +193,7 @@ export class TicketController {
 
   @Post(':id/remove-defaulter/approve')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Approve Defaulter Removal (Checker Partner - SEC-B)',
     description:
@@ -219,7 +219,7 @@ export class TicketController {
 
   @Post(':id/remove-defaulter/reject')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Reject Defaulter Removal Request (Checker Partner - SEC-B)',
     description:
@@ -245,11 +245,11 @@ export class TicketController {
 
   @Post(':id/substitute')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Subscriber Substitution for Defaulted Ticket (ADR-13)',
     description:
-      'Assigns a new KYC-verified customer to a ticket previously removed under REMOVED_DEF_3M. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same scheme. Restores ticket status to ACTIVE. Allowed strictly: Super Admin.',
+      'Assigns a new KYC-verified customer to a ticket previously removed under REMOVED_DEF_3M. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same scheme. Restores ticket status to ACTIVE. Allowed strictly: Partner.',
   })
   @ApiOkResponseEnvelope(SubstituteSubscriberResponseDto, {
     description: 'Subscriber successfully substituted and ticket restored to ACTIVE',
@@ -271,7 +271,7 @@ export class TicketController {
 
   @Post(':id/settle-removal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Defaulter Account Settlement & Exit Refund Voucher (Partner strictly, Maker != Checker)',
     description:

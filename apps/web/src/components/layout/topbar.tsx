@@ -107,7 +107,10 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   };
 
   const isSuperAdminOrAuditor =
-    isMounted && (user?.roles?.includes('SUPER_ADMIN') || user?.roles?.includes('AUDITOR'));
+    isMounted &&
+    (user?.roles?.includes('PARTNER') ||
+      user?.roles?.includes('SUPER_ADMIN') ||
+      user?.roles?.includes('AUDITOR'));
 
   const initials = React.useMemo(() => {
     if (!isMounted || !user?.name) return 'KC';
@@ -369,14 +372,36 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
 
                 {/* Role badges */}
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {user?.roles?.map((r) => (
-                    <span
-                      key={r}
-                      className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-300 uppercase tracking-wider"
-                    >
-                      {r.replace('_', ' ')}
-                    </span>
-                  ))}
+                  {user?.roles?.map((r) => {
+                    if (r === 'SUPER_ADMIN') {
+                      return (
+                        <span
+                          key={r}
+                          className="rounded bg-sky-500/10 border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-mono text-sky-400 font-semibold uppercase tracking-wider"
+                        >
+                          IT ADMIN
+                        </span>
+                      );
+                    }
+                    if (r === 'PARTNER') {
+                      return (
+                        <span
+                          key={r}
+                          className="rounded bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold uppercase tracking-wider"
+                        >
+                          PARTNER
+                        </span>
+                      );
+                    }
+                    return (
+                      <span
+                        key={r}
+                        className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-300 uppercase tracking-wider"
+                      >
+                        {r.replace('_', ' ')}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
 

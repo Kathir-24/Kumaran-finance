@@ -18,18 +18,18 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
   let jwtService: JwtService;
 
   // Authenticated Role Tokens & User IDs
-  let managingPartnerToken: string; // SUPER_ADMIN, isPartner: true (Maker)
+  let managingPartnerToken: string; // PARTNER (Maker)
   let managingPartnerId: string;
-  let checkerPartnerToken: string; // SUPER_ADMIN, isPartner: true (Checker)
+  let checkerPartnerToken: string; // PARTNER (Checker)
   let checkerPartnerId: string;
-  let itAdminToken: string; // SUPER_ADMIN, isPartner: false (Non-Partner Super Admin)
+  let itAdminToken: string; // SUPER_ADMIN (Non-Partner IT Admin)
   let itAdminId: string;
-  let branchManagerToken: string; // BRANCH_MANAGER, isPartner: false (Staff Maker)
+  let branchManagerToken: string; // BRANCH_MANAGER (Staff Maker)
   let branchManagerId: string;
-  let accountantToken: string; // ACCOUNTANT, isPartner: false (Staff Maker)
+  let accountantToken: string; // ACCOUNTANT (Staff Maker)
   let accountantId: string;
-  let fieldAgentToken: string; // COLLECTION_AGENT, isPartner: false
-  let auditorToken: string; // AUDITOR, isPartner: false (Read-only Compliance)
+  let fieldAgentToken: string; // COLLECTION_AGENT
+  let auditorToken: string; // AUDITOR (Read-only Compliance)
   let customerToken: string; // CUSTOMER (Subscriber)
   let primaryCustomerId: string;
 
@@ -86,58 +86,57 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
     });
     defaultBranchId = branch!.id;
 
-    // 1. Login Managing Partner (Super Admin, isPartner: true)
+    // 1. Login Managing Partner (Partner)
     const adminRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543210', password: 'Admin@Kumaran2026' });
     managingPartnerToken = adminRes.body.data.accessToken;
     managingPartnerId = adminRes.body.data.user.id;
 
-    // 2. Login Checker Partner (Super Admin, isPartner: true)
+    // 2. Login Checker Partner (Partner)
     const checkerRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543211', password: 'Admin@Kumaran2026' });
     checkerPartnerToken = checkerRes.body.data.accessToken;
     checkerPartnerId = checkerRes.body.data.user.id;
 
-    // 3. Login Branch Manager (BRANCH_MANAGER, isPartner: false)
+    // 3. Login Branch Manager (BRANCH_MANAGER)
     const bmRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543212', password: 'Admin@Kumaran2026' });
     branchManagerToken = bmRes.body.data.accessToken;
     branchManagerId = bmRes.body.data.user.id;
 
-    // 4. Login Desk Accountant (ACCOUNTANT, isPartner: false)
+    // 4. Login Desk Accountant (ACCOUNTANT)
     const accRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543213', password: 'Admin@Kumaran2026' });
     accountantToken = accRes.body.data.accessToken;
     accountantId = accRes.body.data.user.id;
 
-    // 5. Login Field Agent (COLLECTION_AGENT, isPartner: false)
+    // 5. Login Field Agent (COLLECTION_AGENT)
     const faRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543214', password: 'Admin@Kumaran2026' });
     fieldAgentToken = faRes.body.data.accessToken;
 
-    // 6. Login CA Auditor (AUDITOR, isPartner: false)
+    // 6. Login CA Auditor (AUDITOR)
     const audRes = await request(app.getHttpServer())
       .post('/api/v1/auth/web/login')
       .send({ phone: '9876543216', password: 'Admin@Kumaran2026' });
     auditorToken = audRes.body.data.accessToken;
 
-    // 7. Seed & Login Administrative Non-Partner Super Admin (isPartner: false) for ADR-21 / Guardrail 11 tests
+    // 7. Seed & Login Administrative Non-Partner Super Admin (roles: [Role.SUPER_ADMIN]) for ADR-21 / ADR-27 / Guardrail 11 tests
     const itAdminPhone = '9876543299';
     const itAdminUser = await prisma.user.upsert({
       where: { phone: itAdminPhone },
-      update: { isPartner: false, roles: [Role.SUPER_ADMIN] },
+      update: { roles: [Role.SUPER_ADMIN] },
       create: {
         branchId: defaultBranchId,
         name: 'IT Support Super Admin (Non-Partner)',
         phone: itAdminPhone,
         passwordHash: await bcrypt.hash('Admin@Kumaran2026', 10),
         roles: [Role.SUPER_ADMIN],
-        isPartner: false,
         isActive: true,
       },
     });
@@ -630,7 +629,7 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
         .set('Authorization', `Bearer ${branchManagerToken}`);
       expect(selfApproveRes.status).toBe(403);
 
-      // Step 5: Partner Exclusivity Guard - Administrative IT Super Admin (isPartner: false) is barred
+      // Step 5: Partner Exclusivity Guard - Administrative IT Super Admin (roles: [Role.SUPER_ADMIN]) is barred
       const nonPartnerRes = await request(app.getHttpServer())
         .post(`/api/v1/disbursements/group/${schemeId}/approve-final-settlement`)
         .set('Authorization', `Bearer ${itAdminToken}`);
@@ -1398,7 +1397,7 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
       expect(actRes.body.data.status).toBe('ACTIVE');
     });
 
-    it('TC-T3-03: Administrative Super Admin (isPartner: false) is barred from activating schemes (HTTP 403 PARTNER_IDENTITY_REQUIRED)', async () => {
+    it('TC-T3-03: Administrative Super Admin (roles: [Role.SUPER_ADMIN]) is barred from activating schemes (HTTP 403 PARTNER_IDENTITY_REQUIRED)', async () => {
       // Create a full 20-ticket scheme
       const code = `KCNONPART-${Date.now()}`;
       const createRes = await request(app.getHttpServer())
@@ -1422,7 +1421,7 @@ describe('Module 4: Chit Scheme Management & Mid-Cycle Intake E2E Suite', () => 
           .send({ ticketNumber: i, customerId: sampleCustomers[i - 1].id });
       }
 
-      // IT Support Super Admin (isPartner: false) attempts to activate
+      // IT Support Super Admin attempts to activate
       const actRes = await request(app.getHttpServer())
         .post(`/api/v1/chits/${sId}/activate`)
         .set('Authorization', `Bearer ${itAdminToken}`);

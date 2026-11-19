@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits** (Kumaran Finance, Perundurai, Tamil Nadu)  
 > **Status**: Authoritative Architectural Specification (`CONFIRMED-BY-DEVELOPER`)  
 > **Key Architecture Decisions**: [ADR-01 through ADR-26](../01-business/decision-log.md), [permissions-matrix.md](../01-business/permissions-matrix.md), [financial-rules.md](../01-business/financial-rules.md)  
-> **Core Mandate**: The 4 Partners (Super Admin, `isPartner: true`) have **100% full operational parity on BOTH Web and Mobile frontends for BOTH Maker and Checker roles**. The backend is completely device-agnostic (`maker_user_id != checker_user_id`).
+> **Core Mandate**: The 4 Partners (`Role.PARTNER`) have **100% full operational parity on BOTH Web and Mobile frontends for BOTH Maker and Checker roles**. The backend is completely device-agnostic (`maker_user_id != checker_user_id`).
 >
 > [!NOTE]
 > **Implementation Status**: This document defines the authoritative architectural blueprint and screen catalog for the Web Portal (`apps/web/`) and Mobile Application (`apps/mobile/`).
@@ -95,8 +95,8 @@ flowchart LR
    - **Collector**: Field agent submits daily collection tally on **Mobile** (`apps/mobile`).
    - **Acknowledger**: Partner physically counts cash at branch counter and taps **"Acknowledge Cash Received"** on **Mobile** or **Web** (`collector_user_id != acknowledger_user_id`).
 4. **Payment Reversals (`KFC-SEC-001` Two-Partner Dual Control)**:
-   - **Maker**: **Partner A (`SUPER_ADMIN` with `isPartner: true` strictly)** requests reversal with mandatory justification (`ACCOUNTANT` and `BRANCH_MANAGER` are blocked `403`).
-   - **Checker**: Independent **Partner B (`isPartner: true`, `maker != checker`)** reviews ledger impact and approves or rejects.
+   - **Maker**: **Partner A (`Role.PARTNER` strictly)** requests reversal with mandatory justification (`ACCOUNTANT`, `BRANCH_MANAGER`, and `SUPER_ADMIN` are blocked `403`).
+   - **Checker**: Independent **Partner B (`Role.PARTNER`, `maker != checker`)** reviews ledger impact and approves or rejects.
 
 ---
 
@@ -156,7 +156,7 @@ apps/web/src/app/
 │   │   ├── page.tsx                       # Company branch directory (PRD, ERD) with active status
 │   │   └── new/page.tsx                   # Branch creation console with bilingual Tamil name
 │   ├── users/
-│   │   ├── page.tsx                       # Staff user administration, RBAC roles, isPartner & status toggle
+│   │   ├── page.tsx                       # Staff user administration, RBAC roles & status toggle
 │   │   └── new/page.tsx                   # Staff onboarding console with random temp password (F16)
 │   └── reports/
 │       ├── page.tsx                       # Statutory reports index

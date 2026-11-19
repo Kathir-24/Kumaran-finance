@@ -1,5 +1,5 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { PaymentMethod, PaymentStatus, AuctionStatus, DisbursementMode } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, AuctionStatus, DisbursementMode, Role } from '@prisma/client';
 
 describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', () => {
   let prisma: PrismaService;
@@ -49,12 +49,11 @@ describe('Real PostgreSQL 17 Maker-Checker DB Constraints (F12 remediation)', ()
     // Create Checker user
     const checker = await prisma.user.upsert({
       where: { phone: '9842100092' },
-      update: { branchId, isPartner: true },
+      update: { branchId, roles: [Role.PARTNER] },
       create: {
         phone: '9842100092',
         name: 'Test Checker Partner',
-        roles: ['SUPER_ADMIN'],
-        isPartner: true,
+        roles: [Role.PARTNER],
         branchId,
         passwordHash: '$2b$12$DummyHashForTestingOnly12345678901234567890',
       },

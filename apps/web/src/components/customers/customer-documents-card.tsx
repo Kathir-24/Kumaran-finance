@@ -48,10 +48,10 @@ export function CustomerDocumentsCard({ customerId, documents }: CustomerDocumen
   const user = useAuthStore((s: AuthState) => s.user);
 
   const canUpload = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'].includes(role),
   );
   const canDelete = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
   );
 
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);

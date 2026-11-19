@@ -191,13 +191,27 @@ test('DEF-FE-03: Enforces canonical RBAC gates across all personas without leaki
     roles: ['SUPER_ADMIN'],
     tokenType: 'access',
   });
-  for (const path of ['/branches', '/users', '/admin', '/admin/jobs', '/print/receipt/1']) {
+  for (const path of ['/branches', '/users', '/admin', '/admin/jobs', '/reports/audit-logs']) {
     const res = await evaluateEdgeAuth({
       pathname: path,
       accessToken: superAdminToken,
       jwtSecret: TEST_SECRET,
     });
     assert.deepEqual(res, { action: 'next' }, `SUPER_ADMIN must access ${path}`);
+  }
+
+  const partnerToken = await signTestJwt({
+    sub: 'partner-1',
+    roles: ['PARTNER'],
+    tokenType: 'access',
+  });
+  for (const path of ['/', '/schemes', '/auctions', '/disbursements', '/reversals', '/print/receipt/1', '/print/voucher/1']) {
+    const res = await evaluateEdgeAuth({
+      pathname: path,
+      accessToken: partnerToken,
+      jwtSecret: TEST_SECRET,
+    });
+    assert.deepEqual(res, { action: 'next' }, `PARTNER must access ${path}`);
   }
 
   const auditorToken = await signTestJwt({
@@ -300,14 +314,41 @@ test('DEF-FE-03: Sanitizes open redirect targets on /login?redirect=...', async 
       accessToken: adminToken,
       jwtSecret: TEST_SECRET,
     }),
+    { action: 'redirect', location: '/users', clearStaleCookies: false },
+  );
+
+  const partnerTokenRedirect = await signTestJwt({
+    sub: 'partner-1',
+    roles: ['PARTNER'],
+    tokenType: 'access',
+  });
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/login',
+      redirectParam: '//evil.example.com/phish',
+      accessToken: partnerTokenRedirect,
+      jwtSecret: TEST_SECRET,
+    }),
     { action: 'redirect', location: '/', clearStaleCookies: false },
   );
 
+  // For adminToken (SUPER_ADMIN), /schemes/onboard is unauthorized, so it falls back to /users
   assert.deepEqual(
     await evaluateEdgeAuth({
       pathname: '/login',
       redirectParam: '/schemes/onboard',
       accessToken: adminToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    { action: 'redirect', location: '/users', clearStaleCookies: false },
+  );
+
+  // For partnerTokenRedirect (PARTNER), /schemes/onboard is authorized, so it redirects to /schemes/onboard
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/login',
+      redirectParam: '/schemes/onboard',
+      accessToken: partnerTokenRedirect,
       jwtSecret: TEST_SECRET,
     }),
     { action: 'redirect', location: '/schemes/onboard', clearStaleCookies: false },
@@ -403,11 +444,30 @@ test('DEF-FE-08: Edge Middleware guards /2fa using cryptographic HttpOnly kc_tot
     },
   );
 
-  // 5. Already authenticated user on /2fa still redirects cleanly to dashboard
+  // 5. Already authenticated IT Super Admin on /2fa redirects cleanly to /users
   assert.deepEqual(
     await evaluateEdgeAuth({
       pathname: '/2fa',
       accessToken: wrongAccessToken,
+      jwtSecret: TEST_SECRET,
+    }),
+    {
+      action: 'redirect',
+      location: '/users',
+      clearStaleCookies: false,
+    },
+  );
+
+  const partnerAccessToken = await signTestJwt({
+    sub: 'partner-001',
+    roles: ['PARTNER'],
+    tokenType: 'access',
+  });
+  // Authenticated Partner on /2fa redirects cleanly to dashboard /
+  assert.deepEqual(
+    await evaluateEdgeAuth({
+      pathname: '/2fa',
+      accessToken: partnerAccessToken,
       jwtSecret: TEST_SECRET,
     }),
     {

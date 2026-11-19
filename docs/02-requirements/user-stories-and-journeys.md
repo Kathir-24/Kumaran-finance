@@ -58,9 +58,10 @@ The platform encompasses **10 Core Functional Modules** broken down into **28 Gr
 
 ## 2. Detailed Persona Profiles
 
-### Persona 1: Super Admin / Owner (The 4 Partners)
-- **Profile**: The 4 equal partners of Kumaran Finance operating from Head Office (Perundurai, Erode).
-- **Client Platforms**: **100% Full Feature Parity on BOTH Platforms** — Desktop Web Portal (`apps/web/`) AND Android Smartphone Mobile App (`apps/mobile/`).
+### Persona 1: Statutory Business Partner (`Role.PARTNER`) & IT Super Admin (`Role.SUPER_ADMIN`)
+- **Statutory Business Partner (`Role.PARTNER`)**: The 4 equal partners of Kumaran Finance operating from Head Office (Perundurai, Erode). Hold full ownership and financial Maker/Checker authority across all chit operations (auctions, payouts, reversals, schemes, collections, reports).
+- **IT Super Admin (`Role.SUPER_ADMIN`)**: Dedicated IT Infrastructure Administrator managing staff onboarding (`/users`), branches (`/branches`), background queues (`/admin/jobs`), and immutable audit trail (`/reports/audit-logs`). Strictly barred from financial operations and chit dashboard.
+- **Client Platforms**: Desktop Web Portal (`apps/web/`) AND Android Smartphone Mobile App (`apps/mobile/`, Phase 2).
 - **Core Mindset**: Safeguarding capital, preventing internal fraud, ensuring statutory compliance, and expanding the customer base with instant pocket approvals.
 - **Dual Role & Cross-Device Invariant**: Acts as **Operational Maker** (entering auction bids, safety proof, reversals) or **Final Checker** (finalizing auctions, payment reversals, prize payouts, cash handover). **Must never approve their own entries** (`maker != checker`), regardless of client device.
 
@@ -213,8 +214,8 @@ flowchart TD
 - **So that**: The chit group collection pool is safeguarded against chronic default (ADR-07 & ADR-12).
 - **Acceptance Criteria**:
   - **Given** Ticket #7 has `consecutiveUnpaidMonths >= 3` and `isPrized === false`,
-  - **When** Partner A (`isPartner: true`) calls `POST /tickets/:id/remove-defaulter/request` (or legacy alias `/remove-defaulter`), ticket transitions to `PENDING_REMOVAL_APPROVAL`;
-  - **When** independent Partner B (`isPartner: true`, `maker != checker`) calls `POST /tickets/:id/remove-defaulter/approve`, ticket transitions to `REMOVED_DEF_3M` (or `/reject` restores `DEFAULT_3_MONTHS`);
+  - **When** Partner A (`Role.PARTNER`) calls `POST /tickets/:id/remove-defaulter/request` (or legacy alias `/remove-defaulter`), ticket transitions to `PENDING_REMOVAL_APPROVAL`;
+  - **When** independent Partner B (`Role.PARTNER`, `maker != checker`) calls `POST /tickets/:id/remove-defaulter/approve`, ticket transitions to `REMOVED_DEF_3M` (or `/reject` restores `DEFAULT_3_MONTHS`);
   - **When** Partner calls `POST /tickets/:id/substitute` with new customer ID, a replacement ticket is issued under the same number, while financial exit damage settlement (`POST /tickets/:id/settle-removal`) remains strictly locked fail-closed (`UNAPPROVED_SETTLEMENT_POLICY`) pending formal Partner Board resolution and statutory legal validation (Q25).
 
 #### US-SA-6: Dual-Control Auction Finalization (Checker)
@@ -237,8 +238,8 @@ flowchart TD
   - **Error Case**: System throws `403 Forbidden` if a Branch Manager attempts to authorize payout.
 
 #### US-SA-8: Dual-Control Payment Reversal Approval / Rejection (Checker)
-- **As a**: Super Admin / Partner B (Checker, `isPartner: true`)
-- **I want to**: Approve or reject a payment reversal request initiated exclusively by Partner A (Maker, `isPartner: true`)
+- **As a**: Partner B (Checker, `Role.PARTNER`)
+- **I want to**: Approve or reject a payment reversal request initiated exclusively by Partner A (Maker, `Role.PARTNER`)
 - **So that**: Accounting ledger corrections are strictly verified by an independent partner (`KFC-SEC-001`).
 - **Acceptance Criteria**:
   - **Given** reversal was requested with reason code on `POST /payments/:id/request-reversal` by Partner A (`ACCOUNTANT` and `BRANCH_MANAGER` are strictly blocked with `403 Forbidden`),
@@ -252,7 +253,7 @@ flowchart TD
 - **Acceptance Criteria**:
   - **Given** scheme is activated, Month 1 pool of ₹1,00,000 is assigned to company customer ticket with ₹0 dividend;
   - **Given** chit reaches Month $N$ (e.g. Month 20 of 20),
-  - **When** Maker staff prepares the voucher via `POST /disbursements/group/:chitGroupId/prepare-final-settlement` and independent Partner B (`isPartner: true`, `maker != checker`) approves via `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`),
+  - **When** Maker staff prepares the voucher via `POST /disbursements/group/:chitGroupId/prepare-final-settlement` and independent Partner B (`Role.PARTNER`, `maker != checker`) approves via `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`),
   - **Then** system verifies all prior auctions 1 to $N-1$ are settled, retains frozen 4% commission (₹4,000), deducts Month $N$ installment **only if unpaid** (`FIN-B`: ₹0 if already paid at desk), deducts prior arrears, disburses net payout with voucher, and transitions chit group status to `COMPLETED`.
 
 #### US-SA-10: Prize Disbursement Fund Release Execution

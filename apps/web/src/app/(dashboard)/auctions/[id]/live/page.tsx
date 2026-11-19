@@ -73,8 +73,7 @@ function LiveAuctionRoomContent() {
   const user = useAuthStore((s) => s.user);
   // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial auction recording
   const canConductAuction =
-    hasAnyRole(user, ['BRANCH_MANAGER']) ||
-    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
+    hasAnyRole(user, ['BRANCH_MANAGER', 'PARTNER']);
 
   const auctionId = String(params.id);
   const monthParam = searchParams.get('month');

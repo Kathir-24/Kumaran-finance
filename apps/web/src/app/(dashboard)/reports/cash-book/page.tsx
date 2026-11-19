@@ -46,12 +46,13 @@ export default function FormXxiiCashBookPage() {
 
   const user = useAuthStore((s) => s.user);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
-  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER') && !user?.roles?.includes('SUPER_ADMIN'));
-  const isSuperAdminOrAccountant = Boolean(
-    user?.roles?.includes('SUPER_ADMIN') || user?.roles?.includes('ACCOUNTANT') || user?.roles?.includes('AUDITOR')
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER') && !user?.roles?.includes('PARTNER'));
+  const isPartnerOrAccountant = Boolean(
+    user?.roles?.includes('PARTNER') || user?.roles?.includes('ACCOUNTANT') || user?.roles?.includes('AUDITOR')
   );
+  const isSuperAdminOrAccountant = isPartnerOrAccountant;
 
-  const allowedRoles = ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
+  const allowedRoles = ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
   const hasAccess = user?.roles?.some((r) => allowedRoles.includes(r));
 
   // Current Date State (defaults to today IST YYYY-MM-DD)
@@ -75,7 +76,7 @@ export default function FormXxiiCashBookPage() {
       );
       return res || [];
     },
-    enabled: isSuperAdminOrAccountant,
+    enabled: isPartnerOrAccountant,
   });
 
   // 1. Fetch Form XXII Cash Book

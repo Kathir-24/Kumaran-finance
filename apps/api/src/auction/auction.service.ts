@@ -101,7 +101,7 @@ export class AuctionService {
 
   /**
    * Guardrail 11 / ADR-21: When a SUPER_ADMIN (without BRANCH_MANAGER role) acts as
-   * auction Maker (recordBid / recordTieBreak), enforce verified partner identity (isPartner: true).
+   * auction Maker (recordBid / recordTieBreak), enforce verified partner identity (Role.PARTNER).
    */
   private async assertMakerPartnerIfSuperAdminOnly(
     makerUserId: string,
@@ -837,9 +837,9 @@ export class AuctionService {
     dto?: FinalizeAuctionDto,
     userRoles?: string[],
   ) {
-    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+    if (userRoles && !userRoles.includes(Role.PARTNER)) {
       throw new ForbiddenException(
-        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to finalize and commit auctions.',
+        'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to finalize and commit auctions.',
       );
     }
 
@@ -1767,9 +1767,9 @@ export class AuctionService {
     dto: RequestAuctionCorrectionDto,
     userRoles?: string[],
   ) {
-    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+    if (userRoles && !userRoles.includes(Role.PARTNER)) {
       throw new ForbiddenException(
-        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to request auction corrections.',
+        'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to request auction corrections.',
       );
     }
 
@@ -2049,9 +2049,9 @@ export class AuctionService {
     dto?: ApproveAuctionCorrectionDto,
     userRoles?: string[],
   ) {
-    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+    if (userRoles && !userRoles.includes(Role.PARTNER)) {
       throw new ForbiddenException(
-        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to approve auction corrections.',
+        'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to approve auction corrections.',
       );
     }
 
@@ -2571,9 +2571,9 @@ export class AuctionService {
     dto: RejectAuctionCorrectionDto,
     userRoles?: string[],
   ) {
-    if (userRoles && !userRoles.includes(Role.SUPER_ADMIN)) {
+    if (userRoles && !userRoles.includes(Role.PARTNER)) {
       throw new ForbiddenException(
-        'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to reject auction corrections.',
+        'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to reject auction corrections.',
       );
     }
 

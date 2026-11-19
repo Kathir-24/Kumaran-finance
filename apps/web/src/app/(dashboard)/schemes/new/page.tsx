@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, ShieldAlert } from 'lucide-react';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { SchemeForm } from '@/components/schemes/scheme-form';
@@ -13,9 +13,9 @@ export default function NewSchemePage() {
   const t = useTranslations('schemes');
   const user = useAuthStore((s) => s.user);
 
-  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
+  const isAuthorized = hasAnyRole(user, ['PARTNER']);
 
-  if (!isSuperAdmin) {
+  if (!isAuthorized) {
     return (
       <div className="space-y-6">
         <Link

@@ -102,7 +102,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         findUnique: jest.fn(),
       },
       user: {
-        findUnique: jest.fn().mockResolvedValue({ id: mockCheckerId, isPartner: true }),
+        findUnique: jest.fn().mockResolvedValue({ id: mockCheckerId, roles: [Role.PARTNER], isActive: true }),
       },
       auditLog: {
         create: jest.fn(),
@@ -780,7 +780,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
     });
 
     it('should accurately calculate consecutive unpaid arrears when approving reversal (DEF-02)', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, isPartner: true });
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, roles: [Role.PARTNER], isActive: true });
       prismaMock.payment.findUnique.mockResolvedValue({
         ...mockSuccessPayment,
         reversal: {
@@ -803,7 +803,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
         mockPaymentId,
         { notes: 'Cheque bounced at bank' },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // Consecutive unpaid: 4, 3, 2 = 3 months -> triggers DEFAULT_3_MONTHS
@@ -819,7 +819,7 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
     });
 
     it('SEC-A / DEF-03: should reject reversal rejection if checker is not a verified partner', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockCheckerId, roles: [Role.SUPER_ADMIN], isActive: true });
 
       await expect(
         paymentService.rejectReversal(
@@ -861,10 +861,10 @@ describe('Module 7: Payments, Bilingual Receipts & Maker-Checker Reversals Tests
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('SEC-A / DEF-15: should fail closed when partner user is deactivated (isPartner: true, isActive: false)', async () => {
+    it('SEC-A / DEF-15: should fail closed when partner user is deactivated (roles: [PARTNER], isActive: false)', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: mockCheckerId,
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: false,
       });
 

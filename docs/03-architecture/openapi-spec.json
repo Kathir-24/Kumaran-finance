@@ -2374,6 +2374,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",
@@ -10536,6 +10537,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",
@@ -10549,11 +10551,6 @@
             "example": "branch-prd-001",
             "description": "Assigned branch ID",
             "nullable": true
-          },
-          "isPartner": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the staff member is a verified business partner"
           },
           "isTotpEnabled": {
             "type": "boolean",
@@ -10805,6 +10802,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",
@@ -10818,11 +10816,6 @@
             "example": "branch-prd-001",
             "description": "Assigned branch ID",
             "nullable": true
-          },
-          "isPartner": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the staff member is a verified business partner"
           },
           "isTotpEnabled": {
             "type": "boolean",
@@ -11301,6 +11294,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",
@@ -11308,11 +11302,6 @@
                 "AUDITOR"
               ]
             }
-          },
-          "isPartner": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether the staff member is a verified business partner"
           },
           "isActive": {
             "type": "boolean",
@@ -11403,6 +11392,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",
@@ -11455,6 +11445,7 @@
               "type": "string",
               "enum": [
                 "SUPER_ADMIN",
+                "PARTNER",
                 "BRANCH_MANAGER",
                 "ACCOUNTANT",
                 "COLLECTION_AGENT",

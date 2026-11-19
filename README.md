@@ -10,7 +10,7 @@
 2. **Whole Rupee Arithmetic**: All financial amounts (installments, dividends, foreman commissions, prize payouts) are stored and calculated strictly as **whole integer Rupees (₹)**. Paise are never used in Kumaran Finance operations.
 3. **Commission & Dividends**: Foreman commission defaults to **4.00%** and is frozen per chit group upon activation. Dividends are shared **equally across ALL members in that chit group, INCLUDING the auction winner and past prized winners** (`CONFIRMED-BY-DEVELOPER`), and deducted directly from the monthly installment payable next month ($I_{net} = I_{base} - Div$). Total dividend must be cleanly divisible across tickets ($(D - C_f) \pmod M == 0$). Month $N$ final settlement deducts commission, base installment (if unpaid; zero deduction if already paid under FIN-B), and prior arrears ($V - C_f - I_{\text{base}} - \text{arrears} = \mathbf{₹91,000}$ net on ₹1L chit; or $\mathbf{₹96,000}$ if Month $N$ was already paid).
 4. **Auctions & Tie-Breaks**: Auctions are conducted offline at the branch. The software records and validates bids against a fixed **one-fourth (1/4 or 25%) discount ceiling** ($D \le \frac{V}{4}$). Tied ceiling bids are resolved via **Option A (Physical Paper Token Draw)** at the branch. Clerical corrections follow a 2-partner workflow (`KFC-FIN-005`) with downstream paid due guards (`ALREADY_PAID_DUES_EXIST` under FIN-E).
-5. **Operating Structure & Dual Controls**: Supports Kumaran Finance's structure (**4 equal partners**, **2–3 field collection agents**, **1 physical branch office**). High-risk financial actions (reversals, auction finalization, auction corrections, prize payouts, defaulter removals) strictly enforce **Maker-Checker separation of duties** (`maker_user_id != checker_user_id`) and verified partner identity (`isPartner: true` under SEC-A/B).
+5. **Operating Structure & Dual Controls**: Supports Kumaran Finance's structure (**4 equal partners**, **2–3 field collection agents**, **1 physical branch office**). High-risk financial actions (reversals, auction finalization, auction corrections, prize payouts, defaulter removals) strictly enforce **Maker-Checker separation of duties** (`maker_user_id != checker_user_id`) and verified statutory partner identity (`Role.PARTNER` under ADR-21, ADR-27, SEC-A/B).
 6. **Data Scope**: Handles fresh new chits as well as mid-cycle onboarding from physical paper notebooks and physical receipts.
 7. **Operational Platform Scope**: Production focus is on the Web Management Portal (`apps/web`) and NestJS API (`apps/api`). Implementation of the Flutter mobile UI and Android application is **postponed** per explicit owner approval; all mobile API contracts remain preserved.
 
@@ -23,7 +23,7 @@ The entire project blueprint, architecture, compliance, and operational manual s
 ```text
 docs/
 ├── 01-business/
-│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-25)
+│   ├── decision-log.md                       # Architectural Decision Records (ADR-01 through ADR-27)
 │   ├── financial-rules.md                    # Confirmed financial math (whole-rupee mandate, 4% commission, dividends)
 │   ├── permissions-matrix.md                 # RBAC + maker-checker dual controls (4 partners & field agents)
 │   ├── compliance-checklist.md               # Regulatory items, data minimization, & statutory review
@@ -128,7 +128,7 @@ pnpm install
 # Apply Prisma migrations to PostgreSQL
 pnpm run prisma:migrate
 
-# Seed Head Office (PRD) and initial Super Admin partner
+# Seed Head Office (PRD), IT Super Admin, and statutory Partners
 pnpm run prisma:seed
 ```
 

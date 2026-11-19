@@ -45,6 +45,18 @@ export default function DashboardLayout({
     }
   }, [isHydrated, isLoading, isAuthenticated, router]);
 
+  // Persona Landing Redirect: IT Super Admin lands on /users, not on financial dashboard
+  React.useEffect(() => {
+    if (isHydrated && isAuthenticated && user) {
+      const userRoles = user.roles || [];
+      const isPureSuperAdmin =
+        userRoles.includes('SUPER_ADMIN') && !userRoles.includes('PARTNER');
+      if (isPureSuperAdmin && pathname === '/') {
+        router.replace('/users');
+      }
+    }
+  }, [isHydrated, isAuthenticated, user, pathname, router]);
+
   // FOUC Prevention Guard: While verifying session, render minimal clean skeleton
   if (!isHydrated || isLoading) {
     return (

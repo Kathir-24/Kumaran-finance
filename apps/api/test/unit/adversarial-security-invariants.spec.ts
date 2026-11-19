@@ -52,7 +52,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
   beforeEach(() => {
     prismaMock = {
       user: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isActive: true, isPartner: true })),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isActive: true, roles: [Role.PARTNER] })),
         findFirst: jest.fn(),
         update: jest.fn(),
       },
@@ -430,7 +430,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       });
 
       it('SEC-A: should REJECT non-partner Super Admin attempting to approve reversal (403 Forbidden)', async () => {
-        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', roles: [Role.SUPER_ADMIN], isActive: true });
         await expect(
           paymentService.approveReversal(
             mockPaymentId,
@@ -446,7 +446,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       });
 
       it('SEC-A: should REJECT non-partner attempting to request reversal (403 Forbidden)', async () => {
-        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-maker', isPartner: false });
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-maker', roles: [Role.SUPER_ADMIN], isActive: true });
         await expect(
           paymentService.requestReversal(
             mockPaymentId,
@@ -532,7 +532,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
       });
 
       it('SEC-A: should REJECT non-partner Super Admin attempting to authorize payout (403 Forbidden)', async () => {
-        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', roles: [Role.SUPER_ADMIN], isActive: true });
         await expect(
           disbursementService.authorizePayout(
             mockAuctionId,
@@ -606,7 +606,7 @@ describe('Adversarial Security, RBAC & Dual Control Challenger Suite', () => {
         ),
       ).rejects.toThrow(
         new ForbiddenException(
-          'SUPER_ADMIN_REQUIRED: Only Partners (Super Admin) are authorized to finalize and commit auctions.',
+          'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to finalize and commit auctions.',
         ),
       );
     });

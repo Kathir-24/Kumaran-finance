@@ -10,7 +10,6 @@ import {
   IdCard,
   Loader2,
   Phone,
-  Shield,
   Sparkles,
   User,
 } from 'lucide-react';
@@ -25,6 +24,7 @@ const INDIAN_PHONE_REGEX = /^[6-9]\d{9}$/;
 
 const ROLE_OPTIONS = [
   { role: 'SUPER_ADMIN' as const, labelKey: 'roleSuperAdmin' as const },
+  { role: 'PARTNER' as const, labelKey: 'rolePartner' as const },
   { role: 'BRANCH_MANAGER' as const, labelKey: 'roleBranchManager' as const },
   { role: 'ACCOUNTANT' as const, labelKey: 'roleAccountant' as const },
   { role: 'COLLECTION_AGENT' as const, labelKey: 'roleCollectionAgent' as const },
@@ -41,7 +41,6 @@ export function UserForm() {
   const [phone, setPhone] = React.useState('');
   const [branchId, setBranchId] = React.useState('');
   const [selectedRoles, setSelectedRoles] = React.useState<string[]>(['COLLECTION_AGENT']);
-  const [isPartner, setIsPartner] = React.useState(false);
   const [password, setPassword] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -76,9 +75,18 @@ export function UserForm() {
     selectedRoles.length > 0;
 
   const toggleRole = (role: string) => {
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    );
+    setSelectedRoles((prev) => {
+      if (prev.includes(role)) {
+        return prev.filter((r) => r !== role);
+      }
+      if (role === 'SUPER_ADMIN') {
+        return [...prev.filter((r) => r !== 'PARTNER'), role];
+      }
+      if (role === 'PARTNER') {
+        return [...prev.filter((r) => r !== 'SUPER_ADMIN'), role];
+      }
+      return [...prev, role];
+    });
   };
 
   const createMutation = useMutation({
@@ -97,8 +105,7 @@ export function UserForm() {
           body: {
             name: name.trim(),
             phone: cleanPhone,
-            roles: selectedRoles as Array<'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR'>,
-            isPartner: selectedRoles.includes('SUPER_ADMIN') ? isPartner : false,
+            roles: selectedRoles as Array<'SUPER_ADMIN' | 'PARTNER' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR'>,
             branchId: branchId || undefined,
             password: password.trim() || undefined,
           },
@@ -235,31 +242,6 @@ export function UserForm() {
                     );
                   })}
                 </div>
-
-                {selectedRoles.includes('SUPER_ADMIN') && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-[11px] text-amber-200/90 leading-relaxed space-y-2.5 mt-2">
-                    <div className="flex items-start gap-2">
-                      <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-semibold text-amber-300">Super Admin Authority (SEC-A / ADR-21):</span>
-                        <p className="mt-0.5 text-slate-300">
-                          Administrative Super Admins manage staff users, audit registers, and background queues. Only verified statutory business partners can perform financial authorizations (auctions, payouts, reversals).
-                        </p>
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer pt-1.5 border-t border-amber-500/20">
-                      <input
-                        type="checkbox"
-                        checked={isPartner}
-                        onChange={(e) => setIsPartner(e.target.checked)}
-                        className="rounded border-amber-500/40 bg-slate-950 text-amber-500 focus:ring-amber-500/30 h-3.5 w-3.5"
-                      />
-                      <span className="font-semibold text-amber-200">
-                        Designate as Verified Statutory Business Partner (isPartner: true)
-                      </span>
-                    </label>
-                  </div>
-                )}
               </div>
 
               {/* Initial Temporary Password */}

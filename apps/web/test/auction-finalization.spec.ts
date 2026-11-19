@@ -40,34 +40,33 @@ describe('Task 6.3: Dual-Control Maker-Checker Auction Finalization & Minutes Un
     assert.equal(canAuthorize(checkerUserId, makerUserId), true);
   });
 
-  // 3. RBAC & Guardrail 11 (SEC-A / KFC-SEC-003): Strictly SUPER_ADMIN with isPartner: true
-  it('RBAC Authority & Guardrail 11: Restricts finalization strictly to verified Partners (SUPER_ADMIN + isPartner: true)', () => {
-    const canFinalize = (roles: string[], isPartner: boolean) =>
-      roles.includes('SUPER_ADMIN') && isPartner === true;
+  // 3. RBAC & Guardrail 11 (SEC-A / KFC-SEC-003): Strictly Role.PARTNER
+  it('RBAC Authority & Guardrail 11: Restricts finalization strictly to verified Partners (Role.PARTNER)', () => {
+    const canFinalize = (roles: string[]) =>
+      roles.includes('PARTNER');
 
-    assert.equal(canFinalize(['SUPER_ADMIN'], true), true);
-    assert.equal(canFinalize(['SUPER_ADMIN'], false), false); // Non-partner IT admin strictly blocked
-    assert.equal(canFinalize(['BRANCH_MANAGER'], true), false); // Branch Manager strictly blocked per KFC-SEC-003
-    assert.equal(canFinalize(['ACCOUNTANT'], false), false);
-    assert.equal(canFinalize(['COLLECTION_AGENT'], false), false);
-    assert.equal(canFinalize(['CUSTOMER'], false), false);
-    assert.equal(canFinalize(['AUDITOR'], false), false);
+    assert.equal(canFinalize(['PARTNER']), true);
+    assert.equal(canFinalize(['SUPER_ADMIN']), false); // Non-partner IT admin strictly blocked
+    assert.equal(canFinalize(['BRANCH_MANAGER']), false); // Branch Manager strictly blocked per KFC-SEC-003
+    assert.equal(canFinalize(['ACCOUNTANT']), false);
+    assert.equal(canFinalize(['COLLECTION_AGENT']), false);
+    assert.equal(canFinalize(['CUSTOMER']), false);
+    assert.equal(canFinalize(['AUDITOR']), false);
   });
 
-  // 3b. Source regression: AuctionFinalizeCard strictly excludes BRANCH_MANAGER & enforces isPartner
-  it('DEF-WM-02 Regression: AuctionFinalizeCard restricts finalization to SUPER_ADMIN + isPartner and checks recorded bid', () => {
+  // 3b. Source regression: AuctionFinalizeCard strictly excludes BRANCH_MANAGER & enforces PARTNER
+  it('DEF-WM-02 Regression: AuctionFinalizeCard restricts finalization to PARTNER and checks recorded bid', () => {
     const cardPath = path.resolve(
       process.cwd(),
       'src/components/auctions/auction-finalize-card.tsx',
     );
     const source = fs.readFileSync(cardPath, 'utf-8');
-    assert.match(source, /hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)/);
+    assert.match(source, /hasAnyRole\(user,\s*\['PARTNER'\]\)/);
     assert.doesNotMatch(
       source,
-      /hasAnyRole\(user,\s*\['SUPER_ADMIN',\s*'BRANCH_MANAGER'\]\)/,
+      /hasAnyRole\(user,\s*\[.*'BRANCH_MANAGER'.*\]\)/,
       'BRANCH_MANAGER must NOT be allowed to finalize auctions (KFC-SEC-003)',
     );
-    assert.match(source, /Boolean\(user\?\.isPartner\)/);
     assert.match(source, /hasRecordedBid/);
   });
 
@@ -93,7 +92,7 @@ describe('Task 6.3: Dual-Control Maker-Checker Auction Finalization & Minutes Un
     );
     assert.match(correctionSource, /disbursementStatus === 'DISBURSED'/);
     assert.match(correctionSource, /isSelfApproval/);
-    assert.match(correctionSource, /Boolean\(user\?\.isPartner\)/);
+    assert.match(correctionSource, /hasAnyRole\(user,\s*\['PARTNER'\]\)/);
 
     // XR-WM-02: Server pendingCorrection hydration across reloads + correctedWinningTicketId swap selector
     assert.match(detailSource, /pendingCorrection=\{auction\.pendingCorrection\}/);
@@ -268,10 +267,10 @@ describe('Task 6.3: Dual-Control Maker-Checker Auction Finalization & Minutes Un
       'utf-8',
     );
 
-    // M9-WEB-DEF-02: canRecordFiling enforces isPartner on Super Admin
+    // M9-WEB-DEF-02: canRecordFiling enforces partner authority
     assert.match(
       detailSource,
-      /canRecordFiling\s*=\s*hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+      /canRecordFiling\s*=\s*hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT',\s*'PARTNER'\]\)/,
     );
 
     // M9-WEB-DEF-06: AuctionFinalizeCard validates signedByForeman before onFinalize

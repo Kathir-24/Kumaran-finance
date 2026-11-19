@@ -297,18 +297,18 @@ describe('Task 6.2: Real-Time In-Office Auction Room Unit Tests', () => {
       'DefaulterEligibilityRoster must never bypass server eligibility with || fallback',
     );
 
-    // Guardrail 11 (SEC-A): IT Super Admin (isPartner: false) blocked on live room & bidding console
+    // Guardrail 11 (SEC-A): IT Super Admin blocked on live room & bidding console
     const consoleSource = fs.readFileSync(
       path.resolve(process.cwd(), 'src/components/auctions/bidding-console.tsx'),
       'utf-8',
     );
     assert.match(
       livePageSource,
-      /hasAnyRole\(user,\s*\['BRANCH_MANAGER'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'PARTNER'\]\)/,
     );
     assert.match(
       consoleSource,
-      /hasAnyRole\(user,\s*\['BRANCH_MANAGER'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'PARTNER'\]\)/,
     );
 
     // TieBreakModal token auto-assignment allocates smallest unused positive integer (zero duplicates)

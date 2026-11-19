@@ -48,7 +48,6 @@ async function main() {
       name: 'Browser Onboarding Staff',
       passwordHash,
       roles: [Role.SUPER_ADMIN],
-      isPartner: true,
       branchId: branch.id,
       isActive: true,
       mustChangePassword: true,

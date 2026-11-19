@@ -70,7 +70,7 @@ flowchart TD
 8. **Defaulter & Single Payment Rules (ADR-07)**: Any subscriber who has not paid their installment due for that month is **strictly ineligible to participate or bid** in that month's auction. 3 consecutive unpaid months grants the company removal rights. Each month has strictly a single discrete payment; **zero double payments**, **zero partial payments**, and **zero advance balances** exist. `DueStatus` is strictly `UNPAID`, `PAID`, `OVERDUE`.
 9. **Company Safety Proof Checklist (ADR-15)**: Property documents are completely eliminated. Collateral/surety is **not mandatory** across the board and requested only on-demand for company safety. Software acts as a flexible checklist and attachment recordkeeper (signed agreement with winner & nominee, signed blank cheques, promissory notes, and scanned uploads).
 10. **Maker-Checker Separation of Duties**: Critical actions (payment reversals, auction finalization, prize disbursements, cash handover) strictly enforce **`maker_user_id != checker_user_id`** at application and database levels, regardless of client device (Web-to-Web, Mobile-to-Mobile, or Cross-Device).
-11. **Verified Partner Identity (ADR-21 / SEC-A)**: Not all Super Admins are partners. Administrative Super Admins (`isPartner: false`) possess IT capabilities (user onboarding, settings, viewing audit logs, and BullMQ queues) but are **strictly barred** from financial authorizations (reversals, auction finalization, prize payouts, defaulter removal). Only verified statutory business partners (`isPartner: true`) can act as Maker or Checker on financial mutations under Guardrail 10. Viewing audit logs and background queues is restricted strictly to Super Admin.
+11. **Verified Partner Identity & Persona Separation (ADR-21, ADR-27 / SEC-A)**: `SUPER_ADMIN` and `PARTNER` are strictly separate first-class roles. The legacy `isPartner` boolean column and flags have been completely removed from the database and system in favor of pure first-class `Role.PARTNER` vs `Role.SUPER_ADMIN`. `SUPER_ADMIN` is the IT Infrastructure & User Administrator, possessing IT capabilities (`/users`, `/users/new`, `/branches`, `/admin/jobs`, `/reports/audit-logs`) but is **strictly barred** from all financial mutations and chit operations (reversals, auction finalization, prize payouts, defaulter removal, schemes, counter collections, financial dashboard). Only statutory business partners (`Role.PARTNER`) hold Maker/Checker financial authority under Guardrail 10. Viewing audit logs and background queues is restricted strictly to Super Admin.
 
 ---
 
@@ -83,7 +83,7 @@ Before starting any task, read the exact corresponding specification document in
 | **Database Models & Prisma Schema** | [`docs/03-architecture/data-model.md`](docs/03-architecture/data-model.md) |
 | **Database Concurrency, Pooling & Resilience** | [docs/03-architecture/database-concurrency-and-performance.md](docs/03-architecture/database-concurrency-and-performance.md) |
 | **Financial Formulas & Chit Math** | [`docs/01-business/financial-rules.md`](docs/01-business/financial-rules.md) |
-| **Architectural Decisions (ADR 01-25)** | [`docs/01-business/decision-log.md`](docs/01-business/decision-log.md) |
+| **Architectural Decisions (ADR 01-27)** | [`docs/01-business/decision-log.md`](docs/01-business/decision-log.md) |
 | **Personas, Roles & RBAC Matrix** | [`docs/01-business/permissions-matrix.md`](docs/01-business/permissions-matrix.md) |
 | **Security & Anti-BOLA/IDOR Guardians** | [`docs/03-architecture/security-and-access-guardians.md`](docs/03-architecture/security-and-access-guardians.md) |
 | **Functional Requirements (10 Modules)** | [`docs/02-requirements/prd.md`](docs/02-requirements/prd.md) |
@@ -134,7 +134,7 @@ Before starting any task, read the exact corresponding specification document in
 Before claiming any task is complete, verify:
 - [ ] Stored currency amounts use `BigInt` (not `number` or float).
 - [ ] Maker $\ne$ Checker constraint is enforced on sensitive endpoints.
-- [ ] Partner identity (`isPartner: true`) is enforced on financial endpoints; audit logs and BullMQ telemetry are restricted strictly to Super Admin.
+- [ ] Partner identity (`Role.PARTNER`) is enforced on financial endpoints; audit logs and BullMQ telemetry are restricted strictly to Super Admin.
 - [ ] No unverified business or statutory rules were assumed without confirmation.
 - [ ] Automated tests verify calculation invariants with 100% pass rate.
 - [ ] Code is formatted and compiles cleanly without lint errors.

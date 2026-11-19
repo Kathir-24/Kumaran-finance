@@ -25,7 +25,7 @@
 - **Session Security (`ADR-20` & `ADR-24`)**:
   - Web: Next.js 15 BFF HttpOnly cookies (`kc_access_token` 15 min, `kc_refresh_token` 7 days; zero browser `localStorage` tokens), durable PostgreSQL `Session` vault with cryptographic `sid` binding and client-family isolation, 18-minute warning / 20-minute inactivity auto-logout (`SessionInactivityGuard`), and Microsoft Authenticator TOTP 2FA.
   - Mobile Core: Single-flight 401 refresh mutex (`AuthSessionManager`, `F14`); 15-minute JWT access tokens; Android Keystore biometric binding targeted for Phase 2 UI (`ADR-26`).
-- **Maker-Checker & Partner Identity Enforcement (`ADR-21` & `ADR-25`)**: All 8 critical financial workflows enforce `maker_user_id != checker_user_id` at both service layer (`assertVerifiedPartner`, `isPartner: true`) and PostgreSQL 17 storage layer (8 engine-level `CHECK` constraints).
+- **Maker-Checker & Partner Identity Enforcement (`ADR-21`, `ADR-25` & `ADR-27`)**: All 8 critical financial workflows enforce `maker_user_id != checker_user_id` at both service layer (`assertVerifiedPartner`, `Role.PARTNER`) and PostgreSQL 17 storage layer (8 engine-level `CHECK` constraints).
 - **Immutable Audit Trail**: Append-only audit logs (`GET /reports/audit-logs`, restricted strictly to `SUPER_ADMIN`) for all financial mutations, auction finalizations/corrections, and role adjustments. Direct `UPDATE` or `DELETE` on financial records is blocked.
 
 ---

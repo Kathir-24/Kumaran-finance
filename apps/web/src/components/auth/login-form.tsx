@@ -34,6 +34,7 @@ export function LoginForm() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const setPendingTotp = useAuthStore((state) => state.setPendingTotp);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -46,9 +47,14 @@ export function LoginForm() {
   // Guard: Redirect already-authenticated users to target dashboard
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.replace(redirectUrl);
+      const userRoles = user?.roles || [];
+      const isPureSuperAdmin =
+        userRoles.includes('SUPER_ADMIN') && !userRoles.includes('PARTNER');
+      const targetUrl =
+        redirectUrl === '/' && isPureSuperAdmin ? '/users' : redirectUrl;
+      router.replace(targetUrl);
     }
-  }, [isAuthenticated, router, redirectUrl]);
+  }, [isAuthenticated, router, redirectUrl, user]);
 
   // ADR-18 Form Validation Schema: Strictly 10-digit Indian Mobile + min 6 char password
   const loginSchema = React.useMemo(
@@ -139,7 +145,12 @@ export function LoginForm() {
       // Branch 2: Direct Authentication (HttpOnly session established)
       if (response?.success && response?.user) {
         setAuth(response.user);
-        router.push(redirectUrl);
+        const userRoles = response.user.roles || [];
+        const isPureSuperAdmin =
+          userRoles.includes('SUPER_ADMIN') && !userRoles.includes('PARTNER');
+        const targetUrl =
+          redirectUrl === '/' && isPureSuperAdmin ? '/users' : redirectUrl;
+        router.push(targetUrl);
         return;
       }
 

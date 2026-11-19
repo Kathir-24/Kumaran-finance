@@ -118,7 +118,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         create: jest.fn(),
       },
       user: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isPartner: true, name: 'Partner Test' })),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', roles: [Role.PARTNER], isActive: true, name: 'Partner Test' })),
       },
       customer: {
         findUnique: jest.fn(),
@@ -313,12 +313,12 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
           },
           mockMakerId, // Same as Maker!
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should ENFORCE SUPER_ADMIN EXCLUSIVITY: Block Branch Manager from authorizing prize payout', async () => {
+    it('should ENFORCE PARTNER EXCLUSIVITY: Block Branch Manager from authorizing prize payout', async () => {
       prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
 
       // User has only BRANCH_MANAGER role
@@ -329,9 +329,24 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
           },
           mockCheckerId,
-          [Role.BRANCH_MANAGER], // Not Super Admin!
+          [Role.BRANCH_MANAGER], // Not Partner!
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('SEC-A: should reject non-partner Super Admin attempting to authorize prize payout', async () => {
+      prismaMock.auction.findUnique.mockResolvedValue(mockVerifiedAuction);
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'it-admin', roles: [Role.SUPER_ADMIN], isActive: true });
+      await expect(
+        disbursementService.authorizePayout(
+          mockAuctionId,
+          {
+            disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
+          },
+          'it-admin',
+          [Role.SUPER_ADMIN],
+        ),
+      ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
     });
 
     it('should authorize prize payout when independent Partner B (Checker) approves', async () => {
@@ -351,7 +366,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           notes: 'Authorized after verifying blank cheques and agreement',
         },
         mockCheckerId, // Independent Partner B (Maker != Checker satisfied!)
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith(
@@ -397,7 +412,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           notes: 'Authorized ₹3,75,000 prize payout in hard cash at Perundurai head office',
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith(
@@ -441,7 +456,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         mockAuctionId,
         { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(mockRedisClient.del).toHaveBeenCalledWith(
@@ -476,7 +491,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           notes: 'Deducted ₹10,000 prior arrears from ₹75,000 prize',
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // Verify DB update recorded net amount after arrears offset: 75,000 - 10,000 = 65,000
@@ -505,7 +520,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             disbursedAmount: 70000, // Override attempt!
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -619,7 +634,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       const staffUser: JwtPayload = {
         sub: mockMakerId,
         phone: '9842199999',
-        roles: [Role.SUPER_ADMIN],
+        roles: [Role.PARTNER],
         branchId: mockBranchId,
         tokenType: 'access',
       };
@@ -666,7 +681,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       const staffUser: JwtPayload = {
         sub: mockMakerId,
         phone: '9842199999',
-        roles: [Role.SUPER_ADMIN],
+        roles: [Role.PARTNER],
         branchId: null,
         tokenType: 'access',
       };
@@ -714,7 +729,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE,
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -762,7 +777,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           makerUserId: mockMakerId,
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(result.settlement.grossPrize).toBe(100000);
@@ -833,7 +848,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           makerUserId: mockMakerId,
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(result.settlement.grossPrize).toBe(100000);
@@ -845,7 +860,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
     });
 
     it('SEC-A: should reject non-partner Super Admin attempting final month settlement', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         disbursementService.settleFinalMonth(
           mockChitGroup.id,
@@ -985,7 +1000,6 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       sub: 'it-admin-001',
       phone: '9842100077',
       roles: [Role.SUPER_ADMIN],
-      isPartner: false,
       branchId: mockBranchId,
       tokenType: 'access',
     };
@@ -997,7 +1011,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           mockAuctionId,
           { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
           'deleted-user-id',
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(ForbiddenException);
 
@@ -1011,7 +1025,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: mockMakerId,
           },
           'deleted-user-id',
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(ForbiddenException);
 
@@ -1020,13 +1034,13 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         disbursementService.approveFinalSettlement(
           mockChitGroup.id,
           'deleted-user-id',
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('DISB-01: blocks administrative IT Super Admin (isPartner: false) from verifySafetyProof, releasePayout, and prepareFinalSettlement', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, isPartner: false, isActive: true });
+    it('DISB-01: blocks administrative IT Super Admin (roles: [Role.SUPER_ADMIN]) from verifySafetyProof, releasePayout, and prepareFinalSettlement', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         disbursementService.verifySafetyProof(
           mockAuctionId,
@@ -1036,7 +1050,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         ),
       ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/i);
 
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, isPartner: false, isActive: true });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         disbursementService.releasePayout(
           mockAuctionId,
@@ -1046,7 +1060,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         ),
       ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/i);
 
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, isPartner: false, isActive: true });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: itSuperAdmin.sub, roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         disbursementService.prepareFinalSettlement(
           mockChitGroup.id,
@@ -1156,7 +1170,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           makerUserId: mockMakerId,
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // 100,000 - 5% (5,000) - Month 20 base (5,000) = 90,000
@@ -1254,7 +1268,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       prismaMock.subscriberTicket.count.mockResolvedValue(1);
       // First lookup: checker partner (valid); second lookup: spoofed makerUserId (null!)
       prismaMock.user.findUnique
-        .mockResolvedValueOnce({ id: mockCheckerId, isPartner: true, isActive: true })
+        .mockResolvedValueOnce({ id: mockCheckerId, roles: [Role.PARTNER], isActive: true })
         .mockResolvedValueOnce(null);
 
       await expect(
@@ -1266,14 +1280,14 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: '00000000-0000-0000-0000-000000000999',
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/INVALID_MAKER_IDENTITY/i);
 
       // Now test valid settlement with 1 prior arrears due -> verifies PRIZE_ARREARS_OFFSET_ALLOCATED logs
       prismaMock.user.findUnique
-        .mockResolvedValueOnce({ id: mockCheckerId, isPartner: true, isActive: true })
-        .mockResolvedValueOnce({ id: mockMakerId, roles: [Role.ACCOUNTANT], isPartner: false, isActive: true });
+        .mockResolvedValueOnce({ id: mockCheckerId, roles: [Role.PARTNER], isActive: true })
+        .mockResolvedValueOnce({ id: mockMakerId, roles: [Role.ACCOUNTANT], isActive: true });
       prismaMock.installmentDue.findMany
         .mockResolvedValueOnce([
           { id: 'due-m19', ticketId: mockTicketId, installmentMonth: 19, netPayableAmount: 4000n, paidAmount: 0n, status: DueStatus.OVERDUE },
@@ -1297,7 +1311,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           makerUserId: mockMakerId,
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // 100,000 - 4,000 commission - 5,000 Month 20 - 4,000 Month 19 prior arrears = 87,000
@@ -1341,7 +1355,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         disbursementService.approveFinalSettlement(
           mockChitGroup.id,
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/ARREARS_STATE_CHANGED/i);
     });
@@ -1427,7 +1441,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       const voucher = await disbursementService.getBilingualVoucher(mockAuctionId, {
         sub: mockCheckerId,
         phone: '9842199999',
-        roles: [Role.SUPER_ADMIN],
+        roles: [Role.PARTNER],
         branchId: mockBranchId,
         tokenType: 'access',
       });
@@ -1498,7 +1512,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: mockMakerId,
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/INVALID_COMMISSION_RATE/i);
 
@@ -1517,7 +1531,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: mockMakerId,
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/INVALID_COMMISSION_RATE/i);
 
@@ -1541,7 +1555,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           makerUserId: mockMakerId,
         },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(settled.settlement.paymentReference).toBe('FINAL_SETTLEMENT_MONTH_N');
@@ -1568,7 +1582,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           mockAuctionId,
           { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/AUCTION_NOT_FINALIZED/i);
 
@@ -1582,7 +1596,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           mockAuctionId,
           { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/INVALID_PAYOUT_MONTH/i);
 
@@ -1631,7 +1645,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: mockMakerId, // Forged client makerUserId!
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
           { requirePreparedSettlement: true },
         ),
       ).rejects.toThrow(/PREPARED_SETTLEMENT_REQUIRED/i);
@@ -1663,7 +1677,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             makerUserId: mockMakerId, // Attempt to spoof different maker!
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
           { requirePreparedSettlement: true },
         ),
       ).rejects.toThrow(/MAKER_CHECKER_VIOLATION/i);
@@ -1717,7 +1731,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
         mockAuctionId,
         { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
         mockCheckerId,
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(lockOrder).toEqual([
@@ -1753,7 +1767,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
           mockAuctionId,
           { disbursementMode: DisbursementMode.ACCOUNT_PAYEE_CHEQUE },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/INVALID_PRIZE_MONEY/i);
     });
@@ -1764,7 +1778,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       await disbursementService.getWinnerDisbursement(mockAuctionId, {
         sub: mockCheckerId,
         phone: '9876543211',
-        roles: [Role.SUPER_ADMIN],
+        roles: [Role.PARTNER],
         branchId: mockBranchId,
         tokenType: 'access',
       });
@@ -1931,7 +1945,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
       const voucher = await disbursementService.getBilingualVoucher(mockAuctionId, {
         sub: mockCheckerId,
         phone: '9876543211',
-        roles: [Role.SUPER_ADMIN],
+        roles: [Role.PARTNER],
         branchId: mockBranchId,
         tokenType: 'access',
       });
@@ -2026,7 +2040,7 @@ describe('Module 8: Prize Disbursements & Company Safety Proof Checklist Tests',
             disbursedAmount: 75000,
           },
           mockCheckerId,
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/PENDING_CORRECTION_LOCKOUT/i);
 

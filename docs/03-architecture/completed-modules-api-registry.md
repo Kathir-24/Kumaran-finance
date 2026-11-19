@@ -14,7 +14,7 @@
 | **Foundation, Health & Metrics** | `/`, `/health`, `/metrics` | 6 | Root liveness, Terminus `/health`, `/readiness`, `/liveness`, `/sentry-test`, Prometheus APM (`MetricsAuthGuard`) |
 | **Module 1: Auth & Staff Identity** | `/auth` | 15 | bcrypt (salt 10-12), RFC 6238 TOTP (Lua claim), Redis Lua SMS-OTP (300s TTL, 3 attempts), MPIN (`F01`), forced onboarding (`F16`), PostgreSQL `Session` Vault (`F04`) |
 | **Branches: Company Offices** | `/branches` | 4 | Single company tenancy (ADR-01), bilingual Tamil names, branch metadata `PATCH`, branch-scoping |
-| **Users: Staff Administration** | `/users` | 6 | RBAC role management, `isPartner` verified partner flag, atomic session revocation on deactivation/reset (`F02`) |
+| **Users: Staff Administration** | `/users` | 6 | RBAC role management (including `Role.PARTNER` vs `Role.SUPER_ADMIN`), atomic session revocation on deactivation/reset (`F02`) |
 | **Module 2: Customer & KYC Intake** | `/customers` | 12 | Auto `KC-CUST-XXXXX`, bilingual names, masked `aadhaarLast4`, S3 KYC upload + direct presigned `/confirm`, 15-min presigned URLs, scan deletion |
 | **Module 3: Chit Groups & Intake** | `/chits` | 12 | 4% commission lock, fixed 1/4 ceiling ($D \le V/4$), ADR-13 ticket limit, Month 1 pool, draft update/register/activate/cancel/close, ticket unassign |
 | **Module 4: In-Office Auctions** | `/auctions` | 13 | Pre-auction defaulter & pending-removal block, Option A paper token draw, Partner-only Maker $\ne$ Checker finalize (`KFC-SEC-003`), finalized correction (`request`/`approve`/`reject`), Registrar filing (`COMPLETED` $\to$ `MINUTES_FILED`) |
@@ -38,8 +38,8 @@ An automated AST inspection utility (`apps/api/scripts/audit/audit-persona-enfor
 
 | Persona Role | Scope & Enforcement Boundary |
 |---|---|
-| **`SUPER_ADMIN` (`isPartner: true`)** | Full global administrative and financial authority on Web & Mobile. `maker != checker` enforced at service and PostgreSQL engine levels (8 `CHECK` constraints). Only verified Partners can authorize reversals, auction finalizations/corrections, prize payouts, and defaulter removals. |
-| **`SUPER_ADMIN` (`isPartner: false`)** | Administrative IT access (branches, staff onboarding/resets, `GET /reports/audit-logs`, `GET /jobs/*`, Bull Board `/admin/queues`), strictly barred from financial mutations under Guardrail 11 (`ADR-21`). |
+| **`Role.PARTNER`** | Full global ownership and financial authority on Web & Mobile (auctions, payouts, reversals, schemes, collections, reports). `maker != checker` enforced at service and PostgreSQL engine levels (8 `CHECK` constraints). |
+| **`Role.SUPER_ADMIN`** | Administrative IT access (branches, staff onboarding/resets, `GET /reports/audit-logs`, `GET /jobs/*`, Bull Board `/admin/queues`), strictly barred from financial dashboard and chit mutations under Guardrails 10 & 11 (`ADR-21`, `ADR-27`). |
 | **`BRANCH_MANAGER`** | Branch-scoped customer intake, auction facilitation (`record-bid`, `tie-break`), safety proof verification, vault cash acknowledgment, and reports. Strictly blocked from scheme creation/activation, user resets, auction finalization (`KFC-SEC-003`), payment reversal initiation/approval (`KFC-SEC-001`), prize payout authorization, defaulter removal (`KFC-SEC-002`), audit logs, and BullMQ telemetry. |
 | **`ACCOUNTANT`** | Company-wide financial ledger entries, mid-cycle notebook transcription (Maker), safety proof verification, payout release (`disburse`), cash handover acknowledgment, UPI claim verification, and statutory registers. Strictly blocked from user admin, scheme activation, auction bidding/finalization, payment reversals (`KFC-SEC-001`), payout authorization, audit logs, and BullMQ telemetry. |
 | **`COLLECTION_AGENT`** | Scoped strictly to active-ticket customers in assigned branch. Doorstep collections, offline sync, handover submission, viewing assigned dues, generating customer UPI intent. Strictly blocked from customer KYC viewing (`403`), prize disbursements/vouchers, Form XVII minutes, passbooks, payment reversals, audit logs, and BullMQ telemetry. |
@@ -228,7 +228,7 @@ An automated AST inspection utility (`apps/api/scripts/audit/audit-persona-enfor
 | `POST` | `/disbursements/auction/:auctionId/disburse` | Record payout release & reference | **Allowed** | 🚫 **Blocked** | **Allowed** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `GET` | `/disbursements/auction/:auctionId/voucher` | Generate bilingual payout voucher | **All** | **Branch Scope** | **Company-wide** | 🚫 **Blocked** | **Own Voucher Only**| **Read-Only (Global)** |
 | `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher | **Allowed (Maker)** | **Allowed (Branch)** | **Allowed (Desk)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
-| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`isPartner: true`, `maker != checker`) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
+| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`Role.PARTNER`, `maker != checker`) | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 | `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Direct Settlement**: Combined payout execution with verified Maker DTO | **Allowed (Checker)** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** | 🚫 **Blocked** |
 
 ## 10. Module 9: Dashboards & Statutory Reports (`apps/api/src/report/`)

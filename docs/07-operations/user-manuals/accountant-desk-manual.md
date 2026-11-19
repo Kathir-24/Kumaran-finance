@@ -210,7 +210,7 @@ flowchart TD
 4. **Server-Computed Payout & Automatic Arrears Offset (`KFC-FIN-003` / `KFC-FIN-004`)**:
    - The server automatically computes net prize money (`Gross Pool - Winning Discount - Unpaid Arrears`). Manual net-payout overrides are strictly prohibited (`KFC-FIN-004`); any unpaid dues on the winning ticket are automatically deducted (`KFC-FIN-003`) before disbursement.
 5. Select the requested payout mode (**Account Payee Cheque**, **NEFT/RTGS**, or **Cash**).
-6. Click **"Submit Payout Voucher"** (`POST /api/v1/disbursements/auction/:id/verify-safety-proof`). Status transitions to `VERIFIED_BY_MAKER`, awaiting Verified Partner (`isPartner: true`) authorization.
+6. Click **"Submit Payout Voucher"** (`POST /api/v1/disbursements/auction/:id/verify-safety-proof`). Status transitions to `VERIFIED_BY_MAKER`, awaiting Statutory Partner (`Role.PARTNER`) authorization.
 
 ---
 
@@ -266,22 +266,22 @@ flowchart TD
 ## 10. Escalating Payment Reversals to Verified Partners (`KFC-SEC-001`)
 
 > [!IMPORTANT]
-> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21)**: Under live backend enforcement (`payment.controller.ts`), the `ACCOUNTANT` role is **strictly blocked (`HTTP 403 Forbidden`)** from calling `POST /api/v1/payments/:id/request-reversal` or `POST /api/v1/payments/:id/approve-reversal`. Both Maker and Checker steps for payment reversals must be executed by two distinct **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)**.
+> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21 / ADR-27)**: Under live backend enforcement (`payment.controller.ts`), the `ACCOUNTANT` role is **strictly blocked (`HTTP 403 Forbidden`)** from calling `POST /api/v1/payments/:id/request-reversal` or `POST /api/v1/payments/:id/approve-reversal`. Both Maker and Checker steps for payment reversals must be executed by two distinct **Statutory Partners (`Role.PARTNER`)**. IT Super Admins (`Role.SUPER_ADMIN`) are also barred.
 
 ```mermaid
 flowchart TD
     Mistake["Mistake Identified at Counter:\nRecorded ₹4,100 to Ticket #8 instead of Ticket #9"] --> Prep["Desk Accountant gathers physical receipt KC-REC-PRD-2026-00412\n& writes signed discrepancy note"]
-    Prep --> Escalate["Escalate to Verified Partner A (isPartner: true)"]
-    Escalate --> PartnerA["Verified Partner A submits reversal request\n(POST /api/v1/payments/:id/request-reversal)\n• PaymentReversal created: Status = REQUESTED\n• Payment remains SUCCESS until approved"]
-    PartnerA --> PartnerB["Independent Verified Partner B (isPartner: true) approves\n(POST /api/v1/payments/:id/approve-reversal)\n• Payment transitions: SUCCESS -> REVERSED\n• Ticket due reverts to UNPAID\n• PDF stamped 'ரத்து செய்யப்பட்டது / CANCELLED'"]
+    Prep --> Escalate["Escalate to Statutory Partner A (Role.PARTNER)"]
+    Escalate --> PartnerA["Statutory Partner A submits reversal request\n(POST /api/v1/payments/:id/request-reversal)\n• PaymentReversal created: Status = REQUESTED\n• Payment remains SUCCESS until approved"]
+    PartnerA --> PartnerB["Independent Statutory Partner B (Role.PARTNER) approves\n(POST /api/v1/payments/:id/approve-reversal)\n• Payment transitions: SUCCESS -> REVERSED\n• Ticket due reverts to UNPAID\n• PDF stamped 'ரத்து செய்யப்பட்டது / CANCELLED'"]
 ```
 
 ### Step-by-Step Instructions:
 1. Locate the erroneous payment under **Payments $\to$ Recent Collections** and note the exact receipt number (e.g., `KC-REC-PRD-2026-00412`).
 2. Do **not** attempt to cancel or reverse the entry directly from an `ACCOUNTANT` login — the API returns `HTTP 403 Forbidden` by design (`KFC-SEC-001`).
 3. Print or retrieve the physical counter receipt and write a clear discrepancy memo (e.g., *"Cashier error: Member Mani (Ticket #9) paid ₹4,100 cash, but was entered against Ticket #8 (Kannan)."*).
-4. Hand the physical receipt and memo to **Verified Partner A (`isPartner: true`)** to submit the Maker reversal request (`POST /api/v1/payments/:id/request-reversal`, creating a `PaymentReversal` record in **`REQUESTED`** status while the original `Payment` stays **`SUCCESS`**).
-5. **Independent Verified Partner B (`isPartner: true`)** then approves the reversal (`POST /api/v1/payments/:id/approve-reversal`, enforcing `maker != checker`), transitioning the payment to **`REVERSED`**, reverting the ticket due to `UNPAID`, and stamping future PDF downloads with the bold red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
+4. Hand the physical receipt and memo to **Statutory Partner A (`Role.PARTNER`)** to submit the Maker reversal request (`POST /api/v1/payments/:id/request-reversal`, creating a `PaymentReversal` record in **`REQUESTED`** status while the original `Payment` stays **`SUCCESS`**).
+5. **Independent Statutory Partner B (`Role.PARTNER`)** then approves the reversal (`POST /api/v1/payments/:id/approve-reversal`, enforcing `maker != checker`), transitioning the payment to **`REVERSED`**, reverting the ticket due to `UNPAID`, and stamping future PDF downloads with the bold red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
 6. Once reversed, record the payment cleanly against the correct subscriber ticket (`Ticket #9`) and issue the new official receipt.
 
 ---
@@ -316,6 +316,6 @@ flowchart TD
 | Common Trap / Mistake | Software Behavior | Proper Resolution by Cashier |
 |---|---|---|
 | **Member insists on paying ₹2,000 partial installment** | Input rejected; system enforces discrete binary amount ($I_{net} = \text{₹}3,700$). | Politely explain: *"Under company policy, full monthly installment must be paid at once."* Hold physical cash in customer envelope until full balance is ready. |
-| **Cashier tries to request or approve a payment reversal** | Software throws `HTTP 403 Forbidden` (`KFC-SEC-001`: reversals are strictly restricted to Verified Partners with `isPartner: true`). | Escalate physical receipt + written discrepancy memo to Verified Partner A (Maker) and Verified Partner B (Checker). |
+| **Cashier tries to request or approve a payment reversal** | Software throws `HTTP 403 Forbidden` (`KFC-SEC-001`: reversals are strictly restricted to Statutory Partners with `Role.PARTNER`). | Escalate physical receipt + written discrepancy memo to Statutory Partner A (Maker) and Statutory Partner B (Checker). |
 | **Member brings soiled / counterfeit currency note** | Note-sorting machine rejects note. | Hand note back to subscriber immediately; request clean replacement note before issuing receipt. |
 | **Customer forgot physical paper passbook** | Digital receipt prints normally and TRAI DLT SMS alert is sent (Phase 2: FCM Push). | Issue printed paper slip; inform member to bring passbook next month for pen endorsement. |

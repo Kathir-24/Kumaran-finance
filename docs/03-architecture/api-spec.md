@@ -100,18 +100,18 @@
 ### 2.4 Module 3: Chit Schemes & Mid-Cycle Intake (`/api/v1/chits`)
 | Method | Endpoint | Description | Allowed Roles |
 |---|---|---|---|
-| `POST` | `/chits` (alias `/chits/new`) | Create fresh chit group in DRAFT status | `SUPER_ADMIN` |
-| `PATCH`| `/chits/:id` | Update draft chit scheme parameters (groupName, dates, sanction details) | `SUPER_ADMIN` |
-| `POST` | `/chits/onboard-ongoing` | **Mid-Cycle Intake**: Onboard ongoing chit from physical notebook | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/chits` (alias `/chits/new`) | Create fresh chit group in DRAFT status | `PARTNER` |
+| `PATCH`| `/chits/:id` | Update draft chit scheme parameters (groupName, dates, sanction details) | `PARTNER` |
+| `POST` | `/chits/onboard-ongoing` | **Mid-Cycle Intake**: Onboard ongoing chit from physical notebook | `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `GET`  | `/chits` | List chit schemes with status & keyword filter | All Authenticated |
 | `GET`  | `/chits/:id` | View chit scheme details, duration, base dues, and rules | All Authenticated |
-| `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 unique constraint) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `DELETE`| `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/chits/:id/tickets/assign` | Assign ticket 1..N (Enforces ADR-13 unique constraint) | `PARTNER`, `BRANCH_MANAGER` |
+| `DELETE`| `/chits/:id/tickets/:ticketNumber` | Unassign ticket before scheme activation (DRAFT only) | `PARTNER`, `BRANCH_MANAGER` |
 | `GET`  | `/chits/:id/tickets` | View all assigned tickets and status in scheme | Staff, Member, Auditor |
-| `POST` | `/chits/:id/register` | Record Chit Registrar sanction order (`DRAFT` $\to$ `REGISTERED`) | `SUPER_ADMIN` |
-| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 pool (`DRAFT`/`REGISTERED` $\to$ `ACTIVE`) | `SUPER_ADMIN` |
-| `POST` | `/chits/:id/cancel` | Cancel an unactivated draft chit scheme (`DRAFT` $\to$ `CANCELLED`) | `SUPER_ADMIN` |
-| `POST` | `/chits/:id/close` | Reconcile and permanently close a completed scheme (`COMPLETED` $\to$ `CLOSED`) | `SUPER_ADMIN` |
+| `POST` | `/chits/:id/register` | Record Chit Registrar sanction order (`DRAFT` $\to$ `REGISTERED`) | `PARTNER` |
+| `POST` | `/chits/:id/activate` | Lock terms, freeze 4% commission & Month 1 pool (`DRAFT`/`REGISTERED` $\to$ `ACTIVE`) | `PARTNER` |
+| `POST` | `/chits/:id/cancel` | Cancel an unactivated draft chit scheme (`DRAFT` $\to$ `CANCELLED`) | `PARTNER` |
+| `POST` | `/chits/:id/close` | Reconcile and permanently close a completed scheme (`COMPLETED` $\to$ `CLOSED`) | `PARTNER` |
 
 ### 2.5 Module 4: In-Office Offline Auctions & Tie-Breakers (`/api/v1/auctions`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -119,16 +119,16 @@
 | `GET`  | `/auctions/group/:chitGroupId` | List past auctions, winners & dividend history for group | All Authenticated |
 | `GET`  | `/auctions/:id` | Get single auction record & tie-break results (Group membership enforced for customers, branch checked for managers, fellow subscriber phone masked as `+91 ******0000`) | All Authenticated (Scoped) |
 | `GET`  | `/auctions/:id/eligible-bidders` | **Pre-Auction Guard**: Active non-prized subscribers with 0 arrears | Staff, Auditor |
-| `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `SUPER_ADMIN`, `BRANCH_MANAGER` |
-| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`, `isPartner: true`); enqueues background auction result broadcast to BullMQ `notification-queue` | `SUPER_ADMIN` (Partner) |
-| `POST` | `/auctions/:id/correction/request` | **Maker**: Request correction of winning ticket or bid discount with reason (`KFC-FIN-005`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/auctions/:id/correction/approve` | **Checker**: Authorize and apply auction correction, swap prized ticket, reconcile downstream unpaid dues (`maker != checker`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/auctions/:id/correction/reject` | **Checker**: Reject pending finalized auction correction request, leaving auction unchanged (`maker != checker`) | `SUPER_ADMIN` (Partner) |
+| `POST` | `/auctions/:id/record-bid` | **Maker**: Enter winning ticket & bid discount ($D \le V/4$) | `PARTNER`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/tie-break` | **Option A (Physical Draw)**: Record paper token lot draw winner | `PARTNER`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/tie-break-record` | **Option A Tie-Break (Alias)**: Record paper token lot draw winner | `PARTNER`, `BRANCH_MANAGER` |
+| `POST` | `/auctions/:id/finalize` | **Checker**: Commit auction result & generate dues (`maker != checker`, `Role.PARTNER`); enqueues background auction result broadcast to BullMQ `notification-queue` | `PARTNER` |
+| `POST` | `/auctions/:id/correction/request` | **Maker**: Request correction of winning ticket or bid discount with reason (`KFC-FIN-005`) | `PARTNER` |
+| `POST` | `/auctions/:id/correction/approve` | **Checker**: Authorize and apply auction correction, swap prized ticket, reconcile downstream unpaid dues (`maker != checker`) | `PARTNER` |
+| `POST` | `/auctions/:id/correction/reject` | **Checker**: Reject pending finalized auction correction request, leaving auction unchanged (`maker != checker`) | `PARTNER` |
 | `GET`  | `/auctions/:id/minutes` | View Form XVII statutory auction minutes summary | Staff, Auditor |
 | `GET`  | `/auctions/:id/minutes/pdf` | Form XVII statutory auction minutes layout for print/PDF | Staff, Auditor |
-| `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar (`COMPLETED` $\to$ `MINUTES_FILED`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `PATCH`| `/auctions/:auctionId/mark-filed-with-registrar` | Record physical filing of Form XVII at Registrar (`COMPLETED` $\to$ `MINUTES_FILED`) | `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 
 ### 2.6 Module 5: Installments, Digital Passbook & Defaulters (`/api/v1/tickets`, `/api/v1/installments`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -137,12 +137,12 @@
 | `GET`  | `/tickets/:ticketId/passbook` | Detailed 6-column digital passbook ledger statement | Staff, Member, Auditor |
 | `GET`  | `/tickets/defaulters` | List subscribers with continuous arrears with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
 | `GET`  | `/installments/defaulters` | **Defaulters (Alias)**: Query 3-month consecutive defaulter report with pagination (`?page=1&limit=20`, max 100) | Staff, Auditor |
-| `POST` | `/tickets/:id/remove-defaulter` | Legacy defaulter removal route (enforces two-partner SEC-B policy; use `/request` $\to$ `/approve`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/tickets/:id/remove-defaulter/request` | **Defaulter Removal Request (Maker)**: Partner A requests removal with justification (`PENDING_REMOVAL_APPROVAL`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/tickets/:id/remove-defaulter/approve` | **Defaulter Removal Approval (Checker)**: Partner B approves removal (`REMOVED_DEF_3M`; `maker != checker`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/tickets/:id/remove-defaulter/reject` | **Defaulter Removal Rejection (Checker)**: Partner B rejects removal (reverts to `DEFAULT_3_MONTHS`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `SUPER_ADMIN` |
-| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement (BLOCKED / Q25)**: Fails closed with `400 UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation | `SUPER_ADMIN` |
+| `POST` | `/tickets/:id/remove-defaulter` | Legacy defaulter removal route (enforces two-partner SEC-B policy; use `/request` $\to$ `/approve`) | `PARTNER` |
+| `POST` | `/tickets/:id/remove-defaulter/request` | **Defaulter Removal Request (Maker)**: Partner A requests removal with justification (`PENDING_REMOVAL_APPROVAL`) | `PARTNER` |
+| `POST` | `/tickets/:id/remove-defaulter/approve` | **Defaulter Removal Approval (Checker)**: Partner B approves removal (`REMOVED_DEF_3M`; `maker != checker`) | `PARTNER` |
+| `POST` | `/tickets/:id/remove-defaulter/reject` | **Defaulter Removal Rejection (Checker)**: Partner B rejects removal (reverts to `DEFAULT_3_MONTHS`) | `PARTNER` |
+| `POST` | `/tickets/:id/substitute` | **Defaulter Substitution**: Assign replacement customer to `REMOVED_DEF_3M` ticket (ADR-13) | `PARTNER` |
+| `POST` | `/tickets/:id/settle-removal` | **Exit Settlement (BLOCKED / Q25)**: Fails closed with `400 UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation | `PARTNER` |
 | `GET`  | `/installments/group/:chitGroupId/month/:month` | View member dues list for specified month | Staff, Auditor |
 | `POST` | `/installments/group/:chitGroupId/month/:month/generate` | Generate dues from auction dividend | `SUPER_ADMIN`, `BRANCH_MANAGER` |
 | `GET`  | `/installments/:dueId/upi-intent` | Generate NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` |
@@ -167,9 +167,9 @@
 | `POST` | `/payments/upi-claim` | **Customer UPI Claim**: Self-report 12-digit bank UTR reference; validates uniqueness and records payment in `INITIATED` status | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `GET`  | `/payments/pending-upi-claims` | **Claims Queue**: List pending UPI claims awaiting bank credit statement verification with pagination (`?page=1&limit=20`, max 100) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `POST` | `/payments/:id/verify-upi-claim` | **Checker**: Verify bank credit, transition to `SUCCESS`, issue bilingual receipt & mark due `PAID` (`maker != checker`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
-| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `SUPER_ADMIN` |
-| `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `SUPER_ADMIN` |
-| `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `SUPER_ADMIN` |
+| `POST` | `/payments/:id/request-reversal` | **Maker**: Request payment reversal with mandatory reason; enqueues high-priority Partner push alert to BullMQ `notification-queue` (`JOB_DISPATCH_APPROVAL_ALERT`; excludes maker user) | `PARTNER` |
+| `POST` | `/payments/:id/approve-reversal` | **Checker**: Authorize and commit reversal (`maker != checker`) | `PARTNER` |
+| `POST` | `/payments/:id/reject-reversal` | **Checker**: Dismiss reversal request | `PARTNER` |
 
 *(Note: Reversed payments do not use a separate `/receipt/cancelled` route; `GET /pdf/receipt/:paymentId` dynamically detects `paymentStatus === 'REVERSED'` and renders the red bilingual `ரத்து செய்யப்பட்டது / CANCELLED` watermark per `KFC-PDF-001`.)*
 
@@ -182,12 +182,12 @@
 | `POST` | `/disbursements/auction/:auctionId/confirm-safety-proof` | **Maker**: Confirm direct-to-S3 presigned PUT safety proof scan upload (`safety-proof/:auctionId/...`, fail-closed `fileExists`) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
 | `GET`  | `/disbursements/auction/:auctionId/safety-proof-url` | **Checker**: Generate 15-minute presigned viewing URL to inspect safety proof photos | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` |
 | `POST` | `/disbursements/auction/:auctionId/verify-safety-proof` | **Maker**: Verify safety proof checklist (agreement, nominee, blank cheques, scans); enqueues high-priority Partner alert | `SUPER_ADMIN`, `ACCOUNTANT`, `BRANCH_MANAGER` |
-| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher with automatic prior arrears offset; fails closed if arrears $\ge$ prize (`maker != checker`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/disbursements/auction/:auctionId/disburse` | Release payout, auto-settle deducted arrears dues as `PAID`, enforce `ARREARS_STATE_CHANGED` TOCTOU & UTR uniqueness, and record payout reference | `ACCOUNTANT`, `SUPER_ADMIN` |
+| `POST` | `/disbursements/auction/:auctionId/authorize-payout` | **Checker**: Authorize payout voucher with automatic prior arrears offset; fails closed if arrears $\ge$ prize (`maker != checker`) | `PARTNER` |
+| `POST` | `/disbursements/auction/:auctionId/disburse` | Release payout, auto-settle deducted arrears dues as `PAID`, enforce `ARREARS_STATE_CHANGED` TOCTOU & UTR uniqueness, and record payout reference | `ACCOUNTANT`, `PARTNER` |
 | `GET`  | `/disbursements/auction/:auctionId/voucher` | Generate bilingual prize payout voucher JSON (English + தமிழ்) | Staff (Excl. Agents), Winner (Customer), Auditor |
-| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears) | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` |
-| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`isPartner: true`, `maker != checker`; marks Month N due `PAID`) | `SUPER_ADMIN` (Partner) |
-| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Final Settlement Alias**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`), reading authoritative Maker from Stage 1 prepared settlement | `SUPER_ADMIN` (Partner) |
+| `POST` | `/disbursements/group/:chitGroupId/prepare-final-settlement` | **Stage 1 Final Settlement (Maker)**: Compute settlement snapshot & voucher (Deducts 4% commission, Month N base installment if unpaid [zero deduction if already paid under `FIN-B`], and prior arrears) | `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` |
+| `POST` | `/disbursements/group/:chitGroupId/approve-final-settlement` | **Stage 2 Final Settlement (Checker)**: Approve & disburse payout (`Role.PARTNER`, `maker != checker`; marks Month N due `PAID`) | `PARTNER` |
+| `POST` | `/disbursements/group/:chitGroupId/final-settlement` | **Month N Final Settlement Alias**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`), reading authoritative Maker from Stage 1 prepared settlement | `PARTNER` |
 
 ### 2.10 Module 9: Dashboards & Statutory Reports (`/api/v1/reports`)
 | Method | Endpoint | Description | Allowed Roles |
@@ -546,7 +546,7 @@ All financial mutation endpoints enforce strict `@IsInt()` whole-rupee validatio
 
 ### 3.12 `POST /api/v1/auctions/:id/correction/{request, approve, reject}` (Auction Correction Workflow — `KFC-FIN-005`)
 - **HTTP Methods**: `POST`
-- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with `isPartner: true` strictly)
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.PARTNER` strictly)
 - **Path Parameter**: `id` — Auction UUID
 - **Request Body (`RequestAuctionCorrectionDto`)**:
   ```json
@@ -615,7 +615,7 @@ To strictly enforce **Guardrail 10 (Maker-Checker Separation of Duties)** and **
 
 #### 3.13.2 `POST /api/v1/disbursements/group/:chitGroupId/approve-final-settlement` (Stage 2: Checker Approval)
 - **HTTP Method**: `POST`
-- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with verified partner identity `isPartner: true`)
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.PARTNER` strictly)
 - **Path Parameter**: `chitGroupId` — Chit Group UUID
 - **Description**: Stage 2 Checker approval. Verifies the prepared voucher. Strictly enforces **`maker_user_id != checker_user_id`** (rejects with HTTP 403 `MAKER_CHECKER_VIOLATION` if checker is the user who prepared it). Commits the payout, marks Month N auction `COMPLETED`, winner `DISBURSED`, ticket `isPrized = true`, and scheme `COMPLETED`. Database PostgreSQL `CHECK` constraint `chk_auction_maker_checker` backs this at database level.
 - **Success Response (`HTTP 200 OK`)**:
@@ -646,7 +646,7 @@ To strictly enforce **Guardrail 10 (Maker-Checker Separation of Duties)** and **
 
 #### 3.13.3 `POST /api/v1/disbursements/group/:chitGroupId/final-settlement` (Final Settlement Execution Alias — `CR-DISB-02`)
 - **HTTP Method**: `POST`
-- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.SUPER_ADMIN` with `isPartner: true`)
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>` (`Role.PARTNER` strictly)
 - **Description**: Enforces `requirePreparedSettlement: true` (`CR-DISB-02`) on all HTTP settlement invocations — reading the authoritative Maker identity from the Stage 1 prepared settlement record (`prepare-final-settlement`), re-verifying live arrears (`ARREARS_STATE_CHANGED` on drift), and enforcing `makerUserId !== checkerUserId` at both service and database levels.
 
 ---

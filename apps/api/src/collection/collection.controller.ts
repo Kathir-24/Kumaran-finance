@@ -49,7 +49,7 @@ export class CollectionController {
 
   @Get('agent-dues')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -71,7 +71,7 @@ export class CollectionController {
   @Post('record')
   @HttpCode(HttpStatus.CREATED)
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -79,7 +79,7 @@ export class CollectionController {
   @ApiOperation({
     summary: 'Record doorstep field collection (Exact Inet Matching)',
     description:
-      'Records discrete single monthly installment collection. Strictly rejects partial payments or double payments (ADR-07). Generates sequential bilingual receipt and sets cashHandoverStatus. Allowed: Collection Agent, Desk Staff.',
+      'Records discrete single monthly installment collection. Strictly rejects partial payments or double payments (ADR-07). Generates sequential bilingual receipt and sets cashHandoverStatus. Allowed: Collection Agent, Desk Staff, Partner.',
   })
   @ApiCreatedResponseEnvelope(CollectionRecordResponseDto, { description: 'Collection recorded & receipt generated' })
   @ApiResponse({
@@ -101,7 +101,7 @@ export class CollectionController {
   @Post('sync-offline-queue')
   @HttpCode(HttpStatus.OK)
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -109,7 +109,7 @@ export class CollectionController {
   @ApiOperation({
     summary: 'Batch sync offline field collections with partial success isolation',
     description:
-      'Processes an offline queue of doorstep collections (1 to 100 items). Features item-level failure isolation and idempotency deduplication. Ineligible/conflicting payments are rejected with granular error codes without failing the entire batch. Allowed: Collection Agent, Desk Staff, Super Admin.',
+      'Processes an offline queue of doorstep collections (1 to 100 items). Features item-level failure isolation and idempotency deduplication. Ineligible/conflicting payments are rejected with granular error codes without failing the entire batch. Allowed: Collection Agent, Desk Staff, Partner.',
   })
   @ApiOkResponseEnvelope(SyncOfflineQueueResponseDto, {
     description: 'Batch sync completed with summary and item results',
@@ -128,7 +128,7 @@ export class CollectionController {
 
   @Get('daily-summary')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -155,11 +155,11 @@ export class CollectionController {
 
   @Post('cash-handover/submit')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.COLLECTION_AGENT)
+  @Roles(Role.PARTNER, Role.COLLECTION_AGENT)
   @ApiOperation({
     summary: 'Submit evening cash handover batch for office vault deposit',
     description:
-      'Aggregates all unhanded cash collections recorded by the field agent. Allowed: Collection Agent, Super Admin.',
+      'Aggregates all unhanded cash collections recorded by the field agent. Allowed: Collection Agent, Partner.',
   })
   @ApiOkResponseEnvelope(CashHandoverBatchResponseDto, { description: 'Cash handover batch submitted' })
   async submitHandover(
@@ -171,7 +171,7 @@ export class CollectionController {
 
   @Post('cash-handover/acknowledge')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Acknowledge physical cash deposit into branch vault (Dual Control)',
     description:

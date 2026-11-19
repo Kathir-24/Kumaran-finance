@@ -133,6 +133,7 @@ export class DisbursementService {
     if (!user) return;
     const isGlobalRole =
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.ACCOUNTANT) ||
       user.roles.includes(Role.AUDITOR);
     if (isGlobalRole) return;
@@ -148,7 +149,7 @@ export class DisbursementService {
 
   /**
    * Guardrail 11 (ADR-21 / SEC-A): Fail-closed statutory partner identity check.
-   * Rejects administrative IT Super Admins (isPartner: false), missing users, and inactive users.
+   * Rejects administrative IT Super Admins (lacking Role.PARTNER), missing users, and inactive users.
    */
   private async assertVerifiedPartner(
     userId: string,
@@ -159,20 +160,26 @@ export class DisbursementService {
     }
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isPartner: true, isActive: true },
+      select: { isActive: true, roles: true },
     });
     // Prisma returns `null` when the user row does not exist (never `undefined`);
     // `undefined` occurs only in unstubbed unit test mocks.
     if (user === undefined) {
       return;
     }
-    if (user === null || !user.isPartner || user.isActive === false) {
+    const isVerified = Boolean(
+      user &&
+        user.isActive !== false &&
+        Array.isArray(user.roles) &&
+        user.roles.includes(Role.PARTNER),
+    );
+    if (!isVerified) {
       throw new ForbiddenException(errorMessage);
     }
   }
 
   /**
-   * Guardrail 11: Blocks administrative IT Super Admins (roles: [SUPER_ADMIN], isPartner: false)
+   * Guardrail 11: Blocks administrative IT Super Admins (roles: [SUPER_ADMIN])
    * from acting as Maker or Releaser on financial disbursement mutations.
    */
   private async assertPartnerIfSuperAdminOnly(
@@ -182,7 +189,9 @@ export class DisbursementService {
   ): Promise<void> {
     if (!roles) return;
     const hasOperationalRole =
-      roles.includes(Role.ACCOUNTANT) || roles.includes(Role.BRANCH_MANAGER);
+      roles.includes(Role.ACCOUNTANT) ||
+      roles.includes(Role.BRANCH_MANAGER) ||
+      roles.includes(Role.PARTNER);
     if (!hasOperationalRole && roles.includes(Role.SUPER_ADMIN)) {
       await this.assertVerifiedPartner(
         userId,
@@ -201,7 +210,7 @@ export class DisbursementService {
     }
     const maker = await this.prisma.user.findUnique({
       where: { id: makerUserId },
-      select: { id: true, roles: true, isPartner: true, isActive: true },
+      select: { id: true, roles: true, isActive: true },
     });
     // Prisma returns `null` when missing; `undefined` occurs only in unstubbed unit test mocks.
     if (maker === undefined) {
@@ -216,7 +225,7 @@ export class DisbursementService {
       const isAuthorizedMaker =
         maker.roles.includes(Role.ACCOUNTANT) ||
         maker.roles.includes(Role.BRANCH_MANAGER) ||
-        (maker.roles.includes(Role.SUPER_ADMIN) && maker.isPartner === true);
+        maker.roles.includes(Role.PARTNER);
       if (!isAuthorizedMaker) {
         throw new ForbiddenException(
           'INVALID_MAKER_IDENTITY: Specified maker user does not possess financial maker authority',
@@ -590,6 +599,7 @@ export class DisbursementService {
     // Branch scoping for branch manager (fail-closed when branchId is missing)
     const isGlobalReader =
       requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.PARTNER) ||
       requestingUser.roles.includes(Role.ACCOUNTANT) ||
       requestingUser.roles.includes(Role.AUDITOR);
     if (!isGlobalReader && requestingUser.roles.includes(Role.BRANCH_MANAGER)) {
@@ -655,7 +665,7 @@ export class DisbursementService {
     makerUserId: string,
     requestingUser?: JwtPayload,
   ) {
-    // Guardrail 11: Block administrative IT Super Admins (isPartner: false) from financial mutations
+    // Guardrail 11: Block administrative IT Super Admins from financial mutations
     await this.assertPartnerIfSuperAdminOnly(
       makerUserId,
       requestingUser?.roles,
@@ -1072,7 +1082,7 @@ export class DisbursementService {
     checkerRoles: Role[],
   ) {
     // 1. Enforce Super Admin & Verified Partner Exclusivity (SEC-A, fail-closed)
-    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+    if (!checkerRoles.includes(Role.PARTNER) && !checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to authorize prize money disbursements',
       );
@@ -1306,7 +1316,7 @@ export class DisbursementService {
     releaseUserId: string,
     requestingUser?: JwtPayload,
   ) {
-    // Guardrail 11: Block administrative IT Super Admins (isPartner: false) from releasing funds
+    // Guardrail 11: Block administrative IT Super Admins from releasing funds
     await this.assertPartnerIfSuperAdminOnly(
       releaseUserId,
       requestingUser?.roles,
@@ -1768,7 +1778,7 @@ export class DisbursementService {
             ),
           };
 
-    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+    if (!checkerRoles.includes(Role.PARTNER) && !checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to authorize final month settlements',
       );
@@ -2379,15 +2389,15 @@ export class DisbursementService {
     branchOrUser?: string | null | JwtPayload,
   ) {
     const isAuthorizedMaker = makerRoles.some((r) =>
-      ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+      ([Role.PARTNER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
     );
     if (!isAuthorizedMaker) {
       throw new ForbiddenException(
-        'Only Branch Manager, Accountant, or Super Admin can prepare Month N final settlement vouchers',
+        'Only Branch Manager, Accountant, Partner, or Super Admin can prepare Month N final settlement vouchers',
       );
     }
 
-    // Guardrail 11: Block administrative IT Super Admins (isPartner: false) from preparing settlements
+    // Guardrail 11: Block administrative IT Super Admins from preparing settlements
     await this.assertPartnerIfSuperAdminOnly(
       makerUserId,
       makerRoles,
@@ -2649,7 +2659,7 @@ export class DisbursementService {
     checkerUserId: string,
     checkerRoles: Role[],
   ) {
-    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+    if (!checkerRoles.includes(Role.PARTNER) && !checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'DISBURSEMENT_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve settlements',
       );

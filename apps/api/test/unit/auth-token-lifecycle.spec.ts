@@ -535,7 +535,6 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
           status: 'ACTIVE',
           tokenRevokedBeforeMs: null,
           roles: [Role.SUPER_ADMIN],
-          isPartner: true,
         }),
       );
 
@@ -584,7 +583,6 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
           return JSON.stringify({
             status: 'ACTIVE',
             roles: [Role.SUPER_ADMIN],
-            isPartner: true,
           });
         }
         return null;
@@ -641,7 +639,6 @@ describe('Auth & Session Security: RFC 6819 Refresh Token Lifecycle & Reuse Dete
         select: {
           id: true,
           isActive: true,
-          isPartner: true,
           tokenRevokedBefore: true,
           roles: true,
         },

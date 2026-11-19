@@ -35,12 +35,13 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - The software supports an arbitrary, dynamic number ($N$) of users assigned to any persona.
   - Headcounts are **never static or hardcoded**. The system accommodates any number of partners, managers, accountants, collection agents, customers, and auditors at present and in the future.
 - **The Standardized Personas & Operating Reality**:
-  1. `SUPER_ADMIN` (`isPartner: true` vs. `isPartner: false`, `ADR-21`): Verified business partners (`isPartner: true`) hold full financial Maker/Checker authority (auction finalization, corrections, payout authorization, reversals, defaulter removals). Administrative IT Super Admins (`isPartner: false`) manage users, settings, immutable audit logs, and BullMQ queues, but are strictly blocked from financial authorizations (`assertVerifiedPartner`). The **4 partners directly run branch operations**; no external Branch Manager is hired.
-  2. `BRANCH_MANAGER`: Operational branch head persona (optional/future expansion). Currently fulfilled directly by the 4 partners.
-  3. `ACCOUNTANT`: Manages collections verification, bank reconciliation, day books, cash handovers, and voucher prep. **Can be assigned to field collection agents performing dual office accounting roles**.
-  4. `COLLECTION_AGENT`: Field staff for doorstep collections, offline recording, and cash handover submission (Web Portal in Phase 1; Flutter Android UI deferred to Phase 2 per `ADR-26`).
-  5. `CUSTOMER`: Subscribers viewing digital passbooks, dividend savings, upcoming dues, and making online UPI payments (backend APIs preserved; Flutter Mobile UI deferred to Phase 2 per `ADR-26`).
-  6. `AUDITOR`: Independent auditor with read-only access to ledgers, auction records, and statutory reports (excluding Super-Admin-only audit logs and BullMQ queues).
+  1. `PARTNER` (`Role.PARTNER`, `ADR-27`): The 4 equal statutory business partners holding ownership and full financial Maker/Checker authority (auction finalization, clerical corrections, prize payout authorization, payment reversals, defaulter removals, and scheme activation). The **4 partners directly run branch operations**; no external Branch Manager is hired.
+  2. `SUPER_ADMIN` (`Role.SUPER_ADMIN`, `ADR-27`): Dedicated IT Infrastructure & User Administrator managing staff onboarding (`/users`), branches (`/branches`), immutable audit logs (`/reports/audit-logs`), and background queues (`/admin/jobs`). Strictly barred from financial mutations and chit operations.
+  3. `BRANCH_MANAGER`: Operational branch head persona (optional/future expansion).
+  4. `ACCOUNTANT`: Manages collections verification, bank reconciliation, day books, cash handovers, and voucher prep. **Can be assigned to field collection agents performing dual office accounting roles**.
+  5. `COLLECTION_AGENT`: Field staff for doorstep collections, offline recording, and cash handover submission (Web Portal in Phase 1; Flutter Android UI deferred to Phase 2 per `ADR-26`).
+  6. `CUSTOMER`: Subscribers viewing digital passbooks, dividend savings, upcoming dues, and making online UPI payments (backend APIs preserved; Flutter Mobile UI deferred to Phase 2 per `ADR-26`).
+  7. `AUDITOR`: Independent auditor with read-only access to ledgers, auction records, and statutory reports (excluding Super-Admin-only audit logs and BullMQ queues).
 - **Enforced Maker-Checker Dual Controls (`ADR-21`, `ADR-22`, `ADR-25`)**:
   - High-risk operations (payment reversals, auction finalization/correction, prize disbursements, Month $N$ settlements, defaulter removals, cash handovers, UPI claim verification) strictly enforce `maker_user_id != checker_user_id` at application and PostgreSQL 17 `CHECK` constraint levels (`CONFIRMED-BY-DEVELOPER`).
   - Partner-to-Partner workflow: One verified partner initiates an entry (Maker) $\to$ Another verified partner reviews and finalizes (Checker).
@@ -71,7 +72,7 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
     $$\text{Final Net Settlement Payout} = V - C_f - \text{finalMonthDeduction} - \text{priorArrears}$$
   - If Month $N$ installment is unpaid, $\text{finalMonthDeduction} = I_{\text{base}}$ (₹5,000 on a ₹1,00,000 chit), net payout is strictly **₹91,000** ($100,000 - 4,000 - 5,000$), and Month $N$ `InstallmentDue` is atomically marked `PAID`.
   - If Month $N$ installment was already paid in advance or at branch desk (`monthNDue.status === 'PAID'`), $\text{finalMonthDeduction} = 0$, preventing double collection and resulting in strictly **₹96,000** net payout (`FIN-B`).
-  - Executed strictly via **2-stage Maker-Checker settlement (`ADR-25` / `CR-DISB-02`)**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `isPartner: true`, `maker != checker`), releasing funds with a formal settlement voucher.
+  - Executed strictly via **2-stage Maker-Checker settlement (`ADR-25` / `CR-DISB-02`)**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `Role.PARTNER`, `maker != checker`), releasing funds with a formal settlement voucher.
 - **Initialization Lifecycle**:
   - `NEW_GROUP`: Standard lifecycle starting from Month 1.
   - `ONGOING_GROUP`: Mid-cycle onboarding from physical paper notebooks (e.g., entering at Month 7) with historical winner discounts and opening balances.
@@ -128,14 +129,14 @@ Provide a reliable, robust, single-company chit-fund operations platform for **K
   - Property documents are completely eliminated; security proof is evaluated case-by-case by the company and is **not mandatory** across the board (`CONFIRMED-BY-DEVELOPER`).
 - **Payment Reversals (`KFC-SEC-001`, `KFC-PDF-001`)**:
   - Never delete a posted payment from the ledger.
-  - Reversal initiation (`POST /payments/:id/request-reversal`) is strictly restricted to **Super Admin (`Partner A, isPartner: true`)**; Branch Manager and Accountant roles are blocked.
-  - Reversal approval (`POST /payments/:id/approve-reversal`) and rejection (`POST /payments/:id/reject-reversal`) are strictly restricted to independent **Super Admin (`Partner B, isPartner: true`)** with hard dual control (`maker_user_id != checker_user_id`, `chk_reversal_maker_checker`).
+  - Reversal initiation (`POST /payments/:id/request-reversal`) is strictly restricted to **Partner A (`Role.PARTNER`)**; Branch Manager, Accountant, and IT Super Admin roles are blocked.
+  - Reversal approval (`POST /payments/:id/approve-reversal`) and rejection (`POST /payments/:id/reject-reversal`) are strictly restricted to independent **Partner B (`Role.PARTNER`)** with hard dual control (`maker_user_id != checker_user_id`, `chk_reversal_maker_checker`).
   - Reversed receipts dynamically render a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (-35°, 28pt bold, `#DC2626`, opacity `0.28`).
 
 ### Module 9: In-Office Staff-Recorded Auction Engine (`CONFIRMED-BY-DEVELOPER`)
 - **Offline Auction Recording & Finalization**:
   - Auctions are conducted offline at the branch by staff/foreman in the presence of members.
-  - Software validates and records results entered by staff; finalization is strictly reserved for verified **Super Admin Partners (`isPartner: true`)** under `maker_user_id != checker_user_id`.
+  - Software validates and records results entered by staff; finalization is strictly reserved for verified **Partners (`Role.PARTNER`)** under `maker_user_id != checker_user_id`.
 - **Validation Rules & Pre-Conditions**:
   1. Bid discount $\ge$ Foreman commission (4.00%).
   2. Bid discount $\le$ Fixed 1/4 (25.00%) ceiling of the total chit value ($D \le \frac{V}{4}$).

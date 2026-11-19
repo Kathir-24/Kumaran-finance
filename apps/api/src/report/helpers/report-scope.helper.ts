@@ -14,6 +14,7 @@ const ISO_DATE_PREFIX_REGEX = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s]|$)/;
 
 const GLOBAL_REPORT_ROLES: readonly Role[] = [
   Role.SUPER_ADMIN,
+  Role.PARTNER,
   Role.ACCOUNTANT,
   Role.AUDITOR,
 ];

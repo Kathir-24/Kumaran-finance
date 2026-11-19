@@ -208,15 +208,15 @@ export class UserService {
   /**
    * Creates a new staff user account (Super Admin only)
    */
-  async create(dto: CreateUserDto, currentUser?: any) {
+  async create(dto: CreateUserDto, _currentUser?: any) {
     if (dto.roles.includes(Role.CUSTOMER)) {
       throw new BadRequestException('Customer role cannot be assigned to staff user accounts');
     }
 
-    if (dto.isPartner) {
-      if (currentUser && !currentUser.isPartner) {
-        throw new ForbiddenException('Only verified business partners can grant Partner status');
-      }
+    if (dto.roles.includes(Role.SUPER_ADMIN) && dto.roles.includes(Role.PARTNER)) {
+      throw new BadRequestException(
+        'SUPER_ADMIN and PARTNER roles are mutually exclusive and cannot be assigned to the same user',
+      );
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -256,7 +256,6 @@ export class UserService {
         phone: dto.phone.trim(),
         passwordHash,
         roles: dto.roles,
-        isPartner: dto.isPartner === true,
         isActive: true,
         mustChangePassword: isTempPassword,
       },
@@ -314,14 +313,19 @@ export class UserService {
    */
   async updateRoles(id: string, dto: UpdateUserRolesDto, currentUser?: any) {
     const currentUserId = typeof currentUser === 'string' ? currentUser : currentUser?.sub;
-    const currentUserIsPartner = typeof currentUser === 'string' ? false : Boolean(currentUser?.isPartner);
 
     if (dto.roles.includes(Role.CUSTOMER)) {
       throw new BadRequestException('Customer role cannot be assigned to staff user accounts');
     }
 
-    if (id === currentUserId && !dto.roles.includes(Role.SUPER_ADMIN)) {
-      throw new BadRequestException('Super Admins cannot revoke their own Super Admin privileges');
+    if (dto.roles.includes(Role.SUPER_ADMIN) && dto.roles.includes(Role.PARTNER)) {
+      throw new BadRequestException(
+        'SUPER_ADMIN and PARTNER roles are mutually exclusive and cannot be assigned to the same user',
+      );
+    }
+
+    if (id === currentUserId && !dto.roles.includes(Role.SUPER_ADMIN) && !dto.roles.includes(Role.PARTNER)) {
+      throw new BadRequestException('Administrators cannot revoke their own administrative privileges');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -332,25 +336,12 @@ export class UserService {
       throw new NotFoundException(`Staff user with ID ${id} not found`);
     }
 
-    // Partner status mutation security check
-    let targetIsPartner = user.isPartner;
-    if (dto.isPartner !== undefined && dto.isPartner !== user.isPartner) {
-      if (currentUser && !currentUserIsPartner) {
-        throw new ForbiddenException('Only verified business partners can modify Partner status');
-      }
-      if (id === currentUserId && !dto.isPartner && user.isPartner) {
-        throw new BadRequestException('Partners cannot revoke their own partner status');
-      }
-      targetIsPartner = dto.isPartner;
-    }
-
     const now = new Date();
     const updateFn = async (tx: any) => {
       const res = await tx.user.update({
         where: { id },
         data: {
           roles: dto.roles,
-          isPartner: targetIsPartner,
           tokenRevokedBefore: now,
           refreshTokenHash: null,
           fcmToken: null,

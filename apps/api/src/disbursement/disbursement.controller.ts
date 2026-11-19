@@ -63,7 +63,7 @@ export class DisbursementController {
 
   @Get()
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.AUDITOR,
@@ -83,7 +83,7 @@ export class DisbursementController {
 
   @Get('auction/:auctionId')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,
@@ -126,7 +126,7 @@ export class DisbursementController {
       },
     },
   })
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Maker: Upload signed blank cheques & agreement safety proof scan (Legacy Multipart Fallback)',
     description:
@@ -152,7 +152,7 @@ export class DisbursementController {
 
   @Post('auction/:auctionId/confirm-safety-proof')
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Maker: Confirm direct-to-S3 safety proof collateral upload (ADR-15)',
     description:
@@ -177,11 +177,11 @@ export class DisbursementController {
   }
 
   @Get('auction/:auctionId/safety-proof-url')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Checker: Generate 15-minute presigned viewing URL for safety proof scan',
     description:
-      'Returns a secure, time-limited S3 presigned URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout. Allowed: Super Admin, Branch Manager, Accountant, Auditor.',
+      'Returns a secure, time-limited S3 presigned URL for Partner B (Checker) or Auditor to inspect uploaded blank cheques and agreements before clicking Authorize Payout. Allowed: Partner, Branch Manager, Accountant, Auditor.',
   })
   @ApiOkResponseEnvelope(SafetyProofUrlResponseDto, {
     description: 'Presigned viewing URL generated successfully',
@@ -196,7 +196,7 @@ export class DisbursementController {
 
   @Post('auction/:auctionId/verify-safety-proof')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Maker: Verify Company Safety Proof Checklist (ADR-15)',
     description:
@@ -220,9 +220,9 @@ export class DisbursementController {
 
   @Post('auction/:auctionId/authorize-payout')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
-    summary: 'Checker: Authorize prize money payout voucher (Super Admin strictly)',
+    summary: 'Checker: Authorize prize money payout voucher (Partner strictly)',
     description:
       'Authorizes prize payout mode (Cheque, NEFT/RTGS/IMPS, Cash) and whole-rupee amount. Enforces Maker != Checker (verifiedByUserId != authorizedByUserId) and blocks Branch Manager.',
   })
@@ -245,7 +245,7 @@ export class DisbursementController {
 
   @Post('auction/:auctionId/disburse')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Release prize money disbursement and record official reference',
     description:
@@ -279,7 +279,7 @@ export class DisbursementController {
 
   @Get('auction/:auctionId/voucher')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,
@@ -302,7 +302,7 @@ export class DisbursementController {
 
   @Post('group/:chitGroupId/prepare-final-settlement')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Maker: Prepare Month N final settlement voucher and financial breakdown',
     description:
@@ -328,7 +328,7 @@ export class DisbursementController {
 
   @Post('group/:chitGroupId/approve-final-settlement')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Checker: Authorize and disburse prepared Month N settlement (Maker != Checker)',
     description:
@@ -351,11 +351,11 @@ export class DisbursementController {
 
   @Post('group/:chitGroupId/final-settlement')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
-    summary: 'Super Admin: Execute prepared final Month N settlement (Strict 2-Stage Dual Control)',
+    summary: 'Partner: Execute prepared final Month N settlement (Strict 2-Stage Dual Control)',
     description:
-      'Settles Month N without auction strictly from an existing Stage-1 prepared settlement voucher (prepare-final-settlement). Enforces independent Maker != Checker from persisted DB Stage-1 maker identity (never trusting client makerUserId). Marks ticket isPrized = true and transitions chit scheme to COMPLETED. Allowed: Super Admin (Partner).',
+      'Settles Month N without auction strictly from an existing Stage-1 prepared settlement voucher (prepare-final-settlement). Enforces independent Maker != Checker from persisted DB Stage-1 maker identity (never trusting client makerUserId). Marks ticket isPrized = true and transitions chit scheme to COMPLETED. Allowed: Partner.',
   })
   @ApiOkResponseEnvelope(FinalSettlementResponseDto, { description: 'Final month settlement successfully executed' })
   @ApiResponse({ status: 400, description: 'Prepared settlement missing, invalid settlement request, or more than 1 unprized ticket exists' })

@@ -12,11 +12,11 @@
 Financial transactions recorded in PostgreSQL can **never be deleted** (immutable ledger integrity). When an operational error occurs—such as entering a collection for the wrong ticket number during peak branch counter rush, a subscriber cheque dishonored/bounced during bank clearing, or a network glitch creating a duplicate entry—the correction must be executed strictly through a controlled **Two-Partner Payment Reversal Workflow (`KFC-SEC-001` / Guardrails 10 & 11)**:
 
 > [!IMPORTANT]
-> **Verified Partner Exclusivity (`KFC-SEC-001` / Guardrail 11 / `ADR-21`)**: While `ACCOUNTANT` and `BRANCH_MANAGER` can view reversal queue status on `/reversals`, all three mutation endpoints (`request-reversal`, `approve-reversal`, `reject-reversal`) are strictly restricted by `PaymentController` (`@Roles(Role.SUPER_ADMIN)`) and `PaymentService` (`isPartner: true`) to **two distinct Verified Partners**. Desk Accountants, Branch Managers, and non-partner IT `SUPER_ADMIN` accounts receive `HTTP 403 Forbidden` and must escalate physical receipts with a written discrepancy memo to Verified Partner A.
+> **Verified Partner Exclusivity (`KFC-SEC-001` / Guardrail 11 / `ADR-21` / `ADR-27`)**: While `ACCOUNTANT` and `BRANCH_MANAGER` can view reversal queue status on `/reversals`, all three mutation endpoints (`request-reversal`, `approve-reversal`, `reject-reversal`) are strictly restricted by `PaymentController` (`@Roles(Role.PARTNER)`) and `PaymentService` to **two distinct Statutory Partners (`Role.PARTNER`)**. Desk Accountants, Branch Managers, and IT `SUPER_ADMIN` accounts receive `HTTP 403 Forbidden` and must escalate physical receipts with a written discrepancy memo to Statutory Partner A.
 
 ### Key Operational Capabilities
 
-#### A. Maker Step (Verified Partner A — `SUPER_ADMIN` with `isPartner: true`, `KFC-SEC-001`)
+#### A. Maker Step (Statutory Partner A — `Role.PARTNER`, `KFC-SEC-001`)
 1. **Error Identification & Search**:
    - Partner A navigates to `/reversals` and clicks **"Request Payment Reversal"**.
    - Enters or pastes Receipt Number (`KC-REC-PRD-2026-00001`) or Payment ID to fetch live payment preview card.
@@ -34,14 +34,14 @@ Financial transactions recorded in PostgreSQL can **never be deleted** (immutabl
    - `PaymentReversal.status` becomes `REQUESTED`.
    - The payment itself remains in `SUCCESS` and the installment due remains `PAID` until authorized.
 
-#### B. Checker Step (Independent Verified Partner B — `SUPER_ADMIN` with `isPartner: true`)
+#### B. Checker Step (Independent Statutory Partner B — `Role.PARTNER`)
 1. **Pending Approvals Queue**:
    - Partners inspect pending reversals at `/reversals` retrieved from `GET /api/v1/reports/pending-approvals`.
    - Table displays Reversal ID, Receipt #, Customer Name & Code, Amount ($₹$), Reason, Maker Name, and Date.
-2. **Guardrails 10 & 11 (Strict Maker $\ne$ Checker + Verified Partner Identity)**:
-   $$\texttt{initiatedByUserId} \ne \texttt{approvedByUserId} \quad \land \quad \texttt{isPartner} = \texttt{true}$$
+2. **Guardrails 10 & 11 (Strict Maker $\ne$ Checker + Statutory Partner Identity)**:
+   $$\texttt{initiatedByUserId} \ne \texttt{approvedByUserId} \quad \land \quad \texttt{roles.includes(Role.PARTNER)}$$
    - Enforced in Web UI (`Maker Guard` badge & disabled buttons), NestJS service guards, AND PostgreSQL database `CHECK` constraint (`chk_reversal_maker_checker`, PostgreSQL `23514`).
-   - The Partner who requested the reversal **CANNOT** approve or reject it; non-partner IT `SUPER_ADMIN`s are blocked with `PARTNER_IDENTITY_REQUIRED`.
+   - The Partner who requested the reversal **CANNOT** approve or reject it; non-partner staff and IT `SUPER_ADMIN`s are blocked with `PARTNER_IDENTITY_REQUIRED` / `HTTP 403`.
 3. **Approval Execution (`POST /api/v1/payments/:id/approve-reversal`)**:
    - Independent Partner B enters optional verification remarks.
    - In an atomic database transaction:
@@ -65,15 +65,15 @@ Financial transactions recorded in PostgreSQL can **never be deleted** (immutabl
 
 ```mermaid
 flowchart TD
-    subgraph MakerWorkflow["Maker Step (Verified Partner A — isPartner: true)"]
+    subgraph MakerWorkflow["Maker Step (Statutory Partner A — Role.PARTNER)"]
         ERR["Payment Error Identified\n(Counter Escalation / Bounced Cheque / Duplicate)"] --> REQMOD["ReversalRequestModal\nSelect Reason Code & Justification (min 5 chars)"]
         REQMOD --> POST_REQ["POST /api/v1/payments/:id/request-reversal"]
         POST_REQ --> PEND["PaymentReversal: status = REQUESTED\nPayment: SUCCESS (Unchanged)\nDue: PAID (Unchanged)"]
     end
 
-    subgraph CheckerWorkflow["Checker Step (Verified Partner B — isPartner: true)"]
+    subgraph CheckerWorkflow["Checker Step (Statutory Partner B — Role.PARTNER)"]
         PEND --> QUEUE["GET /api/v1/reports/pending-approvals\nPending Reversal Requests Queue"]
-        QUEUE --> G10{"Guardrails 10 & 11\nPartner B (isPartner: true) != Partner A?"}
+        QUEUE --> G10{"Guardrails 10 & 11\nPartner B (Role.PARTNER) != Partner A?"}
         G10 -- "Same User or Non-Partner" --> BLK["Blocked: Maker Guard / HTTP 403\nDB CHECK: chk_reversal_maker_checker"]
         G10 -- "Different Verified Partner" --> DECIDE{"Partner Review"}
         
@@ -106,9 +106,9 @@ All files strictly comply with the modularity limit per **AGENTS.md Rule 4**:
 
 ## 4. API Integration Endpoints
 
-- **`POST /api/v1/payments/:id/request-reversal`** *(Verified Partner `SUPER_ADMIN`, `isPartner: true`)*: Maker submits reversal request with `{ reason, notes }`.
-- **`POST /api/v1/payments/:id/approve-reversal`** *(Independent Verified Partner `SUPER_ADMIN`, `isPartner: true`)*: Authorizes reversal (`maker != checker`, DB `chk_reversal_maker_checker`), reverses ledger, restores due to `UNPAID`, and triggers `KFC-PDF-001` `CANCELLED` receipt watermark.
-- **`POST /api/v1/payments/:id/reject-reversal`** *(Independent Verified Partner `SUPER_ADMIN`, `isPartner: true`)*: Rejects reversal with `{ rejectionReason }`.
+- **`POST /api/v1/payments/:id/request-reversal`** *(Statutory Partner, `Role.PARTNER`)*: Maker submits reversal request with `{ reason, notes }`.
+- **`POST /api/v1/payments/:id/approve-reversal`** *(Independent Statutory Partner, `Role.PARTNER`)*: Authorizes reversal (`maker != checker`, DB `chk_reversal_maker_checker`), reverses ledger, restores due to `UNPAID`, and triggers `KFC-PDF-001` `CANCELLED` receipt watermark.
+- **`POST /api/v1/payments/:id/reject-reversal`** *(Independent Statutory Partner, `Role.PARTNER`)*: Rejects reversal with `{ rejectionReason }`.
 - **`GET /api/v1/reports/pending-approvals`**: Returns array of pending payment reversals awaiting Checker signoff.
 - **`GET /api/v1/payments?paymentStatus=REVERSED`**: Returns historical reversed payments for the audit ledger.
 
@@ -118,7 +118,7 @@ All files strictly comply with the modularity limit per **AGENTS.md Rule 4**:
 
 ### A. Task 8.4 Invariant Test Results (`apps/web/test/payment-reversals.spec.ts`) — 8/8 Pass
 - **Guardrail 10**: Strictly rejects self-approval when `checkerUserId === initiatedByUserId`.
-- **Guardrail 11 / `KFC-SEC-001`**: Restricts reversal initiation, approval, and rejection strictly to Verified Partners (`SUPER_ADMIN` with `isPartner: true`).
+- **Guardrail 11 / `KFC-SEC-001`**: Restricts reversal initiation, approval, and rejection strictly to Statutory Partners (`Role.PARTNER`).
 - **Payment State Transition**: Transitions payment strictly from `SUCCESS` $\to$ `REVERSED` upon approval.
 - **Due Restoration**: Restores installment due strictly to `UNPAID` with `paidAmount = 0n`.
 - **Arrears Recalculation**: Correctly increments unpaid arrears and flags `DEFAULT_3_MONTHS` if unpaid $\ge 3$.

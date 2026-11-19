@@ -165,7 +165,7 @@ describe('Full-Product N×N Status Matrix Exhaustion Suite (113 State Transition
           update: jest.fn(),
         },
         user: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'admin-001', isPartner: true }),
+          findUnique: jest.fn().mockResolvedValue({ id: 'admin-001', roles: [Role.PARTNER], isActive: true }),
         },
         auditLog: {
           create: jest.fn(),

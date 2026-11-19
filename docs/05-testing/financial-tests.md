@@ -152,7 +152,7 @@ it('should restore original installment due amount with zero penny difference up
   expect(paidDue.paidAmount).toBe(3750n);
   expect(paidDue.status).toBe('PAID');
 
-  // Verified Partner Maker initiates reversal request (SUPER_ADMIN with isPartner: true per KFC-SEC-001 / payment.controller.ts:220-222)
+  // Verified Partner Maker initiates reversal request (Role.PARTNER per Guardrails 10 & 11 / payment.controller.ts:220-222)
   const reversalRequest = await requestPaymentReversal({
     paymentId: payment.id,
     reason: 'Wrong customer ticket entered',

@@ -15,7 +15,7 @@ import {
 import { formatRupee } from '@kumaran/api-client';
 import { apiClient, getErrorMessage, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
@@ -71,9 +71,9 @@ export default function SchemeDetailPage() {
     enabled: !!id,
   });
 
-  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
+  const isPartner = hasAnyRole(user, ['PARTNER']);
   const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
-  const canManage = isSuperAdmin || isBranchManager;
+  const canManage = isPartner || isBranchManager;
 
   const tickets: TicketItem[] = scheme?.tickets || [];
   const totalTickets = scheme?.totalTickets || 20;
@@ -145,7 +145,7 @@ export default function SchemeDetailPage() {
             </Button>
           )}
 
-          {isDraft && isSuperAdmin && (
+          {isDraft && isPartner && (
             <Button
               variant="outline"
               size="sm"
@@ -157,7 +157,7 @@ export default function SchemeDetailPage() {
             </Button>
           )}
 
-          {isDraft && isSuperAdmin && (
+          {isDraft && isPartner && (
             <Button
               size="sm"
               disabled={!isFull}

@@ -64,7 +64,7 @@ stateDiagram-v2
   - Branch staff enters the physically drawn winning ticket number into the software.
   - Software logs all tied bidders and records the physical draw outcome without running an electronic random lottery.
 - **`BID_RECORDED` $\to$ `FINALIZED` (`COMPLETED`)**:
-  - **Partner Exclusivity (`KFC-SEC-003`)**: Strictly gated to `Role.SUPER_ADMIN` with verified Partner identity (`isPartner: true`); `BRANCH_MANAGER` is strictly blocked (`403 Forbidden`).
+  - **Partner Exclusivity (`KFC-SEC-003`)**: Strictly gated to `Role.PARTNER`; `BRANCH_MANAGER` and `SUPER_ADMIN` are strictly blocked (`403 Forbidden`).
   - **Maker $\neq$ Checker Dual Approval (`chk_auction_maker_checker`)**: The user who conducted/recorded the auction (`conductedByUserId`) cannot finalize it (`finalizedByUserId`). Enforced across both `COMPLETED` and `MINUTES_FILED` states at application and PostgreSQL levels.
   - Automatically calculates Foreman Commission ($C_f = V \times 0.04$), Total Dividend ($Div_{total} = D - C_f$), and per-ticket dividend allocated equally across all members (including auction winners).
   - Generates next month's net installment dues in whole integer Rupees ($I_{net} = I_{base} - Div_{ticket}$) uniformly for all members.
@@ -97,7 +97,7 @@ stateDiagram-v2
     5. Promissory note / personal guarantee submitted? [Yes / No]
     6. Scanned copies uploaded to secure storage.
 - **`VERIFIED_BY_MAKER` $\to$ `AUTHORIZED_BY_CHECKER`**:
-  - Super Admin / Partner B (`isPartner: true`) authorizes the payout voucher.
+  - Partner B (`Role.PARTNER`) authorizes the payout voucher.
   - Enforces `maker_user_id != checker_user_id` (`chk_winner_maker_checker` enforced on `VERIFIED_BY_MAKER`, `AUTHORIZED_BY_CHECKER`, and `DISBURSED`).
   - **Correction Lockout (`M9-DUAL-DEF-02`)**: Blocked with `PENDING_CORRECTION_LOCKOUT` across all 3 disbursement stages (`verifySafetyProof`, `authorizePayout`, `releasePayout`) if an unapproved finalized auction correction is pending.
   - **Strict Override Prohibition (`KFC-FIN-004`)**: Payout amount must exactly equal `grossPrizeMoney - totalArrears`; arbitrary manual overrides are strictly prohibited (`400 Bad Request`).
@@ -109,7 +109,7 @@ stateDiagram-v2
 - **Month $N$ Final Maturity Settlement (Two-Stage Workflow / F05 & `CR-DISB-02`)**:
   - Month $N$ final payout has no auction. All HTTP settlement paths enforce `requirePreparedSettlement: true` under two-stage dual control:
     1. `prepareFinalSettlement` (Maker Staff): Computes Month $N$ deductions, prior arrears, 4% commission, and creates a pending settlement record with `disbursementStatus = 'VERIFIED_BY_MAKER'` stamping `conductedByUserId = makerUserId` and `verifiedByUserId = makerUserId`.
-    2. `approveFinalSettlement` (Checker Partner): Verifies the prepared snapshot (throwing `ARREARS_STATE_CHANGED` if arrears mutated post-preparation), enforces `makerUserId != checkerUserId` and `isPartner: true`, transitions status to `DISBURSED`, marks Month $N$ due `PAID`, stamps `finalizedByUserId` and `authorizedByUserId`, and completes the chit group.
+    2. `approveFinalSettlement` (Checker Partner): Verifies the prepared snapshot (throwing `ARREARS_STATE_CHANGED` if arrears mutated post-preparation), enforces `makerUserId != checkerUserId` and `Role.PARTNER`, transitions status to `DISBURSED`, marks Month $N$ due `PAID`, stamps `finalizedByUserId` and `authorizedByUserId`, and completes the chit group.
     3. Enforced at both application and database levels via PostgreSQL engine constraint `chk_winner_maker_checker`.
 
 ---
@@ -157,7 +157,7 @@ stateDiagram-v2
     - Marks that specific month's `InstallmentDue` status as `PAID`.
 - **`SUCCESS` $\to$ `REVERSED` (Two-Partner Dual Control — `KFC-SEC-001`)**:
   - Never deletes the original payment record.
-  - **Initiation**: Strictly gated to Partner A (`POST /payments/:id/request-reversal`, `@Roles(Role.SUPER_ADMIN)` with `isPartner: true`; `ACCOUNTANT` & `BRANCH_MANAGER` blocked with `403 Forbidden`).
+  - **Initiation**: Strictly gated to Partner A (`POST /payments/:id/request-reversal`, `@Roles(Role.PARTNER)`; `ACCOUNTANT`, `BRANCH_MANAGER`, and `SUPER_ADMIN` blocked with `403 Forbidden`).
   - **Resolution**: Independent Partner B (`maker != checker`, enforced by `chk_reversal_maker_checker`) either approves (`POST /payments/:id/approve-reversal`, transitioning `PaymentReversal` to `APPROVED`, `Payment` to `REVERSED`, restoring `InstallmentDue` to `UNPAID`, and dynamically stamping the receipt PDF with **`ரத்து செய்யப்பட்டது / CANCELLED`** at `0.28` opacity per `KFC-PDF-001`) or rejects (`POST /payments/:id/reject-reversal`, leaving `Payment` in `SUCCESS`).
 
 ---
@@ -216,8 +216,8 @@ stateDiagram-v2
   - Triggered when `consecutiveUnpaidMonths == 3`. Ticket is flagged for default removal.
 - **`DEFAULT_3_MONTHS` $\to$ `PENDING_REMOVAL_APPROVAL` $\to$ `REMOVED_DEF_3M` (SEC-B Two-Partner Dual Control)**:
   - **Prized Immutability Guard (`KFC-SEC-004`)**: Prized subscriber tickets (`isPrized: true`) can never be removed or substituted; attempts throw `400 Bad Request` (`PRIZED_TICKET_IMMUTABLE`).
-  - **Step 1 (Maker Request)**: Partner A (`SUPER_ADMIN` with `isPartner: true`) submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Status transitions to `PENDING_REMOVAL_APPROVAL` (and immediately bars the ticket from bidding via `removalRequestedByUserId != null`, `DEF-M9-ENG-01`).
-  - **Step 2 (Checker Resolution)**: Independent Partner B (`SUPER_ADMIN` with `isPartner: true`) either approves (`POST /tickets/:id/remove-defaulter/approve`) or rejects (`POST /tickets/:id/remove-defaulter/reject`, reverting status to `DEFAULT_3_MONTHS`). Backend and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker` (`20261117170000`) enforce `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
+  - **Step 1 (Maker Request)**: Partner A (`Role.PARTNER`) submits removal request: `POST /tickets/:id/remove-defaulter/request` with `removalReason`. Status transitions to `PENDING_REMOVAL_APPROVAL` (and immediately bars the ticket from bidding via `removalRequestedByUserId != null`, `DEF-M9-ENG-01`).
+  - **Step 2 (Checker Resolution)**: Independent Partner B (`Role.PARTNER`) either approves (`POST /tickets/:id/remove-defaulter/approve`) or rejects (`POST /tickets/:id/remove-defaulter/reject`, reverting status to `DEFAULT_3_MONTHS`). Backend and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker` (`20261117170000`) enforce `ticket.removalRequestedByUserId !== checkerPartnerUserId` (`maker != checker`).
   - On approval, sets `status: REMOVED_DEF_3M`, vacates ticket for customer substitution, and logs immutable `DEFAULTER_REMOVAL_APPROVED`.
   - **Q25 Financial Guardrail**: Financial damage settlement on removal remains **BLOCKED** and fails closed with `UNAPPROVED_SETTLEMENT_POLICY` pending legal confirmation.
 

@@ -6,6 +6,7 @@
 
 export type UserRole =
   | 'SUPER_ADMIN'
+  | 'PARTNER'
   | 'BRANCH_MANAGER'
   | 'ACCOUNTANT'
   | 'COLLECTION_AGENT'
@@ -14,6 +15,7 @@ export type UserRole =
 
 export const DASHBOARD_STAFF_ROLES: readonly UserRole[] = [
   'SUPER_ADMIN',
+  'PARTNER',
   'BRANCH_MANAGER',
   'ACCOUNTANT',
   'AUDITOR',
@@ -26,21 +28,21 @@ export interface RoutePermissionRule {
 }
 
 /**
- * Canonical permission rules mapped to the 14 primary navigation modules.
+ * Canonical permission rules mapped to the 15 primary navigation modules.
  */
 export const NAV_ROUTE_PERMISSIONS = {
-  '/': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
-  '/schemes': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
-  '/schemes/onboard': ['SUPER_ADMIN', 'ACCOUNTANT'],
-  '/customers': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
-  '/auctions': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'AUDITOR'],
-  '/disbursements': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'],
-  '/collections': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
-  '/collections/handover': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
-  '/reversals': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'],
-  '/reports': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+  '/': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+  '/schemes': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+  '/schemes/onboard': ['PARTNER', 'ACCOUNTANT'],
+  '/customers': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+  '/auctions': ['PARTNER', 'BRANCH_MANAGER', 'AUDITOR'],
+  '/disbursements': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'],
+  '/collections': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
+  '/collections/handover': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT'],
+  '/reversals': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'],
+  '/reports': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
   '/reports/audit-logs': ['SUPER_ADMIN'],
-  '/instructions': ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+  '/instructions': ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
   '/branches': ['SUPER_ADMIN'],
   '/users': ['SUPER_ADMIN'],
   '/admin/jobs': ['SUPER_ADMIN'],
@@ -67,15 +69,15 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   },
   {
     href: '/print',
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+    allowedRoles: ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
   },
   {
     href: '/print/receipt',
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
+    allowedRoles: ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR', 'COLLECTION_AGENT'],
   },
   {
     href: '/print/voucher',
-    allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+    allowedRoles: ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'],
   },
 ];
 

@@ -72,7 +72,7 @@ flowchart LR
 
 ### Lifecycle 1: Authentication, 2FA, Branches & Staff User Administration (24 Baseline Steps) — ✅ VERIFIED
 - Covers web login (`POST /api/v1/auth/web/login`, now strictly `ADR-18` phone-only `{ phone, password }`), `/me`, `/fcm-token`, `/totp/{setup,enable,disable}`, `/web/verify-totp`, `/mobile/{request-otp,verify-otp,set-mpin,login-mpin}`, `/refresh-token`, `/logout`, `/change-password`, `POST/GET /branches`, and `POST/GET/PATCH /users` + `/reset-password`.
-- *Post-Oct-2026 Live Additions (covered by Jest & E2E)*: `POST /api/v1/auth/complete-onboarding` (`F16`), `PATCH /api/v1/branches/:id` (`ISSUE-M2-03`), `Session` vault isolation (`ADR-24`), and `isPartner` Verified Partner governance (`ADR-21`).
+- *Post-Oct-2026 Live Additions (covered by Jest & E2E)*: `POST /api/v1/auth/complete-onboarding` (`F16`), `PATCH /api/v1/branches/:id` (`ISSUE-M2-03`), `Session` vault isolation (`ADR-24`), and Verified Partner governance (`ADR-21`, `ADR-27`).
 
 ### Lifecycle 2: Customer Intake, Nominees & KYC Documents (11 Baseline Steps) — ✅ VERIFIED
 - Covers `POST/GET/PATCH /customers`, `/nominees`, `/kyc-status`, `/fcm-token`, `/documents` upload, 15-min presigned URL, and delete.
@@ -96,7 +96,7 @@ flowchart LR
 
 ### Lifecycle 7: Office Counter Payments, Direct UPI Claims & Reversals — ✅ VERIFIED
 - Covers `POST/GET /payments`, `GET /payments/:id`, `/receipt`, and `POST /payments/:id/{request-reversal,approve-reversal,reject-reversal}`.
-- *Post-Oct-2026 Live Additions & Hardening*: Direct NPCI KVB UPI intent (`GET /installments/:dueId/upi-intent`) and dual-control UPI claim verification (`POST /payments/upi-claim`, `POST /payments/:id/verify-upi-claim` per `ADR-19`). All reversal mutations (`request`, `approve`, `reject`) strictly enforce **Verified Partner `SUPER_ADMIN` (`isPartner: true`)** with `maker != checker` (`KFC-SEC-001` + `chk_reversal_maker_checker`).
+- *Post-Oct-2026 Live Additions & Hardening*: Direct NPCI KVB UPI intent (`GET /installments/:dueId/upi-intent`) and dual-control UPI claim verification (`POST /payments/upi-claim`, `POST /payments/:id/verify-upi-claim` per `ADR-19`). All reversal mutations (`request`, `approve`, `reject`) strictly enforce **Statutory Partner (`Role.PARTNER`)** with `maker != checker` (`KFC-SEC-001` + `chk_reversal_maker_checker`).
 
 ### Lifecycle 8: Prize Disbursements, Safety Proof & Maturity Settlement — ✅ VERIFIED
 - Covers `GET /disbursements`, `/auction/:auctionId`, `upload-safety-proof`, `safety-proof-url`, `verify-safety-proof`, `authorize-payout`, `disburse`, `voucher`, and Month $N$ maturity settlement.
@@ -127,7 +127,7 @@ This register consolidates the final, reconciled status across all 34 business r
 ### 5.1 Reconciliation of All 34 Confirmed Business Rules
 | Category | Count | Current Verified Status |
 |---|:---:|---|
-| **Fully Implemented & Automated-Test Verified (`MATCH / TESTED`)** | **28** | Enforced across PostgreSQL 17, NestJS 12, Next.js 15, `@kumaran/api-client`, and Dart Core (all 11 Architectural Guardrails, whole-rupee `BigInt`, 4% frozen commission, universal dividends, 1/4 ceiling & Option A tie-break, Month 1/$N$ rules, discrete payments, sequential receipts, arrears offset, safety proof checklist, 8 DB `CHECK` constraints, `isPartner: true`, bilingual EN/TA receipts/PDFs, zero WhatsApp). |
+| **Fully Implemented & Automated-Test Verified (`MATCH / TESTED`)** | **28** | Enforced across PostgreSQL 17, NestJS 12, Next.js 15, `@kumaran/api-client`, and Dart Core (all 11 Architectural Guardrails, whole-rupee `BigInt`, 4% frozen commission, universal dividends, 1/4 ceiling & Option A tie-break, Month 1/$N$ rules, discrete payments, sequential receipts, arrears offset, safety proof checklist, 8 DB `CHECK` constraints, `Role.PARTNER` exclusivity, bilingual EN/TA receipts/PDFs, zero WhatsApp). |
 | **Software Complete — Pending Live Production External Credentials (`PARTIAL / OPS`)** | **3** | Live MSG91 TRAI DLT production credentials (`KMRCHT`), live Cloudflare R2/S3 production bucket keys, and live KVB corporate UPI bank reconciliation operations on go-live VPS. |
 | **Intentionally Fail-Closed Pending Business Owner / Legal Sign-Off (`BLOCKED`)** | **2** | `Q19` (unclaimed prize money statutory bank deposit automation) and `Q25` (early subscriber exit settlement deduction policy — `settle-removal` fails closed with `UNAPPROVED_SETTLEMENT_POLICY`). |
 | **Authoritatively Deferred to Phase 2 (`DEFERRED — Q2 2027`)** | **1** | Flutter Android mobile UI screens, APK packaging, and live FCM push rollout (`ADR-26`); Dart Client Core (`apps/mobile/lib/core/`) is built and passing 6/6 suites. |

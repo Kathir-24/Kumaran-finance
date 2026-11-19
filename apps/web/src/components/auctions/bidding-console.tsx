@@ -58,8 +58,7 @@ export function BiddingConsole({
   const user = useAuthStore((s) => s.user);
   // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial bid recording
   const canRecordBid =
-    hasAnyRole(user, ['BRANCH_MANAGER']) ||
-    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
+    hasAnyRole(user, ['BRANCH_MANAGER', 'PARTNER']);
 
   // Pure BigInt whole-rupee math boundaries (Guardrail 2, 3, 6)
   const chitValueBig = toSafeWholeRupeeBigInt(chitValue, 0n);
@@ -140,7 +139,7 @@ export function BiddingConsole({
     setErrorMsg(null);
 
     if (!canRecordBid) {
-      setErrorMsg('Only a verified Partner (Super Admin with isPartner: true) or Branch Manager can record in-office auction bids.');
+      setErrorMsg('Only a verified Partner or Branch Manager can record in-office auction bids.');
       return;
     }
 

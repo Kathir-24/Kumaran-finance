@@ -40,20 +40,20 @@ flowchart LR
 
 1. **Real PostgreSQL 17 Ledger**: Every auction bid, receipt, reversal, and status mutation reads and mutates real PostgreSQL rows.
 2. **Real JWT & BFF Security**: Authenticates via `POST /api/v1/auth/web/login` using bcrypt-12 hashes seeded in PostgreSQL and injects real `HttpOnly` BFF cookies.
-3. **Maker $\ne$ Checker & Verified Partner Enforcement (Guardrails 10 & 11)**: Dual-control workflows execute across distinct verified partner sessions (`isPartner: true`).
+3. **Maker $\ne$ Checker & Verified Partner Enforcement (Guardrails 10 & 11)**: Dual-control workflows execute across distinct verified partner sessions (`Role.PARTNER`).
 
 ---
 
 ## 2. Seeded Operating Personas Registry
 
-The database seeder (`apps/api/prisma/seeders/01-branch-users.seeder.ts`) seeds **9 deterministic staff accounts** (including all 4 statutory Verified Partners with `isPartner: true`: `9876543210`, `9876543211`, `9876543217`, `9876543218`). Of those, `apps/web/e2e/fixtures/auth-personas.ts` binds **6 primary E2E fixtures**:
+The database seeder (`apps/api/prisma/seeders/01-branch-users.seeder.ts`) seeds **10 deterministic staff accounts** (including all 4 statutory Partners with `Role.PARTNER`: `9876543210`, `9876543211`, `9876543217`, `9876543218`, and IT Super Admin `9876543219`). Of those, `apps/web/e2e/fixtures/auth-personas.ts` binds **6 primary E2E fixtures**:
 
 | Persona Key | Name & Role | Phone (`ADR-18`) | Password | Branch | Effective Permissions |
 |---|---|---|---|---|---|
-| `SUPER_ADMIN_MANAGING` | P. Kumaran (`SUPER_ADMIN`, `isPartner: true`) | `9876543210` | `Admin@Kumaran2026` | `PRD` | Full company access + Verified Partner Maker & Audit Logs / Jobs telemetry |
-| `SUPER_ADMIN_CHECKER` | K. Senthil (`SUPER_ADMIN`, `isPartner: true`) | `9876543211` | `Admin@Kumaran2026` | `PRD` | Full company access + Verified Partner Checker |
+| `SUPER_ADMIN_MANAGING` | P. Kumaran (`PARTNER` / `SUPER_ADMIN`) | `9876543210` | `Admin@Kumaran2026` | `PRD` | Full company access + Statutory Partner Maker & Audit Logs / Jobs telemetry |
+| `SUPER_ADMIN_CHECKER` | K. Senthil (`PARTNER`) | `9876543211` | `Admin@Kumaran2026` | `PRD` | Full company access + Statutory Partner Checker |
 | `BRANCH_MANAGER` | M. Rajendran (`BRANCH_MANAGER`) | `9876543212` | `Admin@Kumaran2026` | `PRD` | Branch operations & auction bid Maker |
-| `ACCOUNTANT` | S. Priya (`ACCOUNTANT`) | `9876543213` | `Admin@Kumaran2026` | `PRD` | Counter cash collections, cash handover acknowledgment, and `/reversals` desk UI view (backend reversal mutations strictly require Verified Partners `SUPER_ADMIN` per `KFC-SEC-001`) |
+| `ACCOUNTANT` | S. Priya (`ACCOUNTANT`) | `9876543213` | `Admin@Kumaran2026` | `PRD` | Counter cash collections, cash handover acknowledgment, and `/reversals` desk UI view (backend reversal mutations strictly require Statutory Partners `Role.PARTNER` per `KFC-SEC-001`) |
 | `COLLECTION_AGENT` | R. Murugan (`COLLECTION_AGENT`) | `9876543214` | `Admin@Kumaran2026` | `PRD` | Doorstep collections & evening cash handover submission |
 | `AUDITOR` | CA V. Natarajan (`AUDITOR`) | `9876543216` | `Admin@Kumaran2026` | `PRD` | Read-only statutory books (Form XVII, Form XXI, Form XXII, Day Book, Defaulters); **blocked (`HTTP 403`) from `/reports/audit-logs` & `/admin/jobs` per Guardrail 11 (`ADR-21`)** |
 
@@ -72,7 +72,7 @@ The database seeder (`apps/api/prisma/seeders/01-branch-users.seeder.ts`) seeds 
 | **Suite 05** | `05-disbursement-safety.e2e.spec.ts` | 3 | Winner disbursement queue & prize breakdown, `ADR-15` non-mandatory safety proof checklist, Guardrail 10 Checker Partner dual-control authorization |
 | **Suite 06** | `06-counter-payments.e2e.spec.ts` | 3 | Counter collections desk & daily payments ledger, `ADR-07` discrete single net due matching, `ADR-11` A5 print preview with statutory passbook precedence notice |
 | **Suite 07** | `07-cash-handover.e2e.spec.ts` | 3 | Field agent evening cash handover desk, Desk Accountant dual-control acknowledgment (`collector != acknowledger`), Managing Partner branch vault count |
-| **Suite 08** | `08-payment-reversals.e2e.spec.ts` | 3 | Tests `/reversals` UI view for `accountantPage` (KPI cards, `Desk Staff (Maker Only)` status badge, justification modal trigger) and `checkerPartnerPage` (`Partner Authorized` dual-control status). *Note: At the API layer (`PaymentController`), both `POST :id/request-reversal` and `POST :id/approve-reversal` strictly enforce `@Roles(Role.SUPER_ADMIN)` with Verified Partner `isPartner: true` per `KFC-SEC-001` / Guardrail 11.* |
+| **Suite 08** | `08-payment-reversals.e2e.spec.ts` | 3 | Tests `/reversals` UI view for `accountantPage` (KPI cards, `Desk Staff (Maker Only)` status badge, justification modal trigger) and `checkerPartnerPage` (`Partner Authorized` dual-control status). *Note: At the API layer (`PaymentController`), both `POST :id/request-reversal` and `POST :id/approve-reversal` strictly enforce `@Roles(Role.PARTNER)` per `KFC-SEC-001` / Guardrails 10 & 11.* |
 | **Suite 09** | `09-reports-registers.e2e.spec.ts` | 5 | `auditorPage`: Reports hub & Form XXII 12-column cash book, Form XVII auction minutes & 21-day filing window, Form XXI continuous ledger & CSV export, Defaulters register (`ADR-07`). **`managingPartnerPage` (`SUPER_ADMIN` strictly)**: Test 5 verifies `/reports/audit-logs` immutable event stream & Maker–Checker badges per Guardrail 11 |
 | **Suite 10** | `10-bilingual-i18n.e2e.spec.ts` | 4 | Topbar language toggle (`English` $\leftrightarrow$ `தமிழ்`), authentic Tamil terminology across navigation, zero raw translation token leaks, restore English typography |
 | **Suite 11** | `11-claims-and-defaulters.e2e.spec.ts` | 2 | Collections Pending UPI Claims tab (`ADR-19`) & Scheme Defaulters Desk (`/schemes/[id]/defaulters`) rendering cleanly |

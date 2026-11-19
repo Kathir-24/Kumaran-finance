@@ -1,11 +1,11 @@
-# Kumaran Chits — Super Admin & Partner Operations Manual
+# Kumaran Chits — Business Partner & Foreman Operations Manual
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Target Persona**: **Verified Business Partners (`SUPER_ADMIN` with `isPartner: true`) & Foremen**  
+> **Target Persona**: **Statutory Business Partners (`Role.PARTNER`) & Foremen**  
 > **Platform Rollout (`ADR-26`)**: **Phase 1 Primary: Web Operations Portal (`apps/web/`, mobile-responsive)**; Partner Native Android Mobile App (`apps/mobile/`) UI & biometric push approvals roll out in **Phase 2 (Q2 2027)** over the existing Dart Client Core (`apps/mobile/lib/core/`).  
 > **Currency Standard**: Strictly whole integer Rupees (**`BigInt`**); zero paise, zero decimals.  
-> **Governance Model (Guardrails 10–11 / `ADR-21`)**: The 4 equal verified Partners (`isPartner: true`) share executive oversight with strict **Maker-Checker Dual Control** (`maker_user_id != checker_user_id`, enforced in app + 8 PostgreSQL `CHECK` constraints). Non-Partner IT Super Admins (`isPartner: false`) can manage users/settings and inspect audit logs/Bull Board, but are strictly barred from financial authorizations.
+> **Governance Model (Guardrails 10–11 / `ADR-21` / `ADR-27`)**: The 4 equal statutory Partners (`Role.PARTNER`) share executive oversight with strict **Maker-Checker Dual Control** (`maker_user_id != checker_user_id`, enforced in app + 8 PostgreSQL `CHECK` constraints). IT Super Admins (`Role.SUPER_ADMIN`) manage users/branches and inspect audit logs/BullMQ queues, but are strictly barred from financial authorizations and chit operations.
 
 ---
 
@@ -165,14 +165,14 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Push["Verified Partner B (isPartner: true) Alerted:\n'Auction Finalization Required: KCA-1L Month 4'"] --> Open["Open Pending Approvals on Web Portal\n(Phase 2: Android Push Alert)"]
-    Open --> Guard{"Dual-Control & Partner Guard:\nIs Partner B (isPartner: true) != Partner A?"}
+    Push["Verified Partner B (Role.PARTNER) Alerted:\n'Auction Finalization Required: KCA-1L Month 4'"] --> Open["Open Pending Approvals on Web Portal\n(Phase 2: Android Push Alert)"]
+    Open --> Guard{"Dual-Control & Partner Guard:\nIs Partner B != Partner A?"}
     Guard -- No --> Deny["HTTP 403 Forbidden: Maker cannot be Checker\nor non-partner Super Admin blocked!"]
     Guard -- Yes --> Commit["Click 'Finalize Auction & Commit Results'\n• Status transitions: SCHEDULED -> COMPLETED\n• Commits 4% Commission: ₹4,000\n• Calculates Total Dividend: D - ₹4,000\n• Divides Equally: Div_ticket = Div_total / 20\n• Generates Next Month Net Dues: Inet = Ibase - Div_ticket\n• Generates Form XVII Minutes PDF"]
 ```
 
 ### Step-by-Step Instructions:
-1. Verified Partner B (`SUPER_ADMIN` with `isPartner: true`) opens **Pending Approvals** on the Web Portal (and receives an Android FCM push alert in Phase 2 per ADR-26).
+1. Verified Partner B (`Role.PARTNER`) opens **Pending Approvals** on the Web Portal (and receives an Android FCM push alert in Phase 2 per ADR-26).
 2. Open the **Auction Verification Screen** (`POST /api/v1/auctions/:id/finalize`).
 3. Verify the winning ticket number, bid discount, and attendee list.
 4. Click **"Finalize Auction & Commit Results"** (`POST /api/v1/auctions/:id/finalize`).
@@ -253,21 +253,21 @@ flowchart TD
 ## 10. Requesting & Approving Erroneous Payment Reversals (Two-Partner Dual Control)
 
 > [!IMPORTANT]
-> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21)**: Both requesting (`POST /api/v1/payments/:id/request-reversal`) and approving (`POST /api/v1/payments/:id/approve-reversal`) a payment reversal are restricted strictly to **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)**. Desk Accountants and Branch Managers must escalate erroneous counter entries with the physical receipt to Partner A; they cannot submit reversal requests in software (`HTTP 403`).
+> **Verified Partner Exclusivity (`KFC-SEC-001` / ADR-21 / ADR-27)**: Both requesting (`POST /api/v1/payments/:id/request-reversal`) and approving (`POST /api/v1/payments/:id/approve-reversal`) a payment reversal are restricted strictly to **Statutory Partners (`Role.PARTNER`)**. Desk Accountants and Branch Managers must escalate erroneous counter entries with the physical receipt to Partner A; they cannot submit reversal requests in software (`HTTP 403`). IT Super Admins (`Role.SUPER_ADMIN`) are also barred (`HTTP 403`).
 
 ```mermaid
 flowchart TD
-    Error["Erroneous payment entry reported by Cashier\n(escalated with physical counter receipt)"] --> Req["Verified Partner A (isPartner: true) clicks 'Request Payment Reversal'\n• Enters mandatory written justification\n• PaymentReversal record created: Status = REQUESTED\n• Original Payment stays SUCCESS until approved"]
+    Error["Erroneous payment entry reported by Cashier\n(escalated with physical counter receipt)"] --> Req["Verified Partner A (Role.PARTNER) clicks 'Request Payment Reversal'\n• Enters mandatory written justification\n• PaymentReversal record created: Status = REQUESTED\n• Original Payment stays SUCCESS until approved"]
     Req --> Queue["Queued in Pending Approvals -> Payment Reversals\n(Phase 2: Partner B Android Push Alert)"]
-    Queue --> Review["Verified Partner B (isPartner: true) opens Reversals Queue\nReads reason & inspects physical receipt"]
+    Queue --> Review["Verified Partner B (Role.PARTNER) opens Reversals Queue\nReads reason & inspects physical receipt"]
     Review --> Dual{"Verified Partner B != Verified Partner A?"}
     Dual -- No --> Deny["HTTP 403: Maker cannot approve own reversal\nor non-partner Super Admin blocked!"]
     Dual -- Yes --> Approve["Partner B clicks 'Approve Reversal'\n• Payment transitions: SUCCESS -> REVERSED\n• PaymentReversal transitions: REQUESTED -> APPROVED\n• Ticket due reverts to UNPAID\n• Receipt PDF stamped 'ரத்து செய்யப்பட்டது / CANCELLED'\n• Offsetting cash entry in Form XXII + immutable audit trail"]
 ```
 
 ### Step-by-Step Instructions:
-1. When an erroneous payment entry is identified at the counter, the Desk Accountant hands the physical counter receipt and written discrepancy note to **Verified Partner A (`isPartner: true`)**, who submits the reversal request (`POST /api/v1/payments/:id/request-reversal`) with a mandatory written justification (Maker). A `PaymentReversal` record is created with status **`REQUESTED`** while the underlying `Payment` remains **`SUCCESS`** until Checker approval.
-2. Independent **Verified Partner B (`isPartner: true`)** opens **Pending Approvals $\to$ Payment Reversals** on the Web Portal.
+1. When an erroneous payment entry is identified at the counter, the Desk Accountant hands the physical counter receipt and written discrepancy note to **Verified Partner A (`Role.PARTNER`)**, who submits the reversal request (`POST /api/v1/payments/:id/request-reversal`) with a mandatory written justification (Maker). A `PaymentReversal` record is created with status **`REQUESTED`** while the underlying `Payment` remains **`SUCCESS`** until Checker approval.
+2. Independent **Verified Partner B (`Role.PARTNER`)** opens **Pending Approvals $\to$ Payment Reversals** on the Web Portal.
 3. Review the written reason and inspect the physical counter receipt.
 4. Click **"Approve Payment Reversal"** (`POST /api/v1/payments/:id/approve-reversal`).
    - The `Payment` transitions from `SUCCESS` $\to$ **`REVERSED`** and the `PaymentReversal` record transitions to **`APPROVED`**.

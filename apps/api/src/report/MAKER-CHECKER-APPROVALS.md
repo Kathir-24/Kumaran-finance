@@ -2,13 +2,13 @@
 
 > **Module**: `apps/api/src/report/`  
 > **Company**: **Kumaran Finance** (Perundurai, Erode, Tamil Nadu)  
-> **Guiding Guardrails**: Guardrail #10 (`Maker != Checker` + 8 PostgreSQL `CHECK` constraints) & Guardrail #11 (`ADR-21` / `SEC-A`: `isPartner: true` Verified Partner Identity & `SUPER_ADMIN`-only Audit Logs)
+> **Guiding Guardrails**: Guardrail #10 (`Maker != Checker` + 8 PostgreSQL `CHECK` constraints) & Guardrail #11 (`ADR-21`, `ADR-27` / `SEC-A`: `Role.PARTNER` Statutory Partner Identity & `SUPER_ADMIN`-only Audit Logs)
 
 ---
 
 ## 1. The 8 Live Maker–Checker Approval Queues
 
-Sensitive financial mutations cannot be finalized unilaterally or by Administrative IT Super Admins (`isPartner: false`):
+Sensitive financial mutations cannot be finalized unilaterally or by Administrative IT Super Admins (`Role.SUPER_ADMIN`):
 
 1. **Cash Handovers**: Field agents submit collected cash (`PENDING_HANDOVER`, `SUCCESS` only); an independent staff/partner (`collector != acknowledger`) counts and signs off into the branch vault (`chk_payment_cash_handover_maker_checker`).
 2. **Payment Reversals (`KFC-SEC-001`)**: Verified Partner A initiates a reversal (`REQUESTED`, `POST /api/v1/payments/:id/request-reversal`); a distinct Verified Partner B approves or rejects (`maker != checker`, `chk_reversal_maker_checker`).
@@ -55,7 +55,7 @@ Distilling the complete 19-operation company governance audit across Kumaran Fin
 |---|---|---|
 | **Strict Dual Control (`Maker != Checker`) — Enforced Live** | Auction Finalization, Finalized Auction Correction (Queue 6), Prize Disbursement Authorization, Cash Handover Acknowledgment, UPI Claim Verification (`submitter != verifier`), Payment Reversal (Verified Partner Maker + Verified Partner Checker per `KFC-SEC-001`), 3-Month Defaulter Removal (2-Partner Dual Control per `ADR-22` + `chk_ticket_removal_maker_checker`), Month $N$ Direct Settlement (Queue 8) | Enforced in application services (`assertVerifiedPartner`, `SELECT FOR UPDATE` row locks) and **8 PostgreSQL engine-level `CHECK` constraints** |
 | **Gated Downstream Execution** | Prize Payment Release (`POST /api/v1/disbursements/:id/release`) | Single-user cashier/partner execution strictly gated by prior `AUTHORIZED_BY_CHECKER` state |
-| **Single-Person Operational Actions (Partner-Governed Scope)** | Customer Intake & Optional KYC (`ADR-16`), Chit Scheme Creation & Activation, Subscriber Ticket Assignment (`ADR-13`), Counter/Field Cash Collection & Receipt Issuance, Defaulter Substitution (Verified Partner `isPartner: true`), Staff Account Creation & Role Updates (`isPartner` changes restricted to Verified Partners), Sub-Registrar Minutes Filing | Designed for Perundurai branch operational velocity; elevated multi-partner quorum options (e.g., 2-partner scheme activation or `SUPER_ADMIN` promotion) remain tracked as future partner-policy extensions |
+| **Single-Person Operational Actions (Partner-Governed Scope)** | Customer Intake & Optional KYC (`ADR-16`), Chit Scheme Creation & Activation, Subscriber Ticket Assignment (`ADR-13`), Counter/Field Cash Collection & Receipt Issuance, Defaulter Substitution (Statutory Partner `Role.PARTNER`), Staff Account Creation & Role Updates, Sub-Registrar Minutes Filing | Designed for Perundurai branch operational velocity; elevated multi-partner quorum options (e.g., 2-partner scheme activation or `SUPER_ADMIN` promotion) remain tracked as future partner-policy extensions |
 | **Intentionally Immutable / Read-Only By Design** | Financial Reports (`report.controller.ts` — strictly `@Get` / `@Sse`, zero overrides), Disbursed Prize Payouts (`DISBURSED` terminal state, `FIN-05`), Immutable `AuditLog` (`ENABLE ALWAYS` triggers + `SUPER_ADMIN`-only viewing per Guardrail 11) | Statutory Chit Funds Act 1982 & ledger integrity mandates; no persistent customer bank-account table exists (payout details captured per disbursement under `ADR-15`) |
 | **External Infrastructure / CLI Operations** | Disaster Recovery Restore (`infra/scripts/restore-from-s3.sh` / `apps/api/scripts/ops/restore-from-s3.ts`) | Zero in-app restore endpoints; production DRP runbook mandates dual-partner server sign-off before executing `pg_restore` |
 
@@ -85,7 +85,7 @@ Verified by **60 automated Jest unit tests** across **3 spec files** under `apps
 
 | Spec File | Tests | Verified Scope |
 |---|:---:|---|
-| `apps/api/test/unit/report.spec.ts` | **47** | 8-queue Maker–Checker aggregation, fail-closed branch scoping, post-cache `isPartner` / `actionableOnly` flags, `@BypassEnvelope()` & SSE heartbeat/auth termination, `take: 200` Queue 6 bound, `SURRENDERED` exclusion, `@Max(10000)` pagination bounds, IST boundaries, Audit Log secret redaction |
+| `apps/api/test/unit/report.spec.ts` | **47** | 8-queue Maker–Checker aggregation, fail-closed branch scoping, post-cache Partner / `actionableOnly` flags, `@BypassEnvelope()` & SSE heartbeat/auth termination, `take: 200` Queue 6 bound, `SURRENDERED` exclusion, `@Max(10000)` pagination bounds, IST boundaries, Audit Log secret redaction |
 | `apps/api/test/unit/report-etag.spec.ts` | **9** | Caller-scoped HTTP `304 Not Modified` ETag isolation for historical closed reports |
 | `apps/api/test/unit/statutory-report-m10.spec.ts` | **4** | Form XXII physical cash reversal outflows & `cashHandoverAcknowledgedAt` continuity, Form XXI running `BigInt` cumulative totals & `1..N` grid, Form XVII Option A tie-break metadata |
 

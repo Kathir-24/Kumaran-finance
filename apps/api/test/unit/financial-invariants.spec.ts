@@ -197,14 +197,26 @@ describe('Kumaran Chits — Financial Invariants & Mathematical Laws', () => {
       expect(branch?.isActive).toBe(true);
     });
 
-    it('should verify seeded Super Admin partner exists with roles array [SUPER_ADMIN]', async () => {
+    it('should verify seeded Statutory Partner exists with roles array [PARTNER]', async () => {
       if (!isDbConnected) return;
-      const admin = await prisma.user.findUnique({
+      const partner = await prisma.user.findUnique({
         where: { phone: '9876543210' },
       });
-      expect(admin).not.toBeNull();
-      expect(admin?.roles).toContain(Role.SUPER_ADMIN);
-      expect(admin?.isActive).toBe(true);
+      expect(partner).not.toBeNull();
+      expect(partner?.roles).toContain(Role.PARTNER);
+      expect(partner?.roles).not.toContain(Role.SUPER_ADMIN);
+      expect(partner?.isActive).toBe(true);
+    });
+
+    it('should verify seeded IT Super Admin exists with roles array [SUPER_ADMIN] and strictly barred from PARTNER', async () => {
+      if (!isDbConnected) return;
+      const itAdmin = await prisma.user.findUnique({
+        where: { phone: '9876543219' },
+      });
+      expect(itAdmin).not.toBeNull();
+      expect(itAdmin?.roles).toContain(Role.SUPER_ADMIN);
+      expect(itAdmin?.roles).not.toContain(Role.PARTNER);
+      expect(itAdmin?.isActive).toBe(true);
     });
 
     it('should enforce ADR-13: Max 1 ticket per customer in same chit group (@@unique([chitGroupId, customerId]))', async () => {

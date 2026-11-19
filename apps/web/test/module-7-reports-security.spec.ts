@@ -234,22 +234,22 @@ test('M7-WEB-05: Guardrail 10 & 11 RBAC for audit logs, RegistrarFilingModal & P
   assert.equal(isRoleAuthorizedForPath('/reports/audit-logs', ['ACCOUNTANT']), false);
 
   // 2. Registrar filing gate (XR-AUC-05 / Guardrail 11)
-  assert.equal(canUserRecordRegistrarFiling({ roles: ['SUPER_ADMIN'], isPartner: true }), true);
-  assert.equal(canUserRecordRegistrarFiling({ roles: ['SUPER_ADMIN'], isPartner: false }), false);
-  assert.equal(canUserRecordRegistrarFiling({ roles: ['BRANCH_MANAGER'], isPartner: false }), true);
-  assert.equal(canUserRecordRegistrarFiling({ roles: ['ACCOUNTANT'], isPartner: false }), true);
-  assert.equal(canUserRecordRegistrarFiling({ roles: ['AUDITOR'], isPartner: false }), false);
+  assert.equal(canUserRecordRegistrarFiling({ roles: ['PARTNER'] }), true);
+  assert.equal(canUserRecordRegistrarFiling({ roles: ['SUPER_ADMIN'] }), false);
+  assert.equal(canUserRecordRegistrarFiling({ roles: ['BRANCH_MANAGER'] }), true);
+  assert.equal(canUserRecordRegistrarFiling({ roles: ['ACCOUNTANT'] }), true);
+  assert.equal(canUserRecordRegistrarFiling({ roles: ['AUDITOR'] }), false);
 
   // 3. PendingApprovalsBanner access evaluation (Guardrail 11)
-  const partnerAccess = evaluateApprovalBannerAccess({ roles: ['SUPER_ADMIN'], isPartner: true });
+  const partnerAccess = evaluateApprovalBannerAccess({ roles: ['PARTNER'] });
   assert.equal(partnerAccess.canApproveFinancial, true);
   assert.equal(partnerAccess.isNonPartnerSuperAdmin, false);
 
-  const itAdminAccess = evaluateApprovalBannerAccess({ roles: ['SUPER_ADMIN'], isPartner: false });
+  const itAdminAccess = evaluateApprovalBannerAccess({ roles: ['SUPER_ADMIN'] });
   assert.equal(itAdminAccess.canApproveFinancial, false);
   assert.equal(itAdminAccess.isNonPartnerSuperAdmin, true);
 
-  const auditorAccess = evaluateApprovalBannerAccess({ roles: ['AUDITOR'], isPartner: false });
+  const auditorAccess = evaluateApprovalBannerAccess({ roles: ['AUDITOR'] });
   assert.equal(auditorAccess.isReadOnlyAuditor, true);
   assert.equal(auditorAccess.canApproveFinancial, false);
 });
@@ -473,7 +473,8 @@ test('XR-M7-WEB-01..04: Round-3 Defaulters branch scoping, IST dates/Form XVII b
   assert.ok(!auditPageSrc.includes('127.0.0.1'), 'audit-logs/page.tsx must not fabricate 127.0.0.1');
 
   // XR-M7-WEB-04: Dashboard report queries strictly gated to authorized office/audit roles
-  assert.equal(canQueryDashboardReports({ roles: ['SUPER_ADMIN'] }), true);
+  assert.equal(canQueryDashboardReports({ roles: ['PARTNER'] }), true);
+  assert.equal(canQueryDashboardReports({ roles: ['SUPER_ADMIN'] }), false);
   assert.equal(canQueryDashboardReports({ roles: ['BRANCH_MANAGER'] }), true);
   assert.equal(canQueryDashboardReports({ roles: ['ACCOUNTANT'] }), true);
   assert.equal(canQueryDashboardReports({ roles: ['AUDITOR'] }), true);

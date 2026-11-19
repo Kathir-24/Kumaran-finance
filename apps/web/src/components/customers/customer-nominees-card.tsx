@@ -50,10 +50,10 @@ export function CustomerNomineesCard({ customerId, nominees }: CustomerNomineesC
   const user = useAuthStore((s: AuthState) => s.user);
 
   const canManageNominees = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
   );
   const canDeleteNominees = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER'].includes(role),
   );
 
   const [isAddOpen, setIsAddOpen] = React.useState(false);

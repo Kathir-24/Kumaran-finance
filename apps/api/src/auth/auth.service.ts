@@ -52,7 +52,6 @@ export interface SanitizedUser {
   name: string;
   phone: string;
   roles: string[];
-  isPartner?: boolean;
   branchId: string | null;
   isTotpEnabled: boolean;
   hasMpin: boolean;
@@ -107,7 +106,6 @@ export class AuthService {
       name: user.name,
       phone: user.phone,
       roles: user.roles,
-      isPartner: user.isPartner ?? false,
       branchId: user.branchId,
       isTotpEnabled: user.isTotpEnabled,
       hasMpin: !!user.mpinHash,
@@ -2091,7 +2089,6 @@ export class AuthService {
       sub: user.id,
       phone: user.phone,
       roles: user.roles,
-      isPartner: user.isPartner ?? false,
       branchId: user.branchId,
       tokenType: 'access',
       clientType,
@@ -2104,7 +2101,6 @@ export class AuthService {
       sub: user.id,
       phone: user.phone,
       roles: user.roles,
-      isPartner: user.isPartner ?? false,
       branchId: user.branchId,
       tokenType: 'refresh',
       clientType,

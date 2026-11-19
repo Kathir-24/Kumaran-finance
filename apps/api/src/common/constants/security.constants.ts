@@ -105,6 +105,7 @@ export const CORS_MAX_AGE_SECONDS = 86_400;
  */
 export const STAFF_ROLES = [
   'SUPER_ADMIN',
+  'PARTNER',
   'BRANCH_MANAGER',
   'ACCOUNTANT',
   'COLLECTION_AGENT',

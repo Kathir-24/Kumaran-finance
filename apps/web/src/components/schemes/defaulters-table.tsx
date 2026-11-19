@@ -44,7 +44,7 @@ interface DefaultersTableProps {
   onRemoveClick: (ticket: DefaulterTicketRef) => void;
   onSubstituteClick: (ticket: DefaulterTicketRef) => void;
   onSettleClick: (ticket: DefaulterTicketRef) => void;
-  isSuperAdmin: boolean;
+  isPartner?: boolean;
   canSettle: boolean;
 }
 
@@ -57,9 +57,10 @@ export function DefaultersTable({
   onRemoveClick,
   onSubstituteClick,
   onSettleClick,
-  isSuperAdmin,
+  isPartner,
   canSettle,
 }: DefaultersTableProps) {
+  const hasPartnerAuthority = Boolean(isPartner);
   const t = useTranslations('schemes');
   const [activeTab, setActiveTab] = React.useState<'all' | 'active_arrears' | 'removal_eligible' | 'removed'>('all');
 
@@ -248,7 +249,7 @@ export function DefaultersTable({
                       <div className="flex items-center justify-end gap-1.5">
                         {isRemoved ? (
                           <>
-                            {isSuperAdmin && (
+                            {hasPartnerAuthority && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -272,7 +273,7 @@ export function DefaultersTable({
                             )}
                           </>
                         ) : isEligibleForRemoval ? (
-                          isSuperAdmin ? (
+                          hasPartnerAuthority ? (
                             <Button
                               size="sm"
                               variant="destructive"

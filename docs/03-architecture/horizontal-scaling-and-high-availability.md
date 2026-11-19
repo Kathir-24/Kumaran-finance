@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Compliance & Invariants**: Strictly conforms to the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`isPartner: true`, `ADR-21`), and zero hallucination policy.
+> **Compliance & Invariants**: Strictly conforms to the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`Role.PARTNER`, `ADR-21`, `ADR-27`), and zero hallucination policy.
 
 ---
 

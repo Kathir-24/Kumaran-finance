@@ -23,7 +23,7 @@ The web application (`apps/web`) and backend API (`apps/api`) of **Kumaran Chits
 | **PostgreSQL Concurrency** | Real DB row locking, deadlocks, race conditions, triggers (Postgres 17) | 26 real contention scenarios (CONCURR-INV-1..26) | **100.0%** (26/26) | **VERIFIED & CERTIFIED** |
 | **Financial Mathematics** | BigInt whole Rupee math, 1/4 ceiling, universal dividends | All bid, tie-break, offset, and settlement math | **100.0%** | **VERIFIED & CERTIFIED** |
 | **Dual Control (Maker-Checker)** | Payment reversal, auction commit, prize release, defaulters | Strict identity separation (`maker_id != checker_id`) | **100.0%** | **VERIFIED & CERTIFIED** |
-| **Partner Identity (SEC-A)** | Verified partner check (`isPartner: true`) vs Super Admin | Enforced on reversals, auctions, payouts, removals | **100.0%** | **VERIFIED & CERTIFIED** |
+| **Partner Identity (SEC-A / ADR-27)** | First-class `Role.PARTNER` vs IT `Role.SUPER_ADMIN` | Enforced on reversals, auctions, payouts, removals | **100.0%** | **VERIFIED & CERTIFIED** |
 | **Disaster Recovery & Backup**| Daily pg_dump `-F c` backup script & S3 replication | Script syntax and restore protocol verified | **RPO $\le$ 24h, RTO $\le$ 1h**| **VERIFIED & CERTIFIED (Local)** |
 | **Telecom DLT SMS (Q34)** | MSG91 flow driver, TRAI DLT template interpolation | Pluggable driver unit tests and circuit breaker | **100.0%** | **VERIFIED (Mock Sandbox)** |
 
@@ -68,7 +68,7 @@ To ensure complete transparency and zero false assumptions, all functional domai
 
 Before switching Perundurai branch operations from paper notebooks to Kumaran Chits:
 - [x] Run database migrations on production PostgreSQL 17 instance (`prisma migrate deploy`).
-- [x] Seed branch users and assign verified partner flags (`isPartner: true`) to the 4 business partners.
+- [x] Seed branch users and assign `Role.PARTNER` to the 4 business partners and `Role.SUPER_ADMIN` to the IT administrator.
 - [ ] Configure production `.env` with live MSG91 credentials and TRAI DLT template IDs.
 - [ ] Configure Cloudflare R2 bucket credentials and verify automated daily backup cron (`scripts/backup.sh`).
 - [ ] Onboard existing active chits and historical balances using `manual-onboarding-sop.md`.

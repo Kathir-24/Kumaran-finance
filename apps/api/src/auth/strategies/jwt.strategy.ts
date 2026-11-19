@@ -85,9 +85,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
               if (cached.roles) {
                 payload.roles = cached.roles;
               }
-              if (typeof cached.isPartner === 'boolean') {
-                payload.isPartner = cached.isPartner;
-              }
               return payload;
             }
           }
@@ -103,7 +100,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, isActive: true, isPartner: true, tokenRevokedBefore: true, roles: true },
+      select: { id: true, isActive: true, tokenRevokedBefore: true, roles: true },
     });
 
     if (!user || !user.isActive) {
@@ -151,7 +148,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
               status: 'ACTIVE',
               tokenRevokedBeforeMs: customer.tokenRevokedBefore?.getTime() ?? null,
               roles: [Role.CUSTOMER],
-              isPartner: false,
               sid: payload.sid ?? null,
             });
             await redis.set(cacheKey, customerStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});
@@ -202,14 +198,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     payload.roles = user.roles;
-    payload.isPartner = user.isPartner;
 
     if (useRedis && redis) {
       const userStatusData = JSON.stringify({
         status: 'ACTIVE',
         tokenRevokedBeforeMs: user.tokenRevokedBefore?.getTime() ?? null,
         roles: user.roles,
-        isPartner: user.isPartner,
         sid: payload.sid ?? null,
       });
       await redis.set(cacheKey, userStatusData, 'EX', USER_STATUS_CACHE_TTL_SECONDS).catch(() => {});

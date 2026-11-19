@@ -63,7 +63,7 @@ Every subscriber's physical paper passbook at Kumaran Finance maintains strictly
    - **Double Collection Prohibition (FIN-B)**:
      - Case 1 (Month $N$ Unpaid): $\text{finalMonthDeduction} = I_{base}$. Payout is $100,000 - 4,000 - 5,000 = \mathbf{₹91,000}$. Month $N$ due is marked `PAID`.
      - Case 2 (Month $N$ Already Paid at branch desk): $\text{finalMonthDeduction} = 0n$. Payout is $100,000 - 4,000 - 0 = \mathbf{₹96,000}$. Zero double collection.
-   - Executed strictly via **2-stage Maker-Checker settlement**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `isPartner: true`, `maker != checker`). Scheme status transitions to `COMPLETED`.
+   - Executed strictly via **2-stage Maker-Checker settlement**: Stage 1 `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff) $\to$ Stage 2 `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner, `Role.PARTNER`, `maker != checker`). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -112,7 +112,7 @@ The numbers below illustrate arithmetic relationships based on confirmed rules:
   2. The company retains the 4.00% foreman commission ($C_f = \text{₹4,000}$).
   3. **FIN-B Check**: If subscriber has NOT yet paid Month $N$ installment, ₹5,000 is deducted and Month $N$ due marked `PAID` ($\text{Net Payout} = \mathbf{₹91,000}$). If subscriber ALREADY paid Month $N$ installment at the branch desk, final month deduction is ₹0 ($\text{Net Payout} = \mathbf{₹96,000}$).
   4. Any prior unpaid arrears are also deducted from the prize snapshot.
-  5. The payout is authorized and released via formal settlement voucher by verified Partners (`isPartner: true`). Scheme status transitions to `COMPLETED`.
+  5. The payout is authorized and released via formal settlement voucher by verified Partners (`Role.PARTNER`). Scheme status transitions to `COMPLETED`.
 
 ---
 
@@ -174,16 +174,16 @@ The dividend settlement policy is confirmed as follows:
 ### 6.4 Finalized Auction Correction Workflow (`KFC-FIN-005` / `M9-DUAL-DEF-01..05` / `CONFIRMED-BY-DEVELOPER`)
 In the event of a human clerical error during physical auction data entry (e.g. inverted digit on winning ticket or mistyped discount):
 1. **Maker Request (`POST /api/v1/auctions/:id/correction/request`)**:
-   - Initiated strictly by **Super Admin (Partner A, `isPartner: true`)** with a mandatory justification inside a row-locked transaction (`withTransactionRetry`, monotonic DAG locks).
+   - Initiated strictly by **Partner A (`Role.PARTNER`)** with a mandatory justification inside a row-locked transaction (`withTransactionRetry`, monotonic DAG locks).
    - Enforces the 25% discount ceiling, whole-rupee divisibility (`KFC-FIN-002`), and rejects no-op corrections.
    - **Immutable Disbursed Prize Guard**: If prize money is already disbursed (`disbursementStatus === 'DISBURSED'`), correction is strictly blocked (`DISBURSED_PRIZE_IMMUTABLE`).
    - **Settled History Guard (`FIN-E`)**: If ANY subscriber has already paid their Month $N+1$ installment due, correction fails closed with `ALREADY_PAID_DUES_EXIST`.
    - **Disbursement Lockout (`M9-DUAL-DEF-02`)**: While a correction request is pending, all 3 prize disbursement stages (`verifySafetyProof`, `authorizePayout`, `releasePayout`) fail closed (`PENDING_CORRECTION_LOCKOUT`) so disputed winners cannot be paid out.
 2. **Checker Approval (`POST /api/v1/auctions/:id/correction/approve`)**:
-   - Approved strictly by **Super Admin (Partner B, `isPartner: true`)** with hard dual control: `maker_user_id != checker_user_id`.
+   - Approved strictly by **Partner B (`Role.PARTNER`)** with hard dual control: `maker_user_id != checker_user_id`.
    - Atomically updates auction fields (`winningTicketId`, `bidDiscount`, `prizeMoney`, `dividendPerTicket`), swaps `isPrized` flags if the winner changed, reconciles all unpaid Month $N+1$ installment dues (`netPayableAmount = baseInstallment - correctedDividend`), and if corrected below ceiling ($D < V/4$), purges stale `AuctionTieBidder` rows and resets `wasTieBreakWinner = false` (`M9-DUAL-DEF-04`).
 3. **Checker Rejection (`POST /api/v1/auctions/:id/correction/reject`)**:
-   - Independent **Super Admin (Partner B, `isPartner: true`, `maker != checker`)** can dismiss an erroneous correction request, logging `AUCTION_CORRECTION_REJECTED` and lifting the disbursement lockout (`M9-DUAL-DEF-01`).
+   - Independent **Partner B (`Role.PARTNER`, `maker != checker`)** can dismiss an erroneous correction request, logging `AUCTION_CORRECTION_REJECTED` and lifting the disbursement lockout (`M9-DUAL-DEF-01`).
 
 ---
 
@@ -273,7 +273,7 @@ Kumaran Finance currently tracks active chits in physical notebooks and paper re
 
 ## 11. Finalized Auction Correction Downstream Integrity Guard (FIN-E, `KFC-FIN-005` & `M9-DUAL-DEF-01..02`)
 
-1. **Dual Control Requirement**: Partner A requests (`POST /auctions/:id/correction/request`); independent Partner B approves (`POST /auctions/:id/correction/approve`) or rejects (`POST /auctions/:id/correction/reject`) under `maker != checker` and `isPartner: true`.
+1. **Dual Control Requirement**: Partner A requests (`POST /auctions/:id/correction/request`); independent Partner B approves (`POST /auctions/:id/correction/approve`) or rejects (`POST /auctions/:id/correction/reject`) under `maker != checker` and `Role.PARTNER`.
 2. **Disbursed Prize Immutability & Pending Lockout**: If prize money has already been disbursed to the winner, correction is strictly rejected (`DISBURSED_PRIZE_IMMUTABLE`). While a correction request is pending, all 3 prize disbursement stages fail closed (`PENDING_CORRECTION_LOCKOUT`).
 3. **Settled Financial History Preservation (FIN-E)**:
    - If ANY subscriber has already paid their installment due for downstream Month $N+1$, correction fails closed:

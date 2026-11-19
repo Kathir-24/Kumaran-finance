@@ -1,11 +1,13 @@
-# Phase 1: Super Admin / Owner (The 4 Partners) — Comprehensive Operational Guide & User Journeys
+# Phase 1: Statutory Business Partner (`Role.PARTNER`) & IT Super Admin (`Role.SUPER_ADMIN`) — Operational Guide & User Journeys
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
-> **Persona**: **Super Admin / Owner (The 4 Equal Partners — `isPartner: true`)**  
+> **Personas**:  
+> - **Statutory Business Partner (`Role.PARTNER`)**: The 4 Equal Owners with Maker/Checker financial authority across all chit operations.  
+> - **IT Super Admin (`Role.SUPER_ADMIN`)**: System Administrator managing staff accounts (`/users`), branches (`/branches`), BullMQ queues (`/admin/jobs`), and audit trail (`/reports/audit-logs`). Barred from chit operations.  
 > **Target Audience**: Beginners, Business Partners, Staff, and Engineers learning Kumaran Chits operations.  
 > **Platform Scope (`ADR-26`)**: **Phase 1 Active Production = Web Portal (`apps/web/`) + NestJS API (`apps/api/`)**; Flutter Android Mobile UI (`apps/mobile/`) is **deferred to Phase 2 (Q2 2027)** while Dart Core models (`apps/mobile/lib/core/`) and cross-device backend Maker $\ne$ Checker APIs remain 100% preserved.  
-> **Partner Identity Guard (`ADR-21` / Guardrail 11)**: Verified business partners (`isPartner: true`) hold financial authorization rights; Administrative IT Super Admins (`isPartner: false`) manage users, settings, immutable audit logs, and BullMQ telemetry, but are strictly barred from financial mutations (`assertVerifiedPartner`).  
+> **Partner Identity Guard (`ADR-21` / `ADR-27` / Guardrail 11)**: `Role.PARTNER` holds financial authorization rights; `Role.SUPER_ADMIN` manages users, settings, immutable audit logs, and BullMQ telemetry, but is strictly barred from financial mutations (`assertVerifiedPartner`).  
 > **Authoritative Compliance**: [`AGENTS.md`](../../../AGENTS.md), [`financial-rules.md`](../../01-business/financial-rules.md), and [`permissions-matrix.md`](../../01-business/permissions-matrix.md).
 
 ---
@@ -90,15 +92,15 @@ Here are the formal Agile user stories defining every capability the Super Admin
 
 ### Module 8: Payments, Bilingual Receipts & Reversals (M8)
 * **US-8.1 (In-Branch Payment Recording)**: *As a Partner*, I want to record walk-in payments via Cash, UPI, Cheque, or NEFT, sign the customer's physical passbook, and enqueue an asynchronous receipt notification (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* customers get instant proof of payment.
-* **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A (`isPartner: true`) to initiate a reversal (`POST /payments/:id/request-reversal`) with a written reason and independent Partner B (`isPartner: true`) to approve (`POST /payments/:id/approve-reversal`) or reject (`POST /payments/:id/reject-reversal`), rendering a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (`0.28` opacity, `KFC-PDF-001`) on cancelled receipts, *so that* no single person can manipulate cash entries.
+* **US-8.2 (Maker-Checker Payment Reversal)**: *As a Partner*, if an erroneous payment is recorded, I want Partner A (`Role.PARTNER`) to initiate a reversal (`POST /payments/:id/request-reversal`) with a written reason and independent Partner B (`Role.PARTNER`) to approve (`POST /payments/:id/approve-reversal`) or reject (`POST /payments/:id/reject-reversal`), rendering a bold red diagonal watermark `ரத்து செய்யப்பட்டது / CANCELLED` (`0.28` opacity, `KFC-PDF-001`) on cancelled receipts, *so that* no single person can manipulate cash entries.
 
 ### Module 9: Offline Auctions & Prize Disbursements (M9)
 * **US-9.1 (Defaulter Auction Block)**: *As a Partner*, I want the software to strictly prevent any subscriber who has unpaid dues for the month (`consecutiveUnpaidMonths > 0`) or a pending removal (`removalRequestedByUserId != null`) from bidding or winning the auction, *so that* defaulters cannot take company prize money.
 * **US-9.2 (Recording Auction Result - Maker)**: *As a Partner (Maker)*, I want to enter the winning ticket and bid discount (between 4% commission and 25% ceiling, enforcing `KFC-FIN-002` whole-rupee divisibility `(D - C_f) % M === 0`) after conducting the in-person branch auction, *so that* the result is queued for verification.
 * **US-9.3 (Physical Paper Token Tie-Break)**: *As a Partner*, if multiple members bid the maximum 25% ceiling, I want to conduct a physical paper lot draw in front of members and enter the unique paper token numbers and drawn winning ticket into the system, *so that* the draw is completely transparent and verified by subscribers.
-* **US-9.4 (Auction Finalization - Checker)**: *As a Partner (Checker, `isPartner: true`)*, I want to review the entered auction bid and click finalize (`maker != checker`, `chk_auction_maker_checker`), *so that* dividends and next month's due schedules are committed.
+* **US-9.4 (Auction Finalization - Checker)**: *As a Partner (Checker, `Role.PARTNER`)*, I want to review the entered auction bid and click finalize (`maker != checker`, `chk_auction_maker_checker`), *so that* dividends and next month's due schedules are committed.
 * **US-9.5 (Company Safety Proof Verification - Maker)**: *As a Partner (Maker)*, I want to inspect the winner's agreement, nominee signature, signed blank cheques, and promissory notes, check off the items, and prepare the payout voucher.
-* **US-9.6 (Prize Payout Authorization - Checker)**: *As a Partner (Checker, `isPartner: true`)*, I want to review the safety proof and authorize releasing the prize money via `CASH`, `ACCOUNT_PAYEE_CHEQUE`, or NEFT/RTGS/IMPS (`maker != checker`, `chk_winner_maker_checker`), *so that* funds are safely disbursed with automated arrears offset (`KFC-FIN-003`).
+* **US-9.6 (Prize Payout Authorization - Checker)**: *As a Partner (Checker, `Role.PARTNER`)*, I want to review the safety proof and authorize releasing the prize money via `CASH`, `ACCOUNT_PAYEE_CHEQUE`, or NEFT/RTGS/IMPS (`maker != checker`, `chk_winner_maker_checker`), *so that* funds are safely disbursed with automated arrears offset (`KFC-FIN-003`).
 * **US-9.7 (Finalized Auction Correction — `KFC-FIN-005`, `M9-DUAL-DEF-01..05`)**: *As a Partner*, if a clerical error occurs before prize disbursement and before any Month $N+1$ due is paid (`ALREADY_PAID_DUES_EXIST`), I want Partner A to request correction (`POST /auctions/:id/correction/request`, locking disbursements with `PENDING_CORRECTION_LOCKOUT`) and Partner B to approve (`POST /auctions/:id/correction/approve`) or reject (`POST /auctions/:id/correction/reject`), *so that* clerical mistakes are corrected safely under dual control.
 
 ### Module 10: Dashboards & Statutory Reports (M10)
@@ -261,7 +263,7 @@ Kandasamy (Ticket `#5`) comes to the office 3 days later to collect his prize mo
    - Payout Amount: `₹75,000` (Whole integer Rupees, minus any unpaid arrears offset via `KFC-FIN-003`).
    - Click **"Verify Safety Proof"** (`POST /disbursements/auction/:auctionId/verify-safety-proof`, Maker: Partner A). Status updates to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`).
 4. **Step 4: Authorize Prize Payout Voucher (Checker)**:
-   - Partner C (or Partner B/D, `isPartner: true`) opens the approval queue on the Web Portal.
+   - Partner C (or Partner B/D, `Role.PARTNER`) opens the approval queue on the Web Portal.
    - They inspect the attached cheque scan and signed agreement via 15-minute presigned URL (`GET /disbursements/auction/:auctionId/safety-proof-url`), select `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` (or `CASH` / `BANK_TRANSFER_NEFT`), and click **"Authorize Payout Voucher"** (`POST /disbursements/auction/:auctionId/authorize-payout`).
    - System asserts `verifiedByUserId != checkerUserId` and sets status to **`AUTHORIZED_BY_CHECKER`**.
 5. **Step 5: Release Prize Money Disbursement**:
@@ -344,7 +346,7 @@ The standard statutory chit lifecycle requires specialized handling for the firs
 - When the chit group reaches Month 20, there is only 1 non-prized subscriber remaining (e.g. Ticket #18, Marimuthu).
 - There is **NO auction** in Month 20.
 - **Stage 1 (Maker Preparation)**: Accountant, Branch Manager, or Partner A calls `POST /disbursements/group/:chitGroupId/prepare-final-settlement` to compute the settlement voucher snapshot (frozen 4.00% commission `₹4,000`, prior arrears, and `FIN-B` Month 20 check: deducts `₹5,000` **only if Month 20 due is unpaid** $\to$ net payout `₹91,000`; or `₹0` deduction if already paid at desk $\to$ net payout `₹96,000`).
-- **Stage 2 (Checker Partner Approval)**: Independent Partner B (`isPartner: true`, `maker != checker`) calls `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`):
+- **Stage 2 (Checker Partner Approval)**: Independent Partner B (`Role.PARTNER`, `maker != checker`) calls `POST /disbursements/group/:chitGroupId/approve-final-settlement` (or `final-settlement` with `requirePreparedSettlement: true`):
   - Net prize money is settled directly to Marimuthu with a formal payout voucher (`KC-VOU-...`).
   - The chit scheme transitions automatically to `COMPLETED`.
 
@@ -379,7 +381,7 @@ When provisioning a field agent to assist with office counter duties during the 
 
 ## 5. Summary & Checklist for Phase 1
 
-- [x] Full operational context of the 4 equal partners (`isPartner: true` vs. `isPartner: false`) established.
+- [x] Full operational context of the 4 equal partners (`Role.PARTNER`) and IT administrator (`Role.SUPER_ADMIN`) established.
 - [x] Basic chit-fund mathematics and vocabulary explained in simple terms.
 - [x] 23 granular user stories spanning all 10 modules authored.
 - [x] 8 detailed, click-by-click operational journeys with Mermaid diagrams documented.

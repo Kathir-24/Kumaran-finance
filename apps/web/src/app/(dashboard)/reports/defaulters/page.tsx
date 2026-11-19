@@ -40,10 +40,10 @@ export default function DefaultersRegisterPage() {
   const activeBranchId = useAuthStore((s: AuthState) => s.activeBranchId);
   const roles = user?.roles || [];
   const hasAccess = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT', 'AUDITOR'].includes(r)
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'COLLECTION_AGENT', 'AUDITOR'].includes(r)
   );
   const isSuperAdminOrAccountant = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'ACCOUNTANT', 'AUDITOR'].includes(r)
+    ['PARTNER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
   );
 
   // Filter States (XR-M7-WEB-01: non-global roles locked strictly to user.branchId)

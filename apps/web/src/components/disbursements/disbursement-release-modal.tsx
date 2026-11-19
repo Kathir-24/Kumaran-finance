@@ -66,9 +66,7 @@ export function DisbursementReleaseModal({
   const t = useTranslations('disbursements');
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const canReleasePayout =
-    hasAnyRole(user, ['ACCOUNTANT']) ||
-    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
+  const canReleasePayout = hasAnyRole(user, ['ACCOUNTANT', 'PARTNER']);
 
   const [paymentReference, setPaymentReference] = useState<string>('');
   const [disbursedAt, setDisbursedAt] = useState<string>('');

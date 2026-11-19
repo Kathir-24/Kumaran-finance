@@ -336,7 +336,7 @@ describe('Task 7.2: Maker != Checker Prize Money Payout Release & Final Settleme
   });
 
   // 9. DEF-WM-06 & DEF-WM-07 Regression: Partner-only auth, release RBAC, KFC-FIN-004 no manual override, paymentReference
-  it('DEF-WM-05/06/07 Regression: Enforces isPartner, release RBAC, KFC-FIN-004 no override, Month N Maker != Checker, and paymentReference', () => {
+  it('DEF-WM-05/06/07 Regression: Enforces Partner role, release RBAC, KFC-FIN-004 no override, Month N Maker != Checker, and paymentReference', () => {
     const rootDir = fs.existsSync(path.resolve(process.cwd(), 'src/components/disbursements'))
       ? process.cwd()
       : path.resolve(process.cwd(), 'apps/web');
@@ -362,8 +362,8 @@ describe('Task 7.2: Maker != Checker Prize Money Payout Release & Final Settleme
       'utf8',
     );
 
-    // Guardrail 11: voucher/page.tsx checks user?.isPartner and guards Release Payout button by role
-    assert.match(voucherPageSrc, /Boolean\(user\?\.isPartner\)/);
+    // Guardrail 11: voucher/page.tsx checks PARTNER role and guards Release Payout button by role
+    assert.match(voucherPageSrc, /hasAnyRole\(user,\s*\['PARTNER'\]\)/);
     assert.match(voucherPageSrc, /canReleasePayout/);
 
     // KFC-FIN-004: DisbursementAuthModal must NOT send user-editable disbursedAmount override
@@ -379,7 +379,7 @@ describe('Task 7.2: Maker != Checker Prize Money Payout Release & Final Settleme
 
     // Guardrail 10 & 11 on Month N FinalSettlementModal
     assert.match(finalModalSrc, /isSelfApproval/);
-    assert.match(finalModalSrc, /Boolean\(user\?\.isPartner\)/);
+    assert.match(finalModalSrc, /hasAnyRole\(user,\s*\['PARTNER'\]\)/);
     assert.match(finalModalSrc, /canApproveStage2/);
 
     // DEF-WM-07: PayoutVoucherCard reads canonical Prisma paymentReference & workflow stamps
@@ -387,14 +387,14 @@ describe('Task 7.2: Maker != Checker Prize Money Payout Release & Final Settleme
     assert.match(voucherCardSrc, /isStep2Done \|\| voucher\.verifiedByUserId/);
     assert.match(voucherCardSrc, /isStep3Done \|\| voucher\.authorizedByUserId/);
 
-    // Guardrail 11 (SEC-A): SafetyProofChecklist enforces read-only for IT Super Admin (isPartner: false)
+    // Guardrail 11 (SEC-A): SafetyProofChecklist enforces partner authority
     const checklistSrc = fs.readFileSync(
       path.resolve(rootDir, 'src/components/disbursements/safety-proof-checklist.tsx'),
       'utf8',
     );
     assert.match(
       checklistSrc,
-      /hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT'\]\)\s*\|\|\s*\(hasAnyRole\(user,\s*\['SUPER_ADMIN'\]\)\s*&&\s*Boolean\(user\?\.isPartner\)\)/,
+      /hasAnyRole\(user,\s*\['BRANCH_MANAGER',\s*'ACCOUNTANT',\s*'PARTNER'\]\)/,
     );
 
     // XR-WM-01: Stage-2 FinalSettlementModal displays Maker's prepared details & handles MINUTES_FILED/CLOSED

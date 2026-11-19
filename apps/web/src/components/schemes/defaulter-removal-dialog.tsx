@@ -58,8 +58,7 @@ export function DefaulterRemovalDialog({
   const [reason, setReason] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -97,7 +96,7 @@ export function DefaulterRemovalDialog({
 
   const isEligible = ticket.consecutiveUnpaidMonths >= 3;
   const isReasonValid = reason.trim().length >= 10;
-  const canSubmit = isSuperAdmin && isPartner && isEligible && isReasonValid && !removeMutation.isPending;
+  const canSubmit = isPartner && isEligible && isReasonValid && !removeMutation.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -118,19 +117,11 @@ export function DefaulterRemovalDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Super Admin Guard Banner */}
-        {!isSuperAdmin && (
+        {/* Partner Guard Banner */}
+        {!isPartner && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-300">
             <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>{t('accessDeniedDesc')}</span>
-          </div>
-        )}
-
-        {/* Legal Partner Guard Banner (SEC-A) */}
-        {isSuperAdmin && !isPartner && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-300">
-            <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>Only verified legal partners (isPartner: true) possess financial authority to request defaulter removal.</span>
+            <span>Only verified legal partners possess statutory authority to request defaulter removal.</span>
           </div>
         )}
 
@@ -175,7 +166,7 @@ export function DefaulterRemovalDialog({
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
             placeholder={t('removeReasonPlaceholder')}
             rows={3}
-            disabled={!isSuperAdmin || !isEligible || removeMutation.isPending}
+            disabled={!isPartner || !isEligible || removeMutation.isPending}
             className="text-xs border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500 focus:border-rose-500"
           />
           {reason.trim().length > 0 && reason.trim().length < 10 && (

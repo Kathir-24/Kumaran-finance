@@ -77,7 +77,7 @@ export function assertAuctionBranchAccess(
 
 /**
  * Guardrail 11 / ADR-21 (SEC-A): Fail-closed statutory partner identity check.
- * Rejects BOTH non-partner users (isPartner: false) AND null/missing user records.
+ * Rejects BOTH non-partner users (lacking Role.PARTNER) AND null/missing user records.
  */
 export async function assertVerifiedPartner(
   prisma: { user?: { findUnique?: (args: any) => Promise<any> } },
@@ -90,10 +90,17 @@ export async function assertVerifiedPartner(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isPartner: true, isActive: true },
+    select: { isActive: true, roles: true },
   });
 
-  if (!user || !user.isPartner || user.isActive === false) {
+  const isVerified = Boolean(
+    user &&
+      user.isActive !== false &&
+      Array.isArray(user.roles) &&
+      user.roles.includes(Role.PARTNER),
+  );
+
+  if (!isVerified) {
     throw new ForbiddenException(
       `PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to ${actionDescription}.`,
     );

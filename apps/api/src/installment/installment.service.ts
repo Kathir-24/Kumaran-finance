@@ -1145,7 +1145,7 @@ export class InstallmentService {
     // If requesting user is CUSTOMER, they can only request intent for their own ticket
     if (requestingUser && requestingUser.roles.includes(Role.CUSTOMER)) {
       const isPrivilegedStaff = requestingUser.roles.some((r) =>
-        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT] as Role[]).includes(r),
+        ([Role.PARTNER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT] as Role[]).includes(r),
       );
       if (!isPrivilegedStaff) {
         const customer = await this.prisma.customer.findUnique({

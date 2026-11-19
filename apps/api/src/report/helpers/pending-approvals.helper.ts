@@ -689,8 +689,7 @@ export function annotatePendingApprovalsForUser(
   caller: ApprovalCallerContext,
   actionableOnly: boolean = false,
 ): PendingApprovalsResponse {
-  const isVerifiedPartner =
-    caller.roles.includes(Role.SUPER_ADMIN) && caller.isPartner;
+  const isVerifiedPartner = caller.roles.includes(Role.PARTNER);
   const canVerifyOperationalQueues =
     isVerifiedPartner ||
     caller.roles.includes(Role.BRANCH_MANAGER) ||
@@ -816,26 +815,29 @@ export async function resolveApprovalCallerContext(
   prisma: PrismaService,
   requestingUser: JwtPayload,
 ): Promise<ApprovalCallerContext> {
-  const roles = Array.isArray(requestingUser?.roles) ? requestingUser.roles : [];
-  let isPartner = Boolean(requestingUser.isPartner);
+  let roles = Array.isArray(requestingUser?.roles) ? requestingUser.roles : [];
 
   if (
-    roles.includes(Role.SUPER_ADMIN) &&
+    (roles.includes(Role.SUPER_ADMIN) || roles.includes(Role.PARTNER)) &&
     requestingUser.sub &&
     typeof prisma.user?.findUnique === 'function'
   ) {
     const dbUser = await prisma.user.findUnique({
       where: { id: requestingUser.sub },
-      select: { isPartner: true, isActive: true },
+      select: { roles: true, isActive: true },
     });
-    if (dbUser !== undefined) {
-      isPartner = Boolean(dbUser && dbUser.isActive !== false && dbUser.isPartner);
+    if (dbUser) {
+      if (dbUser.isActive === false) {
+        roles = [];
+      } else if (Array.isArray(dbUser.roles)) {
+        roles = dbUser.roles;
+      }
     }
   }
 
   return {
     userId: requestingUser.sub,
     roles,
-    isPartner,
+    isPartner: roles.includes(Role.PARTNER),
   };
 }

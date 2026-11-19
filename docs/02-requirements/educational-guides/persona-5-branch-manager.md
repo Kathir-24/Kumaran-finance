@@ -79,7 +79,7 @@ Here are the formal Agile user stories defining every capability of the Branch M
 
 ### Module 5: Ticket Enrollment & Arrears Monitoring (M5)
 * **US-5.1 (Enrolling Subscribers into Tickets)**: *As a Branch Manager*, I want to allocate tickets (1 to $N$) to approved subscribers, with the system strictly preventing any customer from holding 2 or more tickets in the same scheme, *so that* concentration risk is avoided.
-* **US-5.2 (Monitoring 3-Month Defaulters)**: *As a Branch Manager*, I want to review subscribers who have missed 3 consecutive monthly installments via `GET /reports/defaulters` and escalate them offline to the Partners (who execute 2-partner removal `POST /tickets/:id/remove-defaulter/{request,approve,reject}` strictly as `SUPER_ADMIN` with `isPartner: true`), *so that* delinquent tickets are tracked within RBAC boundaries.
+* **US-5.2 (Monitoring 3-Month Defaulters)**: *As a Branch Manager*, I want to review subscribers who have missed 3 consecutive monthly installments via `GET /reports/defaulters` and escalate them offline to the Partners (who execute 2-partner removal `POST /tickets/:id/remove-defaulter/{request,approve,reject}` strictly as `Role.PARTNER`), *so that* delinquent tickets are tracked within RBAC boundaries.
 
 ### Module 6: Due Schedules & Dividend Allocations (M6)
 * **US-6.1 (Branch Dues Schedule Lookup)**: *As a Branch Manager*, I want to view the active due schedule for my branch showing the net installment payable ($I_{net} = I_{base} - Div$) for all tickets, *so that* I can resolve customer billing inquiries accurately.
@@ -91,7 +91,7 @@ Here are the formal Agile user stories defining every capability of the Branch M
 
 ### Module 8: Payments, Digital Receipts & Reversals (M8)
 * **US-8.1 (Branch Counter Payment Handling)**: *As a Branch Manager*, I want to assist at the counter during peak morning hours by recording walk-in payments, signing customer physical passbooks, and enqueuing automated receipt confirmations (Phase 1: Indian TRAI DLT SMS via MSG91 per `ADR-23`; Phase 2: FCM Push per `ADR-26`), *so that* subscriber wait times are minimized.
-* **US-8.2 (Escalating Erroneous Postings to Partners — `KFC-SEC-001`)**: *As a Branch Manager*, if a counter cashier makes a posting mistake, I understand the system strictly blocks me (`403 Forbidden`) from initiating or approving payment reversals (`POST /payments/:id/request-reversal`), *so that* I immediately escalate the receipt to **Partner A (`isPartner: true`)** to initiate and **Partner B** to approve/reject.
+* **US-8.2 (Escalating Erroneous Postings to Partners — `KFC-SEC-001`)**: *As a Branch Manager*, if a counter cashier makes a posting mistake, I understand the system strictly blocks me (`403 Forbidden`) from initiating or approving payment reversals (`POST /payments/:id/request-reversal`), *so that* I immediately escalate the receipt to **Partner A (`Role.PARTNER`)** to initiate and **Partner B** to approve/reject.
 
 ### Module 9: Conducting Branch Auctions & Payout Prep (M9)
 * **US-9.1 (Conducting In-Person Branch Auction — Maker)**: *As a Branch Manager*, I want to conduct the physical monthly auction at the branch counter, verify that unpaid members are blocked from bidding, record the winning ticket and bid discount (up to the 25% ceiling), and submit the result for Partner finalization.
@@ -276,7 +276,7 @@ Auction winner Mani visits the branch 3 days later to claim his ₹75,000 prize 
 4. Submit Safety Proof Verification (`POST /disbursements/auction/:auctionId/verify-safety-proof`, Maker: Branch Manager):
    - Net Prize Amount: **`₹75,000`** (Whole integer Rupees, minus any unpaid arrears offset via `KFC-FIN-003`).
    - Click **`"Submit Safety Proof Verification"`**.
-5. The disbursement record transitions to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`). Partner B (`isPartner: true`) then selects `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` (or `CASH` / `BANK_TRANSFER_*`) and authorizes payout (`AUTHORIZED_BY_CHECKER`), followed by cashier release (`POST /disbursements/auction/:auctionId/disburse` $\to$ `DISBURSED`).
+5. The disbursement record transitions to **`VERIFIED_BY_MAKER`** (`schema.prisma:309`). Partner B (`Role.PARTNER`) then selects `disbursementMode: 'ACCOUNT_PAYEE_CHEQUE'` (or `CASH` / `BANK_TRANSFER_*`) and authorizes payout (`AUTHORIZED_BY_CHECKER`), followed by cashier release (`POST /disbursements/auction/:auctionId/disburse` $\to$ `DISBURSED`).
 
 ---
 

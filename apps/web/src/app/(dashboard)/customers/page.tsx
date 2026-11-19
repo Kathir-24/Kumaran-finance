@@ -144,10 +144,10 @@ function CustomersDirectoryContent() {
     setPage(1);
   };
 
-  // RBAC permissions check: Super Admin, Branch Manager, Collection Agent can register customers
+  // RBAC permissions check: Partner, Branch Manager, Collection Agent can register customers
   const canRegisterCustomer =
     user?.roles?.some((r) =>
-      ['SUPER_ADMIN', 'BRANCH_MANAGER', 'COLLECTION_AGENT'].includes(r)
+      ['PARTNER', 'BRANCH_MANAGER', 'COLLECTION_AGENT'].includes(r)
     ) ?? true;
 
   return (

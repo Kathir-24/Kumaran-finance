@@ -5,13 +5,13 @@
 > **Status**: **Phase 6 Task 6.4 100% COMPLETED & VERIFIED**  
 > **Target Audience**: Web Engineers, Backend Engineers, CA Auditors, Partner/Foreman Operations, Desk Accountants  
 > **Scope**: Scheme Defaulters Desk, Ineligible Bidder Warnings, Company 3-Month Arrears Removal Rights (ADR-07 & ADR-12), Replacement Subscriber Substitution (ADR-13 & Guardrail 7), Defaulter Account Exit Settlement & Voucher (`KC-VOU-DEF-XXXXXX`), and 4.00% Foreman Commission Damages Math.  
-> **Applicable Architectural Guardrails**: Guardrail 1 (Single Company), Guardrail 2 (Pure Whole Rupee Math), Guardrail 3 (4.00% Commission Damages — proposed model locked under Q25), Guardrail 7 / ADR-13 (Max 1 Ticket Per Scheme Limit), Guardrail 8 / ADR-07 (Defaulter Rules & 3-Month Arrears Removal), Guardrail 10 (Maker $\ne$ Checker), Guardrail 11 / ADR-21 (Verified Partner `isPartner: true`), `KFC-SEC-004` (`PRIZED_TICKET_IMMUTABLE`).
+> **Applicable Architectural Guardrails**: Guardrail 1 (Single Company), Guardrail 2 (Pure Whole Rupee Math), Guardrail 3 (4.00% Commission Damages — proposed model locked under Q25), Guardrail 7 / ADR-13 (Max 1 Ticket Per Scheme Limit), Guardrail 8 / ADR-07 (Defaulter Rules & 3-Month Arrears Removal), Guardrail 10 (Maker $\ne$ Checker), Guardrail 11 / ADR-21, ADR-27 (Statutory Partner `Role.PARTNER`), `KFC-SEC-004` (`PRIZED_TICKET_IMMUTABLE`).
 
 ---
 
 ## 1. Executive Summary & Capabilities Delivered
 
-Under the **Tamil Nadu Chit Funds Act, 1982** and **Kumaran Chits Master Architectural Rules (ADR-07, ADR-12, ADR-13, ADR-21)**, Task 6.4 delivers a dedicated operational desk for managing subscriber arrears, exercising statutory company removal rights under two-partner dual control (`SEC-B`), onboarding replacement members, and enforcing the fail-closed Q25 exit settlement lock:
+Under the **Tamil Nadu Chit Funds Act, 1982** and **Kumaran Chits Master Architectural Rules (ADR-07, ADR-12, ADR-13, ADR-21, ADR-27)**, Task 6.4 delivers a dedicated operational desk for managing subscriber arrears, exercising statutory company removal rights under two-partner dual control (`SEC-B`), onboarding replacement members, and enforcing the fail-closed Q25 exit settlement lock:
 
 ```mermaid
 flowchart TD
@@ -20,10 +20,10 @@ flowchart TD
         Table["Defaulters Table with Arrears Badges\nIneligible to Bid (1-2 Mo) | Removal Eligible (>=3 Mo) | Removed (REMOVED_DEF_3M)"]
     end
 
-    subgraph Actions["2. Authorized Verified Partner Operations (isPartner: true)"]
+    subgraph Actions["2. Authorized Statutory Partner Operations (Role.PARTNER)"]
         Remove["Company 3-Month Removal Rights (ADR-07, ADR-12 & SEC-B)\nTwo-Partner Dual Control (Partner A requests -> Partner B approves/rejects)\nRequires >= 3 consecutive missed months & >= 10 char notice\nPrized tickets strictly immutable (KFC-SEC-004)"]
-        Substitute["Replacement Subscriber Substitution (ADR-13 & Guardrail 7)\nStrictly Verified Partners (SUPER_ADMIN)\nValidates replacement is KYC-Verified\nStrictly prevents duplicate ticket in same scheme (@@unique)"]
-        Settle["Defaulter Account Exit Settlement (Q25 Fail-Closed Lock)\nStrictly Verified Partners (SUPER_ADMIN)\nLocked Fail-Closed: HTTP 400 UNAPPROVED_SETTLEMENT_POLICY\nPending written Partner Board & legal damages policy"]
+        Substitute["Replacement Subscriber Substitution (ADR-13 & Guardrail 7)\nStrictly Statutory Partners (Role.PARTNER)\nValidates replacement is KYC-Verified\nStrictly prevents duplicate ticket in same scheme (@@unique)"]
+        Settle["Defaulter Account Exit Settlement (Q25 Fail-Closed Lock)\nStrictly Statutory Partners (Role.PARTNER)\nLocked Fail-Closed: HTTP 400 UNAPPROVED_SETTLEMENT_POLICY\nPending written Partner Board & legal damages policy"]
     end
 
     DefaultersDesk -->|>= 3 Mo Arrears| Remove
@@ -45,7 +45,7 @@ flowchart TD
    - **Removed Tickets (`REMOVED_DEF_3M`)**: Highlighted with a purple badge, exposing `Substitute Member` and the Q25 fail-closed `Settle Account` guard.
 
 3. **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog` — `SEC-B` / `KFC-SEC-004`)**:
-   - Restricted strictly to **Verified Partners (`SUPER_ADMIN` with `isPartner: true`)** (`SEC-A` / Guardrail 11).
+   - Restricted strictly to **Statutory Partners (`Role.PARTNER`)** (`SEC-A` / Guardrails 10 & 11).
    - **Two-Partner Dual Control (`SEC-B`)**: Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`, alias `/remove-defaulter`) with mandatory justification ($\ge 10$ characters), placing the ticket into `PENDING_REMOVAL_APPROVAL`.
    - Independent Partner B reviews and either approves (`POST /api/v1/tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`) or rejects (`POST /api/v1/tickets/:id/remove-defaulter/reject` $\to$ restores `DEFAULT_3_MONTHS`). Hard guard: `maker != checker`.
    - **Prized Subscriber Immutability (`KFC-SEC-004`)**: Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
@@ -73,11 +73,11 @@ flowchart TD
 |---|---|---|---|---|
 | **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Query: `minConsecutiveMonths=1` | Paginated tickets with unpaid dues and overdue totals |
 | **Scheme Tickets** | `GET /api/v1/chits/:id` | Authenticated Staff / Customers | Path: `id` (chit group UUID) | Scheme details + $N$ tickets with status, dues & customers |
-| **Request Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/request` *(alias `/remove-defaulter`)* | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ reason: string }` ($\ge 10$ chars) | Transitions to `PENDING_REMOVAL_APPROVAL` (`SEC-B`; blocks prized tickets `KFC-SEC-004`) |
-| **Approve Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Optional `{ notes?: string }` (`maker != checker`) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
-| **Reject Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/reject` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Optional `{ reason?: string }` (`maker != checker`) | Rejects request and restores ticket to `DEFAULT_3_MONTHS` |
-| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
-| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (`isPartner: true`) | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` (Q25) |
+| **Request Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/request` *(alias `/remove-defaulter`)* | Strictly `Role.PARTNER` | `{ reason: string }` ($\ge 10$ chars) | Transitions to `PENDING_REMOVAL_APPROVAL` (`SEC-B`; blocks prized tickets `KFC-SEC-004`) |
+| **Approve Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/approve` | Strictly `Role.PARTNER` | Optional `{ notes?: string }` (`maker != checker`) | Transitions to `REMOVED_DEF_3M`, tags `removedAt` & `removedByUserId` |
+| **Reject Defaulter Removal** | `POST /api/v1/tickets/:id/remove-defaulter/reject` | Strictly `Role.PARTNER` | Optional `{ reason?: string }` (`maker != checker`) | Rejects request and restores ticket to `DEFAULT_3_MONTHS` |
+| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `Role.PARTNER` | `{ newCustomerId: UUID, reason?: string }` | Restores to `ACTIVE`, resets `consecutiveUnpaidMonths = 0` |
+| **Settle Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `Role.PARTNER` | `{ paymentMethod: CASH/BANK/CHEQUE, notes?: string }` | Fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` (Q25) |
 
 ---
 

@@ -13,7 +13,7 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
   const superAdminPartner: JwtPayload = {
     sub: 'user-partner-001',
     phone: '+919876543210',
-    roles: [Role.SUPER_ADMIN],
+    roles: [Role.PARTNER],
     branchId: 'branch-prd-001',
     tokenType: 'access' as const,
   };
@@ -214,7 +214,8 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
     it('F05-2: approveFinalSettlement rejects non-partner user with 403 PARTNER_IDENTITY_REQUIRED', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: superAdminNonPartner.sub,
-        isPartner: false,
+        roles: [Role.SUPER_ADMIN],
+        isActive: true,
       });
 
       await expect(
@@ -229,7 +230,8 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
     it('F05-3: approveFinalSettlement rejects when makerUserId === checkerUserId with 403 MAKER_CHECKER_VIOLATION', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: superAdminPartner.sub,
-        isPartner: true,
+        roles: [Role.PARTNER],
+        isActive: true,
       });
 
       prismaMock.chitGroup.findUnique.mockResolvedValue({
@@ -268,7 +270,8 @@ describe('Phase 2 Security Remediation: Adversarial Verification (F05, F06, F07,
     it('F05-4: approveFinalSettlement succeeds when makerUserId !== checkerUserId and checker is partner', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: superAdminPartner.sub,
-        isPartner: true,
+        roles: [Role.PARTNER],
+        isActive: true,
       });
 
       prismaMock.chitGroup.findUnique.mockResolvedValue({

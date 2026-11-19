@@ -6,7 +6,6 @@ export interface JwtPayload {
   sub: string;
   phone: string;
   roles: Role[];
-  isPartner?: boolean;
   branchId: string | null;
   tokenType: TokenType;
   clientType?: string;

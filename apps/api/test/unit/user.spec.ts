@@ -181,44 +181,47 @@ describe('Staff User Management Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should allow verified partner to create staff with isPartner: true', async () => {
+    it('should allow Super Admin to create staff with Role.PARTNER', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
       prismaMock.branch.findFirst.mockResolvedValue({ id: mockBranchId });
-      prismaMock.user.create.mockResolvedValue({ ...mockStaffUser, isPartner: true });
+      prismaMock.user.create.mockResolvedValue({
+        ...mockStaffUser,
+        name: 'Partner User',
+        phone: '9842111111',
+        roles: [Role.PARTNER],
+      });
 
-      const partnerUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: true };
+      const superAdminUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN] };
       const res = await userController.create(
         {
           name: 'Partner User',
           phone: '9842111111',
-          roles: [Role.SUPER_ADMIN],
-          isPartner: true,
+          roles: [Role.PARTNER],
         },
-        partnerUser as any,
+        superAdminUser as any,
       );
 
-      expect(res.isPartner).toBe(true);
+      expect(res.roles).toContain(Role.PARTNER);
       expect(prismaMock.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ isPartner: true }),
+          data: expect.objectContaining({ roles: [Role.PARTNER] }),
         }),
       );
     });
 
-    it('should throw ForbiddenException if non-partner attempts to create user with isPartner: true', async () => {
-      const nonPartnerAdmin = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: false };
+    it('should throw BadRequestException if creating user with both SUPER_ADMIN and PARTNER roles', async () => {
+      const superAdminUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN] };
 
       await expect(
         userController.create(
           {
-            name: 'Attempted Partner',
+            name: 'Conflicted User',
             phone: '9842122222',
-            roles: [Role.SUPER_ADMIN],
-            isPartner: true,
+            roles: [Role.SUPER_ADMIN, Role.PARTNER],
           },
-          nonPartnerAdmin as any,
+          superAdminUser as any,
         ),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -296,36 +299,38 @@ describe('Staff User Management Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw ForbiddenException if non-partner modifies isPartner status', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
-      const nonPartnerAdmin = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: false };
+    it('should throw BadRequestException if assigning both SUPER_ADMIN and PARTNER roles', async () => {
+      const superAdminUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN] };
 
       await expect(
         userController.updateRoles(
           mockAgentId,
-          { roles: [Role.SUPER_ADMIN], isPartner: true },
-          nonPartnerAdmin as any,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should prevent partner from revoking their own partner status', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({
-        ...mockStaffUser,
-        id: mockSuperAdminId,
-        roles: [Role.SUPER_ADMIN],
-        isPartner: true,
-      });
-
-      const partnerUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN], isPartner: true };
-
-      await expect(
-        userController.updateRoles(
-          mockSuperAdminId,
-          { roles: [Role.SUPER_ADMIN], isPartner: false },
-          partnerUser as any,
+          { roles: [Role.SUPER_ADMIN, Role.PARTNER] },
+          superAdminUser as any,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow Super Admin to update staff roles to Role.PARTNER', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockStaffUser);
+      prismaMock.user.update.mockResolvedValue({
+        ...mockStaffUser,
+        roles: [Role.PARTNER],
+      });
+
+      const superAdminUser = { sub: mockSuperAdminId, roles: [Role.SUPER_ADMIN] };
+      const res = await userController.updateRoles(
+        mockAgentId,
+        { roles: [Role.PARTNER] },
+        superAdminUser as any,
+      );
+
+      expect(res.roles).toContain(Role.PARTNER);
+      expect(prismaMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ roles: [Role.PARTNER] }),
+        }),
+      );
     });
   });
 });

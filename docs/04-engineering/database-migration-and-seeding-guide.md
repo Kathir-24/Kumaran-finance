@@ -100,7 +100,7 @@ Opens in your browser at `http://localhost:5555`.
 | `20261106170415_add_concurrency_and_performance_indexes` | 2026-11-06 | Added composite B-tree concurrency & reporting indexes across dues, payments, and receipts. | **Applied & Verified** |
 | `20261106175923_add_optimistic_locking_version_columns` | 2026-11-06 | Added `version Int @default(1)` optimistic concurrency columns on `Customer` and `Branch`. | **Applied & Verified** |
 | `20261112115900_add_allocation_and_tie_bidder_indexes` | 2026-11-12 | Added `PaymentAllocation` FK B-Tree indexes (`paymentId`, `ticketId`, `installmentDueId`), `AuctionTieBidder` `@@unique([auctionId, ticketId])`, and `@@index([ticketId])` (`DEF-DB-05`). | **Applied & Verified** (`CONCURR-INV-20`–`23`) |
-| `20261113200000_add_partner_identity_and_removal_approval` | 2026-11-13 | Added `isPartner` boolean on `User` (ADR-21 / SEC-A) and two-partner dual control removal approval fields on `SubscriberTicket` (ADR-22 / SEC-B). | **Applied & Verified** |
+| `20261113200000_add_partner_identity_and_removal_approval` | 2026-11-13 | Added initial partner identity tracking (ADR-21 / SEC-A) and two-partner dual control removal approval fields on `SubscriberTicket` (ADR-22 / SEC-B). | **Superseded by 20261119130000** |
 | `20261113233000_audit_log_immutability_trigger` | 2026-11-13 | Created initial PostgreSQL engine-level triggers preventing `UPDATE` and `DELETE` on `AuditLog` table. | **Applied & Verified** |
 | `20261114010000_audit_log_complete_immutability` | 2026-11-14 | Hardened `ENABLE ALWAYS` triggers (`trg_prevent_audit_log_mutation`, `trg_prevent_audit_log_truncate`) + `REVOKE UPDATE, DELETE, TRUNCATE FROM PUBLIC`. | **Applied & Verified** (`CONCURR-INV-26`) |
 | `20261115030000_auth_revocation_and_session_vault` | 2026-11-15 | Added dedicated PostgreSQL `Session` vault model (`[userId, clientType]`, `[customerId, clientType]`) and authoritative `tokenRevokedBefore` cutoffs on `User` and `Customer` (F02, F04). | **Applied & Verified** |
@@ -109,6 +109,7 @@ Opens in your browser at `http://localhost:5555`.
 | `20261117170000_add_ticket_removal_maker_checker` | 2026-11-17 | Added ticket removal Maker-Checker constraint columns and DB `CHECK` guard (`chk_ticket_removal_maker_checker`). | **Applied & Verified** |
 | `20261118110000_harden_auction_disbursement_constraints` | 2026-11-18 | Hardened monetary & disbursement `CHECK` constraints (`DB-001`..`DB-005` closure, bringing engine-level `CHECK` constraints to 8). | **Applied & Verified** |
 | `20261118124500_case_insensitive_payout_ref_index` | 2026-11-18 | Added case-insensitive partial unique index `uq_auction_winner_non_cash_payment_ref` blocking duplicate non-cash prize payout references. | **Applied & Verified** |
+| `20261119130000_remove_is_partner_boolean` | 2026-11-19 | Dropped legacy `isPartner` boolean column from `User` table; enforced pure first-class `Role.PARTNER` vs `Role.SUPER_ADMIN` persona separation (ADR-21, ADR-27 / SEC-A). | **Applied & Verified** |
 
 ---
 
@@ -167,7 +168,7 @@ apps/api/prisma/
 ├── schema.prisma
 ├── seed.ts                                  # Orchestrator
 └── seeders/
-    ├── 01-branch-users.seeder.ts           # Branch & 9 Staff accounts across all 6 RBAC roles (4 isPartner: true)
+    ├── 01-branch-users.seeder.ts           # Branch & 10 Staff accounts across all 6 RBAC roles (4 statutory PARTNER accounts + 1 SUPER_ADMIN)
     ├── 02-customers.seeder.ts              # 25 Verified Tamil Nadu customers, Nominees & KYC
     ├── 03-schemes-groups.seeder.ts         # 5 Schemes/ChitGroups & unique SubscriberTickets (ADR-13)
     └── 04-scenarios.seeder.ts              # All 10 operational edge cases & N scenarios
@@ -176,7 +177,7 @@ apps/api/prisma/
 ### 5.2 The 10 Seeded $N$-Scenarios
 | Scenario # | Scenario / Model Target | Seeded Characteristics |
 |---|---|---|
-| **Scenario 1** | **Staff Hierarchy & Personas** | 4 Equal Partners (`SUPER_ADMIN`, `isPartner: true`), 1 Branch Manager, 1 Accountant, 2 Field Agents, 1 Auditor (9 staff total, phone-only per ADR-18). |
+| **Scenario 1** | **Staff Hierarchy & Personas** | 4 Statutory Partners (`PARTNER`), 1 IT Administrator (`SUPER_ADMIN`), 1 Branch Manager, 1 Accountant, 2 Field Agents, 1 Auditor (10 staff total, phone-only per ADR-18). |
 | **Scenario 2** | **Month 1 Company Pool Invariant** | `KCA-1L-20M-01`: Ticket #1 takes full pool without auction (₹0 dividend). 12 tickets paid at counter. |
 | **Scenario 3** | **Active Competitive Bidding Group** | `KCB-2L-20M-01` (Month 4): Past auctions at ₹30k and ₹40k discounts with universal dividends. |
 | **Scenario 4** | **Fixed 25% Ceiling Tie-Break (ADR-06)**| `KCA-1L-20M-02`: 3 subscribers bid max ceiling (₹25,000); physical token draw recorded with Ticket #7 drawn. |
@@ -188,16 +189,17 @@ apps/api/prisma/
 | **Scenario 10**| **Mature Group Final Settlement (Month N)**| `KCA-1L-20M-MATURE`: Final non-prized subscriber awarded chit pool directly with 4% commission (no auction). |
 
 ### 5.3 Test Credentials (Phone-Only Identity — ADR-18, [`01-branch-users.seeder.ts`](file:///u:/Kumaran-finance/apps/api/prisma/seeders/01-branch-users.seeder.ts))
-All 9 seeded staff members authenticate strictly by 10-digit Indian phone number (zero `email` column per migration `20261022205000_remove_user_email`), using password `Admin@Kumaran2026` and mobile MPIN `123456`:
-- **Partner 1 — P. Kumaran (Managing Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543210`
-- **Partner 2 — K. Senthil (Operations Partner / Checker / `SUPER_ADMIN`, `isPartner: true`)**: `9876543211`
-- **Partner 3 — A. Velusamy (Finance Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543217`
-- **Partner 4 — R. Selvaraj (Compliance Partner / `SUPER_ADMIN`, `isPartner: true`)**: `9876543218`
-- **Branch Manager — M. Rajendran (`BRANCH_MANAGER`, `isPartner: false`)**: `9876543212`
-- **Desk Accountant — S. Priya (`ACCOUNTANT`, `isPartner: false`)**: `9876543213`
-- **Field Agent 1 — R. Murugan (Perundurai Route / `COLLECTION_AGENT`, `isPartner: false`)**: `9876543214`
-- **Field Agent 2 — V. Karthik (Erode Route / `COLLECTION_AGENT`, `isPartner: false`)**: `9876543215`
-- **Statutory Auditor — CA V. Natarajan (`AUDITOR`, `isPartner: false`)**: `9876543216`
+All 10 seeded staff members authenticate strictly by 10-digit Indian phone number (zero `email` column per migration `20261022205000_remove_user_email`), using password `Admin@Kumaran2026` and mobile MPIN `123456`:
+- **Partner 1 — P. Kumaran (Managing Partner / `PARTNER`)**: `9876543210`
+- **Partner 2 — K. Senthil (Operations Partner / Checker / `PARTNER`)**: `9876543211`
+- **Partner 3 — A. Velusamy (Finance Partner / `PARTNER`)**: `9876543217`
+- **Partner 4 — R. Selvaraj (Compliance Partner / `PARTNER`)**: `9876543218`
+- **IT Super Admin — S. Karthikeyan (IT System Administrator / `SUPER_ADMIN`)**: `9876543219`
+- **Branch Manager — M. Rajendran (`BRANCH_MANAGER`)**: `9876543212`
+- **Desk Accountant — S. Priya (`ACCOUNTANT`)**: `9876543213`
+- **Field Agent 1 — R. Murugan (Perundurai Route / `COLLECTION_AGENT`)**: `9876543214`
+- **Field Agent 2 — V. Karthik (Erode Route / `COLLECTION_AGENT`)**: `9876543215`
+- **Statutory Auditor — CA V. Natarajan (`AUDITOR`)**: `9876543216`
 
 ### 5.4 Executing the Seed
 ```powershell

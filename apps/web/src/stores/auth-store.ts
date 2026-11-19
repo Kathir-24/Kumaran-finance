@@ -23,7 +23,6 @@ export interface AuthUser {
   hasMpin?: boolean;
   fullNameTamil?: string | null;
   customerCode?: string;
-  isPartner?: boolean;
   lastLoginAt?: string | null;
 }
 

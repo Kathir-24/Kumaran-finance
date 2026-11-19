@@ -250,7 +250,7 @@ describe('Operational Lifecycles & Maintenance Workflows', () => {
     it('6. POST /tickets/:id/substitute: assigns verified replacement customer to REMOVED_DEF_3M ticket', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'admin-1',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       mockPrisma.subscriberTicket.findUnique
@@ -293,7 +293,7 @@ describe('Operational Lifecycles & Maintenance Workflows', () => {
     it('6b. POST /tickets/:id/substitute: enforces ADR-13 single ticket rule', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'admin-1',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       mockPrisma.subscriberTicket.findUnique

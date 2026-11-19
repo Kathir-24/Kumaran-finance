@@ -112,12 +112,10 @@ export default function PayoutVoucherPage() {
       user.id.trim().toLowerCase() === winner.verifiedByUserId.trim().toLowerCase(),
   );
 
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
-  const canAuthorizePayout = !isMaker && isSuperAdmin && isPartner;
-  // Release Payout: Accountant OR verified Partner (Super Admin with isPartner: true)
-  const canReleasePayout =
-    hasAnyRole(user, ['ACCOUNTANT']) || (isSuperAdmin && isPartner);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
+  const canAuthorizePayout = !isMaker && isPartner;
+  // Release Payout: Accountant OR verified Partner
+  const canReleasePayout = hasAnyRole(user, ['ACCOUNTANT', 'PARTNER']);
 
   return (
     <div className="space-y-6">
@@ -217,17 +215,6 @@ export default function PayoutVoucherPage() {
           <div>
             <div className="font-semibold text-sm">{t('makerGuardAlertTitle')}</div>
             <div className="text-amber-300/80 mt-1">{t('makerGuardAlertDesc')}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Guardrail 11 (SEC-A) Alert if non-partner Super Admin views voucher awaiting authorization */}
-      {status === 'VERIFIED_BY_MAKER' && !isMaker && isSuperAdmin && !isPartner && (
-        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-3 shadow-sm">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-semibold text-sm">Verified Partner Identity Required (Guardrail 11 / SEC-A)</div>
-            <div className="text-amber-300/80 mt-1">{t('partnerOnlyAuthAlert')}</div>
           </div>
         </div>
       )}

@@ -36,9 +36,6 @@ export class SanitizedUserDto {
   @ApiProperty({ type: String, example: 'branch-prd-001', description: 'Assigned branch ID', nullable: true })
   branchId?: string | null;
 
-  @ApiProperty({ example: true, description: 'Whether the staff member is a verified business partner', required: false })
-  isPartner?: boolean;
-
   @ApiProperty({ example: false, description: 'Whether Microsoft Authenticator TOTP is enabled' })
   isTotpEnabled: boolean;
 

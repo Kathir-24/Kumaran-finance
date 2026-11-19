@@ -2867,17 +2867,12 @@ export interface components {
              *       "SUPER_ADMIN"
              *     ]
              */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            roles: ("SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
             /**
              * @description Assigned branch ID
              * @example branch-prd-001
              */
             branchId: string | null;
-            /**
-             * @description Whether the staff member is a verified business partner
-             * @example true
-             */
-            isPartner?: boolean;
             /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
@@ -3035,17 +3030,12 @@ export interface components {
              *       "SUPER_ADMIN"
              *     ]
              */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            roles: ("SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
             /**
              * @description Assigned branch ID
              * @example branch-prd-001
              */
             branchId: string | null;
-            /**
-             * @description Whether the staff member is a verified business partner
-             * @example true
-             */
-            isPartner?: boolean;
             /**
              * @description Whether Microsoft Authenticator TOTP is enabled
              * @example false
@@ -3370,12 +3360,7 @@ export interface components {
              *       "COLLECTION_AGENT"
              *     ]
              */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
-            /**
-             * @description Whether the staff member is a verified business partner
-             * @example true
-             */
-            isPartner?: boolean;
+            roles: ("SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
             /**
              * @description Whether the staff account is active
              * @example true
@@ -3434,7 +3419,7 @@ export interface components {
              *       "COLLECTION_AGENT"
              *     ]
              */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            roles: ("SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
             /**
              * @description Assigned branch ID. Defaults to Head Office (PRD) if omitted.
              * @example branch-prd-001
@@ -3461,7 +3446,7 @@ export interface components {
              *       "ACCOUNTANT"
              *     ]
              */
-            roles: ("SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
+            roles: ("SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR")[];
         };
         ResetPasswordResponseDto: {
             /**
@@ -8601,7 +8586,7 @@ export interface operations {
                 /** @description Search by staff name or phone */
                 search?: string;
                 /** @description Filter by specific staff role */
-                role?: "SUPER_ADMIN" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR";
+                role?: "SUPER_ADMIN" | "PARTNER" | "BRANCH_MANAGER" | "ACCOUNTANT" | "COLLECTION_AGENT" | "CUSTOMER" | "AUDITOR";
                 /** @description Filter by assigned branch ID */
                 branchId?: string;
                 /** @description Filter by active status ("true" | "false") */

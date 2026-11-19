@@ -55,11 +55,11 @@ export function CustomerProfileHeader({ customer }: CustomerProfileHeaderProps) 
   const user = useAuthStore((s: AuthState) => s.user);
 
   const canManageKyc = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(role),
   );
 
   const canEditProfile = user?.roles?.some((role: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER'].includes(role),
+    ['PARTNER', 'BRANCH_MANAGER'].includes(role),
   );
 
   const [isEditOpen, setIsEditOpen] = React.useState(false);

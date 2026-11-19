@@ -25,7 +25,7 @@ import { UserTable, type UserItem } from '@/components/users/user-table';
 import { cn } from '@/lib/utils';
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
-type RoleFilter = 'ALL' | 'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR';
+type RoleFilter = 'ALL' | 'PARTNER' | 'SUPER_ADMIN' | 'BRANCH_MANAGER' | 'ACCOUNTANT' | 'COLLECTION_AGENT' | 'AUDITOR';
 
 export default function UsersDirectoryPage() {
   const t = useTranslations('users');
@@ -108,7 +108,7 @@ export default function UsersDirectoryPage() {
 
   // KPI Calculations
   const activeCount = users.filter((u) => u.isActive).length;
-  const partnerCount = users.filter((u) => Boolean(u.isPartner)).length;
+  const partnerCount = users.filter((u) => u.roles?.includes('PARTNER')).length;
   const agentCount = users.filter((u) => u.roles.includes('COLLECTION_AGENT')).length;
 
   return (
@@ -225,6 +225,7 @@ export default function UsersDirectoryPage() {
             className="w-full sm:w-auto rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
           >
             <option value="ALL">{t('filterRoleAll')}</option>
+            <option value="PARTNER">{t('rolePartner')}</option>
             <option value="SUPER_ADMIN">{t('roleSuperAdmin')}</option>
             <option value="BRANCH_MANAGER">{t('roleBranchManager')}</option>
             <option value="ACCOUNTANT">{t('roleAccountant')}</option>

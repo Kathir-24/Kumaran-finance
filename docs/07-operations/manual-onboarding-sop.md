@@ -98,8 +98,8 @@ $$\sum \text{Total Historical Collections (System)} \quad \text{vs.} \quad \sum 
 
 ### Step 6: Dual Sign-Off & Forward Activation (`CONFIRMED-BY-DEVELOPER` / Guardrails 10–11)
 1. **Maker (Desk Accountant, Branch Manager, or Partner A)**: Enters the digitized historical data from the physical notebooks via `POST /api/v1/chits/onboard-ongoing` ([`chit.controller.ts:73-87`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.controller.ts#L73-L87)) and submits for review.
-2. **Checker (Independent Verified Partner B — `SUPER_ADMIN` with `isPartner: true`)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"** (`POST /api/v1/chits/:id/activate`, [`chit.controller.ts:205-220`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.controller.ts#L205-L220)).
-   - Strict constraint enforced: `maker_user_id != checker_user_id` and verified Partner identity (`isPartner: true`, Guardrail 11 / `ADR-21`). The user who transcribed the data cannot self-activate the chit group.
+2. **Checker (Independent Verified Partner B — `Role.PARTNER`)**: Verifies the opening ledger balance against the physical notebook and clicks **"Confirm & Activate Chit"** (`POST /api/v1/chits/:id/activate`, [`chit.controller.ts:205-220`](file:///u:/Kumaran-finance/apps/api/src/chit/chit.controller.ts#L205-L220)).
+   - Strict constraint enforced: `maker_user_id != checker_user_id` and verified Partner identity (`Role.PARTNER`, Guardrail 11 / `ADR-21`, `ADR-27`). The user who transcribed the data cannot self-activate the chit group.
 3. **Forward Engine Activated**:
    - The chit is now officially `ACTIVE`.
    - Installments for Month 7 to Month 20 will be managed digitally.

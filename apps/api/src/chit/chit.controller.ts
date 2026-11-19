@@ -54,11 +54,11 @@ export class ChitController {
 
   @Post(['', 'new'])
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Create a fresh chit scheme (Starts Month 1)',
     description:
-      'Initializes a new chit group in DRAFT status with automatic whole-rupee math, 4.00% commission lock, and fixed 1/4 ceiling. Allowed strictly: Super Admin.',
+      'Initializes a new chit group in DRAFT status with automatic whole-rupee math, 4.00% commission lock, and fixed 1/4 ceiling. Allowed strictly: Partner.',
   })
   @ApiCreatedResponseEnvelope(ChitGroupResponseDto, { description: 'Chit group created successfully' })
   @ApiResponse({ status: 409, description: 'Group code already exists' })
@@ -72,11 +72,11 @@ export class ChitController {
 
   @Post('onboard-ongoing')
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Mid-Cycle Intake: Onboard ongoing chit from physical paper notebook (Maker)',
     description:
-      'Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Super Admin, Branch Manager, Accountant (Maker). Requires Checker activation by Super Admin.',
+      'Transcribes an active ongoing chit currently tracked in paper notebooks (e.g. Month 7) with historical auction winners and member roster. Enforces 1/4 ceiling and ADR-13 ticket limit. Allowed: Partner, Branch Manager, Accountant (Maker). Requires Checker activation by Partner.',
   })
   @ApiCreatedResponseEnvelope(ChitGroupResponseDto, { description: 'Ongoing chit onboarded successfully' })
   async onboardOngoing(
@@ -89,7 +89,7 @@ export class ChitController {
 
   @Get()
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -107,7 +107,7 @@ export class ChitController {
 
   @Get(':id')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -129,11 +129,11 @@ export class ChitController {
   }
 
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Update draft chit scheme parameters',
     description:
-      'Modifies group name, scheduled dates, or auction timing. Permitted strictly while status is DRAFT. Allowed strictly: Super Admin.',
+      'Modifies group name, scheduled dates, or auction timing. Permitted strictly while status is DRAFT. Allowed strictly: Partner.',
   })
   @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit group updated successfully' })
   @ApiResponse({ status: 400, description: 'Cannot update chit: Scheme is not in DRAFT status' })
@@ -148,11 +148,11 @@ export class ChitController {
 
   @Post(':id/tickets/assign')
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Assign a ticket to a verified subscriber',
     description:
-      'Assigns ticket 1..N to a customer. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same chit group. Allowed: Super Admin, Branch Manager.',
+      'Assigns ticket 1..N to a customer. Strictly enforces ADR-13: a customer cannot hold 2 or more tickets in the same chit group. Allowed: Partner, Branch Manager.',
   })
   @ApiCreatedResponseEnvelope(TicketResponseDto, { description: 'Ticket allocated successfully' })
   @ApiResponse({ status: 409, description: 'Customer already holds a ticket or ticket taken' })
@@ -164,7 +164,7 @@ export class ChitController {
   }
 
   @Delete(':id/tickets/:ticketNumber')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Unassign a ticket before scheme activation',
     description:
@@ -183,7 +183,7 @@ export class ChitController {
 
   @Get(':id/tickets')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -204,11 +204,11 @@ export class ChitController {
 
   @Post(':id/activate')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Lock terms and activate chit scheme',
     description:
-      'Verifies that all N tickets are filled, permanently freezes 4.00% commission, and executes Month 1 rule (company ticket takes full pool, no auction, ₹0 dividend). Allowed: Super Admin.',
+      'Verifies that all N tickets are filled, permanently freezes 4.00% commission, and executes Month 1 rule (company ticket takes full pool, no auction, ₹0 dividend). Allowed: Partner.',
   })
   @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit activated successfully' })
   @ApiResponse({ status: 400, description: 'Not all tickets assigned or already active' })
@@ -222,11 +222,11 @@ export class ChitController {
 
   @Post(':id/register')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Record sanction order and register chit scheme (DRAFT -> REGISTERED)',
     description:
-      'Transitions a chit scheme from DRAFT to REGISTERED status. Allowed: Super Admin.',
+      'Transitions a chit scheme from DRAFT to REGISTERED status. Allowed: Partner.',
   })
   @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit registered successfully' })
   @ApiResponse({ status: 400, description: 'Cannot register chit: Scheme is not in DRAFT status' })
@@ -240,11 +240,11 @@ export class ChitController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Cancel an unactivated draft chit scheme (DRAFT -> CANCELLED)',
     description:
-      'Transitions an unactivated chit scheme from DRAFT to CANCELLED status. Allowed: Super Admin.',
+      'Transitions an unactivated chit scheme from DRAFT to CANCELLED status. Allowed: Partner.',
   })
   @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit cancelled successfully' })
   @ApiResponse({ status: 400, description: 'Cannot cancel chit: Scheme is not in DRAFT status' })
@@ -258,11 +258,11 @@ export class ChitController {
 
   @Post(':id/close')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Final account reconciliation and scheme closure (COMPLETED -> CLOSED)',
     description:
-      'Transitions a completed chit scheme to CLOSED status upon balance reconciliation. Allowed: Super Admin.',
+      'Transitions a completed chit scheme to CLOSED status upon balance reconciliation. Allowed: Partner.',
   })
   @ApiOkResponseEnvelope(ChitGroupResponseDto, { description: 'Chit closed successfully' })
   @ApiResponse({ status: 400, description: 'Cannot close chit: Scheme is not in COMPLETED status' })

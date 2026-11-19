@@ -57,13 +57,13 @@ model AuctionMinutes {
 
 ### `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar`
 
-Allows authorized staff (`SUPER_ADMIN` with `isPartner: true` if pure Super Admin per `XR-AUC-05`, `BRANCH_MANAGER` scoped to own branch, or `ACCOUNTANT`) to log physical Registrar filing and atomically transition `Auction.status` from `COMPLETED` $\to$ `MINUTES_FILED` under pessimistic `Auction` $\to$ `AuctionMinutes` row locks.
+Allows authorized staff (`Role.PARTNER`, `BRANCH_MANAGER` scoped to own branch, or `ACCOUNTANT`) to log physical Registrar filing and atomically transition `Auction.status` from `COMPLETED` $\to$ `MINUTES_FILED` under pessimistic `Auction` $\to$ `AuctionMinutes` row locks.
 
 #### HTTP Request
 - **Method**: `PATCH`
 - **Path**: `/api/v1/auctions/:auctionId/mark-filed-with-registrar`
 - **Headers**: `Authorization: Bearer <JWT>`
-- **Guards**: `JwtAuthGuard`, `RolesGuard` (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`) + `assertVerifiedPartner` (`XR-AUC-05`) + `assertAuctionBranchAccess`
+- **Guards**: `JwtAuthGuard`, `RolesGuard` (`Role.PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT`) + `assertAuctionBranchAccess`
 
 #### Request Body (`MarkMinutesFiledDto`)
 ```json

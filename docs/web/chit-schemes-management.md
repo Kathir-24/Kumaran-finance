@@ -84,7 +84,7 @@ All 18 endpoints connect directly to live NestJS 12 controllers (`ChitController
 | **Scheme Tickets** | `GET /api/v1/chits/:id/tickets` | All Authenticated Personas | Retrieves all $N$ subscriber ticket allocations for the scheme |
 | **Assign Ticket** | `POST /api/v1/chits/:id/tickets/assign` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Assigns ticket slot to subscriber with ADR-13 unique customer check |
 | **Unassign Ticket** | `DELETE /api/v1/chits/:id/tickets/:ticketNumber` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Vacates an assigned ticket slot in `DRAFT` before scheme activation |
-| **Activate Scheme** | `POST /api/v1/chits/:id/activate` | `SUPER_ADMIN` *(Verified Partner `isPartner: true`)* | Locks commission, activates scheme once roster is 100% full, executes Month 1 company pool |
+| **Activate Scheme** | `POST /api/v1/chits/:id/activate` | `Role.PARTNER` | Locks commission, activates scheme once roster is 100% full, executes Month 1 company pool |
 | **Close Completed Scheme** | `POST /api/v1/chits/:id/close` | `SUPER_ADMIN` | Final account reconciliation and scheme closure (`COMPLETED -> CLOSED`) |
 | **Onboard Ongoing** | `POST /api/v1/chits/onboard-ongoing` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` | Transcribes mid-cycle running chit from physical notebook into `DRAFT` status |
 | **Month Dues** | `GET /api/v1/installments/group/:chitGroupId/month/:month` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Lists subscriber gross, dividend, net payable, paid amount, and payment status |
@@ -110,7 +110,7 @@ Every requirement in Phase 4 maps directly to the master invariants confirmed in
 | **Guardrail 6** | **Fixed 1/4 Ceiling & Tie-Break** | Winning bid discount cannot exceed $V/4$ (25.00%). Enforced in creation wizard, onboarding grid, and dues generator. |
 | **Guardrail 7** | **Ticket Limit Constraint (ADR-13)** | A customer cannot hold 2 or more tickets in the same chit group (`@@unique([chitGroupId, customerId])`). Enforced in ticket assignment dialog and onboarding grid. |
 | **Guardrail 8** | **Defaulter & Discrete Single Payment** | Dues status is strictly `PAID`, `UNPAID`, or `OVERDUE`. Rejects double payments, partial payments, or advance balances. Flags $\ge 3$ consecutive unpaid months (`DEFAULT_3_MONTHS`) for removal under ADR-07. |
-| **Guardrails 10 & 11** | **Maker $\ne$ Checker & Verified Partner Identity (`ADR-21`)** | Mid-cycle onboarding drafts initiated by Makers (`ACCOUNTANT` / `BRANCH_MANAGER` / Partner A) require activation by an independent **Verified Partner (`SUPER_ADMIN` with `isPartner: true`)**. |
+| **Guardrails 10 & 11** | **Maker $\ne$ Checker & Verified Partner Identity (`ADR-21`, `ADR-27`)** | Mid-cycle onboarding drafts initiated by Makers (`ACCOUNTANT` / `BRANCH_MANAGER` / Partner A) require activation by an independent **Statutory Partner (`Role.PARTNER`)**. |
 
 ---
 

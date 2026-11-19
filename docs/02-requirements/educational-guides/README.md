@@ -13,12 +13,13 @@
 
 | # | Persona | Role Code | Phase 1 Active / Phase 2 Target Platform | Guide Link |
 |---|---|:---:|:---:|---|
-| **1** | **Super Admin / Owner (The 4 Partners)** | `SUPER_ADMIN` | Web Portal (Phase 1) + Android Mobile Parity (Phase 2) | [`persona-1-super-admin.md`](./persona-1-super-admin.md) |
-| **2** | **Desk Accountant / Cashier** | `ACCOUNTANT` | Web Portal (High-Density Ledgers) | [`persona-2-desk-accountant.md`](./persona-2-desk-accountant.md) |
-| **3** | **Field Collection Agent** | `COLLECTION_AGENT` | Web Portal (Phase 1) / Android Mobile Offline Sync (Phase 2) | [`persona-3-field-collection-agent.md`](./persona-3-field-collection-agent.md) |
-| **4** | **Customer / Chit Subscriber** | `CUSTOMER` | Digital Passbook PDF (Phase 1) / Android Mobile App (Phase 2) | [`persona-4-customer.md`](./persona-4-customer.md) |
-| **5** | **Branch Manager (Operational Lead)** | `BRANCH_MANAGER` | Web Portal (Branch Scoped Workspace) | [`persona-5-branch-manager.md`](./persona-5-branch-manager.md) |
-| **6** | **Independent Auditor (CA)** | `AUDITOR` | Web Portal (Global Read-Only Forensic Console) | [`persona-6-auditor.md`](./persona-6-auditor.md) |
+| **1** | **Business Partner / Owner (The 4 Partners)** | `PARTNER` | Web Portal (Financial Maker/Checker Console) | [`persona-1-super-admin.md`](./persona-1-super-admin.md) |
+| **2** | **Super Admin (IT Administrator)** | `SUPER_ADMIN` | Web Portal (Staff & Infrastructure Governance) | [`persona-1-super-admin.md`](./persona-1-super-admin.md) |
+| **3** | **Desk Accountant / Cashier** | `ACCOUNTANT` | Web Portal (High-Density Ledgers) | [`persona-2-desk-accountant.md`](./persona-2-desk-accountant.md) |
+| **4** | **Field Collection Agent** | `COLLECTION_AGENT` | Web Portal (Phase 1) / Android Mobile Offline Sync (Phase 2) | [`persona-3-field-collection-agent.md`](./persona-3-field-collection-agent.md) |
+| **5** | **Customer / Chit Subscriber** | `CUSTOMER` | Digital Passbook PDF (Phase 1) / Android Mobile App (Phase 2) | [`persona-4-customer.md`](./persona-4-customer.md) |
+| **6** | **Branch Manager (Operational Lead)** | `BRANCH_MANAGER` | Web Portal (Branch Scoped Workspace) | [`persona-5-branch-manager.md`](./persona-5-branch-manager.md) |
+| **7** | **Independent Auditor (CA)** | `AUDITOR` | Web Portal (Global Read-Only Forensic Console) | [`persona-6-auditor.md`](./persona-6-auditor.md) |
 
 ---
 
@@ -35,4 +36,4 @@ Every single user story and screen journey strictly asserts all 11 invariant gua
 8. **Defaulter & Single Discrete Payment Rules (`ADR-07`)**: Unpaid dues and pending removals block auction participation. Single discrete payments only; zero partial payments, zero late fees, and zero advance balances.
 9. **Company Safety Proof Checklist (`ADR-15`)**: Property deeds completely eliminated. Flexible safety checklist (signed agreements, blank cheques, promissory notes).
 10. **Dual Control Maker $\ne$ Checker (`ADR-22`, `ADR-25`)**: All 8 high-risk financial mutations strictly enforce `maker_user_id != checker_user_id` at application and PostgreSQL 17 `CHECK` constraint levels.
-11. **Verified Partner Identity (`ADR-21` / `SEC-A`)**: Administrative IT Super Admins (`isPartner: false`) are barred from financial authorizations; only verified business partners (`isPartner: true`) can approve reversals, auctions, corrections, payouts, settlements, and defaulter removals. Audit logs and BullMQ telemetry remain restricted strictly to `SUPER_ADMIN`.
+11. **Verified Partner Identity & Persona Separation (`ADR-21` / `ADR-27` / `SEC-A`)**: `SUPER_ADMIN` and `PARTNER` are strictly separate first-class roles; the legacy `isPartner` boolean column has been completely removed. Administrative IT Super Admins (`Role.SUPER_ADMIN`) manage staff accounts (`/users`), branches (`/branches`), background queues (`/admin/jobs`), and audit logs (`/reports/audit-logs`), and are strictly barred from financial authorizations, the financial dashboard, and chit operations; only verified statutory business partners (`Role.PARTNER`) can approve reversals, auctions, corrections, payouts, settlements, and defaulter removals.

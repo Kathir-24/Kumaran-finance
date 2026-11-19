@@ -32,7 +32,7 @@
 flowchart LR
     G1["1. Single Company Tenancy\nZero company_id columns/params"] --> G2["2. Pure Whole Rupee Math\nBigInt only; zero paise/floats"]
     G2 --> G10["10. Dual-Control Integrity\nMaker != Checker enforcement"]
-    G10 --> G11["11. Verified Partner (ADR-21)\nisPartner: true & Admin-Only Audit/Queues"]
+    G10 --> G11["11. Verified Partner (ADR-27)\nRole.PARTNER & Admin-Only Audit/Queues"]
     G11 --> ADR20["ADR-18/20: Phone-Only & BFF Cookies\nZero localStorage JWTs; Edge HS256"]
 ```
 
@@ -40,7 +40,7 @@ flowchart LR
 2. **Pure Whole Rupee Math (Guardrail 2)**: All financial amounts operate on 64-bit integer rupees (`bigint`). Formatting via `apps/web/src/lib/currency.ts` (`formatRupee`) and `rupee-words.ts` strictly suppresses paise (`₹50,000`, never `₹50,000.00`).
 3. **Phone-Only Staff Identity & RFC 6238 2FA (ADR-18)**: Office desk login requires strictly a 10-digit Indian mobile number (`^[6-9]\d{9}$`) with zero email fields, backed by Microsoft Authenticator TOTP 2FA.
 4. **BFF HttpOnly Cookie Isolation & Zero-FOUC Edge Middleware (ADR-20)**: All JWTs (`kc_access_token`, `kc_refresh_token`, `kc_totp_pending_token`, `kc_onboarding_token`) reside exclusively in `HttpOnly`, `SameSite=Lax` cookies; `middleware.ts` cryptographically verifies tokens at the Edge via `jose` HS256 with longest-prefix RBAC from `src/lib/route-permissions.ts`.
-5. **Dual-Control & Verified Partner Exclusivity (Guardrails 10 & 11 / ADR-21)**: Sensitive financial authorizations (reversals, auction finalization, prize authorization, defaulter removal) enforce `maker != checker` AND `isPartner: true`; `/reports/audit-logs` and `/admin/jobs` are restricted strictly to `SUPER_ADMIN`.
+5. **Dual-Control & Verified Partner Exclusivity (Guardrails 10 & 11 / ADR-27)**: Sensitive financial authorizations (reversals, auction finalization, prize authorization, defaulter removal) enforce `maker != checker` AND `Role.PARTNER`; `/reports/audit-logs` and `/admin/jobs` are restricted strictly to `SUPER_ADMIN`.
 6. **Verified Frontend Audit & Visual Crawl Readiness**:
    - **Responsive Web Coverage (320px–1440px)**: Automated Playwright visual crawler (`e2e/visual-audit.e2e.spec.ts`) verified **21 core routes across 4 permutations** (English/Tamil $\times$ Desktop `1440×900` & Mobile `390×844` = **84 full-page crawls**) with **0 horizontal scroll overflows (`scrollWidth === innerWidth`)**, **0 untranslated raw keys**, and **0 unhandled exceptions**.
    - **Phase 1 Responsive Web vs. Phase 2 Flutter Android (`ADR-26`)**: Field agents operate via the mobile-responsive Web Portal (`390px` viewport, `min-h-[44px]` touch targets) during Phase 1; native Flutter Android UI screens and APK packaging are deferred to Phase 2 (Q2 2027), building on `apps/mobile/lib/core/`.

@@ -248,8 +248,8 @@ The auditor examines the two approved payment reversals executed earlier this ye
    - **Status Proof**: Original `Payment` row was **never deleted** (`paymentStatus: REVERSED`), linked to `PaymentReversal` (`status: APPROVED`).
    - **Reason Documented**: *"Cashier error: Member Mani (Ticket #9) paid ₹3,950 cash for Month 5, but payment was accidentally recorded against Ticket #8 (Kannan). Physical counter receipt verified."*
    - **Dual-Control Partners (`KFC-SEC-001` & `chk_reversal_maker_checker`)**:
-     - **Maker (`initiatedByUserId`)**: `Partner A (SUPER_ADMIN, isPartner: true)`.
-     - **Checker (`approvedByUserId`)**: `Partner B (SUPER_ADMIN, isPartner: true)`.
+     - **Maker (`initiatedByUserId`)**: `Partner A (Role.PARTNER)`.
+     - **Checker (`approvedByUserId`)**: `Partner B (Role.PARTNER)`.
      - **Database Engine Guarantee**: `initiatedByUserId != approvedByUserId` enforced in both `PaymentService` and PostgreSQL `CHECK` constraint `chk_reversal_maker_checker`.
    - **Ledger & Receipt Verification**:
      - Ticket #8's Month 5 `InstallmentDue` cleanly reverted from `PAID` to `UNPAID` with zero floating balance.

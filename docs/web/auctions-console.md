@@ -27,14 +27,14 @@ flowchart TD
     end
 
     subgraph Finalize["3. Checker Finalization, Corrections & Minutes (/auctions/:id)"]
-        Dual["Dual-Control Checker Card\nVerified Partner (isPartner: true) != Maker (KFC-SEC-003)\nAttendees >= 1 | Foreman Signature | Prize Marking"]
+        Dual["Dual-Control Checker Card\nStatutory Partner (Role.PARTNER) != Maker (KFC-SEC-003)\nAttendees >= 1 | Foreman Signature | Prize Marking"]
         Corr["Finalized Auction Correction Card (2-Partner Dual Control)\nRequest -> Approve / Reject (Blocked if Prize Disbursed)"]
         Minutes["Form XVII Statutory Minutes\nProceedings Text | 21-Day Registrar Filing Countdown\nChallan Recordkeeper | BFF Binary PDF Stream"]
     end
 
     subgraph Defaulters["4. Defaulter Desk (/schemes/:id/defaulters)"]
         DTable["Defaulters Table & Aging Badges\n1-2 Mo: Barred from Bidding\n>=3 Mo: Company Removal Rights (ADR-07 & ADR-12)"]
-        Actions["Verified Partner Actions (isPartner: true)\n2-Partner Removal (SEC-B, >= 10 char notice)\nADR-13 KYC Substitution | Exit Settlement Locked (Q25)"]
+        Actions["Statutory Partner Actions (Role.PARTNER)\n2-Partner Removal (SEC-B, >= 10 char notice)\nADR-13 KYC Substitution | Exit Settlement Locked (Q25)"]
     end
 
     Schedule -->|Enter Room| Live
@@ -60,7 +60,7 @@ flowchart TD
    - **Auction Summary Card (`AuctionSummaryCard`)**: Previews winning bid results, prize money, universal dividend allocation, and Maker audit stamp (`conductedByUserId`).
 
 3. **Dual-Control Maker-Checker Finalization, Corrections & Minutes (Task 6.3)**:
-   - Detailed auction view at `/auctions/[id]` enforcing **Guardrails 10 & 11 (`KFC-SEC-003`)**: if `currentUser.id === conductedByUserId`, finalization is disabled with an amber self-approval blocked banner. **Strictly Verified Partners (`SUPER_ADMIN` with `isPartner: true`)** can act as finalization Checker (`auction.controller.ts:219-231`); `BRANCH_MANAGER` can act as Maker (`record-bid` / `tie-break`) but cannot finalize.
+   - Detailed auction view at `/auctions/[id]` enforcing **Guardrails 10 & 11 (`KFC-SEC-003`)**: if `currentUser.id === conductedByUserId`, finalization is disabled with an amber self-approval blocked banner. **Strictly Statutory Partners (`Role.PARTNER`)** can act as finalization Checker (`auction.controller.ts:219-231`); `BRANCH_MANAGER` can act as Maker (`record-bid` / `tie-break`) but cannot finalize.
    - Commits official results via `POST /api/v1/auctions/:id/finalize`, setting status to `COMPLETED`, tagging `finalizedByUserId`, and marking `subscriberTicket.isPrized = true`.
    - **Finalized Auction Correction (`AuctionCorrectionCard`)**: Audited two-partner dual-control workflow (`POST /api/v1/auctions/:id/correction/request` $\to$ `/approve` or `/reject`, Verified Partner `maker != checker`) recalculating universal dividends and downstream monthly dues if a finalized bid/winner must be corrected prior to disbursement (fails closed once prize money is `DISBURSED`).
    - **Form XVII Statutory Minutes (`AuctionMinutesCard`)**: Displays full proceedings record, physical attendee count ($S_{present} \ge 1$), and Foreman signature badge.
@@ -72,7 +72,7 @@ flowchart TD
    - Dedicated desk at `/schemes/[id]/defaulters` with 5 KPI summary cards (Total Tickets, 1-2 Mo Arrears, $\ge 3$ Mo Removal Eligible, Removed, Total Scheme Overdue Arrears).
    - Embedded `BusinessRuleBanner` detailing **ADR-07 & ADR-12 Company Removal Rights** and **ADR-13 Ticket Limit Substitution Guard**.
    - **Arrears Aging & Ineligibility Badging (`DefaultersTable`)**: Tabs for All, Active Arrears ($1\text{--}2$ mo), Removal Eligible ($\ge 3$ mo), and Removed Members.
-   - **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**: Restricted to **Verified Partners (`SUPER_ADMIN`, `isPartner: true`)**. Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`) with mandatory justification ($\ge 10$ characters). Ticket transitions to `PENDING_REMOVAL_APPROVAL`. Independent Partner B reviews and approves (`/approve` $\to$ `REMOVED_DEF_3M`) or rejects (`/reject` $\to$ `DEFAULT_3_MONTHS`) under strict dual control (`maker != checker`, `SEC-B`). Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE` / `KFC-SEC-004`).
+   - **Company 3-Month Arrears Removal Rights (`DefaulterRemovalDialog`)**: Restricted to **Statutory Partners (`Role.PARTNER`)**. Partner A initiates removal request (`POST /api/v1/tickets/:id/remove-defaulter/request`) with mandatory justification ($\ge 10$ characters). Ticket transitions to `PENDING_REMOVAL_APPROVAL`. Independent Partner B reviews and approves (`/approve` $\to$ `REMOVED_DEF_3M`) or rejects (`/reject` $\to$ `DEFAULT_3_MONTHS`) under strict dual control (`maker != checker`, `SEC-B`). Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE` / `KFC-SEC-004`).
    - **ADR-13 Subscriber Substitution (`DefaulterSubstitutionModal`)**: Restricted to **Super Admin**. Validates candidate customer has `isKycVerified: true`. Enforces ADR-13 & Guardrail 7 by rejecting replacement customer already holding another ticket in the same chit scheme (`@@unique([chitGroupId, customerId])`). Restores ticket to `ACTIVE` and resets arrears to 0.
    - **Defaulter Account Exit Settlement Guard (`DefaulterSettlementDialog`)**: Submitting `POST /api/v1/tickets/:id/settle-removal` strictly fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` pending formal confirmation of the contractual damages formula by the business owner and legal counsel under Q25.
 
@@ -89,18 +89,18 @@ All 18 endpoints connect directly to live NestJS 12 controllers (`AuctionControl
 | **Eligible Bidders** | `GET /api/v1/auctions/:id/eligible-bidders?month=...` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `AUDITOR` | Pre-Auction Defaulter Guard: returns active subscribers with zero arrears |
 | **Record Winning Bid** | `POST /api/v1/auctions/:id/record-bid` | `SUPER_ADMIN`, `BRANCH_MANAGER` | Maker records in-office winning bid discount with floor (4%), ceiling (1/4), & `KFC-FIN-002` divisibility |
 | **Record Tie-Break** | `POST /api/v1/auctions/:id/tie-break` *(alias `/tie-break-record`)* | `SUPER_ADMIN`, `BRANCH_MANAGER` | Option A: records physical paper token lot draw winner drawn by Foreman |
-| **Finalize Auction** | `POST /api/v1/auctions/:id/finalize` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Checker commits official result (`SCHEDULED -> COMPLETED`), marks winner `isPrized = true`, generates Form XVII minutes (`KFC-SEC-003`) |
-| **Request Auction Correction** | `POST /api/v1/auctions/:id/correction/request` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Maker Partner requests audited correction of a finalized auction (fails closed if prize disbursed) |
-| **Approve Auction Correction** | `POST /api/v1/auctions/:id/correction/approve` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Independent Partner (`maker != checker`) applies correction & recalculates universal dividends/dues |
-| **Reject Auction Correction** | `POST /api/v1/auctions/:id/correction/reject` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Independent Partner (`maker != checker`) rejects pending auction correction |
+| **Finalize Auction** | `POST /api/v1/auctions/:id/finalize` | Strictly `Role.PARTNER` | Checker commits official result (`SCHEDULED -> COMPLETED`), marks winner `isPrized = true`, generates Form XVII minutes (`KFC-SEC-003`) |
+| **Request Auction Correction** | `POST /api/v1/auctions/:id/correction/request` | Strictly `Role.PARTNER` | Maker Partner requests audited correction of a finalized auction (fails closed if prize disbursed) |
+| **Approve Auction Correction** | `POST /api/v1/auctions/:id/correction/approve` | Strictly `Role.PARTNER` | Independent Partner (`maker != checker`) applies correction & recalculates universal dividends/dues |
+| **Reject Auction Correction** | `POST /api/v1/auctions/:id/correction/reject` | Strictly `Role.PARTNER` | Independent Partner (`maker != checker`) rejects pending auction correction |
 | **Get Minutes Text** | `GET /api/v1/auctions/:id/minutes` *(alias `/minutes/pdf`)* | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Retrieves Form XVII statutory auction proceedings record |
 | **Download Minutes PDF** | `GET /api/v1/pdf/minutes/:auctionId?download=true` | Staff & Auditor | Streams official Form XVII binary PDF via Next.js BFF (`downloadMinutesPdf`) |
 | **Mark Minutes Filed** | `PATCH /api/v1/auctions/:auctionId/mark-filed-with-registrar` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` | Records official government Challan reference, filing date, and staff remarks (`COMPLETED -> MINUTES_FILED`) |
 | **List Chit Schemes** | `GET /api/v1/chits` | All Authenticated Personas | Fetches schemes (`DRAFT`, `REGISTERED`, `ACTIVE`, `COMPLETED`, `CLOSED`, `CANCELLED`) for scheme selector |
 | **Defaulters Report** | `GET /api/v1/tickets/defaulters` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `AUDITOR` | Queries subscribers with continuous arrears and overdue totals |
-| **Remove Defaulter (Request / Approve / Reject)** | `POST /api/v1/tickets/:id/remove-defaulter/request`<br>`POST /api/v1/tickets/:id/remove-defaulter/approve`<br>`POST /api/v1/tickets/:id/remove-defaulter/reject` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Two-partner dual control removal (`SEC-B`); sets status to `REMOVED_DEF_3M` or restores `DEFAULT_3_MONTHS`; blocks prized tickets (`KFC-SEC-004`) |
-| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `SUPER_ADMIN` (`isPartner: true`) | ADR-13 substitution of KYC-verified replacement member; restores ticket to `ACTIVE` |
-| **Settle Defaulter Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `SUPER_ADMIN` (`isPartner: true`) | Fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` pending confirmed policy under Q25 |
+| **Remove Defaulter (Request / Approve / Reject)** | `POST /api/v1/tickets/:id/remove-defaulter/request`<br>`POST /api/v1/tickets/:id/remove-defaulter/approve`<br>`POST /api/v1/tickets/:id/remove-defaulter/reject` | Strictly `Role.PARTNER` | Two-partner dual control removal (`SEC-B`); sets status to `REMOVED_DEF_3M` or restores `DEFAULT_3_MONTHS`; blocks prized tickets (`KFC-SEC-004`) |
+| **Substitute Subscriber** | `POST /api/v1/tickets/:id/substitute` | Strictly `Role.PARTNER` | ADR-13 substitution of KYC-verified replacement member; restores ticket to `ACTIVE` |
+| **Settle Defaulter Account** | `POST /api/v1/tickets/:id/settle-removal` | Strictly `Role.PARTNER` | Fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` pending confirmed policy under Q25 |
 
 ---
 
@@ -116,7 +116,7 @@ All 18 endpoints connect directly to live NestJS 12 controllers (`AuctionControl
 | **Guardrail 6** | **Fixed 1/4 Ceiling & Option A Draw** | Maximum discount ceiling is fixed at one-fourth of chit value ($D \le V/4$). When tied, Foreman draws physical paper tokens in front of members. Zero computer lotteries. |
 | **Guardrail 7** | **Ticket Limit Constraint (ADR-13)** | A customer cannot hold 2 or more tickets in the same chit scheme (`@@unique([chitGroupId, customerId])`). Substitution modal pre-checks duplicate assignment and blocks mutations. |
 | **Guardrail 8** | **Defaulter Rules & 3-Month Removal (ADR-07 & ADR-12)** | Subscribers with unpaid arrears are strictly ineligible to bid. Subscribers with $\ge 3$ consecutive missed installments grant company removal rights to Verified Partners (prized tickets strictly immutable per `KFC-SEC-004`). |
-| **Guardrails 10 & 11** | **Maker $\ne$ Checker & Verified Partner Identity (`ADR-21` / `KFC-SEC-003`)** | Bids are recorded by Makers (`conductedByUserId`) and finalized exclusively by independent **Verified Partners (`SUPER_ADMIN`, `isPartner: true`, `finalizedByUserId`)**, enforced in UI, service guards, and PostgreSQL `chk_auction_maker_checker`. |
+| **Guardrails 10 & 11** | **Maker $\ne$ Checker & Verified Partner Identity (`ADR-21` / `KFC-SEC-003`)** | Bids are recorded by Makers (`conductedByUserId`) and finalized exclusively by independent **Statutory Partners (`Role.PARTNER`, `finalizedByUserId`)**, enforced in UI, service guards, and PostgreSQL `chk_auction_maker_checker`. |
 | **F08 Privacy Guard** | **Subscriber PII Masking** | When accessed by a subscriber, fellow members' phone numbers are masked (`+91 ******0000`) and names are redacted; subscribers can only view auctions for groups in which they hold active tickets. |
 
 ---
@@ -178,7 +178,7 @@ Phase 6 is verified by **4 dedicated automated test suites asserting 32 critical
 |---|---|:---:|:---:|
 | [`apps/web/test/auctions-schedule.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/auctions-schedule.spec.ts) | Month 1 Company Pool zero dividend ($I_{net} \equiv I_{base}$), Month $N$ final settlement, 1/4 ceiling bound, 4.00% commission floor, universal equal dividend math, Option A tie-break token badge, status filtering, 100% bilingual parity. | 8 tests | **100% PASS** |
 | [`apps/web/test/auction-live-room.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/auction-live-room.spec.ts) | Floor $\ge 4.00\%$ and Ceiling $\le V/4$ bounds, whole-rupee math & paise rejection, universal equal dividend calculation, net prize money $P = V - D$, ADR-07 defaulter exclusion, Option A paper token draw protocol, Maker-Checker transition payload, 100% bilingual parity. | 8 tests | **100% PASS** |
-| [`apps/web/test/auction-finalization.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/auction-finalization.spec.ts) | Guardrails 10 & 11 Maker != Checker separation, self-finalization rejection, independent Verified Partner (`isPartner: true`, `KFC-SEC-003`) Checker authorization, Form XVII attendees validation ($S_{present} \ge 1$), winner prize transition (`isPrized: true`), 21-day Registrar filing deadline math, Challan schema, 100% bilingual parity. | 8 tests | **100% PASS** |
+| [`apps/web/test/auction-finalization.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/auction-finalization.spec.ts) | Guardrails 10 & 11 Maker != Checker separation, self-finalization rejection, independent Statutory Partner (`Role.PARTNER`, `KFC-SEC-003`) Checker authorization, Form XVII attendees validation ($S_{present} \ge 1$), winner prize transition (`isPrized: true`), 21-day Registrar filing deadline math, Challan schema, 100% bilingual parity. | 8 tests | **100% PASS** |
 | [`apps/web/test/defaulter-substitution.spec.ts`](file:///u:/Kumaran-finance/apps/web/test/defaulter-substitution.spec.ts) | Guardrail 8 fail-closed removal block ($consecutiveUnpaidMonths < 3$), authorized removal rights ($\ge 3$ months) transitioning to `REMOVED_DEF_3M`, $\ge 10$ character reason validation, ADR-13 unique ticket check, KYC verification guard, Q25 exit settlement validation, 100% bilingual parity. | 8 tests | **100% PASS** |
 
 ### Complete Verified Web Test Suite & Build Proofs:

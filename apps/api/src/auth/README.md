@@ -13,7 +13,7 @@ The **Auth Module** provides multi-factor authentication, client-scoped session 
 1. **Web Portal Dual-Factor Login (`ADR-18` / `ADR-20`)**:
    - Phone-only identifier (`10-digit Indian mobile`, zero email login) + bcrypt-12 password hash followed by RFC 6238 TOTP (Microsoft Authenticator / Google Authenticator).
    - Web browsers authenticate through the Next.js BFF (`/api/auth/*`), storing JWTs exclusively in `HttpOnly`, `SameSite=Lax` cookies.
-   - JWT payloads embed `isPartner` (`boolean`) alongside `roles[]` and `branchId` so Guardrail 11 (`ADR-21`) strictly separates Verified Partner financial authority (`isPartner: true`) from Administrative IT Super Admins (`isPartner: false`).
+   - JWT payloads embed `roles[]` and `branchId` so Guardrail 11 (`ADR-21`, `ADR-27`) strictly separates Statutory Partner financial authority (`Role.PARTNER`) from Administrative IT Super Admins (`Role.SUPER_ADMIN`).
 2. **Mobile Quick Unlock & MPIN Lifecycle (`F01`)**:
    - 6-digit MPIN authentication (bcrypt-12 hashed) for Field Collection Agents and Partners via the Dart Core client SDK (`apps/mobile/lib/core/`).
    - Enforces TOTP validation on MPIN login (`loginMpin`) when `isTotpEnabled = true`, returning `requiresTotp: true` with a scoped challenge token.
@@ -52,7 +52,7 @@ All 15 routes are exposed by `apps/api/src/auth/auth.controller.ts`:
 | 3 | `POST` | `/api/v1/auth/refresh-token` | Rotate access & refresh tokens within the caller's client family | Public |
 | 4 | `POST` | `/api/v1/auth/logout` | Revoke session (`?clientType=WEB\|MOBILE\|DESKTOP\|ALL`) & clear `fcmToken` | Authenticated |
 | 5 | `PATCH` | `/api/v1/auth/fcm-token` | Register or update device FCM push token (Phase 2 Android push readiness) | Authenticated Staff |
-| 6 | `GET` | `/api/v1/auth/me` | Fetch authenticated profile, `roles`, `isPartner`, and branch scope (Staff & Customer) | Authenticated |
+| 6 | `GET` | `/api/v1/auth/me` | Fetch authenticated profile, `roles`, and branch scope (Staff & Customer) | Authenticated |
 | 7 | `POST` | `/api/v1/auth/change-password` | Self-service password change with current password verification & global session revocation | Authenticated Staff |
 | 8 | `POST` | `/api/v1/auth/totp/setup` | Generate Base32 TOTP secret & authenticator QR code | Authenticated |
 | 9 | `POST` | `/api/v1/auth/totp/enable` | Verify 6-digit TOTP and lock 2FA (`password` required when replacing active TOTP per `F10`) | Authenticated |
@@ -71,7 +71,7 @@ The Auth module is verified by **54 automated Jest tests** across **3 spec files
 
 | Spec File | Tests | Verified Scope |
 |---|:---:|---|
-| `apps/api/test/unit/auth.spec.ts` | **28** | TOTP setup/verify/replace (`F10`), MPIN setup/unlock (`F01`), `complete-onboarding` (`F16`), `RolesGuard` & `isPartner` checks, FCM clearance, Redis OTP TTL & 3-attempt lockout (`F13`), offline fallback |
+| `apps/api/test/unit/auth.spec.ts` | **28** | TOTP setup/verify/replace (`F10`), MPIN setup/unlock (`F01`), `complete-onboarding` (`F16`), `RolesGuard` & `Role.PARTNER` checks, FCM clearance, Redis OTP TTL & 3-attempt lockout (`F13`), offline fallback |
 | `apps/api/test/unit/auth-token-lifecycle.spec.ts` | **25** | Multi-client `Session` vault isolation (`WEB`/`MOBILE`/`DESKTOP`), SHA-256+bcrypt refresh rotation, password reset 7-day revocation cutoff (`F02`), role-change invalidation (`F03`), scoped/global logout (`F04`), 120s Redis `user:status:*` cache |
 | `apps/api/test/unit/auth-redis-live.spec.ts` | **1** | Live Redis Lua atomic OTP verification & lockout enforcement |
 

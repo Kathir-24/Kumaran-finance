@@ -25,7 +25,7 @@ import type { PendingReversalItem } from './reversal-action-dialogs';
 
 interface ReversalApprovalTableProps {
   reversals: PendingReversalItem[];
-  currentUser: { id: string; name?: string; roles?: string[]; isPartner?: boolean } | null;
+  currentUser: { id: string; name?: string; roles?: string[] } | null;
   onApprove: (item: PendingReversalItem) => void;
   onReject: (item: PendingReversalItem) => void;
 }
@@ -48,9 +48,8 @@ export function ReversalApprovalTable({
     );
   }
 
-  const isSuperAdmin = Boolean(currentUser?.roles?.includes('SUPER_ADMIN'));
-  const isPartner = Boolean(currentUser?.isPartner);
-  const canApprove = isSuperAdmin && isPartner;
+  const isPartner = Boolean(currentUser?.roles?.includes('PARTNER'));
+  const canApprove = isPartner;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-lg">
@@ -117,7 +116,7 @@ export function ReversalApprovalTable({
                         {t('makerGuardBadge')}
                       </div>
                     ) : !canApprove ? (
-                      <span className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1" title={!isPartner ? "Only verified legal partners (isPartner: true) can approve reversals" : t('partnerAuthorityRequired')}>
+                      <span className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1" title={!isPartner ? "Only verified statutory partners can approve reversals" : t('partnerAuthorityRequired')}>
                         <Lock className="h-3 w-3" />
                         {t('partnerAuthorityRequired')}
                       </span>

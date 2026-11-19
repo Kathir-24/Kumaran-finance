@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileSpreadsheet, Plus, Search, Layers } from 'lucide-react';
 import { apiClient, unwrapApiResponse } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { useDebounce } from '@/hooks/use-debounce';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
 import { Button } from '@/components/ui/button';
@@ -70,7 +70,7 @@ export default function SchemesDirectoryPage() {
   const totalPages = Number(
     schemesResponse?.totalPages ?? Math.max(1, Math.ceil(totalSchemes / SCHEMES_PAGE_LIMIT)),
   );
-  const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
+  const canCreateScheme = hasAnyRole(user, ['PARTNER']);
 
   return (
     <div className="space-y-6">
@@ -98,7 +98,7 @@ export default function SchemesDirectoryPage() {
             </Link>
           </Button>
 
-          {isSuperAdmin && (
+          {canCreateScheme && (
             <Button
               size="sm"
               className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs h-9"
@@ -190,7 +190,7 @@ export default function SchemesDirectoryPage() {
           </div>
           <h3 className="text-base font-semibold text-slate-200">{t('emptyTitle')}</h3>
           <p className="text-xs text-slate-400 max-w-sm mt-1">{t('emptyDesc')}</p>
-          {isSuperAdmin && (
+          {canCreateScheme && (
             <Button
               size="sm"
               className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"

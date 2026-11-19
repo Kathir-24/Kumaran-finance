@@ -33,7 +33,7 @@ Every AI coding assistant working in this repository must strictly adhere to the
 | **8** | **Defaulter & Payment Rules** | (1) Unpaid for current month = ineligible to bid. (2) 3 consecutive unpaid months = removal rights. (3) Zero partial payment, zero double payment, zero advance balance (`DueStatus`: `UNPAID`, `PAID`, `OVERDUE`). | Backend transition guards reject unpaid bidders and enforce single discrete payment per month. |
 | **9** | **Company Safety Proof** | Flexible checklist recordkeeper (signed agreement [Yes/No], nominee signed [Yes/No], blank cheques [Yes/No], scans). | Property documents eliminated; security is **not mandatory** across the board and requested only for company safety. |
 | **10** | **Maker $\ne$ Checker** | Dual authorization enforced on reversals, auctions, payouts, and defaulter removals. | Reject any transaction where `maker_user_id == checker_user_id` (enforced in app + 8 PostgreSQL `CHECK` constraints). |
-| **11** | **Verified Partner Identity (`ADR-21`)** | Not all Super Admins are statutory business partners (`isPartner: true`). | Non-Partner IT Super Admins (`isPartner: false`) are strictly barred from financial authorizations; audit logs & BullMQ telemetry are restricted strictly to `SUPER_ADMIN`. |
+| **11** | **Verified Partner Identity & Persona Separation (`ADR-21`, `ADR-27` / `SEC-A`)** | `SUPER_ADMIN` and `PARTNER` are strictly separate first-class roles (legacy `isPartner` boolean removed). | `Role.PARTNER` holds statutory business partner Maker/Checker financial authority (auctions, payouts, reversals, schemes, collections, reports). IT System Administrators (`Role.SUPER_ADMIN`) strictly manage `/users`, `/branches`, `/admin/jobs`, and `/reports/audit-logs` and are barred from financial operations. |
 
 ---
 
@@ -115,7 +115,7 @@ Mandatory Rules:
 Before accepting any AI-generated code or committing to Git, ask the AI (or verify yourself):
 - [ ] *Did you use any `number` or floating-point types for monetary values?* (Must be `BigInt`).
 - [ ] *Does this transaction verify that `maker_user_id != checker_user_id`?*
-- [ ] *Is verified Partner identity (`isPartner: true`, Guardrail 11) enforced on financial authorizations, and are audit logs / BullMQ queues restricted strictly to `SUPER_ADMIN`?*
+- [ ] *Is verified Partner identity (`Role.PARTNER`, Guardrail 11) enforced on financial authorizations, and are audit logs / BullMQ queues restricted strictly to `Role.SUPER_ADMIN`?*
 - [ ] *Do financial write paths enforce row-level locking (`SELECT FOR UPDATE`) inside `withTransactionRetry`?*
 - [ ] *Are unpaid subscribers prevented from bidding in this auction?*
 - [ ] *Did you prevent a customer from holding 2 tickets in the same group?*

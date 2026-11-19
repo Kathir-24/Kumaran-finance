@@ -10,7 +10,7 @@
 > [!NOTE]
 > **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 6 & Module 9 hardening added:
 > 1. **Two-Partner Finalized Auction Corrections (`KFC-FIN-005` / `M9-DUAL-DEF-01`)**: Added `POST /api/v1/auctions/:id/correction/{request,approve,reject}` reconciling unpaid Month $N+1$ dues under `SELECT FOR UPDATE` locks while locking out prize disbursements during active disputes (`assertNoPendingAuctionCorrection`).
-> 2. **Verified Partner & Engine-Level Dual Control (`ADR-21` / `ADR-25`)**: Financial auction mutations enforce fail-closed `assertVerifiedPartner` (`isPartner: true` + `isActive`) and PostgreSQL `CHECK` constraint `chk_auction_maker_checker` across `COMPLETED` & `MINUTES_FILED`.
+> 2. **Verified Partner & Engine-Level Dual Control (`ADR-21`, `ADR-27` / `ADR-25`)**: Financial auction mutations enforce fail-closed `assertVerifiedPartner` (`Role.PARTNER` + `isActive`) and PostgreSQL `CHECK` constraint `chk_auction_maker_checker` across `COMPLETED` & `MINUTES_FILED`.
 > 3. **Dynamic Frozen Commission & Strict Divisibility (`KFC-FIN-002`, `DEF-AUC-01`)**: Pure-`BigInt` basis-point arithmetic reading frozen `ChitGroup.foremanCommissionRate` (zero hardcoded `4%`) and `ParseUUIDPipe` across all 12 `AuctionController` routes.
 > 4. **Notification Channel (`ADR-23` / `ADR-26`)**: Phase 1 broadcasts auction results via **bilingual MSG91 TRAI DLT SMS (`KMRCHT`, zero WhatsApp)**; Android FCM Push activates in Phase 2 (Q2 2027).
 

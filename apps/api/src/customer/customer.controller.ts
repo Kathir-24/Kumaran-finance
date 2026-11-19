@@ -71,11 +71,11 @@ export class CustomerController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.COLLECTION_AGENT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.COLLECTION_AGENT)
   @ApiOperation({
     summary: 'Register a new customer profile',
     description:
-      'Creates a customer record with auto-generated KC-CUST-XXXXX code, bilingual names, and masked Aadhaar (last 4 digits). Allowed: Super Admin, Branch Manager, Collection Agent.',
+      'Creates a customer record with auto-generated KC-CUST-XXXXX code, bilingual names, and masked Aadhaar (last 4 digits). Allowed: Partner, Branch Manager, Collection Agent.',
   })
   @ApiCreatedResponseEnvelope(CustomerResponseDto, { description: 'Customer created successfully' })
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
@@ -88,7 +88,7 @@ export class CustomerController {
 
   @Get()
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -109,7 +109,7 @@ export class CustomerController {
 
   @Get(':id')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -143,11 +143,11 @@ export class CustomerController {
   }
 
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Update customer profile details',
     description:
-      'Updates contact numbers, address, and profile details. Allowed: Super Admin, Branch Manager.',
+      'Updates contact numbers, address, and profile details. Allowed: Partner, Branch Manager.',
   })
   @ApiOkResponseEnvelope(CustomerResponseDto, { description: 'Customer updated successfully' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
@@ -162,7 +162,7 @@ export class CustomerController {
   @Post(':id/nominees')
   @HttpCode(HttpStatus.CREATED)
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,
@@ -184,10 +184,10 @@ export class CustomerController {
 
   @Delete(':id/nominees/:nomineeId')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Remove a linked nominee',
-    description: 'Deletes a nominee record. Allowed: Super Admin, Branch Manager.',
+    description: 'Deletes a nominee record. Allowed: Partner, Branch Manager.',
   })
   @ApiOkResponseEnvelope(ActionSuccessResponseDto, { description: 'Nominee removed successfully' })
   @ApiResponse({ status: 404, description: 'Nominee not found' })
@@ -200,11 +200,11 @@ export class CustomerController {
   }
 
   @Patch(':id/kyc-status')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Update customer KYC verification status',
     description:
-      'Approves or revokes KYC verification for customer profile. Allowed: Super Admin, Branch Manager, Accountant.',
+      'Approves or revokes KYC verification for customer profile. Allowed: Partner, Branch Manager, Accountant.',
   })
   @ApiOkResponseEnvelope(CustomerResponseDto, { description: 'KYC status updated' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
@@ -218,7 +218,7 @@ export class CustomerController {
 
   @Patch(':id/fcm-token')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.COLLECTION_AGENT,
     Role.CUSTOMER,
@@ -274,7 +274,7 @@ export class CustomerController {
     },
   })
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -314,7 +314,7 @@ export class CustomerController {
   @Post(':id/documents/confirm')
   @HttpCode(HttpStatus.CREATED)
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -351,7 +351,7 @@ export class CustomerController {
 
   @Get(':id/documents/:docId/url')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,
@@ -387,7 +387,7 @@ export class CustomerController {
 
   @Delete(':id/documents/:docId')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,

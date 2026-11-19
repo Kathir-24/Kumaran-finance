@@ -59,8 +59,7 @@ export function SafetyProofChecklist({
   const user = useAuthStore((s) => s.user);
   // Guardrail 11 (SEC-A): Non-partner IT Super Admins are barred from financial safety-proof verification
   const canVerifySafetyProof =
-    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) ||
-    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT', 'PARTNER']);
 
   const isAlreadyVerified =
     winner.disbursementStatus !== 'PENDING_VERIFICATION';
@@ -341,7 +340,7 @@ export function SafetyProofChecklist({
           </Button>
         ) : (
           <div className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 text-xs text-slate-400">
-            Read-only view: Safety proof verification requires a verified Partner (Super Admin with isPartner: true), Branch Manager, or Accountant role.
+            Read-only view: Safety proof verification requires a verified Partner, Branch Manager, or Accountant role.
           </div>
         )}
       </CardContent>

@@ -25,7 +25,7 @@
 
 4. **Maker-Checker Separation of Duties & Verified Partner Identity (Guardrails 10–11 / `ADR-21`)**:
    - Critical actions (payment reversals, auction finalization/corrections, prize disbursements, defaulter removals) strictly enforce **`maker_user_id != checker_user_id`** at application and PostgreSQL engine levels (**8 `CHECK` constraints**, `CONFIRMED-BY-DEVELOPER`).
-   - Only verified statutory business partners (`isPartner: true`) may authorize financial mutations; non-Partner IT Super Admins (`isPartner: false`) are strictly barred, and audit logs / BullMQ telemetry remain strictly `SUPER_ADMIN`-only.
+   - Only verified statutory business partners (`Role.PARTNER`) may authorize financial mutations; IT Super Admins (`Role.SUPER_ADMIN`) strictly manage IT administrative functions and are strictly barred from financial operations, while audit logs and BullMQ telemetry remain strictly `Role.SUPER_ADMIN`-only.
    - Under no circumstances may a user approve their own entry.
 
 5. **No AI Features in Operational Scope**:

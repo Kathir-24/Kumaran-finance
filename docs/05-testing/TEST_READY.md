@@ -286,7 +286,7 @@ All **11 Invariant Architectural Guardrails** confirmed by developer in `AGENTS.
 | **8** | **Defaulter & Single Discrete Payment (ADR-07)** | Zero double payments, zero partial payments, zero advance balances. Unpaid due must be paid with exact discrete amount. | `TC-BIZ-01` & `TC-BIZ-02` in Payments |
 | **9** | **Company Safety Proof Checklist (ADR-15)** | Property documents eliminated. Flexible checklist (signed agreement, cheques, promissory note) recorded and verified before payout. | `TC-HP-01` & `TC-VAL-01` in Disbursements |
 | **10** | **Maker != Checker Separation of Duties** | Enforced across Payment Reversals, Auctions, Prize Disbursements, Defaulter Removals, Cash Handover, and UPI Claims in both app + **8 PostgreSQL 17 `CHECK` constraints**. | `TC-BIZ-03`, `TC-UPI-05`, `TC-AUTHZ-01`, `08-maker-checker-db-constraints.e2e-spec.ts` (25/25) |
-| **11** | **Verified Partner Identity (ADR-21 / SEC-A)** | Non-Partner IT Super Admins (`isPartner: false`) are strictly barred from financial authorizations; audit logs & BullMQ telemetry are restricted strictly to `SUPER_ADMIN`. | `05-disbursements-jobs.e2e-spec.ts`, `adversarial-security-invariants.spec.ts` |
+| **11** | **Verified Partner Identity & Persona Separation (ADR-21, ADR-27 / SEC-A)** | Statutory Business Partners (`Role.PARTNER`) hold full Maker/Checker financial authority; IT Super Admins (`Role.SUPER_ADMIN`) strictly manage IT administrative functions and are barred from financial operations, while audit logs & BullMQ telemetry are restricted strictly to `Role.SUPER_ADMIN`. | `05-disbursements-jobs.e2e-spec.ts`, `adversarial-security-invariants.spec.ts` |
 
 ---
 

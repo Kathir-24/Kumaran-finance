@@ -44,8 +44,7 @@ function AuctionsContent() {
   const [isFinalSettlementOpen, setIsFinalSettlementOpen] = React.useState(false);
 
   const canSettleFinalMonth =
-    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) ||
-    (hasAnyRole(user, ['SUPER_ADMIN']) && Boolean(user?.isPartner));
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT', 'PARTNER']);
 
   // 1. Fetch all chit schemes
   const {

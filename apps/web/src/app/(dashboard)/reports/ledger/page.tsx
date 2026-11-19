@@ -50,7 +50,7 @@ function FormXxiLedgerContent() {
   const user = useAuthStore((s: AuthState) => s.user);
   const roles = user?.roles || [];
   const hasAccess = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
   );
 
   // Filter States

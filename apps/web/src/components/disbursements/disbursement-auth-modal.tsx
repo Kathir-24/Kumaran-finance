@@ -115,9 +115,8 @@ export function DisbursementAuthModal({
 
   // Maker != Checker Guard (Guardrail 10) & Verified Partner Guard (Guardrail 11 / SEC-A)
   const isMaker = isSelfApproval(user?.id, { verifiedByUserId: winner?.verifiedByUserId });
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
-  const canAuthorize = !isMaker && isSuperAdmin && isPartner;
+  const isPartner = hasAnyRole(user, ['PARTNER']);
+  const canAuthorize = !isMaker && isPartner;
 
   const authorizeMutation = useMutation({
     mutationFn: async () => {
@@ -125,7 +124,7 @@ export function DisbursementAuthModal({
       if (isMaker) {
         throw new Error(t('makerGuardAlertDesc'));
       }
-      if (!isSuperAdmin || !isPartner) {
+      if (!isPartner) {
         throw new Error(t('partnerOnlyAuthAlert'));
       }
 
@@ -187,8 +186,8 @@ export function DisbursementAuthModal({
             </div>
           )}
 
-          {/* Legal Partner / Super Admin Guardrail (Guardrail 11 / SEC-A) */}
-          {(!isSuperAdmin || !isPartner) && (
+          {/* Legal Partner Guardrail (Guardrail 11 / SEC-A) */}
+          {!isPartner && (
             <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
               <span>{t('partnerOnlyAuthAlert')}</span>

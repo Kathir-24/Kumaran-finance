@@ -13,6 +13,7 @@ import {
   Building2,
   UserCog,
   Activity,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export type NavLabelSubKey =
   | 'handover'
   | 'reversals'
   | 'reports'
+  | 'auditLogs'
   | 'instructions'
   | 'branches'
   | 'users'
@@ -113,6 +115,12 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     labelKey: 'nav.reports',
     icon: FileSpreadsheet,
     allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/reports'],
+  },
+  {
+    href: '/reports/audit-logs',
+    labelKey: 'nav.auditLogs',
+    icon: ShieldCheck,
+    allowedRoles: ROUTE_PERMISSIONS_BY_HREF['/reports/audit-logs'],
   },
   {
     href: '/instructions',

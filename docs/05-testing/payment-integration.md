@@ -71,7 +71,7 @@ When launched on Android, the payment app does not allow the subscriber to edit 
 ### 2.3 Strict Maker != Checker Separation
 - If an office staff member or collection agent enters a payment claim on behalf of a customer, they are permanently recorded as the `maker` (`recordedByUserId`).
 - The endpoint `POST /payments/:id/verify-upi-claim` enforces that `recordedByUserId != checkerUserId`.
-- Only an independent staff member (`ACCOUNTANT`, `BRANCH_MANAGER`, or `SUPER_ADMIN`) who did not submit the claim can verify the credit against KVB NetBanking.
+- Only an independent staff member (`ACCOUNTANT`, `BRANCH_MANAGER`, or `PARTNER`) who did not submit the claim can verify the credit against KVB NetBanking.
 
 ---
 
@@ -79,10 +79,10 @@ When launched on Android, the payment app does not allow the subscriber to edit 
 
 | Method & Path | Exact Live `@Roles(...)` | Description |
 |---|---|---|
-| `GET /api/v1/installments/:dueId/upi-intent` | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` ([`installment.controller.ts:132-138`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.controller.ts#L132-L138); excludes `AUDITOR`) | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
-| `POST /api/v1/payments/upi-claim` | `CUSTOMER`, `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:309`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L309); excludes `COLLECTION_AGENT` & `AUDITOR`) | Customer/staff submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
-| `GET /api/v1/payments/pending-upi-claims` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:140`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L140)) | Lists paginated (`?page=1&limit=20`, max `100`) pending UPI claims via `ApiPaginatedResponseEnvelope` for Accounting Desk statement matching. |
-| `POST /api/v1/payments/:id/verify-upi-claim` | `SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:330`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L330)) | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
+| `GET /api/v1/installments/:dueId/upi-intent` | `CUSTOMER`, `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT`, `COLLECTION_AGENT` ([`installment.controller.ts:132-138`](file:///u:/Kumaran-finance/apps/api/src/installment/installment.controller.ts#L132-L138); excludes `AUDITOR` and `SUPER_ADMIN`) | Builds standard NPCI 1-tap `upi://pay` URI locking exact whole-rupee $I_{net}$ amount and KVB account payee VPA (`kumaranfinance@kvb`). |
+| `POST /api/v1/payments/upi-claim` | `CUSTOMER`, `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:309`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L309); excludes `COLLECTION_AGENT`, `AUDITOR`, `SUPER_ADMIN`) | Customer/staff submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
+| `GET /api/v1/payments/pending-upi-claims` | `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:140`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L140)) | Lists paginated (`?page=1&limit=20`, max `100`) pending UPI claims via `ApiPaginatedResponseEnvelope` for Accounting Desk statement matching. |
+| `POST /api/v1/payments/:id/verify-upi-claim` | `PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT` ([`payment.controller.ts:330`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.controller.ts#L330)) | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
 
 ---
 

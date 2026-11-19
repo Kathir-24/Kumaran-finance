@@ -375,12 +375,25 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
   }
 
   if (isAuthPage) {
-    if (errorParam === 'forbidden' || !isRoleAuthorizedForPath('/', auth.roles)) {
+    if (errorParam === 'forbidden') {
+      return { action: 'next' };
+    }
+
+    const defaultLanding =
+      auth.roles.includes('SUPER_ADMIN') && !auth.roles.includes('PARTNER')
+        ? '/users'
+        : isRoleAuthorizedForPath('/', auth.roles)
+        ? '/'
+        : null;
+
+    if (!defaultLanding) {
       return { action: 'next' };
     }
 
     const candidate = sanitizeSafeRedirectPath(redirectParam);
-    const destination = isRoleAuthorizedForPath(candidate, auth.roles) ? candidate : '/';
+    const destination = isRoleAuthorizedForPath(candidate, auth.roles)
+      ? candidate
+      : defaultLanding;
     return {
       action: 'redirect',
       location: destination,
@@ -391,6 +404,8 @@ export async function evaluateEdgeAuth(params: EdgeAuthParams): Promise<EdgeAuth
   if (!isRoleAuthorizedForPath(pathname, auth.roles)) {
     const destination = isRoleAuthorizedForPath('/', auth.roles)
       ? '/?error=forbidden'
+      : auth.roles.includes('SUPER_ADMIN')
+      ? '/users?error=forbidden'
       : '/login?error=forbidden';
 
     return {

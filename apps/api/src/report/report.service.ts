@@ -42,6 +42,7 @@ export type { PendingApprovalsResponse };
 
 const APPROVALS_STREAM_ALLOWED_ROLES: readonly Role[] = [
   Role.SUPER_ADMIN,
+  Role.PARTNER,
   Role.BRANCH_MANAGER,
   Role.ACCOUNTANT,
   Role.AUDITOR,
@@ -898,7 +899,7 @@ export class ReportService {
 
   /**
    * Resolves and validates mid-flight session validity, token expiry cutoff, persisted Session
-   * identity (F04), live DB roles/branchId/isPartner, and role authorization for open SSE streams (F15).
+   * identity (F04), live DB roles/branchId, and role authorization for open SSE streams (F15).
    * Returns a refreshed JwtPayload reflecting live DB state so mid-stream role/partner demotions
    * take effect immediately on the next tick (XR-M7-RPT-01).
    */
@@ -933,7 +934,7 @@ export class ReportService {
       }
     }
 
-    // 3. Database check: user active status, DB tokenRevokedBefore cutoff, live roles/branch/partner
+    // 3. Database check: user active status, DB tokenRevokedBefore cutoff, live roles/branch
     const user = await this.prisma.user.findUnique({
       where: { id: currentUser.sub },
       select: {
@@ -941,7 +942,6 @@ export class ReportService {
         tokenRevokedBefore: true,
         roles: true,
         branchId: true,
-        isPartner: true,
       },
     });
 
@@ -998,7 +998,7 @@ export class ReportService {
 
     // 5. Fail-closed branch assignment & mid-stream reassignment check for pure BRANCH_MANAGER
     const hasGlobalRole = user.roles.some((r) =>
-      ([Role.SUPER_ADMIN, Role.ACCOUNTANT, Role.AUDITOR] as Role[]).includes(r),
+      ([Role.SUPER_ADMIN, Role.PARTNER, Role.ACCOUNTANT, Role.AUDITOR] as Role[]).includes(r),
     );
     if (!hasGlobalRole && user.roles.includes(Role.BRANCH_MANAGER)) {
       const liveBranchId = user.branchId?.trim();
@@ -1018,7 +1018,6 @@ export class ReportService {
       ...currentUser,
       roles: user.roles,
       branchId: user.branchId ?? null,
-      isPartner: Boolean(user.isPartner),
     };
   }
 

@@ -618,8 +618,8 @@ class SanitizedUserDto {
   final List<String> roles;
   /// Assigned branch ID
   final String? branchId;
-  /// Whether the staff member is a verified business partner
-  final bool? isPartner;
+  /// Whether the staff member holds the statutory PARTNER role (derived from roles)
+  bool get isPartner => roles.contains('PARTNER');
   /// Whether Microsoft Authenticator TOTP is enabled
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
@@ -633,7 +633,6 @@ class SanitizedUserDto {
     required this.phone,
     required this.roles,
     this.branchId,
-    this.isPartner,
     required this.isTotpEnabled,
     required this.hasMpin,
     this.lastLoginAt,
@@ -646,7 +645,6 @@ class SanitizedUserDto {
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       branchId: json['branchId']?.toString(),
-      isPartner: json['isPartner'] as bool?,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
       lastLoginAt: json['lastLoginAt']?.toString(),
@@ -660,7 +658,6 @@ class SanitizedUserDto {
     data['phone'] = phone;
     data['roles'] = roles;
     data['branchId'] = branchId;
-    data['isPartner'] = isPartner;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;
     data['lastLoginAt'] = lastLoginAt;
@@ -907,8 +904,8 @@ class UserProfileResponseDto {
   final List<String> roles;
   /// Assigned branch ID
   final String? branchId;
-  /// Whether the staff member is a verified business partner
-  final bool? isPartner;
+  /// Whether the staff member holds the statutory PARTNER role (derived from roles)
+  bool get isPartner => roles.contains('PARTNER');
   /// Whether Microsoft Authenticator TOTP is enabled
   final bool isTotpEnabled;
   /// Whether 6-digit MPIN is configured
@@ -930,7 +927,6 @@ class UserProfileResponseDto {
     required this.phone,
     required this.roles,
     this.branchId,
-    this.isPartner,
     required this.isTotpEnabled,
     required this.hasMpin,
     this.lastLoginAt,
@@ -947,7 +943,6 @@ class UserProfileResponseDto {
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
       branchId: json['branchId']?.toString(),
-      isPartner: json['isPartner'] as bool?,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
       lastLoginAt: json['lastLoginAt']?.toString(),
@@ -965,7 +960,6 @@ class UserProfileResponseDto {
     data['phone'] = phone;
     data['roles'] = roles;
     data['branchId'] = branchId;
-    data['isPartner'] = isPartner;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;
     data['lastLoginAt'] = lastLoginAt;
@@ -1450,8 +1444,8 @@ class UserResponseDto {
   final String phone;
   /// Assigned RBAC roles
   final List<String> roles;
-  /// Whether the staff member is a verified business partner
-  final bool? isPartner;
+  /// Whether the staff member holds the statutory PARTNER role (derived from roles)
+  bool get isPartner => roles.contains('PARTNER');
   /// Whether the staff account is active
   final bool isActive;
   /// Whether TOTP 2FA is active
@@ -1474,7 +1468,6 @@ class UserResponseDto {
     required this.name,
     required this.phone,
     required this.roles,
-    this.isPartner,
     required this.isActive,
     required this.isTotpEnabled,
     required this.hasMpin,
@@ -1491,7 +1484,6 @@ class UserResponseDto {
       name: json['name']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       roles: ((json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList()) ?? [],
-      isPartner: json['isPartner'] as bool?,
       isActive: json['isActive'] as bool? ?? false,
       isTotpEnabled: json['isTotpEnabled'] as bool? ?? false,
       hasMpin: json['hasMpin'] as bool? ?? false,
@@ -1509,7 +1501,6 @@ class UserResponseDto {
     data['name'] = name;
     data['phone'] = phone;
     data['roles'] = roles;
-    data['isPartner'] = isPartner;
     data['isActive'] = isActive;
     data['isTotpEnabled'] = isTotpEnabled;
     data['hasMpin'] = hasMpin;

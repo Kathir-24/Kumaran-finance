@@ -60,7 +60,7 @@ export function RegistrarFilingModal({
 
     if (!canRecordFiling) {
       setErrorMsg(
-        'Verified Partner (isPartner: true), Branch Manager, or Accountant authority is required to record Registrar filings (Guardrail 11).',
+        'Verified Partner, Branch Manager, or Accountant authority is required to record Registrar filings (Guardrail 11).',
       );
       return;
     }

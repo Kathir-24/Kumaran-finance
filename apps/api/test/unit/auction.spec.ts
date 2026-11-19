@@ -81,7 +81,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         findFirst: jest.fn(),
       },
       user: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', isPartner: true })),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve({ id: where?.id || 'usr-default', roles: [Role.PARTNER], isActive: true })),
       },
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
@@ -966,7 +966,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           correctedBidDiscount: 24000,
           reason: 'Corrected bid discount entered incorrectly in branch ledger',
         },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(result.success).toBe(true);
@@ -1001,7 +1001,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             correctedBidDiscount: 24000,
             reason: 'Attempting correction after payout',
           },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -1018,7 +1018,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             correctedBidDiscount: 20005,
             reason: 'Non-divisible bid discount',
           },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -1037,7 +1037,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             correctedBidDiscount: 24000,
             reason: 'Correction attempt after subscribers paid Month 4',
           },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(
         new BadRequestException(
@@ -1047,7 +1047,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
     });
 
     it('SEC-A: should reject non-partner Super Admin on finalizeAuction', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'non-partner-admin', roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         auctionService.finalizeAuction(
           mockAuctionId,
@@ -1079,7 +1079,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { notes: 'Self-approval attempt' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -1114,7 +1114,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         mockCheckerId, // Independent Partner B approves
         { notes: 'Approved after verifying branch register' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(result.success).toBe(true);
@@ -1399,7 +1399,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       });
     });
 
-    it('DEF-AUC-05: fail-closed isPartner blocks missing/null user record AND non-partner IT Super Admin as Maker', async () => {
+    it('DEF-AUC-05: fail-closed partner identity blocks missing/null user record AND non-partner IT Super Admin as Maker', async () => {
       // Null user on finalizeAuction MUST fail closed (not fall through!)
       prismaMock.user.findUnique.mockResolvedValueOnce(null);
       await expect(
@@ -1407,14 +1407,14 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           'deleted-user-id',
           { subscribersPresent: 12 },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
 
-      // Deactivated partner (isPartner: true, isActive: false) MUST fail closed
+      // Deactivated partner (roles: [PARTNER], isActive: false) MUST fail closed
       prismaMock.user.findUnique.mockResolvedValueOnce({
         id: 'deactivated-partner',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: false,
       });
       await expect(
@@ -1422,12 +1422,12 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           'deactivated-partner',
           { subscribersPresent: 12 },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/PARTNER_IDENTITY_REQUIRED/);
 
       // Non-partner IT SUPER_ADMIN (without BRANCH_MANAGER) attempting recordBid MUST fail closed
-      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'it-admin', isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'it-admin', roles: [Role.SUPER_ADMIN], isActive: true });
       await expect(
         auctionService.recordBid(
           mockChitGroupId,
@@ -1448,7 +1448,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { correctedBidDiscount: 30000, reason: 'Over ceiling test' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/exceeds maximum allowable 1\/4 ceiling/);
 
@@ -1458,7 +1458,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { correctedBidDiscount: 2000, reason: 'Negative dividend test' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/Foreman Commission/);
 
@@ -1472,7 +1472,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { correctedBidDiscount: 24000, reason: 'Month 1 attempt' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/Guardrail 5 Violation/);
 
@@ -1496,7 +1496,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockCheckerId,
           { notes: 'Replay attempt' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/NO_PENDING_CORRECTION/);
 
@@ -1522,7 +1522,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         mockCheckerId,
         { notes: 'Verified' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(prismaMock.auctionWinner.update).toHaveBeenCalledWith({
@@ -1602,7 +1602,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         mockCheckerId,
         { notes: 'Lock order verified' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(lockOrder).toEqual([
@@ -1890,7 +1890,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         mockCheckerId,
         { notes: 'Swapped cleanly' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // XR-AUC-01: ALL safety proof & collateral fields MUST be wiped on winner swap
@@ -1963,7 +1963,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { correctedBidDiscount: 24000, reason: 'Attempt on closed scheme' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/must be ACTIVE/);
 
@@ -1972,7 +1972,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockCheckerId,
           { notes: 'Attempt on closed scheme' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/must be ACTIVE/);
     });
@@ -2059,10 +2059,10 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       ).rejects.toThrow(/DUPLICATE_TOKEN_NUMBER/);
     });
 
-    it('XR-AUC-05: markMinutesFiled rejects non-partner IT Super Admin (isPartner: false) fail-closed', async () => {
+    it('XR-AUC-05: markMinutesFiled rejects non-partner IT Super Admin fail-closed', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce({
         id: 'it-admin',
-        isPartner: false,
+        roles: [Role.SUPER_ADMIN],
         isActive: true,
       });
 
@@ -2135,7 +2135,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           mockMakerId,
           { correctedBidDiscount: 24000, reason: '   \t\n  ' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/CORRECTION_REASON_REQUIRED/);
     });
@@ -2380,9 +2380,9 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
       prismaMock.auction.findUnique.mockResolvedValue(mockCompletedAuction);
       prismaMock.user.findUnique.mockImplementation(({ where }: any) => {
         if (where?.id === 'non-partner-uuid') {
-          return Promise.resolve({ id: 'non-partner-uuid', isPartner: false });
+          return Promise.resolve({ id: 'non-partner-uuid', roles: [Role.SUPER_ADMIN], isActive: true });
         }
-        return Promise.resolve({ id: where?.id || 'partner-id', isPartner: true });
+        return Promise.resolve({ id: where?.id || 'partner-id', roles: [Role.PARTNER], isActive: true });
       });
 
       const pendingCorrectionAudit = {
@@ -2420,7 +2420,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           partnerA,
           { reason: 'Self-canceling request' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/Maker-Checker Separation of Duties Violated/i);
 
@@ -2431,7 +2431,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         partnerB,
         { reason: 'Token verification matched original 25,000 bid', notes: 'Checked physical slips' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       expect(rejectResult.success).toBe(true);
@@ -2470,7 +2470,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
           mockAuctionId,
           partnerB,
           { notes: 'Attempting to approve rejected request' },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/already been rejected/i);
     });
@@ -2574,7 +2574,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
         mockAuctionId,
         partnerB,
         { notes: 'Approved sub-ceiling correction' },
-        [Role.SUPER_ADMIN],
+        [Role.PARTNER],
       );
 
       // Must purge stale tie-bidders because tie-breaks only exist at ceiling
@@ -2617,7 +2617,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             correctedBidDiscount: 21000,
             reason: 'Second correction request while first is pending',
           },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/PENDING_CORRECTION_EXISTS/i);
     });
@@ -2635,7 +2635,7 @@ describe('Module 4: In-Office Offline Auctions & Tie-Breakers Tests', () => {
             correctedWinningTicketId: mockTicketId1,
             reason: 'Identical values without changes',
           },
-          [Role.SUPER_ADMIN],
+          [Role.PARTNER],
         ),
       ).rejects.toThrow(/NO_CHANGES_DETECTED/i);
     });

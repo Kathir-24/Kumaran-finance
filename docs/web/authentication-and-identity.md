@@ -31,7 +31,7 @@ The Authentication & Identity module governs office staff access to the **Kumara
 | **Enable / Replace 2FA** | `POST /api/v1/auth/totp/enable` | `Bearer <JWT>` (via BFF) | `{ secret: string, code: string, password?: string }` *(current `password` required strictly when replacing an existing factor — `F10`)* | `{ success: true, message: string }` | `400` Invalid code<br>`401` Unauthorized<br>`429` Rate limited |
 | **Disable 2FA** | `POST /api/v1/auth/totp/disable` | `Bearer <JWT>` (via BFF) | `{ password: string }` | `{ success: true, message: string }` | `401` Invalid password<br>`429` Rate limited |
 | **Change Password** | `POST /api/v1/auth/change-password` | `Bearer <JWT>` (via BFF) | `{ currentPassword: string, newPassword: string }` | `{ success: true, message: string }` (stamps `tokenRevokedBefore` & revokes active sessions) | `400` New pass <8 chars<br>`401` Incorrect current pass |
-| **Get Staff Profile** | `GET /api/v1/auth/me` | `Bearer <JWT>` (via BFF) | *None* | `AuthUser` object with `roles`, `isPartner`, `isTotpEnabled`, and assigned branch | `401` Unauthorized |
+| **Get Staff Profile** | `GET /api/v1/auth/me` | `Bearer <JWT>` (via BFF) | *None* | `AuthUser` object with `roles`, `isTotpEnabled`, and assigned branch | `401` Unauthorized |
 | **Staff Logout** | `POST /api/v1/auth/logout?clientType=WEB\|MOBILE\|DESKTOP\|ALL` | `Bearer <JWT>` (via BFF) | Query `clientType` (defaults to `ALL`; Web BFF passes `WEB` to preserve mobile field rounds per `ADR-24`) | `{ success: true, message: string }` | `401` Unauthorized |
 
 > [!NOTE]

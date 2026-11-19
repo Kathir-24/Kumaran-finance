@@ -21,8 +21,8 @@ Kumaran Chits employs a defense-in-depth security model designed specifically fo
 
 | Role | Business Persona | Scope & Allowed Operations | Prohibited Actions |
 |---|---|---|---|
-| **SUPER_ADMIN (isPartner=true)** | 4 Business Partners | Full company control, financial authorizations, payment reversals, auction finalizations, prize disbursements, defaulter removals. | Self-approval (`maker != checker`), bypassing audit log. |
-| **SUPER_ADMIN (isPartner=false)** | IT Administrator / System Admin | User onboarding, system configuration, infrastructure maintenance, audit log viewing, background queue inspection. | Authorizing payouts, approving reversals, committing auctions, removing defaulters. |
+| **PARTNER** | 4 Business Partners | Full company control, financial authorizations, payment reversals, auction finalizations, prize disbursements, defaulter removals. | Self-approval (`maker != checker`), bypassing audit log, background queue management. |
+| **SUPER_ADMIN** | IT Administrator / System Admin | User onboarding, branch infrastructure maintenance, audit log viewing, background queue inspection. | Authorizing payouts, approving reversals, committing auctions, removing defaulters, financial dashboard. |
 | **BRANCH_MANAGER** | Branch Head (Perundurai) | Branch staff supervision, customer onboarding, scheme viewing, auction conducting, physical handover supervision. | Finalizing auctions, authorizing prize payouts, approving reversals, system audit logs. |
 | **ACCOUNTANT** | Desk Accountant / Cashier | Counter cash receipt entry, UPI claim verification, cash handover acknowledgment, safety proof verification. | Payout authorization, payment reversal approval, auction finalization, system audit logs. |
 | **COLLECTION_AGENT** | Field Route Agent | Doorstep cash collection, collection batch submission, view assigned route customers. | Approving cash handover, modifying dues, viewing company financial reports, system audit logs. |
@@ -51,7 +51,7 @@ Broken Object Level Authorization (BOLA) and Insecure Direct Object References (
 
 ## 4. Token Lifecycle & Session Management
 
-- **Access Token**: HMAC SHA-256 JWT, 15-minute expiration, contains `sub`, `phone`, `roles`, `branchId`, `isPartner`.
+- **Access Token**: HMAC SHA-256 JWT, 15-minute expiration, contains `sub`, `phone`, `roles`, `branchId`.
 - **Refresh Token**: Cryptographically secure 256-bit random string hashed with SHA-256 in PostgreSQL (`refreshTokenHash`); transmitted exclusively via `HttpOnly`, `SameSite=Strict`, `Secure` cookie.
 - **Fast-Path Redis Revocation**:
   - Every authenticated request checks Redis key `auth:user:status:{userId}` (120s TTL).

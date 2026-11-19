@@ -85,8 +85,8 @@ flowchart TD
 
 | Persona Role | Live Scope & Enforcement Boundaries |
 |---|---|
-| **`SUPER_ADMIN` (`isPartner: true` — Verified Statutory Partner)** | Full administrative, telemetry, audit log, and financial authority. Maker $\ne$ Checker dual control (`maker_user_id != checker_user_id`) strictly enforced in services (`assertVerifiedPartner`) and **8 PostgreSQL `CHECK` constraints** (`Guardrails 10 & 11`). |
-| **`SUPER_ADMIN` (`isPartner: false` — Administrative IT Super Admin)** | IT administration (user onboarding, branches, settings), immutable Audit Logs (`GET /api/v1/reports/audit-logs`), and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`). **Strictly barred (`HTTP 403 PARTNER_IDENTITY_REQUIRED`)** from financial authorizations (reversals, auction finalizations/corrections, prize payouts, defaulter removals/substitutions, `isPartner` flag mutations) per **Guardrail 11 (`ADR-21` / `SEC-A`)**. |
+| **`PARTNER` (Verified Statutory Partner)** | Statutory Business Partner with full Maker/Checker financial authority (auctions, payouts, reversals, schemes, collections, reports). Maker $\ne$ Checker dual control (`maker_user_id != checker_user_id`) strictly enforced in services (`assertVerifiedPartner`) and **8 PostgreSQL `CHECK` constraints** (`Guardrails 10 & 11`). Barred from `/reports/audit-logs` and BullMQ telemetry. |
+| **`SUPER_ADMIN` (Administrative IT Super Admin)** | IT administration (user onboarding, branches, settings), immutable Audit Logs (`GET /api/v1/reports/audit-logs`), and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`). **Strictly barred (`HTTP 403 PARTNER_IDENTITY_REQUIRED` / forbidden)** from financial operations and authorizations (reversals, auction finalizations/corrections, prize payouts, defaulter removals/substitutions) per **Guardrail 11 (`ADR-21`, `ADR-27` / `SEC-A`)**. |
 | **`BRANCH_MANAGER`** | Branch-scoped (`currentUser.branchId`, fail-closed Anti-BOLA) intake, staff directory reads, auction bid Maker, and branch reminder triggers. Blocked from creating/editing branches, activating schemes, user password resets, reversal approvals, prize payouts, `/reports/audit-logs`, and `/admin/jobs` telemetry. |
 | **`ACCOUNTANT`** | Counter collections, cash handover acknowledgment (`collector != acknowledger`), UPI claim verification (`submitter != verifier`), safety proof uploads/verification, Day Book / Form XXII / Form XXI / Form XVII reads. Blocked from user/branch/scheme admin, reversal mutations (`KFC-SEC-001`), prize payout release authorization, `/reports/audit-logs`, and `/admin/jobs`. |
 | **`COLLECTION_AGENT`** | Strictly scoped to assigned branch/route dues, doorstep collections, offline queue sync, evening handover submission, and **upload-only** doorstep KYC scans. Strictly barred from viewing KYC scans / presigned URLs, `/reports/pending-approvals` & SSE stream, Form XVII/XXI/XXII registers, `/reports/audit-logs`, and admin endpoints. |
@@ -118,7 +118,7 @@ flowchart TD
 
 1. `POST /api/v1/auth/logout`: Scoped (`?clientType=WEB|MOBILE|DESKTOP`) or global (`ALL`) session revocation + clears `fcmToken = null`.
 2. `PATCH /api/v1/auth/fcm-token`: Registers or clears the authenticated user's FCM token (Phase 2 push readiness).
-3. `GET /api/v1/auth/me`: Returns caller's own profile, `roles`, `isPartner`, and branch (dual Staff & Customer support).
+3. `GET /api/v1/auth/me`: Returns caller's own profile, `roles`, and branch (dual Staff & Customer support).
 4. `POST /api/v1/auth/change-password`: Self-service staff password change with current-password verification and 7-day global revocation cutoff (`F02`).
 5. `POST /api/v1/auth/totp/setup`: Generates Base32 TOTP secret & QR URI.
 6. `POST /api/v1/auth/totp/enable`: Locks 2FA (`password` required when replacing active TOTP per `F10`).

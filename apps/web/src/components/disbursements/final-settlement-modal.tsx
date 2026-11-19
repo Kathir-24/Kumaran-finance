@@ -115,12 +115,11 @@ export function FinalSettlementModal({
   const [preparedSummary, setPreparedSummary] = useState<string | null>(null);
 
   // Guardrail 10 & 11 (SEC-A) & ADR-25 Two-Stage Dual Control
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isPartner = Boolean(user?.isPartner);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
   const canPrepareStage1 =
-    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT']) || (isSuperAdmin && isPartner);
+    hasAnyRole(user, ['BRANCH_MANAGER', 'ACCOUNTANT', 'PARTNER']);
   const isMaker = isSelfApproval(user?.id, { makerUserId: preparedByUserId });
-  const canApproveStage2 = isSuperAdmin && isPartner && !isMaker;
+  const canApproveStage2 = isPartner && !isMaker;
 
   useEffect(() => {
     if (isOpen && chitGroup) {
@@ -200,7 +199,7 @@ export function FinalSettlementModal({
       if (isMaker) {
         throw new Error(t('makerGuardAlertDesc'));
       }
-      if (!isSuperAdmin || !isPartner) {
+      if (!isPartner) {
         throw new Error(t('partnerOnlyAuthAlert'));
       }
 
@@ -361,7 +360,7 @@ export function FinalSettlementModal({
             </div>
           )}
 
-          {isPrepared && !isMaker && (!isSuperAdmin || !isPartner) && (
+          {isPrepared && !isMaker && !isPartner && (
             <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <span>{t('partnerOnlyAuthAlert')}</span>

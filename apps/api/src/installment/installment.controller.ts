@@ -47,7 +47,7 @@ export class InstallmentController {
   constructor(private readonly installmentService: InstallmentService) {}
 
   @Get('group/:chitGroupId/month/:month')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'View all subscriber dues for a specific month in a chit scheme',
     description:
@@ -68,11 +68,11 @@ export class InstallmentController {
 
   @Post('group/:chitGroupId/month/:month/generate')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Generate / sync monthly installment dues from auction dividend',
     description:
-      'Calculates universal dividend deduction (Inet = Ibase - Div) across ALL members in that chit group (including auction winner and past winners) and creates or updates InstallmentDue records. Allowed: Super Admin, Branch Manager.',
+      'Calculates universal dividend deduction (Inet = Ibase - Div) across ALL members in that chit group (including auction winner and past winners) and creates or updates InstallmentDue records. Allowed: Partner, Branch Manager.',
   })
   @ApiOkResponseEnvelope(GenerateDuesResultResponseDto, {
     description: 'Monthly dues generated successfully',
@@ -96,7 +96,7 @@ export class InstallmentController {
   }
 
   @Get('defaulters')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Alias to list defaulters with consecutive arrears',
     description:
@@ -131,7 +131,7 @@ export class InstallmentController {
   @Get(':dueId/upi-intent')
   @Roles(
     Role.CUSTOMER,
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,

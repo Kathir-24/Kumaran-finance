@@ -11,7 +11,7 @@
 > **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 4 & Module 5 hardening evolved the live contract as follows:
 > 1. **Two-Partner Defaulter Removal (`ADR-22` / `DEF-05` / `DEF-16`)**: Unilateral `remove-defaulter` evolved into strict two-partner Maker–Checker (`POST /api/v1/tickets/:id/{request-removal,approve-removal,reject-removal}`), backed by `SELECT FOR UPDATE` TOCTOU locks, `PRIZED_TICKET_IMMUTABLE`, `assertVerifiedPartner`, and PostgreSQL `CHECK` constraint `chk_ticket_removal_maker_checker`.
 > 2. **Early Exit Settlement Fail-Closed (`Q25`)**: `POST /api/v1/tickets/:id/settle-removal` (shown running a 4% damages deduction during the Oct 2026 run) now **fails closed with `UNAPPROVED_SETTLEMENT_POLICY`** pending business owner / legal confirmation of `Q25`.
-> 3. **Dual Route Aliases & Verified Partner Substitution (`DEF-M4-05`, `DEF-04`, `DEF-07`)**: Mounted on `@Controller(['installments', 'installment-dues'])` and `@Controller(['tickets', 'installments/tickets'])`; `substituteSubscriber` strictly requires Verified Partner `isPartner: true`.
+> 3. **Dual Route Aliases & Verified Partner Substitution (`DEF-M4-05`, `DEF-04`, `DEF-07`)**: Mounted on `@Controller(['installments', 'installment-dues'])` and `@Controller(['tickets', 'installments/tickets'])`; `substituteSubscriber` strictly requires Statutory Partner `Role.PARTNER`.
 
 ---
 

@@ -13,11 +13,11 @@ export default function NewCustomerPage() {
   const t = useTranslations('customers');
   const user = useAuthStore((s) => s.user);
 
-  // RBAC Authority Gate: Super Admin, Branch Manager, Collection Agent are permitted.
-  // Desk Accountant is strictly barred from subscriber profile intake/creation (CustomerController.create).
+  // RBAC Authority Gate: Partner, Branch Manager, Collection Agent are permitted.
+  // Desk Accountant and pure IT Super Admin are strictly barred from subscriber profile intake/creation (CustomerController.create).
   const canRegisterCustomer =
     user?.roles?.some((r) =>
-      ['SUPER_ADMIN', 'BRANCH_MANAGER', 'COLLECTION_AGENT'].includes(r)
+      ['PARTNER', 'BRANCH_MANAGER', 'COLLECTION_AGENT'].includes(r)
     ) ?? true;
 
   if (!canRegisterCustomer) {

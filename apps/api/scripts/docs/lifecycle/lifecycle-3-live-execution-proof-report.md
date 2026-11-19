@@ -11,7 +11,7 @@
 > **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 24, 2026 live-server run verbatim. Subsequent Module 4 hardening (`DEF-M4-01..04`, verified in `04-module4-chit-schemes.e2e-spec.ts` — 49/49 passing) added:
 > 1. **Draft Cancellation State (`DEF-M4-01`)**: `POST /api/v1/chits/:id/cancel` transitioning `DRAFT -> CANCELLED` (terminal state).
 > 2. **Whole-Rupee Divisibility Gate (`DEF-M4-02`)**: Strict pre-insert rejection when $V \pmod N \ne 0$.
-> 3. **Verified Partner Dual-Control Activation (`DEF-M4-03`, Guardrails 10 & 11)**: `POST /api/v1/chits/:id/activate` strictly enforces `makerUserId != checkerUserId` and Verified Partner `isPartner: true`.
+> 3. **Verified Partner Dual-Control Activation (`DEF-M4-03`, Guardrails 10 & 11)**: `POST /api/v1/chits/:id/activate` strictly enforces `makerUserId != checkerUserId` and Statutory Partner `Role.PARTNER`.
 
 ---
 

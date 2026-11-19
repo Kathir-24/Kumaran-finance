@@ -15,7 +15,6 @@ describe('Module 10: Statutory Reports Forensic Remediations (DEF-M10-STAT-01..0
     phone: '9842100001',
     roles: [Role.SUPER_ADMIN],
     branchId: null,
-    isPartner: true,
     tokenType: 'access',
   };
 

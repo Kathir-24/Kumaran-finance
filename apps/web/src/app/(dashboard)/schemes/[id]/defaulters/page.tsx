@@ -46,9 +46,9 @@ export default function SchemeDefaultersPage() {
   const [substitutionTicket, setSubstitutionTicket] = React.useState<DefaulterTicketRef | null>(null);
   const [settlementTicket, setSettlementTicket] = React.useState<DefaulterTicketRef | null>(null);
 
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
   const isAccountant = hasAnyRole(user, ['ACCOUNTANT']);
-  const canSettle = isSuperAdmin || isAccountant;
+  const canSettle = isPartner || isAccountant;
 
   // 1. Fetch Chit Scheme Detail (Includes all tickets & customers)
   const {
@@ -230,7 +230,7 @@ export default function SchemeDefaultersPage() {
         onRemoveClick={(tRef) => setRemovalTicket(tRef)}
         onSubstituteClick={(tRef) => setSubstitutionTicket(tRef)}
         onSettleClick={(tRef) => setSettlementTicket(tRef)}
-        isSuperAdmin={isSuperAdmin}
+        isPartner={isPartner}
         canSettle={canSettle}
       />
 

@@ -1,6 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsIn } from 'class-validator';
 import { STAFF_ROLES } from '../../common/constants';
 
 export class UpdateUserRolesDto {
@@ -14,15 +14,7 @@ export class UpdateUserRolesDto {
   @ArrayNotEmpty()
   @IsIn(STAFF_ROLES, {
     each: true,
-    message: 'roles must contain only staff roles (SUPER_ADMIN, BRANCH_MANAGER, ACCOUNTANT, COLLECTION_AGENT, AUDITOR)',
+    message: 'roles must contain only staff roles (SUPER_ADMIN, PARTNER, BRANCH_MANAGER, ACCOUNTANT, COLLECTION_AGENT, AUDITOR)',
   })
   roles: Role[];
-
-  @ApiPropertyOptional({
-    example: true,
-    description: 'Updated verified statutory partner identity (requires caller to be an active partner)',
-  })
-  @IsBoolean()
-  @IsOptional()
-  isPartner?: boolean;
 }

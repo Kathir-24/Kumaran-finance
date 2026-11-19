@@ -135,7 +135,7 @@ Every engineer and AI assistant contributing to `apps/api/` must strictly uphold
 8. **Defaulter & Single Discrete Payment Rules (`ADR-07`)**: Unpaid members cannot bid in that month's auction; 3 consecutive unpaid months grants removal rights. Each installment month has strictly one discrete payment — zero partial payments, zero double payments, zero late fees, and zero advance balances (`DueStatus`: `UNPAID`, `PAID`, `OVERDUE`). Full cash receipts & prize payouts are supported without artificial caps (`DisbursementMode.CASH`), and customer intake requires only Full Name, Phone, Address, and City (`ADR-16`; Aadhaar/PAN/scans optional).
 9. **Company Safety Proof Checklist (`ADR-15`)**: Property documents are completely eliminated. Collateral/surety is non-mandatory and tracked via a flexible checklist and scanned attachments (signed agreement, blank cheques, promissory notes).
 10. **Maker $\ne$ Checker Dual Control**: Critical mutations (payment reversals, auction finalization, prize disbursements, evening cash handover `collector_user_id != acknowledger_user_id`, defaulter removal) strictly enforce **`maker_user_id != checker_user_id`** in application logic and **8 PostgreSQL engine-level `CHECK` constraints**.
-11. **Verified Partner Identity (`ADR-21` / `SEC-A`)**: Administrative IT Super Admins (`isPartner: false`) cannot authorize financial mutations; only verified statutory partners (`isPartner: true`) can act as Maker or Checker on financial controls. Viewing immutable Audit Logs (`/api/v1/reports/audit-logs`) and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`) is restricted strictly to `SUPER_ADMIN`. PostgreSQL 17 remains the sole financial truth (volatile ledgers are never cached in Redis; historical closed reports leverage HTTP 304 ETags).
+11. **Verified Partner Identity & Persona Separation (`ADR-21`, `ADR-27` / `SEC-A`)**: `SUPER_ADMIN` and `PARTNER` are strictly separate first-class roles (legacy `isPartner` boolean removed). Administrative IT Super Admins (`Role.SUPER_ADMIN`) cannot authorize financial mutations; only verified statutory partners (`Role.PARTNER`) can act as Maker or Checker on financial operations. Viewing immutable Audit Logs (`/api/v1/reports/audit-logs`) and BullMQ telemetry (`/api/v1/jobs/*`, `/admin/queues`) is restricted strictly to `SUPER_ADMIN`. PostgreSQL 17 remains the sole financial truth (volatile ledgers are never cached in Redis; historical closed reports leverage HTTP 304 ETags).
 
 ---
 
@@ -163,5 +163,5 @@ apps/api/src/
 ├── prisma/          # PrismaService lifecycle, connection pooling & transaction retry helpers
 ├── report/          # Form XVII, Form XXI, Form XXII Cash Book, Day Book, Defaulters, Approvals SSE & SUPER_ADMIN Audit Logs
 ├── storage/         # Local & Private S3/R2 driver with 15-minute presigned URLs
-└── user/            # Staff administration, RBAC role & isPartner governance, emergency password reset
+└── user/            # Staff administration, RBAC role governance, emergency password reset
 ```

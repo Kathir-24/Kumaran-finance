@@ -66,7 +66,7 @@ export class PaymentController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -116,7 +116,7 @@ export class PaymentController {
 
   @Get()
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -137,12 +137,12 @@ export class PaymentController {
   }
 
   @Get('pending-upi-claims')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'List pending UPI payment claims awaiting bank statement verification',
     description: 'Returns paginated claims in INITIATED status with customer and due details for Accounting Desk action.',
   })
-  @ApiQuery({ name: 'branchId', required: false, type: String, description: 'Filter by branch ID (Super Admin only)' })
+  @ApiQuery({ name: 'branchId', required: false, type: String, description: 'Filter by branch ID' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20, max: 100)' })
   @ApiPaginatedResponseEnvelope(PendingUpiClaimItemDto, {
@@ -154,8 +154,8 @@ export class PaymentController {
     @Query('page', new ParseIntPipe({ optional: true })) pageQuery?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limitQuery?: number,
   ) {
-    const isSuperAdmin = currentUser.roles.includes(Role.SUPER_ADMIN);
-    const branchId = isSuperAdmin ? branchIdQuery : (currentUser.branchId || undefined);
+    const isPartner = currentUser.roles.includes(Role.PARTNER);
+    const branchId = isPartner ? branchIdQuery : (currentUser.branchId || undefined);
     const page = Math.max(1, pageQuery || 1);
     const limit = Math.min(100, Math.max(1, limitQuery || 20));
     return this.paymentService.getPendingUpiClaims(branchId, { page, limit });
@@ -163,7 +163,7 @@ export class PaymentController {
 
   @Get(':id')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -190,7 +190,7 @@ export class PaymentController {
 
   @Get(':id/receipt')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -219,7 +219,7 @@ export class PaymentController {
 
   @Post(':id/request-reversal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Maker: Request payment reversal with justification (Partner strictly)',
     description:
@@ -244,9 +244,9 @@ export class PaymentController {
 
   @Post(':id/approve-reversal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
-    summary: 'Checker: Authorize payment reversal (Super Admin strictly)',
+    summary: 'Checker: Authorize payment reversal (Partner strictly)',
     description:
       'Approves payment reversal, updates Payment to REVERSED, restores InstallmentDue strictly to UNPAID, and logs AuditLog. Strictly enforces Maker != Checker (maker_user_id != checker_user_id).',
   })
@@ -275,9 +275,9 @@ export class PaymentController {
 
   @Post(':id/reject-reversal')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
-    summary: 'Checker: Reject payment reversal request (Super Admin strictly)',
+    summary: 'Checker: Reject payment reversal request (Partner strictly)',
     description:
       'Rejects reversal request and retains payment in SUCCESS status. Strictly enforces Maker != Checker.',
   })
@@ -306,7 +306,7 @@ export class PaymentController {
   @Post('upi-claim')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: THROTTLE_UPI_CLAIM_LIMIT, ttl: THROTTLE_UPI_CLAIM_TTL_MS } })
-  @Roles(Role.CUSTOMER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.CUSTOMER, Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Submit customer UPI payment claim (Bank UTR self-report)',
     description:
@@ -327,7 +327,7 @@ export class PaymentController {
 
   @Post(':id/verify-upi-claim')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Verify customer UPI claim against bank statement & issue receipt',
     description:

@@ -16,7 +16,7 @@ import { formatRupee } from '@/lib/currency';
 import { formatDate } from '@/lib/date-utils';
 import { apiClient, unwrapApiResponse, unwrapPaginatedList } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasAnyRole } from '@/stores/auth-store';
 import { ReversalRequestModal } from '@/components/reversals/reversal-request-modal';
 import { ReversalApprovalTable } from '@/components/reversals/reversal-approval-table';
 import {
@@ -123,8 +123,7 @@ export default function PaymentReversalsPage() {
     refetchHistory();
   };
 
-  const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
-  const isPartner = isSuperAdmin && Boolean(user?.isPartner);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
 
   return (
     <div className="space-y-6">

@@ -35,7 +35,7 @@ Scripts are provided in pairs:
 | [`verify-config.sh`](verify-config.sh) / [`.ps1`](verify-config.ps1) | **Configuration** | Validates environment variables, loopback ports, and Docker network prerequisites. | CI / Pre-Deploy |
 
 > [!CAUTION]
-> **Mandatory Dual-Partner Production Restore Guardrail**: `restore-db.*` and `restore-from-s3.*` execute destructive `pg_restore` operations directly at the OS shell with **zero in-app Maker–Checker gate**. Before running any restore script against production, operators MUST obtain written/verified sign-off from **two statutory Partners (`isPartner: true`)**, capture a pre-restore safety snapshot, and verify SHA-256 checksum parity against `manifest.json`.
+> **Mandatory Dual-Partner Production Restore Guardrail**: `restore-db.*` and `restore-from-s3.*` execute destructive `pg_restore` operations directly at the OS shell with **zero in-app Maker–Checker gate**. Before running any restore script against production, operators MUST obtain written/verified sign-off from **two statutory Partners (`Role.PARTNER`)**, capture a pre-restore safety snapshot, and verify SHA-256 checksum parity against `manifest.json`.
 
 ### DRP & Backup Health Baseline
 - **Recovery Targets**: Nightly custom-format dump (`02:00 AM IST`, non-PITR baseline) achieves **RPO $\le 24\text{ hours}$** and **RTO $\le 60\text{ minutes}$** (empirically verified DRP restore drill completed in `1.04s` on test snapshots).

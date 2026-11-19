@@ -15,7 +15,7 @@
 The **FCM Push Driver** provides real-time, zero-marginal-cost Android push notification delivery once handsets enroll `fcmToken` in Phase 2, supporting two core business flows:
 
 1. **Instant Maker–Checker Approvals (The 4 Verified Partners)**:
-   - When Desk Staff verifies safety proofs on a finalized auction (`apps/api/src/disbursement/`, Module 6) or Verified Partner A initiates a payment reversal (`apps/api/src/payment/`, Module 5/8 — strictly Verified Partner `isPartner: true` per `KFC-SEC-001` / Guardrail 11), a distinct Verified Partner B receives a high-priority Android push alert (`channelId: 'kumaran_high_importance'`) to inspect attachments and authorize dual-control completion.
+   - When Desk Staff verifies safety proofs on a finalized auction (`apps/api/src/disbursement/`, Module 6) or Verified Partner A initiates a payment reversal (`apps/api/src/payment/`, Module 5/8 — strictly Statutory Partner `Role.PARTNER` per `KFC-SEC-001` / Guardrails 10 & 11), a distinct Verified Partner B receives a high-priority Android push alert (`channelId: 'kumaran_high_importance'`) to inspect attachments and authorize dual-control completion.
 2. **Digital Passbook & Auction Alerts (Chit Subscribers)**:
    - When an installment is settled at the doorstep or office counter, subscribers with an enrolled `fcmToken` receive an instant push notification deep-linking to `/passbook` with receipt details; subscribers without an enrolled token automatically receive **TRAI DLT SMS**.
 

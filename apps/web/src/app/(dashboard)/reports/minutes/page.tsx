@@ -51,7 +51,7 @@ function FormXviiMinutesContent() {
   const user = useAuthStore((s: AuthState) => s.user);
   const roles = user?.roles || [];
   const hasAccess = roles.some((r: string) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r)
   );
   // Guardrail 11 / XR-AUC-05: Verified Partner, Branch Manager, or Accountant only
   const canRecordFiling = canUserRecordRegistrarFiling(user);

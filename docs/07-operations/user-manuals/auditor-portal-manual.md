@@ -121,7 +121,7 @@ flowchart TD
 ## 6. Sampling Prize Disbursements & Presigned S3 Cheques
 
 > [!NOTE]
-> **Web Desk vs. Read-Only API Boundary**: In `apps/web/src/lib/route-permissions.ts`, the interactive `/disbursements` operational desk is scoped to staff (`SUPER_ADMIN`, `BRANCH_MANAGER`, `ACCOUNTANT`), whereas the backend read-only disbursement endpoints (`GET /api/v1/disbursements`, `GET /api/v1/disbursements/auction/:auctionId`, `GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`) and printable `/print/voucher/[id]` view explicitly grant read-only access to `Role.AUDITOR`.
+> **Web Desk vs. Read-Only API Boundary**: In `apps/web/src/lib/route-permissions.ts`, the interactive `/disbursements` operational desk is scoped to staff (`PARTNER`, `BRANCH_MANAGER`, `ACCOUNTANT`), whereas the backend read-only disbursement endpoints (`GET /api/v1/disbursements`, `GET /api/v1/disbursements/auction/:auctionId`, `GET /api/v1/disbursements/auction/:auctionId/safety-proof-url`) and printable `/print/voucher/[id]` view explicitly grant read-only access to `Role.AUDITOR`.
 
 ```mermaid
 flowchart TD
@@ -152,7 +152,7 @@ flowchart TD
     OpenBooks["Auditor Opens Statutory Books:\nForm XXII Cash Book, Day Book & Form XXI Ledger"] --> Locate["Locate Reversal Offsetting Entry:\nReceipt #KC-REC-PRD-2026-00412 (REVERSED)"]
     Locate --> CheckPDF["Verify Cancelled Receipt PDF:\nDiagonal red 'ரத்து செய்யப்பட்டது / CANCELLED' watermark (KFC-PDF-001)"]
     CheckPDF --> ReqExtract["Obtain Super Admin Certified AuditLog Export\n(GET /api/v1/reports/audit-logs is SUPER_ADMIN-only)"]
-    ReqExtract --> AssertDual{"Verify Verified Partner Dual Control:\n• initiatedByUserId (Partner A, isPartner: true)\n• approvedByUserId (Partner B, isPartner: true)\n• maker != checker enforced by DB CHECK constraint?"}
+    ReqExtract --> AssertDual{"Verify Statutory Partner Dual Control:\n• initiatedByUserId (Partner A, Role.PARTNER)\n• approvedByUserId (Partner B, Role.PARTNER)\n• maker != checker enforced by DB CHECK constraint?"}
     AssertDual -- No --> Violation["CRITICAL COMPLIANCE VIOLATION"]
     AssertDual -- Yes --> Certified["Dual-Control & Ledger Reconciliation Verified"]
 ```
@@ -160,9 +160,9 @@ flowchart TD
 ### Step-by-Step Instructions:
 1. Open **Reports $\to$ Form XXII Cash Book** (`/reports/cash-book`) and **Day Book** (`GET /api/v1/reports/day-book`) to identify offsetting reversal entries for the audit period.
 2. Verify that reversed payments reverted the subscriber's Form XXI installment due to `UNPAID` and that any receipt PDF download renders the mandatory diagonal red **`ரத்து செய்யப்பட்டது / CANCELLED`** watermark (`KFC-PDF-001`).
-3. Request a period-filtered certified `AuditLog` export from a Managing Partner (`SUPER_ADMIN` via `/reports/audit-logs`) covering `PAYMENT_REVERSAL`, `AUCTION_FINALIZATION`, `PRIZE_DISBURSEMENT`, and `DEFAULTER_REMOVAL`.
+3. Request a period-filtered certified `AuditLog` export from an IT Administrator (`SUPER_ADMIN` via `/reports/audit-logs`) covering `PAYMENT_REVERSAL`, `AUCTION_FINALIZATION`, `PRIZE_DISBURSEMENT`, and `DEFAULTER_REMOVAL`.
 4. **The Maker-Checker & Verified Partner Verification (Guardrails 10 & 11)**:
-   - Verify that `maker_user_id` and `checker_user_id` are two distinct, non-identical **Verified Partners (`isPartner: true`)**, backed by PostgreSQL engine-level `CHECK` constraints.
+   - Verify that `maker_user_id` and `checker_user_id` are two distinct, non-identical **Statutory Partners (`Role.PARTNER`)**, backed by PostgreSQL engine-level `CHECK` constraints.
    - Verify that a mandatory written justification is documented and that an offsetting balancing entry appears in the Form XXII Cash Book.
 
 ---
@@ -225,7 +225,7 @@ flowchart TD
     Checklist --> C8["8. Binary Dues: UNPAID / PAID / OVERDUE (0 partial dues or late fees)"]
     Checklist --> C9["9. Safety Proofs: Agreements & blank cheques verified (no property deeds)"]
     Checklist --> C10["10. Dual Control: Asserted maker_user_id != checker_user_id (8 DB CHECK constraints)"]
-    Checklist --> C11["11. Verified Partner Exclusivity: isPartner: true on financial approvals; SUPER_ADMIN-only audit/queues"]
+    Checklist --> C11["11. Verified Partner Exclusivity & Separation: Role.PARTNER on financial approvals; SUPER_ADMIN-only audit/queues"]
     C11 --> DPDP["DPDP Act Verification: Aadhaar masked to last 4 digits (XXXXXXXX1234)"]
     DPDP --> SignCert["Certify Audit Report for Chit Registrar & Partners"]
 ```
@@ -234,4 +234,4 @@ flowchart TD
 1. **Mathematical Conservation Invariant**: Confirmed $D = C_f + Div_{total}$ and exact whole-rupee dividend divisibility (`KFC-FIN-002`) across all completed auctions without a single rupee variance.
 2. **Whole Rupee Arithmetic (`BigInt`)**: Confirmed all ledger values in PostgreSQL are 64-bit integer Rupees (`BigInt`) with server-computed prize payouts and automatic arrears offsets (`KFC-FIN-003` / `KFC-FIN-004`).
 3. **DPDP Act 2023 Compliance**: Verified that zero unmasked 12-digit Aadhaar numbers are stored in plain text. All customer identity records store strictly masked numbers (`XXXXXXXX1234`), with scanned documents secured under AES-256 encrypted private S3/R2 storage with 15-minute presigned access.
-4. **Dual-Control & Partner Exclusivity Enforcement (Guardrails 10 & 11)**: Certified that all high-risk financial mutations (reversals, activations, auction finalizations, prize payouts, defaulter removals, handovers) enforced non-identical Maker and Checker signatures and Verified Partner (`isPartner: true`) identity where mandated.
+4. **Dual-Control & Partner Exclusivity Enforcement (Guardrails 10 & 11)**: Certified that all high-risk financial mutations (reversals, activations, auction finalizations, prize payouts, defaulter removals, handovers) enforced non-identical Maker and Checker signatures and Statutory Partner (`Role.PARTNER`) identity where mandated.

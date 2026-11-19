@@ -5,7 +5,6 @@
 
 export interface ApprovalBannerUserContext {
   roles?: string[];
-  isPartner?: boolean;
 }
 
 export interface ApprovalBannerAccessState {
@@ -30,31 +29,32 @@ export interface ExtendedApprovalsSummary {
 
 /**
  * Guardrail 11 / XR-AUC-05: Determines whether the caller is authorized to record
- * statutory Registrar filings (Branch Manager, Accountant, or Verified Partner Super Admin).
- * Administrative IT Super Admins (`isPartner: false` without operational role) are barred.
+ * statutory Registrar filings (Branch Manager, Accountant, or Verified Partner).
+ * Administrative IT Super Admins are barred.
  */
 export function canUserRecordRegistrarFiling(
   user: ApprovalBannerUserContext | null | undefined,
 ): boolean {
   const roles = user?.roles ?? [];
-  if (roles.includes('BRANCH_MANAGER') || roles.includes('ACCOUNTANT')) {
-    return true;
-  }
-  return roles.includes('SUPER_ADMIN') && Boolean(user?.isPartner);
+  return (
+    roles.includes('BRANCH_MANAGER') ||
+    roles.includes('ACCOUNTANT') ||
+    roles.includes('PARTNER')
+  );
 }
 
 /**
  * Guardrails 10 & 11 (SEC-A): Evaluates whether the signed-in user may act as a
- * financial Checker (verified Partner with `isPartner: true`), operational verifier
+ * financial Checker (verified Partner with `Role.PARTNER`), operational verifier
  * (Accountant / Branch Manager), or read-only viewer (IT Super Admin / Auditor).
  */
 export function evaluateApprovalBannerAccess(
   user?: ApprovalBannerUserContext | null,
 ): ApprovalBannerAccessState {
   const roles = user?.roles ?? [];
-  const isSuperAdmin = roles.includes('SUPER_ADMIN');
-  const isVerifiedPartner = isSuperAdmin && Boolean(user?.isPartner);
-  const isNonPartnerSuperAdmin = isSuperAdmin && !user?.isPartner;
+  const isVerifiedPartner = roles.includes('PARTNER');
+  const isNonPartnerSuperAdmin =
+    roles.includes('SUPER_ADMIN') && !roles.includes('PARTNER');
   const isReadOnlyAuditor =
     roles.includes('AUDITOR') && !roles.some((r) => r !== 'AUDITOR');
   const hasOperationalRole =
@@ -149,7 +149,7 @@ export function resolveDefaultersInitialBranchId(
 ): string {
   const roles = user?.roles ?? [];
   const isGlobalScopeRole = roles.some((r) =>
-    ['SUPER_ADMIN', 'ACCOUNTANT', 'AUDITOR'].includes(r),
+    ['PARTNER', 'SUPER_ADMIN', 'ACCOUNTANT', 'AUDITOR'].includes(r),
   );
   if (isGlobalScopeRole) {
     return activeBranchId || '';
@@ -160,14 +160,14 @@ export function resolveDefaultersInitialBranchId(
 /**
  * XR-M7-WEB-04: Determines whether the signed-in user holds a role authorized for
  * `/api/v1/reports/dashboard` and `/api/v1/reports/pending-approvals`.
- * Prevents `COLLECTION_AGENT` (who lands on `/`) from firing unauthorized 403 requests.
+ * Prevents `COLLECTION_AGENT` and pure `SUPER_ADMIN` from firing unauthorized 403 requests.
  */
 export function canQueryDashboardReports(
   user: { roles?: string[] } | null | undefined,
 ): boolean {
   const roles = user?.roles ?? [];
   return roles.some((r) =>
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r),
+    ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(r),
   );
 }
 

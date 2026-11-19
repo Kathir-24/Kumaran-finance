@@ -93,7 +93,6 @@ describe('Real PostgreSQL 17 & Redis 7 Lifecycle Tests (e2e)', () => {
         name: 'Real Lifecycle Staff',
         passwordHash,
         roles: [Role.SUPER_ADMIN],
-        isPartner: true,
         branchId: testBranchId,
         isActive: true,
         mustChangePassword: false,
@@ -150,7 +149,6 @@ describe('Real PostgreSQL 17 & Redis 7 Lifecycle Tests (e2e)', () => {
     // Validate access token via JwtStrategy
     const validated = await jwtStrategy.validate(decodedAccess);
     expect(validated.sub).toBe(testUserId);
-    expect(validated.isPartner).toBe(true);
   });
 
   it('2. Real Multi-Device Session Isolation (WEB and MOBILE coexist)', async () => {

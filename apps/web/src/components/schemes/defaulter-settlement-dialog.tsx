@@ -76,9 +76,7 @@ export function DefaulterSettlementDialog({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [voucherData, setVoucherData] = React.useState<SettleResult | null>(null);
 
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
-  const isAccountant = hasAnyRole(user, ['ACCOUNTANT']);
-  const canSettle = isSuperAdmin || isAccountant;
+  const canSettle = hasAnyRole(user, ['ACCOUNTANT', 'PARTNER']);
 
   const valueBigInt = BigInt(chitValue || 0);
   const damagesAmount = (valueBigInt * 4n) / 100n;

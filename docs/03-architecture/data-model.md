@@ -90,7 +90,8 @@ model Branch {
 
 // Supports dynamic N persons per persona across present and future
 enum Role {
-  SUPER_ADMIN      // Partners / Proprietor (full oversight, final checker approval)
+  PARTNER          // Statutory Business Partner (Partnership Deed Stakeholder, financial Maker/Checker authority)
+  SUPER_ADMIN      // IT Administrator (Infrastructure, user management, BullMQ queue telemetry, audit logs)
   BRANCH_MANAGER   // Operational branch head (maker for auctions, member intake)
   ACCOUNTANT       // Financial verification, day books, reconciliations, voucher prep
   COLLECTION_AGENT // Doorstep field collections, mobile app
@@ -105,8 +106,7 @@ model User {
   name             String
   phone            String    @unique
   passwordHash     String
-  roles            Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [SUPER_ADMIN])
-  isPartner        Boolean   @default(false) // Verified business partner identity (SEC-A)
+  roles            Role[]    // Supports multiple roles (e.g., [COLLECTION_AGENT, ACCOUNTANT] or [PARTNER])
   isActive         Boolean   @default(true)
   totpSecret       String?   // RFC 6238 TOTP secret for Microsoft Authenticator 2FA
   isTotpEnabled    Boolean   @default(false)

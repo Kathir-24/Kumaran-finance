@@ -1287,8 +1287,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
     const partnerAUser: JwtPayload = {
       sub: 'partner-a-001',
       phone: '9842100011',
-      roles: [Role.SUPER_ADMIN],
-      isPartner: true,
+      roles: [Role.PARTNER],
       branchId: null,
       tokenType: 'access',
     };
@@ -1296,8 +1295,7 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
     const partnerBUser: JwtPayload = {
       sub: 'partner-b-002',
       phone: '9842100012',
-      roles: [Role.SUPER_ADMIN],
-      isPartner: true,
+      roles: [Role.PARTNER],
       branchId: null,
       tokenType: 'access',
     };
@@ -1306,7 +1304,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
       sub: 'it-admin-001',
       phone: '9842100013',
       roles: [Role.SUPER_ADMIN],
-      isPartner: false,
       branchId: null,
       tokenType: 'access',
     };
@@ -2338,23 +2335,21 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
     });
 
     describe('Round-3 Cross-Review Remediations (XR-M7-RPT-01..05)', () => {
-      it('XR-M7-RPT-01: resolveLiveStreamUser returns live DB roles/branchId/isPartner and ReportController passes refreshed user into getPendingApprovals', async () => {
+      it('XR-M7-RPT-01: resolveLiveStreamUser returns live DB roles/branchId and ReportController passes refreshed user into getPendingApprovals', async () => {
         prismaMock.user = {
           findUnique: jest.fn().mockResolvedValue({
             isActive: true,
             tokenRevokedBefore: null,
             roles: [Role.BRANCH_MANAGER],
             branchId: 'branch-A',
-            isPartner: false,
           }),
         };
 
-        // Initial JWT claimed SUPER_ADMIN + isPartner=true, but DB demoted user to BRANCH_MANAGER (branch-A)
+        // Initial JWT claimed SUPER_ADMIN, but DB demoted user to BRANCH_MANAGER (branch-A)
         const stalePartnerJwt: JwtPayload = {
           sub: 'demoted-partner-1',
           phone: '9842100077',
           roles: [Role.SUPER_ADMIN],
-          isPartner: true,
           branchId: 'branch-A',
           tokenType: 'access',
         };
@@ -2363,7 +2358,6 @@ describe('Module 9: Dashboards & Statutory Reports Tests', () => {
           await reportService.resolveLiveStreamUser(stalePartnerJwt);
         expect(effectiveUser.roles).toEqual([Role.BRANCH_MANAGER]);
         expect(effectiveUser.branchId).toBe('branch-A');
-        expect(effectiveUser.isPartner).toBe(false);
 
         // Passing refreshed effectiveUser into getPendingApprovals with foreign branch-B immediately fails closed (403)
         await expect(

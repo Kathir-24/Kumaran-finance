@@ -52,7 +52,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
         update: jest.fn(),
       },
       user: {
-        findUnique: jest.fn().mockResolvedValue({ id: mockAdminId, isPartner: true }),
+        findUnique: jest.fn().mockResolvedValue({ id: mockAdminId, roles: [Role.PARTNER], isActive: true }),
       },
       customer: {
         findUnique: jest.fn(),
@@ -502,7 +502,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     it('SEC-B: should ALLOW independent Partner B to approve defaulter removal (REMOVED_DEF_3M)', async () => {
       const independentPartnerId = 'partner-b-uuid';
       prismaMock.user.findUnique.mockImplementation(({ where }: any) =>
-        Promise.resolve({ id: where?.id || independentPartnerId, isPartner: true }),
+        Promise.resolve({ id: where?.id || independentPartnerId, roles: [Role.PARTNER], isActive: true }),
       );
 
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
@@ -574,7 +574,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     });
 
     it('SEC-A / DEF-04: should reject substituteSubscriber if caller is not a verified partner', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, roles: [Role.SUPER_ADMIN], isActive: true });
 
       await expect(
         installmentService.substituteSubscriber(mockTicketId1, mockAdminId, {
@@ -585,7 +585,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     });
 
     it('SEC-A / DEF-04: should allow verified partner to substitute subscriber on REMOVED_DEF_3M ticket', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, isPartner: true });
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockAdminId, roles: [Role.PARTNER], isActive: true });
       prismaMock.subscriberTicket.findUnique
         .mockResolvedValueOnce({
           id: mockTicketId1,
@@ -750,7 +750,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
 
       prismaMock.user.findUnique.mockResolvedValue({
         id: mockAdminId,
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: false,
       });
 
@@ -769,7 +769,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     it('DEF-16: approveDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent payment drops arrears below 3', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: 'partner-checker-02',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
@@ -805,7 +805,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     it('DEF-16: approveDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent auction prized the ticket', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: 'partner-checker-02',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
@@ -840,7 +840,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     it('DEF-16: rejectDefaulterRemoval MUST abort under SELECT FOR UPDATE if concurrent approval already removed ticket', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: 'partner-checker-03',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({
@@ -875,7 +875,7 @@ describe('Module 5: Installment Dues, Passbook & Defaulter Removal Tests', () =>
     it('DEF-16: requestDefaulterRemoval MUST reject duplicate request when locked row is already PENDING_REMOVAL_APPROVAL', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: 'partner-maker-02',
-        isPartner: true,
+        roles: [Role.PARTNER],
         isActive: true,
       });
       prismaMock.subscriberTicket.findUnique.mockResolvedValue({

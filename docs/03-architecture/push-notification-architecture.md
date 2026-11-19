@@ -109,7 +109,7 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
 - **App Behavior**: Opens the Auction Terms & Schedule screen.
 
 ### 3.3 Maker-Checker Prize Disbursement Approval
-- **Target Persona**: Active `SUPER_ADMIN` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Note: `BRANCH_MANAGER` receives operational alerts only — per Guardrail 11 (**ADR-21**), **only the 4 verified statutory Partners (`SUPER_ADMIN` with `isPartner: true`)** can authorize prize payouts.
+- **Target Persona**: Active `PARTNER` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Note: `BRANCH_MANAGER` receives operational alerts only — per Guardrail 11 (**ADR-21 / ADR-27**), **only the 4 verified statutory Partners (`Role.PARTNER`)** can authorize prize payouts.
 - **Trigger**: Safety proof checklist verified by Maker ([`DisbursementService.verifySafetyProof()`](file:///u:/Kumaran-finance/apps/api/src/disbursement/disbursement.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
 - **Title**: `பரிசு தொகை ஒப்புதல் தேவை / Prize Disbursement Approval Required`
 - **Body**: `குழு {chitCode} டிக்கெட் #{ticketNo} ({customerName}) பரிசு தொகை ரூ. {amount} பாதுகாப்பு சான்றிதழ் சரிபார்க்கப்பட்டது. இறுதி ஒப்புதல் தேவை. / Prize money verified. Checker authorization required.`
@@ -127,7 +127,7 @@ All push notifications configure Android Channel ID `kumaran_high_importance`:
 - **App Behavior**: Opens Partner Executive Authorization view with cheque photos and 1-second fingerprint unlock (Phase 2 mobile; Phase 1 approvals execute on the Web Dashboard).
 
 ### 3.4 Payment Reversal Approval
-- **Target Persona**: Active `SUPER_ADMIN` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Per Guardrail 11 (**ADR-21**), **only verified statutory Partners (`SUPER_ADMIN` with `isPartner: true`)** can approve or reject reversals.
+- **Target Persona**: Active `PARTNER` & `BRANCH_MANAGER` recipients with `fcmToken` ([`notification.service.ts:430`](file:///u:/Kumaran-finance/apps/api/src/jobs/services/notification.service.ts#L430)), strictly excluding `maker_user_id`. Per Guardrail 11 (**ADR-21 / ADR-27**), **only verified statutory Partners (`Role.PARTNER`)** can approve or reject reversals.
 - **Trigger**: Payment reversal requested by Maker ([`PaymentService.requestReversal()`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts)); enqueues [`JOB_DISPATCH_APPROVAL_ALERT`](file:///u:/Kumaran-finance/apps/api/src/jobs/constants/queue-names.constant.ts) post-commit (strictly excluding maker user).
 - **Title**: `திருப்புதல் ஒப்புதல் தேவை / Reversal Approval Required`
 - **Body**: `ரூ. {amount} கட்டண திருப்புதல் ஒப்புதலுக்கு காத்திருக்கிறது. காரணம்: {reason}. / Payment reversal pending checker approval.`

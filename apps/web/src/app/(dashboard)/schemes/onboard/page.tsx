@@ -104,9 +104,9 @@ export default function NotebookOnboardingPage() {
   const user = useAuthStore((s) => s.user);
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
-  // Check role authorization: Super Admin, Branch Manager, or Accountant (Maker)
+  // Check role authorization: Partner, Branch Manager, or Accountant (Maker)
   const isAuthorized =
-    user?.roles?.includes('SUPER_ADMIN') ||
+    user?.roles?.includes('PARTNER') ||
     user?.roles?.includes('BRANCH_MANAGER') ||
     user?.roles?.includes('ACCOUNTANT');
 

@@ -863,8 +863,8 @@ Content-Type: image/jpeg
 ---
 
 ### 7.3 `POST /api/v1/auctions/:id/finalize`
-**Description**: **Checker**: Finalize auction (`SCHEDULED` $\to$ `COMPLETED`) and schedule next month's Universal Dividends (`isPartner: true`, `maker != checker`). `:id` is the Auction UUID.  
-**Roles**: `SUPER_ADMIN` (Partner strictly; `KFC-SEC-003`)
+**Description**: **Checker**: Finalize auction (`SCHEDULED` $\to$ `COMPLETED`) and schedule next month's Universal Dividends (`Role.PARTNER`, `maker != checker`). `:id` is the Auction UUID.  
+**Roles**: `Role.PARTNER` strictly (`KFC-SEC-003`)
 
 #### Request Body (`FinalizeAuctionDto`)
 ```json
@@ -1117,8 +1117,8 @@ Content-Type: image/jpeg
 ---
 
 ### 7.2 `POST /api/v1/payments/:id/request-reversal`
-**Description**: **Maker (Partner A)**: Request payment reversal with audit reason (`KFC-SEC-001` — `ACCOUNTANT` & `BRANCH_MANAGER` strictly blocked `403`).  
-**Roles**: `SUPER_ADMIN` (`isPartner: true` strictly)
+**Description**: **Maker (Partner A)**: Request payment reversal with audit reason (`KFC-SEC-001` — `ACCOUNTANT`, `BRANCH_MANAGER`, and `SUPER_ADMIN` strictly blocked `403`).  
+**Roles**: `Role.PARTNER` strictly
 
 #### Request Body
 ```json
@@ -1407,8 +1407,8 @@ Content-Type: image/jpeg
 ---
 
 ### 8.4 `POST /api/v1/disbursements/auction/:auctionId/authorize-payout`
-**Description**: **Checker**: Authorize net payout voucher after automatic prior arrears offset (`isPartner: true`, `maker != checker`, `KFC-FIN-004` prohibits arbitrary manual overrides). Transitions `disbursementStatus` to `AUTHORIZED_BY_CHECKER`.  
-**Roles**: `SUPER_ADMIN` (Partner strictly)
+**Description**: **Checker**: Authorize net payout voucher after automatic prior arrears offset (`Role.PARTNER`, `maker != checker`, `KFC-FIN-004` prohibits arbitrary manual overrides). Transitions `disbursementStatus` to `AUTHORIZED_BY_CHECKER`.  
+**Roles**: `Role.PARTNER` strictly
 
 #### Request Body (`AuthorizePayoutDto`)
 ```json
@@ -1502,8 +1502,8 @@ Content-Type: image/jpeg
 ```
 
 ### 8.7 `POST /api/v1/disbursements/group/:chitGroupId/approve-final-settlement` (Stage 2: Checker Approval)
-**Description**: **Stage 2 Final Settlement (Checker)**: Independent Partner approves and commits disbursement (`isPartner: true`, `maker != checker`). Transitions chit group to `COMPLETED` and marks Month N due `PAID`.  
-**Roles**: `SUPER_ADMIN` (Partner)
+**Description**: **Stage 2 Final Settlement (Checker)**: Independent Partner approves and commits disbursement (`Role.PARTNER`, `maker != checker`). Transitions chit group to `COMPLETED` and marks Month N due `PAID`.  
+**Roles**: `Role.PARTNER` strictly
 
 #### Request Body
 ```json

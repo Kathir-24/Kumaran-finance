@@ -58,8 +58,8 @@ flowchart LR
    - The application strictly enforces `collector_user_id != acknowledger_user_id`. An agent who collected cash cannot acknowledge their own cash.
 5. **Maker-Checker Dual Control on Reversals (ADR-08, `KFC-SEC-001` & Operations SOP §2)**:
    - Posted payments are immutable and never deleted.
-   - If an error occurs (cheque bounce, wrong ticket, duplicate bank entry), **Partner A (`SUPER_ADMIN` with `isPartner: true` strictly)** initiates a reversal request (`POST /payments/:id/request-reversal`; `ACCOUNTANT` & `BRANCH_MANAGER` are blocked `403`).
-   - A separate **Partner B (`SUPER_ADMIN` with `isPartner: true`)** acts as Checker (`POST /payments/:id/approve-reversal` or `reject-reversal`).
+   - If an error occurs (cheque bounce, wrong ticket, duplicate bank entry), **Partner A (`Role.PARTNER` strictly)** initiates a reversal request (`POST /payments/:id/request-reversal`; `ACCOUNTANT`, `BRANCH_MANAGER`, and `SUPER_ADMIN` are blocked `403`).
+   - A separate **Partner B (`Role.PARTNER`)** acts as Checker (`POST /payments/:id/approve-reversal` or `reject-reversal`).
    - Both service logic and PostgreSQL `CHECK` constraint `chk_reversal_maker_checker` strictly enforce `maker_user_id != checker_user_id`. The partner who requested the reversal cannot approve or reject it.
 6. **Bank UTR Anti-Duplication Invariant (ADR-19)**:
    - Every non-null bank UTR or cheque reference string (`transactionRef`) is strictly unique across the entire database (`Payment_transactionRef_key`).
@@ -100,7 +100,7 @@ sequenceDiagram
         API->>Queue: Enqueue JOB_DISPATCH_APPROVAL_ALERT (Alerts Independent Partners)
         API-->>PartnerA: HTTP 200 OK (Pending Checker Partner)
         PartnerB->>API: POST /payments/:id/approve-reversal (notes)
-        API->>API: Verify maker_user_id != checker_user_id & isPartner == true
+        API->>API: Verify maker_user_id != checker_user_id & Role.PARTNER
         API->>DB: Transaction: Payment -> REVERSED, Due -> UNPAID, Recalculate Arrears
         DB-->>API: Commit Successful
         API-->>PartnerB: HTTP 200 OK (Payment Reversed, Due Restored)
@@ -250,8 +250,8 @@ model PaymentReversal {
   reason            String    // Reason code (e.g. CHEQUE_BOUNCE, WRONG_TICKET)
   status            String    @default("REQUESTED") // REQUESTED, APPROVED, REJECTED
   notes             String?
-  initiatedByUserId String    // Maker (Partner A — SUPER_ADMIN with isPartner: true)
-  approvedByUserId  String?   // Checker (Partner B — SUPER_ADMIN with isPartner: true) - maker != checker
+  initiatedByUserId String    // Maker (Partner A — Role.PARTNER)
+  approvedByUserId  String?   // Checker (Partner B — Role.PARTNER) - maker != checker
   reversedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -276,9 +276,9 @@ All endpoints are protected by [`JwtAuthGuard`](file:///u:/Kumaran-finance/apps/
 | `POST /payments/upi-claim` | Customer, Staff | Customer submits 12-digit bank UTR reference. Validates UTR uniqueness; records payment in `INITIATED` status pending bank check. |
 | `GET /payments/pending-upi-claims` | Accountant, Branch Manager, Super Admin | Lists all pending UPI claims for Accounting Desk statement matching. |
 | `POST /payments/:id/verify-upi-claim` | **Super Admin, Branch Manager, Accountant** | Confirms bank credit. Transitions payment to `SUCCESS`, issues bilingual receipt, marks due `PAID`. **Enforces `maker != checker`**. |
-| `POST /payments/:id/request-reversal` | **Super Admin Strictly (Partner A)** | Maker creates reversal request with mandatory reason code. Enqueues partner push alert. |
-| `POST /payments/:id/approve-reversal` | **Super Admin Strictly** | Checker approves reversal. Enforces `maker_user_id != checker_user_id`. Restores due to `UNPAID`. |
-| `POST /payments/:id/reject-reversal` | **Super Admin Strictly** | Checker rejects reversal. Enforces `maker_user_id != checker_user_id`. Retains `SUCCESS`. |
+| `POST /payments/:id/request-reversal` | **Partner Strictly (Role.PARTNER)** | Maker creates reversal request with mandatory reason code. Enqueues partner push alert. |
+| `POST /payments/:id/approve-reversal` | **Partner Strictly (Role.PARTNER)** | Checker approves reversal. Enforces `maker_user_id != checker_user_id`. Restores due to `UNPAID`. |
+| `POST /payments/:id/reject-reversal` | **Partner Strictly (Role.PARTNER)** | Checker rejects reversal. Enforces `maker_user_id != checker_user_id`. Retains `SUCCESS`. |
 
 ### 5.2 Collections & Cash Handover Endpoints ([`CollectionController`](file:///u:/Kumaran-finance/apps/api/src/collection/collection.controller.ts))
 
@@ -332,10 +332,10 @@ if (paymentAmount !== due.netPayableAmount) {
 From [`apps/api/src/payment/payment.service.ts#L820-L855`](file:///u:/Kumaran-finance/apps/api/src/payment/payment.service.ts#L820-L855) (backed at DB engine level by `chk_reversal_maker_checker`):
 
 ```typescript
-// 1. Enforce Super Admin Exclusivity (plus verified Partner isPartner: true check)
-if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+// 1. Enforce Partner Exclusivity (Role.PARTNER under ADR-27)
+if (!checkerRoles.includes(Role.PARTNER)) {
   throw new ForbiddenException(
-    'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve payment reversals',
+    'REVERSAL_PERMISSION_DENIED: Only statutory Partners possess financial authority to approve payment reversals',
   );
 }
 

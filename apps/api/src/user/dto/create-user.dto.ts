@@ -3,7 +3,6 @@ import { Role } from '@prisma/client';
 import {
   ArrayNotEmpty,
   IsArray,
-  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -33,17 +32,9 @@ export class CreateUserDto {
   @ArrayNotEmpty()
   @IsIn(STAFF_ROLES, {
     each: true,
-    message: 'roles must contain only staff roles (SUPER_ADMIN, BRANCH_MANAGER, ACCOUNTANT, COLLECTION_AGENT, AUDITOR)',
+    message: 'roles must contain only staff roles (SUPER_ADMIN, PARTNER, BRANCH_MANAGER, ACCOUNTANT, COLLECTION_AGENT, AUDITOR)',
   })
   roles: Role[];
-
-  @ApiPropertyOptional({
-    example: false,
-    description: 'Verified statutory partner identity (requires caller to be an active partner)',
-  })
-  @IsBoolean()
-  @IsOptional()
-  isPartner?: boolean;
 
   @ApiProperty({
     example: 'branch-prd-001',

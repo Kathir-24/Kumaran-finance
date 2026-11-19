@@ -11,7 +11,7 @@
 > **Historical Execution Snapshot vs Current Live Contract Delta**: The HTTP/SQL transcripts below preserve the authentic October 22–24, 2026 live-server verification log verbatim. Subsequent architectural upgrades hardened the live contract as follows:
 > 1. **Phone-Only Identity (`ADR-18`)**: The `email` column shown in the Oct 2026 SQL output was 100% eliminated from `User`; `POST /api/v1/auth/web/login` now accepts `{ phone, password }` (replacing legacy `{ identifier }`).
 > 2. **Multi-Device Session Vault (`ADR-24`)**: Refresh token hashes moved from `User.refreshTokenHash` into dedicated `Session` table records with `WEB` / `MOBILE` / `DESKTOP` client-family isolation and 7-day `tokenRevokedBefore` cutoffs.
-> 3. **Verified Partner Identity (`ADR-21` / Guardrail 11)**: `User` now carries `isPartner: boolean`; `AuthController` expanded to **15 routes** (adding `POST /api/v1/auth/complete-onboarding`) and `BranchController` expanded to **4 routes** (adding `PATCH /api/v1/branches/:id`).
+> 3. **Verified Partner Identity & Persona Separation (`ADR-21`, `ADR-27` / Guardrail 11)**: First-class `Role.PARTNER` vs `Role.SUPER_ADMIN` separation enforced (legacy `isPartner` boolean removed); `AuthController` expanded to **15 routes** (adding `POST /api/v1/auth/complete-onboarding`) and `BranchController` expanded to **4 routes** (adding `PATCH /api/v1/branches/:id`).
 
 ---
 

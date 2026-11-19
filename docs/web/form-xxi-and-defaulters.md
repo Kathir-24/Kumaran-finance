@@ -14,7 +14,7 @@
 
 Under the **Tamil Nadu Chit Funds Rules**, every chit fund foreman must maintain **Form XXI: Subscribers' Ledger**. This ledger records the continuous month-by-month financial history for every subscriber ticket across the full term of the chit scheme ($N$ months), detailing gross base dues ($I_{base}$), universal dividend deductions ($Div_{ticket}$), discounted net dues payable ($I_{net}$), actual amounts paid, receipt numbers, and outstanding arrears.
 
-Alongside Form XXI, management and audit staff use the **Defaulters & Arrears Analysis Register (`/reports/defaulters`)** to track overdue installments, categorize subscribers into default risk tiers (`1-Month Attention`, `2-Month Medium Risk`, `3-Month High Risk Removal`), and link directly to the **Defaulter Removal & Substitution Desk (`/schemes/[id]/defaulters`)** where Verified Partners (`isPartner: true`) execute **SEC-B** two-partner dual-control removal on non-prized 3-month defaulters (`KFC-SEC-004` prized immutability; Q25 fail-closed exit settlement lock `UNAPPROVED_SETTLEMENT_POLICY`).
+Alongside Form XXI, management and audit staff use the **Defaulters & Arrears Analysis Register (`/reports/defaulters`)** to track overdue installments, categorize subscribers into default risk tiers (`1-Month Attention`, `2-Month Medium Risk`, `3-Month High Risk Removal`), and link directly to the **Defaulter Removal & Substitution Desk (`/schemes/[id]/defaulters`)** where Statutory Partners (`Role.PARTNER`) execute **SEC-B** two-partner dual-control removal on non-prized 3-month defaulters (`KFC-SEC-004` prized immutability; Q25 fail-closed exit settlement lock `UNAPPROVED_SETTLEMENT_POLICY`).
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
 - `DueStatus` is strictly `UNPAID`, `PAID`, `OVERDUE`.
 - Zero double payments, zero partial payments, zero advance balances, and zero automated late-fee penalties.
 - Consecutive unpaid months counter increments upon nightly `00:01 AM IST` arrears maintenance scan.
-- $\ge 3$ consecutive unpaid months tags the subscriber as **`DEFAULT_3_MONTHS` / `HIGH_RISK_3M_REMOVAL`**, enabling **Verified Partners (`isPartner: true`)** to execute **SEC-B** two-partner dual-control removal (`PENDING_REMOVAL_APPROVAL -> REMOVED_DEF_3M`) on **non-prized** tickets.
+- $\ge 3$ consecutive unpaid months tags the subscriber as **`DEFAULT_3_MONTHS` / `HIGH_RISK_3M_REMOVAL`**, enabling **Statutory Partners (`Role.PARTNER`)** to execute **SEC-B** two-partner dual-control removal (`PENDING_REMOVAL_APPROVAL -> REMOVED_DEF_3M`) on **non-prized** tickets.
 - **Prized Subscriber Immutability (`KFC-SEC-004`)**: Prized tickets strictly reject removal (`PRIZED_TICKET_IMMUTABLE`).
 - **Q25 Exit Settlement Fail-Closed Lock**: Early-exit refund/damages settlement (`settle-removal`) fails closed with `HTTP 400 UNAPPROVED_SETTLEMENT_POLICY` pending formal written Partner Board & legal counsel confirmation.
 

@@ -1,8 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 /**
  * Guardrail 11 / ADR-21 (SEC-A): Fail-closed statutory partner identity check.
- * Rejects non-partner users (`isPartner: false`), deactivated accounts
+ * Rejects non-partner users (lacking Role.PARTNER), deactivated accounts
  * (`isActive: false`), AND missing/deleted user records (`null`).
  *
  * Defense-in-depth against the 120s Redis auth-status cache window and
@@ -20,10 +21,17 @@ export async function assertVerifiedPartner(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isPartner: true, isActive: true },
+    select: { isActive: true, roles: true },
   });
 
-  if (!user || !user.isPartner || user.isActive === false) {
+  const isVerified = Boolean(
+    user &&
+      user.isActive !== false &&
+      Array.isArray(user.roles) &&
+      user.roles.includes(Role.PARTNER),
+  );
+
+  if (!isVerified) {
     throw new ForbiddenException(
       customMessage ??
         `PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to ${actionDescription}.`,

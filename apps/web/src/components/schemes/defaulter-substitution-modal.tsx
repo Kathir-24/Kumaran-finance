@@ -66,7 +66,7 @@ export function DefaulterSubstitutionModal({
   const [reason, setReason] = React.useState('');
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+  const isPartner = hasAnyRole(user, ['PARTNER']);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -130,7 +130,7 @@ export function DefaulterSubstitutionModal({
 
   if (!ticket) return null;
 
-  const canSubmit = isSuperAdmin && selectedCustomer && isKycVerified && !conflictTicket && !substituteMutation.isPending;
+  const canSubmit = isPartner && selectedCustomer && isKycVerified && !conflictTicket && !substituteMutation.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -150,11 +150,11 @@ export function DefaulterSubstitutionModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Super Admin Guard Banner */}
-        {!isSuperAdmin && (
+        {/* Partner Guard Banner */}
+        {!isPartner && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-300">
             <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>{t('accessDeniedDesc')}</span>
+            <span>Only verified legal partners possess statutory authority to substitute subscribers.</span>
           </div>
         )}
 

@@ -42,7 +42,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
         findUnique: jest.fn(),
       },
       user: {
-        findUnique: jest.fn().mockResolvedValue({ isPartner: true }),
+        findUnique: jest.fn().mockResolvedValue({ roles: [Role.PARTNER], isActive: true }),
       },
       branch: {
         findFirst: jest.fn(),
@@ -554,7 +554,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
         createdByUserId: mockAdminId, // Creator is mockAdminId
       });
 
-      prismaMock.user.findUnique.mockResolvedValue({ isPartner: true });
+      prismaMock.user.findUnique.mockResolvedValue({ roles: [Role.PARTNER], isActive: true });
       prismaMock.auction.create.mockResolvedValue({ id: 'm1-auction' });
       prismaMock.auctionWinner.create.mockResolvedValue({});
       prismaMock.subscriberTicket.update.mockResolvedValue({});
@@ -619,7 +619,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
         tickets: fullTickets,
         createdByUserId: mockAdminId, // Creator is mockAdminId
       });
-      prismaMock.user.findUnique.mockResolvedValue({ isPartner: true });
+      prismaMock.user.findUnique.mockResolvedValue({ roles: [Role.PARTNER], isActive: true });
 
       // Attempt self-activation where checker is also mockAdminId
       await expect(
@@ -627,7 +627,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should ENFORCE Partner Identity: reject activation when checker isPartner is false (403 Forbidden)', async () => {
+    it('should ENFORCE Partner Identity: reject activation when checker is not a partner (403 Forbidden)', async () => {
       const fullTickets = [
         { id: 't-1', ticketNumber: 1, customerId: mockCustomerId1 },
         { id: 't-2', ticketNumber: 2, customerId: mockCustomerId2 },
@@ -645,7 +645,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
       });
 
       // Checker is an IT admin, NOT a partner
-      prismaMock.user.findUnique.mockResolvedValue({ isPartner: false });
+      prismaMock.user.findUnique.mockResolvedValue({ roles: [Role.SUPER_ADMIN], isActive: true });
 
       await expect(
         chitService.activate(mockChitGroupId, mockPartnerCheckerId),
@@ -668,7 +668,7 @@ describe('Module 4: Chit Groups & Mid-Cycle Intake Tests', () => {
         tickets: fullTickets,
         createdByUserId: 'partner-user-001',
       });
-      prismaMock.user.findUnique.mockResolvedValue({ isPartner: true });
+      prismaMock.user.findUnique.mockResolvedValue({ roles: [Role.PARTNER], isActive: true });
 
       // Attempt self-activation with uppercase and padded spaces
       await expect(

@@ -61,7 +61,7 @@ export class AuctionController {
 
   @Get('group/:chitGroupId')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -83,7 +83,7 @@ export class AuctionController {
 
   @Get(':id')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,
@@ -105,7 +105,7 @@ export class AuctionController {
   }
 
   @Get(':id/eligible-bidders')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.AUDITOR)
   @ApiOperation({
     summary: 'Pre-Auction Defaulter Guard: List eligible non-prized subscribers',
     description:
@@ -129,11 +129,11 @@ export class AuctionController {
 
   @Post(':id/record-bid')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Maker: Record winning auction bid and whole-rupee discount',
     description:
-      'Records the in-office winning bid discount (Floor >= frozen Foreman Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Super Admin (Partner), Branch Manager (Branch-scoped).',
+      'Records the in-office winning bid discount (Floor >= frozen Foreman Commission, Ceiling <= 1/4 Chit Value). Updates status to SCHEDULED and tags conductedByUserId (Maker). ID can be an Auction UUID or ChitGroup UUID (with optional month query). Allowed: Partner, Branch Manager (Branch-scoped).',
   })
   @ApiQuery({
     name: 'month',
@@ -164,12 +164,12 @@ export class AuctionController {
 
   @Post(':id/tie-break')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary:
       'Option A (Physical Paper Token Draw): Record ceiling tie-break winner',
     description:
-      'Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Super Admin (Partner), Branch Manager (Branch-scoped).',
+      'Records all tied ceiling bidders and the winner drawn physically by Foreman in paper token draw. Zero computer lotteries. Allowed: Partner, Branch Manager (Branch-scoped).',
   })
   @ApiQuery({
     name: 'month',
@@ -196,7 +196,7 @@ export class AuctionController {
 
   @Post(':id/tie-break-record')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER)
   @ApiOperation({
     summary: 'Alias for Option A Tie-Break (as in API Specification)',
   })
@@ -218,11 +218,11 @@ export class AuctionController {
 
   @Post(':id/finalize')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Checker: Finalize auction and commit results (Partner strictly, Maker != Checker)',
     description:
-      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed strictly: Super Admin (Partner). Throws 403 Forbidden if finalized by the same user who recorded bids.',
+      'Strict Maker-Checker Separation of Duties: Commits official auction results, updates winner ticket isPrized = true, and generates statutory minutes. Allowed strictly: Partner. Throws 403 Forbidden if finalized by the same user who recorded bids.',
   })
   @ApiOkResponseEnvelope(FinalizeAuctionResponseDto, { description: 'Auction successfully finalized' })
   @ApiResponse({
@@ -239,7 +239,7 @@ export class AuctionController {
   }
 
   @Get(':id/minutes')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Get statutory Auction Minutes proceedings text',
     description:
@@ -255,7 +255,7 @@ export class AuctionController {
   }
 
   @Get(':id/minutes/pdf')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Get statutory Auction Minutes layout for printing / PDF',
     description:
@@ -270,7 +270,7 @@ export class AuctionController {
   }
 
   @Patch(':auctionId/mark-filed-with-registrar')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT)
   @ApiOperation({
     summary: 'Mark auction minutes as filed with Government Chit Registrar',
     description:
@@ -294,7 +294,7 @@ export class AuctionController {
 
   @Post(':id/correction/request')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Maker: Request correction of a finalized auction (Partner strictly)',
     description:
@@ -304,7 +304,7 @@ export class AuctionController {
     description: 'Finalized auction correction requested successfully (pending checker partner approval)',
   })
   @ApiResponse({ status: 400, description: 'Auction not finalized, prize already disbursed, or non-divisible dividend' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Super Admin only' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Partner only' })
   @ApiResponse({ status: 404, description: 'Auction not found' })
   async requestAuctionCorrection(
     @Param('id', new ParseUUIDPipe({ version: '4' })) auctionId: string,
@@ -321,7 +321,7 @@ export class AuctionController {
 
   @Post(':id/correction/approve')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Checker: Authorize and apply finalized auction correction (Independent Partner)',
     description:
@@ -348,7 +348,7 @@ export class AuctionController {
 
   @Post(':id/correction/reject')
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.PARTNER)
   @ApiOperation({
     summary: 'Checker: Reject finalized auction correction request (Independent Partner)',
     description:

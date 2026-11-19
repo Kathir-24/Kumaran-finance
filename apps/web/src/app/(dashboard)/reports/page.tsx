@@ -24,7 +24,7 @@ export default function ReportsHubPage() {
 
   const user = useAuthStore((s) => s.user);
   const isSuperAdmin = Boolean(user?.roles?.includes('SUPER_ADMIN'));
-  const allowedRoles = ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
+  const allowedRoles = ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'AUDITOR'];
   const hasAccess = user?.roles?.some((r) => allowedRoles.includes(r));
 
   if (!hasAccess) {

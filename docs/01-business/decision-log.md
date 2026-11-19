@@ -2,7 +2,7 @@
 
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance**  
-> **Status**: Active Architecture Decision Log (`ADR-01` through `ADR-26`)  
+> **Status**: Active Architecture Decision Log (`ADR-01` through `ADR-27`)  
 > **Status Labels Used**:
 > - `CONFIRMED-BY-DEVELOPER`: Confirmed by developer based on direct knowledge/experience; subject to final company confirmation where noted.
 > - `PROPOSED`: Proposed working design or technical pattern.
@@ -36,12 +36,13 @@
 | **ADR-18** | Phone-Only Identity & Email Elimination | Single non-nullable unique `phone` across users and customers; `email` column permanently dropped. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-22 | **Y** |
 | **ADR-19** | Zero-Fee Native UPI Intent & Bank UTR Uniqueness | Zero third-party gateway fees (No Razorpay/Cashfree/2% MDR). NPCI native `upi://pay` deep-linking to KVB current account. `Payment.transactionRef @unique` prevents duplicate bank UTR claims. Customer claims verified by Desk Accountant under Maker != Checker. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer / Owner | 2026-10-27 | **Y** |
 | **ADR-20** | Backend-For-Frontend (BFF) & HttpOnly Cookie Architecture | Next.js 15 BFF proxy with HttpOnly cookies (`kc_access_token`, `kc_refresh_token`). Raw tokens eliminated from browser storage. | `CONFIRMED-BY-DEVELOPER` | Developer | Developer | 2026-11-10 | **Y** |
-| **ADR-21** | Partner Identity Separation (SEC-A) | `isPartner: true` on `User` and JWT separates verified business partners from administrative Super Admin. Enforced on reversals, auctions, corrections, payouts, settlements, and defaulter removals. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
+| **ADR-21** | Partner Identity Separation (SEC-A) | [Superseded by ADR-27] Originally separated verified business partners from administrative Super Admin via `isPartner: true`; fully superseded by first-class `Role.PARTNER` with complete removal of `isPartner` boolean column. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-22** | Defaulter Removal Dual Control (SEC-B) | Two-partner workflow: Partner A requests removal (`PENDING_REMOVAL_APPROVAL`), Partner B reviews & approves (`REMOVED_DEF_3M`) or rejects with `maker != checker`. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-23** | Indian TRAI DLT SMS Exclusivity (Q34) | Automated notifications delivered strictly via Indian TRAI DLT SMS flow (MSG91). WhatsApp simulation channels purged; mobile push disabled in production Phase 1. | `CONFIRMED-BY-DEVELOPER` | Swarm | Developer | 2026-11-13 | **Y** |
 | **ADR-24** | Session Vault, Client-Family Scoping & Durable Revocation | Dedicated PostgreSQL `Session` vault with device-family isolation (`WEB`, `MOBILE`, `DESKTOP`). Cryptographic session UUID (`sid`) binding prevents resurrection after replacement login. Invalidation on password reset, role demotion, and deactivation is durable and Redis-loss resilient. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
 | **ADR-25** | Two-Stage Final Month Settlement & Engine-Level CHECK Constraints | Decoupled Month $N$ maturity settlement into Stage 1 (`prepare-final-settlement` Maker) and Stage 2 (`approve-final-settlement` Checker Partner, `maker != checker`). 8 PostgreSQL 17 engine-level CHECK constraints enforce dual control and financial integrity at storage level. | `CONFIRMED-BY-DEVELOPER` | Security Architecture | Developer | 2026-11-15 | **Y** |
 | **ADR-26** | Flutter Android UI Phase 2 Deferral & Dart Core Preservation | Authoritative Nov 13, 2026 Owner Directive: Flutter Android mobile UI screens and APK/AAB packaging deferred to Phase 2 (Q2 2027). Phase 1 ships 100% Web Operations Portal + NestJS API + preserved Dart Core (`apps/mobile/lib/core/`) and `@kumaran/api-client`. | `DEFERRED` (Phase 2 — Q2 2027) | Business Owner | Owner / Developer | 2026-11-13 | **N** |
+| **ADR-27** | First-Class PARTNER Role, Complete Removal of `isPartner` Boolean & IT SUPER_ADMIN Isolation | Elevated `Role.PARTNER` to a first-class enum role and completely removed the `isPartner` boolean column from PostgreSQL and all schemas. `SUPER_ADMIN` is strictly limited to IT governance (`/users`, `/branches`, `/admin/jobs`, `/reports/audit-logs`) and barred from financial endpoints and Chit operations. | `CONFIRMED-BY-DEVELOPER` | Business Owner & Developer | Developer | 2026-11-19 | **Y** |
 
 ---
 
@@ -222,8 +223,8 @@
 
 ---
 
-### ADR-21: Verified Partner Identity Separation (`isPartner: true`) vs Administrative Super Admin (SEC-A) (`CONFIRMED-BY-DEVELOPER`)
-- **Status**: **ACCEPTED & IMPLEMENTED** (100% Verified)
+### ADR-21: Verified Partner Identity Separation vs Administrative Super Admin (SEC-A) (`CONFIRMED-BY-DEVELOPER` — Superseded by ADR-27)
+- **Status**: **SUPERSEDED BY ADR-27** (The `isPartner` boolean column introduced in ADR-21 has been completely removed in ADR-27 in favor of first-class `Role.PARTNER`)
 - **Date**: 2026-11-13
 - **Operational Reality**: In Kumaran Finance, 4 equal partners own the business. The system role `SUPER_ADMIN` was previously overloaded between administrative IT privileges and genuine business partner authority. An administrative staff member or IT support user possessing `SUPER_ADMIN` must not have unilateral authority to authorize payouts, reverse payments, commit auctions, or remove subscribers.
 - **Architectural Decision**:
@@ -278,7 +279,7 @@
 - **Architectural Decision**:
   1. **Two-Stage Settlement Lifecycle (`CR-DISB-02`)**:
      - Stage 1: `POST /disbursements/group/:chitGroupId/prepare-final-settlement` (Maker staff calculates arrears, Month $N$ due deduction, 4% commission, and generates voucher snapshot).
-     - Stage 2: `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner approves payout, enforcing `maker != checker` and verified partner identity `isPartner: true`). The legacy route `POST /disbursements/group/:chitGroupId/final-settlement` also enforces `{ requirePreparedSettlement: true }`, guaranteeing zero single-stage bypass.
+     - Stage 2: `POST /disbursements/group/:chitGroupId/approve-final-settlement` (Checker Partner approves payout, enforcing `maker != checker` and verified partner identity `Role.PARTNER` under ADR-27). The legacy route `POST /disbursements/group/:chitGroupId/final-settlement` also enforces `{ requirePreparedSettlement: true }`, guaranteeing zero single-stage bypass.
   2. **8 PostgreSQL 17 Engine CHECK Constraints**:
      - `chk_payment_cash_handover_maker_checker` on `Payment`
      - `chk_auction_maker_checker` on `Auction` (covers both `COMPLETED` and `MINUTES_FILED`)
@@ -317,3 +318,28 @@
   - [ ] Pair field agent handheld Android devices with Bluetooth thermal printers.
   - [ ] Configure production Firebase Cloud Messaging (FCM) credentials for Push alerts.
   - [ ] Conduct field agent training at Perundurai Head Office.
+
+---
+
+### ADR-27: First-Class PARTNER Role, Complete Removal of `isPartner` Boolean Column & Strict IT SUPER_ADMIN Domain Isolation (`CONFIRMED-BY-DEVELOPER`)
+- **Status**: `CONFIRMED-BY-DEVELOPER`
+- **Date**: 2026-11-19
+- **Deciders**: Business Owner, Developer, Security Architecture
+- **Context**:
+  Previously under ADR-21, statutory business partners and IT administrators were both represented by the `SUPER_ADMIN` role in `Role[]`, distinguished only by a secondary boolean flag (`isPartner: true` vs `isPartner: false`). This caused cognitive ambiguity in staff administration, web navigation, and route permissions where an IT administrator account could inadvertently view or land on financial dashboard views. Maintaining a boolean column alongside an RBAC enum created state redundancy and potential synchronization bugs.
+- **Decision (Path A: First-Class Separation & Complete Removal of `isPartner` Boolean Column)**:
+  1. Add `PARTNER` as a first-class value in Prisma `enum Role` and PostgreSQL type `"Role"`.
+  2. **Completely eliminate and drop the `isPartner` boolean column** across the PostgreSQL database schema, Prisma migrations, NestJS entity models, DTOs, `@kumaran/api-client` SDK types, and web UI components. All partner verification is derived strictly from `user.roles.includes(Role.PARTNER)`.
+  3. Deprecate and remove all boolean flags (`isPartner?: boolean`) from API contracts, user responses, and forms (`/users/new`, `/users`), eliminating nested boolean checkboxes.
+  4. Partition personas into strict, non-overlapping domains:
+     - **`SUPER_ADMIN` (IT Infrastructure Administrator)**: Strictly limited to IT governance:
+       - Allowed routes: `/users` (and `/users/new` — default landing), `/branches`, `/admin/jobs` (BullMQ queues), `/reports/audit-logs` (Audit trail).
+       - Excluded routes: 100% barred from `/` (Financial Dashboard), `/schemes`, `/schemes/onboard`, `/customers`, `/auctions`, `/disbursements`, `/collections`, `/reversals`, `/reports` (Day Book, Cash Book, Minutes, Ledger, Defaulters), and `/instructions`.
+     - **`PARTNER` (Statutory Business Partner)**: Partnership Deed stakeholder holding full financial Maker/Checker authority across all operational modules under Guardrail 10 (`maker_id != checker_id`).
+       - Excluded routes: `/admin/jobs` and IT user provisioning.
+  5. All NestJS financial business controllers (`AuctionController`, `DisbursementController`, `PaymentController`, `ChitController`, `CollectionController`, `CustomerController`, `InstallmentController`, `TicketController`) enforce `@Roles(Role.PARTNER)`. `Role.SUPER_ADMIN` callers receive `403 Forbidden` on all financial endpoints.
+- **Consequences**:
+  - Zero ambiguity in permissions matrices, user onboarding forms, and staff directory filters.
+  - Complete elimination of the redundant `isPartner` boolean column, schema properties, and nested UI checkboxes.
+  - Robust, type-safe authorization relying purely on first-class enum roles.
+  - Complete domain isolation between IT operations and statutory financial management.

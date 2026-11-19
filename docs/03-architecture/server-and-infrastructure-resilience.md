@@ -3,7 +3,7 @@
 > **Product**: **Kumaran Chits**  
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Audience**: Core Engineering, DevOps Engineers, Cloud Architects, AI Coding Agents  
-> **Compliance & Guardrails**: Strictly enforces the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), pure whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`isPartner: true`, `ADR-21`), and PostgreSQL 17 as the sole source of financial truth.
+> **Compliance & Guardrails**: Strictly enforces the 11 Invariant Architectural Guardrails (`CONFIRMED-BY-DEVELOPER`), pure whole-rupee math (`BigInt`), Maker $\ne$ Checker separation of duties, verified Partner identity (`Role.PARTNER`, `ADR-21`, `ADR-27`), and PostgreSQL 17 as the sole source of financial truth.
 
 ---
 

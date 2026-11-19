@@ -43,8 +43,11 @@ async function main() {
   console.log(`✅ Kumaran Chits database seed completed in ${durationSec}s!`);
   console.log('================================================================');
   console.log('🔐 Staff Test Credentials:');
-  console.log('   • Super Admin (Managing Partner): 9876543210 / Admin@Kumaran2026');
-  console.log('   • Super Admin (Checker Partner) : 9876543211 / Admin@Kumaran2026');
+  console.log('   • Partner (Managing Partner)    : 9876543210 / Admin@Kumaran2026 (roles: [PARTNER])');
+  console.log('   • Partner (Checker Partner)     : 9876543211 / Admin@Kumaran2026 (roles: [PARTNER])');
+  console.log('   • Partner (Finance Partner)     : 9876543217 / Admin@Kumaran2026 (roles: [PARTNER])');
+  console.log('   • Partner (Compliance Partner)  : 9876543218 / Admin@Kumaran2026 (roles: [PARTNER])');
+  console.log('   • Super Admin (IT Admin Only)   : 9876543219 / Admin@Kumaran2026 (roles: [SUPER_ADMIN])');
   console.log('   • Branch Manager (Maker)        : 9876543212 / Admin@Kumaran2026');
   console.log('   • Desk Accountant (Maker)       : 9876543213 / Admin@Kumaran2026');
   console.log('   • Field Agent 1 (Perundurai)    : 9876543214 / Admin@Kumaran2026');

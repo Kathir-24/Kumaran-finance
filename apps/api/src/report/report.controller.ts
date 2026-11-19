@@ -63,7 +63,7 @@ export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
   @Get('dashboard')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Executive KPI Dashboard & Vault Metrics',
     description:
@@ -78,11 +78,11 @@ export class ReportController {
   }
 
   @Get('pending-approvals')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Aggregated Maker-Checker Pending Approvals Queue',
     description:
-      'Aggregates all dual-control operational queues requiring action: unacknowledged cash handovers, prize disbursement authorizations, payment reversals, safety proof verifications, auction finalizations, finalized auction corrections, defaulter removals, and Month N final settlements. Annotates Maker != Checker and Partner (isPartner) actionability per caller. Fail-closed branch scoping for Branch Manager.',
+      'Aggregates all dual-control operational queues requiring action: unacknowledged cash handovers, prize disbursement authorizations, payment reversals, safety proof verifications, auction finalizations, finalized auction corrections, defaulter removals, and Month N final settlements. Annotates Maker != Checker and Partner (Role.PARTNER) actionability per caller. Fail-closed branch scoping for Branch Manager.',
   })
   @ApiOkResponseEnvelope(PendingApprovalsResponseDto, {
     description: 'Aggregated pending approvals queue returned',
@@ -99,7 +99,7 @@ export class ReportController {
   @SetTimeout(0)
   @Header('X-Accel-Buffering', 'no')
   @Header('Cache-Control', 'no-cache, no-transform')
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Real-Time Server-Sent Events (SSE) Stream for Pending Approvals',
     description:
@@ -162,7 +162,7 @@ export class ReportController {
 
   @Get('day-book')
   @UseInterceptors(ReportEtagInterceptor)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Day Book: Daily Collection & Disbursement Journal',
     description:
@@ -178,7 +178,7 @@ export class ReportController {
 
   @Get('form-xxii')
   @UseInterceptors(ReportEtagInterceptor)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Form XXII: Cash Book Register (Physical Cash Only) [UNVERIFIED-LEGAL]',
     description:
@@ -194,7 +194,7 @@ export class ReportController {
 
   @Get('form-xvii')
   @UseInterceptors(ReportEtagInterceptor)
-  @Roles(Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
+  @Roles(Role.PARTNER, Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.AUDITOR)
   @ApiOperation({
     summary: 'Form XVII: Auction Minutes Consolidated Register [UNVERIFIED-LEGAL]',
     description:
@@ -210,7 +210,7 @@ export class ReportController {
 
   @Get('form-xxi')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.AUDITOR,
@@ -231,7 +231,7 @@ export class ReportController {
 
   @Get('defaulters')
   @Roles(
-    Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.COLLECTION_AGENT,

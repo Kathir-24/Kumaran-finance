@@ -678,9 +678,15 @@ export class ChitService {
     if (typeof this.prisma.user?.findUnique === 'function') {
       const checker = await this.prisma.user.findUnique({
         where: { id: checkerUserId.trim() },
-        select: { isPartner: true },
+        select: { roles: true, isActive: true },
       });
-      if (!checker || !checker.isPartner) {
+      const isVerified = Boolean(
+        checker &&
+          checker.isActive !== false &&
+          Array.isArray(checker.roles) &&
+          checker.roles.includes(Role.PARTNER),
+      );
+      if (!isVerified) {
         throw new ForbiddenException(
           'PARTNER_IDENTITY_REQUIRED: Only verified business partners possess authority to activate chit schemes.',
         );

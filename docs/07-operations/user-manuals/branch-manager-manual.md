@@ -134,7 +134,7 @@ flowchart TD
     TieCheck -- No --> Single["Winning Bid Identified"]
     Draw --> EnterResult["Branch Manager enters Ticket #5 & Discount ₹25,000 (Maker)\nClicks 'Submit Auction Result' (POST /api/v1/auctions/:id/record-bid)"]
     Single --> EnterResult
-    EnterResult --> AwaitingChecker["Auction stays SCHEDULED\nQueued for Verified Partner Finalization (isPartner: true -> COMPLETED)"]
+    EnterResult --> AwaitingChecker["Auction stays SCHEDULED\nQueued for Verified Partner Finalization (Role.PARTNER -> COMPLETED)"]
 ```
 
 ### Step-by-Step Instructions:
@@ -145,7 +145,7 @@ flowchart TD
    - Ensure bids do not exceed the **one-fourth (1/4) ceiling** ($D \le \text{₹}25,000$), stay at or above the 4% commission floor ($D \ge C_f$), and satisfy whole-rupee dividend divisibility ($(D - C_f) \pmod N == 0$, `KFC-FIN-002`).
    - If multiple members bid the ceiling, conduct the **Option A Physical Paper Token Draw** live in the room.
 5. In the portal, select the winning ticket number, enter the winning bid discount, and click **"Submit Auction Result"** (`POST /api/v1/auctions/:id/record-bid`).
-6. The auction remains in **`SCHEDULED`** status with the winning bid recorded, ready for an independent **Verified Partner (`SUPER_ADMIN` with `isPartner: true`, `KFC-SEC-003`)** to finalize it to **`COMPLETED`** (Branch Managers are strictly blocked from calling `/finalize`).
+6. The auction remains in **`SCHEDULED`** status with the winning bid recorded, ready for an independent **Verified Partner (`Role.PARTNER`, `KFC-SEC-003`)** to finalize it to **`COMPLETED`** (Branch Managers are strictly blocked from calling `/finalize`).
 
 ---
 
@@ -210,7 +210,7 @@ flowchart TD
 ```
 
 ### Step-by-Step Instructions:
-1. Once Verified Partner B (`isPartner: true`) finalizes the auction (status `COMPLETED`), navigate to **Auctions $\to$ Auction Minutes**.
+1. Once Verified Partner B (`Role.PARTNER`) finalizes the auction (status `COMPLETED`), navigate to **Auctions $\to$ Auction Minutes**.
 2. Click **"Download Form XVII Minutes PDF"**.
 3. Print two copies on official paper.
 4. Affix your branch manager signature and collect signatures from the attending subscribers.
@@ -246,7 +246,7 @@ flowchart TD
     Midday["1:00 PM: Midday Operational Inspection"] --> LiveDash["Open Branch Live Collections Monitor:\n• Murugan: ₹24,000 collected (6/12 customers)\n• Selvam: ₹18,500 collected (5/10 customers)"]
     LiveDash --> CheckDefaulters["Review 3-Month Arrears Alert Queue"]
     CheckDefaulters --> Escalation{"Is subscriber in 3M Arrears?"}
-    Escalation -- "Yes (Murugesan - Ticket #14)" --> IssueNotice["1. Issue Formal Form XXIV Default Notice by Registered Post\n2. Dispatch agent with physical legal clearance copy\n3. Escalate to Verified Partners (isPartner: true) for\n   2-Partner Dual-Control Removal (SEC-B) & Substitution"]
+    Escalation -- "Yes (Murugesan - Ticket #14)" --> IssueNotice["1. Issue Formal Form XXIV Default Notice by Registered Post\n2. Dispatch agent with physical legal clearance copy\n3. Escalate to Statutory Partners (Role.PARTNER) for\n   2-Partner Dual-Control Removal (SEC-B) & Substitution"]
     Escalation -- "No" --> Routine["Continue Routine Route Monitoring"]
 ```
 
@@ -257,7 +257,7 @@ flowchart TD
    - Filter tickets with **`status === 'DEFAULT_3_MONTHS'`** (automatically tagged by the 00:01 AM IST maintenance cron after 3 consecutive unpaid installments).
    - Prepare the formal 14-day statutory notice in accordance with Section 30 of the Chit Funds Act, 1982.
    - **Prized Subscriber Immutability (`KFC-SEC-004`)**: Prized subscribers who have already received their chit prize cannot be removed or substituted (`PRIZED_TICKET_IMMUTABLE`); escalate prized arrears for legal recovery / safety-proof enforcement instead.
-   - If a **non-prized** defaulter does not clear arrears within 14 days, forward the file to the **Verified Partners (`isPartner: true`)** to execute two-partner dual-control removal:
+   - If a **non-prized** defaulter does not clear arrears within 14 days, forward the file to the **Statutory Partners (`Role.PARTNER`)** to execute two-partner dual-control removal:
      1. Partner A submits removal request (`POST /api/v1/installments/tickets/:id/remove-defaulter/request` $\to$ `PENDING_REMOVAL_APPROVAL`).
      2. Independent Partner B approves removal (`POST /api/v1/installments/tickets/:id/remove-defaulter/approve` $\to$ `REMOVED_DEF_3M`, `maker != checker`).
      3. Once removed, a Verified Partner assigns the replacement subscriber via `POST /api/v1/installments/tickets/:id/substitute`.

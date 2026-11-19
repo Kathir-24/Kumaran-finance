@@ -456,6 +456,7 @@ export class PaymentService {
     // Non-global staff branch scoping
     const isGlobalViewer =
       requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.PARTNER) ||
       requestingUser.roles.includes(Role.AUDITOR);
     if (
       !isGlobalViewer &&
@@ -495,6 +496,7 @@ export class PaymentService {
     // Branch scoping for branch-bound staff roles
     const isGlobalViewer =
       requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.PARTNER) ||
       requestingUser.roles.includes(Role.AUDITOR);
 
     if (!isGlobalViewer && requestingUser.branchId) {
@@ -616,6 +618,7 @@ export class PaymentService {
     // Non-global staff branch scoping
     const isGlobalStaff =
       requestingUser.roles.includes(Role.SUPER_ADMIN) ||
+      requestingUser.roles.includes(Role.PARTNER) ||
       requestingUser.roles.includes(Role.AUDITOR);
     if (
       !isGlobalStaff &&
@@ -817,7 +820,7 @@ export class PaymentService {
     checkerRoles: Role[],
   ) {
     // 1. Enforce Super Admin & Verified Partner Exclusivity (SEC-A)
-    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+    if (!checkerRoles.includes(Role.PARTNER) && !checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to approve payment reversals',
       );
@@ -979,7 +982,7 @@ export class PaymentService {
     checkerUserId: string,
     checkerRoles: Role[],
   ) {
-    if (!checkerRoles.includes(Role.SUPER_ADMIN)) {
+    if (!checkerRoles.includes(Role.PARTNER) && !checkerRoles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException(
         'REVERSAL_PERMISSION_DENIED: Only Super Admin (Partners) possess financial authority to reject payment reversals',
       );
@@ -1108,7 +1111,7 @@ export class PaymentService {
     // If requesting user is CUSTOMER, ensure it's their ticket
     if (requestingUser.roles.includes(Role.CUSTOMER)) {
       const isPrivilegedStaff = requestingUser.roles.some((r) =>
-        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+        ([Role.PARTNER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
       );
       if (!isPrivilegedStaff) {
         const customer = await this.prisma.customer.findUnique({
@@ -1126,6 +1129,7 @@ export class PaymentService {
     // Cross-Branch Invariant for Staff: Ensure staff does not submit claims across branches
     if (
       !requestingUser.roles.includes(Role.SUPER_ADMIN) &&
+      !requestingUser.roles.includes(Role.PARTNER) &&
       requestingUser.roles.some((r) =>
         ([Role.BRANCH_MANAGER, Role.ACCOUNTANT, Role.COLLECTION_AGENT] as Role[]).includes(r),
       ) &&
@@ -1274,7 +1278,7 @@ export class PaymentService {
     }
     if (
       !checkerRoles.some((r) =>
-        ([Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
+        ([Role.PARTNER, Role.SUPER_ADMIN, Role.BRANCH_MANAGER, Role.ACCOUNTANT] as Role[]).includes(r),
       )
     ) {
       throw new ForbiddenException(
@@ -1337,6 +1341,7 @@ export class PaymentService {
     const branchId = ticket.chitGroup.branchId;
     if (
       !checkerRoles.includes(Role.SUPER_ADMIN) &&
+      !checkerRoles.includes(Role.PARTNER) &&
       checkerBranchId &&
       branchId &&
       checkerBranchId !== branchId

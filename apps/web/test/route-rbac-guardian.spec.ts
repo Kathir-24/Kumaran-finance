@@ -49,41 +49,46 @@ describe('Route-Level RBAC Guardian Unit Tests', () => {
     const onboardRoute = resolveRoutePermissions('/schemes/onboard');
     assert.equal(onboardRoute?.href, '/schemes/onboard');
 
-    // Onboarding allowed for Super Admin and Accountant
-    assert.equal(isRouteAuthorized('/schemes/onboard', ['SUPER_ADMIN']), true);
+    // Onboarding allowed for Partner and Accountant
+    assert.equal(isRouteAuthorized('/schemes/onboard', ['PARTNER']), true);
     assert.equal(isRouteAuthorized('/schemes/onboard', ['ACCOUNTANT']), true);
 
-    // Branch Manager can view schemes, but is blocked from mid-cycle notebook onboarding
+    // IT Super Admin and Branch Manager are blocked from mid-cycle notebook onboarding
+    assert.equal(isRouteAuthorized('/schemes/onboard', ['SUPER_ADMIN']), false);
     assert.equal(isRouteAuthorized('/schemes/onboard', ['BRANCH_MANAGER']), false);
     assert.equal(isRouteAuthorized('/schemes', ['BRANCH_MANAGER']), true);
   });
 
-  it('4. Auction Room: Restricts /auctions strictly to SUPER_ADMIN, BRANCH_MANAGER, and AUDITOR', () => {
-    assert.equal(isRouteAuthorized('/auctions', ['SUPER_ADMIN']), true);
+  it('4. Auction Room: Restricts /auctions strictly to PARTNER, BRANCH_MANAGER, and AUDITOR', () => {
+    assert.equal(isRouteAuthorized('/auctions', ['PARTNER']), true);
     assert.equal(isRouteAuthorized('/auctions', ['BRANCH_MANAGER']), true);
     assert.equal(isRouteAuthorized('/auctions', ['AUDITOR']), true);
 
-    // Desk Accountants and Field Agents cannot conduct or spectate auctions
+    // IT Super Admin, Desk Accountants and Field Agents cannot conduct or spectate auctions
+    assert.equal(isRouteAuthorized('/auctions', ['SUPER_ADMIN']), false);
     assert.equal(isRouteAuthorized('/auctions', ['ACCOUNTANT']), false);
     assert.equal(isRouteAuthorized('/auctions', ['COLLECTION_AGENT']), false);
   });
 
   it('5. Dual-Control Financial Queues: Restricts /disbursements and /reversals to authorized staff', () => {
-    assert.equal(isRouteAuthorized('/disbursements', ['SUPER_ADMIN']), true);
+    assert.equal(isRouteAuthorized('/disbursements', ['PARTNER']), true);
     assert.equal(isRouteAuthorized('/disbursements', ['BRANCH_MANAGER']), true);
     assert.equal(isRouteAuthorized('/disbursements', ['ACCOUNTANT']), true);
+    assert.equal(isRouteAuthorized('/disbursements', ['SUPER_ADMIN']), false);
     assert.equal(isRouteAuthorized('/disbursements', ['COLLECTION_AGENT']), false);
 
-    assert.equal(isRouteAuthorized('/reversals', ['SUPER_ADMIN']), true);
+    assert.equal(isRouteAuthorized('/reversals', ['PARTNER']), true);
     assert.equal(isRouteAuthorized('/reversals', ['BRANCH_MANAGER']), true);
     assert.equal(isRouteAuthorized('/reversals', ['ACCOUNTANT']), true);
+    assert.equal(isRouteAuthorized('/reversals', ['SUPER_ADMIN']), false);
     assert.equal(isRouteAuthorized('/reversals', ['COLLECTION_AGENT']), false);
   });
 
-  it('6. Topbar Branch Switcher Invariant: Restricts multi-branch switching to Super Admin and Auditor', () => {
+  it('6. Topbar Branch Switcher Invariant: Restricts multi-branch switching to Partner, Super Admin and Auditor', () => {
     const canSwitchBranches = (roles: string[]) =>
-      roles.includes('SUPER_ADMIN') || roles.includes('AUDITOR');
+      roles.includes('PARTNER') || roles.includes('SUPER_ADMIN') || roles.includes('AUDITOR');
 
+    assert.equal(canSwitchBranches(['PARTNER']), true);
     assert.equal(canSwitchBranches(['SUPER_ADMIN']), true);
     assert.equal(canSwitchBranches(['AUDITOR']), true);
 

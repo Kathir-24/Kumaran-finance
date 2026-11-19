@@ -90,7 +90,7 @@ export function HandoverVerificationCard({
   const isMaker = Boolean(currentUser && currentUser.id === batch.collectorUserId);
   const canAcknowledgeRole = Boolean(
     currentUser?.roles?.some((r) =>
-      ['SUPER_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(r),
+      ['PARTNER', 'BRANCH_MANAGER', 'ACCOUNTANT'].includes(r),
     ),
   );
 
