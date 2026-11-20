@@ -14,10 +14,12 @@ import {
   FileCheck2,
   Loader2,
   AlertCircle,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BusinessRuleBanner } from '@/components/ui/business-rule-banner';
+import { downloadFormIxPdf } from '@/lib/pdf-download';
 import {
   AuctionFinalizeCard,
   type FinalizeAuctionPayload,
@@ -70,6 +72,23 @@ export default function AuctionDetailPage() {
 
   const auctionId = String(params.id);
   const [isFilingOpen, setIsFilingOpen] = React.useState(false);
+  const [isDownloadingNotice, setIsDownloadingNotice] = React.useState(false);
+
+  const handleDownloadNotice = async () => {
+    if (!auction) return;
+    setIsDownloadingNotice(true);
+    try {
+      const code = auction.chitGroup?.groupCode || 'SCHEME';
+      await downloadFormIxPdf(
+        auctionId,
+        `form-ix-notice-${code}-m${auction.installmentMonth}.pdf`,
+      );
+    } catch (err) {
+      console.error('Failed to download Form IX notice', err);
+    } finally {
+      setIsDownloadingNotice(false);
+    }
+  };
 
   // 1. Fetch Auction Detail
   const {
@@ -283,6 +302,21 @@ export default function AuctionDetailPage() {
               </Link>
             </Button>
           )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isDownloadingNotice}
+            onClick={handleDownloadNotice}
+            className="border-indigo-600/40 bg-indigo-950/20 text-indigo-300 hover:bg-indigo-900/30 text-xs h-8"
+          >
+            {isDownloadingNotice ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-indigo-400" />
+            ) : (
+              <ScrollText className="mr-1.5 h-3.5 w-3.5 text-indigo-400" />
+            )}
+            <span>Form IX Notice</span>
+          </Button>
         </div>
       </div>
 

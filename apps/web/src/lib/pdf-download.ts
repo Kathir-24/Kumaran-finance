@@ -135,3 +135,109 @@ export async function downloadPassbookPdf(
     deps,
   );
 }
+
+type UntypedGetFn = (
+  url: string,
+  options: {
+    params?: {
+      path?: Record<string, string>;
+      query?: Record<string, string | undefined>;
+    };
+    parseAs: 'blob';
+    credentials: 'include';
+  },
+) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
+
+export async function downloadFormIPdf(
+  chitGroupId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-i/{chitGroupId}', {
+      params: { path: { chitGroupId } },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}
+
+export async function downloadFormIiPdf(
+  chitGroupId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-ii/{chitGroupId}', {
+      params: { path: { chitGroupId } },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}
+
+export async function downloadFormVPdf(
+  chitGroupId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-v/{chitGroupId}', {
+      params: { path: { chitGroupId } },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}
+
+export async function downloadFormViiPdf(
+  chitGroupId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-vii/{chitGroupId}', {
+      params: { path: { chitGroupId } },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}
+
+export async function downloadFormIxPdf(
+  auctionId: string,
+  filename: string,
+  ticketId?: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-ix/{auctionId}', {
+      params: {
+        path: { auctionId },
+        query: ticketId ? { ticketId } : undefined,
+      },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}

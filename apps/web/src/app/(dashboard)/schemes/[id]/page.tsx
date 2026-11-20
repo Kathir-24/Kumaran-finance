@@ -24,6 +24,7 @@ import { AssignTicketDialog } from '@/components/schemes/assign-ticket-dialog';
 import { EditSchemeDialog } from '@/components/schemes/edit-scheme-dialog';
 import { ActivateSchemeDialog } from '@/components/schemes/activate-scheme-dialog';
 import { MonthlyInstallmentsPanel } from '@/components/schemes/monthly-installments-panel';
+import { StatutoryFormsDropdown } from '@/components/schemes/statutory-forms-dropdown';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
@@ -131,6 +132,14 @@ export default function SchemeDetailPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
+          <StatutoryFormsDropdown
+            chitGroupId={scheme.id}
+            groupCode={scheme.groupCode}
+            status={scheme.status}
+            totalTickets={totalTickets}
+            subscribedCount={tickets.length}
+          />
+
           {scheme.status === 'ACTIVE' && (
             <Button
               variant="outline"

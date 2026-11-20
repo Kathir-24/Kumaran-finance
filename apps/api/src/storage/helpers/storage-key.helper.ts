@@ -83,4 +83,14 @@ export class StorageKeyHelper {
   static auctionMinutesPdf(chitGroupId: string, installmentMonth: number): string {
     return `minutes/${chitGroupId}/month-${installmentMonth}.pdf`;
   }
+
+  /**
+   * Generates a storage key for statutory government registrar forms (Forms I, II, V, VII, IX).
+   * Path: statutory/{formType}/{id}.pdf
+   */
+  static statutoryFormPdf(formType: string, id: string): string {
+    const cleanForm = formType.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const cleanId = id.replace(/[^a-zA-Z0-9-_]/g, '');
+    return `statutory/${cleanForm}/${cleanId}.pdf`;
+  }
 }

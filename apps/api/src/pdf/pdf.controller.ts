@@ -437,4 +437,153 @@ export class PdfController {
   async getAsyncPdfStatus(@Param('jobId') jobId: string) {
     return await this.pdfService.getAsyncPdfStatus(jobId);
   }
+
+  @Get('statutory/form-i/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form I previous sanction application PDF',
+    description:
+      'Generates statutory Form I previous sanction application with Annexure Statement of 12 Particulars under Section 4(2) and Rule 3 of the Tamil Nadu Chit Funds Rules, 1984.',
+  })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form I PDF binary stream or presigned URL JSON' })
+  async getFormISanctionPdf(
+    @Param('chitGroupId', new ParseUUIDPipe()) chitGroupId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormISanctionPdf(chitGroupId, currentUser);
+    this.deliverPdfResponse(res, result, 'form-i-sanction', chitGroupId, download, redirect, stream);
+  }
+
+  @Get('statutory/form-ii/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form II chit agreement registration application PDF',
+    description:
+      'Generates statutory Form II chit agreement registration application under Section 7 and Rule 5 of the Tamil Nadu Chit Funds Rules, 1984.',
+  })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form II PDF binary stream or presigned URL JSON' })
+  async getFormIiRegistrationPdf(
+    @Param('chitGroupId', new ParseUUIDPipe()) chitGroupId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormIiRegistrationPdf(chitGroupId, currentUser);
+    this.deliverPdfResponse(res, result, 'form-ii-registration', chitGroupId, download, redirect, stream);
+  }
+
+  @Get('statutory/form-v/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form V 100% subscription declaration PDF',
+    description:
+      'Generates statutory Form V declaration under Section 9(1) and Rule 10 certifying that 100% of tickets specified in the chit agreement are fully subscribed.',
+  })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form V PDF binary stream or presigned URL JSON' })
+  async getFormVDeclarationPdf(
+    @Param('chitGroupId', new ParseUUIDPipe()) chitGroupId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormVDeclarationPdf(chitGroupId, currentUser);
+    this.deliverPdfResponse(res, result, 'form-v-declaration', chitGroupId, download, redirect, stream);
+  }
+
+  @Get('statutory/form-vii/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form VII chit agreement furnishing certificate PDF',
+    description:
+      'Generates statutory Form VII certificate under Section 10(2) and Rule 12 certifying that a true copy of the chit agreement was furnished to every subscriber.',
+  })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form VII PDF binary stream or presigned URL JSON' })
+  async getFormViiCertificatePdf(
+    @Param('chitGroupId', new ParseUUIDPipe()) chitGroupId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormViiCertificatePdf(chitGroupId, currentUser);
+    this.deliverPdfResponse(res, result, 'form-vii-certificate', chitGroupId, download, redirect, stream);
+  }
+
+  @Get('statutory/form-ix/:auctionId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form IX auction draw notice PDF',
+    description:
+      'Generates statutory Form IX notice to subscribers of chit draw under Section 16 and Rule 16 of the Tamil Nadu Chit Funds Rules, 1984.',
+  })
+  @ApiQuery({ name: 'ticketId', required: false, type: String })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form IX PDF binary stream or presigned URL JSON' })
+  async getFormIxNoticePdf(
+    @Param('auctionId', new ParseUUIDPipe()) auctionId: string,
+    @Query('ticketId') ticketId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormIxNoticePdf(auctionId, currentUser, ticketId);
+    this.deliverPdfResponse(res, result, 'form-ix-notice', auctionId, download, redirect, stream);
+  }
 }

@@ -23,6 +23,11 @@ import { DocumentAccessHelper } from '../storage/helpers/document-access.helper'
 import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
 import { StorageService } from '../storage/storage.service';
 import { FontResolverHelper } from './helpers/font-resolver.helper';
+import { FormISanctionTemplate } from './templates/form-i-sanction.template';
+import { FormIiRegistrationTemplate } from './templates/form-ii-registration.template';
+import { FormVDeclarationTemplate } from './templates/form-v-declaration.template';
+import { FormViiCertificateTemplate } from './templates/form-vii-certificate.template';
+import { FormIxNoticeTemplate } from './templates/form-ix-notice.template';
 import { FormXviiMinutesTemplate } from './templates/form-xvii-minutes.template';
 import { FormXxiPassbookTemplate } from './templates/form-xxi-passbook.template';
 import { PayoutVoucherTemplate } from './templates/payout-voucher.template';
@@ -811,6 +816,397 @@ export class PdfService {
     });
 
     const key = `passbooks/${chit.id}/ticket-${ticket.ticketNumber}.pdf`;
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form I application for previous sanction under Section 4(2) and Rule 3,
+   * including Annexure Statement of 12 Particulars with full pre-filled details.
+   */
+  async generateFormISanctionPdf(
+    chitGroupId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form I previous sanction application',
+      allowCustomer: false,
+      allowCollectionAgent: false,
+    });
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: { branch: true },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      resourceLabel: 'statutory Form I previous sanction application',
+      allowCollectionAgent: false,
+    });
+
+    const [runningChits, managingPartner] = await Promise.all([
+      this.prisma.chitGroup.findMany({
+        where: { status: { in: ['ACTIVE', 'REGISTERED'] } },
+        select: { chitValue: true },
+      }),
+      this.prisma.user.findFirst({
+        where: { roles: { has: Role.PARTNER }, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { name: true, phone: true },
+      }),
+    ]);
+
+    const aggregateRunningChitsAmount = runningChits.reduce(
+      (acc, c) => acc + BigInt(c.chitValue),
+      0n,
+    );
+
+    const buffer = await FormISanctionTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      maxDiscountCeiling: chit.maxDiscountCeiling,
+      foremanCommissionRate: chit.foremanCommissionRate,
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      branchPhone: chit.branch?.phone,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+      resolutionDate: chit.createdAt,
+      applicationDate: chit.sanctionDate || chit.createdAt,
+      aggregateRunningChitsAmount,
+      runningChitsCount: runningChits.length,
+    });
+
+    const key = StorageKeyHelper.statutoryFormPdf('form-i', chit.id);
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form II application for registration of chit agreement under Section 7 and Rule 5.
+   */
+  async generateFormIiRegistrationPdf(
+    chitGroupId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form II chit agreement registration application',
+      allowCustomer: false,
+      allowCollectionAgent: false,
+    });
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: { branch: true },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      resourceLabel: 'statutory Form II chit agreement registration application',
+      allowCollectionAgent: false,
+    });
+
+    const [runningChits, managingPartner] = await Promise.all([
+      this.prisma.chitGroup.findMany({
+        where: { status: { in: ['ACTIVE', 'REGISTERED'] } },
+        select: { chitValue: true },
+      }),
+      this.prisma.user.findFirst({
+        where: { roles: { has: Role.PARTNER }, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { name: true, phone: true },
+      }),
+    ]);
+
+    const aggregateRunningChitsAmount = runningChits.reduce(
+      (acc, c) => acc + BigInt(c.chitValue),
+      0n,
+    );
+
+    const buffer = await FormIiRegistrationTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      maxDiscountCeiling: chit.maxDiscountCeiling,
+      foremanCommissionRate: chit.foremanCommissionRate,
+      sanctionOrderNumber: chit.sanctionOrderNumber,
+      sanctionDate: chit.sanctionDate,
+      applicationDate: chit.sanctionDate || chit.createdAt,
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+      runningChitsCount: runningChits.length,
+      aggregateRunningChitsAmount,
+    });
+
+    const key = StorageKeyHelper.statutoryFormPdf('form-ii', chit.id);
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form V declaration under Section 9(1) and Rule 10 certifying 100% full subscription.
+   */
+  async generateFormVDeclarationPdf(
+    chitGroupId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form V 100% subscription declaration',
+      allowCustomer: false,
+      allowCollectionAgent: false,
+    });
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: {
+        branch: true,
+        tickets: {
+          include: { customer: { select: SAFE_PDF_CUSTOMER_SELECT } },
+          orderBy: { ticketNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      resourceLabel: 'statutory Form V 100% subscription declaration',
+      allowCollectionAgent: false,
+    });
+
+    const managingPartner = await this.prisma.user.findFirst({
+      where: { roles: { has: Role.PARTNER }, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { name: true, phone: true },
+    });
+
+    const subscribers = (chit.tickets || []).map((t) => ({
+      ticketNumber: t.ticketNumber,
+      customerName: t.customer?.fullName || `Subscriber #${t.ticketNumber}`,
+      customerCode: t.customer?.customerCode || `CUST-${t.ticketNumber}`,
+      phone: t.customer?.phone || '-',
+    }));
+
+    const buffer = await FormVDeclarationTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      sanctionOrderNumber: chit.sanctionOrderNumber,
+      sanctionDate: chit.sanctionDate,
+      declarationDate: chit.updatedAt || new Date(),
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+      subscribedTicketsCount: subscribers.length,
+      subscribers,
+    });
+
+    const key = StorageKeyHelper.statutoryFormPdf('form-v', chit.id);
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form VII certificate under Section 10(2) and Rule 12 certifying furnishing of agreement copies.
+   */
+  async generateFormViiCertificatePdf(
+    chitGroupId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form VII agreement certificate',
+      allowCustomer: false,
+      allowCollectionAgent: false,
+    });
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: { branch: true },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      resourceLabel: 'statutory Form VII agreement certificate',
+      allowCollectionAgent: false,
+    });
+
+    const managingPartner = await this.prisma.user.findFirst({
+      where: { roles: { has: Role.PARTNER }, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { name: true, phone: true },
+    });
+
+    const buffer = await FormViiCertificateTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      sanctionOrderNumber: chit.sanctionOrderNumber,
+      registrationNumber: chit.sanctionOrderNumber,
+      commencementCertificateDate: chit.sanctionDate || chit.startDate,
+      copiesFurnishedDate: chit.startDate,
+      firstDrawDate: chit.startDate,
+      certificateDate: new Date(),
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+    });
+
+    const key = StorageKeyHelper.statutoryFormPdf('form-vii', chit.id);
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form IX notice to subscribers of chit draw under Section 16 and Rule 16.
+   */
+  async generateFormIxNoticePdf(
+    auctionId: string,
+    requestingUser: JwtPayload,
+    ticketId?: string,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form IX auction notice',
+      allowCustomer: true,
+      allowCollectionAgent: true,
+    });
+
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: {
+        chitGroup: {
+          include: { branch: true },
+        },
+      },
+    });
+
+    if (!auction) {
+      throw new NotFoundException('Auction not found');
+    }
+
+    const chit = auction.chitGroup;
+
+    const isCustomer =
+      Array.isArray(requestingUser.roles) && requestingUser.roles.includes(Role.CUSTOMER);
+    if (isCustomer && !ticketId) {
+      throw new ForbiddenException(
+        'Access denied: Subscribers must specify their ticket ID to download statutory Form IX auction notice',
+      );
+    }
+
+    let customerForGuard: { id?: string | null; phone?: string | null } | undefined;
+    let subscriberData: {
+      ticketNumber?: number | null;
+      name?: string | null;
+      nameTamil?: string | null;
+      phone?: string | null;
+    } = {};
+
+    if (ticketId) {
+      const ticket = await this.prisma.subscriberTicket.findUnique({
+        where: { id: ticketId },
+        include: { customer: { select: SAFE_PDF_CUSTOMER_SELECT } },
+      });
+      if (ticket) {
+        customerForGuard = ticket.customer;
+        subscriberData = {
+          ticketNumber: ticket.ticketNumber,
+          name: ticket.customer?.fullName,
+          nameTamil: ticket.customer?.fullNameTamil,
+          phone: ticket.customer?.phone,
+        };
+      }
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      customer: customerForGuard,
+      resourceLabel: 'statutory Form IX auction notice',
+      allowCollectionAgent: true,
+    });
+
+    const managingPartner = await this.prisma.user.findFirst({
+      where: { roles: { has: Role.PARTNER }, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { name: true, phone: true },
+    });
+
+    const buffer = await FormIxNoticeTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      maxDiscountCeiling: chit.maxDiscountCeiling,
+      installmentMonth: auction.installmentMonth,
+      auctionDate: auction.auctionDate,
+      drawVenue: chit.branch?.address,
+      subscriberTicketNumber: subscriberData.ticketNumber,
+      subscriberName: subscriberData.name,
+      subscriberNameTamil: subscriberData.nameTamil,
+      subscriberPhone: subscriberData.phone,
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+      sanctionOrderNumber: chit.sanctionOrderNumber,
+    });
+
+    const suffix = ticketId ? `-${ticketId}` : '';
+    const key = StorageKeyHelper.statutoryFormPdf('form-ix', `${auction.id}${suffix}`);
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
     const presignedUrl = await this.storageService.getPresignedUrl(
       upload.key,
