@@ -1,9 +1,9 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
-import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
 import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
+import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
 
-export interface FormIiPdfData {
+export interface FormIiRegistrationData {
   groupCode: string;
   groupName: string;
   chitValue: bigint;
@@ -11,32 +11,32 @@ export interface FormIiPdfData {
   totalTickets: number;
   baseInstallment: bigint;
   maxDiscountCeiling: bigint;
-  foremanCommissionRate?: string | number | { toString(): string } | null;
+  foremanCommissionRate: string | any;
   sanctionOrderNumber?: string | null;
-  sanctionDate?: Date | string | null;
-  applicationDate?: Date | string | null;
+  sanctionDate?: Date | null;
+  applicationDate?: Date | null;
   statutoryRegistrationFee?: bigint;
-  branchName?: string | null;
-  branchAddress?: string | null;
-  managingPartnerName?: string | null;
+  branchName?: string;
+  branchAddress?: string;
+  managingPartnerName?: string;
   runningChitsCount?: number;
   aggregateRunningChitsAmount?: bigint;
   isBlank?: boolean;
 }
 
 export class FormIiRegistrationTemplate {
-  static async generate(data: FormIiPdfData): Promise<Buffer> {
+  public static async generate(data: FormIiRegistrationData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      let settled = false;
-      const safeResolve = (buf: Buffer) => {
-        if (!settled) {
-          settled = true;
-          resolve(buf);
+      let isSettled = false;
+      const safeResolve = (val: Buffer) => {
+        if (!isSettled) {
+          isSettled = true;
+          resolve(val);
         }
       };
-      const safeReject = (err: unknown) => {
-        if (!settled) {
-          settled = true;
+      const safeReject = (err: any) => {
+        if (!isSettled) {
+          isSettled = true;
           reject(err);
         }
       };
@@ -44,10 +44,10 @@ export class FormIiRegistrationTemplate {
       try {
         StatutoryFormHelper.patchDocumentUnderline();
 
+        // Standard A4 portrait (595.28 x 841.89 pt)
         const doc = new PDFDocument({
           size: 'A4',
-          margins: { top: 40, bottom: 40, left: 45, right: 45 },
-          bufferPages: true,
+          margins: { top: 38, bottom: 38, left: 45, right: 45 },
         });
 
         const chunks: Buffer[] = [];
@@ -75,9 +75,9 @@ export class FormIiRegistrationTemplate {
 
         const appDate = isBlank ? '' : FontResolverHelper.formatPdfDate(data.applicationDate || new Date());
         const sancDate = isBlank ? '' : FontResolverHelper.formatPdfDate(data.sanctionDate || new Date());
-        const feeAmount = data.statutoryRegistrationFee ?? 100n;
+        const feeAmount = data.statutoryRegistrationFee ?? 1000n;
         const feeWords = isBlank ? '' : RupeeWordsHelper.toEnglishWords(feeAmount);
-        const runningCount = data.runningChitsCount ?? 1;
+        const runningCount = data.runningChitsCount ?? 5;
         const aggAmount = data.aggregateRunningChitsAmount ?? data.chitValue;
         const managingPartner = isBlank ? '' : (data.managingPartnerName || 'P. Kumaran (Managing Partner)');
         const firmName = isBlank ? '' : 'KUMARAN FINANCE';
@@ -87,101 +87,101 @@ export class FormIiRegistrationTemplate {
 
         // Header matching Gazette Page 49
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
-        doc.font(boldFont).fontSize(11).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
-        doc.font(boldFont).fontSize(10.5).text('FORM — II', { align: 'center', width: pageWidth });
-        doc.font(regularFont).fontSize(8.5).text('(See Section 7 and Rule 5)', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(11.5).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(11).text('FORM — II', { align: 'center', width: pageWidth });
+        doc.font(regularFont).fontSize(9).text('(See Section 7 and Rule 5)', { align: 'center', width: pageWidth });
         doc.moveDown(0.3);
-        doc.font(boldFont).fontSize(10).text('APPLICATION FOR REGISTRATION OF THE CHIT AGREEMENT', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(10.5).text('APPLICATION FOR REGISTRATION OF THE CHIT AGREEMENT', { align: 'center', width: pageWidth });
         doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.8);
+        doc.moveDown(0.7);
 
         // To & Place / Date
         const topY = doc.y;
-        doc.font(regularFont).fontSize(8.5).text('To', 45, topY);
-        doc.text('The Registrar of Chits,', 45, topY + 14);
-        doc.text('', 45, topY + 28, { continued: true });
+        doc.font(regularFont).fontSize(9).text('To', 45, topY);
+        doc.text('The Registrar of Chits,', 45, topY + 16);
+        doc.text('', 45, topY + 32, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________.');
 
-        doc.font(regularFont).fontSize(8.5).text('Place: ', 360, topY);
+        doc.font(regularFont).fontSize(9).text('Place: ', 360, topY);
         doc.text('', 395, topY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 16);
-        doc.text('', 395, topY + 16, { continued: true });
+        doc.font(regularFont).fontSize(9).text('Date: ', 360, topY + 18);
+        doc.text('', 395, topY + 18, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : appDate, '____________________');
 
-        doc.y = Math.max(doc.y, topY + 52);
-        doc.font(regularFont).fontSize(9).text('Dear Sir,', 45, doc.y);
+        doc.y = Math.max(doc.y, topY + 56);
+        doc.font(regularFont).fontSize(9.5).text('Dear Sir,', 45, doc.y);
         doc.moveDown(0.5);
 
         // (a) and (b) verbatim from Gazette Page 49
-        doc.font(regularFont).fontSize(8.5).text('(a) I ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' S/o Sri. ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the foreman conducting chit under the name and style of * ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________.', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(a) I ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' S/o Sri. ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the foreman conducting chit under the name and style of * ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________.', { lineGap: 4.5 });
         doc.moveDown(0.5);
 
-        doc.font(regularFont).fontSize(8.5).text('(b) We ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Chairman and Secretary respectively of the foreman conducting chit business under the name and style of * ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' hereby apply for registration of the Chit Agreement.', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(b) We ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Chairman and Secretary respectively of the foreman conducting chit business under the name and style of * ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' hereby apply for registration of the Chit Agreement.', { lineGap: 4.5 });
         doc.moveDown(0.5);
 
         // (2)
-        doc.font(regularFont).fontSize(8.5).text('(2) The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the registration fees as required under the Act of Chit Funds Rules, 1984.', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(2) The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the registration fees as required under the Act of Chit Funds Rules, 1984.', { lineGap: 4.5 });
         doc.moveDown(0.5);
 
         // (3)
-        doc.font(regularFont).fontSize(8.5).text('(3) The number of current chits which are running as on the date of this application is ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(runningCount), '__________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' and the aggregate chit amount of these chits involved therein is Rs. ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(3) The number of current chits which are running as on the date of this application is ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(runningCount), '__________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' and the aggregate chit amount of these chits involved therein is Rs. ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 4.5 });
         doc.moveDown(0.5);
 
         // (4)
-        doc.font(regularFont).fontSize(8.5).text('(4) A certified true copy of the sanction obtained in Form IB under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed. A copy of the application dated the ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(4) A certified true copy of the sanction obtained in Form IB under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed. A copy of the application dated the ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.', { lineGap: 4.5 });
         doc.moveDown(0.5);
 
         // (5)
-        doc.font(regularFont).fontSize(8.5).text('(5) I / We remit herewith a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${feeWords} only`, '________________________________________', { continued: true, lineGap: 3.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ') being the fee prescribed for the purpose.', { lineGap: 3.5 });
+        doc.font(regularFont).fontSize(9).text('(5) I / We remit herewith a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${feeWords} only`, '________________________________________', { continued: true, lineGap: 4.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ') being the fee prescribed for the purpose.', { lineGap: 4.5 });
         doc.moveDown(0.6);
 
         // DECLARATION
-        doc.font(boldFont).fontSize(9).text('DECLARATION', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(9.5).text('DECLARATION', { align: 'center', width: pageWidth });
         doc.moveDown(0.3);
-        doc.font(regularFont).fontSize(8.5).text(
+        doc.font(regularFont).fontSize(9).text(
           '(6) I / We have read the Chit Funds Act, 1982 (Central Act No. 40 of 1982) and the Rules made by the State Government thereunder and I / We declare that the chit agreement has been drawn up in conformity with the provisions of the said Act and the Rules.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 3 },
+          { align: 'justify', lineGap: 4 },
         );
         doc.moveDown(0.4);
 
-        doc.font(regularFont).fontSize(8.5).text(
+        doc.font(regularFont).fontSize(9).text(
           'The above statements are true and complete to the best of my / our knowledge, information and belief.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 3 },
+          { align: 'justify', lineGap: 4 },
         );
-        doc.moveDown(0.8);
+        doc.moveDown(0.6);
 
         // Signatures matching Gazette Page 50
         const sigY = doc.y;
-        doc.font(regularFont).fontSize(8.5).text('Yours faithfully,', 360, sigY);
+        doc.font(regularFont).fontSize(9).text('Yours faithfully,', 360, sigY);
         doc.text('Chairman ', 360, sigY + 18, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________');
         doc.text('Secretary ', 360, sigY + 36, { continued: true });
@@ -191,16 +191,21 @@ export class FormIiRegistrationTemplate {
         doc.text('Designation (s) ', 360, sigY + 72, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Managing Partner / Foreman', '____________________');
 
-        doc.y = sigY + 94;
-        doc.font(regularFont).fontSize(8.5).text('* for and on behalf of Foreman ', 45, doc.y, { continued: true });
+        doc.y = sigY + 92;
+        doc.font(regularFont).fontSize(9).text('* for and on behalf of Foreman ', 45, doc.y, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '________________________________________');
 
-        doc.y += 24;
-        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor('#888888').stroke();
-        doc.moveDown(0.3);
-        doc.font(regularFont).fontSize(7.5).text('Note 1. * Here enter the name of the applicant institution if any.', 45);
-        doc.moveDown(0.15);
-        doc.text('2. Strike out or delete whatever is not applicable insert the designation(s) as may be appropriate to the applicant.', 45);
+        // Official Registrar Endorsement Box at bottom
+        doc.y += 18;
+        const ackY = doc.y;
+        doc.rect(45, ackY, pageWidth, 48).strokeColor('#888888').lineWidth(0.8).stroke();
+        doc.font(boldFont).fontSize(8).fillColor('#333333').text('FOR REGISTRAR OF CHITS OFFICE USE ONLY / பதிவாளர் அலுவலக பயன்பாட்டிற்கு:', 55, ackY + 6);
+        doc.font(regularFont).fontSize(7.5).fillColor('#555555');
+        doc.text('Registration Fee Paid: Rs. 1000/-   |   Challan No: ______________   |   Filing Date: ______________', 55, ackY + 19);
+        doc.text('Registration Certificate No: ______________________   |   Registrar Seal & Signature: ______________________', 55, ackY + 32);
+
+        doc.y = ackY + 54;
+        doc.font(regularFont).fontSize(7).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text('Note 1. * Here enter the name of the applicant institution. 2. Strike out or delete whatever is not applicable.', 45, doc.y);
 
         doc.end();
       } catch (err) {

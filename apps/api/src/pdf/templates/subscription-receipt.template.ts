@@ -1,9 +1,9 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
-import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
 import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
+import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
 
-export interface ReceiptPdfData {
+export interface SubscriptionReceiptData {
   receiptNumber: string;
   date: Date;
   groupCode: string;
@@ -12,7 +12,7 @@ export interface ReceiptPdfData {
   ticketNumber: number;
   subscriberName: string;
   subscriberNameTamil?: string | null;
-  address?: string | null;
+  address?: string;
   phone: string;
   baseInstallment: bigint;
   dividendDeduction: bigint;
@@ -23,25 +23,25 @@ export interface ReceiptPdfData {
   branchName?: string;
   branchAddress?: string;
   branchPhone?: string;
-  isCancelled?: boolean; // KFC-PDF-001: True if payment reversal was approved
-  reversalReason?: string | null;
-  reversedAt?: Date | null;
   registrationNumber?: string | null;
+  isCancelled?: boolean;
+  reversedAt?: Date | null;
+  reversalReason?: string | null;
 }
 
 export class SubscriptionReceiptTemplate {
-  static async generate(data: ReceiptPdfData): Promise<Buffer> {
+  public static async generate(data: SubscriptionReceiptData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      let settled = false;
-      const safeResolve = (buf: Buffer) => {
-        if (!settled) {
-          settled = true;
-          resolve(buf);
+      let isSettled = false;
+      const safeResolve = (val: Buffer) => {
+        if (!isSettled) {
+          isSettled = true;
+          resolve(val);
         }
       };
-      const safeReject = (err: unknown) => {
-        if (!settled) {
-          settled = true;
+      const safeReject = (err: any) => {
+        if (!isSettled) {
+          isSettled = true;
           reject(err);
         }
       };
@@ -49,10 +49,9 @@ export class SubscriptionReceiptTemplate {
       try {
         StatutoryFormHelper.patchDocumentUnderline();
 
-        // Standard A5 portrait (419.53 x 595.28 pt)
+        // A5 portrait format (419.53 x 595.28 pt)
         const doc = new PDFDocument({
-          size: 'A5',
-          layout: 'portrait',
+          size: [419.53, 595.28],
           margins: { top: 25, bottom: 25, left: 30, right: 30 },
         });
 
@@ -126,7 +125,7 @@ export class SubscriptionReceiptTemplate {
         const rightColX = leftX + colWidth + 10;
 
         // Left Column: Receipt & Transaction Info
-        doc.font(regularFont).fontSize(8);
+        doc.font(regularFont).fontSize(8.5);
         doc.text(`ரசீது எண் / Receipt No: ${data.receiptNumber}`, leftX, metaStartY, { width: colWidth });
         const recEndY = doc.y;
         doc.text(`தேதி / Date: ${dateStr}`, leftX, recEndY + 2, { width: colWidth });
@@ -159,7 +158,7 @@ export class SubscriptionReceiptTemplate {
         doc.text(`தொலைபேசி / Phone: ${data.phone}`);
 
         doc.moveDown(0.35);
-        doc.font(regularFont).fontSize(7.5).text('Received from ', leftX, doc.y, { continued: true, lineGap: 3.5 });
+        doc.font(regularFont).fontSize(8).text('Received from ', leftX, doc.y, { continued: true, lineGap: 3.5 });
         StatutoryFormHelper.renderField(doc, boldFont, `${data.subscriberName}${nameTamil}`, '____________________', { continued: true, lineGap: 3.5 });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' to credit of ', { continued: true, lineGap: 3.5 });
         StatutoryFormHelper.renderField(doc, boldFont, `${data.groupCode} [#${data.ticketNumber}]`, '__________', { continued: true, lineGap: 3.5 });
@@ -174,81 +173,82 @@ export class SubscriptionReceiptTemplate {
         const tableTop = doc.y;
         const descX = leftX + 8;
         const amountX = rightX - 100;
+        const rowH = 18;
 
-        doc.rect(leftX, tableTop, pageWidth, 16).fillColor('#212529').fill();
-        doc.fillColor('#ffffff').font(boldFont).fontSize(7.5);
-        doc.text('விவரம் / Description', descX, tableTop + 4);
-        doc.text('Rs.    Ps.', amountX, tableTop + 4, { align: 'right', width: 90 });
+        doc.rect(leftX, tableTop, pageWidth, rowH).fillColor('#212529').fill();
+        doc.fillColor('#ffffff').font(boldFont).fontSize(8);
+        doc.text('விவரம் / Description', descX, tableTop + 5);
+        doc.text('Rs.    Ps.', amountX, tableTop + 5, { align: 'right', width: 90 });
 
-        let currentY = tableTop + 18;
+        let currentY = tableTop + rowH + 2;
 
         // Item 1: Base Installment
-        doc.rect(leftX, currentY, pageWidth, 15).fillColor('#ffffff').fill();
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8);
-        doc.text('Payment for current installment (அடிப்படை தவணை)', descX, currentY + 3);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)}`, amountX, currentY + 3, { align: 'right', width: 90 });
-        currentY += 15;
+        doc.rect(leftX, currentY, pageWidth, rowH).fillColor('#ffffff').fill();
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8.5);
+        doc.text('Payment for current installment (அடிப்படை தவணை)', descX, currentY + 4);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)}`, amountX, currentY + 4, { align: 'right', width: 90 });
+        currentY += rowH;
 
         // Item 2: Dividend credit deduction
-        doc.rect(leftX, currentY, pageWidth, 15).fillColor('#f8f9fa').fill();
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8);
-        doc.text('Less: Dividend credit (கழிவு லாபப்பங்கு)', descX, currentY + 3);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`- ₹ ${RupeeWordsHelper.formatWholeRupees(data.dividendDeduction)}`, amountX, currentY + 3, { align: 'right', width: 90 });
-        currentY += 15;
+        doc.rect(leftX, currentY, pageWidth, rowH).fillColor('#f8f9fa').fill();
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8.5);
+        doc.text('Less: Dividend credit (கழிவு லாபப்பங்கு)', descX, currentY + 4);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`- Rs. ${RupeeWordsHelper.formatWholeRupees(data.dividendDeduction)}`, amountX, currentY + 4, { align: 'right', width: 90 });
+        currentY += rowH;
 
         // Item 3: Net Payable
-        doc.rect(leftX, currentY, pageWidth, 15).fillColor('#ffffff').fill();
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8);
-        doc.text('செலுத்த வேண்டிய நிகர தொகை / Net Payable (I_net)', descX, currentY + 3);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.netPayableAmount)}`, amountX, currentY + 3, { align: 'right', width: 90 });
-        currentY += 15;
+        doc.rect(leftX, currentY, pageWidth, rowH).fillColor('#ffffff').fill();
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8.5);
+        doc.text('செலுத்த வேண்டிய நிகர தொகை / Net Payable (I_net)', descX, currentY + 4);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.netPayableAmount)}`, amountX, currentY + 4, { align: 'right', width: 90 });
+        currentY += rowH;
 
         // Total Row matching Gazette Form XVI with bold black underline
-        doc.rect(leftX, currentY, pageWidth, 20).fillColor('#e9ecef').fill();
+        doc.rect(leftX, currentY, pageWidth, 22).fillColor('#e9ecef').fill();
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9);
-        doc.text('Total (செலுத்திய தொகை / TOTAL PAID):', descX, currentY + 5);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.amountPaid)}`, amountX, currentY + 5, {
+        doc.text('Total (செலுத்திய தொகை / TOTAL PAID):', descX, currentY + 6);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.amountPaid)}`, amountX, currentY + 6, {
           align: 'right',
           width: 90,
           statutoryUnderline: true,
           underlineColor: StatutoryFormHelper.TEMPLATE_BLACK,
           underlineWidth: StatutoryFormHelper.BOLD_LINE_WIDTH,
         } as any);
-        currentY += 24;
+        currentY += 26;
 
         // (in words Rupees _____ only) matching Gazette Page 77
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7.5);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8);
         doc.text('(in words Rupees ', descX, currentY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, RupeeWordsHelper.toEnglishWords(data.amountPaid), '________________________________________', { continued: true });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' only)');
-        currentY += 12;
+        currentY += 14;
 
-        doc.font(regularFont).fontSize(7.5).fillColor('#333333');
+        doc.font(regularFont).fontSize(8).fillColor('#333333');
         doc.text(`ரூபாய் வார்த்தைகளில்: ${RupeeWordsHelper.toTamilWords(data.amountPaid)}`, descX, currentY, { width: pageWidth - 16 });
-        currentY = doc.y + 6;
+        currentY = doc.y + 8;
 
         // Date and Revenue Stamp Box matching Gazette Page 77
         doc.moveTo(leftX, currentY).lineTo(rightX, currentY).strokeColor('#888888').lineWidth(0.5).stroke();
-        currentY += 6;
+        currentY += 8;
 
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8.5);
         doc.text('Date: ', leftX, currentY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, dateStr, '____________________');
 
         // Revenue stamp box
-        doc.rect(rightX - 110, currentY, 110, 26).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).lineWidth(0.8).stroke();
-        doc.font(regularFont).fontSize(6).fillColor('#666666').text('Affix revenue\nLabel here\n(Art. 51 Stamp Act)', rightX - 105, currentY + 3, { width: 100, align: 'center' });
+        doc.rect(rightX - 110, currentY, 110, 32).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).lineWidth(0.8).stroke();
+        doc.font(regularFont).fontSize(6.5).fillColor('#666666').text('Affix revenue\nLabel here\n(Art. 51 Stamp Act)', rightX - 105, currentY + 5, { width: 100, align: 'center' });
 
-        currentY += 30;
-        doc.font(regularFont).fontSize(7.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
+        currentY += 36;
+        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.text('Recorded By: ', leftX, currentY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, data.collectedByName, '____________________');
 
         doc.text('for and on behalf of foreman: ', rightX - 180, currentY, { continued: true });
         doc.font(boldFont).text('____________________');
 
-        currentY += 16;
-        doc.fontSize(6.5).fillColor('#555555');
+        currentY += 20;
+        doc.fontSize(7).fillColor('#555555');
         doc.x = leftX;
         doc.y = currentY;
         doc.text('* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. / This is a computer-generated digital receipt.', { align: 'center', width: pageWidth });
