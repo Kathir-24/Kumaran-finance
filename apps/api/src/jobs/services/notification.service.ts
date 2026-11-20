@@ -46,17 +46,47 @@ export class NotificationService {
     if (this.redisProvider?.getIsConnected()) {
       const client = this.redisProvider.getClient();
       if (client) {
-        const json = JSON.stringify(record);
-        client
-          .pipeline()
-          .lpush('audit:notifications', json)
-          .ltrim('audit:notifications', 0, NotificationService.MAX_LOG_SIZE - 1)
-          .expire('audit:notifications', 604800) // 7-day retention
-          .exec()
-          .catch((err: any) => {
-            this.logger.warn(`Redis notification audit log push error: ${err.message}`);
-          });
+        try {
+          const json = JSON.stringify(record, (_key, value) =>
+            typeof value === 'bigint' ? value.toString() : value,
+          );
+          client
+            .pipeline()
+            .lpush('audit:notifications', json)
+            .ltrim('audit:notifications', 0, NotificationService.MAX_LOG_SIZE - 1)
+            .expire('audit:notifications', 604800) // 7-day retention
+            .exec()
+            .catch((err: any) => {
+              this.logger.warn(`Redis notification audit log push error: ${err.message}`);
+            });
+        } catch (err: any) {
+          this.logger.warn(`Failed to serialize notification audit log: ${err.message}`);
+        }
       }
+    }
+  }
+
+  /**
+   * Acquires an atomic Redis idempotency lock for worker execution.
+   * If Redis is disconnected, not configured, or encounters an error,
+   * fails open (returns true) so notification delivery is not interrupted.
+   */
+  private async acquireIdempotencyLock(key: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      if (!this.redisProvider?.getIsConnected()) {
+        return true;
+      }
+      const client = this.redisProvider.getClient();
+      if (!client || typeof client.set !== 'function') {
+        return true;
+      }
+      const result = await client.set(key, String(Date.now()), 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (err: any) {
+      this.logger.warn(
+        `Redis idempotency lock error for key ${key}: ${err?.message || err}. Failing open.`,
+      );
+      return true;
     }
   }
 
@@ -76,7 +106,24 @@ export class NotificationService {
    */
   async dispatchPaymentReceipt(
     payload: PaymentReceiptNotificationJobPayload,
-  ): Promise<{ smsId?: string; pushId?: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
+  ): Promise<{
+    smsId?: string;
+    pushId?: string;
+    channel: 'PUSH_NOTIFICATION' | 'SMS_DLT';
+    isDuplicate?: boolean;
+  }> {
+    const isPushEligible = Boolean(payload.fcmToken) && payload.channelPreference !== 'SMS_FALLBACK';
+    const channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' = isPushEligible ? 'PUSH_NOTIFICATION' : 'SMS_DLT';
+
+    const lockKey = `lock:idemp:notify:receipt:${payload.paymentId || payload.receiptNumber}`;
+    const acquired = await this.acquireIdempotencyLock(lockKey, 86400);
+    if (!acquired) {
+      this.logger.warn(
+        `Duplicate payment receipt notification skipped for receipt ${payload.receiptNumber} (lockKey: ${lockKey})`,
+      );
+      return { channel, isDuplicate: true };
+    }
+
     // Asynchronously pre-render receipt PDF into S3 so user downloads encounter 0ms generation delay
     if (this.pdfService && payload.paymentId) {
       try {
@@ -92,9 +139,6 @@ export class NotificationService {
 
     let smsId: string | undefined;
     let pushId: string | undefined;
-
-    // Check if customer has an active Mobile App Push Token (Primary & ₹0 Cost Channel)
-    const isPushEligible = Boolean(payload.fcmToken) && payload.channelPreference !== 'SMS_FALLBACK';
 
     if (isPushEligible && payload.fcmToken) {
       pushId = `push-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -264,14 +308,30 @@ export class NotificationService {
    */
   async dispatchDefaultWarning(
     payload: DefaultWarningJobPayload,
-  ): Promise<{ notificationId: string; channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' }> {
+  ): Promise<{
+    notificationId: string;
+    channel: 'PUSH_NOTIFICATION' | 'SMS_DLT';
+    isDuplicate?: boolean;
+  }> {
+    const channel: 'PUSH_NOTIFICATION' | 'SMS_DLT' = payload.fcmToken
+      ? 'PUSH_NOTIFICATION'
+      : 'SMS_DLT';
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const lockKey = `lock:idemp:notify:default-warn:${payload.ticketId}:${dateStr}`;
+    const acquired = await this.acquireIdempotencyLock(lockKey, 86400);
+
+    if (!acquired) {
+      this.logger.warn(
+        `Duplicate default warning skipped for ticket ${payload.ticketId} (lockKey: ${lockKey})`,
+      );
+      return { notificationId: 'duplicate-skipped', channel, isDuplicate: true };
+    }
+
     const formattedOverdue = BigInt(payload.totalOverdueAmount).toLocaleString('en-IN');
     let notificationId: string;
-    let channel: 'PUSH_NOTIFICATION' | 'SMS_DLT';
 
     if (payload.fcmToken) {
       notificationId = `push-def-${Date.now()}`;
-      channel = 'PUSH_NOTIFICATION';
       const pushTitle = 'எச்சரிக்கை அறிவிப்பு / Kumaran Finance Warning';
       const pushBody = `குமரன் சீட்ஸ்: டிக்கெட் #${payload.ticketNumber} (${payload.chitCode}) தொடர்ந்து ${payload.consecutiveUnpaidMonths} மாத தவணைகள் நிலுவையில் உள்ளது (₹${formattedOverdue}). உடனடியாக செலுத்தவும். / Urgent: 3-month default warning.`;
 
@@ -303,7 +363,6 @@ export class NotificationService {
       });
     } else {
       notificationId = `sms-def-${Date.now()}`;
-      channel = 'SMS_DLT';
 
       if (this.smsService) {
         await this.smsService.sendDefaultWarningSms({
@@ -344,7 +403,22 @@ export class NotificationService {
    */
   async dispatchAuctionResult(
     payload: AuctionResultNotificationJobPayload,
-  ): Promise<{ dispatchedCount: number; pushCount: number; smsCount: number }> {
+  ): Promise<{
+    dispatchedCount: number;
+    pushCount: number;
+    smsCount: number;
+    isDuplicate?: boolean;
+  }> {
+    const lockKey = `lock:idemp:notify:auction-res:${payload.chitGroupId}:${payload.installmentMonth}`;
+    const acquired = await this.acquireIdempotencyLock(lockKey, 86400);
+
+    if (!acquired) {
+      this.logger.warn(
+        `Duplicate auction result notification skipped for chitGroup ${payload.chitGroupId} month ${payload.installmentMonth} (lockKey: ${lockKey})`,
+      );
+      return { dispatchedCount: 0, pushCount: 0, smsCount: 0, isDuplicate: true };
+    }
+
     let count = 0;
     let pushCount = 0;
     let smsCount = 0;
@@ -443,7 +517,17 @@ export class NotificationService {
    */
   async dispatchApprovalAlert(
     payload: ApprovalAlertJobPayload,
-  ): Promise<{ dispatchedCount: number; partnerCount: number }> {
+  ): Promise<{ dispatchedCount: number; partnerCount: number; isDuplicate?: boolean }> {
+    const lockKey = `lock:idemp:notify:approval-alert:${payload.approvalType}:${payload.entityId}`;
+    const acquired = await this.acquireIdempotencyLock(lockKey, 3600);
+
+    if (!acquired) {
+      this.logger.warn(
+        `Duplicate approval alert skipped for ${payload.approvalType} entity ${payload.entityId} (lockKey: ${lockKey})`,
+      );
+      return { dispatchedCount: 0, partnerCount: 0, isDuplicate: true };
+    }
+
     if (!this.prisma) {
       this.logger.warn('PrismaService not available; skipping dispatchApprovalAlert');
       return { dispatchedCount: 0, partnerCount: 0 };
