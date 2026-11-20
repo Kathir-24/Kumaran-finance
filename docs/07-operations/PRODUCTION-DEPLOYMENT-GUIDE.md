@@ -27,7 +27,7 @@ flowchart TD
         API --> Redis[("Redis 7 Alpine\n(chitflow-redis :6379)\n512mb noeviction (KFC-INF-001)")]
         Worker --> Redis
         API --> S3[("MinIO / Cloudflare R2\n(chitflow-minio :9000, :9001)\nkumaran-chits-private")]
-        BackupCron["Backup Cron\n(chitflow-backup-cron)\n02:00 AM IST Nightly"] --> DB
+        BackupCron["Backup Cron\n(chitflow-backup-cron)\n3x Daily IST Checkpoints\n(1:30 PM, 6:30 PM, 2:00 AM)"] --> DB
         BackupCron --> S3
     end
 ```
@@ -44,7 +44,7 @@ flowchart TD
 | `db` | `chitflow-db` | `postgres:17` | `127.0.0.1:5433:5432` | `1024m` | `max_connections=150`, `shared_buffers=512MB`, `statement_timeout=15000`, `lock_timeout=5000` |
 | `redis` | `chitflow-redis` | `redis:7-alpine` | `127.0.0.1:6379:6379` | `640m` | `--maxmemory 512mb --maxmemory-policy noeviction --save 900 1 --save 300 10` (`KFC-INF-001`) |
 | `minio` | `chitflow-minio` | `cgr.dev/chainguard/minio:latest` | `127.0.0.1:9000:9000`, `127.0.0.1:9001:9001` | `512m` | Private S3-compatible object storage console (`:9001`) and API (`:9000`) |
-| `backup-cron` | `chitflow-backup-cron` | `postgres:17-alpine` + `aws-cli` | — | `256m` | Runs [`infra/scripts/backup-cron-job.sh`](../../infra/scripts/backup-cron-job.sh) at `30 20 * * *` UTC (`02:00 AM IST`) |
+| `backup-cron` | `chitflow-backup-cron` | `postgres:17-alpine` + `aws-cli` | — | `256m` | Runs [`infra/scripts/backup-cron-job.sh`](../../infra/scripts/backup-cron-job.sh) at 3-checkpoint schedule (`0 8 * * *`, `0 13 * * *`, `30 20 * * *` UTC = 1:30 PM, 6:30 PM, 2:00 AM IST) |
 
 ### 1.2 Resource Sizing, Concurrency & Resilience Guardrails
 
