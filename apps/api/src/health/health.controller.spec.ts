@@ -73,10 +73,47 @@ describe('HealthController', () => {
     await expect(controller.check()).rejects.toThrow(ServiceUnavailableException);
   });
 
-  it('throws ServiceUnavailableException (503) when redis probe fails', async () => {
+  it('returns status degraded (200 OK) when redis probe fails', async () => {
     mockRedisClient.ping.mockRejectedValue(new Error('ECONNREFUSED'));
 
-    await expect(controller.check()).rejects.toThrow(ServiceUnavailableException);
+    const result = await controller.check();
+    expect(result.status).toBe('degraded');
+    expect(result.database).toBe('connected');
+    expect(result.redis).toBe('degraded');
+  });
+
+  it('returns status degraded (200 OK) when redis ping times out', async () => {
+    jest.useFakeTimers();
+    mockRedisClient.ping.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve('PONG'), 3000)),
+    );
+
+    const checkPromise = controller.check();
+    await jest.advanceTimersByTimeAsync(1600);
+    const result = await checkPromise;
+
+    expect(result.status).toBe('degraded');
+    expect(result.database).toBe('connected');
+    expect(result.redis).toBe('degraded');
+    jest.useRealTimers();
+  });
+
+  it('returns status degraded (200 OK) when redis client is disconnected', async () => {
+    mockRedisProvider.getClient.mockReturnValueOnce(null as any);
+
+    const result = await controller.check();
+    expect(result.status).toBe('degraded');
+    expect(result.database).toBe('connected');
+    expect(result.redis).toBe('disconnected');
+  });
+
+  it('returns status degraded (200 OK) when redis returns unexpected response', async () => {
+    mockRedisClient.ping.mockResolvedValueOnce('UNKNOWN_RESPONSE');
+
+    const result = await controller.check();
+    expect(result.status).toBe('degraded');
+    expect(result.database).toBe('connected');
+    expect(result.redis).toBe('degraded');
   });
 
   it('handles optional dependencies gracefully when not provided', async () => {

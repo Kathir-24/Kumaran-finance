@@ -29,7 +29,8 @@ export class HealthController {
 
   /**
    * Deep readiness health check: probes PostgreSQL (SELECT 1) and Redis (PING).
-   * Returns HTTP 200 when ready to receive financial traffic, or HTTP 503 if downstream fails.
+   * PostgreSQL is the sole financial truth: fails with HTTP 503 if database is down.
+   * Redis is decoupled: reports 'degraded' (HTTP 200) to keep financial operations alive.
    */
   @Get()
   @ApiOperation({
@@ -38,7 +39,7 @@ export class HealthController {
       'Performs deep connectivity verification for PostgreSQL database pool and Redis queue broker.',
   })
   @ApiOkResponse({
-    description: 'System and critical backing services are fully healthy and ready',
+    description: 'System and critical backing services are ready (ok or degraded)',
     type: HealthCheckResponseDto,
   })
   async check(): Promise<HealthCheckResponseDto> {
@@ -67,14 +68,12 @@ export class HealthController {
       }
     }
 
-    // 2. Redis queue & distributed cache probe
+    // 2. Redis queue & distributed cache probe (Decoupled: non-fatal to financial traffic)
     if (this.redisProvider) {
       const client = this.redisProvider.getClient();
       if (!client) {
         checks.redis = 'disconnected';
-        if (process.env.NODE_ENV === 'production') {
-          errors.push('Redis client is not initialized in production environment');
-        }
+        this.logger.warn('[HealthCheck] Redis client is not initialized or disconnected');
       } else {
         let redisTimer: NodeJS.Timeout | undefined;
         try {
@@ -85,14 +84,13 @@ export class HealthController {
           if (pong === 'PONG') {
             checks.redis = 'connected';
           } else {
-            checks.redis = 'error';
-            errors.push(`Redis unexpected response: ${pong}`);
+            checks.redis = 'degraded';
+            this.logger.warn(`[HealthCheck] Redis unexpected response: ${pong}`);
           }
         } catch (err: any) {
-          checks.redis = 'error';
+          checks.redis = 'degraded';
           const msg = `Redis probe failed: ${err.message}`;
-          this.logger.error(`[HealthCheck] ${msg}`);
-          errors.push(msg);
+          this.logger.warn(`[HealthCheck] ${msg}`);
         } finally {
           if (redisTimer) clearTimeout(redisTimer);
         }
@@ -109,8 +107,10 @@ export class HealthController {
       });
     }
 
+    const isDegraded = checks.redis !== 'connected' && checks.redis !== 'skipped';
+
     return {
-      status: 'ok',
+      status: isDegraded ? 'degraded' : 'ok',
       service: 'chitflow-api',
       database: checks.database,
       redis: checks.redis,
