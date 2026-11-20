@@ -340,7 +340,7 @@ export class NotificationService {
   /**
    * Formats and broadcasts auction result and dividend credit to all chit group subscribers:
    * - Primary (₹0 Cost): Mobile App Push Notification (FCM) for app users (`fcmToken` present).
-   * - Fallback: Indian DLT-Compliant SMS via SmsService for keypad phone users.
+   * - Fallback: Indian DLT-Compliant SMS via SmsService (Template 1407169823412093851) for keypad phone users.
    */
   async dispatchAuctionResult(
     payload: AuctionResultNotificationJobPayload,
@@ -349,9 +349,12 @@ export class NotificationService {
     let pushCount = 0;
     let smsCount = 0;
 
-    const formattedDiscount = BigInt(payload.winningDiscountAmount).toLocaleString('en-IN');
+    const winningBidDiscount = payload.winningBidDiscount ?? payload.winningDiscountAmount;
+    const netInstallmentDue = payload.netInstallmentDue ?? payload.nextMonthNetPayable;
+
+    const formattedDiscount = BigInt(winningBidDiscount).toLocaleString('en-IN');
     const formattedDividend = BigInt(payload.dividendPerTicket).toLocaleString('en-IN');
-    const formattedPayable = BigInt(payload.nextMonthNetPayable).toLocaleString('en-IN');
+    const formattedPayable = BigInt(netInstallmentDue).toLocaleString('en-IN');
 
     for (const sub of payload.subscribers) {
       if (sub.fcmToken) {
@@ -387,8 +390,29 @@ export class NotificationService {
         });
         pushCount++;
       } else {
-        const smsId = `sms-res-${Date.now()}-${count}`;
-        const smsText = `Kumaran Chits: Chit ${payload.chitCode} Month ${payload.installmentMonth} Auction won at Rs.${formattedDiscount} discount. Dividend credit: Rs.${formattedDividend}. Next month installment: Rs.${formattedPayable}.`;
+        let smsId = `sms-res-${Date.now()}-${count}`;
+        let status: 'DELIVERED' | 'FAILED' = 'DELIVERED';
+        const passbookAppUrl = 'https://app.kumaranfinance.in/passbook';
+
+        if (this.smsService) {
+          const smsResult = await this.smsService.sendAuctionResultSms({
+            recipientPhone: sub.phone,
+            chitCode: payload.chitCode,
+            installmentMonth: payload.installmentMonth,
+            winningBidDiscount,
+            dividendPerTicket: payload.dividendPerTicket,
+            netInstallmentDue,
+            passbookAppUrl,
+          });
+          if (smsResult.messageId) {
+            smsId = smsResult.messageId;
+          }
+          if (smsResult.success === false) {
+            status = 'FAILED';
+          }
+        }
+
+        const smsText = `Kumaran Chits: Chit ${payload.chitCode} Month ${payload.installmentMonth} auction won at Rs.${formattedDiscount} discount. Your dividend credit is Rs.${formattedDividend}. Next month net due is Rs.${formattedPayable}. View details: ${passbookAppUrl}`;
 
         this.pushLog({
           id: smsId,
@@ -398,7 +422,7 @@ export class NotificationService {
           messageText: smsText,
           variables: { ...payload, subscriberName: sub.name },
           sentAt: new Date(),
-          status: 'DELIVERED',
+          status,
         });
         smsCount++;
       }

@@ -427,7 +427,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(pushNotif?.channel).toBe('PUSH_NOTIFICATION');
       expect(pushNotif?.messageText).toContain('லாபப்பங்கு ரூ. 1,050');
       expect(smsNotif?.channel).toBe('SMS_DLT');
-      expect(smsNotif?.messageText).toContain('Dividend credit: Rs.1,050');
+      expect(smsNotif?.messageText).toContain('Your dividend credit is Rs.1,050');
     });
 
     it('should dispatch high-priority approval push alerts strictly to active statutory partners (Role.PARTNER) and exclude maker user (Guardrails 10 & 11, SEC-01)', async () => {

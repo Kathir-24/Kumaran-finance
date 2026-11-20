@@ -27,5 +27,10 @@ export const DLT_CONFIG = {
       templateId: '1407169823412093850',
       text: 'Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}',
     },
+    // 5. Monthly Auction Result & Dividend Notification
+    AUCTION_RESULT: {
+      templateId: '1407169823412093851',
+      text: 'Kumaran Chits: Chit {#var#} Month {#var#} auction won at Rs.{#var#} discount. Your dividend credit is Rs.{#var#}. Next month net due is Rs.{#var#}. View details: {#var#}',
+    },
   },
 } as const;

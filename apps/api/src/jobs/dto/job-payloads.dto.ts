@@ -38,6 +38,8 @@ export interface AuctionResultNotificationJobPayload {
   winningDiscountAmount: string;
   dividendPerTicket: string;
   nextMonthNetPayable: string;
+  winningBidDiscount?: string;
+  netInstallmentDue?: string;
   subscribers: Array<{
     name: string;
     phone: string;

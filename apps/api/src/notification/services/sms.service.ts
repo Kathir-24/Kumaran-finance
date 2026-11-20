@@ -44,6 +44,16 @@ export interface DefaultWarningSmsPayload {
   branchPhone: string;
 }
 
+export interface AuctionResultSmsPayload {
+  recipientPhone: string;
+  chitCode: string;
+  installmentMonth: number;
+  winningBidDiscount: bigint | number | string;
+  dividendPerTicket: bigint | number | string;
+  netInstallmentDue: bigint | number | string;
+  passbookAppUrl?: string;
+}
+
 @Injectable()
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
@@ -159,6 +169,42 @@ export class SmsService {
       payload.consecutiveUnpaidMonths,
       formattedOverdue,
       payload.branchPhone,
+    ];
+
+    const messageText = DltTemplateFormatter.interpolate(template.text, rawVars);
+    const variables = DltTemplateFormatter.toMsg91Variables(rawVars);
+
+    return this.safeDispatch({
+      to: payload.recipientPhone,
+      message: messageText,
+      dltTemplateId: templateId,
+      variables,
+    });
+  }
+
+  /**
+   * Broadcasts a TRAI DLT-compliant Monthly Auction Result and Dividend notification.
+   */
+  async sendAuctionResultSms(
+    payload: AuctionResultSmsPayload,
+  ): Promise<SmsDispatchResult> {
+    const template = DLT_CONFIG.TEMPLATES.AUCTION_RESULT;
+    const templateId =
+      this.configService.get<string>('MSG91_DLT_AUCTION_RESULT_TEMPLATE_ID') ||
+      template.templateId;
+
+    const formattedDiscount = BigInt(payload.winningBidDiscount).toLocaleString('en-IN');
+    const formattedDividend = BigInt(payload.dividendPerTicket).toLocaleString('en-IN');
+    const formattedNetDue = BigInt(payload.netInstallmentDue).toLocaleString('en-IN');
+    const passbookAppUrl = payload.passbookAppUrl || 'https://app.kumaranfinance.in/passbook';
+
+    const rawVars = [
+      payload.chitCode,
+      payload.installmentMonth,
+      formattedDiscount,
+      formattedDividend,
+      formattedNetDue,
+      passbookAppUrl,
     ];
 
     const messageText = DltTemplateFormatter.interpolate(template.text, rawVars);

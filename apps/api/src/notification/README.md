@@ -73,6 +73,7 @@ MSG91_DLT_OTP_TEMPLATE_ID=1407169823412093847
 MSG91_DLT_RECEIPT_TEMPLATE_ID=1407169823412093848
 MSG91_DLT_AUCTION_TEMPLATE_ID=1407169823412093849
 MSG91_DLT_DEFAULT_TEMPLATE_ID=1407169823412093850
+MSG91_DLT_AUCTION_RESULT_TEMPLATE_ID=1407169823412093851
 ```
 
 ---
@@ -85,6 +86,7 @@ MSG91_DLT_DEFAULT_TEMPLATE_ID=1407169823412093850
 | **2** | **Payment Receipt** | `1407169823412093848` | `Kumaran Chits: Received Rs.{#var#} for Chit {#var#}, Ticket #{#var#} on {#var#}. Receipt: {#var#}. View passbook: {#var#}` |
 | **3** | **Auction Reminder** | `1407169823412093849` | `Kumaran Chits: Auction for Chit {#var#} Month {#var#} is scheduled on {#var#} at {#var#}. Venue: {#var#}. Contact: {#var#}` |
 | **4** | **Default Arrears Notice** | `1407169823412093850` | `Kumaran Chits: Urgent: Ticket #{#var#} in Chit {#var#} has {#var#} months overdue (Rs.{#var#}). Clear dues to avoid membership cancellation. Contact: {#var#}` |
+| **5** | **Auction Results & Dividend** | `1407169823412093851` | `Kumaran Chits: Chit {#var#} Month {#var#} auction won at Rs.{#var#} discount. Your dividend credit is Rs.{#var#}. Next month net due is Rs.{#var#}. View details: {#var#}` |
 
 ---
 
