@@ -5,6 +5,11 @@ import type { AuctionReminderJobPayload } from '../dto/job-payloads.dto';
 import { NotificationService } from './notification.service';
 import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 import { FIRST_AUCTION_MONTH } from '../../common/constants';
+import {
+  formatIstDate,
+  getIstDayBounds,
+  IST_OFFSET_MS,
+} from '../../report/helpers/report-scope.helper';
 
 export interface ScanUpcomingAuctionsResult {
   chitsCount: number;
@@ -27,20 +32,24 @@ export class AuctionReminderSchedulerService {
    * and broadcasts bilingual push notifications and DLT SMS reminders to all group subscribers.
    */
   async scanAndBroadcastUpcomingAuctions(targetDate?: Date): Promise<ScanUpcomingAuctionsResult> {
-    const scanDate = targetDate ? new Date(targetDate) : new Date();
-    if (!targetDate) {
-      // Default: 3 calendar days ahead
-      scanDate.setDate(scanDate.getDate() + 3);
+    let targetIstDate: string | Date;
+    if (targetDate) {
+      targetIstDate = targetDate;
+    } else {
+      // Advance current instant shifted by IST_OFFSET_MS by 3 UTC days to get the exact target calendar date in IST
+      const istShifted = new Date(Date.now() + IST_OFFSET_MS);
+      istShifted.setUTCDate(istShifted.getUTCDate() + 3);
+      const year = istShifted.getUTCFullYear();
+      const month = String(istShifted.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(istShifted.getUTCDate()).padStart(2, '0');
+      targetIstDate = `${year}-${month}-${day}`;
     }
 
-    const startOfDay = new Date(scanDate);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(scanDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { dateStr, startOfDay, endOfDay } = getIstDayBounds(targetIstDate);
+    const istDateString = targetDate ? formatIstDate(targetDate) : dateStr;
 
     this.logger.log(
-      `Scanning for scheduled auctions between ${startOfDay.toISOString()} and ${endOfDay.toISOString()}`,
+      `Scanning for scheduled auctions on IST date ${istDateString} between ${startOfDay.toISOString()} and ${endOfDay.toISOString()}`,
     );
 
     const scheduledAuctions = await this.prisma.auction.findMany({
