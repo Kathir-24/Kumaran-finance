@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
+import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
 
 export interface FormXviiPdfData {
   groupCode: string;
@@ -36,6 +37,7 @@ export interface FormXviiPdfData {
   signedByForeman: boolean;
   branchName?: string | null;
   branchAddress?: string | null;
+  isBlank?: boolean;
 }
 
 export class FormXviiMinutesTemplate {
@@ -56,6 +58,8 @@ export class FormXviiMinutesTemplate {
       };
 
       try {
+        StatutoryFormHelper.patchDocumentUnderline();
+
         // Standard A4 portrait (595.28 x 841.89 pt)
         const doc = new PDFDocument({
           size: 'A4',
@@ -82,8 +86,10 @@ export class FormXviiMinutesTemplate {
         const commissionRateLabel = RupeeWordsHelper.formatCommissionRatePercent(
           data.foremanCommissionRate,
         );
+        const isBlank = Boolean(data.isBlank);
 
         // Statutory Header
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(13).text('KUMARAN FINANCE / குமரன் பைனான்ஸ்', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(9).text(
           data.branchAddress || 'Head Office: Perundurai, Erode / தலைமை கிளை: பெருந்துறை, ஈரோடு',
@@ -101,65 +107,84 @@ export class FormXviiMinutesTemplate {
           '*(Statutory Draw Minutes under Sec 17 & Rule 17; Form XVII in Tamil Nadu Gazette is Dispute Reference u/s 64)*',
           { align: 'center', width: pageWidth },
         );
-        doc.moveTo(35, doc.y + 3).lineTo(560, doc.y + 3).stroke();
+        doc.moveTo(35, doc.y + 3).lineTo(560, doc.y + 3).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.5);
 
         // Chit Scheme & Auction Info
-        doc.font(regularFont).fontSize(9);
         const aucDate = FontResolverHelper.formatPdfDate(data.auctionDate);
-        doc.text(`சீட்டு குழு / Scheme: ${data.groupCode} (${data.groupName})`, { continued: true });
-        doc.text(`ஏல தேதி / Date: ${aucDate}`, { align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(9);
+        doc.text('சீட்டு குழு / Scheme: ', 35, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    ஏல தேதி / Date: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucDate, '____________________');
 
-        doc.text(`மொத்த மதிப்பு / Value: ₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)} | தவணை காலம் / Duration: ${data.durationMonths} மாதங்கள்`);
-        doc.text(`ஏல தவணை / Month: ${data.installmentMonth} | வருகை தந்த சந்தாதாரர்கள் / Members Present: ${data.subscribersPresent}`);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+        doc.text('மொத்த மதிப்பு / Value: ', 35, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை காலம் / Duration: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.durationMonths} மாதங்கள்`, '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை / Month: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.installmentMonth}`, '____', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | வருகை தந்தோர் / Present: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.subscribersPresent}`, '____');
+
         if (data.sanctionOrderNumber) {
-          doc.text(`அரசு ஆணை எண் / Sanction Order No: ${data.sanctionOrderNumber}`);
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('அரசு ஆணை எண் / Sanction Order No: ', 35, doc.y + 2, { continued: true });
+          StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.sanctionOrderNumber, '____________________');
         }
-        doc.moveDown(0.4);
+        doc.moveDown(0.5);
 
         // Financial Calculation Table
-        doc.font(boldFont).fontSize(9).text('ஏல முடிவு & கழிவு பகிர்வு விவரங்கள் / AUCTION FINANCIAL STATEMENT:');
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9).text('ஏல முடிவு & கழிவு பகிர்வு விவரங்கள் / AUCTION FINANCIAL STATEMENT:');
         doc.moveDown(0.2);
 
         const tableY = doc.y;
         doc.rect(35, tableY, pageWidth, 68).fillAndStroke('#f8f9fa', '#ced4da');
-        doc.fillColor('#000');
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
         const colValX = 360;
         const colValWidth = pageWidth - (colValX - 35) - 15;
 
         doc.font(regularFont).fontSize(8.5);
-        doc.text(`வெற்றி பெற்ற ஏல கழிவு / Winning Bid Discount (Max 25%):`, 45, tableY + 8);
-        doc.font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.bidDiscount)}`, colValX, tableY + 8, { width: colValWidth, align: 'right' });
+        doc.text('வெற்றி பெற்ற ஏல கழிவு / Winning Bid Discount (Max 25%):', 45, tableY + 8);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.bidDiscount)}`, colValX, tableY + 8, { width: colValWidth, align: 'right' });
 
-        doc.font(regularFont).text(`நிறுவன முகவர் கழிவு / Foreman Commission (${commissionRateLabel}):`, 45, tableY + 22);
-        doc.font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.foremanCommissionAmount)}`, colValX, tableY + 22, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text(`நிறுவன முகவர் கழிவு / Foreman Commission (${commissionRateLabel}):`, 45, tableY + 22);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.foremanCommissionAmount)}`, colValX, tableY + 22, { width: colValWidth, align: 'right' });
 
-        doc.font(regularFont).text(`பகிர்ந்தளிக்கப்படும் மொத்த லாபப்பங்கு / Total Universal Dividend:`, 45, tableY + 36);
-        doc.font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.totalDividend)}`, colValX, tableY + 36, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('பகிர்ந்தளிக்கப்படும் மொத்த லாபப்பங்கு / Total Universal Dividend:', 45, tableY + 36);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.totalDividend)}`, colValX, tableY + 36, { width: colValWidth, align: 'right' });
 
-        doc.font(regularFont).text(`ஒரு டிக்கெட்டுக்கான லாபப்பங்கு / Dividend Per Ticket:`, 45, tableY + 50);
-        doc.font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)}`, colValX, tableY + 50, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('ஒரு டிக்கெட்டுக்கான லாபப்பங்கு / Dividend Per Ticket:', 45, tableY + 50);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`₹ ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)}`, colValX, tableY + 50, { width: colValWidth, align: 'right' });
 
         doc.x = 35;
         doc.y = tableY + 76;
 
         doc.font(boldFont).fontSize(9.5);
-        doc.text(`வெற்றியாளருக்கான பரிசு தொகை / Prize Money: ₹ ${RupeeWordsHelper.formatWholeRupees(data.prizeMoney)}`, 35, doc.y, { width: pageWidth });
-        doc.text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: ₹ ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} (அனைவருக்கும் / For All Members)`, 35, doc.y + 2, { width: pageWidth });
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).text(`வெற்றியாளருக்கான பரிசு தொகை / Prize Money: ₹ ${RupeeWordsHelper.formatWholeRupees(data.prizeMoney)}`, 35, doc.y, { width: pageWidth });
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: ₹ ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} (அனைவருக்கும் / For All Members)`, 35, doc.y + 2, { width: pageWidth });
         doc.moveDown(0.5);
 
         // Winner Details Box
-        doc.font(boldFont).fontSize(9).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:', 35, doc.y, { width: pageWidth });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:', 35, doc.y, { width: pageWidth });
         doc.font(regularFont).fontSize(8.5);
         const nameTamil = data.winnerNameTamil ? ` / ${data.winnerNameTamil}` : '';
-        doc.text(`டிக்கெட் / Ticket: #${data.winnerTicketNumber} | பெயர் / Name: ${data.winnerName}${nameTamil}`, 35, doc.y + 2, { width: pageWidth });
-        doc.text(`குறியீடு / Code: ${data.winnerCustomerCode} | தொலைபேசி / Mobile: ${data.winnerPhone}`, 35, doc.y + 2, { width: pageWidth });
+        doc.text('டிக்கெட் / Ticket: ', 35, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.winnerTicketNumber}`, '____', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | பெயர் / Name: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.winnerName}${nameTamil}`, '________________________________________');
+
+        doc.text('குறியீடு / Code: ', 35, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.winnerCustomerCode, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தொலைபேசி / Mobile: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.winnerPhone, '____________________');
         doc.moveDown(0.4);
 
         // Tie-Breaker Table if applicable (Option A)
         if (data.wasTieBreakWinner && data.tiedBidders && data.tiedBidders.length > 0) {
-          doc.font(boldFont).fontSize(8.5).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW (OPTION A):', 35, doc.y, { width: pageWidth });
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8.5).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW (OPTION A):', 35, doc.y, { width: pageWidth });
           doc.font(regularFont).fontSize(8);
           doc.text('அதிகபட்ச கழிவான 25% ஏலம் கேட்டவர்களிடையே நேரில் டோக்கன் குலுக்கல் மூலம் வெற்றியாளர் தேர்வு செய்யப்பட்டார்:', 35, doc.y + 2, { width: pageWidth });
 
@@ -171,7 +196,7 @@ export class FormXviiMinutesTemplate {
         }
 
         // Minutes Proceedings Text
-        doc.font(boldFont).fontSize(8.5).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:', 35, doc.y, { width: pageWidth });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8.5).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:', 35, doc.y, { width: pageWidth });
         doc.font(regularFont).fontSize(8);
         doc.text(data.minutesText || 'ஏலம் முறைப்படி அமைதியான முறையில் உறுப்பினர்கள் முன்னிலையில் நடத்தப்பட்டது.', 35, doc.y + 2, { width: pageWidth });
         doc.moveDown(1.2);
@@ -183,31 +208,37 @@ export class FormXviiMinutesTemplate {
 
         // Signatures (Statutory Rule 17(f) & Section 17(2)(f): Foreman + At least 2 Subscribers Present)
         const sigY = doc.y;
-        doc.moveTo(35, sigY).lineTo(560, sigY).stroke();
+        doc.moveTo(35, sigY).lineTo(560, sigY).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.3);
 
-        doc.font(boldFont).fontSize(8).text('சட்டப்பூர்வ கையொப்பங்கள் / STATUTORY SIGNATURES (Sec 17(2)(f) & Rule 17(f)):', 35, sigY + 5);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8).text('சட்டப்பூர்வ கையொப்பங்கள் / STATUTORY SIGNATURES (Sec 17(2)(f) & Rule 17(f)):', 35, sigY + 5);
 
         // Foreman
         doc.font(regularFont).fontSize(7.5);
         doc.text('முன்னிலையாளர் கையொப்பம் / Foreman:', 35, sigY + 18);
         doc.font(boldFont).fontSize(8).text('குமரன் பைனான்ஸ் (Foreman)', 35, sigY + 30);
+        doc.font(boldFont).text('____________________', 35, sigY + 42);
 
         // Subscriber Witness 1
         doc.font(regularFont).fontSize(7.5);
         doc.text('சந்தாதாரர் சாட்சி 1 / Witness 1:', 175, sigY + 18);
-        doc.text('டிக்கெட் / Ticket: #_______', 175, sigY + 28);
-        doc.text('ஒப்பம்: ________________', 175, sigY + 38);
+        doc.text('டிக்கெட் / Ticket: #', 175, sigY + 28, { continued: true });
+        doc.font(boldFont).text('_______');
+        doc.font(regularFont).text('ஒப்பம்: ', 175, sigY + 40, { continued: true });
+        doc.font(boldFont).text('________________');
 
         // Subscriber Witness 2
         doc.font(regularFont).fontSize(7.5);
         doc.text('சந்தாதாரர் சாட்சி 2 / Witness 2:', 305, sigY + 18);
-        doc.text('டிக்கெட் / Ticket: #_______', 305, sigY + 28);
-        doc.text('ஒப்பம்: ________________', 305, sigY + 38);
+        doc.text('டிக்கெட் / Ticket: #', 305, sigY + 28, { continued: true });
+        doc.font(boldFont).text('_______');
+        doc.font(regularFont).text('ஒப்பம்: ', 305, sigY + 40, { continued: true });
+        doc.font(boldFont).text('________________');
 
         // Registrar Filing Status
         doc.font(regularFont).fontSize(7.5).text('பதிவாளர் தாக்கல் / Registrar Filing (Sec 18):', 435, sigY + 18);
         doc.font(boldFont).fontSize(8).text('சரிபார்க்கப்பட்டு தாக்கல் செய்யப்பட்டது', 435, sigY + 30);
+        doc.text('____________________', 435, sigY + 42);
 
         doc.end();
       } catch (err) {

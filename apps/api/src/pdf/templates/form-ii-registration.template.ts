@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
+import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
 
 export interface FormIiPdfData {
   groupCode: string;
@@ -20,6 +21,7 @@ export interface FormIiPdfData {
   managingPartnerName?: string | null;
   runningChitsCount?: number;
   aggregateRunningChitsAmount?: bigint;
+  isBlank?: boolean;
 }
 
 export class FormIiRegistrationTemplate {
@@ -40,6 +42,8 @@ export class FormIiRegistrationTemplate {
       };
 
       try {
+        StatutoryFormHelper.patchDocumentUnderline();
+
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: 40, bottom: 40, left: 45, right: 45 },
@@ -63,112 +67,139 @@ export class FormIiRegistrationTemplate {
         );
 
         const pageWidth = 595.28 - 90; // 505.28 pt printable
-        const appDate = FontResolverHelper.formatPdfDate(data.applicationDate || new Date());
-        const sancDate = FontResolverHelper.formatPdfDate(data.sanctionDate || new Date());
-        const feeAmount = data.statutoryRegistrationFee ?? 1000n;
-        const feeWords = RupeeWordsHelper.toEnglishWords(feeAmount);
+        const isBlank = Boolean(
+          data.isBlank ||
+          data.groupCode.startsWith('___') ||
+          data.chitValue === 0n,
+        );
+
+        const appDate = isBlank ? '' : FontResolverHelper.formatPdfDate(data.applicationDate || new Date());
+        const sancDate = isBlank ? '' : FontResolverHelper.formatPdfDate(data.sanctionDate || new Date());
+        const feeAmount = data.statutoryRegistrationFee ?? 100n;
+        const feeWords = isBlank ? '' : RupeeWordsHelper.toEnglishWords(feeAmount);
         const runningCount = data.runningChitsCount ?? 1;
         const aggAmount = data.aggregateRunningChitsAmount ?? data.chitValue;
-        const aggWords = RupeeWordsHelper.toEnglishWords(aggAmount);
-        const chitValueWords = RupeeWordsHelper.toEnglishWords(data.chitValue);
-        const managingPartner = data.managingPartnerName || 'P. Kumaran (Managing Partner)';
-        const firmName = 'KUMARAN FINANCE';
-        const officeAddress =
-          data.branchAddress || '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052';
-        const sanctionNo = data.sanctionOrderNumber || 'ROC/ERD/SANCTION/PENDING';
+        const managingPartner = isBlank ? '' : (data.managingPartnerName || 'P. Kumaran (Managing Partner)');
+        const firmName = isBlank ? '' : 'KUMARAN FINANCE';
+        const officeAddress = isBlank
+          ? ''
+          : (data.branchAddress || '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052');
 
-        // Header
+        // Header matching Gazette Page 49
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(11).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(10.5).text('FORM — II', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(8.5).text('(See Section 7 and Rule 5)', { align: 'center', width: pageWidth });
         doc.moveDown(0.3);
         doc.font(boldFont).fontSize(10).text('APPLICATION FOR REGISTRATION OF THE CHIT AGREEMENT', { align: 'center', width: pageWidth });
-        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).stroke();
+        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.8);
 
-        // Place & Date
+        // To & Place / Date
         const topY = doc.y;
-        doc.font(boldFont).fontSize(8.5).text('To:', 45, topY);
-        doc.font(regularFont).fontSize(8.5);
+        doc.font(regularFont).fontSize(8.5).text('To', 45, topY);
         doc.text('The Registrar of Chits,', 45, topY + 12);
-        doc.text('Perundurai / Erode District,', 45, topY + 24);
-        doc.text('Tamil Nadu.', 45, topY + 36);
+        doc.text('', 45, topY + 24, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________.');
 
-        doc.font(boldFont).text('Place: Perundurai', 360, topY);
-        doc.font(boldFont).text(`Date: ${appDate}`, 360, topY + 12);
+        doc.font(regularFont).fontSize(8.5).text('Place: ', 360, topY);
+        doc.text('', 395, topY, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.y = topY + 65;
-        doc.font(boldFont).fontSize(9).text('Dear Sir,', 45, doc.y);
+        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 14);
+        doc.text('', 395, topY + 14, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : appDate, '____________________');
+
+        doc.y = topY + 50;
+        doc.font(regularFont).fontSize(9).text('Dear Sir,', 45, doc.y);
         doc.moveDown(0.4);
 
-        doc.font(regularFont).fontSize(8.5).text(
-          `1. We, the Managing Partner and Partners on behalf of the foreman conducting chit business under the name and style of ${firmName} situated at ${officeAddress}, hereby apply for registration of the Chit Agreement for the scheme detailed below:`,
-          { align: 'justify', lineGap: 2 },
-        );
+        // (a) and (b) verbatim from Gazette Page 49
+        doc.font(regularFont).fontSize(8.5).text('(a) I ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' S/o Sri. ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the foreman conducting chit under the name and style of * ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________.');
         doc.moveDown(0.4);
 
-        // Chit Summary Box
-        const boxY = doc.y;
-        doc.rect(45, boxY, pageWidth, 58).fillAndStroke('#f8f9fa', '#ced4da');
-        doc.fillColor('#000');
-        doc.font(boldFont).fontSize(8.5);
-        doc.text(`Scheme Code: ${data.groupCode} (${data.groupName})`, 55, boxY + 6);
-        doc.font(regularFont).fontSize(8);
-        doc.text(`Chit Value: Rs. ${RupeeWordsHelper.formatWholeRupees(data.chitValue)} (${chitValueWords})`, 55, boxY + 18);
-        doc.text(`Duration: ${data.durationMonths} Months | Total Tickets: ${data.totalTickets} Tickets | Monthly Base Installment: Rs. ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)}`, 55, boxY + 30);
-        doc.text(`Discount Ceiling (25%): Rs. ${RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling)} | Frozen Foreman Commission: 4.00%`, 55, boxY + 42);
-
-        doc.y = boxY + 66;
-        doc.moveDown(0.4);
-
-        doc.font(regularFont).fontSize(8.5).text(
-          `2. The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ${RupeeWordsHelper.formatWholeRupees(feeAmount)} (${feeWords} only) being the registration fees as required under the Act and the Tamil Nadu Chit Funds Rules, 1984.`,
-          { align: 'justify', lineGap: 2 },
-        );
+        doc.font(regularFont).fontSize(8.5).text('(b) We ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Chairman and Secretary respectively of the foreman conducting chit business under the name and style of * ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' hereby apply for registration of the Chit Agreement.');
         doc.moveDown(0.5);
 
-        doc.text(
-          `3. The number of current chits which are running as on the date of this application is ${runningCount} and the aggregate chit amount of these chits involved therein is Rs. ${RupeeWordsHelper.formatWholeRupees(aggAmount)} (${aggWords} only) which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).`,
-          { align: 'justify', lineGap: 2 },
-        );
+        // (2)
+        doc.font(regularFont).fontSize(8.5).text('(2) The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the registration fees as required under the Act of Chit Funds Rules, 1984.');
         doc.moveDown(0.5);
 
-        doc.text(
-          `4. A certified true copy of the previous sanction obtained in Form I-B under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed (Sanction Reference: ${sanctionNo}, Dated: ${sancDate}). A copy of the application dated ${appDate} together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.`,
-          { align: 'justify', lineGap: 2 },
-        );
+        // (3)
+        doc.font(regularFont).fontSize(8.5).text('(3) The number of current chits which are running as on the date of this application is ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(runningCount), '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' and the aggregate chit amount of these chits involved therein is Rs. ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).');
         doc.moveDown(0.5);
 
-        doc.text(
-          `5. I / We remit herewith a sum of Rs. ${RupeeWordsHelper.formatWholeRupees(feeAmount)} (${feeWords} only) being the fee prescribed for the purpose.`,
-          { align: 'justify', lineGap: 2 },
-        );
-        doc.moveDown(0.8);
+        // (4)
+        doc.font(regularFont).fontSize(8.5).text('(4) A certified true copy of the sanction obtained in Form IB under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed. A copy of the application dated the ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.');
+        doc.moveDown(0.5);
 
-        // Statutory Declaration
+        // (5)
+        doc.font(regularFont).fontSize(8.5).text('(5) I / We remit herewith a sum of Rs. ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${feeWords} only`, '________________________________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ') being the fee prescribed for the purpose.');
+        doc.moveDown(0.6);
+
+        // DECLARATION
         doc.font(boldFont).fontSize(9).text('DECLARATION', { align: 'center', width: pageWidth });
         doc.moveDown(0.2);
         doc.font(regularFont).fontSize(8.5).text(
-          `6. I / We have read the Chit Funds Act, 1982 (Central Act No. 40 of 1982) and the Rules made by the State Government thereunder and I / We declare that the chit agreement has been drawn up in conformity with the provisions of the said Act and the Rules.\n\nThe above statements are true and complete to the best of my / our knowledge, information and belief.`,
-          { align: 'justify', lineGap: 2 },
+          '(6) I / We have read the Chit Funds Act, 1982 (Central Act No. 40 of 1982) and the Rules made by the State Government thereunder and I / We declare that the chit agreement has been drawn up in conformity with the provisions of the said Act and the Rules.',
+          45,
+          doc.y,
+          { align: 'justify', lineGap: 1.5 },
         );
-        doc.moveDown(1.5);
+        doc.moveDown(0.3);
 
-        // Signatures
+        doc.font(regularFont).fontSize(8.5).text(
+          'The above statements are true and complete to the best of my / our knowledge, information and belief.',
+          45,
+          doc.y,
+          { align: 'justify', lineGap: 1.5 },
+        );
+        doc.moveDown(0.8);
+
+        // Signatures matching Gazette Page 50
         const sigY = doc.y;
-        doc.font(boldFont).fontSize(8.5).text('Yours faithfully,', 360, sigY);
-        doc.moveDown(2);
-        doc.text(`For and on behalf of Foreman:`, 360, sigY + 35);
-        doc.text(firmName, 360, sigY + 47);
-        doc.font(regularFont).text(managingPartner, 360, sigY + 60);
-        doc.text('(Managing Partner / Foreman)', 360, sigY + 72);
+        doc.font(regularFont).fontSize(8.5).text('Yours faithfully,', 360, sigY);
+        doc.text('Chairman ', 360, sigY + 16, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________');
+        doc.text('Secretary ', 360, sigY + 32, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Partner / Authorised Signatory', '____________________');
+        doc.text('Name(s) ', 360, sigY + 48, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________');
+        doc.text('Designation (s) ', 360, sigY + 64, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Managing Partner / Foreman', '____________________');
 
-        doc.font(boldFont).fontSize(8).text('Enclosures Attached:', 45, sigY + 35);
-        doc.font(regularFont).fontSize(8);
-        doc.text('1. Chit Agreement in Duplicate', 45, sigY + 47);
-        doc.text('2. Certified Copy of Prior Sanction (Form I-B)', 45, sigY + 59);
-        doc.text('3. Copy of Application under Section 4 with Annexure', 45, sigY + 71);
-        doc.text('4. Treasury Challan / Receipt for Registration Fee', 45, sigY + 83);
+        doc.y = sigY + 84;
+        doc.font(regularFont).fontSize(8.5).text('* for and on behalf of Foreman ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '________________________________________');
+
+        doc.y += 20;
+        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor('#888888').stroke();
+        doc.moveDown(0.2);
+        doc.font(regularFont).fontSize(7.5).text('Note 1. * Here enter the name of the applicant institution if any.', 45, doc.y);
+        doc.text('2. Strike out or delete whatever is not applicable insert the designation(s) as may be appropriate to the applicant.', 45, doc.y + 10);
 
         doc.end();
       } catch (err) {

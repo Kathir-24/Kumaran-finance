@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
+import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
 
 export interface FormViiiPdfData {
   groupCode: string;
@@ -26,6 +27,7 @@ export interface FormViiiPdfData {
     customerAddress?: string | null;
     phone: string;
   }>;
+  isBlank?: boolean;
 }
 
 export class FormViiiAgreementTemplate {
@@ -46,6 +48,8 @@ export class FormViiiAgreementTemplate {
       };
 
       try {
+        StatutoryFormHelper.patchDocumentUnderline();
+
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: 35, bottom: 35, left: 40, right: 40 },
@@ -69,20 +73,28 @@ export class FormViiiAgreementTemplate {
         );
 
         const pageWidth = 595.28 - 80; // 515.28 pt printable
-        const chitValueWords = RupeeWordsHelper.toEnglishWords(data.chitValue);
-        const baseInstWords = RupeeWordsHelper.toEnglishWords(data.baseInstallment);
-        const maxDiscountWords = RupeeWordsHelper.toEnglishWords(data.maxDiscountCeiling);
-        const managingPartner = data.managingPartnerName || 'P. Kumaran (Managing Partner)';
-        const firmName = 'KUMARAN FINANCE (Head Office: Perundurai)';
-        const officeAddress =
-          data.branchAddress || '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052';
+        const isBlank = Boolean(
+          data.isBlank ||
+          data.groupCode.startsWith('___') ||
+          data.chitValue === 0n,
+        );
+
+        const chitValueWords = isBlank ? '' : RupeeWordsHelper.toEnglishWords(data.chitValue);
+        const baseInstWords = isBlank ? '' : RupeeWordsHelper.toEnglishWords(data.baseInstallment);
+        const maxDiscountWords = isBlank ? '' : RupeeWordsHelper.toEnglishWords(data.maxDiscountCeiling);
+        const managingPartner = isBlank ? '' : (data.managingPartnerName || 'P. Kumaran (Managing Partner)');
+        const firmName = isBlank ? '' : 'KUMARAN FINANCE (Head Office: Perundurai)';
+        const officeAddress = isBlank
+          ? ''
+          : (data.branchAddress || '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052');
         const commissionRateLabel = RupeeWordsHelper.formatCommissionRatePercent(
           data.foremanCommissionRate,
         );
-        const regNo = data.registrationNumber || data.sanctionOrderNumber || 'ROC/ERD/REG/PENDING';
+        const regNo = isBlank ? '' : (data.registrationNumber || data.sanctionOrderNumber || 'ROC/ERD/REG/PENDING');
         const regYear = new Date().getFullYear();
 
         // ================= PAGE 1: CHIT AGREEMENT =================
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(11).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(10.5).text('FORM VIII', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(8.5).text('(See Section 6 and Rule 13)', { align: 'center', width: pageWidth });
@@ -95,115 +107,127 @@ export class FormViiiAgreementTemplate {
           '(Articles of Agreement between the Foreman and the Subscribers)',
           { align: 'center', width: pageWidth },
         );
-        doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+        doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.6);
 
-        // General Particulars Box
-        const startY = doc.y;
-        doc.rect(40, startY, pageWidth, 58).fillAndStroke('#f8f9fa', '#ced4da');
-        doc.fillColor('#000').font(regularFont).fontSize(8);
-        doc.text(`1. Office where chit is registered: Registrar of Chits, Perundurai / Erode`, 48, startY + 6);
-        doc.text(`2. Year and Registered No: ${regNo} of ${regYear}`, 48, startY + 18);
-        doc.text(`3. Full name and address of foreman: ${firmName}, ${officeAddress}`, 48, startY + 30);
-        doc.text(`4. Managing Partner: ${managingPartner} | Occupation: Chit Fund Business`, 48, startY + 42);
+        // General Particulars 1 to 5 matching Gazette Page 58
+        doc.font(regularFont).fontSize(8);
+        doc.text('1. Office where the chit is registered: ', 40, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Registrar of Chits, Perundurai / Erode District', '________________________________________');
 
-        doc.x = 40;
-        doc.y = startY + 68;
+        doc.text('2. Year and Registered No: Year ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(regYear), '________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' No ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : regNo, '____________________');
+
+        doc.text('3. Full name and address of foreman: ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firmName}, ${officeAddress}`, '________________________________________________________');
+
+        doc.text('4. Occupation (if applicable): ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Chit Fund Operations & Financial Services', '____________________');
+
+        doc.text('5. Age (if applicable): ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '48 Years', '________');
+        doc.moveDown(0.6);
 
         // Article I
-        doc.font(boldFont).fontSize(8.5).text('I. CHIT AMOUNT AND NUMBER OF TICKETS (சீட்டு தொகை மற்றும் டிக்கெட்டுகள்):');
+        doc.font(boldFont).fontSize(8.5).text('I. Chit amount and No of tickets.');
         doc.font(regularFont).fontSize(8);
-        doc.text(`1. Total Chit Value (மொத்த சீட்டு மதிப்பு): ₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)} (${chitValueWords})`);
-        doc.text(`2. Number of Installments & Tickets: ${data.durationMonths} Months | ${data.totalTickets} Tickets`);
-        doc.text(`3. Subscription per Installment (மாத தவணை தொகை): ₹ ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)} (${baseInstWords})`);
-        doc.moveDown(0.4);
+        doc.text('1. No of tickets or fraction thereof held by each subscriber: Full: ', 40, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.totalTickets), '____', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | 3/4: Nil | 1/2: Nil | 1/4: Nil | 1/8: Nil');
+
+        doc.text('2. No. of installments and amount payable for each ticket at every installment: No. ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' Amount Rs. ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.baseInstallment), '__________');
+
+        doc.text('3. Chit amount Rs. ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.chitValue), '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : chitValueWords, '________________________________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ')');
+        doc.moveDown(0.6);
 
         // Article II
-        doc.font(boldFont).fontSize(8.5).text('II. DURATION OF THE CHIT (சீட்டு காலம்):');
+        doc.font(boldFont).fontSize(8.5).text('II. Duration of the chit.');
         doc.font(regularFont).fontSize(8);
-        doc.text(`1. Duration: ${data.durationMonths} consecutive calendar months.`);
-        doc.text(`2. Manner of Installments: Monthly discrete single installments without double or advance payments.`);
-        doc.moveDown(0.4);
+        doc.text('1. Date of 1st installment: ', 40, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15/01/2026', '____________________');
+        doc.text('2. Dates of subsequent installments: ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15th of every consecutive calendar month', '________________________________________');
+        doc.text('3. Duration of the chit: Years: ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '1 Year 8 Months', '________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' consecutive calendar months)');
+        doc.moveDown(0.6);
 
         // Article III
-        doc.font(boldFont).fontSize(8.5).text('III. PLACE, TIME AND COMMENCEMENT OF PROCEEDINGS (ஏலம் நடக்கும் இடம் மற்றும் நேரம்):');
+        doc.font(boldFont).fontSize(8.5).text('III. The place, time and probable date when the chit is to be commenced.');
         doc.font(regularFont).fontSize(8);
-        doc.text(`1. Place: Head Office, ${officeAddress}`);
-        doc.text(`2. Time of Proceedings: On the scheduled auction day at 11:00 AM IST.`);
-        doc.moveDown(0.4);
+        doc.text('1. Place: ', 40, doc.y + 2, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________');
+        doc.text('2. Time of commencement: ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '11:00 AM IST on scheduled draw date', '____________________');
+        doc.moveDown(0.6);
 
         // Article IV
-        doc.font(boldFont).fontSize(8.5).text('IV. FOREMAN SECURITY UNDER SECTION 20 (முன்னிலையாளர் பாதுகாப்பு வைப்பு):');
+        doc.font(boldFont).fontSize(8.5).text('IV. Particulars of security given or deposited by foreman.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Cash deposited in an approved scheduled bank in the name of the Registrar of Chits under Section 20(1)(a)(i) / Bank Guarantee.');
-        doc.text('2. The foreman shall not get release of the security in full until all the liabilities under the chit are completely discharged.');
-        doc.moveDown(0.4);
+        doc.text('1. Cash deposit in approved scheduled bank / bank guarantee in the name of Registrar under Section 20.');
+        doc.text('2. The foreman shall not get release of the security in full until all liabilities under the chit are discharged.');
+        doc.moveDown(0.6);
 
         // Article V
-        doc.font(boldFont).fontSize(8.5).text('V. MODE OF CONDUCTING THE CHIT & 25% DISCOUNT CEILING (ஏல முறை & உச்ச வரம்பு):');
+        doc.font(boldFont).fontSize(8.5).text('V. Mode of conducting the chit.');
         doc.font(regularFont).fontSize(8);
-        doc.text(`1. Ceiling Discount: Under Section 16 & Rule 13, the maximum bid discount is strictly fixed at 25% (1/4th) of total chit value: ₹ ${RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling)} (${maxDiscountWords}).`);
-        doc.text('2. Tie-Break Protocol (Option A): If two or more subscribers bid the ceiling of 25%, the winning prized subscriber is determined through a physical paper token lot draw in front of subscribers. No autonomous software draws.');
-        doc.text('3. Defaulter Ineligibility (ADR-07): A subscriber who has not paid their installment due for that month is strictly ineligible to participate or bid.');
-        doc.moveDown(0.4);
+        doc.text('1. Reverse auction among non-prized eligible subscribers. Defaulters barred under ADR-07.');
+        doc.text('2. Ceiling discount fixed strictly at 25% (1/4th) of chit value: Rs. ', 40, doc.y + 12, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling), '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : maxDiscountWords, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '). Tie-break via physical paper tokens (ADR-06).');
+        doc.moveDown(0.6);
 
-        // Article VI & VII
-        doc.font(boldFont).fontSize(8.5).text('VI. MODE OF PAYMENT & ARREARS (தவணை செலுத்தும் முறை):');
+        // Articles VI to XIII summary
+        doc.font(boldFont).fontSize(8.5).text('VI - XIII. Statutory Provisions, Universal Dividends & Dual-Control:');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Every subscriber shall pay their net installment on or before the due date and obtain a receipt in Form XVI.');
-        doc.text('2. 3 consecutive unpaid installments grants the company removal and substitution rights under Section 28 & 29.');
-        doc.moveDown(0.4);
-
-        // Article VIII - Universal Dividend
-        doc.font(boldFont).fontSize(8.5).text('VIII. DISBURSEMENT OF UNIVERSAL DIVIDENDS (அனைவருக்கும் சமமான லாபப்பங்கு):');
-        doc.font(regularFont).fontSize(8);
-        doc.text('1. Universal Equal Dividend: The auction discount minus foreman commission is divided equally across ALL members in the group, INCLUDING the auction winner and past prized winners.');
-        doc.text('2. Every subscriber pays the discounted net installment (I_net = I_base - Dividend) in the subsequent month.');
-        doc.moveDown(0.4);
-
-        // Article IX - Commission Freeze & Month 1/N Rules
-        doc.font(boldFont).fontSize(8.5).text('IX. FOREMAN COMMISSION & MONTH 1 / MONTH N RULES (கழிவு & விதிமுறைகள்):');
-        doc.font(regularFont).fontSize(8);
-        doc.text(`1. Foreman Commission: Fixed at ${commissionRateLabel} (ADR-04), permanently frozen for the entire duration of the chit scheme.`);
-        doc.text('2. Month 1 & Month N Rules: Month 1 full pool is taken by the company (no auction, ₹0 dividend). Month N is settled directly to the final subscriber with 4% commission (no auction). Auctions occur strictly in Months 2 through N-1.');
-        doc.moveDown(0.4);
-
-        // Article XIII & Signatures
-        doc.font(boldFont).fontSize(8.5).text('XIII. COMPANY SAFETY PROOF & STATUTORY UNDERTAKING (ADR-15):');
-        doc.font(regularFont).fontSize(8);
-        doc.text('1. Prize disbursement requires signed agreement with winner and nominee, signed blank cheques / promissory notes as safety proof.');
-        doc.text('2. Ticket Limit: Strictly maximum 1 ticket per subscriber in this chit group (enforced under ADR-13).');
+        doc.text(`• Universal Equal Dividend: Auction discount minus 4.00% foreman commission divided equally among ALL subscribers.`);
+        doc.text(`• Foreman Commission: Fixed at ${commissionRateLabel} (ADR-04) permanently frozen per scheme.`);
+        doc.text(`• Month 1 & Month N Rules: Month 1 full pool taken by Foreman; Month N settled directly without auction.`);
+        doc.text(`• Single Discrete Payments: Zero double/advance payments; receipts granted under Form XVI with Revenue Stamp.`);
         doc.moveDown(0.8);
 
         // ================= PAGE 2: SUBSCRIBERS EXECUTION ROSTER =================
         doc.addPage();
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(10.5).text('FORM VIII — SCHEDULE 10: SUBSCRIBERS EXECUTION ROSTER', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(8.5).text(
-          `Scheme: ${data.groupCode} (${data.groupName}) | Chit Value: ₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`,
+          `Scheme: ${data.groupCode} (${data.groupName}) | Chit Value: Rs. ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`,
           { align: 'center', width: pageWidth },
         );
-        doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+        doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.6);
 
         doc.font(regularFont).fontSize(8).text(
-          'We, the undersigned subscribers, have read and agreed to the Articles of Chit Agreement set forth above and affix our signatures hereunder:'
+          '10. The subscribers who have affixed their signatures hereunder agreed to the above Articles:'
         );
         doc.moveDown(0.4);
 
-        // Roster Table Header
+        // Roster Table Header matching Gazette Page 65
         const tableY = doc.y;
         doc.rect(40, tableY, pageWidth, 20).fillAndStroke('#343a40', '#343a40');
         doc.fillColor('#fff').font(boldFont).fontSize(7.5);
-        doc.text('Sl', 44, tableY + 5, { width: 22, align: 'center' });
-        doc.text('Ticket', 68, tableY + 5, { width: 38, align: 'center' });
-        doc.text('Subscriber Name & Address', 110, tableY + 5, { width: 175, align: 'left' });
-        doc.text('Phone', 290, tableY + 5, { width: 65, align: 'left' });
-        doc.text('Signature & Date', 360, tableY + 5, { width: 75, align: 'center' });
-        doc.text('Witness Signature', 440, tableY + 5, { width: 70, align: 'center' });
+        doc.text('Sl. No.', 44, tableY + 5, { width: 30, align: 'center' });
+        doc.text('Name and full address of subscriber', 78, tableY + 5, { width: 190, align: 'left' });
+        doc.text('No. of tickets', 272, tableY + 5, { width: 55, align: 'center' });
+        doc.text('Subscribers signature and date', 332, tableY + 5, { width: 95, align: 'center' });
+        doc.text('Name, Signature & witness address', 432, tableY + 5, { width: 115, align: 'center' });
 
         let currentY = tableY + 20;
         const rowHeight = 22;
-        const totalRows = data.subscribers && data.subscribers.length > 0 ? data.subscribers.length : data.totalTickets;
+        const totalRows = isBlank ? 20 : (data.subscribers && data.subscribers.length > 0 ? data.subscribers.length : data.totalTickets);
 
         for (let i = 0; i < totalRows; i++) {
           if (currentY + rowHeight > 780) {
@@ -211,20 +235,28 @@ export class FormViiiAgreementTemplate {
             currentY = 40;
           }
 
-          const sub = data.subscribers?.[i];
+          const sub = isBlank ? null : data.subscribers?.[i];
           const ticketNo = sub?.ticketNumber ?? i + 1;
-          const name = sub?.customerName || '_________________________________';
+          const name = sub?.customerName || '';
           const addr = sub?.customerAddress ? `, ${sub.customerAddress}` : '';
-          const phone = sub?.phone || '____________';
 
           doc.rect(40, currentY, pageWidth, rowHeight).fillAndStroke(i % 2 === 0 ? '#ffffff' : '#f8f9fa', '#dee2e6');
-          doc.fillColor('#000').font(regularFont).fontSize(7);
-          doc.text(String(i + 1), 44, currentY + 6, { width: 22, align: 'center' });
-          doc.font(boldFont).text(`#${ticketNo}`, 68, currentY + 6, { width: 38, align: 'center' });
-          doc.font(regularFont).text(`${name}${addr}`, 110, currentY + 6, { width: 175, ellipsis: true });
-          doc.text(phone, 290, currentY + 6, { width: 65 });
-          doc.text('________________', 360, currentY + 6, { width: 75, align: 'center' });
-          doc.text('________________', 440, currentY + 6, { width: 70, align: 'center' });
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7);
+          doc.text(String(i + 1), 44, currentY + 6, { width: 30, align: 'center' });
+
+          if (isBlank) {
+            doc.text('__________________________________________________', 78, currentY + 6, { width: 190 });
+            doc.text('____', 272, currentY + 6, { width: 55, align: 'center' });
+          } else {
+            doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont);
+            doc.text(`[#${ticketNo}] ${name}${addr}`, 78, currentY + 6, { width: 190, ellipsis: true });
+            doc.text('1 (Full)', 272, currentY + 6, { width: 55, align: 'center' });
+          }
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('____________________', 332, currentY + 6, { width: 95, align: 'center' });
+          doc.text('____________________', 432, currentY + 6, { width: 115, align: 'center' });
 
           currentY += rowHeight;
         }

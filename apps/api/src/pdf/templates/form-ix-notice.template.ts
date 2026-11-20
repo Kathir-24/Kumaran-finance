@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
+import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
 
 export interface FormIxPdfData {
   groupCode: string;
@@ -22,6 +23,7 @@ export interface FormIxPdfData {
   branchAddress?: string | null;
   managingPartnerName?: string | null;
   sanctionOrderNumber?: string | null;
+  isBlank?: boolean;
 }
 
 export class FormIxNoticeTemplate {
@@ -42,6 +44,8 @@ export class FormIxNoticeTemplate {
       };
 
       try {
+        StatutoryFormHelper.patchDocumentUnderline();
+
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: 40, bottom: 40, left: 45, right: 45 },
@@ -65,136 +69,141 @@ export class FormIxNoticeTemplate {
         );
 
         const pageWidth = 595.28 - 90; // 505.28 pt printable
-        const aucDate = FontResolverHelper.formatPdfDate(data.auctionDate);
-        const aucTime = data.auctionTime || '11:00 AM IST';
-        const chitValueWords = RupeeWordsHelper.toEnglishWords(data.chitValue);
-        const managingPartner = data.managingPartnerName || 'P. Kumaran (Managing Partner)';
-        const firmName = 'KUMARAN FINANCE';
-        const officeAddress =
-          data.drawVenue ||
-          data.branchAddress ||
-          '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052';
-        const year = new Date().getFullYear();
+        const isBlank = Boolean(
+          data.isBlank ||
+          data.groupCode.startsWith('___') ||
+          data.chitValue === 0n,
+        );
 
-        // Header
+        const aucDate = isBlank ? '' : FontResolverHelper.formatPdfDate(data.auctionDate);
+        const aucTime = isBlank ? '' : (data.auctionTime || '11:00 AM');
+        const firmName = isBlank ? '' : 'KUMARAN FINANCE';
+        const officeAddress = isBlank
+          ? ''
+          : (data.drawVenue ||
+             data.branchAddress ||
+             '142, Erode Main Road, Perundurai, Erode, Tamil Nadu - 638052');
+        const currentYear = new Date().getFullYear();
+        const year2Digit = String(currentYear).slice(2);
+
+        // Date breakdown for day / month blanks
+        let dayStr = '';
+        let monthStr = '';
+        if (!isBlank && data.auctionDate) {
+          const d = data.auctionDate instanceof Date ? data.auctionDate : new Date(data.auctionDate);
+          if (!Number.isNaN(d.getTime())) {
+            dayStr = String(d.getDate());
+            monthStr = d.toLocaleString('en-IN', { month: 'long' });
+          }
+        }
+
+        // Header matching Gazette Page 66
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(11).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(10.5).text('FORM IX', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(8.5).text('(See Section 16 and Rule 16)', { align: 'center', width: pageWidth });
         doc.moveDown(0.3);
-        doc.font(boldFont).fontSize(10).text(
-          `NOTICE TO SUBSCRIBERS OF CHIT DRAW — SCHEME NO. ${data.groupCode} OF ${year}`,
-          { align: 'center', width: pageWidth },
-        );
-        doc.font(regularFont).fontSize(8.5).text(
-          'படிவம் IX: சீட்டு ஏல அறிவிப்பு கடிதம் (பிரிவு 16 மற்றும் விதி 16)',
-          { align: 'center', width: pageWidth },
-        );
-        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).stroke();
+
+        doc.font(boldFont).fontSize(9.5).text('Notice to subscribers of Chit Number ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, boldFont, ' of 20');
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit);
+        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.8);
 
-        // Addressed To Box
+        // Addressed To & Place / Date
         const topY = doc.y;
-        doc.font(boldFont).fontSize(8.5).text('To:', 45, topY);
-        doc.font(regularFont).fontSize(8.5);
-
-        if (data.subscriberName) {
+        doc.font(regularFont).fontSize(8.5).text('To:', 45, topY);
+        if (isBlank) {
+          doc.text('Subscriber Name: ________________________________________', 45, topY + 12);
+          doc.text('Ticket Number:   ____________________', 45, topY + 24);
+        } else if (data.subscriberName) {
           const tamilSuffix = data.subscriberNameTamil ? ` / ${data.subscriberNameTamil}` : '';
           const ticketLabel = data.subscriberTicketNumber ? ` [Ticket #${data.subscriberTicketNumber}]` : '';
-          doc.font(boldFont).text(`${data.subscriberName}${tamilSuffix}${ticketLabel}`, 45, topY + 12);
+          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`${data.subscriberName}${tamilSuffix}${ticketLabel}`, 45, topY + 12);
+          doc.font(regularFont).fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
           if (data.subscriberPhone) {
-            doc.font(regularFont).text(`Mobile: ${data.subscriberPhone}`, 45, topY + 24);
+            doc.text(`Mobile: ${data.subscriberPhone}`, 45, topY + 24);
           }
-          doc.font(regularFont).text(`Subscriber, Chit Group: ${data.groupCode}`, 45, topY + 36);
+          doc.text(`Subscriber, Chit Group: ${data.groupCode}`, 45, topY + 36);
         } else {
-          doc.font(boldFont).text(`All Esteemed Subscribers of Chit Group ${data.groupCode}`, 45, topY + 12);
-          doc.font(regularFont).text(`${firmName}, Head Office - Perundurai`, 45, topY + 24);
+          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`All Esteemed Subscribers of Chit Group ${data.groupCode}`, 45, topY + 12);
+          doc.font(regularFont).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(`${firmName}, Head Office - Perundurai`, 45, topY + 24);
         }
 
-        doc.font(boldFont).text('Place: Perundurai', 360, topY);
-        doc.font(boldFont).text(`Notice Date: ${aucDate}`, 360, topY + 12);
-        if (data.sanctionOrderNumber) {
-          doc.font(regularFont).fontSize(8).text(`Sanction Ref: ${data.sanctionOrderNumber}`, 360, topY + 24, { width: 150 });
-        }
+        doc.font(regularFont).fontSize(8.5).text('Place: ', 360, topY);
+        doc.text('', 395, topY, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.y = topY + 60;
-        doc.font(boldFont).fontSize(9).text('Sir / Madam,', 45, doc.y);
-        doc.moveDown(0.4);
+        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 14);
+        doc.text('', 395, topY + 14, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucDate, '____________________');
 
-        // Core Statutory Wording from Gazette
-        doc.font(regularFont).fontSize(8.5).text(
-          `This is to inform you that the draw in monthly chit No. ${data.groupCode} (${data.groupName}) of ${year} in which you are one of the subscribers will be held on ${aucDate} at ${aucTime} at ${officeAddress}.`,
-          { align: 'justify', lineGap: 2.5 },
-        );
-        doc.moveDown(0.4);
-
-        doc.font(boldFont).fontSize(8.5).text(
-          'You are requested to be present at the draw in person or by your duly authorized agent.',
-          { align: 'justify', lineGap: 2 },
-        );
-        doc.moveDown(0.6);
-
-        // Draw Schedule Details Box
-        const boxY = doc.y;
-        doc.rect(45, boxY, pageWidth, 115).fillAndStroke('#f8f9fa', '#ced4da');
-        doc.fillColor('#000');
-
-        doc.font(boldFont).fontSize(8.5).text('CHIT DRAW SPECIFICATIONS & FINANCIAL LIMITS:', 55, boxY + 8);
-        doc.font(regularFont).fontSize(8);
-
-        doc.text('1. தவணை எண் / Installment Draw Number:', 55, boxY + 24);
-        doc.font(boldFont).text(`Month ${data.installmentMonth} of ${data.durationMonths} Months`, 250, boxY + 24);
-
-        doc.text('2. மொத்த சீட்டு மதிப்பு / Chit Value:', 55, boxY + 38);
-        doc.font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.chitValue)} (${chitValueWords})`, 250, boxY + 38);
-
-        doc.text('3. மாத அடிப்படை தவணை / Monthly Installment:', 55, boxY + 52);
-        doc.font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)}`, 250, boxY + 52);
-
-        doc.text('4. அதிகபட்ச ஏல கழிவு வரம்பு / Max Ceiling (1/4):', 55, boxY + 66);
-        doc.font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling)} (Strictly 25% Ceiling per ADR-06)`, 250, boxY + 66);
-
-        doc.text('5. ஏல தேதி மற்றும் நேரம் / Date & Time of Draw:', 55, boxY + 80);
-        doc.font(boldFont).text(`${aucDate} at ${aucTime}`, 250, boxY + 80);
-
-        doc.text('6. ஏல இடம் / Venue of Draw:', 55, boxY + 94);
-        doc.font(boldFont).text(officeAddress, 250, boxY + 94, { width: 240 });
-
-        doc.y = boxY + 125;
+        doc.y = topY + 55;
+        doc.font(regularFont).fontSize(9).text('Sir,', 45, doc.y);
         doc.moveDown(0.5);
 
-        // Statutory Conditions Note
-        doc.font(boldFont).fontSize(8).text('STATUTORY AUCTION CONDITIONS (Chit Funds Act, 1982 & Company Rules):');
-        doc.font(regularFont).fontSize(7.5);
-        doc.text(
-          '1. Defaulter Ineligibility: Subscribers who have outstanding unpaid dues for this installment month are strictly ineligible to bid or participate in this auction (Section 16 & ADR-07).',
-          { lineGap: 1.5 },
-        );
-        doc.text(
-          '2. Fixed 1/4 Discount Ceiling: Bidding cannot exceed one-fourth of chit value (Rs. ' +
-            RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling) +
-            '). In case of tie, physical paper tokens will be drawn publicly by Foreman (ADR-06).',
-          { lineGap: 1.5 },
-        );
-        doc.text(
-          '3. Universal Equal Dividend: The auction dividend will be distributed equally among all members (including prized subscribers), reducing the next installment payable.',
-          { lineGap: 1.5 },
-        );
-        doc.moveDown(1.2);
+        // Core Statutory Wording verbatim from Gazette Page 66
+        doc.font(regularFont).fontSize(8.5).text('This is to inform you that the ', 45, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.installmentMonth}th`, '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' draw in monthly / quarterly / half yearly / yearly chit No ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' 20', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit, { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' in which you are one of the subscribers will be held on ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : dayStr, '_______', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' day ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : monthStr, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (month) 20', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit, { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucTime, '__________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' be present at the draw in person or by your duly authorized agent.');
+        doc.moveDown(1.5);
 
-        // Signatures
+        // Signatures matching Gazette Page 66
         const sigY = doc.y;
-        doc.font(boldFont).fontSize(8.5).text('Yours faithfully,', 360, sigY);
-        doc.moveDown(2);
-        doc.text(`For and on behalf of Foreman:`, 360, sigY + 30);
-        doc.text(firmName, 360, sigY + 42);
-        doc.font(regularFont).text(managingPartner, 360, sigY + 55);
-        doc.text('(Managing Partner / Foreman)', 360, sigY + 67);
+        doc.font(regularFont).fontSize(8.5).text('Yours faithfully,', 360, sigY);
+        doc.text('Secretary ', 360, sigY + 20, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Partner / Authorised Signatory', '____________________');
 
-        doc.font(boldFont).fontSize(8).text('Foreman Registered Office:', 45, sigY + 30);
-        doc.font(regularFont).fontSize(8);
-        doc.text(firmName, 45, sigY + 42);
-        doc.text(officeAddress, 45, sigY + 54, { width: 260 });
-        doc.text(`Contact: +91 98765 43210`, 45, sigY + 76);
+        doc.y = sigY + 45;
+        doc.font(regularFont).fontSize(8.5).text('for and on behalf of (foreman) ', 360, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________');
+
+        doc.y += 30;
+        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor('#888888').stroke();
+        doc.moveDown(0.2);
+        doc.font(regularFont).fontSize(7.5).text(
+          'Strike out or delete whatever is not applicable. Insert such designation(s) as may be appropriate.',
+          45,
+          doc.y,
+        );
+
+        // Pre-filled Operational Scheme Summary Box if applicable
+        if (!isBlank) {
+          doc.moveDown(0.8);
+          const boxY = doc.y;
+          doc.rect(45, boxY, pageWidth, 90).fillAndStroke('#f8f9fa', '#ced4da');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
+
+          doc.font(boldFont).fontSize(8.5).text('SCHEME & DRAW SUMMARY / ஏல விவரக் குறிப்பு:', 55, boxY + 8);
+          doc.font(regularFont).fontSize(8);
+
+          doc.text('Scheme Name:', 55, boxY + 24);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${data.groupName} (${data.groupCode})`, 180, boxY + 24);
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('Total Chit Value:', 55, boxY + 38);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`, 180, boxY + 38);
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('Monthly Base Installment:', 55, boxY + 52);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.baseInstallment)}`, 180, boxY + 52);
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('Max Auction Discount Ceiling:', 55, boxY + 66);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling)} (25% / 1/4 Chit Value)`, 180, boxY + 66);
+        }
 
         doc.end();
       } catch (err) {

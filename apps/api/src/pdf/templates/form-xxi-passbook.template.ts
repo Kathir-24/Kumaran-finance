@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { FontResolverHelper } from '../helpers/font-resolver.helper';
 import { RupeeWordsHelper } from '../helpers/rupee-words.helper';
+import { StatutoryFormHelper } from '../helpers/statutory-form.helper';
 
 export interface PassbookScheduleItem {
   installmentMonth: number;
@@ -9,30 +10,34 @@ export interface PassbookScheduleItem {
   dividendDeduction: bigint;
   netPayableAmount: bigint;
   paidAmount: bigint;
-  status: string;
+  status: string | 'PAID' | 'UNPAID' | 'OVERDUE';
   paymentDate?: Date | null;
   receiptNumber?: string | null;
 }
 
-export interface FormXxiPassbookPdfData {
+export interface FormXxiPdfData {
   groupCode: string;
   groupName: string;
   chitValue: bigint;
-  durationMonths: number;
-  baseInstallment: bigint;
+  durationMonths?: number;
+  baseInstallment?: bigint;
   ticketNumber: number;
-  isPrized: boolean;
+  isPrized?: boolean;
   customerCode: string;
   customerName: string;
   customerNameTamil?: string | null;
   phone: string;
   totalGrossDue: bigint;
   totalDividendCredit: bigint;
-  totalNetPayable: bigint;
+  totalNetPayable?: bigint;
   totalPaid: bigint;
   totalOutstandingArrears: bigint;
   schedule: PassbookScheduleItem[];
   branchAddress?: string | null;
+  branchName?: string | null;
+  sanctionOrderNumber?: string | null;
+  registrationNumber?: string | null;
+  isBlank?: boolean;
 }
 
 export class FormXxiPassbookTemplate {
@@ -57,7 +62,7 @@ export class FormXxiPassbookTemplate {
     doc.text('நிலை / Status', 730, tableHeadY + 3, { width: 75, align: 'center' });
   }
 
-  static async generate(data: FormXxiPassbookPdfData): Promise<Buffer> {
+  static async generate(data: FormXxiPdfData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       let settled = false;
       const safeResolve = (buf: Buffer) => {
@@ -74,6 +79,8 @@ export class FormXxiPassbookTemplate {
       };
 
       try {
+        StatutoryFormHelper.patchDocumentUnderline();
+
         // Standard A4 landscape (841.89 x 595.28 pt)
         const doc = new PDFDocument({
           size: 'A4',
@@ -98,8 +105,10 @@ export class FormXxiPassbookTemplate {
         );
 
         const pageWidth = 841.89 - 60; // 781.89 pt printable
+        const isBlank = Boolean(data.isBlank);
 
         // Company Header
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(13).text('KUMARAN FINANCE / குமரன் பைனான்ஸ்', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(8.5).text(
           data.branchAddress || 'Main Road, Perundurai, Erode / தலைமை கிளை, பெருந்துறை, ஈரோடு',
@@ -120,20 +129,26 @@ export class FormXxiPassbookTemplate {
           '*(Formerly cited as Form XXI Passbook; aligned with Form XIV Section I of Tamil Nadu Chit Funds Rules, 1984)*',
           { align: 'center', width: pageWidth },
         );
-        doc.moveTo(30, doc.y + 2).lineTo(810, doc.y + 2).stroke();
+        doc.moveTo(30, doc.y + 2).lineTo(810, doc.y + 2).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.4);
 
         // Customer & Scheme Meta Row
         doc.font(regularFont).fontSize(8.5);
         const nameTamil = data.customerNameTamil ? ` / ${data.customerNameTamil}` : '';
-        doc.text(`சந்தாதாரர் / Member: ${data.customerName}${nameTamil} (${data.customerCode}) | போன்: ${data.phone}`, 30, doc.y, { continued: true });
-        doc.text(`சீட்டு / Scheme: ${data.groupCode} (${data.groupName}) | டிக்கெட்: #${data.ticketNumber}`, { align: 'right' });
+        doc.text(`சந்தாதாரர் / Member: `, 30, doc.y, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.customerName}${nameTamil} (${data.customerCode})`, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ` | போன்: `, { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.phone, '____________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    சீட்டு / Scheme: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | டிக்கெட்: ', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.ticketNumber}`, '____');
         doc.moveDown(0.3);
 
         // Financial Summary Bar
         const summaryY = doc.y;
         doc.rect(30, summaryY, pageWidth, 28).fillAndStroke('#e9ecef', '#ced4da');
-        doc.fillColor('#000');
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
         doc.font(boldFont).fontSize(8);
         doc.text(`மொத்த சந்தா / Gross Due: ₹ ${RupeeWordsHelper.formatWholeRupees(data.totalGrossDue)}`, 40, summaryY + 8);
@@ -142,7 +157,7 @@ export class FormXxiPassbookTemplate {
 
         const arrearsColor = data.totalOutstandingArrears > 0n ? '#dc3545' : '#28a745';
         doc.fillColor(arrearsColor).text(`நிலுவை / Arrears: ₹ ${RupeeWordsHelper.formatWholeRupees(data.totalOutstandingArrears)}`, 620, summaryY + 8);
-        doc.fillColor('#000');
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
         doc.y = summaryY + 36;
 
@@ -153,42 +168,46 @@ export class FormXxiPassbookTemplate {
         const maxRowBottomY = 550; // Leaves room for margins & footer on 595.28pt height
 
         this.drawTableHeader(doc, boldFont, tableHeadY, pageWidth, headHeight);
-        doc.fillColor('#000').font(regularFont).fontSize(7);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7);
         let curY = tableHeadY + headHeight;
 
         data.schedule.forEach((row, idx) => {
           if (curY + rowHeight > maxRowBottomY) {
             doc.addPage();
             this.drawTableHeader(doc, boldFont, 30, pageWidth, headHeight);
-            doc.fillColor('#000').font(regularFont).fontSize(7);
+            doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7);
             curY = 30 + headHeight;
           }
 
           const bg = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
           doc.rect(30, curY, pageWidth, rowHeight).fillAndStroke(bg, '#e9ecef');
-          doc.fillColor('#000');
 
           const dueStr = FontResolverHelper.formatPdfDate(row.dueDate);
           const paidStr = row.paymentDate ? FontResolverHelper.formatPdfDate(row.paymentDate) : '-';
           const recStr = row.receiptNumber || '-';
 
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7);
           doc.text(`மாதம் ${row.installmentMonth}`, 35, curY + 4, { width: 55, align: 'left' });
           doc.text(dueStr, 95, curY + 4, { width: 85, align: 'center' });
+
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont);
           doc.text(`₹ ${RupeeWordsHelper.formatWholeRupees(row.grossAmount)}`, 185, curY + 4, { width: 75, align: 'right' });
           doc.text(`- ₹ ${RupeeWordsHelper.formatWholeRupees(row.dividendDeduction)}`, 265, curY + 4, { width: 75, align: 'right' });
           doc.text(`₹ ${RupeeWordsHelper.formatWholeRupees(row.netPayableAmount)}`, 345, curY + 4, { width: 75, align: 'right' });
           doc.text(`₹ ${RupeeWordsHelper.formatWholeRupees(row.paidAmount)}`, 425, curY + 4, { width: 80, align: 'right' });
+
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
           doc.text(paidStr, 510, curY + 4, { width: 85, align: 'center' });
           doc.text(recStr, 600, curY + 4, { width: 125, align: 'center' });
 
           if (row.status === 'PAID') {
-            doc.fillColor('#28a745').text('PAID', 730, curY + 4, { width: 75, align: 'center' });
+            doc.fillColor('#28a745').font(boldFont).text('PAID', 730, curY + 4, { width: 75, align: 'center' });
           } else if (row.status === 'OVERDUE') {
-            doc.fillColor('#dc3545').text('OVERDUE', 730, curY + 4, { width: 75, align: 'center' });
+            doc.fillColor('#dc3545').font(boldFont).text('OVERDUE', 730, curY + 4, { width: 75, align: 'center' });
           } else {
-            doc.fillColor('#6c757d').text('UNPAID', 730, curY + 4, { width: 75, align: 'center' });
+            doc.fillColor('#6c757d').font(regularFont).text('UNPAID', 730, curY + 4, { width: 75, align: 'center' });
           }
-          doc.fillColor('#000');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
           curY += rowHeight;
         });
