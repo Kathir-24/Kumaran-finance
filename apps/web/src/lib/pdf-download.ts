@@ -220,6 +220,24 @@ export async function downloadFormViiPdf(
   );
 }
 
+export async function downloadFormViiiPdf(
+  chitGroupId: string,
+  filename: string,
+  deps: PdfDownloadDeps = {},
+): Promise<void> {
+  const client = deps.getClient ? deps.getClient() : apiClient;
+  const untypedGet = client.GET as unknown as UntypedGetFn;
+  await downloadPdfAndSave(
+    untypedGet('/api/v1/pdf/statutory/form-viii/{chitGroupId}', {
+      params: { path: { chitGroupId } },
+      parseAs: 'blob',
+      credentials: 'include',
+    }),
+    filename,
+    deps,
+  );
+}
+
 export async function downloadFormIxPdf(
   auctionId: string,
   filename: string,

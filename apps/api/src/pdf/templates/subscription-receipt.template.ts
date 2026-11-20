@@ -82,8 +82,14 @@ export class SubscriptionReceiptTemplate {
         doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).strokeColor('#333333').lineWidth(1).stroke();
         doc.moveDown(0.3);
 
-        // 2. Receipt Title (KFC-PDF-001 cancelled banner when reversed)
+        // 2. Statutory Receipt Title (Form XVI, Rule 25)
+        doc.font(boldFont).fontSize(9.5).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(10.5).text('FORM – XVI: சந்தா ரசீது / SUBSCRIPTION RECEIPT', { align: 'center', width: pageWidth });
+        doc.font(regularFont).fontSize(7.5).text('(See Section 23 and Rule 25 — Original / Duplicate)', { align: 'center', width: pageWidth });
+
+        // KFC-PDF-001 cancelled banner when reversed
         if (data.isCancelled) {
+          doc.moveDown(0.2);
           doc.font(boldFont).fontSize(10).fillColor('#DC2626').text(
             '*** ரத்து செய்யப்பட்ட ரசீது / CANCELLED RECEIPT ***',
             { align: 'center', width: pageWidth },
@@ -101,8 +107,6 @@ export class SubscriptionReceiptTemplate {
             });
             doc.fillColor('#000000');
           }
-        } else {
-          doc.font(boldFont).fontSize(10.5).text('சந்தா ரசீது / SUBSCRIPTION RECEIPT', { align: 'center', width: pageWidth });
         }
         doc.moveDown(0.3);
         doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).strokeColor('#888888').lineWidth(0.5).stroke();
@@ -199,13 +203,19 @@ export class SubscriptionReceiptTemplate {
 
         // 6. Sign-off and Ledger Notice Block
         doc.moveTo(leftX, currentY).lineTo(rightX, currentY).strokeColor('#333333').lineWidth(0.5).stroke();
-        currentY += 8;
+        currentY += 6;
 
         doc.font(regularFont).fontSize(7.5).fillColor('#000000');
         doc.text(`வசூலித்தவர் / Recorded By: ${data.collectedByName}`, leftX, currentY);
-        doc.text('அங்கீகரிக்கப்பட்ட கையொப்பம் / Authorized Signature', rightX - 160, currentY, { align: 'right', width: 160 });
 
-        currentY += 25;
+        // Statutory Stamp Box & Foreman Signature (Gazette Form XVI / Article 51 Indian Stamp Act)
+        doc.rect(rightX - 110, currentY, 110, 26).strokeColor('#888888').lineWidth(0.5).stroke();
+        doc.font(regularFont).fontSize(6).fillColor('#666666').text('வருவாய் வில்லை\nAffix Revenue Stamp\n(Art. 51 Stamp Act)', rightX - 105, currentY + 3, { width: 100, align: 'center' });
+
+        currentY += 28;
+        doc.font(boldFont).fontSize(7.5).fillColor('#000000').text('for and on behalf of foreman / முன்னிலையாளர் சார்பாக', rightX - 190, currentY, { align: 'right', width: 190 });
+
+        currentY += 15;
         doc.fontSize(6.5).fillColor('#555555');
         doc.x = leftX;
         doc.y = currentY;

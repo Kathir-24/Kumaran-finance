@@ -119,10 +119,15 @@ export class PayoutVoucherTemplate {
           data.branchAddress || 'Head Office: Perundurai, Erode / தலைமை கிளை: பெருந்துறை, ஈரோடு',
           { align: 'center', width: pageWidth },
         );
-        doc.moveDown(0.3);
+        doc.moveDown(0.2);
 
+        doc.font(boldFont).fontSize(9.5).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(11).text('பரிசு தொகை பட்டுவாடா வவுச்சர் / PRIZE DISBURSEMENT VOUCHER', { align: 'center', width: pageWidth });
-        doc.moveTo(25, doc.y).lineTo(570, doc.y).stroke();
+        doc.font(regularFont).fontSize(8).text(
+          '(Under Section 23, Rule 25(7) & Rule 27 of Tamil Nadu Chit Funds Rules, 1984)',
+          { align: 'center', width: pageWidth },
+        );
+        doc.moveTo(25, doc.y + 3).lineTo(570, doc.y + 3).stroke();
         doc.moveDown(0.5);
 
         // Metadata Row

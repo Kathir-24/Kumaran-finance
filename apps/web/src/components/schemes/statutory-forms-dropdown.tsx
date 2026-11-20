@@ -25,6 +25,7 @@ import {
   downloadFormIiPdf,
   downloadFormVPdf,
   downloadFormViiPdf,
+  downloadFormViiiPdf,
 } from '@/lib/pdf-download';
 import { getErrorMessage } from '@/lib/api-client';
 
@@ -49,7 +50,7 @@ export function StatutoryFormsDropdown({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleDownload = async (
-    formType: 'FORM_I' | 'FORM_II' | 'FORM_V' | 'FORM_VII',
+    formType: 'FORM_I' | 'FORM_II' | 'FORM_V' | 'FORM_VII' | 'FORM_VIII',
     filename: string,
   ) => {
     setDownloadingForm(formType);
@@ -63,6 +64,8 @@ export function StatutoryFormsDropdown({
         await downloadFormVPdf(chitGroupId, filename);
       } else if (formType === 'FORM_VII') {
         await downloadFormViiPdf(chitGroupId, filename);
+      } else if (formType === 'FORM_VIII') {
+        await downloadFormViiiPdf(chitGroupId, filename);
       }
     } catch (err: unknown) {
       setErrorMessage(getErrorMessage(err, `Failed to download ${formType}`));
@@ -172,6 +175,23 @@ export function StatutoryFormsDropdown({
             </div>
             <p className="text-[11px] text-slate-400 pl-5.5">
               Sec 10(2) & Rule 12 statutory compliance certificate
+            </p>
+          </DropdownMenuItem>
+
+          {/* Form VIII */}
+          <DropdownMenuItem
+            onClick={() =>
+              handleDownload('FORM_VIII', `form-viii-chit-agreement-${groupCode}.pdf`)
+            }
+            className="flex flex-col items-start gap-0.5 p-2 rounded-lg hover:bg-slate-800/80 cursor-pointer text-slate-200"
+          >
+            <div className="flex items-center gap-2 w-full font-medium text-xs text-purple-300">
+              <ScrollText className="h-3.5 w-3.5" />
+              <span>Form VIII — Form of Chit Agreement</span>
+              <Download className="ml-auto h-3 w-3 text-slate-400" />
+            </div>
+            <p className="text-[11px] text-slate-400 pl-5.5">
+              Sec 6 & Rule 13 Articles of Agreement with Subscriber Roster
             </p>
           </DropdownMenuItem>
         </DropdownMenuContent>

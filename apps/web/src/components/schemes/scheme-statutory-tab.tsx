@@ -20,6 +20,7 @@ import {
   downloadFormIiPdf,
   downloadFormVPdf,
   downloadFormViiPdf,
+  downloadFormViiiPdf,
 } from '@/lib/pdf-download';
 import { getErrorMessage } from '@/lib/api-client';
 
@@ -51,7 +52,7 @@ export function SchemeStatutoryTab({
   const isRegisteredOrActive = status === 'REGISTERED' || status === 'ACTIVE' || status === 'COMPLETED';
 
   const handleDownload = async (
-    formType: 'FORM_I' | 'FORM_II' | 'FORM_V' | 'FORM_VII',
+    formType: 'FORM_I' | 'FORM_II' | 'FORM_V' | 'FORM_VII' | 'FORM_VIII',
     filename: string,
   ) => {
     setDownloadingForm(formType);
@@ -65,6 +66,8 @@ export function SchemeStatutoryTab({
         await downloadFormVPdf(chitGroupId, filename);
       } else if (formType === 'FORM_VII') {
         await downloadFormViiPdf(chitGroupId, filename);
+      } else if (formType === 'FORM_VIII') {
+        await downloadFormViiiPdf(chitGroupId, filename);
       }
     } catch (err: unknown) {
       setErrorMessage(getErrorMessage(err, `Failed to download ${formType}`));
@@ -130,6 +133,18 @@ export function SchemeStatutoryTab({
         ? 'Ready to print for statutory compliance record'
         : 'Generates automatically with scheme schedule dates',
     },
+    {
+      type: 'FORM_VIII' as const,
+      name: 'Form VIII — Form of Chit Agreement',
+      legalRef: 'Section 6 & Rule 13 (Gazette Pages 58–65)',
+      description:
+        'Official 13-Article Chit Agreement between the Foreman and Subscribers, including the 25% ceiling, universal dividend rules, tie-break token draw, and the complete subscriber execution roster.',
+      filename: `form-viii-chit-agreement-${groupCode}.pdf`,
+      icon: ScrollText,
+      badge: 'Chit Agreement',
+      badgeColor: 'border-purple-500/30 bg-purple-950/40 text-purple-300',
+      readyStatus: 'Ready for subscriber execution & duplicate filing',
+    },
   ];
 
   return (
@@ -154,7 +169,7 @@ export function SchemeStatutoryTab({
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
             <Badge variant="outline" className="border-indigo-500/40 text-indigo-300 text-xs">
-              4 Forms Ready
+              5 Forms Ready
             </Badge>
           </div>
         </div>

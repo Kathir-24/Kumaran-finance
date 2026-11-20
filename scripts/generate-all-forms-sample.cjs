@@ -19,6 +19,7 @@ const { FormISanctionTemplate } = require('../apps/api/dist/pdf/templates/form-i
 const { FormIiRegistrationTemplate } = require('../apps/api/dist/pdf/templates/form-ii-registration.template.js');
 const { FormVDeclarationTemplate } = require('../apps/api/dist/pdf/templates/form-v-declaration.template.js');
 const { FormViiCertificateTemplate } = require('../apps/api/dist/pdf/templates/form-vii-certificate.template.js');
+const { FormViiiAgreementTemplate } = require('../apps/api/dist/pdf/templates/form-viii-agreement.template.js');
 const { FormIxNoticeTemplate } = require('../apps/api/dist/pdf/templates/form-ix-notice.template.js');
 const { FormXviiMinutesTemplate } = require('../apps/api/dist/pdf/templates/form-xvii-minutes.template.js');
 const { FormXxiPassbookTemplate } = require('../apps/api/dist/pdf/templates/form-xxi-passbook.template.js');
@@ -149,8 +150,32 @@ async function run() {
   });
   await savePdf('04-Form-VII-Agreement-Copies-Furnishing-Certificate-Prefilled.pdf', formViiBuf);
 
-  // 5. Form IX — Chit Draw Notice (Sec 16 & Rule 16)
-  console.log('5. Rendering Form IX (Chit Draw Notice)...');
+  // 5. Form VIII — Chit Agreement Articles (Sec 6 & Rule 13)
+  console.log('5. Rendering Form VIII (Chit Agreement Articles + Subscriber Roster)...');
+  const formViiiBuf = await FormViiiAgreementTemplate.generate({
+    groupCode,
+    groupName,
+    chitValue,
+    durationMonths,
+    totalTickets,
+    baseInstallment,
+    maxDiscountCeiling,
+    foremanCommissionRate,
+    sanctionOrderNumber,
+    sanctionDate: new Date('2026-01-20T10:00:00Z'),
+    registrationNumber: sanctionOrderNumber,
+    registrationDate: new Date('2026-01-25T10:00:00Z'),
+    firstDrawDate: new Date('2026-02-01T10:00:00Z'),
+    drawVenue: branchAddress,
+    branchName: 'Head Office - Perundurai',
+    branchAddress,
+    managingPartnerName: managingPartner,
+    subscribers,
+  });
+  await savePdf('05-Form-VIII-Chit-Agreement-Articles-Prefilled.pdf', formViiiBuf);
+
+  // 6. Form IX — Chit Draw Notice (Sec 16 & Rule 16)
+  console.log('6. Rendering Form IX (Chit Draw Notice)...');
   const formIxBuf = await FormIxNoticeTemplate.generate({
     groupCode,
     groupName,
@@ -172,10 +197,10 @@ async function run() {
     managingPartnerName: managingPartner,
     sanctionOrderNumber,
   });
-  await savePdf('05-Form-IX-Auction-Draw-Notice-Prefilled.pdf', formIxBuf);
+  await savePdf('06-Form-IX-Auction-Draw-Notice-Prefilled.pdf', formIxBuf);
 
-  // 6. Form XVII — Auction Minutes (Sec 17 & Rule 17)
-  console.log('6. Rendering Form XVII (Statutory Auction Minutes)...');
+  // 7. Minutes of Proceedings of Every Draw (Sec 17 & Rule 17)
+  console.log('7. Rendering Statutory Draw Minutes (Sec 17 & Rule 17)...');
   const formXviiBuf = await FormXviiMinutesTemplate.generate({
     groupCode,
     groupName,
@@ -208,10 +233,10 @@ async function run() {
     branchName: 'Head Office - Perundurai',
     branchAddress,
   });
-  await savePdf('06-Form-XVII-Auction-Minutes-Prefilled.pdf', formXviiBuf);
+  await savePdf('07-Statutory-Auction-Minutes-Sec17-Prefilled.pdf', formXviiBuf);
 
-  // 7. Form XXI — Continuous 20-Month Subscriber Passbook
-  console.log('7. Rendering Form XXI (Subscriber Passbook Ledger)...');
+  // 8. Form XIV — Continuous 20-Month Subscriber Passbook Ledger
+  console.log('8. Rendering Form XIV (Subscriber Passbook Ledger)...');
   const schedule = Array.from({ length: 20 }, (_, idx) => {
     const m = idx + 1;
     const isPaid = m <= 4;
@@ -247,10 +272,10 @@ async function run() {
     schedule,
     branchAddress,
   });
-  await savePdf('07-Form-XXI-Continuous-Subscriber-Passbook-Prefilled.pdf', formXxiBuf);
+  await savePdf('08-Form-XIV-Subscriber-Passbook-Ledger-Prefilled.pdf', formXxiBuf);
 
-  // 8. Form XVI — Bilingual Subscription Payment Receipt
-  console.log('8. Rendering Form XVI (Bilingual Subscription Receipt)...');
+  // 9. Form XVI — Bilingual Subscription Payment Receipt
+  console.log('9. Rendering Form XVI (Bilingual Subscription Receipt)...');
   const receiptBuf = await SubscriptionReceiptTemplate.generate({
     receiptNumber: 'KC-REC-PRD-2026-00042',
     date: new Date('2026-05-05T14:30:00Z'),
@@ -273,10 +298,10 @@ async function run() {
     branchPhone: '+91 98765 43210',
     isCancelled: false,
   });
-  await savePdf('08-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf', receiptBuf);
+  await savePdf('09-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf', receiptBuf);
 
-  // 9. Form KC-VOU — Prize Payout Voucher
-  console.log('9. Rendering Form KC-VOU (Prize Disbursement Payout Voucher)...');
+  // 10. Form KC-VOU — Prize Payout Voucher
+  console.log('10. Rendering Prize Disbursement Payout Voucher (Rule 25(7) & Rule 27)...');
   const voucherBuf = await PayoutVoucherTemplate.generate({
     voucherNumber: 'KC-VOU-PRD-2026-KCA-1L-20M-01-00004',
     disbursedAt: new Date('2026-05-20T16:00:00Z'),
@@ -307,7 +332,7 @@ async function run() {
     branchName: 'Head Office - Perundurai',
     branchAddress,
   });
-  await savePdf('09-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf', voucherBuf);
+  await savePdf('10-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf', voucherBuf);
 
   // ==========================================
   // 2. CLEAN BLANK STATUTORY TEMPLATE FORMS
@@ -398,6 +423,26 @@ async function run() {
   });
   await savePdf('04-Form-VII-Agreement-Copies-Furnishing-Certificate-Blank.pdf', blankFormViiBuf);
 
+  // Blank Form VIII — Chit Agreement (Sec 6 & Rule 13)
+  const blankFormViiiBuf = await FormViiiAgreementTemplate.generate({
+    groupCode: '____________________',
+    groupName: '________________________________________',
+    chitValue: 0n,
+    durationMonths: 0,
+    totalTickets: 20,
+    baseInstallment: 0n,
+    maxDiscountCeiling: 0n,
+    foremanCommissionRate: '4.00',
+    sanctionOrderNumber: '___________________________',
+    registrationNumber: '___________________________',
+    drawVenue: '________________________________________________________',
+    branchName: '____________________',
+    branchAddress: '________________________________________________________',
+    managingPartnerName: '___________________________',
+    subscribers: [],
+  });
+  await savePdf('05-Form-VIII-Chit-Agreement-Articles-Blank.pdf', blankFormViiiBuf);
+
   // Blank Form IX
   const blankFormIxBuf = await FormIxNoticeTemplate.generate({
     groupCode: '____________________',
@@ -420,7 +465,7 @@ async function run() {
     managingPartnerName: '___________________________',
     sanctionOrderNumber: '___________________________',
   });
-  await savePdf('05-Form-IX-Auction-Draw-Notice-Blank.pdf', blankFormIxBuf);
+  await savePdf('06-Form-IX-Auction-Draw-Notice-Blank.pdf', blankFormIxBuf);
 
   // Write README Index in sample directory
   const readmeContent = `# Kumaran Chits — Statutory & Operational Forms Suite
@@ -429,30 +474,31 @@ async function run() {
 > **Company**: **Kumaran Finance** (Head Office: Perundurai, Erode, Tamil Nadu)  
 > **Location in Repo**: \`sample-statutory-forms/\`
 
-This directory contains the sample PDF files generated by the **Kumaran Chits** PDF canvas engine. It includes both the **Pre-filled forms** (showing how software automatically populates all database fields) and **Blank forms** (matching the blank templates in the official Government Gazette).
+This directory contains the sample PDF files generated by the **Kumaran Chits** PDF canvas engine. It includes both the **Pre-filled forms** (showing how software automatically populates all database fields) and **Blank forms** (matching the blank templates in the official Government Gazette of Tamil Nadu Chit Funds Rules, 1984).
 
 ---
 
-## 1. Statutory Government Registrar Forms (Pre-filled vs Blank)
+## 1. Statutory Government Registrar Forms (Tamil Nadu Chit Funds Rules, 1984)
 
-| # | Form | Legal Section & Gazette Page | Pre-filled File | Blank Template File |
+| # | Form | Legal Citation in Gazette | Pre-filled File (Auto-Populated) | Blank Template File (Gazette Parity) |
 |---|---|---|---|---|
-| 1 | **Form I + Annexure** | Sec 4(2) & Rule 3 (Pages 43–46) | [\`01-Form-I-Prior-Sanction-Application-Prefilled.pdf\`](./01-Form-I-Prior-Sanction-Application-Prefilled.pdf) | [\`01-Form-I-Prior-Sanction-Application-Blank.pdf\`](./01-Form-I-Prior-Sanction-Application-Blank.pdf) |
-| 2 | **Form II** | Sec 7 & Rule 5 (Pages 49–50) | [\`02-Form-II-Chit-Agreement-Registration-Prefilled.pdf\`](./02-Form-II-Chit-Agreement-Registration-Prefilled.pdf) | [\`02-Form-II-Chit-Agreement-Registration-Blank.pdf\`](./02-Form-II-Chit-Agreement-Registration-Blank.pdf) |
-| 3 | **Form V** | Sec 9(1) & Rule 10 (Page 55) | [\`03-Form-V-100-Percent-Subscription-Declaration-Prefilled.pdf\`](./03-Form-V-100-Percent-Subscription-Declaration-Prefilled.pdf) | [\`03-Form-V-100-Percent-Subscription-Declaration-Blank.pdf\`](./03-Form-V-100-Percent-Subscription-Declaration-Blank.pdf) |
-| 4 | **Form VII** | Sec 10(2) & Rule 12 (Page 57) | [\`04-Form-VII-Agreement-Copies-Furnishing-Certificate-Prefilled.pdf\`](./04-Form-VII-Agreement-Copies-Furnishing-Certificate-Prefilled.pdf) | [\`04-Form-VII-Agreement-Copies-Furnishing-Certificate-Blank.pdf\`](./04-Form-VII-Agreement-Copies-Furnishing-Certificate-Blank.pdf) |
-| 5 | **Form IX** | Sec 16 & Rule 16 (Page 66) | [\`05-Form-IX-Auction-Draw-Notice-Prefilled.pdf\`](./05-Form-IX-Auction-Draw-Notice-Prefilled.pdf) | [\`05-Form-IX-Auction-Draw-Notice-Blank.pdf\`](./05-Form-IX-Auction-Draw-Notice-Blank.pdf) |
+| 1 | **Form I + Annexure** | Sec 4(2) & Rule 3 (Gazette p. 43–46) | [\`01-Form-I-Prior-Sanction-Application-Prefilled.pdf\`](./01-Form-I-Prior-Sanction-Application-Prefilled.pdf) | [\`01-Form-I-Prior-Sanction-Application-Blank.pdf\`](./01-Form-I-Prior-Sanction-Application-Blank.pdf) |
+| 2 | **Form II** | Sec 7 & Rule 5 (Gazette p. 49–50) | [\`02-Form-II-Chit-Agreement-Registration-Prefilled.pdf\`](./02-Form-II-Chit-Agreement-Registration-Prefilled.pdf) | [\`02-Form-II-Chit-Agreement-Registration-Blank.pdf\`](./02-Form-II-Chit-Agreement-Registration-Blank.pdf) |
+| 3 | **Form V** | Sec 9(1) & Rule 10 (Gazette p. 55) | [\`03-Form-V-100-Percent-Subscription-Declaration-Prefilled.pdf\`](./03-Form-V-100-Percent-Subscription-Declaration-Prefilled.pdf) | [\`03-Form-V-100-Percent-Subscription-Declaration-Blank.pdf\`](./03-Form-V-100-Percent-Subscription-Declaration-Blank.pdf) |
+| 4 | **Form VII** | Sec 10(2) & Rule 12 (Gazette p. 57) | [\`04-Form-VII-Agreement-Copies-Furnishing-Certificate-Prefilled.pdf\`](./04-Form-VII-Agreement-Copies-Furnishing-Certificate-Prefilled.pdf) | [\`04-Form-VII-Agreement-Copies-Furnishing-Certificate-Blank.pdf\`](./04-Form-VII-Agreement-Copies-Furnishing-Certificate-Blank.pdf) |
+| 5 | **Form VIII** | Sec 6 & Rule 13 (Gazette p. 58–65) | [\`05-Form-VIII-Chit-Agreement-Articles-Prefilled.pdf\`](./05-Form-VIII-Chit-Agreement-Articles-Prefilled.pdf) | [\`05-Form-VIII-Chit-Agreement-Articles-Blank.pdf\`](./05-Form-VIII-Chit-Agreement-Articles-Blank.pdf) |
+| 6 | **Form IX** | Sec 16 & Rule 16 (Gazette p. 66) | [\`06-Form-IX-Auction-Draw-Notice-Prefilled.pdf\`](./06-Form-IX-Auction-Draw-Notice-Prefilled.pdf) | [\`06-Form-IX-Auction-Draw-Notice-Blank.pdf\`](./06-Form-IX-Auction-Draw-Notice-Blank.pdf) |
 
 ---
 
-## 2. Operational & Accounting Registers (Bilingual English + தமிழ்)
+## 2. Operational & Statutory Accounting Registers (Bilingual English + தமிழ்)
 
-| # | Document | Statutory Form Equivalent | Pre-filled File | Features |
+| # | Document | Statutory Equivalent in Gazette | Pre-filled File | Features & Compliance Alignment |
 |---|---|---|---|---|
-| 6 | **Auction Minutes** | Form XVII (Sec 17 & Rule 17) | [\`06-Form-XVII-Auction-Minutes-Prefilled.pdf\`](./06-Form-XVII-Auction-Minutes-Prefilled.pdf) | Bilingual A4, 25% ceiling, tie-break paper token draw table, universal dividend allocation, Foreman declaration. |
-| 7 | **Subscriber Passbook** | Form XXI (Sec 23 & Rule 21) | [\`07-Form-XXI-Continuous-Subscriber-Passbook-Prefilled.pdf\`](./07-Form-XXI-Continuous-Subscriber-Passbook-Prefilled.pdf) | 20-month continuous statement, gross dues, dividend credit, net payable, paid amount, receipt numbers, arrears. |
-| 8 | **Subscription Receipt** | Form XVI (Rule 16) | [\`08-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf\`](./08-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf) | Bilingual A5 receipt, base installment, dividend deduction, net paid amount, cash/UPI method, collector signature. |
-| 9 | **Prize Payout Voucher** | Form KC-VOU (ADR-15 Checklist) | [\`09-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf\`](./09-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf) | A5 landscape disbursement voucher, arrears offset breakdown, blank cheque/promissory note security stamps, Maker != Checker signatures. |
+| 7 | **Auction Minutes** | Sec 17 & Rule 17 (p. 5) | [\`07-Statutory-Auction-Minutes-Sec17-Prefilled.pdf\`](./07-Statutory-Auction-Minutes-Sec17-Prefilled.pdf) | Bilingual A4, 25% ceiling, tie-break paper token draw, universal dividend allocation, Foreman signature **+ 2 Subscriber Witness signatures** under Sec 17(2)(f). |
+| 8 | **Subscriber Ledger / Passbook** | **Form XIV** (Sec 23 & Rule 25, p. 73) | [\`08-Form-XIV-Subscriber-Passbook-Ledger-Prefilled.pdf\`](./08-Form-XIV-Subscriber-Passbook-Ledger-Prefilled.pdf) | Continuous N-month statement aligned with **Form XIV (Section I: Receipts & Payments in Respect of Subscriber)**. |
+| 9 | **Subscription Receipt** | **Form XVI** (Sec 23 & Rule 25, p. 77) | [\`09-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf\`](./09-Form-XVI-Bilingual-Subscription-Receipt-Prefilled.pdf) | Form XVI (Original / Duplicate), statutory itemization, net paid amount, and **Article 51 Revenue Stamp box**. |
+| 10 | **Prize Payout Voucher** | Rule 25(7) & Rule 27 (p. 10–11) | [\`10-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf\`](./10-Form-KC-VOU-Prize-Disbursement-Payout-Voucher-Prefilled.pdf) | A5 disbursement voucher, arrears deduction table, blank cheque/promissory note stamps, Maker != Checker dual signatures. |
 `;
 
   fs.writeFileSync(path.join(repoOutputDir, 'README.md'), readmeContent);

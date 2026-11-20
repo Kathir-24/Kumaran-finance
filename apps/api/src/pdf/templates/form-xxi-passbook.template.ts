@@ -107,8 +107,20 @@ export class FormXxiPassbookTemplate {
         );
         doc.moveDown(0.2);
 
-        doc.font(boldFont).fontSize(10.5).text('படிவம் XXI / FORM XXI: சந்தாதாரர் பேரேடு / SUBSCRIBER PASSBOOK LEDGER [UNVERIFIED-LEGAL]', { align: 'center', width: pageWidth });
-        doc.moveTo(30, doc.y).lineTo(810, doc.y).stroke();
+        doc.font(boldFont).fontSize(9.5).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(10.5).text(
+          'FORM XIV: சந்தாதாரர் பேரேடு / FORM OF THE LEDGER TO BE MAINTAINED',
+          { align: 'center', width: pageWidth },
+        );
+        doc.font(regularFont).fontSize(8).text(
+          '(Section I — Receipts and Payments in Respect of Subscriber | See Section 23 and Rule 25(2))',
+          { align: 'center', width: pageWidth },
+        );
+        doc.font(regularFont).fontSize(7).text(
+          '*(Formerly cited as Form XXI Passbook; aligned with Form XIV Section I of Tamil Nadu Chit Funds Rules, 1984)*',
+          { align: 'center', width: pageWidth },
+        );
+        doc.moveTo(30, doc.y + 2).lineTo(810, doc.y + 2).stroke();
         doc.moveDown(0.4);
 
         // Customer & Scheme Meta Row

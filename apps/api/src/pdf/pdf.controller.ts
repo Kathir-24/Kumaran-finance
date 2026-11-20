@@ -554,6 +554,36 @@ export class PdfController {
     this.deliverPdfResponse(res, result, 'form-vii-certificate', chitGroupId, download, redirect, stream);
   }
 
+  @Get('statutory/form-viii/:chitGroupId')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Generate and stream statutory Form VIII Chit Agreement PDF',
+    description:
+      'Generates statutory Form VIII Chit Agreement under Section 6 and Rule 13 of the Tamil Nadu Chit Funds Rules, 1984.',
+  })
+  @ApiQuery({ name: 'download', required: false, type: Boolean })
+  @ApiQuery({ name: 'redirect', required: false, type: Boolean })
+  @ApiQuery({ name: 'stream', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Statutory Form VIII PDF binary stream or presigned URL JSON' })
+  async getFormViiiAgreementPdf(
+    @Param('chitGroupId', new ParseUUIDPipe()) chitGroupId: string,
+    @Query('download') download: boolean,
+    @Query('redirect') redirect: string,
+    @Query('stream') stream: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Res() res: Response,
+  ) {
+    const result = await this.pdfService.generateFormViiiAgreementPdf(chitGroupId, currentUser);
+    this.deliverPdfResponse(res, result, 'form-viii-chit-agreement', chitGroupId, download, redirect, stream);
+  }
+
   @Get('statutory/form-ix/:auctionId')
   @Roles(
     Role.SUPER_ADMIN,

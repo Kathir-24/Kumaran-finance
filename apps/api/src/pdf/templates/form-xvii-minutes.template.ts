@@ -89,11 +89,19 @@ export class FormXviiMinutesTemplate {
           data.branchAddress || 'Head Office: Perundurai, Erode / தலைமை கிளை: பெருந்துறை, ஈரோடு',
           { align: 'center', width: pageWidth },
         );
-        doc.moveDown(0.3);
+        doc.moveDown(0.2);
 
-        doc.font(boldFont).fontSize(10.5).text('படிவம் XVII / FORM XVII: ஏல நடவடிக்கைக் குறிப்பேடு [UNVERIFIED-LEGAL]', { align: 'center', width: pageWidth });
-        doc.font(regularFont).fontSize(8.5).text('MINUTES OF THE AUCTION PROCEEDINGS', { align: 'center', width: pageWidth });
-        doc.moveTo(35, doc.y).lineTo(560, doc.y).stroke();
+        doc.font(boldFont).fontSize(9.5).text('TAMIL NADU CHIT FUNDS RULES, 1984', { align: 'center', width: pageWidth });
+        doc.font(boldFont).fontSize(10.5).text('MINUTES OF THE AUCTION PROCEEDINGS / ஏல நடவடிக்கைக் குறிப்பேடு', { align: 'center', width: pageWidth });
+        doc.font(regularFont).fontSize(8).text(
+          '(Under Section 17 of Chit Funds Act, 1982 read with Rule 17 of Tamil Nadu Chit Funds Rules, 1984)',
+          { align: 'center', width: pageWidth },
+        );
+        doc.font(regularFont).fontSize(7).text(
+          '*(Statutory Draw Minutes under Sec 17 & Rule 17; Form XVII in Tamil Nadu Gazette is Dispute Reference u/s 64)*',
+          { align: 'center', width: pageWidth },
+        );
+        doc.moveTo(35, doc.y + 3).lineTo(560, doc.y + 3).stroke();
         doc.moveDown(0.5);
 
         // Chit Scheme & Auction Info
@@ -173,17 +181,33 @@ export class FormXviiMinutesTemplate {
           doc.addPage();
         }
 
-        // Signatures
+        // Signatures (Statutory Rule 17(f) & Section 17(2)(f): Foreman + At least 2 Subscribers Present)
         const sigY = doc.y;
         doc.moveTo(35, sigY).lineTo(560, sigY).stroke();
-        doc.moveDown(0.5);
+        doc.moveDown(0.3);
 
-        doc.font(regularFont).fontSize(8);
-        doc.text('முன்னிலையாளர் கையொப்பம் / Foreman Signature:', 45, sigY + 8);
-        doc.font(boldFont).fontSize(8.5).text('குமரன் பைனான்ஸ் (Foreman)', 45, sigY + 22);
+        doc.font(boldFont).fontSize(8).text('சட்டப்பூர்வ கையொப்பங்கள் / STATUTORY SIGNATURES (Sec 17(2)(f) & Rule 17(f)):', 35, sigY + 5);
 
-        doc.font(regularFont).fontSize(8).text('பதிவாளர் தாக்கல் உறுதிமொழி / Registrar Filing:', 340, sigY + 8);
-        doc.font(boldFont).fontSize(8.5).text('சரிபார்க்கப்பட்டு பதிவு செய்யப்பட்டது', 340, sigY + 22);
+        // Foreman
+        doc.font(regularFont).fontSize(7.5);
+        doc.text('முன்னிலையாளர் கையொப்பம் / Foreman:', 35, sigY + 18);
+        doc.font(boldFont).fontSize(8).text('குமரன் பைனான்ஸ் (Foreman)', 35, sigY + 30);
+
+        // Subscriber Witness 1
+        doc.font(regularFont).fontSize(7.5);
+        doc.text('சந்தாதாரர் சாட்சி 1 / Witness 1:', 175, sigY + 18);
+        doc.text('டிக்கெட் / Ticket: #_______', 175, sigY + 28);
+        doc.text('ஒப்பம்: ________________', 175, sigY + 38);
+
+        // Subscriber Witness 2
+        doc.font(regularFont).fontSize(7.5);
+        doc.text('சந்தாதாரர் சாட்சி 2 / Witness 2:', 305, sigY + 18);
+        doc.text('டிக்கெட் / Ticket: #_______', 305, sigY + 28);
+        doc.text('ஒப்பம்: ________________', 305, sigY + 38);
+
+        // Registrar Filing Status
+        doc.font(regularFont).fontSize(7.5).text('பதிவாளர் தாக்கல் / Registrar Filing (Sec 18):', 435, sigY + 18);
+        doc.font(boldFont).fontSize(8).text('சரிபார்க்கப்பட்டு தாக்கல் செய்யப்பட்டது', 435, sigY + 30);
 
         doc.end();
       } catch (err) {

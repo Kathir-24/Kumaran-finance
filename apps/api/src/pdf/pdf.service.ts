@@ -27,6 +27,7 @@ import { FormISanctionTemplate } from './templates/form-i-sanction.template';
 import { FormIiRegistrationTemplate } from './templates/form-ii-registration.template';
 import { FormVDeclarationTemplate } from './templates/form-v-declaration.template';
 import { FormViiCertificateTemplate } from './templates/form-vii-certificate.template';
+import { FormViiiAgreementTemplate } from './templates/form-viii-agreement.template';
 import { FormIxNoticeTemplate } from './templates/form-ix-notice.template';
 import { FormXviiMinutesTemplate } from './templates/form-xvii-minutes.template';
 import { FormXxiPassbookTemplate } from './templates/form-xxi-passbook.template';
@@ -1101,6 +1102,86 @@ export class PdfService {
     });
 
     const key = StorageKeyHelper.statutoryFormPdf('form-vii', chit.id);
+    const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      upload.key,
+      PRESIGNED_URL_EXPIRES_IN_SECONDS,
+    );
+
+    return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Generates statutory Form VIII Chit Agreement under Section 6 and Rule 13 of Tamil Nadu Chit Funds Rules, 1984.
+   */
+  async generateFormViiiAgreementPdf(
+    chitGroupId: string,
+    requestingUser: JwtPayload,
+  ): Promise<GeneratedPdfResult> {
+    this.assertPreLookupCallerEligibility(requestingUser, {
+      resourceLabel: 'statutory Form VIII chit agreement',
+      allowCustomer: true,
+      allowCollectionAgent: false,
+    });
+
+    const chit = await this.prisma.chitGroup.findUnique({
+      where: { id: chitGroupId },
+      include: {
+        branch: true,
+        tickets: {
+          include: { customer: { select: SAFE_PDF_CUSTOMER_SELECT } },
+          orderBy: { ticketNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!chit) {
+      throw new NotFoundException('Chit scheme not found');
+    }
+
+    this.assertFailClosedBranchAndCustomer(requestingUser, {
+      resourceBranchId: chit.branchId,
+      resourceLabel: 'statutory Form VIII chit agreement',
+      allowCollectionAgent: false,
+    });
+
+    const managingPartner = await this.prisma.user.findFirst({
+      where: { roles: { has: Role.PARTNER }, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { name: true, phone: true },
+    });
+
+    const subscribers = (chit.tickets || []).map((t) => ({
+      ticketNumber: t.ticketNumber,
+      customerName: t.customer?.fullName || 'Anonymous Subscriber',
+      customerAddress: t.customer?.addressLine1
+        ? `${t.customer.addressLine1}, ${t.customer.city || ''}`
+        : 'Perundurai, Erode',
+      phone: t.customer?.phone || '',
+    }));
+
+    const buffer = await FormViiiAgreementTemplate.generate({
+      groupCode: chit.groupCode,
+      groupName: chit.groupName,
+      chitValue: chit.chitValue,
+      durationMonths: chit.durationMonths,
+      totalTickets: chit.totalTickets,
+      baseInstallment: chit.baseInstallment,
+      maxDiscountCeiling: chit.maxDiscountCeiling,
+      foremanCommissionRate: chit.foremanCommissionRate,
+      sanctionOrderNumber: chit.sanctionOrderNumber,
+      sanctionDate: chit.sanctionDate,
+      registrationNumber: chit.sanctionOrderNumber,
+      registrationDate: chit.sanctionDate,
+      firstDrawDate: chit.startDate,
+      drawVenue: chit.branch?.address,
+      branchName: chit.branch?.name,
+      branchAddress: chit.branch?.address,
+      managingPartnerName: managingPartner?.name || 'P. Kumaran (Managing Partner)',
+      subscribers,
+    });
+
+    const key = StorageKeyHelper.statutoryFormPdf('form-viii', chit.id);
     const upload = await this.storageService.uploadFile(key, buffer, 'application/pdf');
     const presignedUrl = await this.storageService.getPresignedUrl(
       upload.key,
