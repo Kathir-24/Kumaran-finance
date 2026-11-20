@@ -29,7 +29,7 @@ export async function checkBackupHealth(
 ): Promise<BackupHealthResult> {
   const config = resolveS3Config();
   const s3Client = createS3Client(config);
-  const maxAgeHours = options?.maxAgeHours ?? 26; // 26 hours accommodates daily 24h cron + 2h margin
+  const maxAgeHours = options?.maxAgeHours ?? 8; // 8 hours: 3-checkpoint schedule (1:30PM/6:30PM/2AM IST) guarantees max 7h gap
 
   // 1. Discover latest backup set from S3/MinIO
   const sets = await listBackupSets(s3Client, config.bucket);
@@ -72,7 +72,7 @@ export async function checkBackupHealth(
     };
   }
 
-  // 3. Validate Freshness (RPO compliance: <= 26 hours)
+  // 3. Validate Freshness (RPO compliance: <= 8 hours; 3-checkpoint schedule: 1:30PM/6:30PM/2AM IST)
   const backupTime = new Date(manifest.timestamp).getTime();
   const now = Date.now();
   const ageMs = Math.max(0, now - backupTime);

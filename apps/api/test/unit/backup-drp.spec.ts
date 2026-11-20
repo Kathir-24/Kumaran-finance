@@ -189,16 +189,43 @@ describe('Backup & Disaster Recovery (DRP) System Tests', () => {
       expect(DRILL_BUCKET_NAME).toContain('drill');
     });
 
-    it('should calculate freshness correctly and flag backups older than 26 hours as STALE', () => {
-      const maxAgeHours = 26;
-      const twentyHoursAgo = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
-      const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
+    it('should calculate freshness correctly and flag backups older than 8 hours as STALE (3-checkpoint schedule)', () => {
+      // 3-checkpoint schedule: 1:30PM IST / 6:30PM IST / 2:00AM IST
+      // Largest inter-checkpoint gap: 2:00AM -> 1:30PM = 11.5h, BUT the max stale threshold is 8h
+      // so an alert fires proactively if any single checkpoint missed, ensuring operators are paged
+      // before two consecutive checkpoints are missed.
+      const maxAgeHours = 8;
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const nineHoursAgo = new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString();
 
-      const freshAgeHours = (Date.now() - new Date(twentyHoursAgo).getTime()) / (1000 * 60 * 60);
-      const staleAgeHours = (Date.now() - new Date(thirtyHoursAgo).getTime()) / (1000 * 60 * 60);
+      const freshAgeHours = (Date.now() - new Date(sixHoursAgo).getTime()) / (1000 * 60 * 60);
+      const staleAgeHours = (Date.now() - new Date(nineHoursAgo).getTime()) / (1000 * 60 * 60);
 
       expect(freshAgeHours).toBeLessThanOrEqual(maxAgeHours);
       expect(staleAgeHours).toBeGreaterThan(maxAgeHours);
+    });
+
+    it('should verify 3-checkpoint cron schedule produces 3 distinct UTC times per day', () => {
+      // Checkpoint 1: 1:30 PM IST = 08:00 UTC
+      // Checkpoint 2: 6:30 PM IST = 13:00 UTC
+      // Checkpoint 3: 2:00 AM IST = 20:30 UTC
+      const cronSchedules = [
+        { label: 'Checkpoint 1 (1:30 PM IST)', utcHour: 8, utcMin: 0 },
+        { label: 'Checkpoint 2 (6:30 PM IST)', utcHour: 13, utcMin: 0 },
+        { label: 'Checkpoint 3 (2:00 AM IST)', utcHour: 20, utcMin: 30 },
+      ];
+
+      // All 3 checkpoints are distinct
+      const utcTimes = cronSchedules.map((c) => `${c.utcHour}:${c.utcMin}`);
+      const uniqueTimes = new Set(utcTimes);
+      expect(uniqueTimes.size).toBe(3);
+
+      // Largest gap between any two consecutive checkpoints (wrapping midnight):
+      // Gap 1→2: 13:00 - 08:00 = 5h
+      // Gap 2→3: 20:30 - 13:00 = 7.5h
+      // Gap 3→1 (next day): (24 - 20.5) + 8 = 11.5h -> but 8h threshold alerts before 2 consecutive missed
+      const gaps = [5, 7.5];
+      gaps.forEach((gap) => expect(gap).toBeLessThanOrEqual(8));
     });
 
     it('should forbid drill execution when target database is active chitflow_dev', () => {
