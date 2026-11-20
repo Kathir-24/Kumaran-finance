@@ -195,17 +195,16 @@ export class FormIiRegistrationTemplate {
         doc.font(regularFont).fontSize(9).text('* for and on behalf of Foreman ', 45, doc.y, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '________________________________________');
 
-        // Official Registrar Endorsement Box at bottom
-        doc.y += 18;
-        const ackY = doc.y;
-        doc.rect(45, ackY, pageWidth, 48).strokeColor('#888888').lineWidth(0.8).stroke();
-        doc.font(boldFont).fontSize(8).fillColor('#333333').text('FOR REGISTRAR OF CHITS OFFICE USE ONLY / பதிவாளர் அலுவலக பயன்பாட்டிற்கு:', 55, ackY + 6);
-        doc.font(regularFont).fontSize(7.5).fillColor('#555555');
-        doc.text('Registration Fee Paid: Rs. 1000/-   |   Challan No: ______________   |   Filing Date: ______________', 55, ackY + 19);
-        doc.text('Registration Certificate No: ______________________   |   Registrar Seal & Signature: ______________________', 55, ackY + 32);
-
-        doc.y = ackY + 54;
-        doc.font(regularFont).fontSize(7).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text('Note 1. * Here enter the name of the applicant institution. 2. Strike out or delete whatever is not applicable.', 45, doc.y);
+        // Footnote matching Gazette Page 50 verbatim
+        doc.y = sigY + 116;
+        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
+        doc.moveDown(0.3);
+        doc.font(regularFont).fontSize(7.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+          'Note 1. * Here enter the name of the applicant institution if any.\n2. Strike out or delete whatever is not applicable insert the designation(s) as may be appropriate to the applicant.',
+          45,
+          doc.y,
+          { width: pageWidth, lineGap: 2 },
+        );
 
         doc.end();
       } catch (err) {

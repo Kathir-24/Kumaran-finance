@@ -253,7 +253,7 @@ export class SubscriptionReceiptTemplate {
         doc.y = currentY;
         doc.text('* இது கணினி மூலம் உருவாக்கப்பட்ட டிஜிட்டல் ரசீது. / This is a computer-generated digital receipt.', { align: 'center', width: pageWidth });
         doc.moveDown(0.2);
-        doc.text('* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும் (ADR-11).', { align: 'center', width: pageWidth });
+        doc.text('* சந்தா செலுத்தியதற்கான முதன்மை சட்டப்பூர்வ ஆதாரம் சந்தாதாரரின் கையொப்பமிட்ட பாஸ்புக் ஆகும்.', { align: 'center', width: pageWidth });
         doc.moveDown(0.2);
         doc.text('* The primary acknowledged legal proof of payment is the signed physical paper passbook.', { align: 'center', width: pageWidth });
 

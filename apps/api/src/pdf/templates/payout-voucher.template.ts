@@ -236,8 +236,8 @@ export class PayoutVoucherTemplate {
         doc.text(`In Words: ${RupeeWordsHelper.toEnglishWords(data.netPrizeMoney)}`, 25, doc.y, { width: pageWidth, lineGap: 3 });
         doc.moveDown(0.35);
 
-        // Safety Proof Checklist Stamp (ADR-15)
-        doc.font(boldFont).fontSize(8.5).text('நிறுவன பாதுகாப்பு சரிபார்ப்பு / COMPANY SAFETY PROOF CHECKLIST (ADR-15):', 25, doc.y, { width: pageWidth });
+        // Safety Proof Checklist Stamp
+        doc.font(boldFont).fontSize(8.5).text('நிறுவன பாதுகாப்பு சரிபார்ப்பு / COMPANY SAFETY PROOF CHECKLIST:', 25, doc.y, { width: pageWidth });
         doc.font(regularFont).fontSize(8);
         const agr = data.agreementSigned ? 'சரி / YES' : 'இல்லை / NO';
         const nom = data.nomineeSigned ? 'சரி / YES' : 'இல்லை / NO';

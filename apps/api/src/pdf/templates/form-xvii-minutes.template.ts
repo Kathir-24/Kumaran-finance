@@ -138,84 +138,85 @@ export class FormXviiMinutesTemplate {
         doc.moveDown(0.4);
 
         // Financial Calculation Table
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9.5).text('ஏல முடிவு & கழிவு பகிர்வு விவரங்கள் / AUCTION FINANCIAL STATEMENT:');
-        doc.moveDown(0.3);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(10).text('ஏல முடிவு & கழிவு பகிர்வு விவரங்கள் / AUCTION FINANCIAL STATEMENT:');
+        doc.moveDown(0.4);
 
         const tableY = doc.y;
-        doc.rect(35, tableY, pageWidth, 78).fillAndStroke('#f8f9fa', '#ced4da');
+        const tableHeight = 96;
+        doc.rect(35, tableY, pageWidth, tableHeight).fillAndStroke('#f8f9fa', '#ced4da');
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
         const colValX = 360;
         const colValWidth = pageWidth - (colValX - 35) - 15;
 
-        doc.font(regularFont).fontSize(8.5);
-        doc.text('வெற்றி பெற்ற ஏல கழிவு / Winning Bid Discount (Max 25%):', 45, tableY + 9);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.bidDiscount)}`, colValX, tableY + 9, { width: colValWidth, align: 'right' });
+        doc.font(regularFont).fontSize(9);
+        doc.text('வெற்றி பெற்ற ஏல கழிவு / Winning Bid Discount (Max 25%):', 45, tableY + 11);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.bidDiscount)}`, colValX, tableY + 11, { width: colValWidth, align: 'right' });
 
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text(`நிறுவன முகவர் கழிவு / Foreman Commission (${commissionRateLabel}):`, 45, tableY + 25);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.foremanCommissionAmount)}`, colValX, tableY + 25, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text(`நிறுவன முகவர் கழிவு / Foreman Commission (${commissionRateLabel}):`, 45, tableY + 31);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.foremanCommissionAmount)}`, colValX, tableY + 31, { width: colValWidth, align: 'right' });
 
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('பகிர்ந்தளிக்கப்படும் மொத்த லாபப்பங்கு / Total Universal Dividend:', 45, tableY + 41);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.totalDividend)}`, colValX, tableY + 41, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('பகிர்ந்தளிக்கப்படும் மொத்த லாபப்பங்கு / Total Universal Dividend:', 45, tableY + 51);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.totalDividend)}`, colValX, tableY + 51, { width: colValWidth, align: 'right' });
 
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('ஒரு டிக்கெட்டுக்கான லாபப்பங்கு / Dividend Per Ticket:', 45, tableY + 57);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)}`, colValX, tableY + 57, { width: colValWidth, align: 'right' });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('ஒரு டிக்கெட்டுக்கான லாபப்பங்கு / Dividend Per Ticket:', 45, tableY + 71);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`Rs. ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)}`, colValX, tableY + 71, { width: colValWidth, align: 'right' });
 
         doc.x = 35;
-        doc.y = tableY + 86;
+        doc.y = tableY + tableHeight + 10;
 
-        doc.font(boldFont).fontSize(9.5);
+        doc.font(boldFont).fontSize(10);
         doc.fillColor(StatutoryFormHelper.DATA_BLUE).text(`வெற்றியாளருக்கான பரிசு தொகை / Prize Money: Rs. ${RupeeWordsHelper.formatWholeRupees(data.prizeMoney)}`, 35, doc.y, { width: pageWidth });
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: Rs. ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} (அனைவருக்கும் / For All Members)`, 35, doc.y + 2, { width: pageWidth });
-        doc.moveDown(0.6);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).text(`அடுத்த மாத நிகர தவணை / Next Month Net Installment: Rs. ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} (அனைவருக்கும் / For All Members)`, 35, doc.y + 3, { width: pageWidth });
+        doc.moveDown(1.0);
 
         // Winner Details Box
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9.5).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:', 35, doc.y, { width: pageWidth });
-        doc.font(regularFont).fontSize(9);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(10).text('வெற்றியாளர் விவரம் / PRIZED SUBSCRIBER DETAILS:', 35, doc.y, { width: pageWidth });
+        doc.font(regularFont).fontSize(9.5);
         const nameTamil = data.winnerNameTamil ? ` / ${data.winnerNameTamil}` : '';
-        doc.text('டிக்கெட் / Ticket: ', 35, doc.y + 3, { continued: true });
+        doc.text('டிக்கெட் / Ticket: ', 35, doc.y + 4, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.winnerTicketNumber}`, '____', { continued: true });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' | பெயர் / Name: ', { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.winnerName}${nameTamil}`, '________________________________________');
 
-        doc.text('குறியீடு / Code: ', 35, doc.y + 3, { continued: true });
+        doc.text('குறியீடு / Code: ', 35, doc.y + 4, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.winnerCustomerCode, '____________________', { continued: true });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' | தொலைபேசி / Mobile: ', { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.winnerPhone, '____________________');
-        doc.moveDown(0.6);
+        doc.moveDown(1.0);
 
-        // Tie-Breaker Table if applicable (Option A)
+        // Tie-Breaker Table if applicable
         if (data.wasTieBreakWinner && data.tiedBidders && data.tiedBidders.length > 0) {
-          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8.5).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW (OPTION A):', 35, doc.y, { width: pageWidth });
-          doc.font(regularFont).fontSize(8);
-          doc.text('அதிகபட்ச கழிவான 25% ஏலம் கேட்டவர்களிடையே நேரில் டோக்கன் குலுக்கல் மூலம் வெற்றியாளர் தேர்வு செய்யப்பட்டார்:', 35, doc.y + 2, { width: pageWidth });
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9).text('அதிபட்ச கழிவு சமநிலை & குலுக்கல் முடிவு / CEILING TIE LOT DRAW:', 35, doc.y, { width: pageWidth });
+          doc.font(regularFont).fontSize(8.5);
+          doc.text('அதிகபட்ச கழிவான 25% ஏலம் கேட்டவர்களிடையே நேரில் டோக்கன் குலுக்கல் மூலம் வெற்றியாளர் தேர்வு செய்யப்பட்டார்:', 35, doc.y + 3, { width: pageWidth });
 
           data.tiedBidders.forEach((tb) => {
             const status = tb.isWinner ? '[வெற்றியாளர் / WINNER]' : '[பங்கேற்றவர் / Participant]';
-            doc.text(`  • டோக்கன் #${tb.tokenNumberDrawn ?? 'N/A'}: டிக்கெட் #${tb.ticketNumber} - ${tb.customerName} ${status}`, 35, doc.y + 2, { width: pageWidth });
+            doc.text(`  • டோக்கன் #${tb.tokenNumberDrawn ?? 'N/A'}: டிக்கெட் #${tb.ticketNumber} - ${tb.customerName} ${status}`, 35, doc.y + 3, { width: pageWidth });
           });
-          doc.moveDown(0.5);
+          doc.moveDown(0.8);
         }
 
-        // Universal Dividend Deduction Policy Note (ADR-03 / Guardrail 4)
+        // Universal Dividend Deduction Policy Note
         const divBoxY = doc.y;
-        doc.rect(35, divBoxY, pageWidth, 48).fillAndStroke('#f8f9fa', '#ced4da');
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8).text('UNIVERSAL EQUAL DIVIDEND DEDUCTION ALLOCATION (Guardrail 4 & Sec 17):', 45, divBoxY + 7);
-        doc.font(regularFont).fontSize(7.5);
-        doc.text(`Dividend of Rs. ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)} per ticket is credited equally to ALL ${data.durationMonths} subscribers (including prized winners).`, 45, divBoxY + 20);
-        doc.text(`All members pay the uniform net installment of Rs. ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} for Month #${data.installmentMonth + 1}.`, 45, divBoxY + 33);
+        doc.rect(35, divBoxY, pageWidth, 54).fillAndStroke('#f8f9fa', '#ced4da');
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8.5).text('UNIVERSAL EQUAL DIVIDEND DEDUCTION ALLOCATION (Sec 17):', 45, divBoxY + 8);
+        doc.font(regularFont).fontSize(8);
+        doc.text(`Dividend of Rs. ${RupeeWordsHelper.formatWholeRupees(data.dividendPerTicket)} per ticket is credited equally to ALL ${data.durationMonths} subscribers (including prized winners).`, 45, divBoxY + 23);
+        doc.text(`All members pay the uniform net installment of Rs. ${RupeeWordsHelper.formatWholeRupees(data.nextMonthNetInstallment)} for Month #${data.installmentMonth + 1}.`, 45, divBoxY + 38);
 
-        doc.y = divBoxY + 54;
+        doc.y = divBoxY + 62;
 
         // Minutes Proceedings Text
-        doc.moveDown(0.4);
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(8.5).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:', 35, doc.y, { width: pageWidth });
-        doc.font(regularFont).fontSize(8);
-        doc.text(data.minutesText || 'ஏலம் முறைப்படி அமைதியான முறையில் உறுப்பினர்கள் முன்னிலையில் நடத்தப்பட்டது.', 35, doc.y + 2, { width: pageWidth });
         doc.moveDown(0.8);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9).text('ஏல நடவடிக்கைகள் & குறிப்புகள் / AUCTION PROCEEDINGS:', 35, doc.y, { width: pageWidth });
+        doc.font(regularFont).fontSize(8.5);
+        doc.text(data.minutesText || 'ஏலம் முறைப்படி அமைதியான முறையில் உறுப்பினர்கள் முன்னிலையில் நடத்தப்பட்டது.', 35, doc.y + 3, { width: pageWidth });
+        doc.moveDown(1.5);
 
         // Signatures (Statutory Rule 17(f) & Section 17(2)(f): Foreman + At least 2 Subscribers Present)
-        const sigY = doc.y;
+        const sigY = Math.max(doc.y, 560);
         doc.moveTo(35, sigY).lineTo(560, sigY).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.3);
 
@@ -247,15 +248,6 @@ export class FormXviiMinutesTemplate {
         doc.font(regularFont).fontSize(7.5).text('பதிவாளர் தாக்கல் / Registrar Filing (Sec 18):', 415, sigY + 20, { width: 140 });
         doc.font(boldFont).fontSize(7.5).text('சரிபார்க்கப்பட்டு தாக்கல் செய்யப்பட்டது', 415, sigY + 34, { width: 140 });
         doc.font(regularFont).fontSize(7.5).text('நிலை: FILED WITH REGISTRAR', 415, sigY + 50, { width: 140 });
-
-        // Official Registrar Endorsement Box at bottom
-        doc.y = sigY + 74;
-        const ackY = doc.y;
-        doc.rect(35, ackY, pageWidth, 54).strokeColor('#888888').lineWidth(0.8).stroke();
-        doc.font(boldFont).fontSize(8).fillColor('#333333').text('FOR REGISTRAR OF CHITS OFFICE FILING RECORD (Sec 18(1)):', 45, ackY + 7);
-        doc.font(regularFont).fontSize(7.5).fillColor('#555555');
-        doc.text('Minutes Filed within 14 days of Draw: YES   |   Filing Date: ______________   |   Challan No: ______________', 45, ackY + 21);
-        doc.text('Receiving Officer Initials: ______________________   |   Official Filing Seal: ______________________', 45, ackY + 35);
 
         doc.end();
       } catch (err) {
