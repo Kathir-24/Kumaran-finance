@@ -135,15 +135,15 @@ export class FormXxiPassbookTemplate {
         // Customer & Scheme Meta Row
         doc.font(regularFont).fontSize(8.5);
         const nameTamil = data.customerNameTamil ? ` / ${data.customerNameTamil}` : '';
-        doc.text(`சந்தாதாரர் / Member: `, 30, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.customerName}${nameTamil} (${data.customerCode})`, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ` | போன்: `, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.phone, '____________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    சீட்டு / Scheme: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | டிக்கெட்: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.ticketNumber}`, '____');
-        doc.moveDown(0.3);
+        doc.text(`சந்தாதாரர் / Member: `, 30, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.customerName}${nameTamil} (${data.customerCode})`, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ` | போன்: `, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.phone, '____________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    சீட்டு / Scheme: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | டிக்கெட்: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.ticketNumber}`, '____', { lineGap: 3.5 });
+        doc.moveDown(0.4);
 
         // Financial Summary Bar
         const summaryY = doc.y;

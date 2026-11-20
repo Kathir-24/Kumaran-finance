@@ -139,26 +139,27 @@ export class PayoutVoucherTemplate {
         // Metadata Row
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(9);
         const voucherDate = FontResolverHelper.formatPdfDate(data.disbursedAt);
-        doc.text('வவுச்சர் எண் / Voucher No: ', 25, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.voucherNumber, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    தேதி / Date: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : voucherDate, '____________________');
-        doc.moveDown(0.2);
+        doc.text('வவுச்சர் எண் / Voucher No: ', 25, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.voucherNumber, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    தேதி / Date: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : voucherDate, '____________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        doc.text('சீட்டு குழு / Chit Group: ', 25, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | மாதம் / Month: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.installmentMonth}`, '____', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | டிக்கெட் / Ticket: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.ticketNumber}`, '____');
+        doc.text('சீட்டு குழு / Chit Group: ', 25, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | மாதம் / Month: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.installmentMonth}`, '____', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | டிக்கெட் / Ticket: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.ticketNumber}`, '____', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
         const winnerTamil = data.winnerNameTamil ? ` / ${data.winnerNameTamil}` : '';
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        doc.text('வெற்றியாளர் / Winner: ', 25, doc.y + 2, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.winnerName}${winnerTamil} (${data.winnerCode})`, '________________________________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தொலைபேசி: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.phone, '____________________');
+        doc.text('வெற்றியாளர் / Winner: ', 25, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.winnerName}${winnerTamil} (${data.winnerCode})`, '________________________________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தொலைபேசி: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.phone, '____________________', { lineGap: 3.5 });
         doc.moveDown(0.4);
 
         // Financial Breakdown Box
@@ -230,8 +231,9 @@ export class PayoutVoucherTemplate {
 
         // Words
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8.5);
-        doc.text(`தொகை (சொற்களில்): ${RupeeWordsHelper.toTamilWords(data.netPrizeMoney)}`, 25, doc.y, { width: pageWidth });
-        doc.text(`In Words: ${RupeeWordsHelper.toEnglishWords(data.netPrizeMoney)}`, 25, doc.y + 2, { width: pageWidth });
+        doc.text(`தொகை (சொற்களில்): ${RupeeWordsHelper.toTamilWords(data.netPrizeMoney)}`, 25, doc.y, { width: pageWidth, lineGap: 3 });
+        doc.moveDown(0.2);
+        doc.text(`In Words: ${RupeeWordsHelper.toEnglishWords(data.netPrizeMoney)}`, 25, doc.y, { width: pageWidth, lineGap: 3 });
         doc.moveDown(0.35);
 
         // Safety Proof Checklist Stamp (ADR-15)
@@ -253,13 +255,13 @@ export class PayoutVoucherTemplate {
         doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).fontSize(8.5).text(data.verifiedByUserName, 35, sigY + 20);
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).text('____________________', 35, sigY + 32);
 
-        doc.font(regularFont).fontSize(8).text('அனுமதித்தவர் (சரிபார்ப்பாளர் / Checker):', 230, sigY + 8);
-        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).fontSize(8.5).text(data.authorizedByUserName, 230, sigY + 20);
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).text('____________________', 230, sigY + 32);
+        doc.font(regularFont).fontSize(8).text('அனுமதித்தவர் (சரிபார்ப்பாளர் / Checker):', 215, sigY + 8);
+        doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).fontSize(8.5).text(data.authorizedByUserName, 215, sigY + 20);
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).text('____________________', 215, sigY + 32);
 
-        doc.font(regularFont).fontSize(8).text('வெற்றியாளர் கையொப்பம் / Winner Signature:', 410, sigY + 8);
-        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(8).text('(கையொப்பம் / Signature)', 410, sigY + 20);
-        doc.font(boldFont).text('____________________', 410, sigY + 32);
+        doc.font(regularFont).fontSize(8).text('வெற்றியாளர் / Winner:', 395, sigY + 8, { width: 175 });
+        doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(7.5).text('(கையொப்பம் / Signature)', 395, sigY + 20, { width: 175 });
+        doc.font(boldFont).text('____________________', 395, sigY + 34);
 
         doc.end();
       } catch (err) {

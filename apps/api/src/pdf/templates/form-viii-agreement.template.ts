@@ -112,91 +112,111 @@ export class FormViiiAgreementTemplate {
 
         // General Particulars 1 to 5 matching Gazette Page 58
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Office where the chit is registered: ', 40, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Registrar of Chits, Perundurai / Erode District', '________________________________________');
+        doc.text('1. Office where the chit is registered: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Registrar of Chits, Perundurai / Erode District', '________________________________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('2. Year and Registered No: Year ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(regYear), '________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' No ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : regNo, '____________________');
+        doc.text('2. Year and Registered No: Year ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(regYear), '________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' No ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : regNo, '____________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('3. Full name and address of foreman: ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firmName}, ${officeAddress}`, '________________________________________________________');
+        doc.text('3. Full name and address of foreman: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firmName}, ${officeAddress}`, '________________________________________________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('4. Occupation (if applicable): ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Chit Fund Operations & Financial Services', '____________________');
+        doc.text('4. Occupation (if applicable): ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Chit Fund Operations & Financial Services', '____________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('5. Age (if applicable): ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '48 Years', '________');
+        doc.text('5. Age (if applicable): ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '48 Years', '________', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Article I
         doc.font(boldFont).fontSize(8.5).text('I. Chit amount and No of tickets.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. No of tickets or fraction thereof held by each subscriber: Full: ', 40, doc.y + 2, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.totalTickets), '____', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | 3/4: Nil | 1/2: Nil | 1/4: Nil | 1/8: Nil');
+        doc.moveDown(0.2);
+        doc.text('1. No of tickets or fraction thereof held by each subscriber: Full: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.totalTickets), '____', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | 3/4: Nil | 1/2: Nil | 1/4: Nil | 1/8: Nil', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('2. No. of installments and amount payable for each ticket at every installment: No. ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' Amount Rs. ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.baseInstallment), '__________');
+        doc.text('2. No. of installments and amount payable for each ticket at every installment: No. ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' Amount Rs. ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.baseInstallment), '__________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
-        doc.text('3. Chit amount Rs. ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.chitValue), '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : chitValueWords, '________________________________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ')');
+        doc.text('3. Chit amount Rs. ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.chitValue), '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : chitValueWords, '________________________________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ')', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Article II
         doc.font(boldFont).fontSize(8.5).text('II. Duration of the chit.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Date of 1st installment: ', 40, doc.y + 2, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15/01/2026', '____________________');
-        doc.text('2. Dates of subsequent installments: ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15th of every consecutive calendar month', '________________________________________');
-        doc.text('3. Duration of the chit: Years: ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '1 Year 8 Months', '________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' consecutive calendar months)');
+        doc.moveDown(0.2);
+        doc.text('1. Date of 1st installment: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15/01/2026', '____________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
+        doc.text('2. Dates of subsequent installments: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '15th of every consecutive calendar month', '________________________________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
+        doc.text('3. Duration of the chit: Years: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '1 Year 8 Months', '________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' consecutive calendar months)', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Article III
         doc.font(boldFont).fontSize(8.5).text('III. The place, time and probable date when the chit is to be commenced.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Place: ', 40, doc.y + 2, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________');
-        doc.text('2. Time of commencement: ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '11:00 AM IST on scheduled draw date', '____________________');
+        doc.moveDown(0.2);
+        doc.text('1. Place: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
+        doc.text('2. Time of commencement: ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '11:00 AM IST on scheduled draw date', '____________________', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Article IV
         doc.font(boldFont).fontSize(8.5).text('IV. Particulars of security given or deposited by foreman.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Cash deposit in approved scheduled bank / bank guarantee in the name of Registrar under Section 20.');
-        doc.text('2. The foreman shall not get release of the security in full until all liabilities under the chit are discharged.');
+        doc.moveDown(0.2);
+        doc.text('1. Cash deposit in approved scheduled bank / bank guarantee in the name of Registrar under Section 20.', 40, doc.y, { lineGap: 3.5 });
+        doc.moveDown(0.3);
+        doc.text('2. The foreman shall not get release of the security in full until all liabilities under the chit are discharged.', 40, doc.y, { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Article V
         doc.font(boldFont).fontSize(8.5).text('V. Mode of conducting the chit.');
         doc.font(regularFont).fontSize(8);
-        doc.text('1. Reverse auction among non-prized eligible subscribers. Defaulters barred under ADR-07.');
-        doc.text('2. Ceiling discount fixed strictly at 25% (1/4th) of chit value: Rs. ', 40, doc.y + 12, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling), '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : maxDiscountWords, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '). Tie-break via physical paper tokens (ADR-06).');
+        doc.moveDown(0.2);
+        doc.text('1. Reverse auction among non-prized eligible subscribers. Defaulters barred under ADR-07.', 40, doc.y, { lineGap: 3.5 });
+        doc.moveDown(0.3);
+        doc.text('2. Ceiling discount fixed strictly at 25% (1/4th) of chit value: Rs. ', 40, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.maxDiscountCeiling), '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : maxDiscountWords, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '). Tie-break via physical paper tokens (ADR-06).', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Articles VI to XIII summary
         doc.font(boldFont).fontSize(8.5).text('VI - XIII. Statutory Provisions, Universal Dividends & Dual-Control:');
         doc.font(regularFont).fontSize(8);
-        doc.text(`• Universal Equal Dividend: Auction discount minus 4.00% foreman commission divided equally among ALL subscribers.`);
-        doc.text(`• Foreman Commission: Fixed at ${commissionRateLabel} (ADR-04) permanently frozen per scheme.`);
-        doc.text(`• Month 1 & Month N Rules: Month 1 full pool taken by Foreman; Month N settled directly without auction.`);
-        doc.text(`• Single Discrete Payments: Zero double/advance payments; receipts granted under Form XVI with Revenue Stamp.`);
+        doc.moveDown(0.2);
+        doc.text(`• Universal Equal Dividend: Auction discount minus 4.00% foreman commission divided equally among ALL subscribers.`, 40, doc.y, { lineGap: 3.5 });
+        doc.moveDown(0.2);
+        doc.text(`• Foreman Commission: Fixed at ${commissionRateLabel} (ADR-04) permanently frozen per scheme.`, 40, doc.y, { lineGap: 3.5 });
+        doc.moveDown(0.2);
+        doc.text(`• Month 1 & Month N Rules: Month 1 full pool taken by Foreman; Month N settled directly without auction.`, 40, doc.y, { lineGap: 3.5 });
+        doc.moveDown(0.2);
+        doc.text(`• Single Discrete Payments: Zero double/advance payments; receipts granted under Form XVI with Revenue Stamp.`, 40, doc.y, { lineGap: 3.5 });
         doc.moveDown(0.8);
 
         // ================= PAGE 2: SUBSCRIBERS EXECUTION ROSTER =================

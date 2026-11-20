@@ -42,14 +42,18 @@ export class StatutoryFormHelper {
 
     proto._fragment = function (text: string, x: number, y: number, options: any = {}) {
       if (options && options.statutoryUnderline) {
-        this.save();
-        this.strokeColor(options.underlineColor || StatutoryFormHelper.TEMPLATE_BLACK);
-        this.lineWidth(options.underlineWidth || StatutoryFormHelper.BOLD_LINE_WIDTH);
-        const textW = options.textWidth ?? this.widthOfString(text, options);
-        const w = Math.max(options.minUnderlineWidth || 0, textW);
-        const lineY = y + this.currentLineHeight() - 1;
-        this.moveTo(x, lineY).lineTo(x + w, lineY).stroke();
-        this.restore();
+        const textStr = String(text || '');
+        if (textStr.trim().length > 0 || options.minUnderlineWidth) {
+          this.save();
+          this.strokeColor(options.underlineColor || StatutoryFormHelper.TEMPLATE_BLACK);
+          this.lineWidth(options.underlineWidth || StatutoryFormHelper.BOLD_LINE_WIDTH);
+          const textW = options.textWidth ?? this.widthOfString(textStr, options);
+          const w = Math.max(options.minUnderlineWidth || 0, textW);
+          // Position underline 1.2pt below lowest glyph descender to prevent cutting through letters
+          const lineY = y + this.currentLineHeight(false) + 1.2;
+          this.moveTo(x, lineY).lineTo(x + w, lineY).stroke();
+          this.restore();
+        }
       }
       return origFragment.call(this, text, x, y, options);
     };

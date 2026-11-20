@@ -100,41 +100,38 @@ export class FormViiCertificateTemplate {
         // To Address
         const topY = doc.y;
         doc.font(regularFont).fontSize(8.5).text('To', 45, topY);
-        doc.text('The Registrar of Chits,', 45, topY + 12);
-        doc.text('', 45, topY + 24, { continued: true });
+        doc.text('The Registrar of Chits,', 45, topY + 14);
+        doc.text('', 45, topY + 28, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________');
 
-        doc.y = topY + 50;
+        doc.y = Math.max(doc.y, topY + 52);
         doc.font(regularFont).fontSize(9).text('Dear Sir,', 45, doc.y);
         doc.moveDown(0.4);
 
         doc.font(regularFont).fontSize(8.5).text('The Chit Funds Act, 1982 (Central Act No.40 of 1982)', 45, doc.y);
-        doc.moveDown(0.4);
+        doc.moveDown(0.5);
 
         // Core Statement verbatim from Gazette Page 57
-        doc.font(regularFont).fontSize(8.5).text('I / We ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Foreman of the chit / chairman and secretary on behalf of the Foreman / Firm / Company conducting the chit, the chit agreement bearing registration number ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : regNo, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' of 20', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(regYear).slice(2), String(regYear).slice(2), { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' has been registered in the office of the Registrar of Chits ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode', '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' do hereby certify that I / We have furnished to every subscriber of the chit a copy of the said chit agreement duly certified by me / us to be a true copy. The copies were furnished to each of the subscribers on ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : furnishedDate, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '.');
+        doc.font(regularFont).fontSize(8.5).text('I / We ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Foreman of the chit / chairman and secretary on behalf of the Foreman / Firm / Company conducting the chit, the chit agreement bearing registration number ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : regNo, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' of 20', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(regYear).slice(2), isBlank ? '____' : String(regYear).slice(2), { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' has been registered in the office of the Registrar of Chits ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode', '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' do hereby certify that I / We have furnished to every subscriber of the chit a copy of the said chit agreement duly certified by me / us to be a true copy. The copies were furnished to each of the subscribers on ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${furnishedDate}.`, '____________________.', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Commencement Certificate date
-        doc.font(regularFont).fontSize(8.5).text('The date of obtaining the certificate of commencement of the said chit granted under sub-section(2) of Section 9 is ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : commencementDate, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '.');
+        doc.font(regularFont).fontSize(8.5).text('The date of obtaining the certificate of commencement of the said chit granted under sub-section(2) of Section 9 is ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${commencementDate}.`, '____________________.', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // First draw date
-        doc.font(regularFont).fontSize(8.5).text('The first draw of the said chit was held on ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firstDrawDate, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '.');
+        doc.font(regularFont).fontSize(8.5).text('The first draw of the said chit was held on ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firstDrawDate}.`, '____________________.', { lineGap: 3.5 });
         doc.moveDown(1.2);
 
         // Signatures matching Gazette Page 57
@@ -145,20 +142,20 @@ export class FormViiCertificateTemplate {
         doc.text('Secretary ', 360, sigY + 40, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Partner / Authorised Signatory', '____________________');
 
-        const placeDateY = sigY + 65;
+        const placeDateY = sigY + 68;
         doc.font(regularFont).fontSize(8.5).text('Place: ', 45, placeDateY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.font(regularFont).fontSize(8.5).text('Date: ', 45, placeDateY + 14, { continued: true });
+        doc.font(regularFont).fontSize(8.5).text('Date: ', 45, placeDateY + 16, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : certDate, '____________________');
 
         doc.font(regularFont).fontSize(8.5).text('for and on behalf of ', 360, placeDateY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________');
-        doc.text('(Foreman)', 360, placeDateY + 14);
+        doc.text('(Foreman)', 360, placeDateY + 16);
 
         doc.y = placeDateY + 45;
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor('#888888').stroke();
-        doc.moveDown(0.2);
+        doc.moveDown(0.3);
         doc.font(regularFont).fontSize(7.5).text(
           'Strike out / delete whatever is not applicable. Insert the designation(s) as may be appropriate to the applicant.',
           45,

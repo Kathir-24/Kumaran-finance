@@ -113,27 +113,30 @@ export class FormXviiMinutesTemplate {
         // Chit Scheme & Auction Info
         const aucDate = FontResolverHelper.formatPdfDate(data.auctionDate);
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(9);
-        doc.text('சீட்டு குழு / Scheme: ', 35, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    ஏல தேதி / Date: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucDate, '____________________');
+        doc.text('சீட்டு குழு / Scheme: ', 35, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.groupCode} (${data.groupName})`, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, '    |    ஏல தேதி / Date: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucDate, '____________________', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        doc.text('மொத்த மதிப்பு / Value: ', 35, doc.y + 2, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை காலம் / Duration: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.durationMonths} மாதங்கள்`, '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை / Month: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.installmentMonth}`, '____', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' | வருகை தந்தோர் / Present: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.subscribersPresent}`, '____');
+        doc.text('மொத்த மதிப்பு / Value: ', 35, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `₹ ${RupeeWordsHelper.formatWholeRupees(data.chitValue)}`, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை காலம் / Duration: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.durationMonths} மாதங்கள்`, '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | தவணை / Month: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `#${data.installmentMonth}`, '____', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' | வருகை தந்தோர் / Present: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.subscribersPresent}`, '____', { lineGap: 3.5 });
+        doc.moveDown(0.35);
 
         if (data.sanctionOrderNumber) {
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-          doc.text('அரசு ஆணை எண் / Sanction Order No: ', 35, doc.y + 2, { continued: true });
-          StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.sanctionOrderNumber, '____________________');
+          doc.text('அரசு ஆணை எண் / Sanction Order No: ', 35, doc.y, { continued: true, lineGap: 3.5 });
+          StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.sanctionOrderNumber, '____________________', { lineGap: 3.5 });
+          doc.moveDown(0.35);
         }
-        doc.moveDown(0.5);
+        doc.moveDown(0.3);
 
         // Financial Calculation Table
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(boldFont).fontSize(9).text('ஏல முடிவு & கழிவு பகிர்வு விவரங்கள் / AUCTION FINANCIAL STATEMENT:');
@@ -215,30 +218,30 @@ export class FormXviiMinutesTemplate {
 
         // Foreman
         doc.font(regularFont).fontSize(7.5);
-        doc.text('முன்னிலையாளர் கையொப்பம் / Foreman:', 35, sigY + 18);
-        doc.font(boldFont).fontSize(8).text('குமரன் பைனான்ஸ் (Foreman)', 35, sigY + 30);
-        doc.font(boldFont).text('____________________', 35, sigY + 42);
+        doc.text('முன்னிலையாளர் / Foreman:', 35, sigY + 18, { width: 125 });
+        doc.font(boldFont).fontSize(7.5).text('குமரன் பைனான்ஸ்', 35, sigY + 30, { width: 125 });
+        doc.font(boldFont).text('____________________', 35, sigY + 44);
 
         // Subscriber Witness 1
         doc.font(regularFont).fontSize(7.5);
-        doc.text('சந்தாதாரர் சாட்சி 1 / Witness 1:', 175, sigY + 18);
-        doc.text('டிக்கெட் / Ticket: #', 175, sigY + 28, { continued: true });
+        doc.text('சாட்சி 1 / Witness 1:', 168, sigY + 18, { width: 115 });
+        doc.text('டிக்கெட் / Ticket: #', 168, sigY + 30, { continued: true });
         doc.font(boldFont).text('_______');
-        doc.font(regularFont).text('ஒப்பம்: ', 175, sigY + 40, { continued: true });
-        doc.font(boldFont).text('________________');
+        doc.font(regularFont).text('ஒப்பம்: ', 168, sigY + 44, { continued: true });
+        doc.font(boldFont).text('______________');
 
         // Subscriber Witness 2
         doc.font(regularFont).fontSize(7.5);
-        doc.text('சந்தாதாரர் சாட்சி 2 / Witness 2:', 305, sigY + 18);
-        doc.text('டிக்கெட் / Ticket: #', 305, sigY + 28, { continued: true });
+        doc.text('சாட்சி 2 / Witness 2:', 290, sigY + 18, { width: 115 });
+        doc.text('டிக்கெட் / Ticket: #', 290, sigY + 30, { continued: true });
         doc.font(boldFont).text('_______');
-        doc.font(regularFont).text('ஒப்பம்: ', 305, sigY + 40, { continued: true });
-        doc.font(boldFont).text('________________');
+        doc.font(regularFont).text('ஒப்பம்: ', 290, sigY + 44, { continued: true });
+        doc.font(boldFont).text('______________');
 
         // Registrar Filing Status
-        doc.font(regularFont).fontSize(7.5).text('பதிவாளர் தாக்கல் / Registrar Filing (Sec 18):', 435, sigY + 18);
-        doc.font(boldFont).fontSize(8).text('சரிபார்க்கப்பட்டு தாக்கல் செய்யப்பட்டது', 435, sigY + 30);
-        doc.text('____________________', 435, sigY + 42);
+        doc.font(regularFont).fontSize(7).text('பதிவாளர் தாக்கல் / Registrar Filing (Sec 18):', 385, sigY + 18, { width: 175 });
+        doc.font(boldFont).fontSize(7).text('சரிபார்க்கப்பட்டு தாக்கல் செய்யப்பட்டது', 385, sigY + 30, { width: 175 });
+        doc.font(regularFont).fontSize(7).text('நிலை: FILED WITH REGISTRAR', 385, sigY + 44, { width: 175 });
 
         doc.end();
       } catch (err) {

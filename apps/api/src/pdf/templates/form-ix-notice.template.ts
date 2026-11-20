@@ -106,8 +106,8 @@ export class FormIxNoticeTemplate {
 
         doc.font(boldFont).fontSize(9.5).text('Notice to subscribers of Chit Number ', 45, doc.y, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, boldFont, ' of 20');
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit);
+        StatutoryFormHelper.renderStatic(doc, boldFont, ' of 20', { continued: true });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, isBlank ? '____' : year2Digit);
         doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.8);
 
@@ -115,53 +115,53 @@ export class FormIxNoticeTemplate {
         const topY = doc.y;
         doc.font(regularFont).fontSize(8.5).text('To:', 45, topY);
         if (isBlank) {
-          doc.text('Subscriber Name: ________________________________________', 45, topY + 12);
-          doc.text('Ticket Number:   ____________________', 45, topY + 24);
+          doc.text('Subscriber Name: ________________________________________', 45, topY + 14);
+          doc.text('Ticket Number:   ____________________', 45, topY + 28);
         } else if (data.subscriberName) {
           const tamilSuffix = data.subscriberNameTamil ? ` / ${data.subscriberNameTamil}` : '';
           const ticketLabel = data.subscriberTicketNumber ? ` [Ticket #${data.subscriberTicketNumber}]` : '';
-          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`${data.subscriberName}${tamilSuffix}${ticketLabel}`, 45, topY + 12);
+          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`${data.subscriberName}${tamilSuffix}${ticketLabel}`, 45, topY + 14);
           doc.font(regularFont).fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
           if (data.subscriberPhone) {
-            doc.text(`Mobile: ${data.subscriberPhone}`, 45, topY + 24);
+            doc.text(`Mobile: ${data.subscriberPhone}`, 45, topY + 28);
           }
-          doc.text(`Subscriber, Chit Group: ${data.groupCode}`, 45, topY + 36);
+          doc.text(`Subscriber, Chit Group: ${data.groupCode}`, 45, topY + 42);
         } else {
-          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`All Esteemed Subscribers of Chit Group ${data.groupCode}`, 45, topY + 12);
-          doc.font(regularFont).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(`${firmName}, Head Office - Perundurai`, 45, topY + 24);
+          doc.font(boldFont).fillColor(StatutoryFormHelper.DATA_BLUE).text(`All Esteemed Subscribers of Chit Group ${data.groupCode}`, 45, topY + 14);
+          doc.font(regularFont).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(`${firmName}, Head Office - Perundurai`, 45, topY + 28);
         }
 
         doc.font(regularFont).fontSize(8.5).text('Place: ', 360, topY);
         doc.text('', 395, topY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 14);
-        doc.text('', 395, topY + 14, { continued: true });
+        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 16);
+        doc.text('', 395, topY + 16, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucDate, '____________________');
 
-        doc.y = topY + 55;
+        doc.y = Math.max(doc.y, topY + 60);
         doc.font(regularFont).fontSize(9).text('Sir,', 45, doc.y);
         doc.moveDown(0.5);
 
         // Core Statutory Wording verbatim from Gazette Page 66
-        doc.font(regularFont).fontSize(8.5).text('This is to inform you that the ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.installmentMonth}th`, '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' draw in monthly / quarterly / half yearly / yearly chit No ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' 20', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit, { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' in which you are one of the subscribers will be held on ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : dayStr, '_______', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' day ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : monthStr, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (month) 20', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, year2Digit, { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucTime, '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' be present at the draw in person or by your duly authorized agent.');
-        doc.moveDown(1.5);
+        doc.font(regularFont).fontSize(8.5).text('This is to inform you that the ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${data.installmentMonth}th`, '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' draw in monthly / quarterly / half yearly / yearly chit No ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : data.groupCode, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' 20', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, isBlank ? '____' : year2Digit, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' in which you are one of the subscribers will be held on ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : dayStr, '_______', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' day ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : monthStr, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (month) 20', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : year2Digit, isBlank ? '____' : year2Digit, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aucTime, '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' be present at the draw in person or by your duly authorized agent.', { lineGap: 3.5 });
+        doc.moveDown(1.2);
 
         // Signatures matching Gazette Page 66
         const sigY = doc.y;

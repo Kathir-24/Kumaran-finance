@@ -158,17 +158,17 @@ export class SubscriptionReceiptTemplate {
         }
         doc.text(`தொலைபேசி / Phone: ${data.phone}`);
 
-        doc.moveDown(0.3);
-        doc.font(regularFont).fontSize(7.5).text('Received from ', leftX, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, `${data.subscriberName}${nameTamil}`, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' to credit of ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, `${data.groupCode} [#${data.ticketNumber}]`, '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' under Chit Agreement No: ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, regNo, '____________________');
+        doc.moveDown(0.35);
+        doc.font(regularFont).fontSize(7.5).text('Received from ', leftX, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, `${data.subscriberName}${nameTamil}`, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' to credit of ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, `${data.groupCode} [#${data.ticketNumber}]`, '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' under Chit Agreement No: ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, regNo, '____________________', { lineGap: 3.5 });
 
         doc.moveDown(0.4);
         doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).lineWidth(0.8).stroke();
-        doc.moveDown(0.3);
+        doc.moveDown(0.35);
 
         // 5. Financial Breakdown Table matching Gazette Form XVI categories
         const tableTop = doc.y;

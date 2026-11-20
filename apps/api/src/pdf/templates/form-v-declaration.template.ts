@@ -101,27 +101,27 @@ export class FormVDeclarationTemplate {
         doc.font(regularFont).fontSize(8.5).text('Place: ', 360, topY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 14, { continued: true });
+        doc.font(regularFont).fontSize(8.5).text('Date: ', 360, topY + 16, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : declDate, '____________________');
 
         doc.y = topY;
         doc.font(regularFont).fontSize(8.5).text('To', 45, topY);
-        doc.text('The Registrar of Chits,', 45, topY + 12);
-        doc.text('', 45, topY + 24, { continued: true });
+        doc.text('The Registrar of Chits,', 45, topY + 14);
+        doc.text('', 45, topY + 28, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________');
 
-        doc.y = topY + 55;
+        doc.y = Math.max(doc.y, topY + 52);
         doc.font(regularFont).fontSize(9).text('Dear Sir,', 45, doc.y);
         doc.moveDown(0.5);
 
         // Paragraph 1 verbatim from Gazette Page 55
-        doc.font(regularFont).fontSize(8.5).text('By your letter dated the ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' you were pleased to grant me / us certificate of registration to commence a new chit of a chit amount of Rs ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.chitValue), '____________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' and of a duration ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' months.');
+        doc.font(regularFont).fontSize(8.5).text('By your letter dated the ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' you were pleased to grant me / us certificate of registration to commence a new chit of a chit amount of Rs ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(data.chitValue), '____________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' and of a duration ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' months.', { lineGap: 3.5 });
         doc.moveDown(0.6);
 
         // Paragraph 2 verbatim from Gazette Page 55
@@ -129,16 +129,16 @@ export class FormVDeclarationTemplate {
           '2. I / We have subsequently enlisted the required number of members and we hereby declare in terms of sub-section(1) of Section 9 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982) that all the tickets specified in the chit agreement have been fully subscribed.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 2 },
+          { align: 'justify', lineGap: 3 },
         );
         doc.moveDown(0.6);
 
         // Paragraph 3 verbatim from Gazette Page 55
-        doc.font(regularFont).fontSize(8.5).text('3. I / We remit herewith a sum of Rs ', 45, doc.y, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees in words only ', { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : feeWords, '________________________________________', { continued: true });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ') being the fees prescribed for the purpose of filing this declaration.');
+        doc.font(regularFont).fontSize(8.5).text('3. I / We remit herewith a sum of Rs ', 45, doc.y, { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees in words only ', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : feeWords, '________________________________________', { continued: true, lineGap: 3.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ') being the fees prescribed for the purpose of filing this declaration.', { lineGap: 3.5 });
         doc.moveDown(1.2);
 
         // Signatures matching Gazette Page 55
@@ -149,13 +149,13 @@ export class FormVDeclarationTemplate {
         doc.text('Secretary ', 360, sigY + 40, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Partner / Authorised Signatory', '____________________');
 
-        doc.y = sigY + 65;
+        doc.y = sigY + 68;
         doc.font(regularFont).fontSize(8.5).text('for and on behalf of (Foreman) ', 45, doc.y, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '________________________________________');
 
         doc.y += 25;
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor('#888888').stroke();
-        doc.moveDown(0.2);
+        doc.moveDown(0.3);
         doc.font(regularFont).fontSize(7.5).text(
           'Strike out or delete whatever is not applicable insert such designation(s) as may be appropriate to the applicant.',
           45,
