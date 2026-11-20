@@ -430,7 +430,7 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(smsNotif?.messageText).toContain('Dividend credit: Rs.1,050');
     });
 
-    it('should dispatch high-priority approval push alerts to active partners and exclude maker user', async () => {
+    it('should dispatch high-priority approval push alerts strictly to active statutory partners (Role.PARTNER) and exclude maker user (Guardrails 10 & 11, SEC-01)', async () => {
       notificationService.clearLog();
 
       prismaMock.user.findMany.mockResolvedValue([
@@ -455,9 +455,10 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(res.dispatchedCount).toBe(1);
       expect(res.partnerCount).toBe(1);
 
+      // Verify that query strictly targets Role.PARTNER and does NOT query SUPER_ADMIN or BRANCH_MANAGER
       expect(prismaMock.user.findMany).toHaveBeenCalledWith({
         where: {
-          roles: { hasSome: [Role.SUPER_ADMIN, Role.BRANCH_MANAGER] },
+          roles: { has: Role.PARTNER },
           isActive: true,
           fcmToken: { not: null },
           id: { not: 'partner-01' },
@@ -470,11 +471,60 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
         },
       });
 
+      // Assert that neither SUPER_ADMIN nor BRANCH_MANAGER are queried
+      const queryWhere = prismaMock.user.findMany.mock.calls[0][0].where;
+      expect(queryWhere.roles).toEqual({ has: Role.PARTNER });
+      expect(queryWhere.roles).not.toHaveProperty('hasSome');
+
       const logs = notificationService.getSentNotificationLog();
       expect(logs).toHaveLength(1);
       expect(logs[0].templateType).toBe('REVERSAL_APPROVAL');
       expect(logs[0].recipientPhone).toBe('9842199881');
       expect(logs[0].channel).toBe('PUSH_NOTIFICATION');
+    });
+
+    it('should query active partners without id exclusion when excludeUserId is not specified', async () => {
+      notificationService.clearLog();
+      prismaMock.user.findMany.mockClear();
+
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'partner-01',
+          name: 'Partner A',
+          phone: '9842199880',
+          fcmToken: 'fcm-partner-a-token',
+        },
+      ]);
+
+      const res = await notificationService.dispatchApprovalAlert({
+        approvalType: 'DISBURSEMENT_APPROVAL',
+        title: 'பட்டுவாடா ஒப்புதல் தேவை / Disbursement Approval Required',
+        body: 'Prize payout pending verification.',
+        entityId: 'disb-001',
+        amount: '95000',
+        data: {},
+      });
+
+      expect(res.dispatchedCount).toBe(1);
+      expect(res.partnerCount).toBe(1);
+
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+        where: {
+          roles: { has: Role.PARTNER },
+          isActive: true,
+          fcmToken: { not: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          fcmToken: true,
+        },
+      });
+
+      const queryWhere = prismaMock.user.findMany.mock.calls[0][0].where;
+      expect(queryWhere.id).toBeUndefined();
+      expect(queryWhere.roles).toEqual({ has: Role.PARTNER });
     });
   });
 

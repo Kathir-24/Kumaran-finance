@@ -412,10 +412,10 @@ export class NotificationService {
   }
 
   /**
-   * Broadcasts high-priority push notifications to active Partners/Admins for Maker-Checker approvals:
+   * Broadcasts high-priority push notifications to active Statutory Partners for Maker-Checker approvals:
    * - Triggered on: DISBURSEMENT_APPROVAL (pending safety proof verification) or REVERSAL_APPROVAL.
-   * - Excludes: Maker user (`excludeUserId`) so maker never receives an approval request for their own action.
-   * - Audience: Active users with Role.SUPER_ADMIN or Role.BRANCH_MANAGER and registered `fcmToken`.
+   * - Excludes: Maker user (`excludeUserId`) so maker never receives an approval request for their own action (Guardrail 10: Maker != Checker).
+   * - Audience: Active Statutory Partners (Role.PARTNER) per Guardrails 10 & 11 and ADR-27 with registered `fcmToken`.
    */
   async dispatchApprovalAlert(
     payload: ApprovalAlertJobPayload,
@@ -427,7 +427,7 @@ export class NotificationService {
 
     const partners = await this.prisma.user.findMany({
       where: {
-        roles: { hasSome: [Role.SUPER_ADMIN, Role.BRANCH_MANAGER] },
+        roles: { has: Role.PARTNER },
         isActive: true,
         fcmToken: { not: null },
         ...(payload.excludeUserId ? { id: { not: payload.excludeUserId } } : {}),
