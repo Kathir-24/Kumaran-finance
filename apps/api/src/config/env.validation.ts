@@ -29,6 +29,8 @@ export interface EnvironmentVariables {
   REDIS_HOST: string;
   REDIS_PORT: number;
   REDIS_DB: number;
+  REDIS_PASSWORD?: string;
+  REDIS_TLS?: boolean;
   BULL_BOARD_USER?: string;
   BULL_BOARD_PASSWORD?: string;
   METRICS_USER?: string;
@@ -213,6 +215,11 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     REDIS_HOST: (config.REDIS_HOST as string) ?? '127.0.0.1',
     REDIS_PORT: Number(config.REDIS_PORT ?? 6379),
     REDIS_DB: redisDb,
+    REDIS_PASSWORD: config.REDIS_PASSWORD ? (config.REDIS_PASSWORD as string) : undefined,
+    REDIS_TLS:
+      config.REDIS_TLS === true ||
+      config.REDIS_TLS === 'true' ||
+      config.REDIS_TLS === '1',
     BULL_BOARD_USER: (config.BULL_BOARD_USER as string) ?? 'admin',
     BULL_BOARD_PASSWORD: (config.BULL_BOARD_PASSWORD as string) ?? 'chitflow_secret',
     METRICS_USER: (config.METRICS_USER as string) ?? (config.BULL_BOARD_USER as string) ?? 'admin',
