@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -11,9 +11,17 @@ import {
   PAYMENT_TRANSACTION_OPTIONS,
 } from '../../common/utils/receipt-sequence.util';
 import { withTransactionRetry } from '../../common/utils/transaction-retry.util';
+import {
+  JOB_DISPATCH_PAYMENT_RECEIPT,
+  NOTIFICATION_QUEUE,
+} from '../constants/queue-names.constant';
+import type {
+  PaymentReceiptNotificationJobPayload,
+  ReconciliationJobResult,
+} from '../dto/job-payloads.dto';
+import { BullMqQueueProvider } from '../providers/bullmq-queue.provider';
 import { DistributedLockService } from './distributed-lock.service';
 import { NotificationService } from './notification.service';
-import type { ReconciliationJobResult } from '../dto/job-payloads.dto';
 
 export interface ProviderSettlementRecord {
   gatewayOrderId: string;
@@ -31,6 +39,9 @@ export class ReconciliationService {
     private readonly prisma: PrismaService,
     @Optional() private readonly notificationService?: NotificationService,
     @Optional() private readonly distributedLockService?: DistributedLockService,
+    @Optional()
+    @Inject(forwardRef(() => BullMqQueueProvider))
+    private readonly queueProvider?: BullMqQueueProvider,
   ) {}
 
   /**
@@ -238,26 +249,46 @@ export class ReconciliationService {
           this.logger.log(msg);
 
           // 5. Post-Commit Non-Blocking Receipt Notification
-          if (this.notificationService && txResult.receipt) {
+          if (txResult.receipt) {
             const primaryAlloc = payment.allocations[0];
             if (primaryAlloc?.ticket?.customer) {
-              try {
-                await this.notificationService.dispatchPaymentReceipt({
-                  paymentId: payment.id,
-                  receiptNumber: txResult.receipt.receiptNumber,
-                  recipientPhone: primaryAlloc.ticket.customer.phone,
-                  subscriberName: primaryAlloc.ticket.customer.fullName,
-                  amountPaid: payment.amount.toString(),
-                  chitCode: primaryAlloc.ticket.chitGroup?.groupCode || 'KCA',
-                  ticketNumber: primaryAlloc.ticket.ticketNumber,
-                  paymentMode: payment.paymentMethod,
-                  transactionTimestamp: (record.settledAt || new Date()).toISOString(),
-                  receiptDownloadUrl: '',
-                  passbookAppUrl: `https://app.kumaranfinance.in/passbook/${primaryAlloc.ticketId}`,
-                  fcmToken: primaryAlloc.ticket.customer.fcmToken || undefined,
-                });
-              } catch (notifyErr: any) {
-                this.logger.warn(`Failed to dispatch reconciliation receipt notification: ${notifyErr.message}`);
+              const receiptPayload: PaymentReceiptNotificationJobPayload = {
+                paymentId: payment.id,
+                receiptNumber: txResult.receipt.receiptNumber,
+                recipientPhone: primaryAlloc.ticket.customer.phone,
+                subscriberName: primaryAlloc.ticket.customer.fullName,
+                amountPaid: payment.amount.toString(),
+                chitCode: primaryAlloc.ticket.chitGroup?.groupCode || 'KCA',
+                ticketNumber: primaryAlloc.ticket.ticketNumber,
+                paymentMode: payment.paymentMethod,
+                transactionTimestamp: (record.settledAt || new Date()).toISOString(),
+                receiptDownloadUrl: '',
+                passbookAppUrl: `https://app.kumaranfinance.in/passbook/${primaryAlloc.ticketId}`,
+                fcmToken: primaryAlloc.ticket.customer.fcmToken || undefined,
+              };
+
+              if (this.queueProvider) {
+                try {
+                  await this.queueProvider.addJob(
+                    NOTIFICATION_QUEUE,
+                    JOB_DISPATCH_PAYMENT_RECEIPT,
+                    receiptPayload,
+                    {
+                      jobId: `receipt-${txResult.receipt.receiptNumber}`,
+                      priority: 1,
+                    },
+                  );
+                } catch (queueErr: any) {
+                  this.logger.warn(
+                    `Failed to enqueue reconciliation receipt notification: ${queueErr.message}`,
+                  );
+                }
+              } else if (this.notificationService) {
+                try {
+                  await this.notificationService.dispatchPaymentReceipt(receiptPayload);
+                } catch (notifyErr: any) {
+                  this.logger.warn(`Failed to dispatch reconciliation receipt notification: ${notifyErr.message}`);
+                }
               }
             }
           }

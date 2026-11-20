@@ -1,4 +1,9 @@
 import { DueStatus, PaymentStatus, Role } from '@prisma/client';
+import {
+  JOB_DISPATCH_DEFAULT_WARNING,
+  JOB_DISPATCH_PAYMENT_RECEIPT,
+  NOTIFICATION_QUEUE,
+} from '../../src/jobs/constants/queue-names.constant';
 import { JobsController } from '../../src/jobs/jobs.controller';
 import { BullMqQueueProvider } from '../../src/jobs/providers/bullmq-queue.provider';
 import { RedisConnectionProvider } from '../../src/jobs/providers/redis-connection.provider';
@@ -223,6 +228,60 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
       expect(result.ticketsInDefault3M).toBe(0);
       expect(result.ticketsInArrears).toBe(0);
+    });
+
+    it('JOB-02: should enqueue default warning via BullMqQueueProvider when queueProvider is present', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'mock-job-id', status: 'ENQUEUED' }),
+      };
+      const arrearsServiceWithQueue = new DailyArrearsService(
+        prismaMock as unknown as PrismaService,
+        notificationService,
+        undefined,
+        mockQueueProvider as unknown as BullMqQueueProvider,
+      );
+
+      const cutoff = new Date('2026-10-19T00:00:00Z');
+      prismaMock.installmentDue.findMany.mockResolvedValue([]);
+      prismaMock.subscriberTicket.findMany.mockResolvedValue([
+        {
+          id: 'tkt-default-queue',
+          ticketNumber: 8,
+          consecutiveUnpaidMonths: 2,
+          status: 'ACTIVE',
+          customer: { fullName: 'R. Ramasamy', phone: '9842199999', fcmToken: 'token-abc' },
+          chitGroup: { groupCode: 'KCA-2L-20M-01' },
+          dues: [
+            { installmentMonth: 3, status: DueStatus.OVERDUE, netPayableAmount: 10000n, paidAmount: 0n },
+            { installmentMonth: 2, status: DueStatus.OVERDUE, netPayableAmount: 10000n, paidAmount: 0n },
+            { installmentMonth: 1, status: DueStatus.OVERDUE, netPayableAmount: 10000n, paidAmount: 0n },
+          ],
+        },
+      ]);
+
+      const dispatchSpy = jest.spyOn(notificationService, 'dispatchDefaultWarning');
+
+      await arrearsServiceWithQueue.processDailyOverdueAndArrears(cutoff);
+
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        NOTIFICATION_QUEUE,
+        JOB_DISPATCH_DEFAULT_WARNING,
+        expect.objectContaining({
+          ticketId: 'tkt-default-queue',
+          customerName: 'R. Ramasamy',
+          customerPhone: '9842199999',
+          chitCode: 'KCA-2L-20M-01',
+          ticketNumber: 8,
+          consecutiveUnpaidMonths: 3,
+          totalOverdueAmount: '30000',
+          fcmToken: 'token-abc',
+        }),
+        expect.objectContaining({
+          jobId: 'default-warning-tkt-default-queue-2026-10-19',
+          priority: 2,
+        }),
+      );
+      expect(dispatchSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -671,6 +730,88 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
 
       expect(result.exceptionCount).toBe(1);
       expect(result.details[0]).toContain('Discrepancy on Order ORDER-MISMATCH');
+    });
+
+    it('JOB-02: should enqueue payment receipt via BullMqQueueProvider when queueProvider is present', async () => {
+      const mockQueueProvider = {
+        addJob: jest.fn().mockResolvedValue({ jobId: 'mock-rec-job', status: 'ENQUEUED' }),
+      };
+      const reconServiceWithQueue = new ReconciliationService(
+        prismaMock as unknown as PrismaService,
+        notificationService,
+        undefined,
+        mockQueueProvider as unknown as BullMqQueueProvider,
+      );
+
+      const mockPayment = {
+        id: 'pay-ghost-queue',
+        branchId: 'branch-prd-001',
+        paymentStatus: PaymentStatus.INITIATED,
+        paymentMethod: 'UPI',
+        amount: 5000n,
+        transactionRef: 'ORDER-GHOST-Q',
+        notes: null,
+        allocations: [
+          {
+            id: 'alloc-q',
+            installmentDueId: 'due-ghost-q',
+            ticketId: 'tkt-ghost-q',
+            amountAllocated: 5000n,
+            due: { id: 'due-ghost-q', installmentMonth: 2, status: DueStatus.UNPAID },
+            ticket: {
+              id: 'tkt-ghost-q',
+              ticketNumber: 9,
+              status: 'ACTIVE',
+              customer: { fullName: 'V. Murugan', phone: '9842188888', fcmToken: 'fcm-murugan' },
+              chitGroup: { groupCode: 'KCA-1L-20M-01', branchId: 'branch-prd-001', branch: { code: 'PRD' } },
+            },
+          },
+        ],
+        receipt: null,
+      };
+
+      prismaMock.payment.findFirst.mockResolvedValue(mockPayment);
+      prismaMock.payment.findUnique.mockResolvedValue(mockPayment);
+      prismaMock.payment.update.mockResolvedValue({ ...mockPayment, paymentStatus: PaymentStatus.SUCCESS });
+      prismaMock.installmentDue.update.mockResolvedValue({ id: 'due-ghost-q', status: DueStatus.PAID, paidAmount: 5000n });
+      prismaMock.installmentDue.findMany.mockResolvedValue([]);
+      prismaMock.subscriberTicket.update.mockResolvedValue({ id: 'tkt-ghost-q', consecutiveUnpaidMonths: 0 });
+      prismaMock.receipt.findUnique.mockResolvedValue(null);
+      prismaMock.receipt.findFirst.mockResolvedValue({ receiptNumber: 'KC-REC-PRD-2026-00050' });
+      prismaMock.receipt.create.mockResolvedValue({ id: 'rec-q-new', receiptNumber: 'KC-REC-PRD-2026-00051' });
+
+      const dispatchReceiptSpy = jest.spyOn(notificationService, 'dispatchPaymentReceipt');
+
+      await reconServiceWithQueue.reconcileSettlement([
+        {
+          gatewayOrderId: 'ORDER-GHOST-Q',
+          gatewayPaymentId: 'pay_gateway_q',
+          amount: 5000n,
+          status: 'SUCCESS',
+          settledAt: new Date('2026-10-29T10:00:00Z'),
+        },
+      ]);
+
+      expect(mockQueueProvider.addJob).toHaveBeenCalledWith(
+        NOTIFICATION_QUEUE,
+        JOB_DISPATCH_PAYMENT_RECEIPT,
+        expect.objectContaining({
+          paymentId: 'pay-ghost-queue',
+          receiptNumber: 'KC-REC-PRD-2026-00051',
+          recipientPhone: '9842188888',
+          subscriberName: 'V. Murugan',
+          amountPaid: '5000',
+          chitCode: 'KCA-1L-20M-01',
+          ticketNumber: 9,
+          paymentMode: 'UPI',
+          fcmToken: 'fcm-murugan',
+        }),
+        expect.objectContaining({
+          jobId: 'receipt-KC-REC-PRD-2026-00051',
+          priority: 1,
+        }),
+      );
+      expect(dispatchReceiptSpy).not.toHaveBeenCalled();
     });
   });
 

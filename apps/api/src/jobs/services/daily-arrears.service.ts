@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DueStatus } from '@prisma/client';
 import { CONSECUTIVE_UNPAID_DEFAULT_THRESHOLD_MONTHS } from '../../common/constants';
 import {
@@ -6,7 +6,15 @@ import {
   deriveTicketArrearsStatus,
 } from '../../common/utils/arrears.util';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { DailyArrearsExecutionResult } from '../dto/job-payloads.dto';
+import {
+  JOB_DISPATCH_DEFAULT_WARNING,
+  NOTIFICATION_QUEUE,
+} from '../constants/queue-names.constant';
+import type {
+  DailyArrearsExecutionResult,
+  DefaultWarningJobPayload,
+} from '../dto/job-payloads.dto';
+import { BullMqQueueProvider } from '../providers/bullmq-queue.provider';
 import { DistributedLockService } from './distributed-lock.service';
 import { NotificationService } from './notification.service';
 
@@ -18,6 +26,9 @@ export class DailyArrearsService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     @Optional() private readonly distributedLockService?: DistributedLockService,
+    @Optional()
+    @Inject(forwardRef(() => BullMqQueueProvider))
+    private readonly queueProvider?: BullMqQueueProvider,
   ) {}
 
   /**
@@ -127,7 +138,7 @@ export class DailyArrearsService {
 
         // Trigger default warning notification if newly entered DEFAULT_3_MONTHS
         if (!wasInDefault && isNowDefault) {
-          await this.notificationService.dispatchDefaultWarning({
+          const warningPayload: DefaultWarningJobPayload = {
             ticketId: ticket.id,
             customerName: ticket.customer.fullName,
             customerPhone: ticket.customer.phone,
@@ -136,7 +147,28 @@ export class DailyArrearsService {
             consecutiveUnpaidMonths: consecutiveUnpaid,
             totalOverdueAmount: totalOverdue.toString(),
             fcmToken: (ticket.customer as any).fcmToken ?? undefined,
-          });
+          };
+
+          if (this.queueProvider) {
+            try {
+              const cutoffDay = effectiveCutoff.toISOString().slice(0, 10);
+              await this.queueProvider.addJob(
+                NOTIFICATION_QUEUE,
+                JOB_DISPATCH_DEFAULT_WARNING,
+                warningPayload,
+                {
+                  jobId: `default-warning-${ticket.id}-${cutoffDay}`,
+                  priority: 2,
+                },
+              );
+            } catch (queueErr: any) {
+              this.logger.warn(
+                `Failed to enqueue default warning for ticket ${ticket.id}: ${queueErr.message}`,
+              );
+            }
+          } else {
+            await this.notificationService.dispatchDefaultWarning(warningPayload);
+          }
         }
       }
     }
