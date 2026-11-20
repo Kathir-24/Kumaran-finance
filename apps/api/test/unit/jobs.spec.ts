@@ -887,6 +887,43 @@ describe('Component 3: BullMQ Background Queue & Daily Cron Worker Tests', () =>
       expect(alertRes.status).toBe('EXECUTED_DIRECT');
     });
 
+    it('PERF-01: should execute JOB_GENERATE_STATUTORY_PDF directly in fallback mode via pdfService', async () => {
+      const mockPdfService = {
+        processAsyncPdfJob: jest.fn().mockResolvedValue({
+          jobId: 'stat-job-1',
+          status: 'COMPLETED',
+        }),
+      };
+
+      const providerWithPdf = new BullMqQueueProvider(
+        redisProviderMock as unknown as RedisConnectionProvider,
+        dailyArrearsService,
+        notificationService,
+        reconciliationService,
+        auctionReminderSchedulerService,
+        mockPdfService as any,
+      );
+
+      const res = await providerWithPdf.addJob(
+        'daily-maintenance-queue',
+        'generate-statutory-pdf',
+        {
+          jobId: 'stat-job-1',
+          type: 'PASSBOOK',
+          entityId: 'tkt-01',
+        },
+      );
+
+      expect(res.status).toBe('EXECUTED_DIRECT');
+      expect(mockPdfService.processAsyncPdfJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: 'stat-job-1',
+          type: 'PASSBOOK',
+          entityId: 'tkt-01',
+        }),
+      );
+    });
+
     it('should allow JobsController to run daily arrears check and return summary', async () => {
       prismaMock.installmentDue.findMany.mockResolvedValue([]);
       prismaMock.subscriberTicket.findMany.mockResolvedValue([]);

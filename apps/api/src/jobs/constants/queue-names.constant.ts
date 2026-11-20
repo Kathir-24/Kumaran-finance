@@ -11,6 +11,7 @@ export const JOB_DISPATCH_AUCTION_RESULT = 'dispatch-auction-result';
 export const JOB_DISPATCH_DEFAULT_WARNING = 'dispatch-default-warning';
 export const JOB_DISPATCH_APPROVAL_ALERT = 'dispatch-approval-alert';
 export const JOB_RUN_DAILY_RECONCILIATION = 'run-daily-reconciliation';
+export const JOB_GENERATE_STATUTORY_PDF = 'generate-statutory-pdf';
 
 /**
  * Bounded Redis retention caps for failed BullMQ jobs (DEF-DB-06).

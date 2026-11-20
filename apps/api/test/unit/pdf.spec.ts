@@ -1979,5 +1979,238 @@ describe('Component 2: Bilingual PDF Canvas Engine Tests', () => {
       }
     });
   });
+
+  describe('11. Asynchronous Statutory PDF Architecture (PERF-01 / Issue 10)', () => {
+    let mockBullMqProvider: any;
+    let mockRedisProvider: any;
+    let redisStore: Map<string, string>;
+    let asyncPdfService: PdfService;
+    let asyncPdfController: PdfController;
+
+    beforeEach(() => {
+      redisStore = new Map();
+
+      mockRedisProvider = {
+        getIsConnected: jest.fn().mockReturnValue(true),
+        getClient: jest.fn().mockReturnValue({
+          set: jest.fn().mockImplementation(async (key: string, val: string) => {
+            redisStore.set(key, val);
+            return 'OK';
+          }),
+          get: jest.fn().mockImplementation(async (key: string) => {
+            return redisStore.get(key) || null;
+          }),
+        }),
+      };
+
+      mockBullMqProvider = {
+        addJob: jest.fn().mockResolvedValue({
+          jobId: 'job-mock-123',
+          status: 'ENQUEUED',
+        }),
+      };
+
+      asyncPdfService = new PdfService(
+        prismaMock as unknown as PrismaService,
+        storageMock as unknown as StorageService,
+        mockBullMqProvider,
+        mockRedisProvider,
+      );
+
+      asyncPdfController = new PdfController(asyncPdfService);
+    });
+
+    it('PERF-01: enqueueAsyncPdfGeneration enqueues job to BullMQ, writes QUEUED status to Redis, and returns checkStatusUrl', async () => {
+      const result = await asyncPdfService.enqueueAsyncPdfGeneration(
+        'PASSBOOK',
+        'tkt-uuid-001',
+        superAdminUser,
+      );
+
+      expect(result.jobId).toBeDefined();
+      expect(result.status).toBe('QUEUED');
+      expect(result.checkStatusUrl).toBe(`/api/v1/pdf/async/status/${result.jobId}`);
+
+      expect(mockBullMqProvider.addJob).toHaveBeenCalledWith(
+        'daily-maintenance-queue',
+        'generate-statutory-pdf',
+        expect.objectContaining({
+          jobId: result.jobId,
+          type: 'PASSBOOK',
+          entityId: 'tkt-uuid-001',
+          currentUser: superAdminUser,
+        }),
+        { jobId: result.jobId },
+      );
+
+      const statusInRedis = JSON.parse(redisStore.get(`pdf:status:${result.jobId}`) || '{}');
+      expect(statusInRedis.status).toBe('QUEUED');
+      expect(statusInRedis.type).toBe('PASSBOOK');
+      expect(statusInRedis.entityId).toBe('tkt-uuid-001');
+    });
+
+    it('PERF-01: enqueueAsyncPdfGeneration rejects unauthorized caller BEFORE enqueuing to BullMQ (Pre-lookup anti-oracle guard)', async () => {
+      await expect(
+        asyncPdfService.enqueueAsyncPdfGeneration(
+          'PASSBOOK',
+          'tkt-uuid-001',
+          collectionAgent1, // Collection agents cannot generate passbooks
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockBullMqProvider.addJob).not.toHaveBeenCalled();
+    });
+
+    it('PERF-01: processAsyncPdfJob renders passbook off main thread, uploads to S3, and writes COMPLETED status to Redis', async () => {
+      const mockTicket = {
+        id: 'tkt-async-passbook',
+        ticketNumber: 7,
+        isPrized: false,
+        chitGroup: {
+          id: 'group-prd-01',
+          groupCode: 'KCA-1L-20M-01',
+          groupName: 'KCA 1 Lakh 20 Months',
+          chitValue: 100000n,
+          durationMonths: 20,
+          baseInstallment: 5000n,
+          branchId: 'branch-PRD',
+          branch: { code: 'PRD', address: 'Main Road, Perundurai' },
+        },
+        customer: {
+          id: 'cust-01',
+          customerCode: 'CUST-001',
+          fullName: 'S. Sundaram',
+          fullNameTamil: 'சுந்தரம்',
+          phone: '9842143210',
+          addressLine1: '14, Netaji Road',
+          city: 'Perundurai',
+        },
+        dues: [],
+      };
+
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+
+      const completed = await asyncPdfService.processAsyncPdfJob({
+        jobId: 'async-job-888',
+        type: 'PASSBOOK',
+        entityId: 'tkt-async-passbook',
+        currentUser: superAdminUser,
+      });
+
+      expect(completed.status).toBe('COMPLETED');
+      expect(completed.jobId).toBe('async-job-888');
+      expect(completed.key).toBe('passbooks/group-prd-01/ticket-7.pdf');
+      expect(completed.presignedUrl).toBeDefined();
+      expect(completed.expiresInSeconds).toBe(900);
+      expect(completed.completedAt).toBeDefined();
+
+      const statusInRedis = JSON.parse(redisStore.get('pdf:status:async-job-888') || '{}');
+      expect(statusInRedis.status).toBe('COMPLETED');
+      expect(statusInRedis.key).toBe('passbooks/group-prd-01/ticket-7.pdf');
+      expect(statusInRedis.presignedUrl).toBeDefined();
+    });
+
+    it('PERF-01: processAsyncPdfJob records FAILED status in Redis and rethrows on rendering error', async () => {
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(null);
+
+      await expect(
+        asyncPdfService.processAsyncPdfJob({
+          jobId: 'async-job-fail-999',
+          type: 'PASSBOOK',
+          entityId: 'tkt-nonexistent',
+          currentUser: superAdminUser,
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      const statusInRedis = JSON.parse(redisStore.get('pdf:status:async-job-fail-999') || '{}');
+      expect(statusInRedis.status).toBe('FAILED');
+      expect(statusInRedis.error).toContain('Subscriber ticket not found');
+      expect(statusInRedis.failedAt).toBeDefined();
+    });
+
+    it('PERF-01: getAsyncPdfStatus retrieves current job status from Redis or throws NotFoundException', async () => {
+      redisStore.set(
+        'pdf:status:job-ready-111',
+        JSON.stringify({
+          jobId: 'job-ready-111',
+          status: 'COMPLETED',
+          key: 'passbooks/group-prd-01/ticket-7.pdf',
+          presignedUrl: 'https://storage.kumaranfinance.in/signed-passbook.pdf',
+          expiresInSeconds: 900,
+          completedAt: new Date().toISOString(),
+        }),
+      );
+
+      const status = await asyncPdfService.getAsyncPdfStatus('job-ready-111');
+      expect(status.status).toBe('COMPLETED');
+      expect(status.presignedUrl).toBe('https://storage.kumaranfinance.in/signed-passbook.pdf');
+
+      await expect(asyncPdfService.getAsyncPdfStatus('job-does-not-exist')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('PERF-01: PdfController POST async/passbook/:ticketId and GET async/status/:jobId endpoints operate correctly', async () => {
+      const enqueueRes = await asyncPdfController.enqueuePassbookPdf(
+        'tkt-uuid-controller-01',
+        superAdminUser,
+      );
+      expect(enqueueRes.jobId).toBeDefined();
+      expect(enqueueRes.status).toBe('QUEUED');
+      expect(enqueueRes.checkStatusUrl).toBe(`/api/v1/pdf/async/status/${enqueueRes.jobId}`);
+
+      const statusRes = await asyncPdfController.getAsyncPdfStatus(enqueueRes.jobId);
+      expect(statusRes.status).toBe('QUEUED');
+    });
+
+    it('PERF-01: fallback mode operates smoothly in-process when BullMQ / Redis are offline', async () => {
+      const offlineService = new PdfService(
+        prismaMock as unknown as PrismaService,
+        storageMock as unknown as StorageService,
+        undefined, // No BullMQ
+        undefined, // No Redis
+      );
+
+      const mockTicket = {
+        id: 'tkt-offline',
+        ticketNumber: 2,
+        isPrized: false,
+        chitGroup: {
+          id: 'group-prd-01',
+          groupCode: 'KCA-1L-20M-01',
+          groupName: 'KCA 1 Lakh 20 Months',
+          chitValue: 100000n,
+          durationMonths: 20,
+          baseInstallment: 5000n,
+          branchId: 'branch-PRD',
+          branch: { code: 'PRD', address: 'Main Road, Perundurai' },
+        },
+        customer: {
+          id: 'cust-01',
+          customerCode: 'CUST-001',
+          fullName: 'S. Sundaram',
+          fullNameTamil: 'சுந்தரம்',
+          phone: '9842143210',
+          addressLine1: '14, Netaji Road',
+          city: 'Perundurai',
+        },
+        dues: [],
+      };
+      prismaMock.subscriberTicket.findUnique.mockResolvedValue(mockTicket);
+
+      const enqueued = await offlineService.enqueueAsyncPdfGeneration(
+        'PASSBOOK',
+        'tkt-offline',
+        superAdminUser,
+      );
+
+      expect(enqueued.jobId).toBeDefined();
+      expect(enqueued.status).toBe('COMPLETED'); // Direct execution fallback completed synchronously
+
+      const status = await offlineService.getAsyncPdfStatus(enqueued.jobId);
+      expect(status.status).toBe('COMPLETED');
+      expect(status.key).toBe('passbooks/group-prd-01/ticket-2.pdf');
+    });
+  });
 });
 

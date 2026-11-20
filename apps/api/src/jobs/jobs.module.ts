@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PdfModule } from '../pdf/pdf.module';
@@ -15,7 +15,7 @@ import { NotificationService } from './services/notification.service';
 import { ReconciliationService } from './services/reconciliation.service';
 
 @Module({
-  imports: [PrismaModule, NotificationModule, PdfModule],
+  imports: [PrismaModule, NotificationModule, forwardRef(() => PdfModule)],
   controllers: [JobsController],
   providers: [
     RedisConnectionProvider,

@@ -1,4 +1,12 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+  forwardRef,
+} from '@nestjs/common';
 import { Job, KeepJobs, Processor, Queue, Worker } from 'bullmq';
 import {
   CRON_DAILY_ARREARS,
@@ -20,6 +28,7 @@ import {
   JOB_DISPATCH_AUCTION_RESULT,
   JOB_DISPATCH_DEFAULT_WARNING,
   JOB_DISPATCH_PAYMENT_RECEIPT,
+  JOB_GENERATE_STATUTORY_PDF,
   JOB_PROCESS_DAILY_ARREARS,
   JOB_RUN_DAILY_RECONCILIATION,
   NOTIFICATION_QUEUE,
@@ -30,6 +39,7 @@ import { DailyArrearsService } from '../services/daily-arrears.service';
 import { NotificationService } from '../services/notification.service';
 import { ReconciliationService } from '../services/reconciliation.service';
 import { RedisConnectionProvider } from './redis-connection.provider';
+import { PdfService } from '../../pdf/pdf.service';
 
 export interface QueueStatusReport {
   queueName: string;
@@ -66,6 +76,7 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     private readonly notificationService: NotificationService,
     private readonly reconciliationService: ReconciliationService,
     @Optional() private readonly auctionReminderSchedulerService?: AuctionReminderSchedulerService,
+    @Optional() @Inject(forwardRef(() => PdfService)) private readonly pdfService?: PdfService,
   ) {}
 
   /**
@@ -152,6 +163,9 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
             if (job.name === JOB_PROCESS_DAILY_ARREARS) {
               const cutoff = job.data?.cutoffDate ? new Date(job.data.cutoffDate) : undefined;
               return await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
+            }
+            if (job.name === JOB_GENERATE_STATUTORY_PDF && this.pdfService) {
+              return await this.pdfService.processAsyncPdfJob(job.data);
             }
           },
           client,
@@ -348,6 +362,8 @@ export class BullMqQueueProvider implements OnModuleInit, OnModuleDestroy {
     if (jobName === JOB_PROCESS_DAILY_ARREARS) {
       const cutoff = data?.cutoffDate ? new Date(data.cutoffDate) : undefined;
       await this.dailyArrearsService.processDailyOverdueAndArrears(cutoff);
+    } else if (jobName === JOB_GENERATE_STATUTORY_PDF && this.pdfService) {
+      await this.pdfService.processAsyncPdfJob(data);
     } else if (jobName === JOB_DISPATCH_PAYMENT_RECEIPT) {
       await this.notificationService.dispatchPaymentReceipt(data);
     } else if (jobName === JOB_DISPATCH_AUCTION_REMINDER) {

@@ -17,6 +17,7 @@ export class DocumentAccessHelper {
   ): void {
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.AUDITOR) ||
       user.roles.includes(Role.ACCOUNTANT)
     ) {
@@ -85,6 +86,7 @@ export class DocumentAccessHelper {
 
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.AUDITOR) ||
       user.roles.includes(Role.ACCOUNTANT)
     ) {
@@ -141,6 +143,7 @@ export class DocumentAccessHelper {
 
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.AUDITOR) ||
       user.roles.includes(Role.ACCOUNTANT)
     ) {
@@ -185,6 +188,7 @@ export class DocumentAccessHelper {
 
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.AUDITOR) ||
       user.roles.includes(Role.ACCOUNTANT)
     ) {
@@ -541,6 +545,7 @@ export class DocumentAccessHelper {
   ): void {
     if (
       user.roles.includes(Role.SUPER_ADMIN) ||
+      user.roles.includes(Role.PARTNER) ||
       user.roles.includes(Role.AUDITOR) ||
       user.roles.includes(Role.ACCOUNTANT)
     ) {

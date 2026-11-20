@@ -1,12 +1,23 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { AuctionStatus, DueStatus, PaymentStatus, Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS } from '../common/constants';
+import {
+  DAILY_MAINTENANCE_QUEUE,
+  JOB_GENERATE_STATUTORY_PDF,
+} from '../jobs/constants/queue-names.constant';
+import { BullMqQueueProvider } from '../jobs/providers/bullmq-queue.provider';
+import { RedisConnectionProvider } from '../jobs/providers/redis-connection.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentAccessHelper } from '../storage/helpers/document-access.helper';
 import { StorageKeyHelper } from '../storage/helpers/storage-key.helper';
@@ -37,11 +48,45 @@ export interface GeneratedPdfResult {
   presignedUrl: string;
 }
 
+export interface AsyncPdfJobPayload {
+  jobId: string;
+  type: string;
+  entityId: string;
+  currentUser: JwtPayload;
+  queuedAt?: string;
+}
+
+export interface AsyncPdfStatusResponse {
+  jobId: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  type?: string;
+  entityId?: string;
+  key?: string;
+  presignedUrl?: string;
+  expiresInSeconds?: number;
+  completedAt?: string;
+  error?: string;
+  failedAt?: string;
+  queuedAt?: string;
+  checkStatusUrl?: string;
+}
+
 @Injectable()
 export class PdfService {
+  private readonly logger = new Logger(PdfService.name);
+  private readonly inMemoryStatusCache = new Map<
+    string,
+    { data: AsyncPdfStatusResponse; expiresAt: number }
+  >();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    @Optional()
+    @Inject(forwardRef(() => BullMqQueueProvider))
+    private readonly bullMqProvider?: BullMqQueueProvider,
+    @Optional()
+    private readonly redisProvider?: RedisConnectionProvider,
   ) {}
 
   /**
@@ -60,6 +105,7 @@ export class PdfService {
     const roles = Array.isArray(user?.roles) ? user.roles : [];
     return (
       roles.includes(Role.SUPER_ADMIN) ||
+      roles.includes(Role.PARTNER) ||
       roles.includes(Role.ACCOUNTANT) ||
       roles.includes(Role.AUDITOR)
     );
@@ -772,5 +818,189 @@ export class PdfService {
     );
 
     return { buffer, key: upload.key, presignedUrl };
+  }
+
+  /**
+   * Internal helper to persist PDF job status to Redis (TTL 3600s) with in-memory fallback.
+   */
+  private async saveStatus(
+    jobId: string,
+    data: AsyncPdfStatusResponse,
+    ttlSeconds = 3600,
+  ): Promise<void> {
+    const redisKey = `pdf:status:${jobId}`;
+    this.inMemoryStatusCache.set(jobId, {
+      data,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+
+    try {
+      const client = this.redisProvider?.getClient();
+      if (client && this.redisProvider?.getIsConnected()) {
+        await client.set(redisKey, JSON.stringify(data), 'EX', ttlSeconds);
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `Failed to persist PDF job status to Redis for ${jobId}: ${err.message}`,
+      );
+    }
+  }
+
+  /**
+   * Internal helper to read PDF job status from Redis or in-memory fallback.
+   */
+  private async readStatus(jobId: string): Promise<AsyncPdfStatusResponse | null> {
+    const redisKey = `pdf:status:${jobId}`;
+    try {
+      const client = this.redisProvider?.getClient();
+      if (client && this.redisProvider?.getIsConnected()) {
+        const raw = await client.get(redisKey);
+        if (raw) {
+          return JSON.parse(raw) as AsyncPdfStatusResponse;
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `Failed to read PDF job status from Redis for ${jobId}: ${err.message}`,
+      );
+    }
+
+    const cached = this.inMemoryStatusCache.get(jobId);
+    if (cached) {
+      if (Date.now() <= cached.expiresAt) {
+        return cached.data;
+      }
+      this.inMemoryStatusCache.delete(jobId);
+    }
+
+    return null;
+  }
+
+  /**
+   * BullMQ background worker processor for asynchronous statutory PDF generation (PERF-01).
+   * Renders the requested PDF off the main event loop, uploads to private storage,
+   * and persists job completion status with 15-minute presigned URL to Redis (TTL 3600s).
+   */
+  async processAsyncPdfJob(payload: AsyncPdfJobPayload): Promise<AsyncPdfStatusResponse> {
+    try {
+      let result: GeneratedPdfResult;
+      const normalizedType = (payload.type || '').toUpperCase();
+
+      switch (normalizedType) {
+        case 'PASSBOOK':
+        case 'FORM_XXI':
+          result = await this.generatePassbookPdf(payload.entityId, payload.currentUser);
+          break;
+        case 'MINUTES':
+        case 'FORM_XVII':
+          result = await this.generateAuctionMinutesPdf(payload.entityId, payload.currentUser);
+          break;
+        case 'RECEIPT':
+          result = await this.generateReceiptPdf(payload.entityId, payload.currentUser);
+          break;
+        case 'VOUCHER':
+          result = await this.generatePayoutVoucherPdf(payload.entityId, payload.currentUser);
+          break;
+        default:
+          throw new BadRequestException(
+            `Unsupported asynchronous PDF generation type: ${payload.type}`,
+          );
+      }
+
+      const completedStatus: AsyncPdfStatusResponse = {
+        jobId: payload.jobId,
+        status: 'COMPLETED',
+        key: result.key,
+        presignedUrl: result.presignedUrl,
+        expiresInSeconds: PRESIGNED_URL_EXPIRES_IN_SECONDS,
+        completedAt: new Date().toISOString(),
+      };
+
+      await this.saveStatus(payload.jobId, completedStatus, 3600);
+      return completedStatus;
+    } catch (err: any) {
+      const failedStatus: AsyncPdfStatusResponse = {
+        jobId: payload.jobId,
+        status: 'FAILED',
+        error: err?.message || 'Unknown PDF generation error',
+        failedAt: new Date().toISOString(),
+      };
+
+      await this.saveStatus(payload.jobId, failedStatus, 3600);
+      throw err;
+    }
+  }
+
+  /**
+   * Enqueues an asynchronous statutory PDF generation task onto BullMQ (PERF-01).
+   * Guards caller eligibility before enqueuing to prevent queue exhaustion by unauthorized requests.
+   */
+  async enqueueAsyncPdfGeneration(
+    type: string,
+    entityId: string,
+    currentUser: JwtPayload,
+  ): Promise<{ jobId: string; status: string; checkStatusUrl: string }> {
+    const jobId = randomUUID();
+    const checkStatusUrl = `/api/v1/pdf/async/status/${jobId}`;
+
+    const normalizedType = (type || '').toUpperCase();
+    if (normalizedType === 'PASSBOOK' || normalizedType === 'FORM_XXI') {
+      this.assertPreLookupCallerEligibility(currentUser, {
+        resourceLabel: 'member passbook statements',
+        allowCustomer: true,
+        allowCollectionAgent: false,
+      });
+    }
+
+    const initialStatus: AsyncPdfStatusResponse = {
+      jobId,
+      status: 'QUEUED',
+      type,
+      entityId,
+      queuedAt: new Date().toISOString(),
+    };
+
+    await this.saveStatus(jobId, initialStatus, 3600);
+
+    const payload: AsyncPdfJobPayload = {
+      jobId,
+      type,
+      entityId,
+      currentUser,
+      queuedAt: initialStatus.queuedAt,
+    };
+
+    if (this.bullMqProvider) {
+      await this.bullMqProvider.addJob(
+        DAILY_MAINTENANCE_QUEUE,
+        JOB_GENERATE_STATUTORY_PDF,
+        payload,
+        { jobId },
+      );
+    } else {
+      // In-process direct fallback if BullMQ provider is absent
+      await this.processAsyncPdfJob(payload).catch((err) => {
+        this.logger.warn(`In-process async PDF generation fallback error: ${err.message}`);
+      });
+    }
+
+    const currentStatus = await this.readStatus(jobId);
+
+    return {
+      jobId,
+      status: currentStatus?.status || 'QUEUED',
+      checkStatusUrl,
+    };
+  }
+
+  /**
+   * Retrieves the current status (QUEUED, COMPLETED, FAILED) of an asynchronous PDF job from Redis.
+   */
+  async getAsyncPdfStatus(jobId: string): Promise<AsyncPdfStatusResponse> {
+    const data = await this.readStatus(jobId);
+    if (!data) {
+      throw new NotFoundException(`PDF generation job ${jobId} not found or expired`);
+    }
+    return data;
   }
 }

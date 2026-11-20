@@ -1,8 +1,12 @@
 import {
   Controller,
   Get,
+  Header,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Post,
   Query,
   Res,
   UseGuards,
@@ -288,6 +292,7 @@ export class PdfController {
   @Get('passbook/:ticketId')
   @Roles(
     Role.SUPER_ADMIN,
+    Role.PARTNER,
     Role.BRANCH_MANAGER,
     Role.ACCOUNTANT,
     Role.CUSTOMER,
@@ -352,5 +357,84 @@ export class PdfController {
   ) {
     const result = await this.pdfService.generatePassbookPdf(ticketId, currentUser);
     this.deliverPdfResponse(res, result, 'form-xxi-passbook', ticketId, download, redirect, stream);
+  }
+
+  @Post('async/passbook/:ticketId')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Enqueue asynchronous Form XXI continuous passbook statement PDF generation (PERF-01)',
+    description:
+      'Enqueues continuous subscriber passbook statement rendering to BullMQ background queue to prevent blocking the event loop.',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Passbook PDF generation enqueued successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+        status: { type: 'string', example: 'QUEUED' },
+        checkStatusUrl: {
+          type: 'string',
+          example: '/api/v1/pdf/async/status/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden access to passbook' })
+  async enqueuePassbookPdf(
+    @Param('ticketId', new ParseUUIDPipe()) ticketId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return await this.pdfService.enqueueAsyncPdfGeneration(
+      'PASSBOOK',
+      ticketId,
+      currentUser,
+    );
+  }
+
+  @Get('async/status/:jobId')
+  @Header('Cache-Control', 'private, no-store')
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.PARTNER,
+    Role.BRANCH_MANAGER,
+    Role.ACCOUNTANT,
+    Role.COLLECTION_AGENT,
+    Role.CUSTOMER,
+    Role.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Check status of an asynchronous PDF generation job (PERF-01)',
+    description:
+      'Retrieves the current execution status (QUEUED, COMPLETED, FAILED) and presigned download URL when ready.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF generation status and presigned download URL',
+    schema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string' },
+        status: { type: 'string', example: 'COMPLETED' },
+        key: { type: 'string' },
+        presignedUrl: { type: 'string' },
+        expiresInSeconds: { type: 'number', example: 900 },
+        completedAt: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Job not found or expired' })
+  async getAsyncPdfStatus(@Param('jobId') jobId: string) {
+    return await this.pdfService.getAsyncPdfStatus(jobId);
   }
 }
