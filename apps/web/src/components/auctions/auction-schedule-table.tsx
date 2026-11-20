@@ -12,9 +12,13 @@ import {
   Clock,
   CheckCircle2,
   Award,
+  ScrollText,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { downloadFormIxPdf, downloadMinutesPdf } from '@/lib/pdf-download';
 import {
   Table,
   TableHeader,
@@ -55,6 +59,35 @@ export function AuctionScheduleTable({
   const chitValueBig = toSafeWholeRupeeBigInt(scheme.chitValue, 0n);
   const duration = Math.max(2, scheme.durationMonths || 20);
   const ceilingDiscount = computeCeilingDiscountBigInt(chitValueBig, scheme.maxDiscountCeiling);
+
+  const [downloadingAuctionId, setDownloadingAuctionId] = React.useState<string | null>(null);
+  const [downloadingType, setDownloadingType] = React.useState<'NOTICE' | 'MINUTES' | null>(null);
+
+  const handleDownloadNotice = async (auctionId: string, month: number) => {
+    setDownloadingAuctionId(auctionId);
+    setDownloadingType('NOTICE');
+    try {
+      await downloadFormIxPdf(auctionId, `form-ix-notice-${scheme.groupCode}-m${month}.pdf`);
+    } catch (err) {
+      console.error('Failed to download Form IX notice', err);
+    } finally {
+      setDownloadingAuctionId(null);
+      setDownloadingType(null);
+    }
+  };
+
+  const handleDownloadMinutes = async (auctionId: string, month: number) => {
+    setDownloadingAuctionId(auctionId);
+    setDownloadingType('MINUTES');
+    try {
+      await downloadMinutesPdf(auctionId, `form-xvii-minutes-${scheme.groupCode}-m${month}.pdf`);
+    } catch (err) {
+      console.error('Failed to download Form XVII minutes', err);
+    } finally {
+      setDownloadingAuctionId(null);
+      setDownloadingType(null);
+    }
+  };
 
   // Map existing auctions by installment month
   const auctionMap = React.useMemo(() => {
@@ -350,33 +383,73 @@ export function AuctionScheduleTable({
                       )}
                     </TableCell>
 
-                    {/* Actions CTA */}
+                    {/* Actions CTA & Quick PDF Downloads */}
                     <TableCell className="text-right whitespace-nowrap">
-                      {isScheduled ? (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-medium shrink-0 whitespace-nowrap"
-                          asChild
-                        >
-                          <Link href={auc?.id ? `/auctions/${auc.id}/live` : `/auctions/live?group=${scheme.id}&month=${row.month}`}>
-                            <Gavel className="mr-1 h-3 w-3 shrink-0" />
-                            <span>{t('enterBiddingRoom')}</span>
-                          </Link>
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 text-[11px] border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 shrink-0 whitespace-nowrap"
-                          asChild
-                        >
-                          <Link href={`/auctions/${auc?.id}`}>
-                            <span>{isMinutesFiled ? t('viewMinutes') : t('viewResults')}</span>
-                            <ArrowRight className="ml-1 h-3 w-3 shrink-0" />
-                          </Link>
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {isScheduled ? (
+                          <>
+                            {auc?.id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={downloadingAuctionId === auc.id}
+                                onClick={() => handleDownloadNotice(auc.id, row.month)}
+                                className="h-7 px-2 text-[11px] border-indigo-700/60 bg-indigo-950/30 hover:bg-indigo-900/40 text-indigo-300 shrink-0"
+                                title="Download Form IX Draw Notice (Tamil Nadu Chit Funds Rules, 1984)"
+                              >
+                                {downloadingAuctionId === auc.id && downloadingType === 'NOTICE' ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-indigo-400" />
+                                ) : (
+                                  <ScrollText className="h-3 w-3 text-indigo-400" />
+                                )}
+                                <span className="hidden xl:inline ml-1">Notice</span>
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-medium shrink-0 whitespace-nowrap"
+                              asChild
+                            >
+                              <Link href={auc?.id ? `/auctions/${auc.id}/live` : `/auctions/live?group=${scheme.id}&month=${row.month}`}>
+                                <Gavel className="mr-1 h-3 w-3 shrink-0" />
+                                <span>{t('enterBiddingRoom')}</span>
+                              </Link>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            {auc?.id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={downloadingAuctionId === auc.id}
+                                onClick={() => handleDownloadMinutes(auc.id, row.month)}
+                                className="h-7 px-2 text-[11px] border-purple-700/60 bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 shrink-0"
+                                title="Download Form XVII Auction Minutes PDF"
+                              >
+                                {downloadingAuctionId === auc.id && downloadingType === 'MINUTES' ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
+                                ) : (
+                                  <FileText className="h-3 w-3 text-purple-400" />
+                                )}
+                                <span className="hidden xl:inline ml-1">Minutes</span>
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-[11px] border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 shrink-0 whitespace-nowrap"
+                              asChild
+                            >
+                              <Link href={`/auctions/${auc?.id}`}>
+                                <span>{isMinutesFiled ? t('viewMinutes') : t('viewResults')}</span>
+                                <ArrowRight className="ml-1 h-3 w-3 shrink-0" />
+                              </Link>
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

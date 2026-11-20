@@ -25,6 +25,7 @@ import { EditSchemeDialog } from '@/components/schemes/edit-scheme-dialog';
 import { ActivateSchemeDialog } from '@/components/schemes/activate-scheme-dialog';
 import { MonthlyInstallmentsPanel } from '@/components/schemes/monthly-installments-panel';
 import { StatutoryFormsDropdown } from '@/components/schemes/statutory-forms-dropdown';
+import { SchemeStatutoryTab } from '@/components/schemes/scheme-statutory-tab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
@@ -255,6 +256,12 @@ export default function SchemeDetailPage() {
             >
               {tInstallments('tabInstallments')}
             </TabsTrigger>
+            <TabsTrigger
+              value="statutory-forms"
+              className="text-xs font-semibold data-[state=active]:bg-indigo-600 data-[state=active]:text-white cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              Govt Forms (TN Rules 1984)
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -304,6 +311,20 @@ export default function SchemeDetailPage() {
             status={scheme.status}
             currentInstallmentMonth={scheme.currentInstallmentMonth}
             canManage={canManage}
+          />
+        </TabsContent>
+
+        {/* Tab 3: Tamil Nadu Chit Funds Rules, 1984 Statutory Forms */}
+        <TabsContent value="statutory-forms" className="space-y-4 outline-none mt-2">
+          <SchemeStatutoryTab
+            chitGroupId={id}
+            groupCode={scheme.groupCode}
+            groupName={scheme.groupName}
+            status={scheme.status}
+            totalTickets={totalTickets}
+            subscribedCount={tickets.length}
+            sanctionOrderNumber={scheme.sanctionOrderNumber}
+            sanctionDate={scheme.sanctionDate}
           />
         </TabsContent>
       </Tabs>

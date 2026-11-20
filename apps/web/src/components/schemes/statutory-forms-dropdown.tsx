@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   downloadFormIPdf,
   downloadFormIiPdf,
@@ -33,6 +34,7 @@ interface StatutoryFormsDropdownProps {
   status?: string;
   totalTickets?: number;
   subscribedCount?: number;
+  compact?: boolean;
 }
 
 export function StatutoryFormsDropdown({
@@ -41,6 +43,7 @@ export function StatutoryFormsDropdown({
   status: _status,
   totalTickets: _totalTickets,
   subscribedCount: _subscribedCount,
+  compact = false,
 }: StatutoryFormsDropdownProps) {
   const [downloadingForm, setDownloadingForm] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -76,15 +79,23 @@ export function StatutoryFormsDropdown({
             variant="outline"
             size="sm"
             disabled={Boolean(downloadingForm)}
-            className="border-indigo-600/40 bg-indigo-950/20 text-indigo-300 hover:bg-indigo-900/30 text-xs font-semibold"
+            className={cn(
+              'border-indigo-600/40 bg-indigo-950/20 text-indigo-300 hover:bg-indigo-900/30 text-xs font-semibold',
+              compact && 'px-2.5 h-9 shrink-0'
+            )}
+            title="Download Statutory Registrar Forms (Tamil Nadu Chit Funds Rules, 1984)"
           >
             {downloadingForm ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-indigo-400" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400 shrink-0" />
             ) : (
-              <ScrollText className="mr-1.5 h-3.5 w-3.5 text-indigo-400" />
+              <ScrollText className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
             )}
-            <span>Statutory Registrar Forms</span>
-            <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+            {compact ? (
+              <span className="ml-1.5 hidden sm:inline whitespace-nowrap">Forms</span>
+            ) : (
+              <span className="ml-1.5 whitespace-nowrap">Statutory Registrar Forms</span>
+            )}
+            <ChevronDown className="ml-1 h-3 w-3 opacity-60 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-80 p-2 space-y-1">

@@ -32,6 +32,7 @@ import {
 import { formatIstDateString } from '@/components/reports/report-bigint';
 import { resolveFormXviiKpiCounts } from '@/components/reports/report-access';
 import { RouteSuspenseFallback } from '@/components/ui/route-suspense-fallback';
+import { StatutoryFormsDropdown } from '@/components/schemes/statutory-forms-dropdown';
 
 interface MinutesSchemeOption {
   id: string;
@@ -249,6 +250,15 @@ function FormXviiMinutesContent() {
               ))}
             </select>
           </div>
+
+          {/* Statutory Government Filing Pack */}
+          {selectedGroupId && (
+            <StatutoryFormsDropdown
+              chitGroupId={selectedGroupId}
+              groupCode={schemes.find((s) => s.id === selectedGroupId)?.groupCode || 'SCHEME'}
+              compact
+            />
+          )}
 
           {/* Export CSV Button */}
           <Button

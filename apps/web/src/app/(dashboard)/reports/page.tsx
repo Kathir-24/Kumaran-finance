@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Vault,
+  ScrollText,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +50,16 @@ export default function ReportsHubPage() {
   }
 
   const reportCards = [
+    {
+      title: 'Tamil Nadu Chit Funds Rules, 1984 — Statutory Forms Suite',
+      description:
+        'Official Government Registrar filing forms: Form I (Prior Sanction Application + 12-Item Annexure), Form II (Chit Agreement Registration), Form V (100% Subscription Declaration), and Form VII (Agreement Certificate).',
+      href: '/schemes',
+      icon: ScrollText,
+      badgeText: 'Govt Gazette',
+      badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      tag: 'Forms I, II, V, VII, IX',
+    },
     {
       title: t('formXxii'),
       description: t('cashBookSubtitle'),

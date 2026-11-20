@@ -8,6 +8,7 @@ import { formatRupee } from '@kumaran/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { StatutoryFormsDropdown } from '@/components/schemes/statutory-forms-dropdown';
 import { cn } from '@/lib/utils';
 
 export interface SchemeSummary {
@@ -164,10 +165,10 @@ export function SchemeCard({ scheme, className }: SchemeCardProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0">
+      <CardFooter className="p-4 pt-0 flex items-center gap-2">
         <Button
           variant="outline"
-          className="w-full justify-between border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-800 hover:text-white"
+          className="flex-1 justify-between border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-800 hover:text-white"
           asChild
         >
           <Link href={`/schemes/${scheme.id}`}>
@@ -175,6 +176,14 @@ export function SchemeCard({ scheme, className }: SchemeCardProps) {
             <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </Button>
+        <StatutoryFormsDropdown
+          chitGroupId={scheme.id}
+          groupCode={scheme.groupCode}
+          status={scheme.status}
+          totalTickets={scheme.totalTickets}
+          subscribedCount={filledTickets}
+          compact
+        />
       </CardFooter>
     </Card>
   );
