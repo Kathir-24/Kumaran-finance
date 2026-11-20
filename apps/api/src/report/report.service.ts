@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { isTokenRevokedInRedis } from '../auth/utils/token-revocation.util';
 import { stringifyBigIntSafe } from '../common/utils/bigint-json.util';
 import { withTtlJitter } from '../common/utils/cache-jitter.util';
 import { acquireRedisMutexLock } from '../common/utils/redis-lock.util';
@@ -918,16 +919,9 @@ export class ReportService {
     const redis = this.redisProvider?.getClient();
     if (redis && this.redisProvider?.getIsConnected() && currentUser.iat) {
       try {
-        const revokedBeforeStr = await redis.get(
-          `auth:revoked:${currentUser.sub}`,
-        );
-        if (revokedBeforeStr) {
-          const revokedBefore = parseInt(revokedBeforeStr, 10);
-          if (currentUser.iat * 1000 < revokedBefore) {
-            throw new UnauthorizedException(
-              'Session revoked: SSE stream terminated',
-            );
-          }
+        const isRevoked = await isTokenRevokedInRedis(redis, currentUser);
+        if (isRevoked) {
+          throw new UnauthorizedException('Session revoked: SSE stream terminated');
         }
       } catch (err: any) {
         if (err instanceof UnauthorizedException) throw err;

@@ -12,6 +12,7 @@ import { Role } from '@prisma/client';
 import * as crypto from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
+import { isTokenRevokedInRedis } from '../../auth/utils/token-revocation.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisConnectionProvider } from '../providers/redis-connection.provider';
 
@@ -120,12 +121,9 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
 
     if (useRedis && redis && payload.iat) {
       try {
-        const revokedBeforeStr = await redis.get(`auth:revoked:${payload.sub}`);
-        if (revokedBeforeStr) {
-          const revokedBefore = parseInt(revokedBeforeStr, 10);
-          if (payload.iat * 1000 < revokedBefore) {
-            return true;
-          }
+        const isRevoked = await isTokenRevokedInRedis(redis, payload);
+        if (isRevoked) {
+          return true;
         }
       } catch {
         // Fallback to database check
