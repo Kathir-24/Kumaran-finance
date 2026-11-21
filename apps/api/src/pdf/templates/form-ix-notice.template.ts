@@ -134,13 +134,13 @@ export class FormIxNoticeTemplate {
         // Signatures matching Gazette Page 66 verbatim (NO underlines after Secretary or foreman!)
         const sigY = Math.max(doc.y, 480);
         doc.font(regularFont).fontSize(10.5).text('Yours faithfully,', 360, sigY);
-        doc.text('Secretary', 360, sigY + 30);
+        doc.text('Secretary', 360, sigY + 36);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 48);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 54);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
-        doc.y = sigY + 85;
+        doc.y = sigY + 102;
         doc.font(regularFont).fontSize(10.5).text('for and on behalf of (foreman)', 360, doc.y);
         if (!isBlank) {
           doc.moveDown(0.2);
@@ -148,15 +148,13 @@ export class FormIxNoticeTemplate {
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
-        // Footnote matching Gazette Page 66 verbatim
-        doc.y = 705;
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+        // Footnote matching Gazette Page 66 verbatim (NO horizontal line in Gazette scan; flows naturally below signatures)
+        doc.y = sigY + (!isBlank ? 172 : 158);
+        doc.font(regularFont).fontSize(9.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Strike out or delete whatever is not applicable. Insert such designation(s) as may be appropriate.',
           50,
           doc.y,
-          { width: pageWidth, lineGap: 2 },
+          { width: pageWidth, lineGap: 4 },
         );
 
         doc.end();

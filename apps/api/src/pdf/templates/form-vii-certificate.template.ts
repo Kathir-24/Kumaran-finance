@@ -125,49 +125,49 @@ export class FormViiCertificateTemplate {
         doc.moveDown(3.0);
 
         // Signatures and Place/Date matching Gazette Page 57 verbatim
-        const sigY = Math.max(doc.y, 490);
+        const sigY = Math.max(doc.y, 480);
         doc.font(regularFont).fontSize(10.5).text('Yours faithfully,', 360, sigY);
-        doc.text('Chairman', 360, sigY + 24);
+        doc.text('Chairman', 360, sigY + 30);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 38);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 46);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
-        doc.text('Secretary', 360, sigY + 54);
+        doc.text('Secretary', 360, sigY + 68);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 68);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 84);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
         // Place and Date on left
         if (isBlank) {
           doc.font(regularFont).fontSize(10.5).text('Place: ', 50, sigY + 68);
-          doc.font(regularFont).fontSize(10.5).text('Date: ', 50, sigY + 92);
+          doc.font(regularFont).fontSize(10.5).text('Date: ', 50, sigY + 95);
         } else {
           doc.font(regularFont).fontSize(10.5).text('Place: ', 50, sigY + 68, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Perundurai');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-          doc.font(regularFont).fontSize(10.5).text('Date: ', 50, sigY + 92, { continued: true });
+          doc.font(regularFont).fontSize(10.5).text('Date: ', 50, sigY + 95, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(certDate);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
         // for and on behalf of on right under Secretary
-        doc.font(regularFont).fontSize(10.5).text('for and on behalf of………..', 360, sigY + 92);
+        doc.font(regularFont).fontSize(10.5).text('for and on behalf of………..', 360, sigY + 95);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 360, sigY + 108);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 360, sigY + 112);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
-        doc.text('(Foreman)', 360, sigY + (!isBlank ? 124 : 112));
+        doc.text('(Foreman)', 360, sigY + (!isBlank ? 130 : 118));
 
-        // Footnote matching Gazette Page 57 verbatim
-        doc.y = 705;
+        // Footnote matching Gazette Page 57 verbatim (divider line sits naturally below Foreman)
+        doc.y = sigY + (!isBlank ? 152 : 138);
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(9).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Strike out / delete whatever is not applicable. Insert the designation(s) as may be appropriate to the applicant.',
           45,
           doc.y,
-          { width: pageWidth, lineGap: 2 },
+          { width: pageWidth, lineGap: 3 },
         );
 
         doc.end();

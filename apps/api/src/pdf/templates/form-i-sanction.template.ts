@@ -165,62 +165,65 @@ export class FormISanctionTemplate {
         doc.addPage();
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
 
+        // Centered Page Number matching Gazette Page 44 verbatim
+        doc.font(regularFont).fontSize(9).text('44', 45, 45, { width: pageWidth, align: 'center' });
+
         // Para 4
-        doc.font(regularFont).fontSize(10).text('4. I / We hereby certify that the aggregate chit amount of the chits run by me / us is Rs ', 45, 50, { continued: true, lineGap: 7 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '__________', { continued: true, lineGap: 7 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 7 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aggWords, '________________________________________', { continued: true, lineGap: 7 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' only) on the date of this application and does not exceed the aggregate chit amount prescribed by Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 7 });
-        doc.moveDown(1.2);
+        doc.font(regularFont).fontSize(10.5).text('4. I / We hereby certify that the aggregate chit amount of the chits run by me / us is Rs ', 45, 90, { continued: true, lineGap: 8 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '__________', { continued: true, lineGap: 8 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees ', { continued: true, lineGap: 8 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : aggWords, '________________________________________', { continued: true, lineGap: 8 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' only) on the date of this application and does not exceed the aggregate chit amount prescribed by Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 8 });
+        doc.moveDown(2.2);
 
         // Para 5
-        doc.font(regularFont).fontSize(10).text(
+        doc.font(regularFont).fontSize(10.5).text(
           '5. I / We request you to accord your sanction for commencing and conducting the Chit. On receipt of such sanction further steps for registration etc., of the chit will be taken.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 7 },
+          { align: 'justify', lineGap: 8 },
         );
-        doc.moveDown(1.2);
+        doc.moveDown(2.0);
 
         // Para 6
-        doc.font(regularFont).fontSize(10).text(
+        doc.font(regularFont).fontSize(10.5).text(
           '6. We further undertake in register the chit within 12 months from the date of sanction by the State Government as per Section 4(1).',
           45,
           doc.y,
-          { align: 'justify', lineGap: 7 },
+          { align: 'justify', lineGap: 8 },
         );
-        doc.moveDown(1.5);
+        doc.moveDown(2.2);
 
-        doc.font(regularFont).fontSize(10).text(
+        doc.font(regularFont).fontSize(10.5).text(
           'We have read the provisions of the Chit Fund Act, 1982 (Central Chit Fund Act No. 40 of 1982) and the Rules framed thereunder and agree to abide by the same in the conduct of the chit business.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 7 },
+          { align: 'justify', lineGap: 8 },
         );
-        doc.moveDown(2.5);
+        doc.moveDown(3.2);
 
         // Signatures block matching Gazette Page 44
-        const sigY = doc.y;
-        doc.font(regularFont).fontSize(10).text('Yours faithfully,', 360, sigY);
-        doc.text('Chairman : ', 360, sigY + 30, { continued: true });
+        const sigY = Math.max(doc.y, 440);
+        doc.font(regularFont).fontSize(10.5).text('Yours faithfully,', 360, sigY);
+        doc.text('Chairman : ', 360, sigY + 38, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________');
-        doc.text('Secretary : ', 360, sigY + 60, { continued: true });
+        doc.text('Secretary : ', 360, sigY + 76, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Partner / Authorised Signatory', '____________________');
 
-        doc.text('Encl: Sheets', 45, sigY + 90);
+        doc.text('Encl: Sheets', 45, sigY + 114);
 
-        doc.text('for or on behalf of ', 360, sigY + 90, { continued: true });
+        doc.text('for or on behalf of ', 360, sigY + 114, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________');
 
-        // Footnote matching Gazette Page 44 verbatim
-        doc.y = 695;
+        // Footnote matching Gazette Page 44 verbatim (divider line sits naturally below signatures)
+        doc.y = sigY + 155;
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(9).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Strike out or delete whatever is not applicable.\n* Insert the designation as may be appropriate to the applicant. @ Here enter the name of the applicant institution, if any.',
           45,
           doc.y,
-          { width: pageWidth, lineGap: 3 },
+          { width: pageWidth, lineGap: 4 },
         );
 
         // ================= PAGE 3: ANNEXURE STATEMENT OF PARTICULARS - PART 1 (GAZETTE PAGE 45) =================
@@ -353,22 +356,22 @@ export class FormISanctionTemplate {
               .text(p.value, col2X, itemStartY, { width: col2Width, lineGap: 2.5 });
             const col2EndY = doc.y;
             doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
-            doc.y = Math.max(col1EndY, col2EndY) + 10;
+            doc.y = Math.max(col1EndY, col2EndY) + 12;
           } else {
-            // In blank mode, space out items down the page
-            doc.y = col1EndY + 14;
+            // In blank mode, space out items down the page matching Gazette rhythm
+            doc.y = col1EndY + 25;
           }
         }
 
         // Solemn declaration matching Gazette Page 46
-        doc.moveDown(0.8);
+        doc.moveDown(1.5);
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).fontSize(9.5).text(
           'I / We* solemnly declare that the facts stated herein as also in the enclosures are true in the best of my / our knowledge, information and belief.',
           45,
           doc.y,
-          { align: 'justify', lineGap: 4 },
+          { align: 'justify', lineGap: 4.5 },
         );
-        doc.moveDown(1.0);
+        doc.moveDown(1.8);
 
         // Date line matching Gazette Page 46 (HAS underlines in Gazette!)
         const declY = doc.y;
@@ -381,7 +384,7 @@ export class FormISanctionTemplate {
         StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________.');
 
-        doc.moveDown(1.2);
+        doc.moveDown(1.8);
         const sigRowY = doc.y;
         doc.font(regularFont).fontSize(9.5).text('Name (s) ', 45, sigRowY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________');
@@ -389,23 +392,30 @@ export class FormISanctionTemplate {
         doc.font(regularFont).fontSize(9.5).text('Signature (s) ', 360, sigRowY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________');
 
-        doc.font(regularFont).fontSize(9.5).text('Designation (s) ', 45, sigRowY + 22, { continued: true });
+        doc.font(regularFont).fontSize(9.5).text('Designation (s) ', 45, sigRowY + 30, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Managing Partner / Foreman', '____________________');
 
-        doc.font(regularFont).fontSize(9.5).text('For and behalf of ', 45, sigRowY + 44, { continued: true });
+        doc.font(regularFont).fontSize(9.5).text('For and behalf of ', 45, sigRowY + 60, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '________________________________________');
 
         // Official Gazette Footnotes matching Gazette Page 46 verbatim
-        doc.y = 690;
+        // * Here enter... sits directly below For and behalf of; divider line sits between institution note and Statement notes
+        doc.y = sigRowY + (!isBlank ? 92 : 86);
+        doc.font(regularFont).fontSize(8.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+          '* Here enter the name of the applicant institution, if any, strike out whatever is not applicable.',
+          45,
+          doc.y,
+          { width: pageWidth, lineGap: 3 },
+        );
+        doc.moveDown(0.8);
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '* Here enter the name of the applicant institution, if any, strike out whatever is not applicable.\n' +
+        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(8.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Note : (1) If the space against any items is inadequate for furnishing full particulars, the required information should be given in separate sheets indicating the cross reference against the relative item of this statement.\n' +
           '(2) A copy each of the latest available audited balance sheet and profit and loss account if any, should be attached.',
           45,
           doc.y,
-          { width: pageWidth, lineGap: 2.8 },
+          { width: pageWidth, lineGap: 3.5 },
         );
 
         doc.end();

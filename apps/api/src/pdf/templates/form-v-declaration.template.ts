@@ -139,34 +139,34 @@ export class FormVDeclarationTemplate {
         doc.moveDown(3.0);
 
         // Signatures matching Gazette Page 55 verbatim (NO underlines after Chairman / Secretary / Foreman!)
-        const sigY = Math.max(doc.y, 490);
+        const sigY = Math.max(doc.y, 480);
         doc.font(regularFont).fontSize(10.5).text('Yours faithfully,', 360, sigY);
-        doc.text('Chairman', 360, sigY + 24);
+        doc.text('Chairman', 360, sigY + 30);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 38);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 46);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
-        doc.text('Secretary', 360, sigY + 54);
+        doc.text('Secretary', 360, sigY + 68);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 68);
-          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        }
-
-        doc.text('for and on behalf of (Foreman)', 360, sigY + 92);
-        if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 360, sigY + 108);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 84);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
-        // Footnote matching Gazette Page 55 verbatim
-        doc.y = 705;
+        doc.text('for and on behalf of (Foreman)', 360, sigY + 106);
+        if (!isBlank) {
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 360, sigY + 122);
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+        }
+
+        // Footnote matching Gazette Page 55 verbatim (divider line sits naturally below signatures)
+        doc.y = sigY + (!isBlank ? 150 : 135);
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
+        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(9).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Strike out or delete whatever is not applicable insert such designation(s) as may be appropriate to the applicant.',
           45,
           doc.y,
-          { width: pageWidth, lineGap: 2 },
+          { width: pageWidth, lineGap: 3 },
         );
 
         doc.end();
