@@ -238,9 +238,14 @@ export class FormISanctionTemplate {
         doc.addPage();
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
         doc.font(boldFont).fontSize(11).text('ANNEXURE', { align: 'center', width: pageWidth });
+        doc.moveDown(0.2);
         doc.font(boldFont).fontSize(10.5).text('STATEMENT OF PARTICULARS', { align: 'center', width: pageWidth });
-        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(1.0);
+        doc.moveDown(1.5);
+
+        // Two-column layout matching Gazette Page 45 (Items 1 to 7 on left, particulars on right)
+        const col1Width = 225;
+        const col2X = 285;
+        const col2Width = 265;
 
         // Gazette Page 45 Items 1 to 7 (NO underlines in Gazette blank form!)
         const annexurePart1: Array<{ item: string; label: string; value: string }> = [
@@ -282,22 +287,26 @@ export class FormISanctionTemplate {
         ];
 
         for (const p of annexurePart1) {
+          const itemStartY = doc.y;
+          // Left Column: Item number and description
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK)
-            .font(boldFont)
+            .font(regularFont)
             .fontSize(9)
-            .text(`${p.item}. `, 45, doc.y, { continued: true, lineGap: 3.5 });
-          doc.font(regularFont)
-            .text(p.label, { width: pageWidth - 15, lineGap: 3.5 });
+            .text(`${p.item}. ${p.label}`, 45, itemStartY, { width: col1Width, lineGap: 3.5 });
+          const col1EndY = doc.y;
+
           if (!isBlank) {
-            doc.moveDown(0.25);
+            // Right Column: Entered data / particulars in bold blue
             doc.fillColor(StatutoryFormHelper.DATA_BLUE)
               .font(boldFont)
               .fontSize(8.5)
-              .text(p.value, 60, doc.y, { width: pageWidth - 20, lineGap: 2.5 });
-            doc.moveDown(0.45);
+              .text(p.value, col2X, itemStartY, { width: col2Width, lineGap: 2.5 });
+            const col2EndY = doc.y;
+            doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
+            doc.y = Math.max(col1EndY, col2EndY) + 12;
           } else {
-            // Clean spacing in blank mode
-            doc.moveDown(1.2);
+            // In blank mode, space out items down the page matching Gazette distribution
+            doc.y = col1EndY + 18;
           }
         }
 
@@ -348,24 +357,28 @@ export class FormISanctionTemplate {
           },
         ];
 
-        doc.y = 45;
+        doc.y = 50;
         for (const p of annexurePart2) {
+          const itemStartY = doc.y;
+          // Left Column: Item number and description
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK)
-            .font(boldFont)
+            .font(regularFont)
             .fontSize(9)
-            .text(`${p.item}. `, 45, doc.y, { continued: true, lineGap: 3.5 });
-          doc.font(regularFont)
-            .text(p.label, { width: pageWidth - 15, lineGap: 3.5 });
+            .text(`${p.item}. ${p.label}`, 45, itemStartY, { width: col1Width, lineGap: 3.5 });
+          const col1EndY = doc.y;
+
           if (!isBlank) {
-            doc.moveDown(0.25);
+            // Right Column: Entered data / particulars in bold blue
             doc.fillColor(StatutoryFormHelper.DATA_BLUE)
               .font(boldFont)
               .fontSize(8.5)
-              .text(p.value, 60, doc.y, { width: pageWidth - 20, lineGap: 2.5 });
-            doc.moveDown(0.45);
+              .text(p.value, col2X, itemStartY, { width: col2Width, lineGap: 2.5 });
+            const col2EndY = doc.y;
+            doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
+            doc.y = Math.max(col1EndY, col2EndY) + 10;
           } else {
-            // Clean spacing in blank mode
-            doc.moveDown(1.2);
+            // In blank mode, space out items down the page
+            doc.y = col1EndY + 14;
           }
         }
 
