@@ -91,85 +91,75 @@ export class FormISanctionTemplate {
 
         // ================= PAGE 1: FORM I APPLICATION (GAZETTE PAGE 43) =================
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
+        doc.y = 55;
         doc.font(boldFont).fontSize(11).text('APPENDIX –', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(11.5).text('FORM I', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(9.5).text('(See Section 4(2) and Rule 3)', { align: 'center', width: pageWidth });
-        doc.moveDown(0.4);
+        doc.moveDown(0.5);
         doc.font(boldFont).fontSize(10).text(
           'FORM OF APPLICATION TO BE USED BY A FOREMAN FOR OBTAINING\nPREVIOUS SANCTION TO COMMENCE OR CONDUCT A CHIT',
           { align: 'center', width: pageWidth, lineGap: 3 },
         );
         doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(1.0);
+        doc.moveDown(2.0);
 
-        // From / Place / Date
-        const metaY = doc.y;
-        doc.font(regularFont).fontSize(10).text('From', 45, metaY);
+        // From / Place / Date matching Gazette Page 43 (From at y ≈ 180)
+        const metaY = Math.max(doc.y, 180);
+        doc.font(regularFont).fontSize(10.5).text('From', 45, metaY);
 
-        doc.font(regularFont).fontSize(10).text('Place: ', 360, metaY, { continued: true });
+        doc.font(regularFont).fontSize(10.5).text('Place: ', 360, metaY, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
 
-        doc.font(regularFont).fontSize(10).text('Date: ', 360, metaY + 22, { continued: true });
+        doc.font(regularFont).fontSize(10.5).text('Date: ', 360, metaY + 22, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : appDate, '____________________');
 
-        doc.y = metaY + 48;
-        doc.font(regularFont).fontSize(10).text('To', 45, doc.y);
-        doc.moveDown(0.25);
+        doc.y = metaY + 50;
+        doc.font(regularFont).fontSize(10.5).text('To', 45, doc.y);
+        doc.moveDown(0.3);
         doc.text('The Secretary to the Govt.', 45);
-        doc.moveDown(0.25);
+        doc.moveDown(0.3);
         doc.text('of ', 45, doc.y, { continued: true });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Tamil Nadu (Authorised Officer / Registrar of Chits, Erode)', '________________________________________');
-        doc.moveDown(0.3);
-        doc.font(regularFont).fontSize(8.5).text('(The Authorised officer by designation)', 45);
-        doc.moveDown(0.8);
+        doc.moveDown(0.4);
+        doc.font(regularFont).fontSize(9).text('(The Authorised officer by designation)', 45);
+        doc.moveDown(1.5);
 
-        doc.font(regularFont).fontSize(10.5).text('Sir,', 45);
-        doc.moveDown(0.7);
+        doc.font(regularFont).fontSize(11).text('Sir,', 45);
+        doc.moveDown(1.2);
 
         // Para 1 matching Gazette Page 43
-        doc.font(regularFont).fontSize(10).text('I ', 45, doc.y, { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'P. Kumaran', '____________________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' Son / Wife / Daughter ', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'K. Periasamy', '____________________', { lineGap: 7.5 });
-        doc.moveDown(0.3);
+        doc.font(regularFont).fontSize(10.5).text('I ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'P. Kumaran', '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' Son / Wife / Daughter ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'K. Periasamy', '____________________', { lineGap: 8.5 });
+        doc.moveDown(0.5);
 
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Business Executive', '____________________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (here state profession or occupation) residing at ', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '__________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' I / We, the Chairman and Secretary respectively* on behalf of (name of the firm, Company, Corporation, Coop-Society etc.) situated at having its registered office at', { lineGap: 7.5 });
-        doc.moveDown(0.3);
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Business Executive', '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (here state profession or occupation) residing at ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '__________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' I / We, the Chairman and Secretary respectively* on behalf of (name of the firm, Company, Corporation, Coop-Society etc.) situated at having its registered office at', { lineGap: 8.5 });
+        doc.moveDown(0.5);
 
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firmName}, ${officeAddress}`, '________________________________________________________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' desire to commence and conduct a chit as foreman at ', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (here specify the place with postal address in detail). Full particulars in this regard are given in the Annexure hereto.', { lineGap: 7.5 });
-        doc.moveDown(1.2);
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${firmName}, ${officeAddress}`, '________________________________________________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' desire to commence and conduct a chit as foreman at ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (here specify the place with postal address in detail). Full particulars in this regard are given in the Annexure hereto.', { lineGap: 8.5 });
+        doc.moveDown(1.8);
 
         // Para 2
-        doc.font(regularFont).fontSize(10).text('2. A certified true copy of the resolution passed by the Managing Committee / Board of Directors at its meeting held on the ', 45, doc.y, { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : resDate, '____________________', { lineGap: 7.5 });
-        doc.moveDown(0.3);
-        StatutoryFormHelper.renderStatic(doc, regularFont, 'for commencing and conducting the chit in question is enclosed.', { lineGap: 7.5 });
-        doc.moveDown(1.2);
+        doc.font(regularFont).fontSize(10.5).text('2. A certified true copy of the resolution passed by the Managing Committee / Board of Directors at its meeting held on the ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : resDate, '____________________', { lineGap: 8.5 });
+        doc.moveDown(0.5);
+        StatutoryFormHelper.renderStatic(doc, regularFont, 'for commencing and conducting the chit in question is enclosed.', { lineGap: 8.5 });
+        doc.moveDown(1.8);
 
         // Para 3
-        doc.font(regularFont).fontSize(10).text('3. I / We remit herewith a sum of Rs ', 45, doc.y, { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees in words)', { lineGap: 7.5 });
-        doc.moveDown(0.3);
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : feeWords, '________________________________________', { continued: true, lineGap: 7.5 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' only) being the fees prescribed for the purpose.', { lineGap: 7.5 });
-
-        // Page 1 Footer / Continuation indicator
-        doc.y = 715;
-        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.4);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '[Form I Continued on Page 2 / படிவம் 1 தொடர்ச்சி பக்கம் 2-ல்]',
-          45,
-          doc.y,
-          { width: pageWidth, align: 'center' },
-        );
+        doc.font(regularFont).fontSize(10.5).text('3. I / We remit herewith a sum of Rs ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees in words)', { lineGap: 8.5 });
+        doc.moveDown(0.5);
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : feeWords, '________________________________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' only) being the fees prescribed for the purpose.', { lineGap: 8.5 });
 
         // ================= PAGE 2: FORM I APPLICATION CONTINUED (GAZETTE PAGE 44) =================
         doc.addPage();
@@ -227,7 +217,6 @@ export class FormISanctionTemplate {
         doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.5);
         doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '----------------------------------------------------------------------------------------------------------------\n' +
           'Strike out or delete whatever is not applicable.\n* Insert the designation as may be appropriate to the applicant. @ Here enter the name of the applicant institution, if any.',
           45,
           doc.y,

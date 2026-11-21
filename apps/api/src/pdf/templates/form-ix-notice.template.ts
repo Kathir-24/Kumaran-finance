@@ -153,7 +153,6 @@ export class FormIxNoticeTemplate {
         doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.5);
         doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '----------------------------------------------------------------------------------------------------------------\n' +
           'Strike out or delete whatever is not applicable. Insert such designation(s) as may be appropriate.',
           50,
           doc.y,

@@ -96,7 +96,7 @@ export class FormViiiAgreementTemplate {
           doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
           doc.moveDown(0.4);
           doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-            `[Form VIII Chit Agreement — Page ${pageNo} of 8 / சீட்டு உடன்படிக்கை பக்கம் ${pageNo}]`,
+            `[Form VIII — Chit Agreement — Page ${pageNo} of 8]`,
             45,
             doc.y,
             { width: pageWidth, align: 'center' },
