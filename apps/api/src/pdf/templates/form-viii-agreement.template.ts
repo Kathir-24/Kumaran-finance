@@ -109,161 +109,148 @@ export class FormViiiAgreementTemplate {
         doc.font(regularFont).fontSize(10).text('(See Section 6 and Rule 13)', { align: 'center', width: pageWidth });
         doc.font(boldFont).fontSize(10.5).text('Form of Chit Agreement', { align: 'center', width: pageWidth });
         doc.font(regularFont).fontSize(9.5).text('(Articles of Agreement between the Foreman and the Subscribers)', { align: 'center', width: pageWidth });
-        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.8);
+        doc.moveDown(1.2);
 
         // General Particulars 1 to 5 (Gazette Page 58)
         doc.font(regularFont).fontSize(9.5);
-        doc.text('1. Office where the chit is registered: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+        if (isBlank) {
+          doc.text('1. Office where the chit is registered.', 45, doc.y);
+          doc.moveDown(0.7);
+          doc.text('2. Year and Registered No.                     Year              No', 45, doc.y);
+          doc.moveDown(0.7);
+          doc.text('3. Full name and address of foreman', 45, doc.y);
+          doc.moveDown(0.7);
+          doc.text('4. Occupation (if applicable)', 45, doc.y);
+          doc.moveDown(0.7);
+          doc.text('5. Age (if applicable)', 45, doc.y);
+          doc.moveDown(1.2);
+        } else {
+          doc.text('1. Office where the chit is registered. ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Office of the Registrar of Chits, Perundurai / Erode District');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.7);
-
-        doc.text('2. Year and Registered No.                     Year: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.7);
+          doc.text('2. Year and Registered No.                     Year: ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${regYear}`, { continued: true });
-          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('        No: ', { continued: true });
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(regNo);
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('  No: ', { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${regNo}`);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('                               No:');
-        }
-        doc.moveDown(0.7);
-
-        doc.text('3. Full name and address of foreman: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.7);
+          doc.text('3. Full name and address of foreman: ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${firmName}, ${officeAddress}`);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.7);
-
-        doc.text('4. Occupation (if applicable): ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.7);
+          doc.text('4. Occupation (if applicable): ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Financial Services & Chit Operations');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.7);
-
-        doc.text('5. Age (if applicable): ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.7);
+          doc.text('5. Age (if applicable): ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('48 Years (Managing Partner: P. Kumaran)');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
+          doc.moveDown(1.2);
         }
-        doc.moveDown(1.2);
 
         // Article I
         doc.font(boldFont).fontSize(10).text('I. Chit amount and No of tickets.');
         doc.font(regularFont).fontSize(9.5);
         doc.moveDown(0.4);
-        doc.text('1. No of tickets or fraction thereof        Full ', 45, doc.y, { continued: true });
-        if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`: ${data.totalTickets} Tickets`);
-          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+        if (isBlank) {
+          doc.text('1. No of tickets or fraction thereof        Full', 45, doc.y);
+          doc.text('    Held by each subscriber                  3/4', 45, doc.y);
+          doc.text('                                             1/2', 45, doc.y);
+          doc.text('                                             1/4', 45, doc.y);
+          doc.text('                                             1/8', 45, doc.y);
+          doc.moveDown(0.6);
+          doc.text('2. No. of installments and amount payable   No.                  Amount', 45, doc.y);
+          doc.text('    for each ticket at every installment        Rs.', 45, doc.y);
+          doc.moveDown(0.6);
+          doc.text('3. Chit amount                                    Rs.', 45, doc.y);
+          doc.moveDown(1.2);
         } else {
-          doc.text('');
-        }
-        doc.text('    Held by each subscriber                  3/4  : Nil', 45, doc.y);
-        doc.text('                                             1/2  : Nil', 45, doc.y);
-        doc.text('                                             1/4  : Nil', 45, doc.y);
-        doc.text('                                             1/8  : Nil', 45, doc.y);
-        doc.moveDown(0.6);
-
-        doc.text('2. No. of installments and amount payable   No. : ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.text('1. No of tickets or fraction thereof        Full : ', 45, doc.y, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${data.totalTickets} Tickets`);
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('    Held by each subscriber                  3/4  : ', 45, doc.y, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Nil');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('                                             1/2  : ', 45, doc.y, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Nil');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('                                             1/4  : ', 45, doc.y, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Nil');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('                                             1/8  : ', 45, doc.y, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Nil');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.moveDown(0.6);
+          doc.text('2. No. of installments and amount payable   No. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${data.durationMonths} Months`, { continued: true });
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('   Amount Rs. : ', { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(RupeeWordsHelper.formatWholeRupees(data.baseInstallment));
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('                 Amount Rs. :');
-        }
-        doc.text('    for each ticket at every installment', 45, doc.y);
-        doc.moveDown(0.6);
-
-        doc.text('3. Chit amount                                    Rs. : ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.text('    for each ticket at every installment', 45, doc.y);
+          doc.moveDown(0.6);
+          doc.text('3. Chit amount                                    Rs. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${RupeeWordsHelper.formatWholeRupees(data.chitValue)} (Rupees ${chitValueWords})`);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
+          doc.moveDown(1.2);
         }
-        doc.moveDown(1.2);
 
         // Article II
         doc.font(boldFont).fontSize(10).text('II. Duration of the chit');
         doc.font(regularFont).fontSize(9.5);
         doc.moveDown(0.4);
-        doc.text('1. Date of 1st installment: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+        if (isBlank) {
+          doc.text('1. Date of 1st installment.', 45, doc.y);
+          doc.moveDown(0.5);
+          doc.text('2. Dates of subsequent installments.', 45, doc.y);
+          doc.moveDown(0.5);
+          doc.text('3. Date of termination.', 45, doc.y);
+          doc.moveDown(0.5);
+          doc.text('4. Duration of the chit.                    Years             months', 45, doc.y);
+          doc.moveDown(1.2);
+        } else {
+          doc.text('1. Date of 1st installment. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('15/01/2026');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.5);
-        doc.text('2. Dates of subsequent installments: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.5);
+          doc.text('2. Dates of subsequent installments. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('15th of every consecutive calendar month');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.5);
-        doc.text('3. Date of termination: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.5);
+          doc.text('3. Date of termination. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('15/09/2027');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.5);
-        doc.text('4. Duration of the chit.                    Years : ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.5);
+          doc.text('4. Duration of the chit.                    Years : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('1 Year 8 Months', { continued: true });
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont).text('       months : ', { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(`${data.durationMonths} Months`);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('                 months :');
+          doc.moveDown(1.2);
         }
-        doc.moveDown(1.2);
 
         // Article III
         doc.font(boldFont).fontSize(10).text('III. The place, time and probable date when the chit is to be commenced.');
         doc.font(regularFont).fontSize(9.5);
         doc.moveDown(0.4);
-        doc.text('1. Place (give full particulars): ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+        if (isBlank) {
+          doc.text('1. Place (give full particulars)', 45, doc.y);
+          doc.moveDown(0.5);
+          doc.text('2. Probable date', 45, doc.y);
+          doc.moveDown(0.5);
+          doc.text('3. Time of commencement of the proceedings.', 45, doc.y);
+        } else {
+          doc.text('1. Place (give full particulars) : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(officeAddress);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.5);
-        doc.text('2. Probable date: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.5);
+          doc.text('2. Probable date : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('15/01/2026');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
-        }
-        doc.moveDown(0.5);
-        doc.text('3. Time of commencement of the proceedings: ', 45, doc.y, { continued: true });
-        if (!isBlank) {
+          doc.moveDown(0.5);
+          doc.text('3. Time of commencement of the proceedings. : ', 45, doc.y, { continued: true });
           doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('11:00 AM IST on scheduled draw date');
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        } else {
-          doc.text('');
         }
         addPageFooter(1);
 

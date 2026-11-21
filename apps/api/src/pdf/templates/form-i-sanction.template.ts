@@ -256,7 +256,7 @@ export class FormISanctionTemplate {
           },
           {
             item: '2',
-            label: 'Constitution i.e., whether incorporated as company / co-op. Society or registered / un- registered association of individuals / partnership / sole proprietorship (also specify the provision of the Act under which incorporated / registered along with the date of incorporation / registration.',
+            label: 'Constitution i.e., whether incorporated as company / co-op. Society or registered / un-registered association of individuals / partnership / sole proprietorship (also specify the provision of the Act under which incorporated / registered along with the date of incorporation / registration.',
             value: 'Partnership Firm registered under the Indian Partnership Act, 1932 (Firm Reg No: TN-ERD-PF-2018-042).',
           },
           {
@@ -303,23 +303,12 @@ export class FormISanctionTemplate {
               .text(p.value, col2X, itemStartY, { width: col2Width, lineGap: 2.5 });
             const col2EndY = doc.y;
             doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
-            doc.y = Math.max(col1EndY, col2EndY) + 12;
+            doc.y = Math.max(col1EndY, col2EndY) + 32;
           } else {
             // In blank mode, space out items down the page matching Gazette distribution
-            doc.y = col1EndY + 18;
+            doc.y = col1EndY + 32;
           }
         }
-
-        // Page 3 Footer / Continuation indicator
-        doc.y = 715;
-        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.4);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '[Annexure Continued on Page 4 / இணைப்பு விவரங்கள் தொடர்ச்சி பக்கம் 4-ல்]',
-          45,
-          doc.y,
-          { width: pageWidth, align: 'center' },
-        );
 
         // ================= PAGE 4: ANNEXURE STATEMENT OF PARTICULARS - PART 2 (GAZETTE PAGE 46) =================
         doc.addPage();

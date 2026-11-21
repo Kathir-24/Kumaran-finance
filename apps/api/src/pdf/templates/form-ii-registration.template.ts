@@ -87,80 +87,59 @@ export class FormIiRegistrationTemplate {
 
         // ================= PAGE 1: FORM II APPLICATION (GAZETTE PAGE 49) =================
         doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK);
-        doc.font(boldFont).fontSize(11.5).text('FORM – II', { align: 'center', width: pageWidth });
-        doc.font(regularFont).fontSize(9.5).text('(See Section 7 and Rule 5)', { align: 'center', width: pageWidth });
-        doc.moveDown(0.3);
-        doc.font(boldFont).fontSize(10).text('APPLICATION FOR REGISTRATION OF THE CHIT AGREEMENT', { align: 'center', width: pageWidth });
-        doc.moveTo(45, doc.y + 4).lineTo(550, doc.y + 4).lineWidth(1).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.8);
+        doc.y = 65;
+        doc.font(boldFont).fontSize(12).text('FORM – II', { align: 'center', width: pageWidth });
+        doc.font(regularFont).fontSize(10).text('(See Section 7 and Rule 5)', { align: 'center', width: pageWidth });
+        doc.moveDown(0.4);
+        doc.font(boldFont).fontSize(10.5).text('APPLICATION FOR REGISTRATION OF THE CHIT AGREEMENT', { align: 'center', width: pageWidth });
+        doc.moveDown(2.0);
 
-        // To block & Place/Date
-        const topY = doc.y;
-        doc.font(regularFont).fontSize(10).text('To', 45, topY);
-        doc.text('The Registrar of Chits,', 45, topY + 18);
-        doc.text('', 45, topY + 36, { continued: true });
+        // To block matching Gazette Page 49 (NO Place/Date on top right in Gazette!)
+        doc.font(regularFont).fontSize(10.5).text('To', 45, doc.y);
+        doc.text('The Registrar of Chits,', 45, doc.y + 18);
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________.');
 
-        doc.font(regularFont).fontSize(10).text('Place: ', 360, topY);
-        doc.text('', 395, topY, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai', '____________________');
-
-        doc.font(regularFont).fontSize(10).text('Date: ', 360, topY + 20);
-        doc.text('', 395, topY + 20, { continued: true });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : appDate, '____________________');
-
-        doc.y = Math.max(doc.y, topY + 62);
-        doc.font(regularFont).fontSize(10).text('Dear Sir,', 45, doc.y);
-        doc.moveDown(0.7);
+        doc.y = doc.y + 28;
+        doc.font(regularFont).fontSize(10.5).text('Dear Sir,', 45, doc.y);
+        doc.moveDown(1.5);
 
         // (a) matching Gazette Page 49
-        doc.font(regularFont).fontSize(10).text('(a) I ', 45, doc.y, { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' S/o Sri. ', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the foreman conducting chit under the name and style of * ', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________.', { lineGap: 6 });
-        doc.moveDown(0.7);
+        doc.font(regularFont).fontSize(10.5).text('(a) I ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' S/o Sri. ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the foreman conducting chit under the name and style of * ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : '____________________', '____________________.', { lineGap: 8.5 });
+        doc.moveDown(2.0);
 
         // (b) matching Gazette Page 49
-        doc.font(regularFont).fontSize(10).text('(b) We ', 45, doc.y, { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Chairman and Secretary respectively of the foreman conducting chit business under the name and style of * ', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' hereby apply for registration of the Chit Agreement.', { lineGap: 6 });
-        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(10.5).text('(b) We ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : managingPartner, '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' the Chairman and Secretary respectively of the foreman conducting chit business under the name and style of * ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : firmName, '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' at ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : officeAddress, '________________________________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' hereby apply for registration of the Chit Agreement.', { lineGap: 8.5 });
+        doc.moveDown(2.2);
 
         // (2)
-        doc.font(regularFont).fontSize(10).text('(2) The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the registration fees as required under the Act of Chit Funds Rules, 1984.', { lineGap: 6 });
-        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(10.5).text('(2) The Chit Agreement in duplicate is attached herewith together with a sum of Rs. ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(feeAmount), '__________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' being the registration fees as required under the Act of Chit Funds Rules, 1984.', { lineGap: 8.5 });
+        doc.moveDown(2.2);
 
         // (3)
-        doc.font(regularFont).fontSize(10).text('(3) The number of current chits which are running as on the date of this application is ', 45, doc.y, { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(runningCount), '__________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' and the aggregate chit amount of these chits involved therein is Rs. ', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 6 });
-        doc.moveDown(0.8);
+        doc.font(regularFont).fontSize(10.5).text('(3) The number of current chits which are running as on the date of this application is ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(runningCount), '__________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' and the aggregate chit amount of these chits involved therein is Rs. ', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : RupeeWordsHelper.formatWholeRupees(aggAmount), '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' which is within the limits specified in Section 13 of the Chit Funds Act, 1982 (Central Act No. 40 of 1982).', { lineGap: 8.5 });
+        doc.moveDown(2.2);
 
         // (4)
-        doc.font(regularFont).fontSize(10).text('(4) A certified true copy of the sanction obtained in Form IB under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed. A copy of the application dated the ', 45, doc.y, { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true, lineGap: 6 });
-        StatutoryFormHelper.renderStatic(doc, regularFont, ' together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.', { lineGap: 6 });
-
-        // Page 1 Footer / Continuation indicator
-        doc.y = 715;
-        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
-        doc.moveDown(0.4);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '[Form II Continued on Page 2 / படிவம் 2 தொடர்ச்சி பக்கம் 2-ல்]',
-          45,
-          doc.y,
-          { width: pageWidth, align: 'center' },
-        );
+        doc.font(regularFont).fontSize(10.5).text('(4) A certified true copy of the sanction obtained in Form IB under Section 4 of the above Act for commencement and conduct of the chit in question is enclosed. A copy of the application dated the ', 45, doc.y, { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : sancDate, '____________________', { continued: true, lineGap: 8.5 });
+        StatutoryFormHelper.renderStatic(doc, regularFont, ' together with its enclosures made to the State Government / authorized officer in this behalf is also enclosed for information and ready reference.', { lineGap: 8.5 });
 
         // ================= PAGE 2: FORM II DECLARATION & SIGNATURES (GAZETTE PAGE 50) =================
         doc.addPage();

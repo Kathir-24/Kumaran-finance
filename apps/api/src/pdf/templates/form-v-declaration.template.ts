@@ -91,28 +91,26 @@ export class FormVDeclarationTemplate {
 
         // Place & Date on right matching Gazette Page 55
         const topY = doc.y;
-        doc.font(regularFont).fontSize(10.5).text('Place: ', 360, topY);
-        if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Perundurai', 400, topY);
+        if (isBlank) {
+          doc.font(regularFont).fontSize(10.5).text('Place: ', 360, topY);
+          doc.text('Date: ', 360, topY + 20);
+        } else {
+          doc.font(regularFont).fontSize(10.5).text('Place: ', 360, topY, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Perundurai');
+          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
+          doc.text('Date: ', 360, topY + 20, { continued: true });
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(declDate);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
-        doc.font(regularFont).fontSize(10.5).text('Date: ', 360, topY + 22);
-        if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(declDate, 400, topY + 22);
-          doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
-        }
-
-        doc.y = topY;
-        doc.font(regularFont).fontSize(10.5).text('To', 50, topY);
-        doc.text('The Registrar of Chits,', 50, topY + 20);
-        doc.text('', 50, topY + 40, { continued: true });
-        // Gazette Page 55 Path 125: line under address
+        doc.y = topY + 44;
+        doc.font(regularFont).fontSize(10.5).text('To', 50, doc.y);
+        doc.text('The Registrar of Chits,', 50, doc.y + 16);
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : 'Perundurai / Erode District, Tamil Nadu.', '________________________________________');
 
-        doc.y = Math.max(doc.y, topY + 85);
+        doc.y = doc.y + 24;
         doc.font(regularFont).fontSize(11).text('Dear Sir,', 50, doc.y);
-        doc.moveDown(1.5);
+        doc.moveDown(1.2);
 
         // Paragraph 1 verbatim from Gazette Page 55 (has 3 underlines: dated the, amount of Rs, duration)
         doc.font(regularFont).fontSize(10.5).text('By your letter dated the ', 50, doc.y, { continued: true, lineGap: 7.5 });
@@ -123,7 +121,7 @@ export class FormVDeclarationTemplate {
         StatutoryFormHelper.renderStatic(doc, regularFont, 'and of a duration ', { continued: true, lineGap: 7.5 });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : String(data.durationMonths), '____________________', { continued: true, lineGap: 7.5 });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' months.', { lineGap: 7.5 });
-        doc.moveDown(2.0);
+        doc.moveDown(1.8);
 
         // Paragraph 2 verbatim from Gazette Page 55 (NO underlines)
         doc.font(regularFont).fontSize(10.5).text(
@@ -132,44 +130,41 @@ export class FormVDeclarationTemplate {
           doc.y,
           { align: 'justify', lineGap: 7.5 },
         );
-        doc.moveDown(2.0);
+        doc.moveDown(1.8);
 
         // Paragraph 3 verbatim from Gazette Page 55 (has 1 underline after Rs)
         doc.font(regularFont).fontSize(10.5).text('3. I / We remit herewith a sum of Rs ', 50, doc.y, { continued: true, lineGap: 7.5 });
         StatutoryFormHelper.renderField(doc, boldFont, isBlank ? '' : `${RupeeWordsHelper.formatWholeRupees(feeAmount)} (${feeWords} only)`, '____________________', { continued: true, lineGap: 7.5 });
         StatutoryFormHelper.renderStatic(doc, regularFont, ' (Rupees in words only) being the fees prescribed for the purpose of filing this declaration.', { lineGap: 7.5 });
-        doc.moveDown(3.5);
+        doc.moveDown(3.0);
 
         // Signatures matching Gazette Page 55 verbatim (NO underlines after Chairman / Secretary / Foreman!)
-        const sigY = Math.max(doc.y, 530);
+        const sigY = Math.max(doc.y, 490);
         doc.font(regularFont).fontSize(10.5).text('Yours faithfully,', 360, sigY);
-        doc.text('Chairman', 360, sigY + 30);
+        doc.text('Chairman', 360, sigY + 24);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 48);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(managingPartner, 360, sigY + 38);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
-        doc.text('Secretary', 360, sigY + 70);
+        doc.text('Secretary', 360, sigY + 54);
         if (!isBlank) {
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 88);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text('Partner / Authorised Signatory', 360, sigY + 68);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
-        doc.y = sigY + 115;
-        doc.font(regularFont).fontSize(10.5).text('for and on behalf of (Foreman)', 50, doc.y);
+        doc.text('for and on behalf of (Foreman)', 360, sigY + 92);
         if (!isBlank) {
-          doc.moveDown(0.2);
-          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 50, doc.y);
+          doc.fillColor(StatutoryFormHelper.DATA_BLUE).font(boldFont).text(firmName, 360, sigY + 108);
           doc.fillColor(StatutoryFormHelper.TEMPLATE_BLACK).font(regularFont);
         }
 
         // Footnote matching Gazette Page 55 verbatim
         doc.y = 705;
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
+        doc.moveTo(45, doc.y).lineTo(550, doc.y).lineWidth(0.5).strokeColor(StatutoryFormHelper.TEMPLATE_BLACK).stroke();
         doc.moveDown(0.5);
-        doc.font(regularFont).fontSize(8).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
-          '----------------------------------------------------------------------------------------------------------------\n' +
+        doc.font(regularFont).fontSize(8.5).fillColor(StatutoryFormHelper.TEMPLATE_BLACK).text(
           'Strike out or delete whatever is not applicable insert such designation(s) as may be appropriate to the applicant.',
-          50,
+          45,
           doc.y,
           { width: pageWidth, lineGap: 2 },
         );
